@@ -9,5 +9,5 @@ function exportFrom1() {
 
 module.exports = { fun1: exportFrom1 };
 
-eee.dsds = 11
+// eee.dsds = 11
 

@@ -26,29 +26,39 @@ void JsPrint(const v8::FunctionCallbackInfo<v8::Value> &args) {
 //void withScriptEnv(std::function<void(v8::Isolate*,))
 
 void JsLoadRequired(const v8::FunctionCallbackInfo<v8::Value> &args) {
-    v8::Isolate *isolate = args.GetIsolate();
-    v8::HandleScope handle_scope(isolate);
+    Scripter::inContext(args, [&](auto se, auto isolate, auto context) {
+        v8::Local<v8::Array> result = v8::Array::New(isolate);
+        v8::String::Utf8Value v8str(isolate, args[0]);
 
-    auto ext = isolate->GetEnteredContext()->GetEmbedderData(1);
-    v8::Local<v8::External> wrap = v8::Local<v8::External>::Cast(ext);
-    ScriptEnvironment *se = static_cast<ScriptEnvironment *>(wrap->Value());
+        string sourceName = *v8::String::Utf8Value(isolate, args[0]);
+        string name = se->resolveRequiredFile(sourceName);
 
-    v8::Local<v8::Array> result = v8::Array::New(isolate);
+        // If it is empty we just return empty array
+        if (!name.empty()) {
+            result->Set(result->Length(), v8::String::NewFromUtf8(isolate, name.c_str()));
+            result->Set(result->Length(), v8::String::NewFromUtf8(isolate, loadAsString(name).c_str()));
+        }
+        args.GetReturnValue().Set(result);
+    });
+}
 
-    v8::String::Utf8Value v8str(isolate, args[0]);
+void JsTimer(const v8::FunctionCallbackInfo<v8::Value> &args) {
+    cout << "TIMER CB CALLED!" << endl;
+}
 
-    string sourceName = *v8::String::Utf8Value(isolate, args[0]);
-    string name = se->resolveRequiredFile(sourceName);
-
-    // If it is empty we just return empty array
-    if (!name.empty()) {
-//        auto resultV8Str =
-//                v8::String::NewFromUtf8(isolate, loadAsString(name).c_str(), v8::NewStringType::kNormal)
-//                        .ToLocalChecked();
-        result->Set(result->Length(), v8::String::NewFromUtf8(isolate, name.c_str()) );
-        result->Set(result->Length(), v8::String::NewFromUtf8(isolate, loadAsString(name).c_str()) );
-    }
-    args.GetReturnValue().Set(result);
+void JsInitTimers(const v8::FunctionCallbackInfo<v8::Value> &args) {
+    Scripter::inContext(args, [&](auto se, auto isolate, auto context) {
+        cout << "CALLED TIMERS INIT" << endl;
+        if (se->timersReady()) {
+            cerr << "SR timers already initialized" << endl;
+        } else {
+            // timer process should be initialized and function returned
+            se->initTimer();
+            args.GetReturnValue().Set(
+                    v8::Local(v8::Function::New(isolate, JsTimer))
+            );
+        }
+    });
 }
 
 

@@ -4,6 +4,7 @@ const console = {
     error: __bios_print
 };
 
+console.log("Initializing isolate, full mode");
 
 const require = (function() {
     const modules = {};
@@ -35,13 +36,14 @@ const require = (function() {
     }
 })();
 
-console.log("Initializing isolate, full mode");
+timers = require('timers.js')
 
-require("test_require_1.js");
-tr1 = require("test_require_1.js");
+
+// require("test_require_1.js");
+// tr1 = require("test_require_1.js");
 // require("mod2");
 
-tr1.fun1()
+// tr1.fun1()
 
 
 'hello' + ', ' + 'world'
