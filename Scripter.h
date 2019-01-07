@@ -10,6 +10,7 @@
 #include <v8.h>
 
 #include "Logging.h"
+#include "AsyncSleep.h"
 
 using namespace std;
 
@@ -35,7 +36,7 @@ public:
 
     static void inContext(
             const v8::FunctionCallbackInfo<v8::Value> &args,
-            const std::function<void(shared_ptr<Scripter>, v8::Isolate*, const v8::Local<v8::Context>&)> &block
+            const std::function<void(shared_ptr<Scripter>, v8::Isolate *, const v8::Local<v8::Context> &)> &block
     );
 
     std::string resolveRequiredFile(const std::string &filName);
@@ -43,7 +44,7 @@ public:
     virtual ~Scripter();
 
     void initTimer() {
-        if(!_timersReady ) {
+        if (!_timersReady) {
             _timersReady = true;
         }
     }
@@ -52,12 +53,22 @@ public:
 
 private:
 
-    // is set by initialize(), not by the constructor
+    // is set by initialize(), not by the constructor. We need this copy to wrap into v8 context data field.
     weak_ptr<Scripter> weakThis;
+
     // prevent double initialize() call - it is dangerous
     bool initialized = false;
+
+    // we should not put this code in the constructor as it uses shared_from_this()
     void initialize();
 
+    // Sleep timer is in exclusive use of this function:
+    friend void JsTimer(const v8::FunctionCallbackInfo<v8::Value> &args);
+
+    // used to implement JS timers.
+    AsyncSleep asyncSleep;
+
+    // prevent attack on system timer double initialization
     bool _timersReady = false;
 
     std::string root;

@@ -43,7 +43,14 @@ void JsLoadRequired(const v8::FunctionCallbackInfo<v8::Value> &args) {
 }
 
 void JsTimer(const v8::FunctionCallbackInfo<v8::Value> &args) {
-    cout << "TIMER CB CALLED!" << endl;
+    Scripter::inContext(args, [&](auto se, auto isolate, auto context) {
+        se->log("TIMER CB CALLED!");
+        // resetTimer( millis, callback)
+        long millis = args[0].As<v8::Integer>()->Value();
+        se->asyncSleep.delay(millis, [se]() {
+            se->log("--------------------------> CALLBACK!!!");
+        });
+    });
 }
 
 void JsInitTimers(const v8::FunctionCallbackInfo<v8::Value> &args) {

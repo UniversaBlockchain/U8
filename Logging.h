@@ -33,7 +33,7 @@ public:
     template<typename ...Ts>
     void put_log(int level, const Ts &... args) {
         if (level >= min_log_level) {
-            std::ostream* os = level < ERROR ? out : err;
+            std::ostream *os = level < ERROR ? out : err;
             *os << name() << ": ";
             put(os, sizeof...(args), args...);
         }
@@ -60,19 +60,6 @@ public:
     };
 
 protected:
-    template<typename T, typename ...Ts>
-    void put(std::ostream* out,int count, T first, Ts... rest) {
-        *out << first;
-        if (count-- > 1)
-            *out << ' ';
-        put(out, count, rest...);
-    }
-
-    void put(std::ostream* out, int count) {
-        *out << std::endl;
-    }
-
-
     const std::string id_str;
 
     static int min_log_level;
@@ -80,13 +67,31 @@ protected:
     static std::ostream *err;
 
 private:
+
+    // Hack: I know no way to iterate over different-type varargs, so I do recursion...
+    template<typename T, typename ...Ts>
+    void put(std::ostream *out, int count, T first, Ts... rest) {
+        *out << first;
+        if (count-- > 1)
+            *out << ' ';
+        put(out, count, rest...);
+    }
+
+    void put(std::ostream *out, int count) {
+        *out << std::endl;
+    }
+    // End of hack.
+
     // Following is just a static contructor for logging
-    struct constructor { constructor() {
+    struct constructor {
+        constructor() {
             min_log_level = Logging::DEBUG;
             out = &std::cout;
             err = &std::cerr;
 
-        } };
+        }
+    };
+
     static constructor constr;
     // end constructor hack
 };

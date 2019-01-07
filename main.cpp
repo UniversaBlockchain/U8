@@ -1,6 +1,7 @@
 #include <iostream>
 #include <stdlib.h>
 #include <string.h>
+#include <thread>
 
 #include <v8.h>
 #include <libplatform/libplatform.h>
@@ -56,6 +57,7 @@ int main(int argc, char **argv) {
                     printf("%s\n", *utf8);
                 }
             }
+            std::this_thread::sleep_for(1s);
         });
         // Dispose the isolate and tear down V8.
     }
