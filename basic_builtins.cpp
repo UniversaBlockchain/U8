@@ -48,9 +48,9 @@ void JsTimer(const v8::FunctionCallbackInfo<v8::Value> &args) {
 
 void JsInitTimers(const v8::FunctionCallbackInfo<v8::Value> &args) {
     Scripter::inContext(args, [&](auto se, auto isolate, auto context) {
-        cout << "CALLED TIMERS INIT" << endl;
+        se->log("CALLED TIMERS INIT");
         if (se->timersReady()) {
-            cerr << "SR timers already initialized" << endl;
+            se->log_e("SR timers already initialized");
         } else {
             // timer process should be initialized and function returned
             se->initTimer();

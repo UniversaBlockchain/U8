@@ -8,7 +8,7 @@ set(CMAKE_CXX_STANDARD 17)
 set(v8_root /usr/local)
 
 
-add_executable(u8 main.cpp Scripter.cpp Scripter.h tools.h basic_builtins.cpp basic_builtins.h tools.cpp)
+add_executable(u8 main.cpp Scripter.cpp Scripter.h tools.h basic_builtins.cpp basic_builtins.h tools.cpp AsyncSleep.cpp AsyncSleep.h Logging.cpp Logging.h)
 
 set(libtype .dylib)
 

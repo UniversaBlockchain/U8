@@ -9,7 +9,7 @@
 #include "tools.h"
 #include "basic_builtins.h"
 
-static const char* ARGV0 = 0;
+static const char* ARGV0 = nullptr;
 
 shared_ptr<Scripter> Scripter::New(const char* script, const char* argv0) {
     if( argv0 ) ARGV0 = argv0;
@@ -21,18 +21,14 @@ shared_ptr<Scripter> Scripter::New(const char* script, const char* argv0) {
 }
 
 
-Scripter::Scripter(const char *argv) {
+Scripter::Scripter(const char *argv) : Logging("SCR") {
     std::string s = argv;
     root = s.substr(0, s.rfind('/'));
     const char *h = std::getenv("HOME");
     home = h ? h : ".";
     require_roots.push_back(root + "/jslib");
     require_roots.push_back(root);
-    require_roots.push_back(".");
-
-
-    // Create a new context.
-//    v8::Local<v8::Context> context = v8::Context::New(pIsolate, NULL, global);
+    require_roots.emplace_back(".");
 }
 
 struct SharedScripter {
@@ -72,10 +68,10 @@ void Scripter::initialize() {
                     .ToLocalChecked(),
             v8::FunctionTemplate::New(pIsolate, JsInitTimers));
 
-    context.Reset(pIsolate, v8::Context::New(pIsolate, NULL, global));
+    context.Reset(pIsolate, v8::Context::New(pIsolate, nullptr, global));
     weakThis = shared_from_this();
     context.Get(pIsolate)->SetEmbedderData(1, v8::External::New(pIsolate, &weakThis));
-    cout << "SR ready " << this << endl;
+    log("ready");
 }
 
 std::string Scripter::expandPath(const std::string &path) {
@@ -91,7 +87,7 @@ std::string Scripter::resolveRequiredFile(const std::string& fileName) {
         return fileName;
     } else {
         // yes, we should try...
-        for (string r: require_roots) {
+        for (const string& r: require_roots) {
             string fn = r + path_separator + fileName;
             if (file_exists(fn)) {
                 return fn;
@@ -111,22 +107,14 @@ std::string Scripter::loadFileAsString(const std::string &fileName) {
 }
 
 Scripter::~Scripter() {
-    cout << "destructing SR" << endl;
-//    auto ext = pIsolate->GetEnteredContext()->GetEmbedderData(1);
-//    cout << "1 ";
-//    v8::Local<v8::External> wrap = v8::Local<v8::External>::Cast(ext);
-//    cout << "2 ";
-//    auto weak = static_cast<weak_ptr<Scripter> *>(wrap->Value());
-//    cout << "destructing SR weak" << weak << endl;
-//    delete weak;
-//    cout << "associated weak_ptr to SR is freed" << endl;
+    log("destructing SR");
     pIsolate->Dispose();
     delete create_params.array_buffer_allocator;
 }
 
 void Scripter::inContext(
         const v8::FunctionCallbackInfo<v8::Value> &args,
-        std::function<void(shared_ptr<Scripter>, v8::Isolate *, const v8::Local<v8::Context>&)> block
+        const std::function<void(shared_ptr<Scripter>, v8::Isolate *, const v8::Local<v8::Context>&)>& block
 ) {
     v8::Isolate *isolate = args.GetIsolate();
     v8::HandleScope handle_scope(isolate);

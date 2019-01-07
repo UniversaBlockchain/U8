@@ -17,11 +17,11 @@ const require = (function() {
         }
         else {
             // console.log(`require: ${moduleName}: LOAD`);
-            let [name, src] = __bios_loadRequired(moduleName)
+            let [name, src] = __bios_loadRequired(moduleName);
             // console.log("full name: "+name);
             // console.log("src: \n"+src);
             try {
-                const module = { exports: {} }
+                const module = { exports: {} };
                 let fn = Function( "module", src+ "\n//# sourceURL="+name+"\n");
                 fn(module);
                 // console.log("Very good we got the result: " + result);
@@ -36,7 +36,7 @@ const require = (function() {
     }
 })();
 
-timers = require('timers.js')
+timers = require('timers.js');
 
 
 // require("test_require_1.js");
@@ -44,6 +44,5 @@ timers = require('timers.js')
 // require("mod2");
 
 // tr1.fun1()
-
 
 'hello' + ', ' + 'world'

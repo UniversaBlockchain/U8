@@ -9,12 +9,14 @@
 #include <vector>
 #include <v8.h>
 
+#include "Logging.h"
+
 using namespace std;
 
-class Scripter : public std::enable_shared_from_this<Scripter> {
+class Scripter : public std::enable_shared_from_this<Scripter>, public Logging {
 public:
 
-    static shared_ptr<Scripter> New(const char *scriptToExecute = 0, const char *argv0 = 0);
+    static shared_ptr<Scripter> New(const char *scriptToExecute = nullptr, const char *argv0 = nullptr);
 
     std::string expandPath(const std::string &path);
 
@@ -24,7 +26,7 @@ public:
 
 //    v8::Local<v8::Context> getContext() { return context.Get(pIsolate); }
 
-    void inContext(std::function<void(const v8::Local<v8::Context> &)> block) {
+    void inContext(const std::function<void(const v8::Local<v8::Context> &)> &block) {
         v8::HandleScope handle_scope(pIsolate);
         auto cxt = context.Get(pIsolate);
         v8::Context::Scope context_scope(cxt);
@@ -33,7 +35,7 @@ public:
 
     static void inContext(
             const v8::FunctionCallbackInfo<v8::Value> &args,
-            std::function<void(shared_ptr<Scripter>, v8::Isolate*, const v8::Local<v8::Context>&)> block
+            const std::function<void(shared_ptr<Scripter>, v8::Isolate*, const v8::Local<v8::Context>&)> &block
     );
 
     std::string resolveRequiredFile(const std::string &filName);
