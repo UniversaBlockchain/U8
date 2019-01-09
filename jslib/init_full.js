@@ -15,26 +15,23 @@ const require = (function () {
             // console.log(`require ${moduleName}: HIT`);
             return m;
         } else {
-            // console.log(`require: ${moduleName}: LOAD`);
+            if( !/\.[mc]?js$/.test(moduleName) )
+                moduleName += ".js";
             let [name, src] = __bios_loadRequired(moduleName);
-            // console.log("full name: "+name);
-            // console.log("src: \n"+src);
             try {
-                const module = {exports: {}};
-                eval("(function(module){" + src + "})(module);\n//# sourceURL=" + name + "\n");
+                let module = {exports: {}};
+                eval("(function(module){let exports=module.exports;" + src + "})(module);\n//# sourceURL=" + name + "\n");
                 modules[moduleName] = module.exports;
-                return module;
+                return module.exports;
             } catch (e) {
-                console.log("Error: " + e);
-                console.log(e.stack);
-                return undefined;
+                console.error(e.stack);
+                throw e;
             }
         }
     }
 })();
 
 timers = require('timers.js');
-
 
 // require("test_require_1.js");
 // tr1 = require("test_require_1.js");

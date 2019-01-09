@@ -16,13 +16,13 @@ set(libtype .dylib)
 target_include_directories(u8 PUBLIC ${v8_root}/include)
 
 #
-# Copy script library to executable location
+# do not Copy script library to executable location - we'll find its location
 #
-file(GLOB files "jslib/*.js")
-foreach (file ${files})
-    get_filename_component(fn ${file} NAME)
-    configure_file(jslib/${fn} jslib/${fn} COPYONLY)
-endforeach (file)
+#file(GLOB files "jslib/*.js")
+#foreach (file ${files})
+#    get_filename_component(fn ${file} NAME)
+#    configure_file(jslib/${fn} jslib/${fn} COPYONLY)
+#endforeach (file)
 
 foreach (l v8 v8_libplatform v8_libbase)
     add_library(${l} SHARED IMPORTED GLOBAL)

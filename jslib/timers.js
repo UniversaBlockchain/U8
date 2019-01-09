@@ -1,4 +1,3 @@
-
 // This file should be used as U8 CJS module, e.g. evaluated only once then cached.
 // It could be 'required' any number of times afterwards.
 
@@ -7,10 +6,13 @@
 let timerHandler = __bios_initTimers();
 
 
+const {SortedArray} = {...require("sorted")};
+// import SortedArray from "sorted")};
+const {arraysEqual} = {...require("tools")};
+
 class TimeoutEntry {
 
 }
-
 
 
 const myCallback = () => {
@@ -18,23 +20,9 @@ const myCallback = () => {
 }
 
 async function badWait(millis) {
-    return  new Promise( function(resolve, reject) {
+    return new Promise(function (resolve, reject) {
         timerHandler(millis, resolve);
     });
-}
-
-if( timerHandler )
-    console.log("Already initialized!");
-else {
-    console.log("Starting timers initialization")
-    timerHandler =
-    console.log("Timers proc: "+timerHandler);
-
-    // timerHandler(500, () => {
-    //     console.log("? called me");
-    // });
-    // timerHandler2 = __bios_initTimers();
-    // console.log("Timers proc: "+timerHandler2);
 }
 
 test();
@@ -45,7 +33,12 @@ async function test() {
     console.log("---------------- after await");
 }
 
-let sorted = require("sorted.js");
+
+let s = new SortedArray([7, 6, 5]);
+console.log("imported: " + s.toArray());
+if (!arraysEqual(s.toArray(), [5, 6, 7])) {
+    throw Error("bad sorted array");
+}
 
 // test();
 
