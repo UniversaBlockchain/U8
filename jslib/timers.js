@@ -6,9 +6,9 @@
 let timerHandler = __bios_initTimers();
 
 
-const {SortedArray} = {...require("sorted")};
-// import SortedArray from "sorted")};
+// const {SortedArray} = {...require("sorted")};
 const {arraysEqual} = {...require("tools")};
+import { SortedArray, binarySearch } from 'sorted'
 
 class TimeoutEntry {
 

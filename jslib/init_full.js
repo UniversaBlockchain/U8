@@ -18,6 +18,12 @@ const require = (function () {
             if( !/\.[mc]?js$/.test(moduleName) )
                 moduleName += ".js";
             let [name, src] = __bios_loadRequired(moduleName);
+
+            // limited support for import keyword
+            src = src.replace(/^import\s+{(.*)}\s+from (.*);?$/m, "let {$1} = {...require($2)};");
+
+            // console.log( "---", src, "^^^");
+
             try {
                 let module = {exports: {}};
                 eval("(function(module){let exports=module.exports;" + src + "})(module);\n//# sourceURL=" + name + "\n");
