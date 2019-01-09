@@ -20,7 +20,7 @@ const require = (function () {
             let [name, src] = __bios_loadRequired(moduleName);
 
             // limited support for import keyword
-            src = src.replace(/^import\s+{(.*)}\s+from (.*);?$/m, "let {$1} = {...require($2)};");
+            src = src.replace(/^import\s+{(.*)}\s+from\s+(.*['"]);?$/mg, "let {$1} = {...require($2)};");
 
             // console.log( "---", src, "^^^");
 
