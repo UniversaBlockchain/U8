@@ -22,6 +22,7 @@ int main(int argc, char **argv) {
     // Create a new Isolate and make it the current one.
     {
         shared_ptr<Scripter> se = Scripter::New(0, argv[0]);
+        v8::Locker locker(se->isolate());
         // Enter the context for compiling and running the hello world script.
 
 //            v8::HandleScope handle_scope(se.isolate());
@@ -31,7 +32,7 @@ int main(int argc, char **argv) {
         se->inContext([&](auto context) {
             // Create a string containing the JavaScript source code.
             auto src = se->loadFileAsString("init_full.js");
-            src = src + "\n//# sourceURL="+"jslib/init_full.js\n";
+            src = src + "\n//# sourceURL=" + "jslib/init_full.js\n";
             v8::Local<v8::String> source =
                     v8::String::NewFromUtf8(se->isolate(), src.c_str(),
                                             v8::NewStringType::kNormal)
@@ -57,11 +58,12 @@ int main(int argc, char **argv) {
                     printf("%s\n", *utf8);
                 }
             }
-            std::this_thread::sleep_for(1s);
         });
         // Dispose the isolate and tear down V8.
     }
-    cout << "se should be already recycled"<< endl;
+    // we put it here to unlock v8 context before sleep
+    std::this_thread::sleep_for(2s);
+    cout << "se should be already recycled" << endl;
 
     v8::V8::Dispose();
     v8::V8::ShutdownPlatform();

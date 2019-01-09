@@ -34,7 +34,17 @@ public:
         block(cxt);
     }
 
-    static void inContext(
+    void lockedContext(const std::function<void(const v8::Local<v8::Context> &)> &block) {
+        v8::Locker locker(pIsolate);
+        v8::HandleScope handle_scope(pIsolate);
+        auto cxt = context.Get(pIsolate);
+//        cxt->Enter();
+        v8::Context::Scope context_scope(cxt);
+        block(cxt);
+//        cxt->Exit();
+    }
+
+    static void unwrap (
             const v8::FunctionCallbackInfo<v8::Value> &args,
             const std::function<void(shared_ptr<Scripter>, v8::Isolate *, const v8::Local<v8::Context> &)> &block
     );

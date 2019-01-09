@@ -78,7 +78,7 @@ private:
     }
 
     void put(std::ostream *out, int count) {
-        *out << std::endl;
+        *out << std::endl << std::flush;
     }
     // End of hack.
 

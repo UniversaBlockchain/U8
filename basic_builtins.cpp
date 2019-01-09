@@ -26,7 +26,7 @@ void JsPrint(const v8::FunctionCallbackInfo<v8::Value> &args) {
 //void withScriptEnv(std::function<void(v8::Isolate*,))
 
 void JsLoadRequired(const v8::FunctionCallbackInfo<v8::Value> &args) {
-    Scripter::inContext(args, [&](auto se, auto isolate, auto context) {
+    Scripter::unwrap(args, [&](auto se, auto isolate, auto context) {
         v8::Local<v8::Array> result = v8::Array::New(isolate);
         v8::String::Utf8Value v8str(isolate, args[0]);
 
@@ -43,18 +43,28 @@ void JsLoadRequired(const v8::FunctionCallbackInfo<v8::Value> &args) {
 }
 
 void JsTimer(const v8::FunctionCallbackInfo<v8::Value> &args) {
-    Scripter::inContext(args, [&](auto se, auto isolate, auto context) {
-        se->log("TIMER CB CALLED!");
+    Scripter::unwrap(args, [&](auto se, auto isolate, auto context) {
         // resetTimer( millis, callback)
         long millis = args[0].As<v8::Integer>()->Value();
-        se->asyncSleep.delay(millis, [se]() {
-            se->log("--------------------------> CALLBACK!!!");
+        // callback function must persist context change, so we need a persistent handle
+        auto jsCallback = new v8::Persistent<v8::Function>(isolate, args[1].As<v8::Function>());
+        se->asyncSleep.delay(millis, [=]() {
+            // We need to re-enter in context as we are in another thread and stack, and as we do
+            // it from another thread, we MUST use lockedContext:
+            se->lockedContext([=](auto context) {
+                // get the local hadnle to function from persistent handle
+                auto fn = jsCallback->Get(context->GetIsolate());
+                // call it using the function as the this context:
+                fn->Call(fn, 0, nullptr);
+                // now we must free the persistent handle as it is single operation
+                jsCallback->Reset();
+            });
         });
     });
 }
 
 void JsInitTimers(const v8::FunctionCallbackInfo<v8::Value> &args) {
-    Scripter::inContext(args, [&](auto se, auto isolate, auto context) {
+    Scripter::unwrap(args, [&](auto se, auto isolate, auto context) {
         se->log("CALLED TIMERS INIT");
         if (se->timersReady()) {
             se->log_e("SR timers already initialized");
