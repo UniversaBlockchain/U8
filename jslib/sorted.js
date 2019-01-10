@@ -56,7 +56,7 @@ class SortedArray {
      * @returns {T|undefined}
      */
     get last() {
-        return this.data.slice(-1);
+        return this.data.slice(-1)[0];
     }
 
     /**
@@ -66,6 +66,19 @@ class SortedArray {
     add(newItem) {
         this.data.push(newItem);
         this.data.sort(this.comparator);
+    }
+
+    /**
+     * map all contained items, much like Array.map, and return results as Array.
+     * @param callback to apply to each element.
+     * @returns {any[]}
+     */
+    map(callback) {
+        return this.data.map(callback);
+    }
+
+    forEach(callback) {
+        this.data.forEach(callback);
     }
 
     /**
@@ -85,7 +98,6 @@ class SortedArray {
      */
     remove(item) {
         let index = this.data.indexOf(item);
-        console.log("---" + index);
         if (index >= 0) {
             this.data.splice(index, 1);
             return true;

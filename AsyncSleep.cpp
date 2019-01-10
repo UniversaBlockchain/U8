@@ -21,20 +21,24 @@ AsyncSleep::~AsyncSleep() {
 AsyncSleep::AsyncSleep() : skip(true), callback(0), delay_millis(TOO_LONG), Logging("ASLP") {
     worker = thread([this]() {
         log("entering");
-        unique_lock<std::mutex> lock(mx);
         while (!shutdown) {
-            cv.wait_for(lock, chrono::milliseconds(delay_millis));
-            put_log(100, "activate, skip:", skip);
-            if (!skip) {
-                // fire
-                callback();
-                // prevent repeat
-                delay_millis = TOO_LONG;
-                // free any resources
-                callback = empty_block;
-            }
-            else
+            decltype(callback) cb;
+            {
+                unique_lock<std::mutex> lock(mx);
                 skip = false;
+                cv.wait_for(lock, chrono::milliseconds(delay_millis));
+                if( skip || shutdown) {
+                    // just re-run loop
+                    continue;
+                }
+                else {
+                    // no repeat, and release block resources
+                    delay_millis = TOO_LONG;
+                    cb = callback;
+                    callback = empty_block;
+                }
+            }
+            cb();
         }
         log("exiting");
     });
@@ -45,6 +49,6 @@ void AsyncSleep::delay(long millis, const function<void()>& new_callback) {
     skip = true;
     delay_millis = millis;
     callback = new_callback;
-    cv.notify_all();
+    cv.notify_one();
 }
 

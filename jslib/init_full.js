@@ -23,26 +23,33 @@ const require = (function () {
             src = src.replace(/^import\s+{(.*)}\s+from\s+(.*['"]);?$/mg, "let {$1} = {...require($2)};");
 
             // console.log( "---", src, "^^^");
-
             try {
                 let module = {exports: {}};
                 eval("(function(module){let exports=module.exports;" + src + "})(module);\n//# sourceURL=" + name + "\n");
                 modules[moduleName] = module.exports;
                 return module.exports;
             } catch (e) {
+                // var err = e.constructor(`in ${moduleName}: ${e.message}`);
+                // +3 because `err` has the line number of the `eval` line plus two.
+                // err.lineNumber = e.lineNumber - err.lineNumber + 3;
+                console.error(`${name}:1 ${e}`);
                 console.error(e.stack);
+                // throw e;
                 throw e;
             }
         }
     }
 })();
 
-timers = require('timers.js');
+const {sleep, timeout, setTimeout, clearTimeout} = {...require('timers')};
 
-// require("test_require_1.js");
-// tr1 = require("test_require_1.js");
-// require("mod2");
+async function test() {
+    await sleep(2370);
+    console.log("test1!");
+}
 
-// tr1.fun1()
-
+test();
+setTimeout(() => console.log("setTimeout: OK"), 3300);
+let tt = setTimeout(()=>console.log("BAD!"), 300);
+clearTimeout(tt);
 'hello' + ', ' + 'world'
