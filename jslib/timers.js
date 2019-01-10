@@ -12,6 +12,9 @@ import {SortedArray} from 'sorted';
 
 let entries = new SortedArray([], (a, b) => b.fireAt - a.fireAt);
 
+class TimeoutError extends Error {
+}
+
 /**
  * Timer queue entry. Use {timeout()} to create one.
  */
@@ -22,16 +25,18 @@ class TimeoutEntry {
      * @param callback to fire on timeout
      * @param repeat now is always false and ignored
      */
-    constructor(millis, callback, repeat = false) {
+    constructor(millis, callback, reject = undefined, repeat = false) {
         this.fireAt = new Date().getTime() + millis;
         this.callback = callback;
         this.repeat = repeat;
+        this.reject = reject;
         registerTimeoutEntry(this);
     }
 
     cancel() {
         entries.remove(this);
         resetCallback();
+        if (this.reject) this.reject(new TimeoutError("timeout cancelled"));
     }
 
     toString() {
@@ -97,9 +102,8 @@ function registerTimeoutEntry(entry) {
  * @param callback to fire
  * @returns {TimeoutEntry} that can be used to cancel timout (use entry.cancel())
  */
-function timeout(millis, callback) {
-    let t = new TimeoutEntry(millis, callback);
-    return t;
+function timeout(millis, callback, reject) {
+    return new TimeoutEntry(millis, callback, reject);
 }
 
 timeout(3000, () => console.log("t3"));
@@ -107,15 +111,20 @@ timeout(1000, () => console.log("t1"));
 timeout(2000, () => console.log("t2"));
 
 /**
- * create Promise that resolves after specified time (async sleep). Important. If a corresponding
- * TimeoutEntry will be comehow cancelled, the Promise will not be rejected but will bever resovled.
- * This is a bad design and we might change it in future.
+ * create Promise that resolves after specified time (async sleep). The returned Promise has
+ * {cancel()} method that rejects the promise and cancels associated TimeoutEntry. The rejection
+ * uses {TimeoutError} error object.
  *
  * @param millis to resolve
  * @returns {Promise<void>} that resolves after millis
  */
 function sleep(millis) {
-    return new Promise((resolve, reject) => timeout(millis, resolve));
+    let entry;
+    let pr = new Promise((resolve, reject) => {
+        entry = timeout(millis, resolve, reject)
+    });
+    pr.cancel = () => entry.cancel();
+    return pr;
 }
 
 /**

@@ -48,7 +48,20 @@ async function test() {
     console.log("test1!");
 }
 
+async function test2() {
+    let pr = sleep(1370);
+    timeout(900, () => pr.cancel() );
+    try {
+        await pr;
+        console.log("test2 failed!");
+    }
+    catch(e) {
+        console.log("test2ok: "+e);
+    }
+}
+
 test();
+test2();
 setTimeout(() => console.log("setTimeout: OK"), 3300);
 let tt = setTimeout(()=>console.log("BAD!"), 300);
 clearTimeout(tt);
