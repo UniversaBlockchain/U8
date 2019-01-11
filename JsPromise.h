@@ -6,6 +6,7 @@
 #define U8_JSPROMISE_H
 
 #include <string>
+#include <vector>
 /**
  * The base class for async JS-initiated C++ library functinos, sucj as encryption/decryption, signging/signature
  * checking, file IO and so on, everything than can and therefore _must_ be executed in the separated thread

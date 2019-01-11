@@ -38,7 +38,8 @@ AsyncSleep::AsyncSleep() : skip(true), callback(0), delay_millis(TOO_LONG), Logg
                     callback = empty_block;
                 }
             }
-            cb();
+            if (cb)
+                cb();
         }
         log("exiting");
     });
