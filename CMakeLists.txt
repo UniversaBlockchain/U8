@@ -21,7 +21,7 @@ endif ()
 add_executable(u8 main.cpp Scripter.cpp Scripter.h tools.h basic_builtins.cpp basic_builtins.h tools.cpp AsyncSleep.cpp
         AsyncSleep.h Logging.cpp Logging.h JsPromise.cpp JsPromise.h)
 
-message("platfor: ${platform}")
+message("platform: ${platform}")
 
 # Macos brew configuration
 if (${platform} STREQUAL macos_brew)
@@ -39,7 +39,7 @@ elseif (${platform} STREQUAL linux_v8)
     add_custom_command(OUTPUT ../download_libs.stamp WORKING_DIRECTORY .. COMMAND sh download_libs.sh linux > download_libs.stamp)
     add_custom_target(u8libs ALL DEPENDS download_libs.stamp)
     add_dependencies(u8 u8libs)
-    set(v8_root download_libs/libv8/linux)
+    set(v8_root ext/linux/libv8)
     target_include_directories(u8 PUBLIC ${v8_root}/include)
     target_link_directories(u8 PUBLIC ${v8_root}/bin)
     target_link_libraries(u8 PUBLIC v8 v8_libplatform v8_libbase pthread)

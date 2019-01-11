@@ -2,13 +2,13 @@
 
 platform=$1
 
-download_path=download_libs
+download_path=ext/$platform
 
 mkdir -p $download_path
 cd $download_path
 
 download_file() {
-    wget https://cxxlibs.universa.io/files/$1 -O $1
+    wget https://cxxlibs.universa.io/files/$platform/$1 -O $1
 }
 
 unpack_archive() {
@@ -30,7 +30,7 @@ download_archive() {
 }
 
 if [ "$platform" = "linux" ]; then
-    download_archive libv8_linux.7z
+    download_archive libv8.7z
 else
     echo "FATAL_ERROR: unknown platform '$platform'"
     exit 1
