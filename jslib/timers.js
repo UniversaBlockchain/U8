@@ -19,6 +19,10 @@ class TimeoutError extends Error {
  * Timer queue entry. Use {timeout()} to create one.
  */
 class TimeoutEntry {
+
+    field1 = "hello1";
+    static field2 = "hello2";
+
     /**
      * Create immediately effective timer entry
      * @param millis to wait
