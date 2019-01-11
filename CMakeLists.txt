@@ -1,6 +1,8 @@
 cmake_minimum_required(VERSION 3.12)
 project(u8)
 
+add_definitions (-DGMP_DESC)
+
 # v8 lib
 # g++ -I/usr/local/Cellar/v8/7.1.302.28 -I/usr/local/Cellar/v8/7.1.302.28/include -Gs samples/hello-world.cc -o hello_world -L/usr/local/Cellar/v8/7.1.302.28 -lv8 -lv8_libplatform -lv8_libbase -Lout.gn/x64.release.sample/obj/ -pthread -std=c++0x -O2
 
@@ -13,13 +15,13 @@ endif ()
 if (MACOSX)
     set(platform "macos_v8_monolith")
 elseif (UNIX)
-    set(platform "linux_v8")
+    set(platform "linux")
 elseif (WIN32)
     set(platform "win_v8")
 endif ()
 
 add_executable(u8 main.cpp Scripter.cpp Scripter.h tools.h basic_builtins.cpp basic_builtins.h tools.cpp AsyncSleep.cpp
-        AsyncSleep.h Logging.cpp Logging.h JsPromise.cpp JsPromise.h)
+        AsyncSleep.h Logging.cpp Logging.h JsPromise.cpp JsPromise.h PublicKey.cpp PrivateKey.cpp base64.cpp)
 
 message("platform: ${platform}")
 
@@ -35,14 +37,15 @@ elseif (${platform} STREQUAL macos_v8_monolith)
     target_include_directories(u8 PUBLIC ext/include)
     target_link_directories(u8 PUBLIC ext/lib/macosx)
     target_link_libraries(u8 PUBLIC v8_monolith)
-elseif (${platform} STREQUAL linux_v8)
-    add_custom_command(OUTPUT ../download_libs.stamp WORKING_DIRECTORY .. COMMAND sh download_libs.sh linux > download_libs.stamp)
+elseif (${platform} STREQUAL linux)
+    add_custom_command(OUTPUT ../download_libs.stamp WORKING_DIRECTORY .. COMMAND sh download_libs.sh ${platform} > download_libs.stamp)
     add_custom_target(u8libs ALL DEPENDS download_libs.stamp)
     add_dependencies(u8 u8libs)
-    set(v8_root ext/linux/libv8)
-    target_include_directories(u8 PUBLIC ${v8_root}/include)
-    target_link_directories(u8 PUBLIC ${v8_root}/bin)
-    target_link_libraries(u8 PUBLIC v8 v8_libplatform v8_libbase pthread)
+    foreach (l libv8 libtomcrypt)
+        target_include_directories(u8 PUBLIC ext/${platform}/${l}/include)
+        target_link_directories(u8 PUBLIC ext/${platform}/${l}/bin)
+    endforeach (l)
+    target_link_libraries(u8 PUBLIC v8 v8_libplatform v8_libbase tomcrypt gmp pthread)
 else ()
     message(FATAL_ERROR "unknown platform ${platform}")
 endif ()
