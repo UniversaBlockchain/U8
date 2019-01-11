@@ -34,14 +34,22 @@ Scripter::Scripter(const char *argv) : Logging("SCR") {
             root_found = true;
             break;
         }
-        path = path.substr(0, path.rfind('/'));
+        auto index = path.rfind('/');
+        cout << "index " << index << endl;
+        if (index == std::string::npos) break;
+        path = path.substr(0, index);
     } while (path != "/");
 
     // if not found, get from ENV
     if (!root_found) {
         // get U8 root from env
         auto u8root = std::getenv("U8_ROOT");
-        if (u8root) require_roots.emplace_back(u8root);
+        if (u8root) {
+            require_roots.emplace_back(u8root);
+        } else {
+            // last chance ;)
+            require_roots.emplace_back("../jslib");
+        }
 
     }
     // then look in the application executable file root

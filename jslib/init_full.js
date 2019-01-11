@@ -18,6 +18,8 @@ const require = (function () {
             if( !/\.[mc]?js$/.test(moduleName) )
                 moduleName += ".js";
             let [name, src] = __bios_loadRequired(moduleName);
+            if( src == "")
+                throw "import failed: not found "+moduleName;
 
             // limited support for import keyword
             src = src.replace(/^import\s+{(.*)}\s+from\s+(.*['"]);?$/mg, "let {$1} = {...require($2)};");
