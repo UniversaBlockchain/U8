@@ -110,10 +110,6 @@ function timeout(millis, callback, reject) {
     return new TimeoutEntry(millis, callback, reject);
 }
 
-timeout(3000, () => console.log("t3"));
-timeout(1000, () => console.log("t1"));
-timeout(2000, () => console.log("t2"));
-
 /**
  * create Promise that resolves after specified time (async sleep). The returned Promise has
  * {cancel()} method that rejects the promise and cancels associated TimeoutEntry. The rejection
@@ -150,4 +146,4 @@ function clearTimeout(entry) {
     entry.cancel();
 }
 
-module.exports = {sleep, timeout, setTimeout, clearTimeout, currentMillis, now};
+module.exports = {sleep, timeout, setTimeout, clearTimeout, currentMillis, now, version: "0.2"};

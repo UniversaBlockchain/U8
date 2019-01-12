@@ -1,13 +1,13 @@
 
-console.log("require1 is being prcessed!!");
-
-var myInternal = "FOO";
-
-function exportFrom1() {
-    console.log("Export from 1-");
-}
-
-module.exports = { fun1: exportFrom1 };
-
+// unsafe
 // eee.dsds = 11
+
+// require = function() { throw "security error 1";}
+// this.require = function() { throw "security error 2";}
+console.log("Simulate exiting the scope", this);
+// console.log("m = " + Object.keys(modules));
+// moodules = undefined
+// console.log(Object.keys(modules['timers.js']));
+// modules['timers.js'] = {}
+// modules['lala.js'] = { exports: []}
 

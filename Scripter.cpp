@@ -35,7 +35,6 @@ Scripter::Scripter(const char *argv) : Logging("SCR") {
             break;
         }
         auto index = path.rfind('/');
-        cout << "index " << index << endl;
         if (index == std::string::npos) break;
         path = path.substr(0, index);
     } while (path != "/");

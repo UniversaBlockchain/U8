@@ -21,8 +21,6 @@ endif ()
 add_executable(u8 main.cpp Scripter.cpp Scripter.h tools.h basic_builtins.cpp basic_builtins.h tools.cpp AsyncSleep.cpp
         AsyncSleep.h Logging.cpp Logging.h JsPromise.cpp JsPromise.h)
 
-message("platfor: ${platform}")
-
 # Macos brew configuration
 if (${platform} STREQUAL macos_brew)
     set(libtype .dylib)
