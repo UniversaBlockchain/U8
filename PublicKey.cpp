@@ -2,6 +2,9 @@
 // Created by Leonid Novikov on 2018-12-11.
 //
 
+#define USE_GMP 1
+#define GMP_DESC 1
+
 #include <gmp.h>
 #include <tomcrypt.h>
 #include "PublicKey.h"

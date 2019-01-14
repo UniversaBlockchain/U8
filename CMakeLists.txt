@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.12)
 project(u8)
 
-add_definitions (-DGMP_DESC)
+add_definitions(-DGMP_DESC)
 
 # v8 lib
 # g++ -I/usr/local/Cellar/v8/7.1.302.28 -I/usr/local/Cellar/v8/7.1.302.28/include -Gs samples/hello-world.cc -o hello_world -L/usr/local/Cellar/v8/7.1.302.28 -lv8 -lv8_libplatform -lv8_libbase -Lout.gn/x64.release.sample/obj/ -pthread -std=c++0x -O2
@@ -34,9 +34,11 @@ if (${platform} STREQUAL macos_brew)
     target_link_directories(u8 PUBLIC ${v8_root}/lib)
     target_link_libraries(u8 PUBLIC v8 v8_libplatform v8_libbase)
 elseif (${platform} STREQUAL macos_v8_monolith)
-    target_include_directories(u8 PUBLIC ext/include)
-    target_link_directories(u8 PUBLIC ext/lib/macosx)
-    target_link_libraries(u8 PUBLIC v8_monolith)
+    foreach (l v8 tomcrypt gmp)
+        target_include_directories(u8 PUBLIC ext/macosx/${l}/include)
+        target_link_directories(u8 PUBLIC ext/macosx/${l}/lib)
+    endforeach (l)
+    target_link_libraries(u8 PUBLIC v8_monolith tomcrypt)
 elseif (${platform} STREQUAL linux)
     add_custom_command(OUTPUT ../download_libs.stamp WORKING_DIRECTORY .. COMMAND sh download_libs.sh ${platform} > download_libs.stamp)
     add_custom_target(u8libs ALL DEPENDS download_libs.stamp)
