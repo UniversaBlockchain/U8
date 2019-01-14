@@ -21,7 +21,7 @@ elseif (WIN32)
 endif ()
 
 add_executable(u8 main.cpp Scripter.cpp Scripter.h tools.h basic_builtins.cpp basic_builtins.h tools.cpp AsyncSleep.cpp
-        AsyncSleep.h Logging.cpp Logging.h JsPromise.cpp JsPromise.h PublicKey.cpp PrivateKey.cpp base64.cpp cryptoCommon.h cryptoCommon.cpp)
+        AsyncSleep.h Logging.cpp Logging.h JsPromise.cpp JsPromise.h PublicKey.cpp PrivateKey.cpp base64.cpp cryptoCommon.h cryptoCommon.cpp AsyncIO.h AsyncIO.cpp)
 
 message("platform: ${platform}")
 
@@ -50,7 +50,7 @@ elseif (${platform} STREQUAL linux)
         target_include_directories(u8 PUBLIC ext/${platform}/${l}/include)
         target_link_directories(u8 PUBLIC ext/${platform}/${l}/lib)
     endforeach (l)
-    target_link_libraries(u8 PUBLIC v8 v8_libplatform v8_libbase tomcrypt gmp pthread)
+    target_link_libraries(u8 PUBLIC v8 v8_libplatform v8_libbase tomcrypt gmp libuv.a pthread)
 else ()
     message(FATAL_ERROR "unknown platform ${platform}")
 endif ()
