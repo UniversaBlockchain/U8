@@ -8,7 +8,7 @@
 #include <uv.h>
 
 namespace asyncio {
-    static uv_async_t exitHandle;
+    extern uv_async_t exitHandle;
     extern uv_loop_t* asyncLoop;
 
     typedef uv_fs_t ioHandle;
