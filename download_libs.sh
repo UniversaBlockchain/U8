@@ -32,6 +32,9 @@ download_archive() {
 if [ "$platform" = "linux" ]; then
     download_archive libv8.7z
     download_archive libtomcrypt.7z
+elif [ "$platform" = "macos" ]; then
+    download_archive libv8.7z
+    download_archive libtomcrypt.7z
 else
     echo "FATAL_ERROR: unknown platform '$platform'"
     exit 1
