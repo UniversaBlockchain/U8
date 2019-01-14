@@ -9,13 +9,15 @@
 
 namespace asyncio {
     static uv_async_t exitHandle;
-    static uv_loop_t* asyncLoop = nullptr;
+    extern uv_loop_t* asyncLoop;
 
     typedef uv_fs_t ioHandle;
     typedef uv_fs_cb ioCallback;
     typedef uv_buf_t ioBuffer;
 
     uv_loop_t* initAndRunLoop();
+
+    inline uv_loop_t* getLoop() { return asyncLoop; };
 
     void deinitLoop();
 

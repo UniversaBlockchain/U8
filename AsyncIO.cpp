@@ -7,6 +7,8 @@
 
 namespace asyncio {
 
+    uv_loop_t* asyncLoop = nullptr;
+
     uv_loop_t* initAndRunLoop() {
         if (!asyncLoop) {
             asyncLoop = uv_loop_new();
