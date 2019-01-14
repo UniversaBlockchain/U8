@@ -16,16 +16,18 @@ unpack_archive() {
 }
 
 download_archive() {
-    download_file $1.sha1
+    archivename=$platform-$1
 
-    if [ ! -f $1 ]; then
-        download_file $1
-        unpack_archive $1
+    download_file $archivename.sha1
+
+    if [ ! -f $archivename ]; then
+        download_file $archivename
+        unpack_archive $archivename
     fi
 
-    if ! shasum --status -c $1.sha1; then
-        download_file $1
-        unpack_archive $1
+    if ! shasum --status -c $archivename.sha1; then
+        download_file $archivename
+        unpack_archive $archivename
     fi
 }
 
