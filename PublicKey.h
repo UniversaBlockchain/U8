@@ -8,14 +8,11 @@
 #include <vector>
 #include <tomcrypt.h>
 #include <gmp.h>
+#include "cryptoCommon.h"
 
 class PublicKey {
 
 public:
-
-    enum HashType {
-        SHA1
-    };
 
     PublicKey();
     virtual ~PublicKey();

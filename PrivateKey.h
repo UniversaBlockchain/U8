@@ -10,6 +10,7 @@
 #include <vector>
 #include <tomcrypt.h>
 #include "PublicKey.h"
+#include "cryptoCommon.h"
 
 class PrivateKey {
 
@@ -25,7 +26,7 @@ public:
 	void printDebug();
 
 	// Signature is created using RSA-PSS as described in PKCS# 1 v 2.1.
-	void sign(std::vector<unsigned char> &input, PublicKey::HashType hashType, std::vector<unsigned char> &output);
+	void sign(std::vector<unsigned char> &input, HashType hashType, std::vector<unsigned char> &output);
 
 	void decrypt(std::vector<unsigned char> &encrypted, std::vector<unsigned char> &output);
 
