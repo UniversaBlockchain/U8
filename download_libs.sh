@@ -15,6 +15,16 @@ unpack_archive() {
     7zr -y x $1
 }
 
+sha1result=1
+check_sha1sum() {
+    if [ "$platform" = "macos" ]; then
+        shasum --status -c $1
+    else
+        sha1sum --status -c $1
+    fi
+    sha1result=$?
+}
+
 download_archive() {
     download_file $1.sha1
 
@@ -23,8 +33,8 @@ download_archive() {
         unpack_archive $1
     fi
 
-    sha1sum --status -c $1.sha1
-    if [ $? -ne 0 ]; then
+    check_sha1sum $1.sha1
+    if [ $sha1result -ne 0 ]; then
         download_file $1
         unpack_archive $1
     fi
