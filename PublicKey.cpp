@@ -30,23 +30,25 @@ void PublicKey::init(mpz_ptr N, mpz_ptr e) {
 
 
 bool PublicKey::verify(const std::vector<unsigned char> &sig, const std::vector<unsigned char> &data, HashType hashType) {
-	int hash_idx = find_hash("sha1");
+	int mgf1hash_idx = getHashIndex(SHA1);
+	int hash_idx = getHashIndex(hashType);
+	auto desc = hash_descriptor[hash_idx];
 
-	unsigned char sha1Result[sha1_desc.hashsize];
+	unsigned char hashResult[desc.hashsize];
 	hash_state md;
-	sha1_init(&md);
-	sha1_process(&md, &data[0], data.size());
-	sha1_done(&md, sha1Result);
+	desc.init(&md);
+	desc.process(&md, &data[0], data.size());
+	desc.done(&md, hashResult);
 
 	int saltLen = rsa_sign_saltlen_get_max_ex(LTC_PKCS_1_PSS, hash_idx, &key);
 
 	int stat = -1;
 	int err = rsa_verify_hash_ex(
-		&sig[0], sig.size(),
-		sha1Result, sha1_desc.hashsize,
-		LTC_PKCS_1_PSS, hash_idx, saltLen, &stat, &key);
+			&sig[0], sig.size(),
+			hashResult, desc.hashsize, hash_idx,
+			LTC_PKCS_1_PSS, mgf1hash_idx, saltLen, &stat, &key);
 	if (err != CRYPT_OK)
-		printf("rsa_verify_hash_ex error: %i\n", err);
+		printf("  warning (rsa_verify_hash_ex): %s\n", error_to_string(err));
 	return stat != 0;
 }
 

@@ -124,24 +124,26 @@ void PrivateKey::printDebug() {
 	gmp_printf ("qP: %Zd\n", key.qP);
 }
 
-void PrivateKey::sign(std::vector<unsigned char> &input, PublicKey::HashType hashType, std::vector<unsigned char> &output) {
-	int hash_idx = find_hash("sha1");
+void PrivateKey::sign(std::vector<unsigned char> &input, HashType hashType, std::vector<unsigned char> &output) {
+	int mgf1hash_idx = getHashIndex(SHA1);
+	int hash_idx = getHashIndex(hashType);
+	auto desc = getHashDescriptor(hashType);
 	int prng_indx = find_prng("sprng");
 
-	unsigned char sha1Result[sha1_desc.hashsize];
+	unsigned char hashResult[desc.hashsize];
 	hash_state md;
-	sha1_init(&md);
-	sha1_process(&md, &input[0], input.size());
-	sha1_done(&md, sha1Result);
+	desc.init(&md);
+	desc.process(&md, &input[0], input.size());
+	desc.done(&md, hashResult);
 
 	int saltLen = rsa_sign_saltlen_get_max_ex(LTC_PKCS_1_PSS, hash_idx, &key);
 
 	unsigned long tomSigLen = 512;
 	unsigned char tomSig[tomSigLen];
 	int res = rsa_sign_hash_ex(
-		sha1Result, sha1_desc.hashsize,
-		tomSig, &tomSigLen,
-		LTC_PKCS_1_PSS, NULL, prng_indx, hash_idx, saltLen, &key);
+			hashResult, desc.hashsize, hash_idx,
+			tomSig, &tomSigLen,
+			LTC_PKCS_1_PSS, NULL, prng_indx, mgf1hash_idx, saltLen, &key);
 	if (res != CRYPT_OK)
 		printf("rsa_sign_hash_ex error: %i\n", res);
 
