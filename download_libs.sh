@@ -23,7 +23,8 @@ download_archive() {
         unpack_archive $1
     fi
 
-    if ! sha1sum --status -c $1.sha1; then
+    sha1sum --status -c $1.sha1
+    if [ $? -ne 0 ]; then
         download_file $1
         unpack_archive $1
     fi
