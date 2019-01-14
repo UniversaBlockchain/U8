@@ -34,7 +34,7 @@ struct stat statbuf;
 static void onClose(asyncio::ioHandle *req) {
     uv_fs_req_cleanup(req);
     uv_sem_post(&stop[(long)req->data - 1]);
-    printf("Close file in thread: %i\n", (long) req->data);
+    printf("Close file in thread: %ld\n", (long) req->data);
     delete req;
 }
 
@@ -62,7 +62,7 @@ static void onRead(asyncio::ioHandle *req) {
 
 static void onOpen(asyncio::ioHandle *req) {
     uv_fs_req_cleanup(req);
-    printf("Open file in thread %i\n", (long) req->data);
+    printf("Open file in thread %ld\n", (long) req->data);
     if (req->result < 0) {
         fprintf(stderr, "error: %s\n", uv_strerror(req->result));
     } else {
@@ -109,7 +109,7 @@ static void onWrite(asyncio::ioHandle *req) {
 
 static void onOpenWrite(asyncio::ioHandle *req) {
     uv_fs_req_cleanup(req);
-    printf("Open file for writing in thread %i\n", (long) req->data);
+    printf("Open file for writing in thread %ld\n", (long) req->data);
     if (req->result < 0) {
         fprintf(stderr, "error: %s\n", uv_strerror(req->result));
     } else {
@@ -139,7 +139,7 @@ void testAsyncFile() {
 
     vector<thread> ths;
 
-    for (int t = 0; t < NUM_THREADS; t++) {
+    for (long t = 0; t < NUM_THREADS; t++) {
         fileSize[t] = 0;
         summ[t] = 0;
 
@@ -164,13 +164,13 @@ void testAsyncFile() {
     printf("Threads started\n");
 
     size_t all = 0;
-    for (int t = 0; t < NUM_THREADS; t++) {
+    for (long t = 0; t < NUM_THREADS; t++) {
         ths[t].join();
         file[t]->free();
         if (fileSize[t] != statbuf.st_size * NUM_ITERATIONS)
-            fprintf(stderr, "mismatch test file size in thread %i\n", t + 1);
+            fprintf(stderr, "mismatch test file size in thread %ld\n", t + 1);
         if (summ[t] != TEST_FILE_SUMM * NUM_ITERATIONS)
-            fprintf(stderr, "mismatch test file sum in thread %i\n", t + 1);
+            fprintf(stderr, "mismatch test file sum in thread %ld\n", t + 1);
         all += fileSize[t];
     }
 
@@ -179,13 +179,13 @@ void testAsyncFile() {
     printf("Threads completed\n");
 
     double fTimeStop = clock() / (double)CLOCKS_PER_SEC;
-    printf("Time of reading %i files %f sec.\nTotal files size %lld bytes\n", NUM_THREADS * NUM_ITERATIONS, fTimeStop - fTimeStart, all);
+    printf("Time of reading %i files %f sec.\nTotal files size %ld bytes\n", NUM_THREADS * NUM_ITERATIONS, fTimeStop - fTimeStart, all);
 
     printf("Write test...\n");
 
     fTimeStart = clock() / (double)CLOCKS_PER_SEC;
 
-    for (int t = 0; t < NUM_THREADS; t++) {
+    for (long t = 0; t < NUM_THREADS; t++) {
         fileSize[t] = 0;
 
         //Init test buffer
@@ -198,7 +198,7 @@ void testAsyncFile() {
                 block[t] = 0;
 
                 char fileName[16];
-                sprintf(fileName, "TestFile%i.bin", t);
+                sprintf(fileName, "TestFile%ld.bin", t);
 
                 file[t]->open(fileName, O_CREAT | O_WRONLY, S_IRWXU | S_IRWXG | S_IRWXO, onOpenWrite, (void *) (t + 1));
 
@@ -222,7 +222,7 @@ void testAsyncFile() {
     printf("Threads completed\n");
 
     fTimeStop = clock() / (double)CLOCKS_PER_SEC;
-    printf("Time of writing %i files %f sec.\nTotal files size %lld bytes\n", NUM_THREADS * NUM_ITERATIONS, fTimeStop - fTimeStart, all);
+    printf("Time of writing %i files %f sec.\nTotal files size %ld bytes\n", NUM_THREADS * NUM_ITERATIONS, fTimeStop - fTimeStart, all);
 
     printf("Reading the entire files test...\n");
 
@@ -244,7 +244,7 @@ void testAsyncFile() {
 
     fTimeStop = clock() / (double)CLOCKS_PER_SEC;
     all = NUM_THREADS * NUM_ITERATIONS * NUM_BLOCKS * BUFF_SIZE;
-    printf("Time of reading (by asyncio::file::readFile) %i files %f sec.\nTotal files size %lld bytes\n", NUM_THREADS * NUM_ITERATIONS, fTimeStop - fTimeStart, all);
+    printf("Time of reading (by asyncio::file::readFile) %i files %f sec.\nTotal files size %ld bytes\n", NUM_THREADS * NUM_ITERATIONS, fTimeStop - fTimeStart, all);
 
     printf("Writing the entire files test...\n");
 
@@ -256,17 +256,16 @@ void testAsyncFile() {
         char fileName[16];
         sprintf(fileName, "TestEntireFile%i.bin", t);
 
-        for (int i = 0; i < NUM_ITERATIONS; i++)
-            asyncio::file::writeFile(fileName, dataBuf, BUFF_SIZE, writeFileCallback);
+        asyncio::file::writeFile(fileName, dataBuf, BUFF_SIZE, writeFileCallback);
     }
 
-    for (int i = 0; i < NUM_THREADS * NUM_ITERATIONS; i++)
+    for (int i = 0; i < NUM_THREADS; i++)
         uv_sem_wait(&stop[0]);
     uv_sem_destroy(&stop[0]);
 
     fTimeStop = clock() / (double)CLOCKS_PER_SEC;
-    all = NUM_THREADS * NUM_ITERATIONS * BUFF_SIZE;
-    printf("Time of writing (by asyncio::file::writeFile) %i files %f sec.\nTotal files size %lld bytes\n", NUM_THREADS * NUM_ITERATIONS, fTimeStop - fTimeStart, all);
+    all = NUM_THREADS * BUFF_SIZE;
+    printf("Time of writing (by asyncio::file::writeFile) %i files %f sec.\nTotal files size %ld bytes\n", NUM_THREADS, fTimeStop - fTimeStart, all);
 
     asyncio::deinitLoop();
 
