@@ -4,25 +4,64 @@
 
 #include <iostream>
 #include <strstream>
+#include <iomanip>
 #include <fstream>
+
 #include "Scripter.h"
 #include "tools.h"
 #include "basic_builtins.h"
 
 static const char *ARGV0 = nullptr;
 
-shared_ptr<Scripter> Scripter::New(const char *script, const char *argv0) {
-    if (argv0) ARGV0 = argv0;
+std::unique_ptr<v8::Platform> Scripter::initV8(const char *argv0) {
+    v8::V8::InitializeICUDefaultLocation(argv0);
+    v8::V8::InitializeExternalStartupData(argv0);
+    ARGV0 = argv0;
+    std::unique_ptr<v8::Platform> platform = v8::platform::NewDefaultPlatform();
+    v8::V8::InitializePlatform(platform.get());
+    v8::V8::Initialize();
+    return platform;
+}
+
+void Scripter::closeV8(std::unique_ptr<v8::Platform> &platform) {
+    v8::V8::Dispose();
+    v8::V8::ShutdownPlatform();
+    platform.release();
+}
+
+int Scripter::Application(const char *argv0, function<int(shared_ptr<Scripter>)> block) {
+    try {
+        auto platform = initV8(argv0);
+        auto se = New();
+        int result;
+        se->inContext([&](auto context) { result = block(se); });
+        return result;
+    }
+    catch (const ScriptError &e) {
+        // Script errors are well traced
+        return 1000;
+    }
+    catch (const std::exception &e) {
+        cerr << "uncaught error: " << e.what() << endl;
+        return 1000;
+    }
+    catch (...) {
+        cerr << "uncaught unspecified error: " << endl;
+        return 2000;
+    }
+
+}
+
+shared_ptr<Scripter> Scripter::New() {
     if (!ARGV0)
-        throw runtime_error("argv0 is not set");
-    shared_ptr<Scripter> scripter(new Scripter(ARGV0));
+        throw runtime_error("Platform in not initialized");
+    shared_ptr<Scripter> scripter(new Scripter());
     scripter->initialize();
     return scripter;
 }
 
-
-Scripter::Scripter(const char *argv) : Logging("SCR") {
-    std::string s = argv;
+Scripter::Scripter() : Logging("SCR") {
+    std::string s = ARGV0;
     auto root = s.substr(0, s.rfind('/'));
     auto path = root;
     bool root_found = false;
@@ -57,6 +96,28 @@ Scripter::Scripter(const char *argv) : Logging("SCR") {
     require_roots.emplace_back(".");
 }
 
+//void JsSmartEval(const v8::FunctionCallbackInfo<v8::Value> &args) {
+//    Scripter::unwrap(args, [&](auto se, auto isolate, auto context) {
+//        ScriptOrigin origin(args[0].As<Value>());
+//        TryCatch trycatch(isolate);
+//        auto scriptResult = Script::Compile(
+//                context,
+//                args[1].As<String>(),
+//                        &origin);
+//        if (scriptResult.IsEmpty())
+//            se->checkException(trycatch, context);
+//        else {
+//            auto maybeResult = scriptResult.ToLocalChecked()->Run(context);
+//            if (maybeResult.IsEmpty())
+//                se->checkException(trycatch, context);
+//            else
+//                args.GetReturnValue().Set(true);
+//            cout << "smart eval ok" << endl;
+//        }
+//    });
+//}
+
+
 void Scripter::initialize() {
     if (initialized)
         throw runtime_error("SR is already initialized");
@@ -65,35 +126,139 @@ void Scripter::initialize() {
     create_params.array_buffer_allocator =
             v8::ArrayBuffer::Allocator::NewDefaultAllocator();
     pIsolate = v8::Isolate::New(create_params);
-
-
     v8::Isolate::Scope isolate_scope(pIsolate);
 
     // Create a stack-allocated handle scope.
     v8::HandleScope handle_scope(pIsolate);
 
-
+    // Global object for U8
     v8::Local<v8::ObjectTemplate> global = v8::ObjectTemplate::New(pIsolate);
     // Bind the global 'print' function to the C++ Print callback.
-    global->Set(
-            v8::String::NewFromUtf8(pIsolate, "__bios_print", v8::NewStringType::kNormal)
-                    .ToLocalChecked(),
-            v8::FunctionTemplate::New(pIsolate, JsPrint));
+    global->Set(v8String("__bios_print"), functionTemplate(JsPrint));
+    global->Set(v8String("__bios_loadRequired"), functionTemplate(JsLoadRequired));
+    global->Set(v8String("__bios_initTimers"), functionTemplate(JsInitTimers));
+//    global->Set(v8String("__smart_eval"), functionTemplate(JsSmartEval));
+    global->Set(v8String("$0"), v8String(ARGV0));
 
-    global->Set(
-            v8::String::NewFromUtf8(pIsolate, "__bios_loadRequired", v8::NewStringType::kNormal)
-                    .ToLocalChecked(),
-            v8::FunctionTemplate::New(pIsolate, JsLoadRequired));
-
-    global->Set(
-            v8::String::NewFromUtf8(pIsolate, "__bios_initTimers", v8::NewStringType::kNormal)
-                    .ToLocalChecked(),
-            v8::FunctionTemplate::New(pIsolate, JsInitTimers));
-
+    // Save context and wrap weak self:
     context.Reset(pIsolate, v8::Context::New(pIsolate, nullptr, global));
     weakThis = shared_from_this();
     context.Get(pIsolate)->SetEmbedderData(1, v8::External::New(pIsolate, &weakThis));
-    log("ready");
+
+    log("context ready, initializing JS library");
+
+    // now run initialization library script
+    inContext([&](auto context) {
+        auto src = loadFileAsString("init_full.js");
+        src = src + "\n//# sourceURL=" + "jslib/init_full.js\n";
+
+        // Compile the source code.
+        TryCatch trycatch(pIsolate);
+        auto scriptResult = v8::Script::Compile(context, v8String(src));
+        if (scriptResult.IsEmpty()) {
+            checkException(trycatch, context);
+            throw runtime_error("failed to compile U8CoreJS library");
+        } else {
+            v8::Local<v8::Script> script = scriptResult.ToLocalChecked();
+            auto maybeResult = script->Run(context);
+            if (maybeResult.IsEmpty()) {
+                checkException(trycatch, context);
+                throw runtime_error("Failed to initialize U8CoreJS Library");
+            }
+        }
+    });
+}
+
+
+bool Scripter::checkException(TryCatch &trycatch, Local<Context> context) {
+    if (trycatch.HasCaught()) {
+        Local<Value> exception = trycatch.Exception();
+        String::Utf8Value exception_str(pIsolate, exception);
+        Local<Message> message = trycatch.Message();
+        if (message.IsEmpty()) {
+            cerr << *exception_str << endl;
+
+        } else {
+            int start = message->GetStartColumn(context).FromJust();
+            int end = message->GetEndColumn(context).FromJust();
+            cerr << endl << getString(message->GetScriptOrigin().ResourceName()) << ":"
+                 << message->GetLineNumber(context).FromJust() << " " << *exception_str << endl
+                 << getString(message->GetSourceLine(context)) << endl
+                 << setw(start + 1) << '^' << setw(end - start) << setfill('^') << '^' << endl << endl;
+        }
+
+        auto stackTrace = trycatch.StackTrace(context);
+        if (!stackTrace.IsEmpty()) {
+            string str = getString(stackTrace);
+            // one-line stack is just copy of the exception error
+            // so we don't repeat it:
+            if (str.find('\n') != string::npos)
+                cerr << str << endl;
+        }
+        return true;
+    }
+    return false;
+}
+
+template<class T>
+void Scripter::throwException(TryCatch &trycatch, Local<Context> context) {
+    if (checkException(trycatch, context)) {
+        throw T(getString(trycatch.Exception()));
+    }
+}
+
+string Scripter::evaluate(const string &src, bool needsReturn, ScriptOrigin *origin) {
+    string res;
+    inContext([&](auto context) {
+        v8::Local<v8::String> source =
+                v8::String::NewFromUtf8(pIsolate, src.c_str(),
+                                        v8::NewStringType::kNormal)
+                        .ToLocalChecked();
+
+        // Compile the source code.
+        TryCatch trycatch(pIsolate);
+        auto scriptResult = v8::Script::Compile(context, source, origin);
+        if (scriptResult.IsEmpty())
+            throwException<SyntaxError>(trycatch, context);
+        else {
+            v8::Local<v8::Script> script = scriptResult.ToLocalChecked();
+            auto maybeResult = script->Run(context);
+            if (maybeResult.IsEmpty())
+                throwException<ScriptError>(trycatch, context);
+            else {
+                if (needsReturn) {
+                    res = getString(maybeResult);
+                }
+            }
+        }
+    });
+    return res;
+}
+
+void Scripter::runAsMain(const string &sourceScript, const vector<string> &&args, ScriptOrigin *origin) {
+//    auto fixedScript = evaluate()
+    inContext([&](auto context) {
+        auto global = context->Global();
+        // fix imports
+        global->Set(v8String("__source"), v8String(sourceScript));
+        string script = evaluate(
+                "let r = __fix_imports(__source); __source = undefined; r",
+                true);
+        // run fixed script
+        evaluate(script, false, origin);
+        // run main if any
+        Local<Function> main = Local<Function>::Cast(global->Get(v8String("main")));
+        if (!main->IsUndefined()) {
+            auto jsArgs = Array::New(pIsolate);
+            for (int i = 0; i < args.size(); i++) {
+                jsArgs->Set(i, String::NewFromUtf8(pIsolate, args[i].c_str()));
+            }
+            auto param = Local<Value>::Cast(jsArgs);
+            TryCatch tryCatch(pIsolate);
+            auto result = main->Call(context, global, 1, &param);
+            throwException<ScriptError>(tryCatch, context);
+        }
+    });
 }
 
 std::string Scripter::expandPath(const std::string &path) {

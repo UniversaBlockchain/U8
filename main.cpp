@@ -1,80 +1,61 @@
 #include <iostream>
-#include <stdlib.h>
-#include <string.h>
-#include <thread>
-
-#include <v8.h>
-#include <libplatform/libplatform.h>
 
 #include "Scripter.h"
+#include "tools.h"
 
-using namespace std;
+void usage();
 
+int main(int argc, const char **argv) {
+    if (argc == 1) {
+        usage();
+        return 1;
+    }
+    else {
+        return Scripter::Application(argv[0], [=](auto se) {
+            std::vector<std::string> args(argv + 1, argv + argc);
+            if (args[0] == "-e")
+                cout << se->evaluate(args[1]) << endl;
+            else {
+                se->runAsMain(loadAsStringOrThrow(args[0]), vector<string>(args.begin() + 1, args.end()), args[0]);
+            }
+            return 0;
+        });
+    }
+}
 
-int main(int argc, char **argv) {
+void usage() {
+    cout << R"End(
+=== U8 Universa execution environment === (beta)
 
-    cout << "we started in " << argv[0] << endl;
+Usage:
 
-    v8::V8::InitializeICUDefaultLocation(argv[0]);
-    v8::V8::InitializeExternalStartupData(argv[0]);
-    std::unique_ptr<v8::Platform> platform = v8::platform::NewDefaultPlatform();
-    v8::V8::InitializePlatform(platform.get());
-    v8::V8::Initialize();
+    u8 [-e "`js code to avaulate`"] | <javascript_file_name>
+
+if -e switch present, evaluates the second command line parameter as Javascript code and
+prints out result ou stdout.
+
+Otherwise executes sctipt fromthe given .js file specified as the first parameter.
+All other parameters are passed to the main(argv) function if present in the script file or
+if it is imported from it.
+
+)End";
+}
+
+/* more specific form of Scripter application:
+ *
+int manual_main(int argc, char **argv) {
+    auto platform = Scripter::initV8(argv[0]);
     try {
-        // Create a new Isolate and make it the current one.
-        {
-            shared_ptr<Scripter> se = Scripter::New(0, argv[0]);
-            {
-                v8::Locker locker(se->isolate());
-
-                // Enter the context for compiling and running the hello world script.
-
-//            v8::HandleScope handle_scope(se.isolate());
-//            auto context = se.getContext();
-
-//            v8::Context::Scope context_scope(context);
-                se->inContext([&](auto context) {
-                    // Create a string containing the JavaScript source code.
-                    auto src = se->loadFileAsString("init_full.js");
-                    src = src + "\n//# sourceURL=" + "jslib/init_full.js\n";
-                    v8::Local<v8::String> source =
-                            v8::String::NewFromUtf8(se->isolate(), src.c_str(),
-                                                    v8::NewStringType::kNormal)
-                                    .ToLocalChecked();
-
-                    // Compile the source code.
-                    auto scriptResult =
-                            v8::Script::Compile(context, source);
-                    if (scriptResult.IsEmpty()) {
-                        cout << "Compilation failed:" << endl << src;
-                    } else {
-                        v8::Local<v8::Script> script = scriptResult.ToLocalChecked();
-
-                        // Run the script to get the result.
-                        auto maybeResult = script->Run(context);
-                        if (maybeResult.IsEmpty()) {
-                            cout << "Error running script... strange";
-                        } else {
-                            v8::Local<v8::Value> result = maybeResult.ToLocalChecked();
-
-                            // Convert the result to an UTF8 string and print it.
-                            v8::String::Utf8Value utf8(se->isolate(), result);
-                            printf("%s\n", *utf8);
-                        }
-                    }
-                });
-            } // locker scope
-            // we put it here to unlock v8 context before sleep
-            std::this_thread::sleep_for(4s);
-        } // se scope
-        cout << "se should be already recycled" << endl;
-        v8::V8::Dispose();
-        v8::V8::ShutdownPlatform();
-//    delete create_params.array_buffer_allocator;
-
+        shared_ptr<Scripter> se = Scripter::New();
+        std::this_thread::sleep_for(4s);
     }
     catch (std::exception &e) {
-        std::cerr << "uncaught: " << e.what() << endl;
+        std::cerr << "uncaught error: " << e.what() << endl;
     }
+    catch (...) {
+        std::cerr << "uncaught unspecified error: " << endl;
+    }
+    Scripter::closeV8(platform);
     return 0;
 }
+*/

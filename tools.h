@@ -22,5 +22,12 @@ std::string replace_all(const std::string &src,
 
 std::string loadAsString(const std::string &fileName);
 
+std::string loadAsStringOrThrow(const std::string &fileName);
+
+class io_error : public std::runtime_error {
+public:
+    using runtime_error::runtime_error;
+};
+
 
 #endif //U8_TOOLS_H

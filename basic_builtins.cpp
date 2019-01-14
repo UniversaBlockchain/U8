@@ -35,8 +35,8 @@ void JsLoadRequired(const v8::FunctionCallbackInfo<v8::Value> &args) {
 
         // If it is empty we just return empty array
         if (!name.empty()) {
-            result->Set(result->Length(), v8::String::NewFromUtf8(isolate, name.c_str()));
-            result->Set(result->Length(), v8::String::NewFromUtf8(isolate, loadAsString(name).c_str()));
+            result->Set(result->Length(), se->v8String(name));
+            result->Set(result->Length(), se->v8String(loadAsString(name)));
         }
         args.GetReturnValue().Set(result);
     });
@@ -70,7 +70,6 @@ void JsInitTimers(const v8::FunctionCallbackInfo<v8::Value> &args) {
             se->log_e("SR timers already initialized");
         } else {
             // timer process should be initialized and function returned
-            se->initTimer();
             args.GetReturnValue().Set(
                     v8::Local(v8::Function::New(isolate, JsTimer))
             );

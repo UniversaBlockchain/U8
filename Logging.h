@@ -26,6 +26,11 @@ public:
     }
 
     template<typename ...Ts>
+    void info(Ts... args) {
+        put_log(INFO, args...);
+    }
+
+    template<typename ...Ts>
     void log_e(Ts... args) {
         put_log(ERROR, args...);
     }
@@ -85,10 +90,9 @@ private:
     // Following is just a static contructor for logging
     struct constructor {
         constructor() {
-            min_log_level = Logging::DEBUG;
+            min_log_level = Logging::INFO;
             out = &std::cout;
             err = &std::cerr;
-
         }
     };
 

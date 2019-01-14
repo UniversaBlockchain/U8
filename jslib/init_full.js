@@ -1,9 +1,12 @@
 'use strict';
+
 const console = {
     log: __bios_print,
     info: __bios_print,
     error: __bios_print
 };
+
+const VERSION = "4.0.0b4";
 
 /**
  * execute some source code in the safe context where nothing critical could be accessed/altered.
@@ -17,6 +20,10 @@ function safeEval(module, sourceUrl, src) {
     // noinspection JSUnusedLocalSymbols
     let exports = module.exports; // this one could be used in evaluated code
     eval(src + "\n//# sourceURL=" + sourceUrl + "\n");
+}
+
+function __fix_imports(source) {
+    return source.replace(/^import\s+{(.*)}\s+from\s+(.*['"]);?$/mg, "let {$1} = {...require($2)};");
 }
 
 const require = (function () {
@@ -35,23 +42,15 @@ const require = (function () {
                 throw "import failed: not found " + moduleName;
 
             // limited support for import keyword
-            src = src.replace(/^import\s+{(.*)}\s+from\s+(.*['"]);?$/mg, "let {$1} = {...require($2)};");
+            src = __fix_imports(src);
 
-            try {
-                let module = {exports: {}}
-                safeEval(module, name, src);
-                // console.log( "---", src, "^^^");
-                modules[moduleName] = module.exports;
-                return module.exports;
-            } catch (e) {
-                // var err = e.constructor(`in ${moduleName}: ${e.message}`);
-                // +3 because `err` has the line number of the `eval` line plus two.
-                // err.lineNumber = e.lineNumber - err.lineNumber + 3;
-                console.error(`${name}:1 ${e}`);
-                console.error(e.stack);
-                // throw e;
-                throw e;
-            }
+            let module = {exports: {}}
+            // we should not catch any exception to let u8 code interpret the error in
+            // a right way. rethrowing an error kills trycatch.Message() info which carries
+            // line number of the syntax error!
+            safeEval(module, name, src);
+            modules[moduleName] = module.exports;
+            return module.exports;
         }
     }
 })();
@@ -101,12 +100,12 @@ function test_security1() {
 //
 // let ll = require ("lala.js");
 // console.log(ll);
-test_security1();
-
+// test_security1();
+// p8132p;kl
 // console.log("-----------------initialization done--------------------------------");
-test();
-test2();
-setTimeout(() => console.log("setTimeout: OK"), 3300);
-let tt = setTimeout(() => console.log("BAD!"), 300);
-clearTimeout(tt);
-'hello' + ', ' + 'world'
+// test();
+// test2();
+// setTimeout(() => console.log("setTimeout: OK"), 3300);
+// let tt = setTimeout(() => console.log("BAD!"), 300);
+// clearTimeout(tt);
+// 'hello' + ', ' + 'world'
