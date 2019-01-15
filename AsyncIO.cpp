@@ -30,6 +30,32 @@ namespace asyncio {
         if (asyncLoop) {
             uv_async_send(&exitHandle);
             uv_loop_close(asyncLoop);
+            asyncLoop = nullptr;
+        }
+    }
+
+    uv_loop_t* initAndRunAuxLoop(uv_async_t** ploop_exitHandle) {
+        uv_loop_t* loop = uv_loop_new();
+        uv_async_t* loop_exitHandle = new uv_async_t();
+        //Opened async handle will keep the loop alive
+        std::thread thread_loop([loop, loop_exitHandle](){
+            uv_async_init(loop, loop_exitHandle, [](uv_async_t* asyncHandle){
+                uv_close((uv_handle_t*) asyncHandle, nullptr);
+            });
+            uv_run(loop, UV_RUN_DEFAULT);
+        });
+        thread_loop.detach();
+
+        *ploop_exitHandle = loop_exitHandle;
+
+        return loop;
+    }
+
+    void deinitAuxLoop(uv_loop_t* loop, uv_async_t* loop_exitHandle) {
+        if (loop && loop_exitHandle) {
+            uv_async_send(loop_exitHandle);
+            uv_loop_close(loop);
+            delete loop_exitHandle;
         }
     }
 

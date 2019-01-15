@@ -16,10 +16,12 @@ namespace asyncio {
     typedef uv_buf_t ioBuffer;
 
     uv_loop_t* initAndRunLoop();
+    uv_loop_t* initAndRunAuxLoop(uv_async_t** ploop_exitHandle);
 
-    inline uv_loop_t* getLoop() { return asyncLoop; };
+    inline uv_loop_t* getMainLoop() { return asyncLoop; };
 
     void deinitLoop();
+    void deinitAuxLoop(uv_loop_t* loop, uv_async_t* loop_exitHandle);
 
     class IOHandle {
     public:
