@@ -34,6 +34,7 @@ download_archive() {
 if [ "$platform" = "linux" ]; then
     download_archive libv8.7z
     download_archive libtomcrypt.7z
+    download_archive libuv.7z
 elif [ "$platform" = "macos" ]; then
     download_archive libv8.7z
     download_archive libtomcrypt.7z
