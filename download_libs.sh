@@ -38,6 +38,7 @@ if [ "$platform" = "linux" ]; then
 elif [ "$platform" = "macos" ]; then
     download_archive libv8.7z
     download_archive libtomcrypt.7z
+    download_archive libuv.7z
 else
     echo "FATAL_ERROR: unknown platform '$platform'"
     exit 1
