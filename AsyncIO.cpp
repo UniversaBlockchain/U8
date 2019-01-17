@@ -61,19 +61,13 @@ namespace asyncio {
 
     IOHandle::IOHandle() {
         ioReq = nullptr;
-        isOpenHandle = false;
-    }
-
-    IOHandle::IOHandle(ioHandle *req) {
-        ioReq = req;
-        isOpenHandle = false;
     }
 
     IOHandle::~IOHandle() {
-        free();
+        freeRequest();
     }
 
-    void IOHandle::free() {
+    void IOHandle::freeRequest() {
         if (ioReq) {
             uv_fs_req_cleanup(ioReq);
             delete ioReq;
@@ -84,118 +78,150 @@ namespace asyncio {
     void IOHandle::initRequest() {
         if (!ioReq)
             ioReq = new ioHandle();
-    }
-
-    void IOHandle::setRequestData(void* data) {
-        initRequest();
-
-        ioReq->data = data;
-    }
-
-    ioHandle* IOHandle::getRequest() {
-        return ioReq;
-    }
-
-    bool IOHandle::isOpen() {
-        return isOpenHandle;
-    }
-
-    ioHandle* IOHandle::open(const char* path, int flags, int mode, ioCallback callback, void* requestData) {
-        initRequest();
-
-        isOpenHandle = true;
-
-        if (requestData)
-            ioReq->data = requestData;
-
-        int result = uv_fs_open(asyncio::asyncLoop, ioReq, path, flags, mode, callback);
-
-        if (result) {
-            fprintf(stderr, "Error at opening file: %s\n", uv_strerror(result));
-
-            free();
-            return nullptr;
+        else if (closed) {
+            freeRequest();
+            ioReq = new ioHandle();
         }
-
-        return ioReq;
     }
 
-    ioHandle* IOHandle::read(ioBuffer* buffer, ioCallback callback, void* requestData) {
+    void IOHandle::open(const char* path, int flags, int mode, openFile_cb callback) {
+        initRequest();
+
+        auto file_data = new openFile_data();
+
+        file_data->callback = std::move(callback);
+        file_data->fileReq = ioReq;
+
+        ioReq->data = file_data;
+
+        int result = uv_fs_open(asyncio::asyncLoop, ioReq, path, flags, mode, open_cb);
+
+        if (result < 0) {
+            file_data->callback(result);
+
+            delete file_data;
+            freeRequest();
+        }
+    }
+
+    void IOHandle::read(uint maxBytesToRead, readFile_cb callback) {
         if (!ioReq) {
             fprintf(stderr, "IOHandle not initialized. Open file for reading.\n");
-            return nullptr;
+            return;
         }
 
-        if (!isOpenHandle) {
-            fprintf(stderr, "IOHandle is not open handle. Open new handle for file.\n");
-            return nullptr;
+        auto req = new ioHandle();
+        auto file_data = new readFile_data();
+
+        file_data->callback = std::move(callback);
+        file_data->fileReq = ioReq;
+        file_data->uvBuff = uv_buf_init((char*) malloc(maxBytesToRead), (unsigned int) maxBytesToRead);
+
+        req->data = file_data;
+
+        int result = uv_fs_read(asyncio::asyncLoop, req, (uv_file) ioReq->result, &file_data->uvBuff, 1, -1, read_cb);
+
+        if (result < 0) {
+            file_data->callback(byte_vector(), result);
+
+            free(file_data->uvBuff.base);
+            delete file_data;
+            delete req;
         }
-
-        ioHandle *req = new ioHandle();
-
-        if (requestData)
-            req->data = requestData;
-
-        int result = uv_fs_read(asyncio::asyncLoop, req, (uv_file) ioReq->result, buffer, 1, -1, callback);
-
-        if (result) {
-            fprintf(stderr, "Error at reading file: %s\n", uv_strerror(result));
-            return nullptr;
-        }
-
-        return req;
     }
 
-    ioHandle* IOHandle::write(ioBuffer* buffer, ioCallback callback, void* requestData) {
+    void IOHandle::write(const byte_vector& data, writeFile_cb callback) {
         if (!ioReq) {
             fprintf(stderr, "IOHandle not initialized. Open file for writing.\n");
-            return nullptr;
+            return;
         }
 
-        if (!isOpenHandle) {
-            fprintf(stderr, "IOHandle is not open handle. Open new handle for file.\n");
-            return nullptr;
+        auto req = new ioHandle();
+        auto file_data = new writeFile_data();
+
+        file_data->callback = std::move(callback);
+        file_data->fileReq = ioReq;
+        file_data->uvBuff = uv_buf_init((char*) data.data(), (unsigned int) data.size());
+
+        req->data = file_data;
+
+        int result = uv_fs_write(asyncio::asyncLoop, req, (uv_file) ioReq->result, &file_data->uvBuff, 1, -1, write_cb);
+
+        if (result < 0) {
+            file_data->callback(result);
+
+            delete file_data;
+            delete req;
         }
-
-        ioHandle *req = new ioHandle();
-
-        if (requestData)
-            req->data = requestData;
-
-        int result = uv_fs_write(asyncio::asyncLoop, req, (uv_file) ioReq->result, buffer, 1, -1, callback);
-
-        if (result) {
-            fprintf(stderr, "Error at writing file: %s\n", uv_strerror(result));
-            return nullptr;
-        }
-
-        return req;
     }
 
-    ioHandle* IOHandle::close(ioCallback callback, void* requestData) {
+    void IOHandle::close(closeFile_cb callback) {
         if (!ioReq) {
             fprintf(stderr, "IOHandle not initialized. Open file first.\n");
-            return nullptr;
+            return;
         }
 
-        if (!isOpenHandle) {
-            fprintf(stderr, "IOHandle is not open handle. Open new handle for file.\n");
-            return nullptr;
+        auto req = new ioHandle();
+        auto file_data = new closeFile_data();
+
+        file_data->callback = std::move(callback);
+        file_data->fileReq = ioReq;
+
+        req->data = file_data;
+
+        int result = uv_fs_close(asyncio::asyncLoop, req, (uv_file) ioReq->result, close_cb);
+
+        if (result < 0) {
+            file_data->callback(result);
+
+            delete file_data;
+            delete req;
         }
+        else
+            closed = true;
+    }
 
-        ioHandle *req = new ioHandle();
+    void IOHandle::open_cb(asyncio::ioHandle *req) {
+        uv_fs_req_cleanup(req);
+        auto file_data = (openFile_data*) req->data;
 
-        if (requestData)
-            req->data = requestData;
+        file_data->callback(req->result);
 
-        int result = uv_fs_close(asyncio::asyncLoop, req, (uv_file) ioReq->result, callback);
+        delete file_data;
+    }
 
-        if (result) {
-            fprintf(stderr, "Error at closing file: %s\n", uv_strerror(result));
-            return nullptr;
-        }
+    void IOHandle::read_cb(asyncio::ioHandle *req) {
+        uv_fs_req_cleanup(req);
+        auto file_data = (readFile_data*) req->data;
 
-        return req;
+        byte_vector data;
+        data.assign(file_data->uvBuff.base, file_data->uvBuff.base + file_data->uvBuff.len);
+
+        file_data->callback(data, req->result);
+
+        free(file_data->uvBuff.base);
+        delete file_data;
+        delete req;
+    }
+
+    void IOHandle::write_cb(asyncio::ioHandle *req) {
+        uv_fs_req_cleanup(req);
+        auto file_data = (writeFile_data*) req->data;
+
+        file_data->callback(req->result);
+
+        delete file_data;
+        delete req;
+    }
+
+    void IOHandle::close_cb(asyncio::ioHandle *req) {
+        uv_fs_req_cleanup(req);
+        auto file_data = (closeFile_data*) req->data;
+
+        file_data->callback(req->result);
+
+        delete file_data;
+        delete req;
     }
 
     void file::readFile_onClose(asyncio::ioHandle *req) {
@@ -209,7 +235,12 @@ namespace asyncio {
         if (file_data->result < 0)
             result = file_data->result;
 
-        file_data->callback(file_data->uvBuff.base, file_data->uvBuff.len, result);
+        std::vector<uint8_t> data;
+        data.assign(file_data->uvBuff.base, file_data->uvBuff.base + file_data->uvBuff.len);
+
+        file_data->callback(data, result);
+
+        free(file_data->uvBuff.base);
 
         delete file_data->fileReq;
         delete file_data;
@@ -221,7 +252,7 @@ namespace asyncio {
 
         readFile_data* file_data = (readFile_data*) req->data;
 
-        ioHandle *closeReq = new ioHandle();
+        ioHandle* closeReq = new ioHandle();
         file_data->result = req->result;
         closeReq->data = req->data;
 
@@ -237,7 +268,7 @@ namespace asyncio {
         uint64_t fileSize = req->statbuf.st_size;
 
         if ((req->result < 0) || (fileSize == 0) || (fileSize > MAX_FILE_SIZE)) {
-            ioHandle *closeReq = new ioHandle();
+            ioHandle* closeReq = new ioHandle();
             file_data->uvBuff.len = fileSize;
             file_data->result = req->result;
             closeReq->data = req->data;
@@ -246,7 +277,7 @@ namespace asyncio {
         } else {
             file_data->uvBuff = uv_buf_init((char*) malloc(fileSize), (unsigned int) fileSize);
 
-            ioHandle *readReq = new ioHandle();
+            ioHandle* readReq = new ioHandle();
             readReq->data = req->data;
 
             uv_fs_read(asyncio::asyncLoop, readReq, (uv_file) ((readFile_data*) req->data)->fileReq->result, &file_data->uvBuff, 1, -1, readFile_onRead);
@@ -260,12 +291,12 @@ namespace asyncio {
         if (req->result < 0) {
             readFile_data* file_data = (readFile_data*) req->data;
 
-            file_data->callback(nullptr, 0, req->result);
+            file_data->callback(std::vector<uint8_t>(), req->result);
 
             delete file_data;
             delete req;
         } else {
-            ioHandle *statReq = new ioHandle();
+            ioHandle* statReq = new ioHandle();
             statReq->data = req->data;
 
             uv_fs_fstat(asyncio::asyncLoop, statReq, (uv_file) req->result, readFile_onStat);
@@ -295,7 +326,7 @@ namespace asyncio {
 
         writeFile_data* file_data = (writeFile_data*) req->data;
 
-        ioHandle *closeReq = new ioHandle();
+        ioHandle* closeReq = new ioHandle();
         file_data->result = req->result;
         closeReq->data = req->data;
 
@@ -315,7 +346,7 @@ namespace asyncio {
             delete file_data;
             delete req;
         } else {
-            ioHandle *writeReq = new ioHandle();
+            ioHandle* writeReq = new ioHandle();
             writeReq->data = req->data;
 
             uv_fs_write(asyncio::asyncLoop, writeReq, (uv_file) req->result, &file_data->uvBuff, 1, -1, writeFile_onWrite);
@@ -323,10 +354,10 @@ namespace asyncio {
     }
 
     int file::readFile(const char* path, readFile_cb callback) {
-        ioHandle *req = new ioHandle();
-        readFile_data *file_data = new readFile_data();
+        ioHandle* req = new ioHandle();
+        readFile_data* file_data = new readFile_data();
 
-        file_data->callback = callback;
+        file_data->callback = std::move(callback);
         file_data->fileReq = req;
         file_data->uvBuff.base = nullptr;
         file_data->uvBuff.len = 0;
@@ -344,14 +375,14 @@ namespace asyncio {
         return result;
     }
 
-    int file::writeFile(const char* path, void* data, size_t len, writeFile_cb callback) {
-        ioHandle *req = new ioHandle();
-        writeFile_data *file_data = new writeFile_data();
+    int file::writeFile(const char* path, const byte_vector& data, writeFile_cb callback) {
+        ioHandle* req = new ioHandle();
+        writeFile_data* file_data = new writeFile_data();
 
-        file_data->callback = callback;
+        file_data->callback = std::move(callback);
         file_data->fileReq = req;
-        file_data->uvBuff.base = (char*) data;
-        file_data->uvBuff.len = len;
+        file_data->uvBuff.base = (char*) data.data();
+        file_data->uvBuff.len = data.size();
         file_data->result = 0;
 
         req->data = file_data;

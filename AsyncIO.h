@@ -6,6 +6,7 @@
 #define U8_ASYNCIO_H
 
 #include <uv.h>
+#include <c++/7/functional>
 
 namespace asyncio {
     extern uv_async_t exitHandle;
@@ -14,6 +15,36 @@ namespace asyncio {
     typedef uv_fs_t ioHandle;
     typedef uv_fs_cb ioCallback;
     typedef uv_buf_t ioBuffer;
+    typedef std::vector<uint8_t> byte_vector;
+
+    typedef std::function<void(ssize_t result)> openFile_cb;
+    typedef std::function<void(const byte_vector& data, ssize_t result)> readFile_cb;
+    typedef std::function<void(ssize_t result)> writeFile_cb;
+    typedef std::function<void(ssize_t result)> closeFile_cb;
+
+    struct openFile_data {
+        openFile_cb callback;
+        ioHandle* fileReq;
+    };
+
+    struct readFile_data {
+        readFile_cb callback;
+        ioHandle* fileReq;
+        uv_buf_t uvBuff;
+        ssize_t result;
+    };
+
+    struct writeFile_data {
+        writeFile_cb callback;
+        ioHandle* fileReq;
+        uv_buf_t uvBuff;
+        ssize_t result;
+    };
+
+    struct closeFile_data {
+        closeFile_cb callback;
+        ioHandle* fileReq;
+    };
 
     uv_loop_t* initAndRunLoop();
     uv_loop_t* initAndRunAuxLoop(uv_async_t** ploop_exitHandle);
@@ -26,49 +57,32 @@ namespace asyncio {
     class IOHandle {
     public:
         IOHandle();
-        IOHandle(ioHandle *req);
-
         ~IOHandle();
-        void free();
 
-        void initRequest();
-        void setRequestData(void* data);
-        ioHandle* getRequest();
-        bool isOpen();
-
-        ioHandle* open(const char* path, int flags, int mode, ioCallback callback, void* requestData = nullptr);
-        ioHandle* read(ioBuffer* buffer, ioCallback callback, void* requestData = nullptr);
-        ioHandle* write(ioBuffer* buffer, ioCallback callback, void* requestData = nullptr);
-        ioHandle* close(ioCallback callback, void* requestData = nullptr);
+        void open(const char* path, int flags, int mode, openFile_cb callback);
+        void read(uint maxBytesToRead, readFile_cb callback);
+        void write(const byte_vector& data, writeFile_cb callback);
+        void close(closeFile_cb callback);
 
     private:
         uv_fs_t* ioReq;
-        bool isOpenHandle;
-    };
+        bool closed = false;
 
-    typedef void (*readFile_cb)(void* data, size_t len, ssize_t result);
-    typedef void (*writeFile_cb)(ssize_t result);
+        void initRequest();
+        void freeRequest();
+
+        static void open_cb(asyncio::ioHandle *req);
+        static void read_cb(asyncio::ioHandle *req);
+        static void write_cb(asyncio::ioHandle *req);
+        static void close_cb(asyncio::ioHandle *req);
+    };
 
     class file {
     public:
         static const unsigned int MAX_FILE_SIZE = 10485760;
 
-        struct readFile_data {
-            readFile_cb callback;
-            ioHandle* fileReq;
-            uv_buf_t uvBuff;
-            ssize_t result;
-        };
-
-        struct writeFile_data {
-            writeFile_cb callback;
-            ioHandle* fileReq;
-            uv_buf_t uvBuff;
-            ssize_t result;
-        };
-
         static int readFile(const char* path, readFile_cb callback);
-        static int writeFile(const char* path, void* data, size_t len, writeFile_cb callback);
+        static int writeFile(const char* path, const byte_vector& data, writeFile_cb callback);
 
     private:
         static void readFile_onClose(asyncio::ioHandle *req);
