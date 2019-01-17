@@ -115,7 +115,8 @@ namespace asyncio {
 
         file_data->callback = std::move(callback);
         file_data->fileReq = ioReq;
-        file_data->uvBuff = uv_buf_init((char*) malloc(maxBytesToRead), (unsigned int) maxBytesToRead);
+        file_data->data = std::make_shared<byte_vector>(maxBytesToRead);
+        file_data->uvBuff = uv_buf_init((char*) file_data->data->data(), (unsigned int) maxBytesToRead);
 
         req->data = file_data;
 
@@ -197,9 +198,9 @@ namespace asyncio {
         byte_vector data;
         data.assign(file_data->uvBuff.base, file_data->uvBuff.base + file_data->uvBuff.len);
 
-        file_data->callback(data, req->result);
+        file_data->callback(*file_data->data, req->result);
 
-        free(file_data->uvBuff.base);
+        file_data->data.reset();
         delete file_data;
         delete req;
     }
@@ -235,13 +236,9 @@ namespace asyncio {
         if (file_data->result < 0)
             result = file_data->result;
 
-        std::vector<uint8_t> data;
-        data.assign(file_data->uvBuff.base, file_data->uvBuff.base + file_data->uvBuff.len);
+        file_data->callback(*file_data->data, result);
 
-        file_data->callback(data, result);
-
-        free(file_data->uvBuff.base);
-
+        file_data->data.reset();
         delete file_data->fileReq;
         delete file_data;
         delete req;
@@ -275,7 +272,8 @@ namespace asyncio {
 
             uv_fs_close(asyncio::asyncLoop, closeReq, (uv_file) ((readFile_data*) req->data)->fileReq->result, readFile_onClose);
         } else {
-            file_data->uvBuff = uv_buf_init((char*) malloc(fileSize), (unsigned int) fileSize);
+            file_data->data = std::make_shared<byte_vector>(fileSize);
+            file_data->uvBuff = uv_buf_init((char*) file_data->data->data(), (unsigned int) fileSize);
 
             ioHandle* readReq = new ioHandle();
             readReq->data = req->data;
@@ -291,7 +289,7 @@ namespace asyncio {
         if (req->result < 0) {
             readFile_data* file_data = (readFile_data*) req->data;
 
-            file_data->callback(std::vector<uint8_t>(), req->result);
+            file_data->callback(byte_vector(), req->result);
 
             delete file_data;
             delete req;

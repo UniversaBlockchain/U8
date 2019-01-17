@@ -7,14 +7,13 @@
 
 #include <uv.h>
 #include <c++/7/functional>
+#include <memory>
 
 namespace asyncio {
     extern uv_async_t exitHandle;
     extern uv_loop_t* asyncLoop;
 
     typedef uv_fs_t ioHandle;
-    typedef uv_fs_cb ioCallback;
-    typedef uv_buf_t ioBuffer;
     typedef std::vector<uint8_t> byte_vector;
 
     typedef std::function<void(ssize_t result)> openFile_cb;
@@ -32,6 +31,7 @@ namespace asyncio {
         ioHandle* fileReq;
         uv_buf_t uvBuff;
         ssize_t result;
+        std::shared_ptr<byte_vector> data;
     };
 
     struct writeFile_data {

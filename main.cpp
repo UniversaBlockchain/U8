@@ -25,6 +25,25 @@ size_t fileSize[NUM_THREADS];
 int summ[NUM_THREADS];
 int block[NUM_THREADS];
 
+void onCallback(const asyncio::byte_vector& data, ssize_t result) {
+    printf("Read file. Size = %i. Result = %i\n", (int) data.size(), (int) result);
+
+    long sum = 0;
+    for (uint8_t n: data)
+        sum += (int8_t) n;
+
+    if (sum != -BUFF_SIZE * NUM_BLOCKS / 2)
+        fprintf(stderr, "mismatch test file sum in readFileCallback\n");
+
+    uv_sem_post(&stop[0]);
+}
+
+void onWriteCallback (ssize_t result) {
+    printf("Wrote file. Result = %i\n", (int) result);
+
+    uv_sem_post(&stop[0]);
+}
+
 void testAsyncFile() {
     printf("testAsyncFile()...\n");
 
@@ -125,7 +144,7 @@ void testAsyncFile() {
                             printf("Close file in thread: %ld\n", t + 1);
                         });
                     else {
-                        for (uint8_t n: dataBuf[t])
+                        for (uint8_t n: data)
                             summ[t] += (int8_t) n;
                         fileSize[t] += result;
 
@@ -175,18 +194,7 @@ void testAsyncFile() {
         snprintf(fileName, 16, "TestFile%i.bin", t);
 
         for (int i = 0; i < NUM_ITERATIONS; i++)
-            asyncio::file::readFile(fileName, [](const std::vector<uint8_t>& data, ssize_t result) {
-                printf("Read file. Size = %i. Result = %i\n", (int) data.size(), (int) result);
-
-                long sum = 0;
-                for (uint8_t n: data)
-                    sum += (int8_t) n;
-
-                if (sum != -BUFF_SIZE * NUM_BLOCKS / 2)
-                    fprintf(stderr, "mismatch test file sum in readFileCallback\n");
-
-                uv_sem_post(&stop[0]);
-            });
+            asyncio::file::readFile(fileName, onCallback);
     }
 
     for (int i = 0; i < NUM_THREADS * NUM_ITERATIONS; i++)
@@ -207,11 +215,7 @@ void testAsyncFile() {
         char fileName[22];
         snprintf(fileName, 22, "TestEntireFile%i.bin", t);
 
-        asyncio::file::writeFile(fileName, dataBuf[t], [](ssize_t result) {
-            printf("Wrote file. Result = %i\n", (int) result);
-
-            uv_sem_post(&stop[0]);
-        });
+        asyncio::file::writeFile(fileName, dataBuf[t], onWriteCallback);
     }
 
     for (int i = 0; i < NUM_THREADS; i++)
