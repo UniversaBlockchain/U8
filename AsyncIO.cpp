@@ -59,6 +59,13 @@ namespace asyncio {
         }
     }
 
+    bool isError(ssize_t result) {
+        return result < 0;
+    }
+    const char* getError(ssize_t code) {
+        return uv_strerror(code);
+    }
+
     IOHandle::IOHandle() {
         ioReq = nullptr;
     }
@@ -104,7 +111,7 @@ namespace asyncio {
         }
     }
 
-    void IOHandle::read(uint maxBytesToRead, readFile_cb callback) {
+    void IOHandle::read(size_t maxBytesToRead, readFile_cb callback) {
         if (!ioReq) {
             fprintf(stderr, "IOHandle not initialized. Open file for reading.\n");
             return;
@@ -225,7 +232,7 @@ namespace asyncio {
     void file::readFile_onClose(asyncio::ioHandle *req) {
         uv_fs_req_cleanup(req);
 
-        readFile_data* file_data = (readFile_data*) req->data;
+        auto file_data = (readFile_data*) req->data;
         ssize_t result = 0;
 
         if (req->result < 0)
@@ -244,9 +251,9 @@ namespace asyncio {
     void file::readFile_onRead(asyncio::ioHandle *req) {
         uv_fs_req_cleanup(req);
 
-        readFile_data* file_data = (readFile_data*) req->data;
+        auto file_data = (readFile_data*) req->data;
 
-        ioHandle* closeReq = new ioHandle();
+        auto closeReq = new ioHandle();
         file_data->result = req->result;
         closeReq->data = req->data;
 
@@ -258,24 +265,33 @@ namespace asyncio {
     void file::readFile_onStat(asyncio::ioHandle *req) {
         uv_fs_req_cleanup(req);
 
-        readFile_data* file_data = (readFile_data*) req->data;
+        auto file_data = (readFile_data*) req->data;
         uint64_t fileSize = req->statbuf.st_size;
 
-        if ((req->result < 0) || (fileSize == 0) || (fileSize > MAX_FILE_SIZE)) {
-            ioHandle* closeReq = new ioHandle();
+        if ((req->result < 0) || (fileSize == 0) || ((fileSize > MAX_FILE_SIZE) && (file_data->maxBytes == 0))) {
+            auto closeReq = new ioHandle();
             file_data->uvBuff.len = fileSize;
             file_data->result = req->result;
             closeReq->data = req->data;
 
             uv_fs_close(asyncio::asyncLoop, closeReq, (uv_file) ((readFile_data*) req->data)->fileReq->result, readFile_onClose);
         } else {
-            file_data->data = std::make_shared<byte_vector>(fileSize);
-            file_data->uvBuff = uv_buf_init((char*) file_data->data->data(), (unsigned int) fileSize);
+            uint64_t bufSize = fileSize;
+            if (file_data->maxBytes > 0) {
+                bufSize = file_data->maxBytes;
 
-            ioHandle* readReq = new ioHandle();
+                if (bufSize + file_data->pos > fileSize)
+                    bufSize = fileSize - file_data->pos;
+            }
+
+            file_data->data = std::make_shared<byte_vector>(bufSize);
+            file_data->uvBuff = uv_buf_init((char*) file_data->data->data(), (unsigned int) bufSize);
+
+            auto readReq = new ioHandle();
             readReq->data = req->data;
 
-            uv_fs_read(asyncio::asyncLoop, readReq, (uv_file) ((readFile_data*) req->data)->fileReq->result, &file_data->uvBuff, 1, -1, readFile_onRead);
+            uv_fs_read(asyncio::asyncLoop, readReq, (uv_file) ((readFile_data*) req->data)->fileReq->result,
+                    &file_data->uvBuff, 1, (file_data->pos > 0) ? file_data->pos : -1, readFile_onRead);
         }
 
         delete req;
@@ -284,14 +300,14 @@ namespace asyncio {
     void file::readFile_onOpen(asyncio::ioHandle *req) {
         uv_fs_req_cleanup(req);
         if (req->result < 0) {
-            readFile_data* file_data = (readFile_data*) req->data;
+            auto file_data = (readFile_data*) req->data;
 
             file_data->callback(byte_vector(), req->result);
 
             delete file_data;
             delete req;
         } else {
-            ioHandle* statReq = new ioHandle();
+            auto statReq = new ioHandle();
             statReq->data = req->data;
 
             uv_fs_fstat(asyncio::asyncLoop, statReq, (uv_file) req->result, readFile_onStat);
@@ -301,7 +317,7 @@ namespace asyncio {
     void file::writeFile_onClose(asyncio::ioHandle *req) {
         uv_fs_req_cleanup(req);
 
-        writeFile_data* file_data = (writeFile_data*) req->data;
+        auto file_data = (writeFile_data*) req->data;
         ssize_t result = 0;
 
         if (req->result < 0)
@@ -319,9 +335,9 @@ namespace asyncio {
     void file::writeFile_onWrite(asyncio::ioHandle *req) {
         uv_fs_req_cleanup(req);
 
-        writeFile_data* file_data = (writeFile_data*) req->data;
+        auto file_data = (writeFile_data*) req->data;
 
-        ioHandle* closeReq = new ioHandle();
+        auto closeReq = new ioHandle();
         file_data->result = req->result;
         closeReq->data = req->data;
 
@@ -333,7 +349,7 @@ namespace asyncio {
     void file::writeFile_onOpen(asyncio::ioHandle *req) {
         uv_fs_req_cleanup(req);
 
-        writeFile_data* file_data = (writeFile_data*) req->data;
+        auto file_data = (writeFile_data*) req->data;
 
         if (req->result < 0) {
             file_data->callback(req->result);
@@ -341,38 +357,69 @@ namespace asyncio {
             delete file_data;
             delete req;
         } else {
-            ioHandle* writeReq = new ioHandle();
+            auto writeReq = new ioHandle();
             writeReq->data = req->data;
 
             uv_fs_write(asyncio::asyncLoop, writeReq, (uv_file) req->result, &file_data->uvBuff, 1, -1, writeFile_onWrite);
         }
     }
 
-    int file::readFile(const char* path, readFile_cb callback) {
-        ioHandle* req = new ioHandle();
-        readFile_data* file_data = new readFile_data();
+    void file::readFile(const char* path, readFile_cb callback) {
+        auto req = new ioHandle();
+        auto file_data = new readFile_data();
 
         file_data->callback = std::move(callback);
         file_data->fileReq = req;
         file_data->uvBuff.base = nullptr;
         file_data->uvBuff.len = 0;
         file_data->result = 0;
+        file_data->pos = 0;
+        file_data->maxBytes = 0;
 
         req->data = file_data;
 
         int result = uv_fs_open(asyncio::asyncLoop, req, path, O_RDONLY, 0, readFile_onOpen);
 
-        if (result) {
-            delete req;
-            delete file_data;
-        }
+        if (result < 0) {
+            file_data->callback(byte_vector(), result);
 
-        return result;
+            delete file_data;
+            delete req;
+        }
     }
 
-    int file::writeFile(const char* path, const byte_vector& data, writeFile_cb callback) {
-        ioHandle* req = new ioHandle();
-        writeFile_data* file_data = new writeFile_data();
+    void file::readFilePart(const char* path, size_t pos, size_t maxBytesToRead, readFile_cb callback) {
+        if (maxBytesToRead == 0) {
+            callback(byte_vector(), -1);
+            return;
+        }
+
+        auto req = new ioHandle();
+        auto file_data = new readFile_data();
+
+        file_data->callback = std::move(callback);
+        file_data->fileReq = req;
+        file_data->uvBuff.base = nullptr;
+        file_data->uvBuff.len = 0;
+        file_data->result = 0;
+        file_data->pos = pos;
+        file_data->maxBytes = maxBytesToRead;
+
+        req->data = file_data;
+
+        int result = uv_fs_open(asyncio::asyncLoop, req, path, O_RDONLY, 0, readFile_onOpen);
+
+        if (result < 0) {
+            file_data->callback(byte_vector(), result);
+
+            delete file_data;
+            delete req;
+        }
+    }
+
+    void file::writeFile(const char* path, const byte_vector& data, writeFile_cb callback) {
+        auto req = new ioHandle();
+        auto file_data = new writeFile_data();
 
         file_data->callback = std::move(callback);
         file_data->fileReq = req;
@@ -384,11 +431,11 @@ namespace asyncio {
 
         int result = uv_fs_open(asyncio::asyncLoop, req, path, O_CREAT | O_WRONLY | O_TRUNC, S_IRWXU | S_IRWXG | S_IRWXO, writeFile_onOpen);
 
-        if (result) {
-            delete req;
-            delete file_data;
-        }
+        if (result < 0) {
+            file_data->callback(result);
 
-        return result;
+            delete file_data;
+            delete req;
+        }
     }
 };

@@ -31,6 +31,8 @@ namespace asyncio {
         ioHandle* fileReq;
         uv_buf_t uvBuff;
         ssize_t result;
+        size_t pos;
+        size_t maxBytes;
         std::shared_ptr<byte_vector> data;
     };
 
@@ -54,13 +56,17 @@ namespace asyncio {
     void deinitLoop();
     void deinitAuxLoop(uv_loop_t* loop, uv_async_t* loop_exitHandle);
 
+    // error helpers
+    bool isError(ssize_t result);
+    const char* getError(ssize_t code);
+
     class IOHandle {
     public:
         IOHandle();
         ~IOHandle();
 
         void open(const char* path, int flags, int mode, openFile_cb callback);
-        void read(uint maxBytesToRead, readFile_cb callback);
+        void read(size_t maxBytesToRead, readFile_cb callback);
         void write(const byte_vector& data, writeFile_cb callback);
         void close(closeFile_cb callback);
 
@@ -81,8 +87,10 @@ namespace asyncio {
     public:
         static const unsigned int MAX_FILE_SIZE = 10485760;
 
-        static int readFile(const char* path, readFile_cb callback);
-        static int writeFile(const char* path, const byte_vector& data, writeFile_cb callback);
+        static void readFile(const char* path, readFile_cb callback);
+        static void readFilePart(const char* path, size_t pos, size_t maxBytesToRead, readFile_cb callback);
+
+        static void writeFile(const char* path, const byte_vector& data, writeFile_cb callback);
 
     private:
         static void readFile_onClose(asyncio::ioHandle *req);
