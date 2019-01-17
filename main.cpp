@@ -125,8 +125,9 @@ void testAsyncFile() {
                             printf("Close file in thread: %ld\n", t + 1);
                         });
                     else {
-                        for (uint8_t n: data)
-                            summ[t] += (int8_t) n;
+                        char* buf = (char*) data.data();
+                        for (int n = 0; n < result; n++)
+                            summ[t] += buf[n];
                         fileSize[t] += result;
 
                         file[t]->read(BUFF_SIZE, onRead);
@@ -179,8 +180,10 @@ void testAsyncFile() {
                 printf("Read file. Size = %i. Result = %i\n", (int) data.size(), (int) result);
 
                 long sum = 0;
-                for (uint8_t n: data)
-                    sum += (int8_t) n;
+                ulong size = data.size();
+                char* buf = (char*) data.data();
+                for (int n = 0; n < size; n++)
+                    sum += buf[n];
 
                 if (sum != -BUFF_SIZE * NUM_BLOCKS / 2)
                     fprintf(stderr, "mismatch test file sum in readFileCallback\n");

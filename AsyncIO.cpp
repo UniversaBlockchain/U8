@@ -195,9 +195,6 @@ namespace asyncio {
         uv_fs_req_cleanup(req);
         auto file_data = (readFile_data*) req->data;
 
-        byte_vector data;
-        data.assign(file_data->uvBuff.base, file_data->uvBuff.base + file_data->uvBuff.len);
-
         file_data->callback(*file_data->data, req->result);
 
         file_data->data.reset();
