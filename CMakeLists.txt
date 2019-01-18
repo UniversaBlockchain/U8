@@ -8,6 +8,8 @@ add_definitions(-DGMP_DESC)
 
 set(CMAKE_CXX_STANDARD 17)
 
+set(CMAKE_CXX_FLAGS_DEBUG -Wno-register)
+
 if (${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
     set(MACOSX true)
 endif ()
@@ -21,7 +23,8 @@ elseif (WIN32)
 endif ()
 
 add_executable(u8 main.cpp Scripter.cpp Scripter.h tools.h basic_builtins.cpp basic_builtins.h tools.cpp AsyncSleep.cpp
-        AsyncSleep.h Logging.cpp Logging.h JsPromise.cpp JsPromise.h PublicKey.cpp PrivateKey.cpp base64.cpp cryptoCommon.h cryptoCommon.cpp AsyncIO.h AsyncIO.cpp AsyncIOTests.cpp AsyncIOTests.h)
+        AsyncSleep.h Logging.cpp Logging.h JsPromise.cpp JsPromise.h PublicKey.cpp PrivateKey.cpp base64.cpp cryptoCommon.h
+        cryptoCommon.cpp AsyncIO.h AsyncIO.cpp AsyncIOTests.cpp AsyncIOTests.h HashId.cpp HashId.h cryptoTests.h cryptoTests.cpp)
 
 message("platform: ${platform}")
 

@@ -50,8 +50,8 @@ bool PublicKey::verify(const std::vector<unsigned char> &sig, const std::vector<
 			&sig[0], sig.size(),
 			hashResult, desc.hashsize, hash_idx,
 			LTC_PKCS_1_PSS, mgf1hash_idx, saltLen, &stat, &key);
-	if (err != CRYPT_OK)
-		printf("  warning (rsa_verify_hash_ex): %s\n", error_to_string(err));
+//	if (err != CRYPT_OK)
+//		printf("  warning (rsa_verify_hash_ex): %s\n", error_to_string(err));
 	return stat != 0;
 }
 

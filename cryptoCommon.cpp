@@ -22,7 +22,6 @@ void initCrypto() {
     hashIndexes[SHA1] = find_hash(sha1_desc.name);
     hashIndexes[SHA512] = find_hash(sha512_desc.name);
     hashIndexes[SHA3_256] = find_hash(sha3_256_desc.name);
-    std::cout << sha3_256_desc.name << std::endl;
 }
 
 int getHashIndex(HashType hashType) {
