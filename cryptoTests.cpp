@@ -5,6 +5,8 @@
 #include "cryptoTests.h"
 #include <iostream>
 #include <vector>
+#include <map>
+#include <unordered_map>
 #include "base64.h"
 #include "PrivateKey.h"
 #include "HashId.h"
@@ -13,9 +15,8 @@ using namespace std;
 
 template <class T>
 void checkResult(const string& msg, const T expected, const T result) {
-//void checkResult(T expected, T result) {
     auto os1 = (result == expected ? &cout : &cerr);
-    *os1 << "checkResult " << msg << " (should be " << expected << "): " << result << endl;
+    *os1 << "checkResult " << msg << " (expected " << expected << "): " << result << endl;
 }
 
 void testCrypto() {
@@ -144,4 +145,54 @@ void testHashId() {
     checkResult<string>("hashId", "KYbgYeFfbIUJJsjt4BaGruK6xSgTPTnUbrB9YOk001SLuDDwJqAOQHs6ZS+Yr/zPzwfi9dC1hO5tLY5QyJ49m2bpCjQpPQ+SC374wBlbB8nv+JIcY1fj7daPKAIoKYCC", HashId::of(str64Tovector("1p2G8xNzmzp1281QwePpwrh6I97aZIIBypjesdZ9OT9v3XogDTgf+oUG70zA8g16m6XUnkia2ggU8HWpKTj7"))->toBase64());
 
     cout << "testHashId()... done!" << endl << endl;
+}
+
+void testHashIdComparison() {
+    cout << "testHashIdComparison()..." << endl;
+
+    typedef unordered_map<HashId, int, HashId::UnorderedHash> HashIdUnorderedMap_t;
+    typedef map<HashId, int> HashIdMap_t;
+
+    auto body1 = str64Tovector("HQ==");
+    auto body2 = str64Tovector("j28=");
+    auto hash1 = HashId(body1);
+    auto hash2 = HashId(body2);
+    auto hash1copy = HashId(hash1);
+    auto hash1shared = HashId::of(body1);
+    auto hash2shared = HashId::of(body2);
+    auto hash1copyshared = HashId::of(body1);
+
+    HashIdUnorderedMap_t um;
+    HashIdMap_t m;
+    um[hash1] = 33;
+    um[hash2] = 44;
+    m[hash1] = 331;
+    m[hash2] = 441;
+
+    checkResult<bool>("hash1 == hash2", false, hash1 == hash2);
+    checkResult<bool>("hash1 == hash1copy", true, hash1 == hash1copy);
+    checkResult<bool>("hash1 == hash1", true, hash1 == hash1);
+    checkResult<bool>("hash1shared == hash2shared", false, *hash1shared == *hash2shared);
+    checkResult<bool>("hash1shared == hash1copyshared", true, *hash1shared == *hash1copyshared);
+    checkResult<bool>("hash1shared == hash1shared", true, *hash1shared == *hash1shared);
+
+    checkResult<bool>("hash1<hash2", true, hash1.operator<(hash2));
+    checkResult<bool>("hash1>hash2", false, hash2.operator<(hash1));
+
+    checkResult("um.find(hash1)", 33, um.find(hash1)->second);
+    checkResult("um.find(hash2)", 44, um.find(hash2)->second);
+    um[hash2] = 442;
+    checkResult("um.find(hash2 updated value)", 442, um.find(hash2)->second);
+    checkResult("m.find(hash1)", 331, m.find(hash1)->second);
+    checkResult("m.find(hash2)", 441, m.find(hash2)->second);
+    m[hash2] = 4421;
+    checkResult("m.find(hash2 updated value)", 4421, m.find(hash2)->second);
+
+    cout << "testHashIdComparison()... done!" << endl << endl;
+}
+
+void testCryptoAll() {
+    testCrypto();
+    testHashId();
+    testHashIdComparison();
 }

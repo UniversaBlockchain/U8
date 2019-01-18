@@ -17,8 +17,7 @@ void testCrypto();
 int main(int argc, const char **argv) {
 
     initCrypto();
-    testCrypto();
-    testHashId();
+    testCryptoAll();
 
     testAsyncFile();
 

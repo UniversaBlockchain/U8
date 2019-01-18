@@ -11,6 +11,10 @@ HashId::HashId(const std::vector<unsigned char> &packedData) {
     initWith(packedData);
 }
 
+HashId::HashId(const HashId& copyFrom) {
+    digest = copyFrom.digest;
+}
+
 std::shared_ptr<HashId> HashId::of(const std::vector<unsigned char> &packedData) {
     return std::make_shared<HashId>(packedData);
 }
@@ -40,4 +44,32 @@ void HashId::initWith(const std::vector<unsigned char> &packedData) {
 
 std::string HashId::toBase64() {
     return base64_encode(&digest[0], digest.size());
+}
+
+bool HashId::operator<(const HashId& other) const {
+    if (digest.size() != other.digest.size()) {
+        //TODO: throw error
+        return false;
+    }
+    for (int i = 0; i < digest.size(); i++) {
+        if (digest[i] < other.digest[i])
+            return true;
+        if (digest[i] > other.digest[i])
+            return false;
+    }
+    return false;
+}
+
+bool HashId::operator==(const HashId& other) const {
+    if (digest.size() != other.digest.size())
+        return false;
+    return std::equal(digest.begin(), digest.end(), other.digest.begin());
+}
+
+size_t HashId::hashCode() const {
+    return std::hash<std::string>()(std::string(digest.begin(), digest.end()));
+}
+
+size_t HashId::UnorderedHash::operator()(const HashId& val) const {
+    return val.hashCode();
 }
