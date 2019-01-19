@@ -8,7 +8,6 @@
 #include <vector>
 #include <string>
 #include <memory>
-#include <bits/shared_ptr.h>
 
 class HashId {
 

@@ -6,7 +6,8 @@
 #define U8_ASYNCIO_H
 
 #include <uv.h>
-#include <c++/7/functional>
+#include <vector>
+#include <functional>
 #include <memory>
 
 namespace asyncio {

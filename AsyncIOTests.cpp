@@ -12,6 +12,7 @@ using namespace std;
 #define NUM_ITERATIONS  5
 #define NUM_BLOCKS      256
 
+typedef unsigned long ulong;
 std::shared_ptr<asyncio::IOHandle> file[NUM_THREADS];
 asyncio::byte_vector dataBuf[NUM_THREADS];
 uv_sem_t stop[NUM_THREADS];

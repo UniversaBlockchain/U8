@@ -62,6 +62,7 @@ int manual_main(int argc, char **argv) {
     auto platform = Scripter::initV8(argv[0]);
     try {
         shared_ptr<Scripter> se = Scripter::New();
+        // Do something with scripter object, e.g. evaluate scripts.
         this_thread::sleep_for(4s);
     }
     catch (exception &e) {

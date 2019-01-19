@@ -46,7 +46,7 @@
 #		define __USE_GNU 1
 #		include <endian.h>
 #	else
-#		include <sys/endian.h>
+#		include <machine/endian.h>
 #	endif /* Linux specific code. */
 #	include <sys/types.h>
 #	include <string.h> /* bcopy, bzero, memcpy, memmove, memset, strerror... */

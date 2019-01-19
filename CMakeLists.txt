@@ -4,7 +4,7 @@ project(u8)
 add_definitions(-DGMP_DESC)
 
 # v8 lib
-# g++ -I/usr/local/Cellar/v8/7.1.302.28 -I/usr/local/Cellar/v8/7.1.302.28/include -Gs samples/hello-world.cc -o hello_world -L/usr/local/Cellar/v8/7.1.302.28 -lv8 -lv8_libplatform -lv8_libbase -Lout.gn/x64.release.sample/obj/ -pthread -std=c++0x -O2
+# g++ -I/usr/local/Cellar/v8/7.1.302.28 -I/usr/local/Cellar/v8/7.1.302.28/include -Gs tests/hello-world.cc -o hello_world -L/usr/local/Cellar/v8/7.1.302.28 -lv8 -lv8_libplatform -lv8_libbase -Lout.gn/x64.release.sample/obj/ -pthread -std=c++0x -O2
 
 set(CMAKE_CXX_STANDARD 17)
 
@@ -35,6 +35,8 @@ if (${platform} STREQUAL macos)
     add_dependencies(u8 u8libs)
     set(libtype .dylib)
     foreach (l libv8 libtomcrypt libuv)
+        message( ext/${platform}/${l}/include)
+        message( ext/${platform}/${l}/include)
         target_include_directories(u8 PUBLIC ext/${platform}/${l}/include)
         target_link_directories(u8 PUBLIC ext/${platform}/${l}/lib)
     endforeach (l)
