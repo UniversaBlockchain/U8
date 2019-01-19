@@ -201,7 +201,7 @@ bool Scripter::checkException(TryCatch &trycatch, Local<Context> context) {
 }
 
 template<class T>
-void Scripter::throwException(TryCatch &trycatch, Local<Context> context) {
+void Scripter::throwPendingException(TryCatch &trycatch, Local<Context> context) {
     if (checkException(trycatch, context)) {
         throw T(getString(trycatch.Exception()));
     }
@@ -219,12 +219,12 @@ string Scripter::evaluate(const string &src, bool needsReturn, ScriptOrigin *ori
         TryCatch trycatch(pIsolate);
         auto scriptResult = v8::Script::Compile(context, source, origin);
         if (scriptResult.IsEmpty())
-            throwException<SyntaxError>(trycatch, context);
+            throwPendingException<SyntaxError>(trycatch, context);
         else {
             v8::Local<v8::Script> script = scriptResult.ToLocalChecked();
             auto maybeResult = script->Run(context);
             if (maybeResult.IsEmpty())
-                throwException<ScriptError>(trycatch, context);
+                throwPendingException<ScriptError>(trycatch, context);
             else {
                 if (needsReturn) {
                     res = getString(maybeResult);
@@ -235,9 +235,9 @@ string Scripter::evaluate(const string &src, bool needsReturn, ScriptOrigin *ori
     return res;
 }
 
-void Scripter::runAsMain(const string &sourceScript, const vector<string> &&args, ScriptOrigin *origin) {
+int Scripter::runAsMain(const string &sourceScript, const vector<string> &&args, ScriptOrigin *origin) {
 //    auto fixedScript = evaluate()
-    inContext([&](auto context) {
+    return inContext([&](Local<Context>& context) {
         auto global = context->Global();
         // fix imports
         global->Set(v8String("__source"), v8String(sourceScript));
@@ -248,7 +248,8 @@ void Scripter::runAsMain(const string &sourceScript, const vector<string> &&args
         evaluate(script, false, origin);
         // run main if any
         Local<Function> main = Local<Function>::Cast(global->Get(v8String("main")));
-        if (!main->IsUndefined()) {
+
+        if (!main->IsUndefined()){
             auto jsArgs = Array::New(pIsolate);
             for (int i = 0; i < args.size(); i++) {
                 jsArgs->Set(i, String::NewFromUtf8(pIsolate, args[i].c_str()));
@@ -256,8 +257,11 @@ void Scripter::runAsMain(const string &sourceScript, const vector<string> &&args
             auto param = Local<Value>::Cast(jsArgs);
             TryCatch tryCatch(pIsolate);
             auto result = main->Call(context, global, 1, &param);
-            throwException<ScriptError>(tryCatch, context);
+            throwPendingException<ScriptError>(tryCatch, context);
+            return result.ToLocalChecked()->Int32Value(context).FromJust();
         }
+        // if we reach this point, there are no main function
+        return 0;
     });
 }
 

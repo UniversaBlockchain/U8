@@ -12,30 +12,33 @@
 using namespace std;
 
 void usage();
+
 void testCrypto();
 
 int main(int argc, const char **argv) {
 
     initCrypto();
-    if( argc == 1) {
+    if (argc == 1) {
         // test only if no args
         testCryptoAll();
         testAsyncFile();
+        return 0;
     }
 
     if (argc == 1) {
         usage();
         return 1;
-    }
-    else {
+    } else {
         return Scripter::Application(argv[0], [=](auto se) {
             vector<string> args(argv + 1, argv + argc);
-            if (args[0] == "-e")
+            if (args[0] == "-e") {
                 cout << se->evaluate(args[1]) << endl;
-            else {
-                se->runAsMain(loadAsStringOrThrow(args[0]), vector<string>(args.begin() + 1, args.end()), args[0]);
+                return 0;
+            } else {
+                return se->runAsMain(
+                                loadAsStringOrThrow(args[0]), vector<string>(args.begin() + 1, args.end()), args[0]
+                        );
             }
-            return 0;
         });
     }
 }

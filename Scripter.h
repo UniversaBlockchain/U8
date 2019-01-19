@@ -20,16 +20,16 @@ class Scripter : public std::enable_shared_from_this<Scripter>, public Logging {
 public:
 
     // ------------------- helpers -------------------------------
-    Local<String> v8String(string x,NewStringType t = NewStringType::kNormal) {
-        return String::NewFromUtf8(pIsolate, x.c_str(),t).ToLocalChecked();
+    Local<String> v8String(string x, NewStringType t = NewStringType::kNormal) {
+        return String::NewFromUtf8(pIsolate, x.c_str(), t).ToLocalChecked();
     }
 
-    Local<String> v8String(const char* cstr,NewStringType t = NewStringType::kNormal) {
+    Local<String> v8String(const char *cstr, NewStringType t = NewStringType::kNormal) {
         return String::NewFromUtf8(pIsolate, cstr, t).ToLocalChecked();
     }
 
     Local<FunctionTemplate> functionTemplate(FunctionCallback callback) {
-        return FunctionTemplate::New(pIsolate,callback);
+        return FunctionTemplate::New(pIsolate, callback);
     }
 
     /**
@@ -74,21 +74,21 @@ public:
      * @param needsReturn true to extract return value
      * @return the string returned by a script or empty string if not +needsReturn+
      */
-    string evaluate(const string &code,bool needsReturn = true,ScriptOrigin* origin = nullptr);
+    string evaluate(const string &code, bool needsReturn = true, ScriptOrigin *origin = nullptr);
 
-    void runAsMain(const string& script,const vector<string>&& args,ScriptOrigin* origin= nullptr);
+    int runAsMain(const string &sourceScript, const vector<string> &&args, ScriptOrigin *origin = nullptr);
 
-    void runAsMain(const string& script,const vector<string>&& args,string fileName) {
+    int runAsMain(const string &script, const vector<string> &&args, string fileName) {
         ScriptOrigin origin(v8String(fileName));
-        runAsMain(script, move(args), &origin);
+        return runAsMain(script, move(args), &origin);
     }
 
-    template <typename T>
+    template<typename T>
     string getString(MaybeLocal<T> value) {
         return getString(value.ToLocalChecked());
     }
 
-    template <typename T>
+    template<typename T>
     string getString(Local<T> value) {
         String::Utf8Value result(pIsolate, value);
         return *result;
@@ -105,22 +105,20 @@ public:
      *
      * @param block to execute
      */
-    void inContext(const std::function<void(v8::Local<v8::Context>)> &block) {
+    template<typename Function>
+    auto inContext(Function&& block) {
         v8::HandleScope handle_scope(pIsolate);
         auto cxt = context.Get(pIsolate);
         v8::Context::Scope context_scope(cxt);
-        block(cxt);
+        return block(cxt);
     }
 
-    /**
-     * Same as inContext() but with non-const lambda.
-     * @param block
-     */
-    void inContext(std::function<void(v8::Local<v8::Context>)> &block) {
+    template<typename Function>
+    auto inContext(Function &block) {
         v8::HandleScope handle_scope(pIsolate);
         auto cxt = context.Get(pIsolate);
         v8::Context::Scope context_scope(cxt);
-        block(cxt);
+        return block(cxt);
     }
 
     /**
@@ -171,8 +169,9 @@ public:
     virtual ~Scripter();
 
     template<class T>
-    void throwException(TryCatch &tc,Local<Context>);
-    bool checkException(TryCatch &tc,Local<Context>);
+    void throwPendingException(TryCatch &tc, Local<Context>);
+
+    bool checkException(TryCatch &tc, Local<Context>);
 
 private:
 
