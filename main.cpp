@@ -17,9 +17,11 @@ void testCrypto();
 int main(int argc, const char **argv) {
 
     initCrypto();
-    testCryptoAll();
-
-    testAsyncFile();
+    if( argc == 1) {
+        // test only if no args
+        testCryptoAll();
+        testAsyncFile();
+    }
 
     if (argc == 1) {
         usage();
