@@ -221,9 +221,43 @@ namespace asyncio {
         static void close_cb(asyncio::ioHandle *req);
     };
 
+    typedef std::function<void(std::shared_ptr<IOHandle> handle, ssize_t result)> openIOHandle_cb;
+
     class file {
     public:
+        /**
+         * Max size of file for readFile and writeFile
+         */
         static const unsigned int MAX_FILE_SIZE = 10485760;
+
+        /**
+         * Asynchronously opening of a file with a callback that returns a shared pointer
+         * to an instance of the IOHandle corresponding to the open file.
+         *
+         * @param path to open file
+         * @param flags (see IOHandle::open)
+         * @param mode - specifies the file mode bits be applied when a new file is created (see IOHandle::open)
+         * @param callback caused when opening a file or error
+         */
+        static void open(const char* path, int flags, int mode, openIOHandle_cb callback);
+
+        /**
+         * Asynchronously opening of a file for reading with a callback that returns a shared pointer
+         * to an instance of the IOHandle corresponding to the open file.
+         *
+         * @param path to open file
+         * @param callback caused when opening a file or error
+         */
+        static void openRead(const char* path, openIOHandle_cb callback);
+
+        /**
+         * Asynchronously opening of a file for writing with a callback that returns a shared pointer
+         * to an instance of the IOHandle corresponding to the open file.
+         *
+         * @param path to open file
+         * @param callback caused when opening a file or error
+         */
+        static void openWrite(const char* path, openIOHandle_cb callback);
 
         /**
          * Asynchronously open and read the entire contents of the file.

@@ -438,4 +438,20 @@ namespace asyncio {
             delete req;
         }
     }
+
+    void file::open(const char* path, int flags, int mode, openIOHandle_cb callback) {
+        std::shared_ptr<IOHandle> handle = std::make_shared<IOHandle>();
+
+        handle->open(path,flags, mode, [handle, callback](ssize_t result){
+            callback(handle, result);
+        });
+    }
+
+    void file::openRead(const char* path, openIOHandle_cb callback) {
+        open(path, O_RDONLY, 0, std::move(callback));
+    }
+
+    void file::openWrite(const char* path, openIOHandle_cb callback) {
+        open(path, O_CREAT | O_WRONLY | O_TRUNC, S_IRWXU | S_IRWXG | S_IRWXO, std::move(callback));
+    }
 };

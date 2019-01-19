@@ -155,10 +155,142 @@ void testAsyncFile() {
         all += fileSize[t];
     }
 
+    ths.clear();
+
     printf("Threads completed\n");
 
     fTimeStop = clock() / (double)CLOCKS_PER_SEC;
     printf("Time of reading %i files %f sec.\nTotal files size %ld bytes\n", NUM_THREADS * NUM_ITERATIONS, fTimeStop - fTimeStart, all);
+
+    printf("Write test with async::file::openWrite...\n");
+
+    fTimeStart = clock() / (double)CLOCKS_PER_SEC;
+
+    for (long t = 0; t < NUM_THREADS; t++) {
+        fileSize[t] = 0;
+
+        ths.emplace_back([t](){
+            for (int i = 0; i < NUM_ITERATIONS; i++) {
+                uv_sem_init(&stop[t], 0);
+                block[t] = 0;
+
+                char fileName[21];
+                snprintf(fileName, 21, "TestOpenWrite%ld.bin", t);
+
+                asyncio::writeFile_cb onWrite = [t, &onWrite](ssize_t result) {
+                    if (asyncio::isError(result))
+                        fprintf(stderr, "error: %s\n", asyncio::getError(result));
+                    else {
+                        fileSize[t] += result;
+
+                        if (++block[t] < NUM_BLOCKS)
+                            file[t]->write(dataBuf[t], onWrite);
+                        else
+                            file[t]->close([t](ssize_t result) {
+                                uv_sem_post(&stop[t]);
+                                printf("Close file in thread: %ld\n", t + 1);
+                            });
+                    }
+                };
+
+                asyncio::file::openWrite(fileName, [t, onWrite](std::shared_ptr<asyncio::IOHandle> handle, ssize_t result) {
+                    printf("Open file for writing in thread %ld\n", t + 1);
+                    if (asyncio::isError(result))
+                        fprintf(stderr, "error: %s\n", asyncio::getError(result));
+                    else {
+                        file[t] = handle;
+                        file[t]->write(dataBuf[t], onWrite);
+                    }
+                });
+
+                uv_sem_wait(&stop[t]);
+                uv_sem_destroy(&stop[t]);
+            }
+        });
+    }
+
+    printf("Threads started\n");
+
+    all = 0;
+    for (int t = 0; t < NUM_THREADS; t++) {
+        ths[t].join();
+        if (fileSize[t] != BUFF_SIZE * NUM_BLOCKS * NUM_ITERATIONS)
+            fprintf(stderr, "mismatch test file size (writing) in thread %i\n", t + 1);
+        all += fileSize[t];
+    }
+
+    ths.clear();
+
+    printf("Threads completed\n");
+
+    fTimeStop = clock() / (double)CLOCKS_PER_SEC;
+    printf("Time of writing (open with async::file::openWrite) %i files %f sec.\nTotal files size %ld bytes\n", NUM_THREADS * NUM_ITERATIONS, fTimeStop - fTimeStart, all);
+
+    printf("Read test with async::file::openRead...\n");
+
+    fTimeStart = clock() / (double)CLOCKS_PER_SEC;
+
+    for (long t = 0; t < NUM_THREADS; t++) {
+        fileSize[t] = 0;
+        summ[t] = 0;
+
+        ths.emplace_back([t](){
+            for (int i = 0; i < NUM_ITERATIONS; i++) {
+                uv_sem_init(&stop[t], 0);
+
+                char fileName[16];
+                snprintf(fileName, 16, "TestFile%ld.bin", t);
+
+                asyncio::readFile_cb onRead = [t, &onRead](const asyncio::byte_vector& data, ssize_t result) {
+                    if (asyncio::isError(result))
+                        fprintf(stderr, "error: %s\n", asyncio::getError(result));
+                    else if (result == 0)
+                        file[t]->close([t](ssize_t result) {
+                            uv_sem_post(&stop[t]);
+                            printf("Close file in thread: %ld\n", t + 1);
+                        });
+                    else {
+                        char* buf = (char*) data.data();
+                        for (int n = 0; n < result; n++)
+                            summ[t] += buf[n];
+                        fileSize[t] += result;
+
+                        file[t]->read(BUFF_SIZE, onRead);
+                    }
+                };
+
+                asyncio::file::openRead(fileName, [t, onRead](std::shared_ptr<asyncio::IOHandle> handle, ssize_t result) {
+                    printf("Open file in thread %ld\n", t + 1);
+                    if (asyncio::isError(result))
+                        fprintf(stderr, "error: %s\n", asyncio::getError(result));
+                    else {
+                        file[t] = handle;
+                        file[t]->read(BUFF_SIZE, onRead);
+                    }
+                });
+
+                uv_sem_wait(&stop[t]);
+                uv_sem_destroy(&stop[t]);
+            }
+        });
+    }
+
+    printf("Threads started\n");
+
+    all = 0;
+    for (long t = 0; t < NUM_THREADS; t++) {
+        ths[t].join();
+        if (fileSize[t] != BUFF_SIZE * NUM_BLOCKS * NUM_ITERATIONS)
+            fprintf(stderr, "mismatch test file size in thread %ld\n", t + 1);
+        if (summ[t] != -BUFF_SIZE * NUM_BLOCKS * NUM_ITERATIONS / 2)
+            fprintf(stderr, "mismatch test file sum in thread %ld\n", t + 1);
+        all += fileSize[t];
+    }
+
+    printf("Threads completed\n");
+
+    fTimeStop = clock() / (double)CLOCKS_PER_SEC;
+    printf("Time of reading (open with async::file::openRead) %i files %f sec.\nTotal files size %ld bytes\n", NUM_THREADS * NUM_ITERATIONS, fTimeStop - fTimeStart, all);
 
     printf("Reading the entire files test...\n");
 
