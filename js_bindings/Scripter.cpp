@@ -33,7 +33,6 @@ int Scripter::Application(const char *argv0, function<int(shared_ptr<Scripter>)>
     try {
         auto platform = initV8(argv0);
         auto se = New();
-//        se->inContext([&](auto context) { result = block(se); });
         return block(se);
     }
     catch (const ScriptError &e) {
@@ -54,7 +53,8 @@ int Scripter::Application(const char *argv0, function<int(shared_ptr<Scripter>)>
 shared_ptr<Scripter> Scripter::New() {
     if (!ARGV0)
         throw runtime_error("Platform in not initialized");
-    shared_ptr<Scripter> scripter(new Scripter());
+    // we can not use make_shared as our constructor is intentionally private:
+    shared_ptr<Scripter> scripter(new Scripter);
     scripter->initialize();
     return scripter;
 }
@@ -86,6 +86,7 @@ Scripter::Scripter() : Logging("SCR") {
         } else {
             // last chance ;)
             require_roots.emplace_back("../jslib");
+            require_roots.emplace_back("./jslib");
         }
 
     }
@@ -128,6 +129,8 @@ void Scripter::initialize() {
     // now run initialization library script
     inContext([&](auto context) {
         auto src = loadFileAsString("init_full.js");
+        if (src.empty())
+            throw runtime_error("failed to find U8 jslib");
         src = src + "\n//# sourceURL=" + "jslib/init_full.js\n";
 
         // Compile the source code.
@@ -214,7 +217,7 @@ string Scripter::evaluate(const string &src, bool needsReturn, ScriptOrigin *ori
 }
 
 int Scripter::runAsMain(const string &sourceScript, const vector<string> &&args, ScriptOrigin *origin) {
-    int code = inContext([&](Local<Context>& context) {
+    int code = inContext([&](Local<Context> &context) {
         auto global = context->Global();
         // fix imports
         global->Set(v8String("__source"), v8String(sourceScript));
@@ -226,21 +229,25 @@ int Scripter::runAsMain(const string &sourceScript, const vector<string> &&args,
         // run main if any
         Local<Function> main = Local<Function>::Cast(global->Get(v8String("main")));
 
-        if (!main->IsUndefined()){
+        if (!main->IsUndefined()) {
             auto jsArgs = Array::New(pIsolate);
             for (int i = 0; i < args.size(); i++) {
                 jsArgs->Set(i, String::NewFromUtf8(pIsolate, args[i].c_str()));
             }
             auto param = Local<Value>::Cast(jsArgs);
             TryCatch tryCatch(pIsolate);
-            auto result = main->Call(context, global, 1, &param);
+            context->Global()->Set(v8String("__args"),param);
+            auto result = evaluate("__call_main(__args)", true);
+//            auto result = main->Call(context, global, 1, &param);
             throwPendingException<ScriptError>(tryCatch, context);
-            return result.ToLocalChecked()->Int32Value(context).FromJust();
+//            return result.ToLocalChecked()->Int32Value(context).FromJust();
+cout << "res " << result << endl;
+            return stoi(result);
         }
         // if we reach this point, there are no main function in the script
         return 0;
     });
-    if( waitExit ) {
+    if (waitExit) {
         pIsolate->Exit();
         Unlocker ul(pIsolate);
         waitExitVar.wait(4000ms);

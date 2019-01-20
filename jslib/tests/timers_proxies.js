@@ -1,14 +1,11 @@
-function main(args) {
-    waitExit();
-    timeout(400, () => {
-            console.log("timer!!!");
-            exit(7)
-        }
-    );
+async function main(args) {
+    // waitExit();
     timeout(300, () => {
             console.log("timer0!!!");
         }
     );
     console.log("Testing timers");
-    return 11;
+    await sleep(400);
+    console.log("main timer");
+    return 17;
 }
