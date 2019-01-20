@@ -179,7 +179,7 @@ void testAsyncFile() {
 
                 asyncio::writeFile_cb onWrite = [t, &onWrite](ssize_t result) {
                     if (asyncio::isError(result))
-                        fprintf(stderr, "error: %s\n", asyncio::getError(result));
+                        fprintf(stderr, "write error: %s\n", asyncio::getError(result));
                     else {
                         fileSize[t] += result;
 
@@ -196,7 +196,7 @@ void testAsyncFile() {
                 asyncio::file::openWrite(fileName, [t, onWrite](std::shared_ptr<asyncio::IOHandle> handle, ssize_t result) {
                     printf("Open file for writing in thread %ld\n", t + 1);
                     if (asyncio::isError(result))
-                        fprintf(stderr, "error: %s\n", asyncio::getError(result));
+                        fprintf(stderr, "open error: %s\n", asyncio::getError(result));
                     else {
                         file[t] = handle;
                         file[t]->write(dataBuf[t], onWrite);
@@ -243,7 +243,7 @@ void testAsyncFile() {
 
                 asyncio::readFile_cb onRead = [t, &onRead](const asyncio::byte_vector& data, ssize_t result) {
                     if (asyncio::isError(result))
-                        fprintf(stderr, "error: %s\n", asyncio::getError(result));
+                        fprintf(stderr, "read error: %s\n", asyncio::getError(result));
                     else if (result == 0)
                         file[t]->close([t](ssize_t result) {
                             uv_sem_post(&stop[t]);
@@ -262,7 +262,7 @@ void testAsyncFile() {
                 asyncio::file::openRead(fileName, [t, onRead](std::shared_ptr<asyncio::IOHandle> handle, ssize_t result) {
                     printf("Open file in thread %ld\n", t + 1);
                     if (asyncio::isError(result))
-                        fprintf(stderr, "error: %s\n", asyncio::getError(result));
+                        fprintf(stderr, "open error: %s\n", asyncio::getError(result));
                     else {
                         file[t] = handle;
                         file[t]->read(BUFF_SIZE, onRead);
@@ -389,6 +389,70 @@ void testAsyncFile() {
     });
 
     uv_sem_wait(&stop[0]);
+    uv_sem_wait(&stop[0]);
+    uv_sem_destroy(&stop[0]);
+
+    printf("Test auto closing file...\n");
+
+    uv_sem_init(&stop[0], 0);
+
+    auto fc = std::make_shared<asyncio::IOHandle>();
+
+    fc->open("TestFile0.bin", O_RDWR, 0, [&](ssize_t result) {
+        if (!asyncio::isError(result))
+            printf("File open\n");
+
+        fc->read(1000, [&](const asyncio::byte_vector& data, ssize_t result) {
+            if (!asyncio::isError(result))
+                printf("Read %ld bytes\n", result);
+
+            fc->write(data, [&](ssize_t result) {
+                if (!asyncio::isError(result))
+                    printf("Wrote %ld bytes\n", result);
+
+                uv_sem_post(&stop[0]);
+            });
+
+            fc.reset();
+        });
+    });
+
+    uv_sem_wait(&stop[0]);
+    uv_sem_destroy(&stop[0]);
+
+    // sleep for auto-closing
+    printf("Sleep for auto-closing...");
+    nanosleep((const struct timespec[]){{0, 500000000L}}, nullptr);
+    printf("done.\n");
+
+    printf("File work test with asyncio::IOHandle::then()...\n");
+
+    uv_sem_init(&stop[0], 0);
+
+    auto f = std::make_shared<asyncio::IOHandle>();
+
+    f->open("TestFile0.bin", O_RDWR, 0)->then([&](ssize_t result) {
+        if (!asyncio::isError(result))
+            printf("File open\n");
+
+        f->read(100)->then([&](const asyncio::byte_vector& data, ssize_t result) {
+            if (!asyncio::isError(result))
+                printf("Read %ld bytes\n", result);
+
+            f->write(data)->then([&](ssize_t result) {
+                if (!asyncio::isError(result))
+                    printf("Wrote %ld bytes\n", result);
+
+                f->close()->then([&](ssize_t result) {
+                    if (!asyncio::isError(result))
+                        printf("File closed\n");
+
+                    uv_sem_post(&stop[0]);
+                });
+            });
+        });
+    });
+
     uv_sem_wait(&stop[0]);
     uv_sem_destroy(&stop[0]);
 

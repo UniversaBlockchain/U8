@@ -9,20 +9,23 @@
 #include <vector>
 #include <functional>
 #include <memory>
+#include <future>
+#include <queue>
+#include <any>
 
 namespace asyncio {
     /**
-     * Exit handle for deinitialize main asynchronously loop
+     * Exit handle for deinitialize main asynchronous loop
      */
     extern uv_async_t exitHandle;
 
     /**
-     * Handle of main asynchronously loop
+     * Handle of main asynchronous loop
      */
     extern uv_loop_t* asyncLoop;
 
     /**
-     * Asynchronously request
+     * Asynchronous request
      */
     typedef uv_fs_t ioHandle;
 
@@ -68,6 +71,18 @@ namespace asyncio {
      */
     typedef std::function<void(ssize_t result)> closeFile_cb;
 
+    class IOHandle;
+
+    /**
+     * File open callback for method asyncio::file::open
+     *
+     * @param handle is shared pointer to open file handle
+     * @param result is file open result
+     * If isError(result) returns true - use getError(result) to determine the error.
+     * If isError(result) returns false - result is handle of opened file.
+     */
+    typedef std::function<void(std::shared_ptr<IOHandle> handle, ssize_t result)> openIOHandle_cb;
+
     struct openFile_data {
         openFile_cb callback;
         ioHandle* fileReq;
@@ -96,43 +111,43 @@ namespace asyncio {
     };
 
     /**
-     * Init and run main asynchronously loop.
+     * Init and run main asynchronous loop.
      * Must be called before asynchronous method calls.
      */
     uv_loop_t* initAndRunLoop();
 
     /**
-     * Init and run auxiliary asynchronously loop.
+     * Init and run auxiliary asynchronous loop.
      *
-     * @param ploop_exitHandle is pointer to exit handle for deinitialize auxiliary asynchronously loop
-     * @return handle of auxiliary asynchronously loop
+     * @param ploop_exitHandle is pointer to exit handle for deinitialize auxiliary asynchronous loop
+     * @return handle of auxiliary asynchronous loop
      */
     uv_loop_t* initAndRunAuxLoop(uv_async_t** ploop_exitHandle);
 
     /**
-     * Get handle of main asynchronously loop
+     * Get handle of main asynchronous loop
      */
     inline uv_loop_t* getMainLoop() { return asyncLoop; };
 
     /**
-     * Deinitialize main asynchronously loop.
+     * Deinitialize main asynchronous loop.
      * Must be called after asynchronous method calls.
      */
     void deinitLoop();
 
     /**
-     * Deinitialize auxiliary asynchronously loop.
-     * Must be called after asynchronous method calls in auxiliary asynchronously loop.
+     * Deinitialize auxiliary asynchronous loop.
+     * Must be called after asynchronous method calls in auxiliary asynchronous loop.
      *
-     * @param loop is handle of auxiliary asynchronously loop
-     * @param loop_exitHandle is exit handle for deinitialize auxiliary asynchronously loop
+     * @param loop is handle of auxiliary asynchronous loop
+     * @param loop_exitHandle is exit handle for deinitialize auxiliary asynchronous loop
      */
     void deinitAuxLoop(uv_loop_t* loop, uv_async_t* loop_exitHandle);
 
     /**
      * Check result for error
      *
-     * @param result from asynchronously callback
+     * @param result from asynchronous callback
      * @return true - if an error occurred
      *         false - if the result is successful
      */
@@ -142,7 +157,7 @@ namespace asyncio {
      * Get error description by result.
      * isError(result) must be returned true.
      *
-     * @param code is result from asynchronously callback
+     * @param code is result from asynchronous callback
      * @return error description
      */
     const char* getError(ssize_t code);
@@ -156,7 +171,7 @@ namespace asyncio {
         ~IOHandle();
 
         /**
-         * Asynchronously open file.
+         * Asynchronous open file.
          *
          * @param path to open file
          * @param flags:
@@ -186,7 +201,7 @@ namespace asyncio {
         void open(const char* path, int flags, int mode, openFile_cb callback);
 
         /**
-         * Asynchronously read file.
+         * Asynchronous read file.
          *
          * @param maxBytesToRead is maximum number of bytes to read from file
          * @param callback caused when reading a file or error
@@ -194,7 +209,7 @@ namespace asyncio {
         void read(size_t maxBytesToRead, readFile_cb callback);
 
         /**
-         * Asynchronously write file.
+         * Asynchronous write file.
          *
          * @param data is byte vector for data written to file
          * @param callback caused when writing a file or error
@@ -202,15 +217,78 @@ namespace asyncio {
         void write(const byte_vector& data, writeFile_cb callback);
 
         /**
-         * Asynchronously close file.
+         * Asynchronous close file.
          *
          * @param callback caused when closing a file or error
          */
         void close(closeFile_cb callback);
 
+        /**
+         * Asynchronous opening of a file with callback initialization in the method IOHandle::then.
+         * @see IOHandle::then(openFile_cb callback).
+         *
+         * @param path to open file
+         * @param flags (@see IOHandle::open(const char* path, int flags, int mode, openFile_cb callback))
+         * @param mode - specifies the file mode bits be applied when a new file is created
+         *              (@see IOHandle::open(const char* path, int flags, int mode, openFile_cb callback))
+         * @return pointer to open file handle
+         */
+        IOHandle* open(const char* path, int flags, int mode);
+
+        /**
+         * Asynchronous read file with callback initialization in the method IOHandle::then.
+         * @see IOHandle::then(readFile_cb callback).
+         *
+         * @param maxBytesToRead is maximum number of bytes to read from file
+         * @return pointer to open file handle
+         */
+        IOHandle* read(size_t maxBytesToRead);
+
+        /**
+         * Asynchronous write file with callback initialization in the method IOHandle::then.
+         * @see IOHandle::then(openFile_cb callback).
+         *
+         * @param data is byte vector for data written to file
+         * @return pointer to open file handle
+         */
+        IOHandle* write(const byte_vector& data);
+
+        /**
+         * Asynchronous close file with callback initialization in the method IOHandle::then.
+         * @see IOHandle::then(openFile_cb callback).
+         *
+         * @return pointer to open file handle
+         */
+        IOHandle* close();
+
+        /**
+         * Callback initialization for asynchronous opening, writing and closing file.
+         * Used when the callback has not been initialized in methods IOHandle::open, IOHandle::write, IOHandle::close.
+         * @see IOHandle::open(const char* path, int flags, int mode)
+         * @see IOHandle::write(const byte_vector& data)
+         * @see IOHandle::close()
+         *
+         * @param callback is initialized callback for asynchronous opening, writing and closing file
+         * @return pointer to open file handle
+         */
+        IOHandle* then(openFile_cb callback);
+
+        /**
+         * Callback initialization for asynchronous reading file.
+         * Used when the callback has not been initialized in method IOHandle::read.
+         * @see IOHandle::read(size_t maxBytesToRead)
+         *
+         * @param callback is initialized callback for asynchronous reading file
+         * @return pointer to open file handle
+         */
+        IOHandle* then(readFile_cb callback);
+
     private:
         uv_fs_t* ioReq;
         bool closed = false;
+
+        std::packaged_task<void(openFile_cb)> task;
+        std::packaged_task<void(readFile_cb)> readTask;
 
         void initRequest();
         void freeRequest();
@@ -221,8 +299,6 @@ namespace asyncio {
         static void close_cb(asyncio::ioHandle *req);
     };
 
-    typedef std::function<void(std::shared_ptr<IOHandle> handle, ssize_t result)> openIOHandle_cb;
-
     class file {
     public:
         /**
@@ -231,18 +307,18 @@ namespace asyncio {
         static const unsigned int MAX_FILE_SIZE = 10485760;
 
         /**
-         * Asynchronously opening of a file with a callback that returns a shared pointer
+         * Asynchronous opening of a file with a callback that returns a shared pointer
          * to an instance of the IOHandle corresponding to the open file.
          *
          * @param path to open file
-         * @param flags (see IOHandle::open)
-         * @param mode - specifies the file mode bits be applied when a new file is created (see IOHandle::open)
+         * @param flags (@see IOHandle::open)
+         * @param mode - specifies the file mode bits be applied when a new file is created (@see IOHandle::open)
          * @param callback caused when opening a file or error
          */
         static void open(const char* path, int flags, int mode, openIOHandle_cb callback);
 
         /**
-         * Asynchronously opening of a file for reading with a callback that returns a shared pointer
+         * Asynchronous opening of a file for reading with a callback that returns a shared pointer
          * to an instance of the IOHandle corresponding to the open file.
          *
          * @param path to open file
@@ -251,7 +327,7 @@ namespace asyncio {
         static void openRead(const char* path, openIOHandle_cb callback);
 
         /**
-         * Asynchronously opening of a file for writing with a callback that returns a shared pointer
+         * Asynchronous opening of a file for writing with a callback that returns a shared pointer
          * to an instance of the IOHandle corresponding to the open file.
          *
          * @param path to open file
@@ -260,7 +336,7 @@ namespace asyncio {
         static void openWrite(const char* path, openIOHandle_cb callback);
 
         /**
-         * Asynchronously open and read the entire contents of the file.
+         * Asynchronous open and read the entire contents of the file.
          *
          * @param path to open file
          * @param callback when the file is read or an error occurs
@@ -268,7 +344,7 @@ namespace asyncio {
         static void readFile(const char* path, readFile_cb callback);
 
         /**
-         * Asynchronously open and read the part of the file.
+         * Asynchronous open and read the part of the file.
          *
          * @param path to open file
          * @param pos is starting position in the file for reading
@@ -278,13 +354,24 @@ namespace asyncio {
         static void readFilePart(const char* path, size_t pos, size_t maxBytesToRead, readFile_cb callback);
 
         /**
-         * Asynchronously open and write the file.
+         * Asynchronous open and write the file.
          *
          * @param path to open file
-         * @param data is byte vector for data written to file         *
+         * @param data is byte vector for data written to file
          * @param callback when the file is wrote or an error occurs
          */
         static void writeFile(const char* path, const byte_vector& data, writeFile_cb callback);
+
+        /**
+         * Asynchronous opening of a file with callback initialization in the method IOHandle::then.
+         * @see IOHandle::then(openFile_cb callback).
+         *
+         * @param path to open file
+         * @param flags (@see IOHandle::open)
+         * @param mode - specifies the file mode bits be applied when a new file is created (@see IOHandle::open)
+         * @return pointer to open file handle
+         */
+        static IOHandle* open(const char* path, int flags, int mode);
 
     private:
         static void readFile_onClose(asyncio::ioHandle *req);

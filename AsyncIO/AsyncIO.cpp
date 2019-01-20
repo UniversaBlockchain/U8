@@ -71,6 +71,11 @@ namespace asyncio {
     }
 
     IOHandle::~IOHandle() {
+        if (ioReq && !closed)
+            close([](ssize_t result){
+                //printf("---AUTO_CLOSING---\n");
+            });
+
         freeRequest();
     }
 
@@ -442,7 +447,7 @@ namespace asyncio {
     void file::open(const char* path, int flags, int mode, openIOHandle_cb callback) {
         std::shared_ptr<IOHandle> handle = std::make_shared<IOHandle>();
 
-        handle->open(path,flags, mode, [handle, callback](ssize_t result){
+        handle->open(path, flags, mode, [handle, callback](ssize_t result) {
             callback(handle, result);
         });
     }
@@ -453,5 +458,96 @@ namespace asyncio {
 
     void file::openWrite(const char* path, openIOHandle_cb callback) {
         open(path, O_CREAT | O_WRONLY | O_TRUNC, S_IRWXU | S_IRWXG | S_IRWXO, std::move(callback));
+    }
+
+    IOHandle* file::open(const char* path, int flags, int mode) {
+        auto handle = new IOHandle();
+
+        handle->open(path, flags, mode);
+
+        return handle;
+    }
+
+    IOHandle* IOHandle::open(const char* path, int flags, int mode) {
+        IOHandle *handle = this;
+
+        if (task.valid())
+            throw std::invalid_argument("ERROR: Task already initialized.");
+
+        std::packaged_task<void(openFile_cb callback)> newTask([handle, path, flags, mode](openFile_cb callback) {
+            handle->open(path, flags, mode, callback);
+        });
+
+        task = std::move(newTask);
+
+        return handle;
+    }
+
+    IOHandle* IOHandle::then(openFile_cb callback) {
+        if (!task.valid())
+            throw std::invalid_argument("ERROR: Task is not initialized.");
+
+        task(std::move(callback));
+        //openTask.get_future().get();
+
+        task = std::packaged_task<void(openFile_cb callback)>();
+
+        return this;
+    }
+
+    IOHandle* IOHandle::read(size_t maxBytesToRead) {
+        IOHandle *handle = this;
+
+        if (readTask.valid())
+            throw std::invalid_argument("ERROR: Task already initialized.");
+
+        std::packaged_task<void(readFile_cb callback)> newTask([handle, maxBytesToRead](readFile_cb callback) {
+            handle->read(maxBytesToRead, callback);
+        });
+
+        readTask = std::move(newTask);
+
+        return handle;
+    }
+
+    IOHandle* IOHandle::then(readFile_cb callback) {
+        if (!readTask.valid())
+            throw std::invalid_argument("ERROR: Task is not initialized.");
+
+        readTask(std::move(callback));
+
+        readTask = std::packaged_task<void(readFile_cb callback)>();
+
+        return this;
+    }
+
+    IOHandle* IOHandle::write(const byte_vector& data) {
+        IOHandle *handle = this;
+
+        if (task.valid())
+            throw std::invalid_argument("ERROR: Task already initialized.");
+
+        std::packaged_task<void(writeFile_cb callback)> newTask([handle, data](writeFile_cb callback) {
+            handle->write(data, callback);
+        });
+
+        task = std::move(newTask);
+
+        return handle;
+    }
+
+    IOHandle* IOHandle::close() {
+        IOHandle *handle = this;
+
+        if (task.valid())
+            throw std::invalid_argument("ERROR: Task already initialized.");
+
+        std::packaged_task<void(closeFile_cb callback)> newTask([handle](closeFile_cb callback) {
+            handle->close(callback);
+        });
+
+        task = std::move(newTask);
+
+        return handle;
     }
 };

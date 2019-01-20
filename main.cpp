@@ -6,7 +6,7 @@
 #include "js_bindings/Scripter.h"
 #include "tools/tools.h"
 
-#include "AsyncIOTests.h"
+#include "AsyncIO/AsyncIOTests.h"
 #include "crypto/cryptoTests.h"
 
 using namespace std;
