@@ -4,7 +4,7 @@
 #include "PrivateKey.h"
 #include "base64.h"
 #include "Scripter.h"
-#include "tools.h"
+#include "tools/tools.h"
 
 #include "AsyncIOTests.h"
 #include "cryptoTests.h"
@@ -22,7 +22,7 @@ int main(int argc, const char **argv) {
         // test only if no args
         testCryptoAll();
         testAsyncFile();
-        return 0;
+//        return 0;
     }
 
     if (argc == 1) {
@@ -31,14 +31,21 @@ int main(int argc, const char **argv) {
     } else {
         return Scripter::Application(argv[0], [=](auto se) {
             vector<string> args(argv + 1, argv + argc);
-            if (args[0] == "-e") {
-                cout << se->evaluate(args[1]) << endl;
-                return 0;
-            } else {
-                return se->runAsMain(
-                                loadAsStringOrThrow(args[0]), vector<string>(args.begin() + 1, args.end()), args[0]
-                        );
-            }
+            // important note. At this point secipter instance is initialized but not locked (owning)
+            // the current thread, so can be used in any thread, but only with lockging the context:
+            // so we lock the context to execute evaluate:
+            return se->lockedContext([&](auto context) {
+                if (args[0] == "-e") {
+//                    cout << se->evaluate("VERSION"args[1]) << endl;
+                    cout << se->evaluate("VERSION") << endl;
+                    return 0;
+                } else {
+                    cout << "will call ram" << endl;
+                    return se->runAsMain(
+                            loadAsStringOrThrow(args[0]), vector<string>(args.begin() + 1, args.end()), args[0]
+                    );
+                }
+            });
         });
     }
 }

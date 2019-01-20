@@ -13,5 +13,9 @@ void JsLoadRequired(const v8::FunctionCallbackInfo<v8::Value> &args);
 
 void JsInitTimers(const v8::FunctionCallbackInfo<v8::Value> &args);
 
+void JsWaitExit(const v8::FunctionCallbackInfo<v8::Value> &args);
+
+void JsExit(const v8::FunctionCallbackInfo<v8::Value> &args);
+
 
 #endif //U8_BASIC_BUILTINS_H

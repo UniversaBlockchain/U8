@@ -3,7 +3,7 @@
 //
 #include <iostream>
 #include "basic_builtins.h"
-#include "tools.h"
+#include "tools/tools.h"
 
 using namespace std;
 
@@ -51,7 +51,7 @@ void JsTimer(const v8::FunctionCallbackInfo<v8::Value> &args) {
         se->asyncSleep.delay(millis, [=]() {
             // We need to re-enter in context as we are in another thread and stack, and as we do
             // it from another thread, we MUST use lockedContext:
-            se->lockedContext([=](auto context) {
+            se->lockedContext([=](Local<Context>& context) {
                 // get the local hadnle to function from persistent handle
                 auto fn = jsCallback->Get(context->GetIsolate());
                 // call it using the function as the this context:
@@ -74,6 +74,19 @@ void JsInitTimers(const v8::FunctionCallbackInfo<v8::Value> &args) {
                     v8::Local(v8::Function::New(isolate, JsTimer))
             );
         }
+    });
+}
+
+void JsWaitExit(const v8::FunctionCallbackInfo<v8::Value> &args) {
+    Scripter::unwrap(args, [&](auto se, auto isolate, auto context) {
+        se->info("CALLED waitForExit");
+        se->setWaitExit();
+    });
+}
+
+void JsExit(const v8::FunctionCallbackInfo<v8::Value> &args) {
+    Scripter::unwrap(args, [&](auto se, auto isolate, auto context) {
+        se->exit(args[0]->Uint32Value(context).FromJust());
     });
 }
 

@@ -11,7 +11,8 @@
 #include <libplatform/libplatform.h>
 
 #include "Logging.h"
-#include "AsyncSleep.h"
+#include "tools/AsyncSleep.h"
+#include "tools/ConditionVar.h"
 
 using namespace std;
 using namespace v8;
@@ -106,15 +107,7 @@ public:
      * @param block to execute
      */
     template<typename Function>
-    auto inContext(Function&& block) {
-        v8::HandleScope handle_scope(pIsolate);
-        auto cxt = context.Get(pIsolate);
-        v8::Context::Scope context_scope(cxt);
-        return block(cxt);
-    }
-
-    template<typename Function>
-    auto inContext(Function &block) {
+    auto inContext(Function &&block) {
         v8::HandleScope handle_scope(pIsolate);
         auto cxt = context.Get(pIsolate);
         v8::Context::Scope context_scope(cxt);
@@ -127,12 +120,14 @@ public:
      *
      * @param block to execute
      */
-    void lockedContext(const std::function<void(const v8::Local<v8::Context> &)> &block) {
+    template<typename F>
+    auto lockedContext(F block) {
         v8::Locker locker(pIsolate);
+        Isolate::Scope iscope(pIsolate);
         v8::HandleScope handle_scope(pIsolate);
-        auto cxt = context.Get(pIsolate);
+        Local<Context> cxt = context.Get(pIsolate);
         v8::Context::Scope context_scope(cxt);
-        block(cxt);
+        return block(cxt);
     }
 
     /**
@@ -173,6 +168,18 @@ public:
 
     bool checkException(TryCatch &tc, Local<Context>);
 
+    /**
+     * Turn "wait exit" more on (may not be effective except with runAsMain)
+     */
+    void setWaitExit() { waitExit = true; }
+
+    bool getWaitExit() { return waitExit; }
+
+    void exit(int code) {
+        exitCode = code;
+        waitExitVar.notify();
+    }
+
 private:
 
     std::string expandPath(const std::string &path);
@@ -185,6 +192,10 @@ private:
 
     // prevent double initialize() call - it is dangerous
     bool initialized = false;
+
+    ConditionVar waitExitVar;
+    int exitCode = 0;
+    bool waitExit = false;
 
     // we should not put this code in the constructor as it uses shared_from_this()
     void initialize();

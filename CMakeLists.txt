@@ -22,9 +22,9 @@ elseif (WIN32)
     set(platform "win_v8")
 endif ()
 
-add_executable(u8 main.cpp Scripter.cpp Scripter.h tools.h basic_builtins.cpp basic_builtins.h tools.cpp AsyncSleep.cpp
-        AsyncSleep.h Logging.cpp Logging.h JsPromise.cpp JsPromise.h PublicKey.cpp PrivateKey.cpp base64.cpp cryptoCommon.h
-        cryptoCommon.cpp AsyncIO.h AsyncIO.cpp AsyncIOTests.cpp AsyncIOTests.h HashId.cpp HashId.h cryptoTests.h cryptoTests.cpp)
+add_executable(u8 main.cpp Scripter.cpp Scripter.h tools/tools.h basic_builtins.cpp basic_builtins.h tools/tools.cpp tools/AsyncSleep.cpp
+        tools/AsyncSleep.h Logging.cpp Logging.h JsPromise.cpp JsPromise.h PublicKey.cpp PrivateKey.cpp base64.cpp cryptoCommon.h
+        cryptoCommon.cpp AsyncIO.h AsyncIO.cpp AsyncIOTests.cpp AsyncIOTests.h HashId.cpp HashId.h cryptoTests.h cryptoTests.cpp tools/ConditionVar.h)
 
 message("platform: ${platform}")
 

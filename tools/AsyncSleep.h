@@ -10,7 +10,7 @@
 #include <thread>
 #include <functional>
 
-#include "Logging.h"
+#include "../Logging.h"
 
 using namespace std;
 
@@ -46,7 +46,7 @@ private:
 
     bool shutdown = false;
 
-    static void wait_thread(AsyncSleep *self);
+//    static void wait_thread(AsyncSleep *self);
 
     thread worker;
 };

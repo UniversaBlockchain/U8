@@ -8,7 +8,7 @@
 #include <fstream>
 
 #include "Scripter.h"
-#include "tools.h"
+#include "tools/tools.h"
 #include "basic_builtins.h"
 
 static const char *ARGV0 = nullptr;
@@ -33,9 +33,8 @@ int Scripter::Application(const char *argv0, function<int(shared_ptr<Scripter>)>
     try {
         auto platform = initV8(argv0);
         auto se = New();
-        int result;
-        se->inContext([&](auto context) { result = block(se); });
-        return result;
+//        se->inContext([&](auto context) { result = block(se); });
+        return block(se);
     }
     catch (const ScriptError &e) {
         // Script errors are well traced
@@ -96,28 +95,6 @@ Scripter::Scripter() : Logging("SCR") {
     require_roots.emplace_back(".");
 }
 
-//void JsSmartEval(const v8::FunctionCallbackInfo<v8::Value> &args) {
-//    Scripter::unwrap(args, [&](auto se, auto isolate, auto context) {
-//        ScriptOrigin origin(args[0].As<Value>());
-//        TryCatch trycatch(isolate);
-//        auto scriptResult = Script::Compile(
-//                context,
-//                args[1].As<String>(),
-//                        &origin);
-//        if (scriptResult.IsEmpty())
-//            se->checkException(trycatch, context);
-//        else {
-//            auto maybeResult = scriptResult.ToLocalChecked()->Run(context);
-//            if (maybeResult.IsEmpty())
-//                se->checkException(trycatch, context);
-//            else
-//                args.GetReturnValue().Set(true);
-//            cout << "smart eval ok" << endl;
-//        }
-//    });
-//}
-
-
 void Scripter::initialize() {
     if (initialized)
         throw runtime_error("SR is already initialized");
@@ -137,7 +114,8 @@ void Scripter::initialize() {
     global->Set(v8String("__bios_print"), functionTemplate(JsPrint));
     global->Set(v8String("__bios_loadRequired"), functionTemplate(JsLoadRequired));
     global->Set(v8String("__bios_initTimers"), functionTemplate(JsInitTimers));
-//    global->Set(v8String("__smart_eval"), functionTemplate(JsSmartEval));
+    global->Set(v8String("waitExit"), functionTemplate(JsWaitExit));
+    global->Set(v8String("exit"), functionTemplate(JsExit));
     global->Set(v8String("$0"), v8String(ARGV0));
 
     // Save context and wrap weak self:
@@ -167,6 +145,7 @@ void Scripter::initialize() {
             }
         }
     });
+    info("init done");
 }
 
 
@@ -237,7 +216,10 @@ string Scripter::evaluate(const string &src, bool needsReturn, ScriptOrigin *ori
 
 int Scripter::runAsMain(const string &sourceScript, const vector<string> &&args, ScriptOrigin *origin) {
 //    auto fixedScript = evaluate()
-    return inContext([&](Local<Context>& context) {
+    info("main1");
+    // we should own the isolate
+    int code = inContext([&](Local<Context>& context) {
+        info("main2");
         auto global = context->Global();
         // fix imports
         global->Set(v8String("__source"), v8String(sourceScript));
@@ -263,6 +245,17 @@ int Scripter::runAsMain(const string &sourceScript, const vector<string> &&args,
         // if we reach this point, there are no main function
         return 0;
     });
+    cout << waitExit << endl;
+    if( waitExit ) {
+        pIsolate->Exit();
+        Unlocker ul(pIsolate);
+        waitExitVar.wait(4000ms);
+        pIsolate->Enter();
+        return exitCode;
+    }
+    return code;
+//    return 0;
+
 }
 
 std::string Scripter::expandPath(const std::string &path) {
@@ -298,7 +291,7 @@ std::string Scripter::loadFileAsString(const std::string &fileName) {
 }
 
 Scripter::~Scripter() {
-    log("destructing SR");
+    info("destructing SR");
     pIsolate->Dispose();
     delete create_params.array_buffer_allocator;
 }
