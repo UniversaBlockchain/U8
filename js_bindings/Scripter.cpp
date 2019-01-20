@@ -8,7 +8,7 @@
 #include <fstream>
 
 #include "Scripter.h"
-#include "tools/tools.h"
+#include "../tools/tools.h"
 #include "basic_builtins.h"
 
 static const char *ARGV0 = nullptr;
@@ -145,7 +145,6 @@ void Scripter::initialize() {
             }
         }
     });
-    info("init done");
 }
 
 
@@ -215,11 +214,7 @@ string Scripter::evaluate(const string &src, bool needsReturn, ScriptOrigin *ori
 }
 
 int Scripter::runAsMain(const string &sourceScript, const vector<string> &&args, ScriptOrigin *origin) {
-//    auto fixedScript = evaluate()
-    info("main1");
-    // we should own the isolate
     int code = inContext([&](Local<Context>& context) {
-        info("main2");
         auto global = context->Global();
         // fix imports
         global->Set(v8String("__source"), v8String(sourceScript));
@@ -242,10 +237,9 @@ int Scripter::runAsMain(const string &sourceScript, const vector<string> &&args,
             throwPendingException<ScriptError>(tryCatch, context);
             return result.ToLocalChecked()->Int32Value(context).FromJust();
         }
-        // if we reach this point, there are no main function
+        // if we reach this point, there are no main function in the script
         return 0;
     });
-    cout << waitExit << endl;
     if( waitExit ) {
         pIsolate->Exit();
         Unlocker ul(pIsolate);
@@ -254,7 +248,6 @@ int Scripter::runAsMain(const string &sourceScript, const vector<string> &&args,
         return exitCode;
     }
     return code;
-//    return 0;
 
 }
 
@@ -291,7 +284,7 @@ std::string Scripter::loadFileAsString(const std::string &fileName) {
 }
 
 Scripter::~Scripter() {
-    info("destructing SR");
+    log("destructing SR");
     pIsolate->Dispose();
     delete create_params.array_buffer_allocator;
 }

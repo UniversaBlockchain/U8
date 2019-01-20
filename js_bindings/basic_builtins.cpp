@@ -3,7 +3,7 @@
 //
 #include <iostream>
 #include "basic_builtins.h"
-#include "tools/tools.h"
+#include "../tools/tools.h"
 
 using namespace std;
 
@@ -79,13 +79,12 @@ void JsInitTimers(const v8::FunctionCallbackInfo<v8::Value> &args) {
 
 void JsWaitExit(const v8::FunctionCallbackInfo<v8::Value> &args) {
     Scripter::unwrap(args, [&](auto se, auto isolate, auto context) {
-        se->info("CALLED waitForExit");
         se->setWaitExit();
     });
 }
 
 void JsExit(const v8::FunctionCallbackInfo<v8::Value> &args) {
-    Scripter::unwrap(args, [&](auto se, auto isolate, auto context) {
+    Scripter::unwrap(args, [&](shared_ptr<Scripter> se, auto isolate, auto context) {
         se->exit(args[0]->Uint32Value(context).FromJust());
     });
 }

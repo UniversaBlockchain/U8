@@ -10,7 +10,7 @@
 #include <thread>
 #include <functional>
 
-#include "../Logging.h"
+#include "Logging.h"
 
 using namespace std;
 

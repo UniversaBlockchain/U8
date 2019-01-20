@@ -10,9 +10,9 @@
 #include <v8.h>
 #include <libplatform/libplatform.h>
 
-#include "Logging.h"
-#include "tools/AsyncSleep.h"
-#include "tools/ConditionVar.h"
+#include "../tools/Logging.h"
+#include "../tools/AsyncSleep.h"
+#include "../tools/ConditionVar.h"
 
 using namespace std;
 using namespace v8;
@@ -175,9 +175,25 @@ public:
 
     bool getWaitExit() { return waitExit; }
 
+    bool getExitCode() { return exitCode; }
+
+    /**
+     * depending on waitExit mode. If setWaitExit() was called (js: waitExit()),
+     * stops waitExit waiting (in runAsMain) and stores exit code that is available with
+     * getExitCode(). Note that it may not be effective until the runMain() is in progress.
+     *
+     * If the setWaitExit was not yet called, it immediately exits the calling application with the specifoed
+     * exit code.
+     *
+     * @param code exit code to report.
+     */
     void exit(int code) {
-        exitCode = code;
-        waitExitVar.notify();
+        if (waitExit) {
+            exitCode = code;
+            waitExitVar.notify();
+        } else {
+            ::exit(code);
+        }
     }
 
 private:
