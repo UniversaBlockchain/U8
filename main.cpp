@@ -1,13 +1,13 @@
 #include <iostream>
 
-#include "cryptoCommon.h"
-#include "PrivateKey.h"
-#include "base64.h"
+#include "crypto/cryptoCommon.h"
+#include "crypto/PrivateKey.h"
+#include "crypto/base64.h"
 #include "js_bindings/Scripter.h"
 #include "tools/tools.h"
 
 #include "AsyncIOTests.h"
-#include "cryptoTests.h"
+#include "crypto/cryptoTests.h"
 
 using namespace std;
 

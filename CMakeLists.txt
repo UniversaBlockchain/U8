@@ -23,8 +23,8 @@ elseif (WIN32)
 endif ()
 
 add_executable(u8 main.cpp js_bindings/Scripter.cpp js_bindings/Scripter.h tools/tools.h js_bindings/basic_builtins.cpp js_bindings/basic_builtins.h tools/tools.cpp tools/AsyncSleep.cpp
-        tools/AsyncSleep.h tools/Logging.cpp tools/Logging.h PublicKey.cpp PrivateKey.cpp base64.cpp cryptoCommon.h
-        cryptoCommon.cpp AsyncIO.h AsyncIO.cpp AsyncIOTests.cpp AsyncIOTests.h HashId.cpp HashId.h cryptoTests.h cryptoTests.cpp tools/ConditionVar.h)
+        tools/AsyncSleep.h tools/Logging.cpp tools/Logging.h crypto/PublicKey.cpp crypto/PrivateKey.cpp crypto/base64.cpp crypto/cryptoCommon.h
+        crypto/cryptoCommon.cpp AsyncIO.h AsyncIO.cpp AsyncIOTests.cpp AsyncIOTests.h crypto/HashId.cpp crypto/HashId.h crypto/cryptoTests.h crypto/cryptoTests.cpp tools/ConditionVar.h)
 
 message("platform: ${platform}")
 
