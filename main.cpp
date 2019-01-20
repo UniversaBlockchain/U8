@@ -18,9 +18,10 @@ void testCrypto();
 int main(int argc, const char **argv) {
 
     initCrypto();
-    if (argc == 1) {
+    if (argc == 2 && strcmp(argv[1], "--selftest") == 0) {
         testCryptoAll();
         testAsyncFile();
+        return 0;
     }
 
     if (argc == 1) {
@@ -52,7 +53,7 @@ void usage() {
 
 Usage:
 
-    u8 [-e "`js code to avaulate`"] | <javascript_file_name>
+    u8 [-e "`js code to avaulate`"] | <javascript_file_name> | [--selftest]
 
 if -e switch present, evaluates the second command line parameter as Javascript code and
 prints out result ou stdout.
@@ -60,6 +61,8 @@ prints out result ou stdout.
 Otherwise executes sctipt fromthe given .js file specified as the first parameter.
 All other parameters are passed to the main(argv) function if present in the script file or
 if it is imported from it.
+
+--sefltest run some internal tests.
 
 )End";
 }
