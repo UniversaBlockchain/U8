@@ -113,17 +113,20 @@ function timeout(millis, callback, reject) {
 /**
  * create Promise that resolves after specified time (async sleep). The returned Promise has
  * {cancel()} method that rejects the promise and cancels associated TimeoutEntry. The rejection
- * uses {TimeoutError} error object.
+ * uses {TimeoutError} error object. Note that cancellable promise will usually be much slower than
+ * system default promise without cancellation so it is optional feature neede to be explicitly requested.
  *
  * @param millis to resolve
+ * @param cancellable set to true to have {cancel()} method in the returned promise (less effective)
  * @returns {Promise<void>} that resolves after millis
  */
-function sleep(millis) {
+function sleep(millis,cancellable=false) {
     let entry;
     let pr = new Promise((resolve, reject) => {
         entry = timeout(millis, resolve, reject)
     });
-    pr.cancel = () => entry.cancel();
+    if(cancellable)
+        pr.cancel = () => entry.cancel();
     return pr;
 }
 
