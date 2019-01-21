@@ -6,7 +6,7 @@
 #include "async_io_bindings.h"
 #include "weak_finalizers.h"
 #include "../tools/tools.h"
-#include "../AsyncIO.h"
+#include "../AsyncIO/AsyncIO.h"
 
 template <class T>
 T* unwrap(const Local<Object>& obj) {

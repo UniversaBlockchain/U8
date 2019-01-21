@@ -6,6 +6,7 @@
 #include "js_bindings/Scripter.h"
 #include "tools/tools.h"
 
+#include "AsyncIO/AsyncIO.h"
 #include "AsyncIO/AsyncIOTests.h"
 #include "crypto/cryptoTests.h"
 
