@@ -26,12 +26,12 @@ hproto.read = function (size) {
     let ap = new AsyncProcessor();
     this._read_raw(size, (data, code) => ap.process(code, data));
     return ap.promise;
-}
+};
 
 function Reader(handle) {
 
-    var chunk = undefined;
-    var pos = 0;
+    let chunk = undefined;
+    let pos = 0;
 
     async function nextByte() {
         if (pos < 0)
@@ -39,7 +39,7 @@ function Reader(handle) {
         if (!chunk || pos >= chunk.length) {
             chunk = await handle.read(chunkSize);
             if (!chunk) {
-                pos = -1
+                pos = -1;
                 return undefined;
             } else {
                 pos = 0;
@@ -54,10 +54,10 @@ function Reader(handle) {
             if (b) yield b;
             else break;
         }
-    }
+    };
 
     this.lines = async function* () {
-        var line = []
+        let line = [];
         while(true) {
             let b = await nextByte();
             if( !b ) {
@@ -65,14 +65,14 @@ function Reader(handle) {
                     yield utf8Decode(Uint8Array.from(line));
                 return;
             }
-            if( b == 0x0A ) {
+            if( b === 0x0A ) {
                 yield utf8Decode(Uint8Array.from(line));
                 line = []
             } else {
                 line.push(b);
             }
         }
-    }
+    };
 
     return this;
 }
@@ -80,22 +80,17 @@ function Reader(handle) {
 
 hproto.reader = function () {
     return new Reader(this);
-}
-
-// hproto.read = function() {
-//
-// };
+};
 
 AsyncProcessor.prototype.call = function (code, result) {
     this.process(code, result)
-}
+};
 
 async function openRead(url) {
     let handle = new IoHandle();
-    let ap = new AsyncProcessor()
+    let ap = new AsyncProcessor();
     handle.open(url, 'r', 0, code => ap.process(code, handle));
     return ap.promise
 }
-
 
 module.exports = {openRead};

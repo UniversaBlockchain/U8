@@ -56,10 +56,8 @@ private:
  */
 template<typename O, typename T>
 void SimpleFinalizerCallback(const WeakCallbackInfo<SimpleFinalizerParameter<O, T>> &data) {
-    cout << "deactructing " << data.GetParameter()->data << endl;
     delete data.GetParameter()->data;
-    // handle resets by destructor
-    //    data.GetParameter()->handle.Reset();
+    // handle resets by destructor so we just delete our parameter, C++ does the rest ;)
     delete data.GetParameter();
 }
 
@@ -145,7 +143,6 @@ Local<FunctionTemplate> bindCppClass(Isolate *isolate, const char *class_name, F
                                                                                      "calling constructor as function")));
                                 } else {
                                     T *cppObject = constructor(args);
-                                    cout << "constructed " << cppObject << endl;
                                     Local<Object> result = args.This();
                                     result->SetInternalField(0, External::New(isolate, cppObject));
                                     SimpleFinalizer(result, cppObject);

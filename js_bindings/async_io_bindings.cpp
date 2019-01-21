@@ -78,7 +78,7 @@ void JsAsyncHandleRead(const FunctionCallbackInfo<Value> &args) {
                         } else {
                             if( result > 0 ) {
                                 Local<ArrayBuffer> ab = ArrayBuffer::New(isolate, result);
-                                memcpy(ab->GetContents().Data(), data.data(), data.size());
+                                memcpy(ab->GetContents().Data(), data.data(), result);
                                 Local<Value> res[2] {Uint8Array::New(ab, 0, result), Integer::New(isolate, result)};
                                 fn->Call(fn, 2, res);
                             }
