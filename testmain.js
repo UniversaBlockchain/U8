@@ -2,26 +2,12 @@
 
 let io = require("io");
 
-// let h = new IoHandle();
-function test() {
-    let h = new IoHandle();
-    console.log("handle: " + h + " : " + h.version);
-    let x = h;
-    h.open("../test.txt", "r", 0, (result) => {
-        console.log("------------------ REsult: " + result + " for handle " + h);
-        if (result < 0)
-            console.log("error: " + h.getErrorText(result));
-        h = undefined;
-    });
-}
-
 async function test1() {
-    h = await io.openRead("../test.1txt", "r")
+    h = await io.openRead("../test/test.txt", "r1")
     console.log("------> opened: " + h);
 }
 
 async function main() {
-    console.log("hadnle class: " + IoHandle);
     await test1();
     await sleep(100);
     gc();

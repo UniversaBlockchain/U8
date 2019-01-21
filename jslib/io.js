@@ -8,7 +8,6 @@ class AsyncProcessor  {
     }
 
     process(code, result) {
-        console.log("inproc", code, result);
         if (code < 0)
             this.reject(new IoError(`${IoHandle.getErrorText(code)} (${code})`));
         else
