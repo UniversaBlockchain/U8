@@ -20,12 +20,12 @@ PublicKey::~PublicKey() {
 void PublicKey::init(mpz_ptr N, mpz_ptr e) {
 	MP_INT zero;
 	mpz_init_set_ui(&zero, 0);
-	size_t bin_e_len = (mpz_sizeinbase(e, 2) + 7) / 8;
-	size_t bin_N_len = (mpz_sizeinbase(N, 2) + 7) / 8;
+	size_t bin_e_len = mpz_unsigned_bin_size(e);
+	size_t bin_N_len = mpz_unsigned_bin_size(N);
 	unsigned char bin_e[bin_e_len];
 	unsigned char bin_N[bin_N_len];
-	mpz_export(bin_e, NULL, 1, 1, 1, 0, e);
-	mpz_export(bin_N, NULL, 1, 1, 1, 0, N);
+	mpz_to_unsigned_bin(e, bin_e);
+	mpz_to_unsigned_bin(N, bin_N);
 	rsa_set_key(bin_N, bin_N_len, bin_e, bin_e_len, NULL, 0, &key);
 	key.type = PK_PUBLIC;
 	mpz_clear(&zero);
@@ -73,4 +73,39 @@ void PublicKey::encrypt(std::vector<unsigned char>& input, std::vector<unsigned 
 
 	output.resize(0);
 	output.insert(output.begin(), buf, buf+bufLen);
+}
+
+void PublicKey::toHash(std::unordered_map<std::string, std::string>& dst) const {
+	char buf[2048];
+	gmp_snprintf(buf, sizeof(buf)/sizeof(buf[0]), "%Zx", key.N);
+	dst["n"] = std::string(buf);
+	gmp_snprintf(buf, sizeof(buf)/sizeof(buf[0]), "%Zx", key.e);
+	dst["e"] = std::string(buf);
+
+	// Optional fields.
+	if (mgf1HashType != DEFAULT_MGF1_HASH)
+		dst["mgf1Hash"] = std::string(getJavaHashName(mgf1HashType));
+}
+
+long PublicKey::getPublicExponent() const {
+	size_t bin_e_len = mpz_unsigned_bin_size((mpz_ptr)key.e);
+	unsigned char bin_e[bin_e_len];
+	mpz_to_unsigned_bin((mpz_ptr)key.e, bin_e);
+	long e = 0;
+	for (int i = 0; i < bin_e_len; ++i)
+		e = (e << 8) | bin_e[i];
+	return e;
+}
+
+int PublicKey::getBitStrength() const {
+	int modulus_bitlen = ltc_mp.count_bits(key.N);
+	return modulus_bitlen;
+}
+
+void PublicKey::getKeyComponentsAsBytes(std::vector<unsigned char>& output) const {
+	int len1 = mpz_unsigned_bin_size((mpz_ptr)key.e);
+	int len2 = mpz_unsigned_bin_size((mpz_ptr)key.N);
+	output.resize(len1 + len2);
+	mpz_to_unsigned_bin((mpz_ptr)key.e, &output[0]);
+	mpz_to_unsigned_bin((mpz_ptr)key.N, &output[len1]);
 }

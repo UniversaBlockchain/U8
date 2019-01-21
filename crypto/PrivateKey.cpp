@@ -7,14 +7,6 @@
 #include "PrivateKey.h"
 #include "PublicKey.h"
 
-size_t mpz_unsigned_bin_size(mpz_ptr p) {
-	return (mpz_sizeinbase(p, 2) + 7) / 8;
-}
-
-void mpz_to_unsigned_bin(mpz_ptr p, unsigned char* buf) {
-	mpz_export(buf, NULL, 1, 1, 1, 0, p);
-}
-
 PrivateKey::PrivateKey() {
 	memset(&key, 0, sizeof(key));
 }

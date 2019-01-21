@@ -10,6 +10,7 @@
 #include "base64.h"
 #include "PrivateKey.h"
 #include "HashId.h"
+#include "KeyAddress.h"
 
 using namespace std;
 
@@ -191,8 +192,26 @@ void testHashIdComparison() {
     cout << "testHashIdComparison()... done!" << endl << endl;
 }
 
+void testKeyAddress() {
+    cout << "testKeyAddress()..." << endl;
+
+    auto strE = string("65537");
+    auto strP = string("166438984042065497734914068855004282550440498640409398677336546927308216381652973497991047247926391839370729407435808892969122519401712385345233169193805241631583305760736715545141142026706356434887369071360563025254193571054123994143642688583692644185979182810270581846072984179584787077062088254715187805453");
+    auto strQ = string("132243238518154268249184631952046833494949171132278166597493094022019934205919755965484010862547916586956651043061215415694791928849764419123506916992508894879133969053226176271305106211090173517182720832250788947720397461739281147258617115635022042579209568022023702283912658756481633266987107149957718776027");
+
+    PrivateKey privateKey;
+    privateKey.initForDebug_decimal(strE, strP, strQ);
+    auto publicKey = privateKey.getPublicKey();
+
+    KeyAddress keyAddressS(*publicKey, 0, false);
+    KeyAddress keyAddressL(*publicKey, 0, true);
+
+    cout << "testKeyAddress()... done!" << endl << endl;
+}
+
 void testCryptoAll() {
     testCrypto();
     testHashId();
     testHashIdComparison();
+    testKeyAddress();
 }

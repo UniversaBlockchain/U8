@@ -10,5 +10,6 @@ void testCryptoAll();
 void testCrypto();
 void testHashId();
 void testHashIdComparison();
+void testKeyAddress();
 
 #endif //U8_CRYPTOTESTS_H
