@@ -456,6 +456,44 @@ void testAsyncFile() {
     uv_sem_wait(&stop[0]);
     uv_sem_destroy(&stop[0]);
 
+    printf("Scan directory test...\n");
+
+    auto dir = std::make_shared<asyncio::IOHandle>();
+
+    auto dirLambda = [&](ssize_t result) {
+        if (!asyncio::isError(result))
+            printf("Directory open for scan\n");
+
+        asyncio::ioDirEntry entry;
+        while (dir->next(&entry)) {
+            if (asyncio::isFile(entry))
+                printf("File: %s\n", entry.name);
+            else if (asyncio::isDir(entry))
+                printf("Directory: %s\n", entry.name);
+            else
+                printf("Other: %s\n", entry.name);
+        }
+
+        uv_sem_post(&stop[0]);
+    };
+
+    // check 2 types syntax
+    uv_sem_init(&stop[0], 0);
+
+    dir->openDir(".", dirLambda);
+
+    uv_sem_wait(&stop[0]);
+    uv_sem_destroy(&stop[0]);
+
+    dir = std::make_shared<asyncio::IOHandle>();
+
+    uv_sem_init(&stop[0], 0);
+
+    dir->openDir(".")->then(dirLambda);
+
+    uv_sem_wait(&stop[0]);
+    uv_sem_destroy(&stop[0]);
+
     asyncio::deinitLoop();
 
     printf("testAsyncFile()...done\n\n");

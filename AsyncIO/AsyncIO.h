@@ -29,10 +29,22 @@ namespace asyncio {
      */
     typedef uv_fs_t ioHandle;
 
+    typedef uv_dirent_t ioDirEntry;
+
     /**
      * Byte vector
      */
     typedef std::vector<uint8_t> byte_vector;
+
+    /**
+     * IO handle type
+     */
+    enum ioHandle_t {
+        FILE,
+        DIRECTORY,
+        TCP_SOCKET,
+        UDP_SOCKET
+    };
 
     /**
      * File open callback
@@ -70,6 +82,15 @@ namespace asyncio {
      * If isError(result) returns false - file is closed.
      */
     typedef std::function<void(ssize_t result)> closeFile_cb;
+
+    /**
+     * Directory open callback
+     *
+     * @param result is directory open result
+     * If isError(result) returns true - use getError(result) to determine the error.
+     * If isError(result) returns false - result is handle of opened directory.
+     */
+    typedef std::function<void(ssize_t result)> openDir_cb;
 
     class IOHandle;
 
@@ -161,6 +182,24 @@ namespace asyncio {
      * @return error description
      */
     const char* getError(ssize_t code);
+
+    /**
+     * Check whether the entry is a file
+     *
+     * @param entry is directory entry (@see IOHandle::next)
+     * @return true - if the entry is a file,
+     *         false - if otherwise
+     */
+    bool isFile(const ioDirEntry& entry);
+
+    /**
+     * Check whether the entry is a directory
+     *
+     * @param entry is directory entry (@see IOHandle::next)
+     * @return true - if the entry is a directory,
+     *         false - if otherwise
+     */
+    bool isDir(const ioDirEntry& entry);
 
     /**
      * Class for asynchronous work with files.
@@ -262,13 +301,15 @@ namespace asyncio {
         IOHandle* close();
 
         /**
-         * Callback initialization for asynchronous opening, writing and closing file.
-         * Used when the callback has not been initialized in methods IOHandle::open, IOHandle::write, IOHandle::close.
+         * Callback initialization for asynchronous opening, writing and closing file and open directory for scan.
+         * Used when the callback has not been initialized in methods IOHandle::open, IOHandle::write, IOHandle::close
+         * and IOHandle::openDir.
          * @see IOHandle::open(const char* path, int flags, int mode)
          * @see IOHandle::write(const byte_vector& data)
          * @see IOHandle::close()
+         * @see IOHandle::openDir(const char* path)
          *
-         * @param callback is initialized callback for asynchronous opening, writing and closing file
+         * @param callback is initialized callback for asynchronous opening, writing and closing file or scan directory
          * @return pointer to open file handle
          */
         IOHandle* then(openFile_cb callback);
@@ -283,14 +324,49 @@ namespace asyncio {
          */
         IOHandle* then(readFile_cb callback);
 
+        /**
+         * Asynchronous open directory for scan.
+         *
+         * @param path to open directory
+         * @param callback caused when opening a directory or error
+         */
+        void openDir(const char* path, openDir_cb callback);
+
+        /**
+         * Get next entry for scan directory.
+         *
+         * Directory entry is struct with fields:
+         *      name - is name of file or directory
+         *      type - is type of directory entry
+         * For check entry is file use isFile(entry).
+         * @see isFile(const ioDirEntry& entry).
+         * For check entry is directory use isDir(entry).
+         * @see isDir(const ioDirEntry& entry).
+         *
+         * @param entry is pointer to next directory entry
+         * @return true - if a entry is successfully get
+         *         false - if can`t get a entry (reached the end of the directory)
+         */
+        bool next(ioDirEntry *entry);
+
+        /**
+         * Asynchronous open directory for scan with callback initialization in the method IOHandle::then.
+         * @see IOHandle::then(openFile_cb callback).
+         *
+         * @param path to open directory
+         * @return pointer to open file handle
+         */
+        IOHandle* openDir(const char* path);
+
     private:
         uv_fs_t* ioReq;
         bool closed = false;
+        ioHandle_t type;
 
         std::packaged_task<void(openFile_cb)> task;
         std::packaged_task<void(readFile_cb)> readTask;
 
-        void initRequest();
+        bool initRequest();
         void freeRequest();
 
         static void open_cb(asyncio::ioHandle *req);
