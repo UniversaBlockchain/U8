@@ -8,6 +8,8 @@
 #include "../tools/tools.h"
 #include "../AsyncIO/AsyncIO.h"
 
+using asyncio::byte_vector;
+
 void JsAsyncGetErrorText(const FunctionCallbackInfo<Value> &args) {
     Scripter::unwrap(args, [&](const shared_ptr<Scripter> &se, auto isolate, auto context) {
         // args is typicalli big int, so we convert it through string
@@ -47,6 +49,7 @@ void JsAsyncHandleOpen(const FunctionCallbackInfo<Value> &args) {
                         Local<Value> res = BigInt::New(isolate, result);
                         fn->Call(fn, 1, &res);
                     }
+                    delete pcb;
                 });
             });
         } else {
@@ -57,32 +60,55 @@ void JsAsyncHandleOpen(const FunctionCallbackInfo<Value> &args) {
     });
 }
 
+void JsAsyncHandleRead(const FunctionCallbackInfo<Value> &args) {
+    Scripter::unwrap(args, [&](const shared_ptr<Scripter> &se, auto isolate, auto context) {
+        auto handle = unwrap<asyncio::IOHandle>(args.This());
+        Persistent<Function> *pcb = new Persistent<Function>(isolate, args[1].As<Function>());
+        handle->read(
+                args[0]->Int32Value(context).FromJust(),
+                [=](const byte_vector &data, ssize_t result) {
 
-void IoHandleConstructor(const FunctionCallbackInfo<Value> &args) {
-    auto isolate = args.GetIsolate();
-    if (!args.IsConstructCall()) {
-        isolate->ThrowException(Exception::TypeError(String::NewFromUtf8(isolate, "calling constructor as function")));
-    } else {
-        asyncio::IOHandle *handle = new asyncio::IOHandle();
-        Local<Object> result = args.This();
-        result->SetInternalField(0, External::New(isolate, handle));
-        SimpleFinalizer(result, handle);
-        args.GetReturnValue().Set(args.This());
-    }
+                    se->lockedContext([&](auto context) {
+
+                        Isolate* isolate = context->GetIsolate();
+                        auto fn = pcb->Get(isolate);
+
+                        if (fn->IsNull()) {
+                            se->throwError("null callback in IoHandle::read");
+                        } else {
+                            if( result > 0 ) {
+                                Local<ArrayBuffer> ab = ArrayBuffer::New(isolate, result);
+                                memcpy(ab->GetContents().Data(), data.data(), data.size());
+                                Local<Value> res[2] {Uint8Array::New(ab, 0, result), Integer::New(isolate, result)};
+                                fn->Call(fn, 2, res);
+                            }
+                            else {
+                                Local<Value> res[] = {Undefined(isolate), Integer::New(isolate, result)};
+                                fn->Call(fn, 2, res);
+                            }
+                        }
+                        delete pcb;
+
+                    });
+                });
+    });
 }
 
 
 void JsInitIoHandle(Isolate *isolate, const Local<ObjectTemplate> &global) {
+    // Bind object with default constructor
     Local<FunctionTemplate> tpl = bindCppClass<asyncio::IOHandle>(isolate, "IoHandle");
 
     // instance methods
     auto prototype = tpl->PrototypeTemplate();
     prototype->Set(isolate, "version", String::NewFromUtf8(isolate, "0.0.1"));
     prototype->Set(isolate, "open", FunctionTemplate::New(isolate, JsAsyncHandleOpen));
+    prototype->Set(isolate, "_read_raw", FunctionTemplate::New(isolate, JsAsyncHandleRead));
 
     // class methods
     tpl->Set(isolate, "getErrorText", FunctionTemplate::New(isolate, JsAsyncGetErrorText));
 
+    // register it into global namespace
     global->Set(isolate, "IoHandle", tpl);
 }
 

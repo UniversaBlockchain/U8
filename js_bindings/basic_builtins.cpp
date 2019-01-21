@@ -51,7 +51,7 @@ void JsTimer(const v8::FunctionCallbackInfo<v8::Value> &args) {
         se->asyncSleep.delay(millis, [=]() {
             // We need to re-enter in context as we are in another thread and stack, and as we do
             // it from another thread, we MUST use lockedContext:
-            se->lockedContext([=](Local<Context>& context) {
+            se->lockedContext([=](Local<Context> &context) {
                 // get the local hadnle to function from persistent handle
                 auto fn = jsCallback->Get(context->GetIsolate());
                 // call it using the function as the this context:
@@ -87,6 +87,20 @@ void JsWaitExit(const v8::FunctionCallbackInfo<v8::Value> &args) {
 void JsExit(const v8::FunctionCallbackInfo<v8::Value> &args) {
     Scripter::unwrap(args, [&](shared_ptr<Scripter> se, auto isolate, auto context) {
         se->exit(args[0]->Uint32Value(context).FromJust());
+    });
+}
+
+void JsTypedArrayToString(const FunctionCallbackInfo<v8::Value> &args) {
+    Scripter::unwrap(args, [&](shared_ptr<Scripter> se, auto isolate, auto context) {
+        if (!args[0]->IsTypedArray())
+            se->throwError("must be a typed array");
+        Local<Uint8Array> array = args[0].As<Uint8Array>();
+        args.GetReturnValue().Set(
+                String::NewFromUtf8(isolate,
+                                    (const char *) array->Buffer()->GetContents().Data(),
+                                    NewStringType::kNormal,
+                                    array->Length()
+                ).ToLocalChecked());
     });
 }
 

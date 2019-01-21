@@ -125,6 +125,7 @@ void Scripter::initialize() {
     global->Set(v8String("__bios_initTimers"), functionTemplate(JsInitTimers));
     global->Set(v8String("waitExit"), functionTemplate(JsWaitExit));
     global->Set(v8String("exit"), functionTemplate(JsExit));
+    global->Set(v8String("utf8Decode"), functionTemplate(JsTypedArrayToString));
     global->Set(v8String("$0"), v8String(ARGV0));
 
     JsInitIoHandle(pIsolate, global);

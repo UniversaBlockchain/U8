@@ -56,6 +56,7 @@ private:
  */
 template<typename O, typename T>
 void SimpleFinalizerCallback(const WeakCallbackInfo<SimpleFinalizerParameter<O, T>> &data) {
+    cout << "deactructing " << data.GetParameter()->data << endl;
     delete data.GetParameter()->data;
     // handle resets by destructor
     //    data.GetParameter()->handle.Reset();
@@ -82,7 +83,7 @@ T *unwrap(const Local<Object> &obj, int fieldNo = 0) {
  * This is a bloody hack intended to evade strange V8 template constructor limitation that does not
  * allow us to pass stateful (e.g. [=]) lambdas for constructor callback.
  *
- * We need them tp be able to pass C++ instance constructing lambda by value (e.g. copy) at least, and,
+ * We need them to be able to pass C++ instance constructing lambda by value (e.g. copy) at least, and,
  * moreover, to be able to have stateful constricting lambda what is generally good.
  *
  * Ignore all this until "end hack". And thanks https://stackoverflow.com/users/4832499/passer-by
@@ -144,6 +145,7 @@ Local<FunctionTemplate> bindCppClass(Isolate *isolate, const char *class_name, F
                                                                                      "calling constructor as function")));
                                 } else {
                                     T *cppObject = constructor(args);
+                                    cout << "constructed " << cppObject << endl;
                                     Local<Object> result = args.This();
                                     result->SetInternalField(0, External::New(isolate, cppObject));
                                     SimpleFinalizer(result, cppObject);
