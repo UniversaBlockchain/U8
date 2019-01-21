@@ -77,10 +77,24 @@ function Reader(handle) {
     return this;
 }
 
+Object.defineProperty(hproto, "reader", {
+    get: function () {
+        if( !this.__reader ) this.__reader= new Reader(this);
+        return this.__reader;
+    }
+});
 
-hproto.reader = function () {
-    return new Reader(this);
-};
+Object.defineProperty(hproto, "lines", {
+    get: function () {
+        return this.reader.lines();
+    }
+});
+
+Object.defineProperty(hproto, "bytes", {
+    get: function () {
+        return this.reader.bytes();
+    }
+});
 
 AsyncProcessor.prototype.call = function (code, result) {
     this.process(code, result)
