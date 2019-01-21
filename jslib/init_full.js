@@ -86,7 +86,7 @@ function __call_main(args) {
 // }
 //
 // async function test2() {
-//     let pr = sleep(1370);
+//     let pr = sleep(1370, true);
 //     timeout(900, () => pr.cancel());
 //     try {
 //         await pr;

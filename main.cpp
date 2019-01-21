@@ -18,6 +18,8 @@ void testCrypto();
 int main(int argc, const char **argv) {
 
     initCrypto();
+    asyncio::initAndRunLoop();
+
     if (argc == 2 && strcmp(argv[1], "--selftest") == 0) {
         testCryptoAll();
         testAsyncFile();

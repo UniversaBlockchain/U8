@@ -196,6 +196,25 @@ public:
         }
     }
 
+    /**
+     * throw Javacript exception as a simple string
+     */
+    void throwException(const string &reason) {
+        pIsolate->ThrowException(v8String(reason));
+    }
+
+    /**
+     * throw Javacript exception as a some object
+     */
+    template<class S>
+    void throwError(const S &&text) {
+        pIsolate->ThrowException(Exception::Error(v8String(text)));
+    }
+
+    void throwError(const char* text) {
+        throwError(string(text));
+    }
+
 private:
 
     std::string expandPath(const std::string &path);

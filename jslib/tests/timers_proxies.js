@@ -5,7 +5,7 @@ async function main(args) {
         }
     );
     console.log("Testing timers");
-    await sleep(400);
+    await sleep(4000);
     console.log("main timer");
     return 17;
 }

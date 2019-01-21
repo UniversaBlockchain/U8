@@ -10,15 +10,23 @@
 #include "Scripter.h"
 #include "../tools/tools.h"
 #include "basic_builtins.h"
+#include "async_io_bindings.h"
 
 static const char *ARGV0 = nullptr;
 
 std::unique_ptr<v8::Platform> Scripter::initV8(const char *argv0) {
+
+    int _argc = 2;
+    char* _argv[] = { (char*)argv0, (char*) "--expose_gc"};
+
     v8::V8::InitializeICUDefaultLocation(argv0);
     v8::V8::InitializeExternalStartupData(argv0);
     ARGV0 = argv0;
     std::unique_ptr<v8::Platform> platform = v8::platform::NewDefaultPlatform();
     v8::V8::InitializePlatform(platform.get());
+    V8::SetFlagsFromCommandLine(&_argc,
+                                _argv,
+                                false);
     v8::V8::Initialize();
     return platform;
 }
@@ -118,6 +126,8 @@ void Scripter::initialize() {
     global->Set(v8String("waitExit"), functionTemplate(JsWaitExit));
     global->Set(v8String("exit"), functionTemplate(JsExit));
     global->Set(v8String("$0"), v8String(ARGV0));
+
+    JsInitIoHandle(pIsolate, global);
 
     // Save context and wrap weak self:
     context.Reset(pIsolate, v8::Context::New(pIsolate, nullptr, global));
@@ -241,7 +251,6 @@ int Scripter::runAsMain(const string &sourceScript, const vector<string> &&args,
 //            auto result = main->Call(context, global, 1, &param);
             throwPendingException<ScriptError>(tryCatch, context);
 //            return result.ToLocalChecked()->Int32Value(context).FromJust();
-cout << "res " << result << endl;
             return stoi(result);
         }
         // if we reach this point, there are no main function in the script

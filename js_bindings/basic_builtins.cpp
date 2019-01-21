@@ -58,6 +58,7 @@ void JsTimer(const v8::FunctionCallbackInfo<v8::Value> &args) {
                 fn->Call(fn, 0, nullptr);
                 // now we must free the persistent handle as it is single operation
                 jsCallback->Reset();
+//                delete jsCallback;
             });
         });
     });

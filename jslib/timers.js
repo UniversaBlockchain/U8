@@ -122,12 +122,12 @@ function timeout(millis, callback, reject) {
  */
 function sleep(millis,cancellable=false) {
     let entry;
-    let pr = new Promise((resolve, reject) => {
+    let promise = new Promise((resolve, reject) => {
         entry = timeout(millis, resolve, reject)
     });
     if(cancellable)
-        pr.cancel = () => entry.cancel();
-    return pr;
+        promise.cancel = () => entry.cancel();
+    return promise;
 }
 
 /**
@@ -143,6 +143,7 @@ function setTimeout(callback, millis) {
 
 /**
  * Legacy clearTimeout. Must use what {setTimeout} has retutrned (as always).
+ *
  * @param entry returned by setTimout()
  */
 function clearTimeout(entry) {
