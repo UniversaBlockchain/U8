@@ -104,6 +104,15 @@ namespace asyncio {
      */
     typedef std::function<void(std::shared_ptr<IOHandle> handle, ssize_t result)> openIOHandle_cb;
 
+    /**
+     * File remove callback
+     *
+     * @param result is file remove result
+     * If isError(result) returns true - use getError(result) to determine the error.
+     * If isError(result) returns false - file is removed.
+     */
+    typedef std::function<void(ssize_t result)> removeFile_cb;
+
     struct openFile_data {
         openFile_cb callback;
         ioHandle* fileReq;
@@ -449,6 +458,15 @@ namespace asyncio {
          */
         static IOHandle* open(const char* path, int flags, int mode);
 
+        /**
+         * Asynchronous remove file.
+         *
+         * @param path to removed file
+         * @param data is byte vector for data written to file
+         * @param callback when the file is wrote or an error occurs
+         */
+        static void remove(const char* path, removeFile_cb callback);
+
     private:
         static void readFile_onClose(asyncio::ioHandle *req);
         static void readFile_onRead(asyncio::ioHandle *req);
@@ -458,6 +476,8 @@ namespace asyncio {
         static void writeFile_onClose(asyncio::ioHandle *req);
         static void writeFile_onWrite(asyncio::ioHandle *req);
         static void writeFile_onOpen(asyncio::ioHandle *req);
+
+        static void remove_onRemoveFile(asyncio::ioHandle *req);
     };
 };
 

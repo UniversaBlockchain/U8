@@ -494,6 +494,44 @@ void testAsyncFile() {
     uv_sem_wait(&stop[0]);
     uv_sem_destroy(&stop[0]);
 
+    printf("Remove files test...\n");
+
+    uv_sem_init(&stop[0], 0);
+
+    for (int t = 0; t < NUM_THREADS; t++) {
+        char fileName[22];
+        snprintf(fileName, 22, "TestFile%i.bin", t);
+
+        asyncio::file::remove(fileName, [=](ssize_t result) {
+            if (!asyncio::isError(result))
+                printf("File %s deleted.\n", fileName);
+
+            uv_sem_post(&stop[0]);
+        });
+
+        snprintf(fileName, 22, "TestEntireFile%i.bin", t);
+
+        asyncio::file::remove(fileName, [=](ssize_t result) {
+            if (!asyncio::isError(result))
+                printf("File %s deleted.\n", fileName);
+
+            uv_sem_post(&stop[0]);
+        });
+
+        snprintf(fileName, 22, "TestOpenWrite%i.bin", t);
+
+        asyncio::file::remove(fileName, [=](ssize_t result) {
+            if (!asyncio::isError(result))
+                printf("File %s deleted.\n", fileName);
+
+            uv_sem_post(&stop[0]);
+        });
+    }
+
+    for (int i = 0; i < NUM_THREADS * 3; i++)
+        uv_sem_wait(&stop[0]);
+    uv_sem_destroy(&stop[0]);
+
     asyncio::deinitLoop();
 
     printf("testAsyncFile()...done\n\n");

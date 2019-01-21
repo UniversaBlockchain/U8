@@ -2,6 +2,7 @@
 // Created by Sergey Chernov on 2019-01-05.
 //
 #include <iostream>
+#include <cstring>
 
 #include "async_io_bindings.h"
 #include "binding_tools.h"

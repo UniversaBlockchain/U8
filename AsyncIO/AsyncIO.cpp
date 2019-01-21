@@ -10,6 +10,10 @@ namespace asyncio {
     uv_loop_t* asyncLoop = nullptr;
     uv_async_t exitHandle;
 
+    //===========================================================================================
+    // Main functions implementation
+    //===========================================================================================
+
     uv_loop_t* initAndRunLoop() {
         if (!asyncLoop) {
             asyncLoop = uv_loop_new();
@@ -59,6 +63,10 @@ namespace asyncio {
         }
     }
 
+    //===========================================================================================
+    // Helpers implementation
+    //===========================================================================================
+
     bool isError(ssize_t result) {
         return result < 0;
     }
@@ -74,6 +82,10 @@ namespace asyncio {
     bool isDir(const ioDirEntry& entry) {
         return entry.type == UV_DIRENT_DIR;
     }
+
+    //===========================================================================================
+    // Class IOHandle implementation
+    //===========================================================================================
 
     IOHandle::IOHandle() {
         ioReq = nullptr;
@@ -237,6 +249,9 @@ namespace asyncio {
         uv_fs_req_cleanup(req);
         auto file_data = (readFile_data*) req->data;
 
+        if ((req->result > 0) && (req->result < file_data->maxBytes))
+            file_data->data->resize((unsigned long) req->result);
+
         file_data->callback(*file_data->data, req->result);
 
         file_data->data.reset();
@@ -263,6 +278,153 @@ namespace asyncio {
         delete file_data;
         delete req;
     }
+
+    IOHandle* file::open(const char* path, int flags, int mode) {
+        auto handle = new IOHandle();
+
+        handle->open(path, flags, mode);
+
+        return handle;
+    }
+
+    IOHandle* IOHandle::open(const char* path, int flags, int mode) {
+        IOHandle *handle = this;
+
+        if (task.valid())
+            throw std::invalid_argument("ERROR: Task already initialized.");
+
+        std::packaged_task<void(openFile_cb callback)> newTask([handle, path, flags, mode](openFile_cb callback) {
+            handle->open(path, flags, mode, callback);
+        });
+
+        task = std::move(newTask);
+
+        return handle;
+    }
+
+    IOHandle* IOHandle::then(openFile_cb callback) {
+        if (!task.valid())
+            throw std::invalid_argument("ERROR: Task is not initialized.");
+
+        task(std::move(callback));
+
+        task = std::packaged_task<void(openFile_cb callback)>();
+
+        return this;
+    }
+
+    IOHandle* IOHandle::read(size_t maxBytesToRead) {
+        IOHandle *handle = this;
+
+        if (readTask.valid())
+            throw std::invalid_argument("ERROR: Task already initialized.");
+
+        std::packaged_task<void(readFile_cb callback)> newTask([handle, maxBytesToRead](readFile_cb callback) {
+            handle->read(maxBytesToRead, callback);
+        });
+
+        readTask = std::move(newTask);
+
+        return handle;
+    }
+
+    IOHandle* IOHandle::then(readFile_cb callback) {
+        if (!readTask.valid())
+            throw std::invalid_argument("ERROR: Task is not initialized.");
+
+        readTask(std::move(callback));
+
+        readTask = std::packaged_task<void(readFile_cb callback)>();
+
+        return this;
+    }
+
+    IOHandle* IOHandle::write(const byte_vector& data) {
+        IOHandle *handle = this;
+
+        if (task.valid())
+            throw std::invalid_argument("ERROR: Task already initialized.");
+
+        std::packaged_task<void(writeFile_cb callback)> newTask([handle, data](writeFile_cb callback) {
+            handle->write(data, callback);
+        });
+
+        task = std::move(newTask);
+
+        return handle;
+    }
+
+    IOHandle* IOHandle::close() {
+        IOHandle *handle = this;
+
+        if (task.valid())
+            throw std::invalid_argument("ERROR: Task already initialized.");
+
+        std::packaged_task<void(closeFile_cb callback)> newTask([handle](closeFile_cb callback) {
+            handle->close(callback);
+        });
+
+        task = std::move(newTask);
+
+        return handle;
+    }
+
+    void IOHandle::openDir(const char* path, openDir_cb callback) {
+        if (!initRequest()) {
+            fprintf(stderr, "IOHandle already initialized. Close opened handle.\n");
+            return;
+        }
+
+        auto file_data = new openFile_data();
+
+        file_data->callback = std::move(callback);
+        file_data->fileReq = ioReq;
+
+        ioReq->data = file_data;
+
+        int result = uv_fs_scandir(asyncio::asyncLoop, ioReq, path, O_RDONLY, open_cb);
+
+        if (result < 0) {
+            file_data->callback(result);
+
+            delete file_data;
+            freeRequest();
+        } else
+            type = DIRECTORY;
+    }
+
+    bool IOHandle::next(ioDirEntry *entry) {
+        if (!ioReq) {
+            fprintf(stderr, "IOHandle not initialized. Open directory for scan.\n");
+            return false;
+        }
+
+        if (type != DIRECTORY) {
+            fprintf(stderr, "IOHandle not directory type.\n");
+            return false;
+        }
+
+        return UV_EOF != uv_fs_scandir_next(ioReq, entry);
+    }
+
+    IOHandle* IOHandle::openDir(const char* path) {
+        IOHandle *handle = this;
+
+        if (task.valid())
+            throw std::invalid_argument("ERROR: Task already initialized.");
+
+        std::packaged_task<void(openDir_cb callback)> newTask([handle, path](openDir_cb callback) {
+            handle->openDir(path, callback);
+        });
+
+        task = std::move(newTask);
+
+        return handle;
+    }
+
+    //===========================================================================================
+    // Class file implementation
+    //===========================================================================================
 
     void file::readFile_onClose(asyncio::ioHandle *req) {
         uv_fs_req_cleanup(req);
@@ -490,146 +652,32 @@ namespace asyncio {
         open(path, O_CREAT | O_WRONLY | O_TRUNC, S_IRWXU | S_IRWXG | S_IRWXO, std::move(callback));
     }
 
-    IOHandle* file::open(const char* path, int flags, int mode) {
-        auto handle = new IOHandle();
+    void file::remove_onRemoveFile(asyncio::ioHandle *req) {
+        uv_fs_req_cleanup(req);
+        auto file_data = (openFile_data*) req->data;
 
-        handle->open(path, flags, mode);
+        file_data->callback(req->result);
 
-        return handle;
+        delete file_data;
+        delete req;
     }
 
-    IOHandle* IOHandle::open(const char* path, int flags, int mode) {
-        IOHandle *handle = this;
-
-        if (task.valid())
-            throw std::invalid_argument("ERROR: Task already initialized.");
-
-        std::packaged_task<void(openFile_cb callback)> newTask([handle, path, flags, mode](openFile_cb callback) {
-            handle->open(path, flags, mode, callback);
-        });
-
-        task = std::move(newTask);
-
-        return handle;
-    }
-
-    IOHandle* IOHandle::then(openFile_cb callback) {
-        if (!task.valid())
-            throw std::invalid_argument("ERROR: Task is not initialized.");
-
-        task(std::move(callback));
-
-        task = std::packaged_task<void(openFile_cb callback)>();
-
-        return this;
-    }
-
-    IOHandle* IOHandle::read(size_t maxBytesToRead) {
-        IOHandle *handle = this;
-
-        if (readTask.valid())
-            throw std::invalid_argument("ERROR: Task already initialized.");
-
-        std::packaged_task<void(readFile_cb callback)> newTask([handle, maxBytesToRead](readFile_cb callback) {
-            handle->read(maxBytesToRead, callback);
-        });
-
-        readTask = std::move(newTask);
-
-        return handle;
-    }
-
-    IOHandle* IOHandle::then(readFile_cb callback) {
-        if (!readTask.valid())
-            throw std::invalid_argument("ERROR: Task is not initialized.");
-
-        readTask(std::move(callback));
-
-        readTask = std::packaged_task<void(readFile_cb callback)>();
-
-        return this;
-    }
-
-    IOHandle* IOHandle::write(const byte_vector& data) {
-        IOHandle *handle = this;
-
-        if (task.valid())
-            throw std::invalid_argument("ERROR: Task already initialized.");
-
-        std::packaged_task<void(writeFile_cb callback)> newTask([handle, data](writeFile_cb callback) {
-            handle->write(data, callback);
-        });
-
-        task = std::move(newTask);
-
-        return handle;
-    }
-
-    IOHandle* IOHandle::close() {
-        IOHandle *handle = this;
-
-        if (task.valid())
-            throw std::invalid_argument("ERROR: Task already initialized.");
-
-        std::packaged_task<void(closeFile_cb callback)> newTask([handle](closeFile_cb callback) {
-            handle->close(callback);
-        });
-
-        task = std::move(newTask);
-
-        return handle;
-    }
-
-    void IOHandle::openDir(const char* path, openDir_cb callback) {
-        if (!initRequest()) {
-            fprintf(stderr, "IOHandle already initialized. Close opened handle.\n");
-            return;
-        }
-
+    void file::remove(const char* path, removeFile_cb callback) {
+        auto req = new ioHandle();
         auto file_data = new openFile_data();
 
         file_data->callback = std::move(callback);
-        file_data->fileReq = ioReq;
+        file_data->fileReq = req;
 
-        ioReq->data = file_data;
+        req->data = file_data;
 
-        int result = uv_fs_scandir(asyncio::asyncLoop, ioReq, path, O_RDONLY, open_cb);
+        int result = uv_fs_unlink(asyncio::asyncLoop, req, path, remove_onRemoveFile);
 
         if (result < 0) {
             file_data->callback(result);
 
             delete file_data;
-            freeRequest();
-        } else
-            type = DIRECTORY;
-    }
-
-    bool IOHandle::next(ioDirEntry *entry) {
-        if (!ioReq) {
-            fprintf(stderr, "IOHandle not initialized. Open directory for scan.\n");
-            return false;
+            delete req;
         }
-
-        if (type != DIRECTORY) {
-            fprintf(stderr, "IOHandle not directory type.\n");
-            return false;
-        }
-
-        return UV_EOF != uv_fs_scandir_next(ioReq, entry);
-    }
-
-    IOHandle* IOHandle::openDir(const char* path) {
-        IOHandle *handle = this;
-
-        if (task.valid())
-            throw std::invalid_argument("ERROR: Task already initialized.");
-
-        std::packaged_task<void(openDir_cb callback)> newTask([handle, path](openDir_cb callback) {
-            handle->openDir(path, callback);
-        });
-
-        task = std::move(newTask);
-
-        return handle;
     }
 };
