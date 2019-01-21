@@ -16,10 +16,9 @@ const VERSION = "4.0.0b4";
  * @param src code to evaluate.
  */
 function safeEval(module, sourceUrl, src) {
-    'strict mode';
     // noinspection JSUnusedLocalSymbols
     let exports = module.exports; // this one could be used in evaluated code
-    eval(src + "\n//# sourceURL=" + sourceUrl + "\n");
+    eval(src + "\n//# sourceURL=" + sourceUrl);
 }
 
 function __fix_imports(source) {

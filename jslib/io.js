@@ -1,4 +1,17 @@
+/**
+ * Carries errors from I/O subsystem. When possible, provides #code property.
+ */
 class IoError extends Error {
+    constructor(reason) {
+        if( reason instanceof String ) {
+            super(reason);
+            this.code = undefined;
+        }
+        else {
+            super(`${IoHandle.getErrorText(reason)} (${reason})`);
+            this.code = reason;
+        }
+    }
 }
 
 class AsyncProcessor {
@@ -10,7 +23,7 @@ class AsyncProcessor {
 
     process(code, result) {
         if (code < 0)
-            this.reject(new IoError(`${IoHandle.getErrorText(code)} (${code})`));
+            this.reject(new IoError(code));
         else
             this.resolve(result);
     }

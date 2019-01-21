@@ -3,11 +3,17 @@
 let io = require("io");
 
 async function test_read_lines() {
-    handle = await io.openRead("../test/test.txt", "r1");
+    let handle = await io.openRead("../test/test.txt");
     let n = 1;
     for await (b of handle.lines ) {
         console.log(`${n++} [${b}]`);
     }
+}
+
+async function test_read_lines2() {
+    let handle = await io.openRead("../test/test.txt");
+    let [a, b] = await handle.reader.lines();
+    console.log(a, b,"--end");
 }
 
 async function main() {
