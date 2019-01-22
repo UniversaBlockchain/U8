@@ -680,4 +680,56 @@ namespace asyncio {
             delete req;
         }
     }
+
+    //===========================================================================================
+    // Class file implementation
+    //===========================================================================================
+
+    void dir::dir_onCreateOrRemove(asyncio::ioHandle *req) {
+        uv_fs_req_cleanup(req);
+        auto dir_data = (openFile_data*) req->data;
+
+        dir_data->callback(req->result);
+
+        delete dir_data;
+        delete req;
+    }
+
+    void dir::createDir(const char* path, int mode, createDir_cb callback) {
+        auto req = new ioHandle();
+        auto dir_data = new openFile_data();
+
+        dir_data->callback = std::move(callback);
+        dir_data->fileReq = req;
+
+        req->data = dir_data;
+
+        int result = uv_fs_mkdir(asyncio::asyncLoop, req, path, mode, dir_onCreateOrRemove);
+
+        if (result < 0) {
+            dir_data->callback(result);
+
+            delete dir_data;
+            delete req;
+        }
+    }
+
+    void dir::removeDir(const char* path, removeDir_cb callback) {
+        auto req = new ioHandle();
+        auto dir_data = new openFile_data();
+
+        dir_data->callback = std::move(callback);
+        dir_data->fileReq = req;
+
+        req->data = dir_data;
+
+        int result = uv_fs_rmdir(asyncio::asyncLoop, req, path, dir_onCreateOrRemove);
+
+        if (result < 0) {
+            dir_data->callback(result);
+
+            delete dir_data;
+            delete req;
+        }
+    }
 };

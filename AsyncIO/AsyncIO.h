@@ -92,27 +92,6 @@ namespace asyncio {
      */
     typedef std::function<void(ssize_t result)> openDir_cb;
 
-    class IOHandle;
-
-    /**
-     * File open callback for method asyncio::file::open
-     *
-     * @param handle is shared pointer to open file handle
-     * @param result is file open result
-     * If isError(result) returns true - use getError(result) to determine the error.
-     * If isError(result) returns false - result is handle of opened file.
-     */
-    typedef std::function<void(std::shared_ptr<IOHandle> handle, ssize_t result)> openIOHandle_cb;
-
-    /**
-     * File remove callback
-     *
-     * @param result is file remove result
-     * If isError(result) returns true - use getError(result) to determine the error.
-     * If isError(result) returns false - file is removed.
-     */
-    typedef std::function<void(ssize_t result)> removeFile_cb;
-
     struct openFile_data {
         openFile_cb callback;
         ioHandle* fileReq;
@@ -384,6 +363,25 @@ namespace asyncio {
         static void close_cb(asyncio::ioHandle *req);
     };
 
+    /**
+     * File open callback for method asyncio::file::open
+     *
+     * @param handle is shared pointer to open file handle
+     * @param result is file open result
+     * If isError(result) returns true - use getError(result) to determine the error.
+     * If isError(result) returns false - result is handle of opened file.
+     */
+    typedef std::function<void(std::shared_ptr<IOHandle> handle, ssize_t result)> openIOHandle_cb;
+
+    /**
+     * File remove callback
+     *
+     * @param result is file remove result
+     * If isError(result) returns true - use getError(result) to determine the error.
+     * If isError(result) returns false - file is removed.
+     */
+    typedef std::function<void(ssize_t result)> removeFile_cb;
+
     class file {
     public:
         /**
@@ -462,8 +460,7 @@ namespace asyncio {
          * Asynchronous remove file.
          *
          * @param path to removed file
-         * @param data is byte vector for data written to file
-         * @param callback when the file is wrote or an error occurs
+         * @param callback when the file is removed or an error occurs
          */
         static void remove(const char* path, removeFile_cb callback);
 
@@ -478,6 +475,47 @@ namespace asyncio {
         static void writeFile_onOpen(asyncio::ioHandle *req);
 
         static void remove_onRemoveFile(asyncio::ioHandle *req);
+    };
+
+    /**
+     * Directory create callback
+     *
+     * @param result is directory create result
+     * If isError(result) returns true - use getError(result) to determine the error.
+     * If isError(result) returns false - directory is created.
+     */
+    typedef std::function<void(ssize_t result)> createDir_cb;
+
+    /**
+     * Directory remove callback
+     *
+     * @param result is directory remove result
+     * If isError(result) returns true - use getError(result) to determine the error.
+     * If isError(result) returns false - directory is removed.
+     */
+    typedef std::function<void(ssize_t result)> removeDir_cb;
+
+    class dir {
+    public:
+        /**
+         * Asynchronous create directory.
+         *
+         * @param path to created directory
+         * @param mode - specifies the directory mode bits be applied when a new directory is created (@see IOHandle::open)
+         * @param callback when the directory is created or an error occurs
+         */
+        static void createDir(const char* path, int mode, createDir_cb callback);
+
+        /**
+         * Asynchronous remove directory.
+         *
+         * @param path to removed directory
+         * @param callback when the directory is removed or an error occurs
+         */
+        static void removeDir(const char* path, removeDir_cb callback);
+
+    private:
+        static void dir_onCreateOrRemove(asyncio::ioHandle *req);
     };
 };
 

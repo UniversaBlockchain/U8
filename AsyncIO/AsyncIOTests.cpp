@@ -532,6 +532,46 @@ void testAsyncFile() {
         uv_sem_wait(&stop[0]);
     uv_sem_destroy(&stop[0]);
 
+    printf("Create directories test...\n");
+
+    uv_sem_init(&stop[0], 0);
+
+    for (int t = 0; t < NUM_THREADS; t++) {
+        char dirName[12];
+        snprintf(dirName, 12, "TestDir%i", t);
+
+        asyncio::dir::createDir(dirName, S_IRWXU | S_IRWXG | S_IRWXO, [=](ssize_t result) {
+            if (!asyncio::isError(result))
+                printf("Directory %s created.\n", dirName);
+
+            uv_sem_post(&stop[0]);
+        });
+    }
+
+    for (int i = 0; i < NUM_THREADS; i++)
+        uv_sem_wait(&stop[0]);
+    uv_sem_destroy(&stop[0]);
+
+    printf("Remove directories test...\n");
+
+    uv_sem_init(&stop[0], 0);
+
+    for (int t = 0; t < NUM_THREADS; t++) {
+        char dirName[12];
+        snprintf(dirName, 12, "TestDir%i", t);
+
+        asyncio::dir::removeDir(dirName, [=](ssize_t result) {
+            if (!asyncio::isError(result))
+                printf("Directory %s removed.\n", dirName);
+
+            uv_sem_post(&stop[0]);
+        });
+    }
+
+    for (int i = 0; i < NUM_THREADS; i++)
+        uv_sem_wait(&stop[0]);
+    uv_sem_destroy(&stop[0]);
+
     asyncio::deinitLoop();
 
     printf("testAsyncFile()...done\n\n");
