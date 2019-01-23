@@ -8,6 +8,8 @@
 
 #include <string>
 #include <sys/stat.h>
+#include <iterator>
+#include <vector>
 
 inline bool file_exists(const std::string &name) {
     struct stat buffer;

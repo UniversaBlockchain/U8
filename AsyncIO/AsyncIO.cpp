@@ -15,6 +15,9 @@ namespace asyncio {
     //===========================================================================================
 
     uv_loop_t* initAndRunLoop() {
+
+        umask(000);
+
         if (!asyncLoop) {
             asyncLoop = uv_loop_new();
             //Opened async handle will keep the loop alive

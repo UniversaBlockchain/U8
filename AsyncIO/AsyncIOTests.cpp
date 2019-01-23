@@ -648,7 +648,8 @@ void testAsyncFile() {
             std::string name = entry.name;
 
             asyncio::file::stat(name.data(), [=](asyncio::ioStat stat, ssize_t result) {
-                printf("%s: %s. Size = %ld Mode = %ld\n", type.data(), name.data(), stat.st_size, stat.st_mode);
+                printf("%s: %s. Size = %lu Mode = %lu\n", type.data(), name.data(),
+                        (unsigned long) stat.st_size, (unsigned long) stat.st_mode);
             });
         }
 
