@@ -96,6 +96,75 @@ void testAsyncFile() {
     double fTimeStop = clock() / (double)CLOCKS_PER_SEC;
     printf("Time of writing %i files %f sec.\nTotal files size %ld bytes\n", NUM_THREADS * NUM_ITERATIONS, fTimeStop - fTimeStart, all);
 
+    printf("Buffer write test...\n");
+
+    fTimeStart = clock() / (double)CLOCKS_PER_SEC;
+
+    //Init test buffer
+    void *buff = malloc(BUFF_SIZE);
+    for (uint i = 0; i < BUFF_SIZE; i++)
+        ((char*) buff)[i] = (char) i & 0xFF;
+
+    for (long t = 0; t < NUM_THREADS; t++) {
+        fileSize[t] = 0;
+
+        ths.emplace_back([t, buff](){
+            for (int i = 0; i < NUM_ITERATIONS; i++) {
+                uv_sem_init(&stop[t], 0);
+                block[t] = 0;
+
+                char fileName[16];
+                snprintf(fileName, 16, "TestFile%ld.bin", t);
+
+                file[t] = std::make_shared<asyncio::IOHandle>();
+
+                asyncio::writeFile_cb onWrite = [t, &onWrite, buff](ssize_t result) {
+                    if (asyncio::isError(result))
+                        fprintf(stderr, "error: %s\n", asyncio::getError(result));
+                    else {
+                        fileSize[t] += result;
+
+                        if (++block[t] < NUM_BLOCKS)
+                            file[t]->write(buff, BUFF_SIZE, onWrite);
+                        else
+                            file[t]->close([t](ssize_t result) {
+                                uv_sem_post(&stop[t]);
+                                printf("Close file in thread: %ld\n", t + 1);
+                            });
+                    }
+                };
+
+                file[t]->open(fileName, O_CREAT | O_WRONLY, S_IRWXU | S_IRWXG | S_IRWXO, [t, onWrite, buff](ssize_t result) {
+                    printf("Open file for writing in thread %ld\n", t + 1);
+                    if (asyncio::isError(result))
+                        fprintf(stderr, "error: %s\n", asyncio::getError(result));
+                    else
+                        file[t]->write(buff, BUFF_SIZE, onWrite);
+                });
+
+                uv_sem_wait(&stop[t]);
+                uv_sem_destroy(&stop[t]);
+            }
+        });
+    }
+
+    printf("Threads started\n");
+
+    all = 0;
+    for (int t = 0; t < NUM_THREADS; t++) {
+        ths[t].join();
+        if (fileSize[t] != BUFF_SIZE * NUM_BLOCKS * NUM_ITERATIONS)
+            fprintf(stderr, "mismatch test file size (writing) in thread %i\n", t + 1);
+        all += fileSize[t];
+    }
+
+    ths.clear();
+
+    printf("Threads completed\n");
+
+    fTimeStop = clock() / (double)CLOCKS_PER_SEC;
+    printf("Time of buffer writing %i files %f sec.\nTotal files size %ld bytes\n", NUM_THREADS * NUM_ITERATIONS, fTimeStop - fTimeStart, all);
+
     printf("Read test...\n");
 
     fTimeStart = clock() / (double)CLOCKS_PER_SEC;
