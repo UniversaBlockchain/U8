@@ -219,6 +219,7 @@ function InputStream(handle, buferLength = chunkSize) {
 
 
 const reSkipFile = /^file:\/(?:\/\/)?([^/].*)$/;
+
 /**
  * Open some resource (as for now, the file) for read.
  * @param url to open. local file name could omit "file://" prefix

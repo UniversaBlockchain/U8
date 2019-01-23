@@ -26,9 +26,9 @@ async function testIterateBytes() {
     assert(x.length == 12);
 }
 async function main() {
-    // await testReadAll();
+    await testReadAll();
     await testIterateBytes();
-
+    await testReadAll();
     // let xx = [];//1,2,3,4,5];
     // console.log(xx.reduce((a,b) => a + b, 0));
     // await sleep(100);

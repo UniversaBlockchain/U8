@@ -64,23 +64,24 @@ void JsAsyncHandleOpen(const FunctionCallbackInfo<Value> &args) {
 void JsAsyncHandleRead(const FunctionCallbackInfo<Value> &args) {
     Scripter::unwrap(args, [&](const shared_ptr<Scripter> &se, auto isolate, auto context) {
         auto handle = unwrap<asyncio::IOHandle>(args.This());
+
         Persistent<Function> *pcb = new Persistent<Function>(isolate, args[1].As<Function>());
-        handle->read(
-                args[0]->Int32Value(context).FromJust(),
-                [=](const byte_vector &data, ssize_t result) {
 
+        // avoid copying results
+        auto max_size = args[0]->Int32Value(context).FromJust();
+        auto ab = ArrayBuffer::New(isolate, max_size);
+        auto presult = new Persistent<Uint8Array>(isolate, Uint8Array::New(ab, 0, max_size));
+        handle->read( ab->GetContents().Data(), max_size,
+                [=](ssize_t result) {
+                    // here we are in another thread
                     se->lockedContext([&](auto context) {
-
                         Isolate* isolate = context->GetIsolate();
                         auto fn = pcb->Get(isolate);
-
                         if (fn->IsNull()) {
                             se->throwError("null callback in IoHandle::read");
                         } else {
                             if( result > 0 ) {
-                                Local<ArrayBuffer> ab = ArrayBuffer::New(isolate, result);
-                                memcpy(ab->GetContents().Data(), data.data(), result);
-                                Local<Value> res[2] {Uint8Array::New(ab, 0, result), Integer::New(isolate, result)};
+                                Local<Value> res[2] {presult->Get(isolate), Integer::New(isolate, result)};
                                 fn->Call(fn, 2, res);
                             }
                             else {
@@ -89,7 +90,7 @@ void JsAsyncHandleRead(const FunctionCallbackInfo<Value> &args) {
                             }
                         }
                         delete pcb;
-
+                        delete presult;
                     });
                 });
     });
