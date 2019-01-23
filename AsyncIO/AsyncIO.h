@@ -66,6 +66,15 @@ namespace asyncio {
     typedef std::function<void(const byte_vector& data, ssize_t result)> readFile_cb;
 
     /**
+     * File read callback with initialized buffer
+     *
+     * @param result is reading result from file
+     * If isError(result) returns true - use getError(result) to determine the error.
+     * If isError(result) returns false - result is number of bytes read.
+     */
+    typedef std::function<void(ssize_t result)> readFileBuffer_cb;
+
+    /**
      * File write callback
      *
      * @param result is file write result
@@ -105,6 +114,16 @@ namespace asyncio {
         size_t pos;
         size_t maxBytes;
         std::shared_ptr<byte_vector> data;
+        uv_timer_t* timer;
+        size_t block;
+        size_t readed;
+    };
+
+    struct readFileBuffer_data {
+        readFileBuffer_cb callback;
+        ioHandle* fileReq;
+        uv_buf_t uvBuff;
+        ssize_t result;
     };
 
     struct writeFile_data {
@@ -236,6 +255,15 @@ namespace asyncio {
         void read(size_t maxBytesToRead, readFile_cb callback);
 
         /**
+         * Asynchronous read file to initialized buffer.
+         *
+         * @param buffer is initialized buffer for read from file, buffer size must be at least maxBytesToRead
+         * @param maxBytesToRead is maximum number of bytes to read from file
+         * @param callback caused when reading a file or error
+         */
+        void read(void* buffer, size_t maxBytesToRead, readFileBuffer_cb callback);
+
+        /**
          * Asynchronous write file.
          *
          * @param data is byte vector for data written to file
@@ -361,6 +389,7 @@ namespace asyncio {
         static void read_cb(asyncio::ioHandle *req);
         static void write_cb(asyncio::ioHandle *req);
         static void close_cb(asyncio::ioHandle *req);
+        static void readBuffer_cb(asyncio::ioHandle *req);
     };
 
     /**
@@ -433,8 +462,13 @@ namespace asyncio {
          * @param pos is starting position in the file for reading
          * @param maxBytesToRead is maximum number of bytes to read from file
          * @param callback when the part of the file is read or an error occurs
+         * @param timeout for read file in milliseconds. If the timeout is reached, the file reading is terminated
+         *        and the read data in the callback is returned (default 0 - without timeout)
+         * @param blockSize is size of block for reading. If the timeout is reached, only read blocks are returned.
+         *        If timeout is 0 - parameter is ignored. Default - 8192 bytes.
          */
-        static void readFilePart(const char* path, size_t pos, size_t maxBytesToRead, readFile_cb callback);
+        static void readFilePart(const char* path, size_t pos, size_t maxBytesToRead, readFile_cb callback,
+                unsigned int timeout = 0, size_t blockSize = 8192);
 
         /**
          * Asynchronous open and write the file.
@@ -475,6 +509,7 @@ namespace asyncio {
         static void writeFile_onOpen(asyncio::ioHandle *req);
 
         static void remove_onRemoveFile(asyncio::ioHandle *req);
+        static void readFilePart_onTimeout(uv_timer_t* handle);
     };
 
     /**
