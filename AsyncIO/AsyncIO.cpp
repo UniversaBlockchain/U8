@@ -641,6 +641,16 @@ namespace asyncio {
         //TODO: possible interrupt current request
     }
 
+    void file::stat_onStat(asyncio::ioHandle *req) {
+        uv_fs_req_cleanup(req);
+        auto st_data = (stat_data*) req->data;
+
+        st_data->callback(req->statbuf, req->result);
+
+        delete st_data;
+        delete req;
+    }
+
     void file::readFile(const char* path, readFile_cb callback) {
         auto req = new ioHandle();
         auto file_data = new readFile_data();
@@ -774,6 +784,25 @@ namespace asyncio {
         }
     }
 
+    void file::stat(const char* path, stat_cb callback) {
+        auto req = new ioHandle();
+        auto st_data = new stat_data();
+
+        st_data->callback = std::move(callback);
+        st_data->req = req;
+
+        req->data = st_data;
+
+        int result = uv_fs_stat(asyncio::asyncLoop, req, path, stat_onStat);
+
+        if (result < 0) {
+            st_data->callback(ioStat(), result);
+
+            delete st_data;
+            delete req;
+        }
+    }
+
     //===========================================================================================
     // Class directory implementation
     //===========================================================================================
@@ -824,5 +853,9 @@ namespace asyncio {
             delete dir_data;
             delete req;
         }
+    }
+
+    void dir::stat(const char* path, stat_cb callback) {
+        file::stat(path, callback);
     }
 };

@@ -31,6 +31,8 @@ namespace asyncio {
 
     typedef uv_dirent_t ioDirEntry;
 
+    typedef uv_stat_t ioStat;
+
     /**
      * Byte vector
      */
@@ -93,6 +95,31 @@ namespace asyncio {
     typedef std::function<void(ssize_t result)> closeFile_cb;
 
     /**
+     * Get stat callback
+     *
+     * @param stat is gotten stat
+     * stat struct contains:
+     *     uint64_t st_dev - device
+     *     uint64_t st_mode - file mode
+     *     uint64_t st_nlink - link count
+     *     uint64_t st_uid - user ID of the file's owner
+     *     uint64_t st_gid - group ID of the file's group
+     *     uint64_t st_rdev - device number, if device
+     *     uint64_t st_ino - file serial number
+     *     uint64_t st_size - size of file, in bytes;
+     *     uint64_t st_blksize - optimal block size for I/O
+     *     uint64_t st_blocks - number 512-byte blocks allocated
+     *     timespec st_atim - time of last access
+     *     timespec st_mtim - time of last modification
+     *     timespec st_ctim - time of last status change
+
+     * @param result is get stat result
+     * If isError(result) returns true - use getError(result) to determine the error.
+     * If isError(result) returns false - result of getting stat.
+     */
+    typedef std::function<void(ioStat stat, ssize_t result)> stat_cb;
+
+    /**
      * Directory open callback
      *
      * @param result is directory open result
@@ -136,6 +163,11 @@ namespace asyncio {
     struct closeFile_data {
         closeFile_cb callback;
         ioHandle* fileReq;
+    };
+
+    struct stat_data {
+        stat_cb callback;
+        ioHandle* req;
     };
 
     /**
@@ -480,6 +512,14 @@ namespace asyncio {
         static void writeFile(const char* path, const byte_vector& data, writeFile_cb callback);
 
         /**
+         * Asynchronous get stat of a file or directory.
+         *
+         * @param path to file or directory
+         * @param callback caused when getting stat or error
+         */
+        static void stat(const char* path, stat_cb callback);
+
+        /**
          * Asynchronous opening of a file with callback initialization in the method IOHandle::then.
          * @see IOHandle::then(openFile_cb callback).
          *
@@ -510,6 +550,8 @@ namespace asyncio {
 
         static void remove_onRemoveFile(asyncio::ioHandle *req);
         static void readFilePart_onTimeout(uv_timer_t* handle);
+
+        static void stat_onStat(asyncio::ioHandle *req);
     };
 
     /**
@@ -548,6 +590,14 @@ namespace asyncio {
          * @param callback when the directory is removed or an error occurs
          */
         static void removeDir(const char* path, removeDir_cb callback);
+
+        /**
+         * Asynchronous get stat of a file or directory.
+         *
+         * @param path to file or directory
+         * @param callback caused when getting stat or error
+         */
+        static void stat(const char* path, stat_cb callback);
 
     private:
         static void dir_onCreateOrRemove(asyncio::ioHandle *req);

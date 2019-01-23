@@ -558,7 +558,7 @@ void testAsyncFile() {
     uv_sem_wait(&stop[0]);
     uv_sem_destroy(&stop[0]);
 
-    printf("Scan directory test...\n");
+    printf("Scan directory test (and get stat of content)...\n");
 
     auto dir = std::make_shared<asyncio::IOHandle>();
 
@@ -568,12 +568,19 @@ void testAsyncFile() {
 
         asyncio::ioDirEntry entry;
         while (dir->next(&entry)) {
+            std::string type;
             if (asyncio::isFile(entry))
-                printf("File: %s\n", entry.name);
+                type = "File";
             else if (asyncio::isDir(entry))
-                printf("Directory: %s\n", entry.name);
+                type = "Directory";
             else
-                printf("Other: %s\n", entry.name);
+                type = "Other";
+
+            std::string name = entry.name;
+
+            asyncio::file::stat(name.data(), [=](asyncio::ioStat stat, ssize_t result) {
+                printf("%s: %s. Size = %ld Mode = %ld\n", type.data(), name.data(), stat.st_size, stat.st_mode);
+            });
         }
 
         uv_sem_post(&stop[0]);
