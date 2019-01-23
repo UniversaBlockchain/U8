@@ -3,11 +3,10 @@
  */
 class IoError extends Error {
     constructor(reason) {
-        if( reason instanceof String ) {
+        if (reason instanceof String) {
             super(reason);
             this.code = undefined;
-        }
-        else {
+        } else {
             super(`${IoHandle.getErrorText(reason)} (${reason})`);
             this.code = reason;
         }
@@ -31,7 +30,12 @@ class AsyncProcessor {
 
 const hproto = IoHandle.prototype;
 
-const chunkSize = 8912;
+/**
+ * Default buffer size for hight level IO operation (e.g. Input and Output
+ *
+ * @type {number}
+ */
+const chunkSize = 4096;
 
 hproto.read = function (size) {
     if (size <= 0)
@@ -41,83 +45,197 @@ hproto.read = function (size) {
     return ap.promise;
 };
 
-function Reader(handle) {
+/**
+ * The InputStream allows effectively read text and binary data from handle-like
+ * object providing only async read(size) function.
+ *
+ * @param handle object capable to async read(size) up to size bytes.  must retunr undefined on end of stream.
+ * @param buferLength buffer size to use with this input.
+ * @returns {InputStream}
+ * @constructor
+ */
+function InputStream(handle, buferLength = chunkSize) {
 
     let chunk = undefined;
     let pos = 0;
 
+    async function loadChunk() {
+        chunk = await handle.read(chunkSize);
+        if (!chunk) {
+            pos = -1;
+            return undefined;
+        } else
+            pos = 0;
+        return chunk;
+    }
+
+    /**
+     * Get next byte, ir undefined if end of stream is reached.
+     *
+     * @returns {Promise<number | undefined>}
+     */
     async function nextByte() {
         if (pos < 0)
             return undefined;
         if (!chunk || pos >= chunk.length) {
-            chunk = await handle.read(chunkSize);
-            if (!chunk) {
-                pos = -1;
-                return undefined;
-            } else {
-                pos = 0;
-            }
+            if (!await loadChunk())
+                return undefined; // EOF
         }
         return chunk[pos++];
     }
 
-    this.bytes = async function* () {
+    /**
+     * Read the line from the current point to the nearest line end.
+     *
+     * @returns {Promise<string | undefined>} resulves to the string ir undefined if end of stream is reached
+     */
+    async function nextLine() {
+        let line = [];
         while (true) {
             let b = await nextByte();
-            if (b) yield b;
-            else break;
-        }
-    };
-
-    this.lines = async function* () {
-        let line = [];
-        while(true) {
-            let b = await nextByte();
-            if( !b ) {
-                if( line.length > 0 )
-                    yield utf8Decode(Uint8Array.from(line));
-                return;
+            if (!b) {
+                if (line.length > 0)
+                    return utf8Decode(Uint8Array.from(line));
+                else
+                    return undefined;
             }
-            if( b === 0x0A ) {
-                yield utf8Decode(Uint8Array.from(line));
+            if (b === 0x0A) {
+                return utf8Decode(Uint8Array.from(line));
                 line = []
             } else {
                 line.push(b);
             }
         }
+    }
+
+    this.nextByte = nextByte;
+    this.nextLine = nextLine;
+
+    /**
+     * Async iterator for remainig bytes. Iterate bytes as numbers.
+     *
+     * @type {{[Symbol.asyncIterator]: Function}}
+     */
+    this.bytes = {
+        [Symbol.asyncIterator]: async function* () {
+            while (true) {
+                let b = await nextByte();
+                if (b) yield b;
+                else break;
+            }
+        }
     };
+
+    /**
+     * Async iterator for remaining lines of the input. Iteration start from the cirrent position in the input
+     *
+     * @type {{[Symbol.asyncIterator]: Function}}
+     */
+    this.lines = {
+        [Symbol.asyncIterator]: async function* () {
+            let line;
+            while (true) {
+                let line = await nextLine();
+                if (line) yield line;
+                else return;
+            }
+        }
+    };
+
+    /**
+     * read the rest of the input as typed array of bytes.
+     *
+     * @returns {Promise<Uint8Array>}
+     */
+    this.allBytes = async function () {
+        let parts = []
+
+        if (pos >= 0) {
+            // if some chunk already load, used unread part of it
+            if (chunk)
+                parts.push(pos > 0 ? chunk.subarray(pos) : chunk);
+
+            // load the rest
+            while (await loadChunk())
+                parts.push(chunk);
+        }
+
+        let size = parts.reduce((a, b) => a + b.length, 0);
+        let result = new Uint8Array(size);
+        let offset = 0;
+
+        parts.forEach(x => {
+            result.set(x, offset);
+            offset += x.length;
+        })
+        return result;
+    }
+
+    /**
+     * Read up to specified number of bytes or until the end of the stream.
+     *
+     * @param size
+     * @returns {Promise<Uint8Array>} the array could be shorter or empty
+     */
+    this.read = async function (size) {
+        let result = new Uint8Array(size);
+        let actualSize = 0;
+
+        function push(part) {
+            result.set(part, actualSize);
+            actualSize += part.length;
+        }
+
+        if (pos >= 0) {
+            if (chunk)
+                push(chunk.subarray(pos, size+pos));
+            while (actualSize < size) {
+                if (!await loadChunk())
+                    break;
+                if (chunk.length + actualSize <= size)
+                    push(chunk)
+                else {
+                    let left = size - actualSize;
+                    // left first bytes of the chunk to copy
+                    push(chunk.subarray(0, left));
+                    pos += left;
+                }
+            }
+        }
+        return result;
+    };
+
+    /**
+     * read the rest of the input as utf8 string.
+     *
+     * @returns {Promise<string>}
+     */
+    this.allAsString = async function () {
+        return utf8Decode(await this.allBytes());
+    }
 
     return this;
 }
 
-Object.defineProperty(hproto, "reader", {
-    get: function () {
-        if( !this.__reader ) this.__reader= new Reader(this);
-        return this.__reader;
-    }
-});
 
-Object.defineProperty(hproto, "lines", {
-    get: function () {
-        return this.reader.lines();
-    }
-});
+const reSkipFile = /^file:\/(?:\/\/)?([^/].*)$/;
 
-Object.defineProperty(hproto, "bytes", {
-    get: function () {
-        return this.reader.bytes();
-    }
-});
-
-AsyncProcessor.prototype.call = function (code, result) {
-    this.process(code, result)
-};
-
-async function openRead(url) {
+/**
+ * Open some resource (as for now, the file) for read.
+ * @param url to open. local file name could omit "file://" prefix
+ * @param bufferLength
+ * @returns {Promise<any>}
+ */
+async function openRead(url, {bufferLength} = {bufferLength: chunkSize}) {
+    // normalize name: remove file:/ and file:/// protocols
+    let match = reSkipFile.exec(url);
+    if( match )
+        url = match[1];
+    // todo: more protcols
     let handle = new IoHandle();
     let ap = new AsyncProcessor();
-    handle.open(url, 'r', 0, code => ap.process(code, handle));
+    handle.open(url, 'r', 0, code => ap.process(code, new InputStream(handle, bufferLength)));
     return ap.promise
 }
 
-module.exports = {openRead};
+module.exports = {openRead, InputStream};

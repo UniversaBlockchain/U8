@@ -162,6 +162,74 @@ void testAsyncFile() {
     fTimeStop = clock() / (double)CLOCKS_PER_SEC;
     printf("Time of reading %i files %f sec.\nTotal files size %ld bytes\n", NUM_THREADS * NUM_ITERATIONS, fTimeStop - fTimeStart, all);
 
+    printf("Buffer read test...\n");
+
+    fTimeStart = clock() / (double)CLOCKS_PER_SEC;
+
+    for (long t = 0; t < NUM_THREADS; t++) {
+        fileSize[t] = 0;
+        summ[t] = 0;
+
+        ths.emplace_back([t](){
+            for (int i = 0; i < NUM_ITERATIONS; i++) {
+                uv_sem_init(&stop[t], 0);
+
+                char fileName[16];
+                snprintf(fileName, 16, "TestFile%ld.bin", t);
+
+                void* buffer = malloc(BUFF_SIZE);
+
+                asyncio::readFileBuffer_cb onRead = [&](ssize_t result) {
+                    if (asyncio::isError(result))
+                        fprintf(stderr, "error: %s\n", asyncio::getError(result));
+                    else if (result == 0)
+                        file[t]->close([=](ssize_t result) {
+                            free(buffer);
+                            uv_sem_post(&stop[t]);
+                            printf("Close file in thread: %ld\n", t + 1);
+                        });
+                    else {
+                        for (int n = 0; n < result; n++)
+                            summ[t] += ((char*) buffer)[n];
+                        fileSize[t] += result;
+
+                        file[t]->read(buffer, BUFF_SIZE, onRead);
+                    }
+                };
+
+                file[t]->open(fileName, O_RDONLY, 0, [=](ssize_t result) {
+                    printf("Open file in thread %ld\n", t + 1);
+                    if (asyncio::isError(result))
+                        fprintf(stderr, "error: %s\n", asyncio::getError(result));
+                    else
+                        file[t]->read(buffer, BUFF_SIZE, onRead);
+                });
+
+                uv_sem_wait(&stop[t]);
+                uv_sem_destroy(&stop[t]);
+            }
+        });
+    }
+
+    printf("Threads started\n");
+
+    all = 0;
+    for (long t = 0; t < NUM_THREADS; t++) {
+        ths[t].join();
+        if (fileSize[t] != BUFF_SIZE * NUM_BLOCKS * NUM_ITERATIONS)
+            fprintf(stderr, "mismatch test file size in thread %ld\n", t + 1);
+        if (summ[t] != -BUFF_SIZE * NUM_BLOCKS * NUM_ITERATIONS / 2)
+            fprintf(stderr, "mismatch test file sum in thread %ld\n", t + 1);
+        all += fileSize[t];
+    }
+
+    ths.clear();
+
+    printf("Threads completed\n");
+
+    fTimeStop = clock() / (double)CLOCKS_PER_SEC;
+    printf("Time of buffer reading %i files %f sec.\nTotal files size %ld bytes\n", NUM_THREADS * NUM_ITERATIONS, fTimeStop - fTimeStart, all);
+
     printf("Write test with async::file::openWrite...\n");
 
     fTimeStart = clock() / (double)CLOCKS_PER_SEC;
@@ -392,6 +460,40 @@ void testAsyncFile() {
     uv_sem_wait(&stop[0]);
     uv_sem_destroy(&stop[0]);
 
+    printf("Reading the part of file test with timeout...\n");
+
+    uv_sem_init(&stop[0], 0);
+
+    for (int t = 0; t < NUM_THREADS; t++) {
+        char fileName[16];
+        snprintf(fileName, 16, "TestFile%i.bin", t);
+
+        asyncio::file::readFilePart(fileName, 10, BUFF_SIZE * NUM_BLOCKS,
+                [](const asyncio::byte_vector& data, ssize_t result) {
+            printf("Read the part of file with timeout. Size = %i. Result = %i\n", (int) data.size(), (int) result);
+
+            long sum = 0;
+            ulong size = data.size();
+            char* buf = (char*) data.data();
+            for (int n = 0; n < size; n++)
+                sum += buf[n];
+
+            char x = 10;
+            long expected = -128 * (result / 256);
+            for (int i = 0; i < result % 256; i++)
+                expected += x++;
+
+            if (sum != expected)
+                fprintf(stderr, "mismatch the part of file sum in readFilePart with timeout\n");
+
+            uv_sem_post(&stop[0]);
+        }, 10, (size_t) 8192 / (t + 1));
+    }
+
+    for (int t = 0; t < NUM_THREADS; t++)
+        uv_sem_wait(&stop[0]);
+    uv_sem_destroy(&stop[0]);
+
     printf("Test auto closing file...\n");
 
     uv_sem_init(&stop[0], 0);
@@ -456,7 +558,7 @@ void testAsyncFile() {
     uv_sem_wait(&stop[0]);
     uv_sem_destroy(&stop[0]);
 
-    printf("Scan directory test...\n");
+    printf("Scan directory test (and get stat of content)...\n");
 
     auto dir = std::make_shared<asyncio::IOHandle>();
 
@@ -466,12 +568,19 @@ void testAsyncFile() {
 
         asyncio::ioDirEntry entry;
         while (dir->next(&entry)) {
+            std::string type;
             if (asyncio::isFile(entry))
-                printf("File: %s\n", entry.name);
+                type = "File";
             else if (asyncio::isDir(entry))
-                printf("Directory: %s\n", entry.name);
+                type = "Directory";
             else
-                printf("Other: %s\n", entry.name);
+                type = "Other";
+
+            std::string name = entry.name;
+
+            asyncio::file::stat(name.data(), [=](asyncio::ioStat stat, ssize_t result) {
+                printf("%s: %s. Size = %ld Mode = %ld\n", type.data(), name.data(), stat.st_size, stat.st_mode);
+            });
         }
 
         uv_sem_post(&stop[0]);
@@ -529,6 +638,46 @@ void testAsyncFile() {
     }
 
     for (int i = 0; i < NUM_THREADS * 3; i++)
+        uv_sem_wait(&stop[0]);
+    uv_sem_destroy(&stop[0]);
+
+    printf("Create directories test...\n");
+
+    uv_sem_init(&stop[0], 0);
+
+    for (int t = 0; t < NUM_THREADS; t++) {
+        char dirName[12];
+        snprintf(dirName, 12, "TestDir%i", t);
+
+        asyncio::dir::createDir(dirName, S_IRWXU | S_IRWXG | S_IRWXO, [=](ssize_t result) {
+            if (!asyncio::isError(result))
+                printf("Directory %s created.\n", dirName);
+
+            uv_sem_post(&stop[0]);
+        });
+    }
+
+    for (int i = 0; i < NUM_THREADS; i++)
+        uv_sem_wait(&stop[0]);
+    uv_sem_destroy(&stop[0]);
+
+    printf("Remove directories test...\n");
+
+    uv_sem_init(&stop[0], 0);
+
+    for (int t = 0; t < NUM_THREADS; t++) {
+        char dirName[12];
+        snprintf(dirName, 12, "TestDir%i", t);
+
+        asyncio::dir::removeDir(dirName, [=](ssize_t result) {
+            if (!asyncio::isError(result))
+                printf("Directory %s removed.\n", dirName);
+
+            uv_sem_post(&stop[0]);
+        });
+    }
+
+    for (int i = 0; i < NUM_THREADS; i++)
         uv_sem_wait(&stop[0]);
     uv_sem_destroy(&stop[0]);
 

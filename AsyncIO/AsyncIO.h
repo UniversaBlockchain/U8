@@ -31,6 +31,8 @@ namespace asyncio {
 
     typedef uv_dirent_t ioDirEntry;
 
+    typedef uv_stat_t ioStat;
+
     /**
      * Byte vector
      */
@@ -66,6 +68,15 @@ namespace asyncio {
     typedef std::function<void(const byte_vector& data, ssize_t result)> readFile_cb;
 
     /**
+     * File read callback with initialized buffer
+     *
+     * @param result is reading result from file
+     * If isError(result) returns true - use getError(result) to determine the error.
+     * If isError(result) returns false - result is number of bytes read.
+     */
+    typedef std::function<void(ssize_t result)> readFileBuffer_cb;
+
+    /**
      * File write callback
      *
      * @param result is file write result
@@ -84,6 +95,31 @@ namespace asyncio {
     typedef std::function<void(ssize_t result)> closeFile_cb;
 
     /**
+     * Get stat callback
+     *
+     * @param stat is gotten stat
+     * stat struct contains:
+     *     uint64_t st_dev - device
+     *     uint64_t st_mode - file mode
+     *     uint64_t st_nlink - link count
+     *     uint64_t st_uid - user ID of the file's owner
+     *     uint64_t st_gid - group ID of the file's group
+     *     uint64_t st_rdev - device number, if device
+     *     uint64_t st_ino - file serial number
+     *     uint64_t st_size - size of file, in bytes;
+     *     uint64_t st_blksize - optimal block size for I/O
+     *     uint64_t st_blocks - number 512-byte blocks allocated
+     *     timespec st_atim - time of last access
+     *     timespec st_mtim - time of last modification
+     *     timespec st_ctim - time of last status change
+
+     * @param result is get stat result
+     * If isError(result) returns true - use getError(result) to determine the error.
+     * If isError(result) returns false - result of getting stat.
+     */
+    typedef std::function<void(ioStat stat, ssize_t result)> stat_cb;
+
+    /**
      * Directory open callback
      *
      * @param result is directory open result
@@ -91,27 +127,6 @@ namespace asyncio {
      * If isError(result) returns false - result is handle of opened directory.
      */
     typedef std::function<void(ssize_t result)> openDir_cb;
-
-    class IOHandle;
-
-    /**
-     * File open callback for method asyncio::file::open
-     *
-     * @param handle is shared pointer to open file handle
-     * @param result is file open result
-     * If isError(result) returns true - use getError(result) to determine the error.
-     * If isError(result) returns false - result is handle of opened file.
-     */
-    typedef std::function<void(std::shared_ptr<IOHandle> handle, ssize_t result)> openIOHandle_cb;
-
-    /**
-     * File remove callback
-     *
-     * @param result is file remove result
-     * If isError(result) returns true - use getError(result) to determine the error.
-     * If isError(result) returns false - file is removed.
-     */
-    typedef std::function<void(ssize_t result)> removeFile_cb;
 
     struct openFile_data {
         openFile_cb callback;
@@ -126,6 +141,16 @@ namespace asyncio {
         size_t pos;
         size_t maxBytes;
         std::shared_ptr<byte_vector> data;
+        uv_timer_t* timer;
+        size_t block;
+        size_t readed;
+    };
+
+    struct readFileBuffer_data {
+        readFileBuffer_cb callback;
+        ioHandle* fileReq;
+        uv_buf_t uvBuff;
+        ssize_t result;
     };
 
     struct writeFile_data {
@@ -138,6 +163,11 @@ namespace asyncio {
     struct closeFile_data {
         closeFile_cb callback;
         ioHandle* fileReq;
+    };
+
+    struct stat_data {
+        stat_cb callback;
+        ioHandle* req;
     };
 
     /**
@@ -255,6 +285,15 @@ namespace asyncio {
          * @param callback caused when reading a file or error
          */
         void read(size_t maxBytesToRead, readFile_cb callback);
+
+        /**
+         * Asynchronous read file to initialized buffer.
+         *
+         * @param buffer is initialized buffer for read from file, buffer size must be at least maxBytesToRead
+         * @param maxBytesToRead is maximum number of bytes to read from file
+         * @param callback caused when reading a file or error
+         */
+        void read(void* buffer, size_t maxBytesToRead, readFileBuffer_cb callback);
 
         /**
          * Asynchronous write file.
@@ -382,7 +421,27 @@ namespace asyncio {
         static void read_cb(asyncio::ioHandle *req);
         static void write_cb(asyncio::ioHandle *req);
         static void close_cb(asyncio::ioHandle *req);
+        static void readBuffer_cb(asyncio::ioHandle *req);
     };
+
+    /**
+     * File open callback for method asyncio::file::open
+     *
+     * @param handle is shared pointer to open file handle
+     * @param result is file open result
+     * If isError(result) returns true - use getError(result) to determine the error.
+     * If isError(result) returns false - result is handle of opened file.
+     */
+    typedef std::function<void(std::shared_ptr<IOHandle> handle, ssize_t result)> openIOHandle_cb;
+
+    /**
+     * File remove callback
+     *
+     * @param result is file remove result
+     * If isError(result) returns true - use getError(result) to determine the error.
+     * If isError(result) returns false - file is removed.
+     */
+    typedef std::function<void(ssize_t result)> removeFile_cb;
 
     class file {
     public:
@@ -435,8 +494,13 @@ namespace asyncio {
          * @param pos is starting position in the file for reading
          * @param maxBytesToRead is maximum number of bytes to read from file
          * @param callback when the part of the file is read or an error occurs
+         * @param timeout for read file in milliseconds. If the timeout is reached, the file reading is terminated
+         *        and the read data in the callback is returned (default 0 - without timeout)
+         * @param blockSize is size of block for reading. If the timeout is reached, only read blocks are returned.
+         *        If timeout is 0 - parameter is ignored. Default - 8192 bytes.
          */
-        static void readFilePart(const char* path, size_t pos, size_t maxBytesToRead, readFile_cb callback);
+        static void readFilePart(const char* path, size_t pos, size_t maxBytesToRead, readFile_cb callback,
+                unsigned int timeout = 0, size_t blockSize = 8192);
 
         /**
          * Asynchronous open and write the file.
@@ -446,6 +510,14 @@ namespace asyncio {
          * @param callback when the file is wrote or an error occurs
          */
         static void writeFile(const char* path, const byte_vector& data, writeFile_cb callback);
+
+        /**
+         * Asynchronous get stat of a file or directory.
+         *
+         * @param path to file or directory
+         * @param callback caused when getting stat or error
+         */
+        static void stat(const char* path, stat_cb callback);
 
         /**
          * Asynchronous opening of a file with callback initialization in the method IOHandle::then.
@@ -462,8 +534,7 @@ namespace asyncio {
          * Asynchronous remove file.
          *
          * @param path to removed file
-         * @param data is byte vector for data written to file
-         * @param callback when the file is wrote or an error occurs
+         * @param callback when the file is removed or an error occurs
          */
         static void remove(const char* path, removeFile_cb callback);
 
@@ -478,6 +549,58 @@ namespace asyncio {
         static void writeFile_onOpen(asyncio::ioHandle *req);
 
         static void remove_onRemoveFile(asyncio::ioHandle *req);
+        static void readFilePart_onTimeout(uv_timer_t* handle);
+
+        static void stat_onStat(asyncio::ioHandle *req);
+    };
+
+    /**
+     * Directory create callback
+     *
+     * @param result is directory create result
+     * If isError(result) returns true - use getError(result) to determine the error.
+     * If isError(result) returns false - directory is created.
+     */
+    typedef std::function<void(ssize_t result)> createDir_cb;
+
+    /**
+     * Directory remove callback
+     *
+     * @param result is directory remove result
+     * If isError(result) returns true - use getError(result) to determine the error.
+     * If isError(result) returns false - directory is removed.
+     */
+    typedef std::function<void(ssize_t result)> removeDir_cb;
+
+    class dir {
+    public:
+        /**
+         * Asynchronous create directory.
+         *
+         * @param path to created directory
+         * @param mode - specifies the directory mode bits be applied when a new directory is created (@see IOHandle::open)
+         * @param callback when the directory is created or an error occurs
+         */
+        static void createDir(const char* path, int mode, createDir_cb callback);
+
+        /**
+         * Asynchronous remove directory.
+         *
+         * @param path to removed directory
+         * @param callback when the directory is removed or an error occurs
+         */
+        static void removeDir(const char* path, removeDir_cb callback);
+
+        /**
+         * Asynchronous get stat of a file or directory.
+         *
+         * @param path to file or directory
+         * @param callback caused when getting stat or error
+         */
+        static void stat(const char* path, stat_cb callback);
+
+    private:
+        static void dir_onCreateOrRemove(asyncio::ioHandle *req);
     };
 };
 
