@@ -17,6 +17,9 @@
 using namespace std;
 using namespace v8;
 
+class ArgsContext;
+
+
 class Scripter : public std::enable_shared_from_this<Scripter>, public Logging {
 public:
 
@@ -143,6 +146,12 @@ public:
             const std::function<void(shared_ptr<Scripter>, v8::Isolate *, const v8::Local<v8::Context> &)> &block
     );
 
+    template<typename F>
+    static void unwrapArgs(
+            const v8::FunctionCallbackInfo<v8::Value> &args,
+            F &&block
+    );
+
     /**
      * Expands filename path and tries to find the specified file in the currently available context for modules (e.g.
      * for require/import).
@@ -211,7 +220,7 @@ public:
         pIsolate->ThrowException(Exception::Error(v8String(text)));
     }
 
-    void throwError(const char* text) {
+    void throwError(const char *text) {
         throwError(string(text));
     }
 
@@ -266,6 +275,58 @@ class SyntaxError : public ScriptError {
 public:
     using ScriptError::ScriptError;
 };
+
+class ArgsContext {
+public:
+    shared_ptr<Scripter> scripter;
+    Isolate *isolate;
+    Local<Context> context;
+
+    ArgsContext(const shared_ptr<Scripter> &scripter_, const FunctionCallbackInfo<Value> &args_)
+            : args(args_), scripter(scripter_), isolate(args_.GetIsolate()),
+              context(isolate->GetEnteredContext()), pcontext(nullptr) {
+    }
+
+    template<typename T>
+    Local<T> as(int index) {
+        return args[index].As<T>();
+    }
+
+    int32_t asInt(int index) {
+        return args[index]->Int32Value(context).FromJust();
+    }
+
+    template<class F>
+    void lockedContext(F &&f) {
+
+    }
+
+private:
+    Persistent<Context> *pcontext;
+
+    const FunctionCallbackInfo<Value> &args;
+};
+
+template<typename F>
+void Scripter::unwrapArgs(
+        const v8::FunctionCallbackInfo<v8::Value> &args,
+        F &&block
+) {
+    Isolate *isolate = args.GetIsolate();
+    HandleScope handle_scope(isolate);
+
+    auto context = isolate->GetEnteredContext();
+    Local<External> wrap = Local<External>::Cast(context->GetEmbedderData(1));
+    auto weak = static_cast<weak_ptr<Scripter> *>(wrap->Value());
+    shared_ptr<Scripter> scripter = weak->lock();
+    if (scripter) {
+        Context::Scope context_scope(context);
+        block(ArgsContext(scripter, args));
+    } else {
+        cerr << "called inContext for recycled SR: ignoring" << endl;
+    }
+
+}
 
 
 #endif //U8_SCRIPTENVIRONMENT_H

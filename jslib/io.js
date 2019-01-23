@@ -28,7 +28,6 @@ class AsyncProcessor {
     }
 }
 
-const hproto = IoHandle.prototype;
 
 /**
  * Default buffer size for hight level IO operation (e.g. Input and Output
@@ -37,6 +36,8 @@ const hproto = IoHandle.prototype;
  */
 const chunkSize = 4096;
 
+const hproto = IoHandle.prototype;
+
 hproto.read = function (size) {
     if (size <= 0)
         throw Error("size must > 0");
@@ -44,6 +45,20 @@ hproto.read = function (size) {
     this._read_raw(size, (data, code) => ap.process(code, data));
     return ap.promise;
 };
+
+hproto.write = function (data) {
+    if (!(data instanceof Uint8Array))
+        data = Uint8Array.from(data);
+    let ap = new AsyncProcessor();
+    this._write_raw(data, code => ap.process(code))
+    return ap.promise;
+}
+
+hproto.close = function() {
+    let ap = new AsyncProcessor();
+    this._close_raw(code => ap.process(code))
+    return ap.promise;
+}
 
 /**
  * The InputStream allows effectively read text and binary data from handle-like
@@ -188,7 +203,7 @@ function InputStream(handle, buferLength = chunkSize) {
 
         if (pos >= 0) {
             if (chunk)
-                push(chunk.subarray(pos, size+pos));
+                push(chunk.subarray(pos, size + pos));
             while (actualSize < size) {
                 if (!await loadChunk())
                     break;
@@ -217,7 +232,6 @@ function InputStream(handle, buferLength = chunkSize) {
     return this;
 }
 
-
 const reSkipFile = /^file:\/(?:\/\/)?([^/].*)$/;
 
 /**
@@ -226,10 +240,10 @@ const reSkipFile = /^file:\/(?:\/\/)?([^/].*)$/;
  * @param bufferLength
  * @returns {Promise<any>}
  */
-async function openRead(url, {bufferLength} = {bufferLength: chunkSize}) {
+async function openRead(url, {bufferLength = chunkSize}={}) {
     // normalize name: remove file:/ and file:/// protocols
     let match = reSkipFile.exec(url);
-    if( match )
+    if (match)
         url = match[1];
     // todo: more protcols
     let handle = new IoHandle();
@@ -238,4 +252,34 @@ async function openRead(url, {bufferLength} = {bufferLength: chunkSize}) {
     return ap.promise
 }
 
-module.exports = {openRead, InputStream};
+function OutputStream(handle, bufferSize = chunkSize) {
+    this.write = async function (data) {
+        await handle.write(data);
+    };
+
+    this.close = async function() { handle.close() };
+}
+
+async function openWrite(url, mode = "w", {bufferLength = chunkSize, umask = 0o644}={}) {
+    switch (mode) {
+        case 'w': case 'a':
+            break;
+        case "wb":
+            mode = "w";
+            break;
+        default:
+            throw Error("unknown write mode " + mode);
+    }
+    // normalize name: remove file:/ and file:/// protocols
+    let match = reSkipFile.exec(url);
+    if (match)
+        url = match[1];
+    // todo: more protcols
+    let handle = new IoHandle();
+    let ap = new AsyncProcessor();
+    handle.open(url, mode, umask, code => ap.process(code, new OutputStream(handle, bufferLength)));
+    return ap.promise
+}
+
+
+module.exports = {openRead, openWrite, InputStream, OutputStream};
