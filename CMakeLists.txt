@@ -26,7 +26,11 @@ add_executable(u8 main.cpp js_bindings/Scripter.cpp js_bindings/Scripter.h tools
         js_bindings/async_io_bindings.cpp js_bindings/async_io_bindings.h js_bindings/basic_builtins.h tools/tools.cpp tools/AsyncSleep.cpp
         tools/AsyncSleep.h tools/Logging.cpp tools/Logging.h crypto/PublicKey.cpp crypto/PrivateKey.cpp crypto/base64.cpp crypto/cryptoCommon.h
         crypto/cryptoCommon.cpp AsyncIO/AsyncIO.h AsyncIO/AsyncIO.cpp AsyncIO/AsyncIOTests.cpp AsyncIO/AsyncIOTests.h crypto/HashId.cpp crypto/HashId.h
-        crypto/cryptoTests.h crypto/cryptoTests.cpp tools/ConditionVar.h js_bindings/binding_tools.h crypto/KeyAddress.h crypto/KeyAddress.cpp)
+        crypto/cryptoTests.h crypto/cryptoTests.cpp tools/ConditionVar.h js_bindings/binding_tools.h crypto/KeyAddress.h crypto/KeyAddress.cpp
+        serialization/BaseSerializer.h serialization/BaseSerializer.cpp serialization/BossSerializer.h serialization/BossSerializer.cpp
+        serialization/SerializationTest.h serialization/SerializationTest.cpp types/UArray.h types/UArray.cpp types/UBinder.h types/UBinder.cpp
+        types/UBool.h types/UBool.cpp types/UBytes.h types/UBytes.cpp types/UDateTime.h types/UDateTime.cpp types/UDouble.h types/UDouble.cpp
+        types/UInt.h types/UInt.cpp types/UObject.h types/UObject.cpp types/UString.h types/UString.cpp types/TestComplexObject.h types/TestComplexObject.cpp)
 
 
 message("platform: ${platform}")
