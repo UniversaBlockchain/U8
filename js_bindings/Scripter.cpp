@@ -306,10 +306,6 @@ Scripter::~Scripter() {
     delete create_params.array_buffer_allocator;
 }
 
-
-
-
-
 void Scripter::unwrap(
         const v8::FunctionCallbackInfo<v8::Value> &args,
         const std::function<void(shared_ptr<Scripter>, v8::Isolate *, const v8::Local<v8::Context> &)> &block

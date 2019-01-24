@@ -30,15 +30,29 @@ async function testWriteBytes() {
     await output.close();
 }
 
+const Boss = require('boss.js');
+
+function testBoss() {
+    let src = { hello: 'world', data: [1,2,3]};
+    let packed = Boss.dump(src);
+    assert(JSON.stringify(Boss.load(packed)) == JSON.stringify(src));
+    let reader = new Boss.Reader(packed);
+    console.log(JSON.stringify(reader.read()));
+    let writer = new Boss.Writer();
+    writer.write(src);
+    assert(packed.toString() == writer.get().toString() );
+}
+
 async function main() {
     // await testReadAll();
     // await testIterateBytes();
     // await testReadAll();
-    await testWriteBytes();
+    // await testWriteBytes();
+    testBoss();
     // let xx = [];//1,2,3,4,5];
     // console.log(xx.reduce((a,b) => a + b, 0));
     // await sleep(100);
     // gc();
-    // await sleep(1000);
+    await sleep(1);
 }
 
