@@ -7,17 +7,37 @@
 #include <vector>
 #include <map>
 #include <unordered_map>
+#include <random>
 #include "base64.h"
 #include "PrivateKey.h"
 #include "HashId.h"
 #include "KeyAddress.h"
+#include "Safe58.h"
 
 using namespace std;
+
+CryptoTestResults cryptoTestResults;
+std::minstd_rand minstdRand;
+
+CryptoTestResults::CryptoTestResults() {
+    minstdRand.seed(time(0));
+}
+
+CryptoTestResults::~CryptoTestResults() {
+    auto os1 = (errorsCounter == 0 ? &cout : &cerr);
+    *os1 << "CryptoTestResults: errors = " << errorsCounter << endl;
+}
+
+void CryptoTestResults::incrementErrorsCounter() {
+    ++errorsCounter;
+}
 
 template <class T>
 void checkResult(const string& msg, const T expected, const T result) {
     auto os1 = (result == expected ? &cout : &cerr);
     *os1 << "checkResult " << msg << " (expected " << expected << "): " << result << endl;
+    if (result != expected)
+        cryptoTestResults.incrementErrorsCounter();
 }
 
 void testCrypto() {
@@ -203,10 +223,49 @@ void testKeyAddress() {
     privateKey.initForDebug_decimal(strE, strP, strQ);
     auto publicKey = privateKey.getPublicKey();
 
-    KeyAddress keyAddressS(*publicKey, 0, false);
-    KeyAddress keyAddressL(*publicKey, 0, true);
+    KeyAddress keyAddressShort(*publicKey, 0, false);
+    KeyAddress keyAddressLong(*publicKey, 0, true);
+    checkResult("keyAddressShort", string("Z7Ui6rRxiCiuCYsTV36dDiCbMaz81ttQDb3JDFkdswsMEpWojT"), keyAddressShort.toString());
+    checkResult("keyAddressLong", string("J2Rhu2e6Nvyu9DjqSxTJdDruKHc64NRAVuiawdbnorNA6a7qGq8ox2xsEgnN72WJHjK2DQy3"), keyAddressLong.toString());
+
+    KeyAddress keyAddressShortLoaded(keyAddressShort.toString());
+    KeyAddress keyAddressLongLoaded(keyAddressLong.toString());
+    checkResult("keyAddressShortLoaded", true, keyAddressShortLoaded.operator==(keyAddressShort));
+    checkResult("keyAddressShortLoaded", false, keyAddressShortLoaded.operator==(keyAddressLong));
+    checkResult("keyAddressLongLoaded", true, keyAddressLongLoaded.operator==(keyAddressLong));
+    checkResult("keyAddressLongLoaded", false, keyAddressLongLoaded.operator==(keyAddressShort));
+
+    checkResult("publicKey->getShortAddress", string("Z7Ui6rRxiCiuCYsTV36dDiCbMaz81ttQDb3JDFkdswsMEpWojT"), publicKey->getShortAddress()->toString());
+    checkResult("publicKey->getLongAddress", string("J2Rhu2e6Nvyu9DjqSxTJdDruKHc64NRAVuiawdbnorNA6a7qGq8ox2xsEgnN72WJHjK2DQy3"), publicKey->getLongAddress()->toString());
 
     cout << "testKeyAddress()... done!" << endl << endl;
+}
+
+std::vector<unsigned char> generateRandomBytes(int len) {
+    std::vector<unsigned char> res(len);
+    for (int i = 0; i < len; ++i)
+        res[i] = static_cast<unsigned char>(minstdRand() & 0xFF);
+    return res;
+}
+
+void testSafe58() {
+    cout << "testSafe58()..." << endl;
+
+    auto ok = Safe58::decode("Helloworld");
+    checkResult("HellOwOr1d", true, std::equal(ok.begin(), ok.end(), Safe58::decode("HellOwOr1d").begin()));
+    checkResult("He1IOw0r1d", true, std::equal(ok.begin(), ok.end(), Safe58::decode("He1IOw0r1d").begin()));
+    checkResult("He!|Ow0r|d", true, std::equal(ok.begin(), ok.end(), Safe58::decode("He!|Ow0r|d").begin()));
+
+    for (int i = 0; i < 100; ++i) {
+        char iStr[16];
+        snprintf(iStr, sizeof(iStr)/sizeof(iStr[0]), "%i", i);
+        auto src = generateRandomBytes(256 + minstdRand()*1024/minstdRand.max());
+        auto encoded = Safe58::encode(src);
+        auto decoded = Safe58::decode(encoded);
+        checkResult(iStr, true, std::equal(src.begin(), src.end(), decoded.begin()));
+    }
+
+    cout << "testSafe58()... done!" << endl << endl;
 }
 
 void testCryptoAll() {
@@ -214,4 +273,5 @@ void testCryptoAll() {
     testHashId();
     testHashIdComparison();
     testKeyAddress();
+    testSafe58();
 }

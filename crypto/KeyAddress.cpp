@@ -3,9 +3,12 @@
 //
 
 #include "KeyAddress.h"
+#include "PublicKey.h"
 #include <unordered_map>
 #include <algorithm>
+#include "cryptoCommon.h"
 #include "base64.h"
+#include "Safe58.h"
 
 KeyAddress::KeyAddress(const PublicKey& key, int typeMark, bool useSha3_384) {
     this->typeMark = typeMark;
@@ -35,8 +38,41 @@ KeyAddress::KeyAddress(const PublicKey& key, int typeMark, bool useSha3_384) {
     crc32_init(&ctx);
     crc32_update(&ctx, &packed[0], 1 + outLen);
     crc32_finish(&ctx, &packed[1 + outLen], 4);
+}
 
-    printf("~~~ %zu, packed: %s\n", outLen, base64_encode(&packed[0], packed.size()).c_str());
+KeyAddress::KeyAddress(const std::string& packedString): KeyAddress(Safe58::decode(packedString)) {
+}
+
+KeyAddress::KeyAddress(const std::vector<unsigned char>& packedSource) {
+    packed = packedSource;
+    typeMark = packedSource[0] & 0x0F;
+    keyMask = (packedSource[0] & 0xFF) >> 4;
+
+    if (keyMask == 0) {
+        //TODO: throw new IllegalAddressException("keyMask is 0");
+    }
+
+    isLong = packedSource.size() == 53;
+
+    HashType hashType = isLong ? HashType::SHA3_384 : HashType::SHA3_256;
+    auto digestDesc = getHashDescriptor(hashType);
+
+    int digestLength1 = digestDesc.hashsize + 1;
+    keyDigest.resize(digestDesc.hashsize);
+    memcpy(&keyDigest[0], &packed[1], digestDesc.hashsize);
+
+    crc32_state ctx;
+    crc32_init(&ctx);
+    crc32_update(&ctx, &packed[0], digestLength1);
+    std::vector<unsigned char> crc32;
+    std::vector<unsigned char> crc32packed;
+    crc32.resize(4);
+    crc32packed.resize(4);
+    crc32_finish(&ctx, &crc32[0], 4);
+    memcpy(&crc32packed[0], &packed[digestLength1], 4);
+    if (!std::equal(crc32.begin(), crc32.end(), crc32packed.begin())) {
+        //TODO: throw new IllegalAddressException("control code failed, address is broken");
+    }
 }
 
 int KeyAddress::mask(const PublicKey& key) {
@@ -49,4 +85,14 @@ int KeyAddress::mask(const PublicKey& key) {
     }
     //TODO: throw new IllegalArgumentException("key can't be masked for address: " + i);
     return 77;
+}
+
+std::string KeyAddress::toString() {
+    return Safe58::encode(packed);
+}
+
+bool KeyAddress::operator==(const KeyAddress& other) const {
+    if (packed.size() != other.packed.size())
+        return false;
+    return std::equal(packed.begin(), packed.end(), other.packed.begin());
 }

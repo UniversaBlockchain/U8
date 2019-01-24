@@ -30,7 +30,8 @@ add_executable(u8 main.cpp js_bindings/Scripter.cpp js_bindings/Scripter.h tools
         serialization/BaseSerializer.h serialization/BaseSerializer.cpp serialization/BossSerializer.h serialization/BossSerializer.cpp
         serialization/SerializationTest.h serialization/SerializationTest.cpp types/UArray.h types/UArray.cpp types/UBinder.h types/UBinder.cpp
         types/UBool.h types/UBool.cpp types/UBytes.h types/UBytes.cpp types/UDateTime.h types/UDateTime.cpp types/UDouble.h types/UDouble.cpp
-        types/UInt.h types/UInt.cpp types/UObject.h types/UObject.cpp types/UString.h types/UString.cpp types/TestComplexObject.h types/TestComplexObject.cpp)
+        types/UInt.h types/UInt.cpp types/UObject.h types/UObject.cpp types/UString.h types/UString.cpp types/TestComplexObject.h types/TestComplexObject.cpp
+        crypto/Safe58.h crypto/Safe58.cpp)
 
 
 message("platform: ${platform}")
