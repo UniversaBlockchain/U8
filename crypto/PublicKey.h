@@ -25,8 +25,8 @@ public:
 	bool verify(const std::vector<unsigned char> &sig, const std::vector<unsigned char> &data, HashType hashType);
 	void encrypt(std::vector<unsigned char>& input, std::vector<unsigned char>& output);
 
-	std::shared_ptr<KeyAddress> getShortAddress() const;
-	std::shared_ptr<KeyAddress> getLongAddress() const;
+	std::shared_ptr<KeyAddress> getShortAddress();
+	std::shared_ptr<KeyAddress> getLongAddress();
 
 	void toHash(std::unordered_map<std::string, std::string>& dst) const;
 	long getPublicExponent() const;
@@ -40,9 +40,6 @@ private:
 
 	std::shared_ptr<KeyAddress> shortAddress = nullptr;
 	std::shared_ptr<KeyAddress> longAddress = nullptr;
-
-	void cacheShortAddress(std::shared_ptr<KeyAddress> val) {shortAddress = val;}
-	void ssss() {shortAddress = std::make_shared<KeyAddress>(*this, 0, false);}
 
 };
 

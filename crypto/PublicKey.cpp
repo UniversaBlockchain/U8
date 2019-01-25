@@ -76,15 +76,16 @@ void PublicKey::encrypt(std::vector<unsigned char>& input, std::vector<unsigned 
 	output.insert(output.begin(), buf, buf+bufLen);
 }
 
-std::shared_ptr<KeyAddress> PublicKey::getShortAddress() const {
-//	if (shortAddress == nullptr)
-//		shortAddress = std::make_shared<KeyAddress>(*this, 0, false);
-//	return shortAddress;
-    return std::make_shared<KeyAddress>(*this, 0, false);
+std::shared_ptr<KeyAddress> PublicKey::getShortAddress() {
+	if (shortAddress == nullptr)
+		shortAddress = std::make_shared<KeyAddress>(*this, 0, false);
+	return shortAddress;
 }
 
-std::shared_ptr<KeyAddress> PublicKey::getLongAddress() const {
-	return std::make_shared<KeyAddress>(*this, 0, true);
+std::shared_ptr<KeyAddress> PublicKey::getLongAddress() {
+	if (longAddress == nullptr)
+		longAddress = std::make_shared<KeyAddress>(*this, 0, true);
+	return longAddress;
 }
 
 void PublicKey::toHash(std::unordered_map<std::string, std::string>& dst) const {
