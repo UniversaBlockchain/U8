@@ -5,6 +5,7 @@
 #include "SerializationTest.h"
 #include "BossSerializer.h"
 #include "../types/UArray.h"
+#include "../types/UBool.h"
 #include "../types/UInt.h"
 #include "../types/UDouble.h"
 #include "../types/UDateTime.h"
@@ -269,6 +270,38 @@ void testBoss() {
         ASSERT(buf[i] == repack_buf[i]);
 
     printf("Repack object test successful\n");
+
+    std::vector<UObject> objs;
+    objs.push_back(binder);
+    objs.push_back(UString("test string #1"));
+    objs.push_back(UDouble(803290.728));
+    objs.push_back(UInt(-183918));
+    objs.push_back(binder);
+    objs.push_back(UBool(true));
+
+    UBytes dump = BossSerializer::dump(objs);
+
+    BossSerializer::Reader reader(dump);
+    obj = reader.readObject();
+    ASSERT(UBinder::isInstance(obj));
+    ASSERT(UBinder::asInstance(obj).size() == 21);
+    obj = reader.readObject();
+    ASSERT(UString::isInstance(obj));
+    ASSERT(UString::asInstance(obj).get() == "test string #1");
+    obj = reader.readObject();
+    ASSERT(UDouble::isInstance(obj));
+    ASSERT(UDouble::asInstance(obj).get() == 803290.728);
+    obj = reader.readObject();
+    ASSERT(UInt::isInstance(obj));
+    ASSERT(UInt::asInstance(obj).get() == -183918);
+    obj = reader.readObject();
+    ASSERT(UBinder::isInstance(obj));
+    ASSERT(UBinder::asInstance(obj).size() == 21);
+    obj = reader.readObject();
+    ASSERT(UBool::isInstance(obj));
+    ASSERT(UBool::asInstance(obj).get());
+
+    printf("Dump test successful\n");
 
     printf("testBoss()...done\n\n");
 }

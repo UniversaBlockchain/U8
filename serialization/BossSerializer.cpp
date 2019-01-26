@@ -19,6 +19,15 @@ UBytes BossSerializer::serialize(const UObject& o) {
     return writer.getBytes();
 }
 
+UBytes BossSerializer::dump(std::vector<UObject> objs) {
+
+    Writer writer;
+    for (int i = 0; i < objs.size(); i++)
+        writer.writeObject(objs[i]);
+
+    return writer.getBytes();
+}
+
 UObject BossSerializer::deserialize(const UBytes& data) {
 
     Reader reader(data);

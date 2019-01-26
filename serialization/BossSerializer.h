@@ -57,6 +57,15 @@ public:
     static UBytes serialize(const UObject& o);
 
     /**
+     * Serialize some objects to BOSS. The objects must inherit UObject.
+     *
+     * @param objs is vector of objects
+     *
+     * @return boss-packed data (@see UBytes)
+     */
+    static UBytes dump(std::vector<UObject> objs);
+
+    /**
      * Deserialize object from boss-packed data
      *
      * @param data is boss-packed data for deserialization
