@@ -41,4 +41,24 @@ std::ostream& operator<< (std::ostream& out, const std::vector<T>& v) {
     return out;
 }
 
+class Noncopyable {
+public:
+    Noncopyable() = default;
+    ~Noncopyable() = default;
+
+private:
+    Noncopyable(const Noncopyable&) = delete;
+    Noncopyable& operator=(const Noncopyable&) = delete;
+};
+
+class Nonmovable {
+public:
+    Nonmovable() = default;
+    ~Nonmovable() = default;
+
+private:
+    Nonmovable(Nonmovable&&) = delete;
+    Nonmovable& operator=(Nonmovable&&) = delete;
+};
+
 #endif //U8_TOOLS_H

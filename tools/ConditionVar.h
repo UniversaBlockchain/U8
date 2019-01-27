@@ -40,10 +40,9 @@ public:
         return cv.wait_for(lock, max_duration) == std::cv_status::no_timeout;
     }
 
-private:
+protected:
     mutex mx;
     condition_variable cv;
 };
-
 
 #endif //U8_CONDITIONVAR_H

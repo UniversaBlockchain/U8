@@ -31,10 +31,14 @@ add_library(u8_lib STATIC js_bindings/Scripter.cpp js_bindings/Scripter.h tools/
         serialization/SerializationTest.h serialization/SerializationTest.cpp types/UArray.h types/UArray.cpp types/UBinder.h types/UBinder.cpp
         types/UBool.h types/UBool.cpp types/UBytes.h types/UBytes.cpp types/UDateTime.h types/UDateTime.cpp types/UDouble.h types/UDouble.cpp
         types/UInt.h types/UInt.cpp types/UObject.h types/UObject.cpp types/UString.h types/UString.cpp types/TestComplexObject.h types/TestComplexObject.cpp
-        crypto/Safe58.h crypto/Safe58.cpp)
+        crypto/Safe58.h crypto/Safe58.cpp tools/vprintf.cpp tools/vprintf.h)
+
+add_executable(u8_tests test/catch2.h test/cpp_tests.cpp test/test_thread_pool.cpp)
 
 add_executable(u8 main.cpp)
+
 target_link_libraries(u8 PRIVATE u8_lib)
+target_link_libraries(u8_tests PRIVATE u8_lib)
 
 message("platform: ${platform}")
 

@@ -38,6 +38,7 @@ function testBoss() {
     assert(JSON.stringify(Boss.load(packed)) == JSON.stringify(src));
     let reader = new Boss.Reader(packed);
     console.log(JSON.stringify(reader.read()));
+    console.log(JSON.stringify(reader.read()));
     let writer = new Boss.Writer();
     writer.write(src);
     assert(packed.toString() == writer.get().toString() );
