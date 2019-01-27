@@ -16,6 +16,9 @@
 using namespace std;
 
 
+/**
+ * The exception raised when attempted to put or get to the closed queue.
+ */
 class QueueClosedException : public exception {
     using exception::exception;
 };
@@ -33,6 +36,14 @@ public:
     Queue(size_t capacity = 0) : _capacity(capacity) {
     }
 
+    /**
+     * put a value into the queue (emplace, actually).
+     *
+     * if capacitry was set to non-zero, could block until the space will be freed.
+     *
+     * @param value to enqueue.
+     * @throws QueueClosedException if the queue is closed
+     */
     void put(T &&value) {
         unique_lock lock(mx);
         while (!_closed && (_capacity && queue.size() >= _capacity))
@@ -46,6 +57,14 @@ public:
 
     }
 
+    /**
+     * put a value into the queue (emplace, actually).
+     *
+     * if capacitry was set to non-zero, could block until the space will be freed.
+     *
+     * @param value to enqueue.
+     * @throws QueueClosedException if the queue is closed
+     */
     void put(const T &value) {
         unique_lock lock(mx);
         while (!_closed && (_capacity && queue.size() >= _capacity))
@@ -58,6 +77,12 @@ public:
             throw QueueClosedException();
     }
 
+    /**
+     * Get the value from the queue. Block until it is available. FIFO order.
+     *
+     * @return next value from the queue.
+     * @throws QueueClosedException if the queue is closed
+     */
     T get() {
         std::unique_lock lock(mx);
         while (!_closed && _size == 0)
@@ -73,6 +98,12 @@ public:
             throw QueueClosedException();
     }
 
+    /**
+     * Get the value from the queue. Return empty optional if it is empty. Does not block.
+     *
+     * @return next value from the queue or empty optional.
+     * @throws QueueClosedException if the queue is closed
+     */
     optional<T> optGet() noexcept {
         unique_lock lock(mx);
         while (!_closed && _size == 0)
@@ -88,12 +119,24 @@ public:
             return optional<T>();
     }
 
+    /**
+     * @return true if the queue is empty
+     */
     bool empty() const { return _size == 0; }
 
+    /**
+     * @return current size of the queue
+     */
     auto size() const { return _size; }
 
+    /**
+     * @return capacity of the queue. 0 means unlimited.
+     */
     auto capacity() const { return _capacity; }
 
+    /**
+     * Closes the queue. All waiting threads will be unblocked and the QueueClosedException will be thrown in them.
+     */
     void close() {
         mx.lock();
         if (!_closed) {
@@ -112,8 +155,14 @@ public:
         mx.unlock();
     }
 
+    /**
+     * @return true if this queue is closed
+     */
     bool closed() const { return _closed; }
 
+    /**
+     * Closes the queue and frees its resources, see also close()
+     */
     ~Queue() {
         close();
     }
@@ -132,10 +181,13 @@ private:
     condition_variable cv_empty;
     condition_variable cv_full;
 
-    Queue(const Queue&);
-    Queue(Queue&&);
-    Queue& operator=(Queue&&);
-    Queue& operator=(const Queue&);
+    Queue(const Queue &);
+
+    Queue(Queue &&);
+
+    Queue &operator=(Queue &&);
+
+    Queue &operator=(const Queue &);
 
 };
 

@@ -23,6 +23,7 @@ TEST_CASE("ThreadPool") {
             pool([&sum, &count, i]() {
                 count++;
                 sum += i;
+                if( i == 1 ) this_thread::sleep_for(5ms);
             });
         }
         REQUIRE(pool.queueSize() > 1);
