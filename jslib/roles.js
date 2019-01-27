@@ -1,0 +1,459 @@
+let bs = require("biserializable");
+let dbm = require("defaultbimapper");
+let t = require("tools");
+const RequiredMode = {
+    ALL_OF : "ALL_OF",
+    ANY_OF : "ANY_OF"
+};
+
+
+///////////////////////////
+//Role
+///////////////////////////
+
+function Role(name) {
+    this.name = name;
+    this.comment = null;
+    bs.BiSerializable.call(this);
+    this.requiredAllReferences = new Set();
+    this.requiredAnyReferences = new Set();
+    this.contract = null;
+}
+
+Role.prototype = Object.create(bs.BiSerializable.prototype);
+
+Role.prototype.isValid = function() {
+    return false;
+};
+
+Role.prototype.equals = function(to) {
+    if(this === to)
+        return true;
+
+    if(Object.getPrototypeOf(this) !== Object.getPrototypeOf(to))
+        return false;
+
+    if(!t.valuesEqual(this.name,to.name))
+        return false;
+
+    if(!t.valuesEqual(this.comment,to.comment))
+        return false;
+
+    if(!t.valuesEqual(this.requiredAllReferences,to.requiredAllReferences))
+        return false;
+    if(!t.valuesEqual(this.requiredAllReferences,to.requiredAnyReferences))
+        return false;
+
+    return true;
+};
+
+Role.prototype.isAllowedForKeys = function(keys) {
+    return this.isAllowedForReferences(this.contract == null ? new Set() : this.contract.validRoleReferences)
+};
+
+Role.prototype.isAllowedForReferences = function(references) {
+
+    for(let ref of this.requiredAllReferences) {
+        if (!references.has(ref)) {
+            return false;
+        }
+    }
+
+    if(this.requiredAnyReferences.size == 0)
+        return true;
+
+    for(let ref of this.requiredAnyReferences) {
+        if (references.has(ref)) {
+            return true;
+        }
+    }
+
+    return false;
+};
+
+
+Role.prototype.deserialize = function (data, deserializer) {
+    this.name = data.name;
+
+    if(data.hasOwnProperty("comment"))
+        this.comment = data.comment;
+    else
+        this.comment = null;
+
+    if(data.hasOwnProperty("required")) {
+        let required = data.required;
+        if(required != null) {
+            if(required.hasOwnProperty(RequiredMode.ALL_OF)) {
+                let array = deserializer.deserialize(required[RequiredMode.ALL_OF]);
+                array.forEach(item => this.requiredAllReferences.add(item))
+            }
+
+            if(required.hasOwnProperty(RequiredMode.ANY_OF)) {
+                let array = deserializer.deserialize(required[RequiredMode.ANY_OF]);
+                array.forEach(item => this.requiredAnyReferences.add(item))
+            }
+        }
+    }
+};
+
+Role.prototype.serialize = function(serializer) {
+    return {name:this.name};
+};
+
+Role.prototype.linkAs = function (linkName) {
+    let newRole = new RoleLink(linkName, name);
+    if (this.contract != null)
+        this.contract.registerRole(newRole);
+    return newRole;
+};
+
+
+
+///////////////////////////
+//RoleLink
+///////////////////////////
+
+function RoleLink(name,roleName) {
+    Role.call(this,name);
+    this.roleName = roleName;
+}
+RoleLink.prototype = Object.create(Role.prototype);
+
+RoleLink.prototype.isValid = function() {
+    let r = this.resolve();
+    if(r != null)
+        return r.isValid();
+    else
+        return false;
+};
+
+RoleLink.prototype.equals = function(to) {
+    if(this === to)
+        return true;
+
+    if(Object.getPrototypeOf(this) !== Object.getPrototypeOf(to))
+        return false;
+
+    if(!Object.getPrototypeOf(RoleLink.prototype).equals.call(this,to))
+        return false;
+
+    if(!t.valuesEqual(this.roleName,to.roleName))
+        return false;
+
+    return true;
+};
+
+RoleLink.prototype.deserialize = function(data,deserializer) {
+    Object.getPrototypeOf(RoleLink.prototype).deserialize.call(this,data,deserializer);
+    this.roleName = data.target_name;
+};
+
+RoleLink.prototype.serialize = function(serializer) {
+    let data = Object.getPrototypeOf(RoleLink.prototype).serialize.call(this,serializer);
+    data.target_name = this.roleName;
+    return data;
+};
+
+RoleLink.prototype.getRole = function() {
+    return this.contract.getRole(this.name);
+};
+
+RoleLink.prototype.resolve = function() {
+    let maxDepth = 40;
+    for (let r = this; maxDepth > 0; maxDepth--) {
+        if (r instanceof RoleLink) {
+            r = r.getRole();
+            if (r == null)
+                return null;
+        } else {
+            return r;
+        }
+    }
+    return null;
+};
+
+RoleLink.prototype.isAllowedForKeys = function(keys) {
+    if(!Object.getPrototypeOf(Role.prototype).isAllowedForKeys(this,keys))
+        return false;
+    let r = this.resolve();
+    if(r != null)
+        return r.isAllowedForKeys(keys);
+    else
+        return false;
+};
+
+
+
+///////////////////////////
+//ListRole
+///////////////////////////
+
+const ListRoleMode = {
+    ALL : "ALL",
+    ANY : "ANY",
+    QUORUM : "QUORUM"
+};
+
+
+function ListRole(name) {
+    Role.call(this,name);
+    this.mode = ListRoleMode.ALL;
+    this.roles = [];
+    this.quorumSize = 0;
+}
+
+ListRole.prototype = Object.create(Role.prototype);
+
+ListRole.prototype.isValid = function() {
+    return this.roles.length > 0 && (this.mode !== ListRoleMode.QUORUM || this.quorumSize <= this.roles.length);
+};
+
+
+ListRole.prototype.equals = function(to) {
+    if(this === to)
+        return true;
+
+    if(Object.getPrototypeOf(this) !== Object.getPrototypeOf(to))
+        return false;
+
+    if(!Object.getPrototypeOf(ListRole.prototype).equals.call(this,to))
+        return false;
+
+    if(!t.valuesEqual(this.mode,to.mode))
+        return false;
+
+    if(this.mode === ListRoleMode.QUORUM) {
+        if(!t.valuesEqual(this.quorumSize,to.quorumSize))
+            return false;
+    }
+
+    if(!t.valuesEqual(this.roles,to.roles))
+        return false;
+
+
+    return true;
+};
+
+ListRole.prototype.deserialize = function(data,deserializer) {
+    Object.getPrototypeOf(ListRole.prototype).deserialize.call(this,data,deserializer);
+
+    this.quorumSize = data.quorumSize;
+
+    let mode = data.mode;
+    if (mode != null) {
+        for(let key in ListRoleMode) {
+            if(ListRoleMode[key] === mode) {
+                this.mode = key;
+            }
+        }
+    }
+
+    let roles = data.roles;
+    for(let r of roles) {
+        this.roles.push(deserializer.deserialize(r));
+    }
+};
+
+ListRole.prototype.serialize = function(serializer) {
+    let data = Object.getPrototypeOf(ListRole.prototype).serialize.call(this,serializer);
+    data.quorumSize = this.quorumSize;
+    data.mode = ListRoleMode[this.mode];
+    data.roles = serializer.serialize(this.roles);
+    return data;
+};
+
+ListRole.prototype.isAllowedForKeys = function(keys) {
+    if(!Object.getPrototypeOf(Role.prototype).isAllowedForKeys(this,keys))
+        return false;
+
+    let valid = 0;
+    let required;
+    if(this.mode === ListRoleMode.ALL)
+        required = this.roles.length;
+    else if(this.mode === ListRoleMode.ANY)
+        required = 1;
+    else if(this.mode === ListRoleMode.QUORUM)
+        required = this.quorumSize;
+
+    for(let r of this.roles) {
+        if(r.isAllowedForKeys(keys)) {
+            valid++;
+            if(valid >= required)
+                return true;
+        }
+    }
+
+    return false;
+};
+
+
+
+///////////////////////////
+//SimpleRole
+///////////////////////////
+
+function SimpleRole(name,param) {
+    Role.call(this,name);
+    this.keyAddresses = new Set();
+    this.anonymousIds = new Set();
+    this.keyRecords = new Map();
+
+    if(param instanceof KeyAddress) {
+        this.keyAddresses.add(param);
+    } else if(param instanceof AnonymousId) {
+        this.anonymousIds.add(param);
+    } else if(param instanceof PublicKey) {
+        this.keyRecords.set(param,new KeyRecord(param));
+    }
+}
+
+SimpleRole.prototype = Object.create(Role.prototype);
+
+SimpleRole.prototype.isValid = function() {
+    return !this.keyRecords.isEmpty() || this.anonymousIds.size > 0 || this.keyAddresses.size > 0 ||
+        this.requiredAllReferences.size > 0 || this.requiredAnyReferences.size > 0;
+};
+
+ListRole.prototype.equals = function(to) {
+    if(this === to)
+        return true;
+
+    if(Object.getPrototypeOf(this) !== Object.getPrototypeOf(to))
+        return false;
+
+    if(!Object.getPrototypeOf(ListRole.prototype).equals.call(this,to))
+        return false;
+
+    if(!t.valuesEqual(this.mode,to.mode))
+        return false;
+
+    if(this.mode === ListRoleMode.QUORUM) {
+        if(!t.valuesEqual(this.quorumSize,to.quorumSize))
+            return false;
+    }
+
+    if(!t.valuesEqual(this.roles,to.roles))
+        return false;
+
+
+    return true;
+};
+
+SimpleRole.prototype.deserialize = function(data,deserializer) {
+    Object.getPrototypeOf(SimpleRole.prototype).deserialize.call(this,data,deserializer);
+
+    //TODO:
+};
+
+SimpleRole.prototype.serialize = function(serializer) {
+    let data = Object.getPrototypeOf(SimpleRole.prototype).serialize.call(this,serializer);
+
+    //TODO:
+
+    return data;
+};
+
+
+
+SimpleRole.prototype.isAllowedForKeys = function(keys) {
+    if(!Object.getPrototypeOf(Role.prototype).isAllowedForKeys(this,keys))
+        return false;
+
+
+
+    for(let anonId of this.anonymousIds) {
+        let found = false;
+        for(let k of keys) {
+            if(k.isMatchingAnonymousId(anonId)) {
+                found = true;
+                break;
+            }
+        }
+        if(!found)
+            return false;
+    }
+
+    for(let key of this.keyRecords.keys()) {
+        let found = false;
+        for(let k of keys) {
+            if(k.isMatchingKey(key)) {
+                found = true;
+                break;
+            }
+        }
+        if(!found)
+            return false;
+    }
+
+    for(let address of this.keyAddresses) {
+        let found = false;
+        for(let k of keys) {
+            if(k.isMatchingKeyAddress(address)) {
+                found = true;
+                break;
+            }
+        }
+        if(!found)
+            return false;
+    }
+    return true;
+};
+
+let roleLinkAdapter = new bs.BiAdapter();
+roleLinkAdapter.getTag = function() {
+    return "RoleLink";
+};
+roleLinkAdapter.getType = function() {
+    return RoleLink.prototype;
+};
+roleLinkAdapter.deserialize = function(data, deserializer) {
+    let rl = new RoleLink();
+    rl.deserialize(data,deserializer);
+    return rl;
+};
+roleLinkAdapter.serialize = function(role,serializer) {
+    return role.serialize(serializer);
+};
+
+
+let listRoleAdapter = new bs.BiAdapter();
+listRoleAdapter.getTag = function() {
+    return "ListRole";
+};
+listRoleAdapter.getType = function() {
+    return ListRole.prototype;
+};
+listRoleAdapter.deserialize = function(data, deserializer) {
+    let lr = new ListRole();
+    lr.deserialize(data,deserializer);
+    return lr;
+};
+listRoleAdapter.serialize = function(role,serializer) {
+    return role.serialize(serializer);
+};
+
+
+let simpleRoleAdapter = new bs.BiAdapter();
+simpleRoleAdapter.getTag = function() {
+    return "SimpleRole";
+};
+simpleRoleAdapter.getType = function() {
+    return SimpleRole.prototype;
+};
+simpleRoleAdapter.deserialize = function(data, deserializer) {
+    let lr = new SimpleRole();
+    lr.deserialize(data,deserializer);
+    return lr;
+};
+simpleRoleAdapter.serialize = function(role,serializer) {
+    return role.serialize(serializer);
+};
+
+dbm.DefaultBiMapper.registerAdapter(roleLinkAdapter);
+dbm.DefaultBiMapper.registerAdapter(listRoleAdapter);
+dbm.DefaultBiMapper.registerAdapter(simpleRoleAdapter);
+
+///////////////////////////
+//EXPORTS
+///////////////////////////
+module.exports = {RequiredMode,Role,RoleLink,ListRoleMode,ListRole,SimpleRole};

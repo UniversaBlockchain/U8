@@ -1,3 +1,5 @@
+let t = require("tools");
+
 //Delta/////////////////
 
 function Delta(parent, oldValue, newValue) {
@@ -27,12 +29,12 @@ Delta.between = function (parent, oldValue, newValue) {
     if (oldValue instanceof Array && newValue instanceof Array)
         return ListDelta.compare(parent, oldValue, newValue);
 
-    if (oldValue instanceof Object && newValue instanceof Object)
+
+    if (Object.getPrototypeOf(oldValue) === Object.prototype && Object.getPrototypeOf(newValue) === Object.prototype)
         return MapDelta.compare(parent, oldValue, newValue);
 
 
-
-    return oldValue === newValue ? null : new ChangedItem(parent, oldValue, newValue);
+    return t.valuesEqual(oldValue,newValue) ? null : new ChangedItem(parent, oldValue, newValue);
 };
 
 
@@ -78,6 +80,9 @@ function MapDelta(parent, oldMap, newMap) {
     this.changes = {};
 
     for (let key in oldMap) {
+        if(key === "equals")
+            continue;
+
         if(newMap.hasOwnProperty(key)) {
             let d = Delta.between(this, oldMap[key], newMap[key]);
             if(d != null)
@@ -89,6 +94,9 @@ function MapDelta(parent, oldMap, newMap) {
 
     // detecting new items
     for (let key in newMap) {
+        if(key === "equals")
+            continue;
+
         if (!oldMap.hasOwnProperty(key) ) {
             this.changes[key] = new CreatedItem(this, newMap[key]);
         }

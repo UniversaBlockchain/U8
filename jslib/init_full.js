@@ -3,7 +3,7 @@
 const console = {
     log: __bios_print,
     info: __bios_print,
-    error: __bios_print
+    error: __bios_print,
 };
 
 const VERSION = "4.0.0b4";

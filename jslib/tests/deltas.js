@@ -1,11 +1,12 @@
 let deltas = require("deltas");
-
+let roles = require("roles");
 async function main() {
 
     //map
     let a1 = {a:1,b:2,c:3};
     let b1 = {a:2,d:4};
     let d1 = deltas.Delta.between(null,a1,b1);
+
     assert(d1 instanceof deltas.MapDelta);
     assert(d1.changes.a instanceof deltas.ChangedItem);
     assert(d1.changes.b instanceof deltas.RemovedItem);
@@ -43,6 +44,7 @@ async function main() {
     assert(d4.changes[3] instanceof deltas.RemovedItem);
     assert(d4.changes[4] instanceof deltas.RemovedItem);
 
+
     //map with subitems
     let a5 = {a:1,b:2,c:3,e:[2,2]};
     let b5 = {a:2,d:4,e:[1,2]};
@@ -55,4 +57,31 @@ async function main() {
     assert(d5.changes.e instanceof deltas.ListDelta);
     assert(Object.keys(d5.changes.e.changes).length == 1);
     assert(d5.changes.e.changes[0] instanceof deltas.ChangedItem);
+
+
+    let a6 = {role:new roles.Role("role1")};
+    let b6 = {role:new roles.Role("role2")};
+    let d6 = deltas.Delta.between(null,a6,b6);
+
+    assert(d6 instanceof deltas.MapDelta);
+    assert(d6.changes.role instanceof deltas.ChangedItem);
+
+
+    let a7 = {role:new roles.Role("role1")};
+    let b7 = {role:new roles.Role("role1")};
+    let d7 = deltas.Delta.between(null,a7,b7);
+    a7.role.requiredAnyReferences.add("ref1");
+    b7.role.requiredAnyReferences.add("ref1");
+
+    assert(d7==null);
+
+    a7.role.requiredAnyReferences.add("ref2");
+    b7.role.requiredAnyReferences.add("ref3");
+
+    let d8 = deltas.Delta.between(null,a7,b7);
+
+    assert(d8 instanceof deltas.MapDelta);
+    assert(d8.changes.role instanceof deltas.ChangedItem);
+
+
 }
