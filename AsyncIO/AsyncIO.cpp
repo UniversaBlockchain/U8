@@ -15,6 +15,9 @@ namespace asyncio {
     //===========================================================================================
 
     uv_loop_t* initAndRunLoop() {
+
+        umask(000);
+
         if (!asyncLoop) {
             asyncLoop = uv_loop_new();
             //Opened async handle will keep the loop alive
@@ -222,6 +225,36 @@ namespace asyncio {
         file_data->callback = std::move(callback);
         file_data->fileReq = ioReq;
         file_data->uvBuff = uv_buf_init((char*) data.data(), (unsigned int) data.size());
+
+        req->data = file_data;
+
+        int result = uv_fs_write(asyncio::asyncLoop, req, (uv_file) ioReq->result, &file_data->uvBuff, 1, -1, write_cb);
+
+        if (result < 0) {
+            file_data->callback(result);
+
+            delete file_data;
+            delete req;
+        }
+    }
+
+    void IOHandle::write(void* buffer, size_t size, writeFile_cb callback) {
+        if (!ioReq) {
+            fprintf(stderr, "IOHandle not initialized. Open file for writing.\n");
+            return;
+        }
+
+        if (type != FILE) {
+            fprintf(stderr, "IOHandle not file type.\n");
+            return;
+        }
+
+        auto req = new ioHandle();
+        auto file_data = new writeFile_data();
+
+        file_data->callback = std::move(callback);
+        file_data->fileReq = ioReq;
+        file_data->uvBuff = uv_buf_init((char*) buffer, (unsigned int) size);
 
         req->data = file_data;
 

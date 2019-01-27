@@ -12,4 +12,13 @@ void testHashId();
 void testHashIdComparison();
 void testKeyAddress();
 
+class CryptoTestResults {
+public:
+    CryptoTestResults();
+    virtual ~CryptoTestResults();
+    void incrementErrorsCounter();
+private:
+    int errorsCounter = 0;
+};
+
 #endif //U8_CRYPTOTESTS_H

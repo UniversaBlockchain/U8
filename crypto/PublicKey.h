@@ -9,19 +9,28 @@
 #include <tomcrypt.h>
 #include <gmp.h>
 #include <unordered_map>
+#include <memory>
 #include "cryptoCommon.h"
+#include "KeyAddress.h"
+#include "../types/UBytes.h"
 
 class PublicKey {
 
 public:
 
-    PublicKey();
+	PublicKey(mpz_ptr N, mpz_ptr e);
+	PublicKey(const std::string& strE, const std::string& strN);
+	PublicKey(const UBytes& e, const UBytes& N);
+	PublicKey(const std::vector<unsigned char>& packedBinaryKey);
     virtual ~PublicKey();
 
-	void init(mpz_ptr N, mpz_ptr e);
+	std::vector<unsigned char> pack() const;
 
 	bool verify(const std::vector<unsigned char> &sig, const std::vector<unsigned char> &data, HashType hashType);
 	void encrypt(std::vector<unsigned char>& input, std::vector<unsigned char>& output);
+
+	const std::unique_ptr<KeyAddress>& getShortAddress();
+	const std::unique_ptr<KeyAddress>& getLongAddress();
 
 	void toHash(std::unordered_map<std::string, std::string>& dst) const;
 	long getPublicExponent() const;
@@ -30,8 +39,16 @@ public:
 
 private:
 
+	void initFromBytes(const UBytes& eValue, const UBytes& nValue);
+	void initFromDecimalStrings(const std::string& strE, const std::string& strN);
+
+private:
+
 	rsa_key key;
 	HashType mgf1HashType = DEFAULT_MGF1_HASH;
+
+	std::unique_ptr<KeyAddress> shortAddress = nullptr;
+	std::unique_ptr<KeyAddress> longAddress = nullptr;
 
 };
 

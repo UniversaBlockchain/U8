@@ -6,12 +6,20 @@
 #define U8_KEYADDRESS_H
 
 #include <vector>
-#include "PublicKey.h"
+#include <string>
+
+class PublicKey;
 
 class KeyAddress {
 
 public:
     KeyAddress(const PublicKey& key, int typeMark, bool useSha3_384);
+    KeyAddress(const std::string& packedString);
+    KeyAddress(const std::vector<unsigned char>& packedString);
+
+    std::string toString();
+
+    bool operator==(const KeyAddress& other) const;
 
 protected:
     static int mask(const PublicKey& key);

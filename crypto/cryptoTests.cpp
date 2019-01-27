@@ -7,17 +7,37 @@
 #include <vector>
 #include <map>
 #include <unordered_map>
+#include <random>
 #include "base64.h"
 #include "PrivateKey.h"
 #include "HashId.h"
 #include "KeyAddress.h"
+#include "Safe58.h"
 
 using namespace std;
+
+CryptoTestResults cryptoTestResults;
+std::minstd_rand minstdRand;
+
+CryptoTestResults::CryptoTestResults() {
+    minstdRand.seed(time(0));
+}
+
+CryptoTestResults::~CryptoTestResults() {
+    auto os1 = (errorsCounter == 0 ? &cout : &cerr);
+    *os1 << "CryptoTestResults: errors = " << errorsCounter << endl;
+}
+
+void CryptoTestResults::incrementErrorsCounter() {
+    ++errorsCounter;
+}
 
 template <class T>
 void checkResult(const string& msg, const T expected, const T result) {
     auto os1 = (result == expected ? &cout : &cerr);
     *os1 << "checkResult " << msg << " (expected " << expected << "): " << result << endl;
+    if (result != expected)
+        cryptoTestResults.incrementErrorsCounter();
 }
 
 void testCrypto() {
@@ -34,8 +54,7 @@ void testCrypto() {
     auto sig512ForVerify = vector<unsigned char>(sign512fromJava.begin(), sign512fromJava.end());
     auto sig3384ForVerify = vector<unsigned char>(sign3384fromJava.begin(), sign3384fromJava.end());
 
-    PrivateKey privateKey;
-    privateKey.initForDebug_decimal(strE, strP, strQ);
+    PrivateKey privateKey(strE, strP, strQ);
     auto publicKey = privateKey.getPublicKey();
 
     vector<unsigned char> encrypted;
@@ -199,14 +218,79 @@ void testKeyAddress() {
     auto strP = string("166438984042065497734914068855004282550440498640409398677336546927308216381652973497991047247926391839370729407435808892969122519401712385345233169193805241631583305760736715545141142026706356434887369071360563025254193571054123994143642688583692644185979182810270581846072984179584787077062088254715187805453");
     auto strQ = string("132243238518154268249184631952046833494949171132278166597493094022019934205919755965484010862547916586956651043061215415694791928849764419123506916992508894879133969053226176271305106211090173517182720832250788947720397461739281147258617115635022042579209568022023702283912658756481633266987107149957718776027");
 
-    PrivateKey privateKey;
-    privateKey.initForDebug_decimal(strE, strP, strQ);
+    PrivateKey privateKey(strE, strP, strQ);
     auto publicKey = privateKey.getPublicKey();
 
-    KeyAddress keyAddressS(*publicKey, 0, false);
-    KeyAddress keyAddressL(*publicKey, 0, true);
+    KeyAddress keyAddressShort(*publicKey, 0, false);
+    KeyAddress keyAddressLong(*publicKey, 0, true);
+    checkResult("keyAddressShort", string("Z7Ui6rRxiCiuCYsTV36dDiCbMaz81ttQDb3JDFkdswsMEpWojT"), keyAddressShort.toString());
+    checkResult("keyAddressLong", string("J2Rhu2e6Nvyu9DjqSxTJdDruKHc64NRAVuiawdbnorNA6a7qGq8ox2xsEgnN72WJHjK2DQy3"), keyAddressLong.toString());
+
+    KeyAddress keyAddressShortLoaded(keyAddressShort.toString());
+    KeyAddress keyAddressLongLoaded(keyAddressLong.toString());
+    checkResult("keyAddressShortLoaded", true, keyAddressShortLoaded.operator==(keyAddressShort));
+    checkResult("keyAddressShortLoaded", false, keyAddressShortLoaded.operator==(keyAddressLong));
+    checkResult("keyAddressLongLoaded", true, keyAddressLongLoaded.operator==(keyAddressLong));
+    checkResult("keyAddressLongLoaded", false, keyAddressLongLoaded.operator==(keyAddressShort));
+
+    checkResult("publicKey->getShortAddress", string("Z7Ui6rRxiCiuCYsTV36dDiCbMaz81ttQDb3JDFkdswsMEpWojT"), publicKey->getShortAddress()->toString());
+    checkResult("publicKey->getLongAddress", string("J2Rhu2e6Nvyu9DjqSxTJdDruKHc64NRAVuiawdbnorNA6a7qGq8ox2xsEgnN72WJHjK2DQy3"), publicKey->getLongAddress()->toString());
 
     cout << "testKeyAddress()... done!" << endl << endl;
+}
+
+std::vector<unsigned char> generateRandomBytes(int len) {
+    std::vector<unsigned char> res(len);
+    for (int i = 0; i < len; ++i)
+        res[i] = static_cast<unsigned char>(minstdRand() & 0xFF);
+    return res;
+}
+
+void testSafe58() {
+    cout << "testSafe58()..." << endl;
+
+    auto ok = Safe58::decode("Helloworld");
+    checkResult("HellOwOr1d", true, std::equal(ok.begin(), ok.end(), Safe58::decode("HellOwOr1d").begin()));
+    checkResult("He1IOw0r1d", true, std::equal(ok.begin(), ok.end(), Safe58::decode("He1IOw0r1d").begin()));
+    checkResult("He!|Ow0r|d", true, std::equal(ok.begin(), ok.end(), Safe58::decode("He!|Ow0r|d").begin()));
+
+    for (int i = 0; i < 100; ++i) {
+        char iStr[16];
+        snprintf(iStr, sizeof(iStr)/sizeof(iStr[0]), "%i", i);
+        auto src = generateRandomBytes(256 + minstdRand()*1024/minstdRand.max());
+        auto encoded = Safe58::encode(src);
+        auto decoded = Safe58::decode(encoded);
+        checkResult(iStr, true, std::equal(src.begin(), src.end(), decoded.begin()));
+    }
+
+    cout << "testSafe58()... done!" << endl << endl;
+}
+
+void testPackUnpackKeys() {
+    cout << "testPackUnpackKeys()..." << endl;
+
+    auto strE = string("65537");
+    auto strP = string("166438984042065497734914068855004282550440498640409398677336546927308216381652973497991047247926391839370729407435808892969122519401712385345233169193805241631583305760736715545141142026706356434887369071360563025254193571054123994143642688583692644185979182810270581846072984179584787077062088254715187805453");
+    auto strQ = string("132243238518154268249184631952046833494949171132278166597493094022019934205919755965484010862547916586956651043061215415694791928849764419123506916992508894879133969053226176271305106211090173517182720832250788947720397461739281147258617115635022042579209568022023702283912658756481633266987107149957718776027");
+
+    PrivateKey privateKey(strE, strP, strQ);
+    auto publicKey = privateKey.getPublicKey();
+
+    auto packedPrivateKey = privateKey.pack();
+    auto packedPublicKey = publicKey->pack();
+    checkResult("packedPrivateKey", string("JgAcAQABvIDtBFjZyB1P7q19Ni0dCPs2ndCJrrVIXzYMbsLzVMNuRFv2NxiERGAZIolO948EGd+/E5tIv+1rAH6Oqoubqrx4MGXwpL2DJw+/No/pQQSqYCKA/v3BeADdaXo+XL12RCr3N87QGV0Ept9Q25GltgZuB75rZ4QN9NWMNa1ql929DbyAvFIUVIg6o9lT2JjnlIWNapM6rZNpo7c8SN/CfAFWxpm5qwqnIpJRrEl3fGUre2K+3psZDVIo0AKFGbuKAi+ZDAWpTAnuwT1R4pQqK/c0Z65HEbnwiAaWOn9HBAUw9c09AvgPoQvVgLS3YSA8/xBe+NeuqnIwl/Tw0m7EjVFSmNs="), base64_encode(&packedPrivateKey[0], packedPrivateKey.size()));
+    checkResult("packedPublicKey", string("HggcAQABxAABrlsvdv82ZRGkQjvt9OS95cOqroMWvS4s0KlrJc+X96y41MKIyOCcvw2tu9R5uh67nHOFWLa4Gr5AMaCI/l6DvGu7JK4EIgX19f+WalCk9A0mzdyUWt/1571iZPh9cIm0O7oXPR1nhcDAApQFJfE7U20cW0OJ0EMNijB4s0tzNc+D6eqCDCnbfcASOw4JQ4MC838HJi5BeqGgoXdZI1UMh2CQ0xHKVzYY9DADzxZTu1Qz/kTbvCL3ust54KHbOh/8Y2eFpLO+waW1s6z11JLGJXERhOBzfB4tQppU+QbI0u7hTdv/GgGh6ED60Ggq7l8Rz5nU5DCHCYZmiYZcPhpyHw=="), base64_encode(&packedPublicKey[0], packedPublicKey.size()));
+    PrivateKey unpackedPrivateKey(packedPrivateKey);
+    PublicKey unpackedPublicKey(packedPublicKey);
+    auto packedPrivateKey2 = unpackedPrivateKey.pack();
+    auto packedPublicKey2 = unpackedPublicKey.pack();
+    checkResult("packedPrivateKey2", string("JgAcAQABvIDtBFjZyB1P7q19Ni0dCPs2ndCJrrVIXzYMbsLzVMNuRFv2NxiERGAZIolO948EGd+/E5tIv+1rAH6Oqoubqrx4MGXwpL2DJw+/No/pQQSqYCKA/v3BeADdaXo+XL12RCr3N87QGV0Ept9Q25GltgZuB75rZ4QN9NWMNa1ql929DbyAvFIUVIg6o9lT2JjnlIWNapM6rZNpo7c8SN/CfAFWxpm5qwqnIpJRrEl3fGUre2K+3psZDVIo0AKFGbuKAi+ZDAWpTAnuwT1R4pQqK/c0Z65HEbnwiAaWOn9HBAUw9c09AvgPoQvVgLS3YSA8/xBe+NeuqnIwl/Tw0m7EjVFSmNs="), base64_encode(&packedPrivateKey2[0], packedPrivateKey2.size()));
+    checkResult("packedPublicKey2", string("HggcAQABxAABrlsvdv82ZRGkQjvt9OS95cOqroMWvS4s0KlrJc+X96y41MKIyOCcvw2tu9R5uh67nHOFWLa4Gr5AMaCI/l6DvGu7JK4EIgX19f+WalCk9A0mzdyUWt/1571iZPh9cIm0O7oXPR1nhcDAApQFJfE7U20cW0OJ0EMNijB4s0tzNc+D6eqCDCnbfcASOw4JQ4MC838HJi5BeqGgoXdZI1UMh2CQ0xHKVzYY9DADzxZTu1Qz/kTbvCL3ust54KHbOh/8Y2eFpLO+waW1s6z11JLGJXERhOBzfB4tQppU+QbI0u7hTdv/GgGh6ED60Ggq7l8Rz5nU5DCHCYZmiYZcPhpyHw=="), base64_encode(&packedPublicKey2[0], packedPublicKey2.size()));
+    PublicKey publicKeyFromDecimalStrings(string("65537"), string("22010430265394139613000868285025463477074223185486244499634177887580324920686226610417706744335933359652430612916358253813893261669330316543239108965341456359299406328906270703947334961348565788596306492647710105586783859797604948705827274758276000792353907279667158525579387393368160190180439522687435755014728372815408024307255185057464905470423281347241480900464128969516046770366189515668158431102639992601462764766100062644885414927549883934897542153111731636732805845904738871223796787350437197422912764815000651812110643298420118455799835223629072584676934684617765337322899072623305931528759760022883356275231"));
+    auto packedPublicKey3 = publicKeyFromDecimalStrings.pack();
+    checkResult("packedPublicKey3", string("HggcAQABxAABrlsvdv82ZRGkQjvt9OS95cOqroMWvS4s0KlrJc+X96y41MKIyOCcvw2tu9R5uh67nHOFWLa4Gr5AMaCI/l6DvGu7JK4EIgX19f+WalCk9A0mzdyUWt/1571iZPh9cIm0O7oXPR1nhcDAApQFJfE7U20cW0OJ0EMNijB4s0tzNc+D6eqCDCnbfcASOw4JQ4MC838HJi5BeqGgoXdZI1UMh2CQ0xHKVzYY9DADzxZTu1Qz/kTbvCL3ust54KHbOh/8Y2eFpLO+waW1s6z11JLGJXERhOBzfB4tQppU+QbI0u7hTdv/GgGh6ED60Ggq7l8Rz5nU5DCHCYZmiYZcPhpyHw=="), base64_encode(&packedPublicKey3[0], packedPublicKey3.size()));
+
+    cout << "testPackUnpackKeys()... done!" << endl << endl;
 }
 
 void testCryptoAll() {
@@ -214,4 +298,6 @@ void testCryptoAll() {
     testHashId();
     testHashIdComparison();
     testKeyAddress();
+    testSafe58();
+    testPackUnpackKeys();
 }

@@ -22,12 +22,23 @@ elseif (WIN32)
     set(platform "win_v8")
 endif ()
 
-add_executable(u8 main.cpp js_bindings/Scripter.cpp js_bindings/Scripter.h tools/tools.h js_bindings/basic_builtins.cpp js_bindings/basic_builtins.h
+add_library(u8_lib STATIC js_bindings/Scripter.cpp js_bindings/Scripter.h tools/tools.h js_bindings/basic_builtins.cpp js_bindings/basic_builtins.h
         js_bindings/async_io_bindings.cpp js_bindings/async_io_bindings.h js_bindings/basic_builtins.h tools/tools.cpp tools/AsyncSleep.cpp
         tools/AsyncSleep.h tools/Logging.cpp tools/Logging.h crypto/PublicKey.cpp crypto/PrivateKey.cpp crypto/base64.cpp crypto/cryptoCommon.h
         crypto/cryptoCommon.cpp AsyncIO/AsyncIO.h AsyncIO/AsyncIO.cpp AsyncIO/AsyncIOTests.cpp AsyncIO/AsyncIOTests.h crypto/HashId.cpp crypto/HashId.h
-        crypto/cryptoTests.h crypto/cryptoTests.cpp tools/ConditionVar.h js_bindings/binding_tools.h crypto/KeyAddress.h crypto/KeyAddress.cpp)
+        crypto/cryptoTests.h crypto/cryptoTests.cpp tools/ConditionVar.h js_bindings/binding_tools.h crypto/KeyAddress.h crypto/KeyAddress.cpp
+        serialization/BaseSerializer.h serialization/BaseSerializer.cpp serialization/BossSerializer.h serialization/BossSerializer.cpp
+        serialization/SerializationTest.h serialization/SerializationTest.cpp types/UArray.h types/UArray.cpp types/UBinder.h types/UBinder.cpp
+        types/UBool.h types/UBool.cpp types/UBytes.h types/UBytes.cpp types/UDateTime.h types/UDateTime.cpp types/UDouble.h types/UDouble.cpp
+        types/UInt.h types/UInt.cpp types/UObject.h types/UObject.cpp types/UString.h types/UString.cpp types/TestComplexObject.h types/TestComplexObject.cpp
+        crypto/Safe58.h crypto/Safe58.cpp tools/vprintf.cpp tools/vprintf.h)
 
+add_executable(u8_tests test/catch2.h test/cpp_tests.cpp test/test_thread_pool.cpp)
+
+add_executable(u8 main.cpp)
+
+target_link_libraries(u8 PRIVATE u8_lib)
+target_link_libraries(u8_tests PRIVATE u8_lib)
 
 message("platform: ${platform}")
 
@@ -40,14 +51,14 @@ if (${platform} STREQUAL macos)
     foreach (l libv8 libtomcrypt libuv)
         message( ext/${platform}/${l}/include)
         message( ext/${platform}/${l}/include)
-        target_include_directories(u8 PUBLIC ext/${platform}/${l}/include)
-        target_link_directories(u8 PUBLIC ext/${platform}/${l}/lib)
+        target_include_directories(u8_lib PUBLIC ext/${platform}/${l}/include)
+        target_link_directories(u8_lib PUBLIC ext/${platform}/${l}/lib)
     endforeach (l)
     target_link_libraries(u8 PUBLIC v8 v8_libplatform v8_libbase tomcrypt gmp uv)
 elseif (${platform} STREQUAL macos_v8_monolith)
     foreach (l v8 tomcrypt gmp)
-        target_include_directories(u8 PUBLIC ext/macosx/${l}/include)
-        target_link_directories(u8 PUBLIC ext/macosx/${l}/lib)
+        target_include_directories(u8_lib PUBLIC ext/macosx/${l}/include)
+        target_link_directories(u8_lib PUBLIC ext/macosx/${l}/lib)
     endforeach (l)
     target_link_libraries(u8 PUBLIC v8_monolith tomcrypt)
 elseif (${platform} STREQUAL linux)
@@ -55,8 +66,8 @@ elseif (${platform} STREQUAL linux)
     add_custom_target(u8libs ALL DEPENDS download_libs.stamp)
     add_dependencies(u8 u8libs)
     foreach (l libv8 libtomcrypt libuv)
-        target_include_directories(u8 PUBLIC ext/${platform}/${l}/include)
-        target_link_directories(u8 PUBLIC ext/${platform}/${l}/lib)
+        target_include_directories(u8_lib PUBLIC ext/${platform}/${l}/include)
+        target_link_directories(u8_lib PUBLIC ext/${platform}/${l}/lib)
     endforeach (l)
     target_link_libraries(u8 PUBLIC v8 v8_libplatform v8_libbase tomcrypt gmp uv pthread)
 else ()

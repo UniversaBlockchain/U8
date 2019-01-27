@@ -8,6 +8,8 @@
 
 #include <string>
 #include <sys/stat.h>
+#include <iterator>
+#include <vector>
 
 inline bool file_exists(const std::string &name) {
     struct stat buffer;
@@ -29,5 +31,34 @@ public:
     using runtime_error::runtime_error;
 };
 
+template <typename T>
+std::ostream& operator<< (std::ostream& out, const std::vector<T>& v) {
+    if ( !v.empty() ) {
+        out << '[';
+        std::copy (v.begin(), v.end(), std::ostream_iterator<T>(out, ", "));
+        out << "\b\b]";
+    }
+    return out;
+}
+
+class Noncopyable {
+public:
+    Noncopyable() = default;
+    ~Noncopyable() = default;
+
+private:
+    Noncopyable(const Noncopyable&) = delete;
+    Noncopyable& operator=(const Noncopyable&) = delete;
+};
+
+class Nonmovable {
+public:
+    Nonmovable() = default;
+    ~Nonmovable() = default;
+
+private:
+    Nonmovable(Nonmovable&&) = delete;
+    Nonmovable& operator=(Nonmovable&&) = delete;
+};
 
 #endif //U8_TOOLS_H

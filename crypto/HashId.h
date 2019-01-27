@@ -31,8 +31,6 @@ public:
 protected:
     std::vector<unsigned char> digest;
 
-//private:
-
 };
 
 #endif //UNITOOLS_HASHID_H

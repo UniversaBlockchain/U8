@@ -11,19 +11,20 @@
 #include <tomcrypt.h>
 #include "PublicKey.h"
 #include "cryptoCommon.h"
+#include "../types/UBytes.h"
 
 class PrivateKey {
 
 public:
 
-    PrivateKey();
+	PrivateKey(const std::string& strE, const std::string& strP, const std::string& strQ);
+	PrivateKey(const UBytes& eValue, const UBytes& pValue, const UBytes& qValue);
+    PrivateKey(const std::vector<unsigned char>& packedBinaryKey);
+    PrivateKey(const PrivateKey& copyFrom);
+
 	virtual ~PrivateKey();
 
-	// for debug
-	void initForDebug_decimal(std::string &strE, std::string &strP, std::string &strQ);
-
-	// for debug
-	void printDebug();
+	std::vector<unsigned char> pack() const;
 
 	// Signature is created using RSA-PSS as described in PKCS# 1 v 2.1.
 	void sign(std::vector<unsigned char> &input, HashType hashType, std::vector<unsigned char> &output);
@@ -31,6 +32,11 @@ public:
 	void decrypt(std::vector<unsigned char> &encrypted, std::vector<unsigned char> &output);
 
 	std::shared_ptr<PublicKey> getPublicKey();
+
+private:
+
+	void initFromBytes(const UBytes& eValue, const UBytes& pValue, const UBytes& qValue);
+	void initFromDecimalStrings(const std::string& strE, const std::string& strP, const std::string& strQ);
 
 private:
 

@@ -9,12 +9,11 @@
 #include "AsyncIO/AsyncIO.h"
 #include "AsyncIO/AsyncIOTests.h"
 #include "crypto/cryptoTests.h"
+#include "serialization/SerializationTest.h"
 
 using namespace std;
 
 void usage();
-
-void testCrypto();
 
 int main(int argc, const char **argv) {
 
@@ -24,6 +23,7 @@ int main(int argc, const char **argv) {
     if (argc == 2 && strcmp(argv[1], "--selftest") == 0) {
         testCryptoAll();
         testAsyncFile();
+        allSerializationTests();
         return 0;
     }
 

@@ -304,6 +304,15 @@ namespace asyncio {
         void write(const byte_vector& data, writeFile_cb callback);
 
         /**
+         * Asynchronous write file from buffer.
+         *
+         * @param buffer contains data written to file
+         * @param size of buffer in bytes
+         * @param callback caused when writing a file or error
+         */
+        void write(void* buffer, size_t size, writeFile_cb callback);
+
+        /**
          * Asynchronous close file.
          *
          * @param callback caused when closing a file or error

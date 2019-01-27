@@ -17,6 +17,7 @@ const VERSION = "4.0.0b4";
  */
 function safeEval(module, sourceUrl, src) {
     // noinspection JSUnusedLocalSymbols
+    // console.log(">>> import "+sourceUrl+" <<<");
     let exports = module.exports; // this one could be used in evaluated code
     eval(src + "\n//# sourceURL=" + sourceUrl);
 }
@@ -37,7 +38,7 @@ const require = (function () {
             return m;
         } else {
             let [name, src] = __bios_loadRequired(moduleName);
-            if (src == "")
+            if (src == "" || !src)
                 throw "import failed: not found " + moduleName;
 
             // limited support for import keyword
