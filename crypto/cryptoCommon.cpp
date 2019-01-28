@@ -79,7 +79,7 @@ void Digest::update(const std::vector<unsigned char>& data) {
 void Digest::doFinal() {
     out.resize(desc.hashsize);
     desc.done(&md, &out[0]);
-    //desc.init(&md);
+    desc.init(&md);
 }
 
 size_t Digest::getDigestSize() {
