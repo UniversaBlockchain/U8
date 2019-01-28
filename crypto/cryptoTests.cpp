@@ -8,12 +8,14 @@
 #include <map>
 #include <unordered_map>
 #include <random>
+#include <atomic>
 #include "base64.h"
 #include "PrivateKey.h"
 #include "PublicKey.h"
 #include "HashId.h"
 #include "KeyAddress.h"
 #include "Safe58.h"
+#include "../tools/ThreadPool.h"
 
 using namespace std;
 
@@ -330,6 +332,38 @@ void testAllHashTypes() {
     cout << "testAllHashTypes()... done!" << endl << endl;
 }
 
+void testKeysConcurrency() {
+    cout << "testKeysConcurrency()..." << endl;
+
+    auto body = base64_decodeToBytes("cXdlcnR5MTIzNDU2");
+    PrivateKey privateKey(base64_decodeToBytes("JgAcAQABvIDtBFjZyB1P7q19Ni0dCPs2ndCJrrVIXzYMbsLzVMNuRFv2NxiERGAZIolO948EGd+/E5tIv+1rAH6Oqoubqrx4MGXwpL2DJw+/No/pQQSqYCKA/v3BeADdaXo+XL12RCr3N87QGV0Ept9Q25GltgZuB75rZ4QN9NWMNa1ql929DbyAvFIUVIg6o9lT2JjnlIWNapM6rZNpo7c8SN/CfAFWxpm5qwqnIpJRrEl3fGUre2K+3psZDVIo0AKFGbuKAi+ZDAWpTAnuwT1R4pQqK/c0Z65HEbnwiAaWOn9HBAUw9c09AvgPoQvVgLS3YSA8/xBe+NeuqnIwl/Tw0m7EjVFSmNs="));
+    PublicKey publicKey(privateKey);
+    std::atomic<long> counter(0);
+    ConditionVar cv;
+    long total_tasks_count = 8000;
+    ThreadPool pool(50);
+    for (int i = 0; i < total_tasks_count; ++i) {
+        pool([&](){
+            vector<unsigned char> encrypted;
+            vector<unsigned char> decrypted;
+            publicKey.encrypt(body, encrypted);
+            privateKey.decrypt(encrypted, decrypted);
+            checkResult("concurrency endcrypt/decrypt", string("cXdlcnR5MTIzNDU2"), base64_encode(decrypted));
+            vector<unsigned char> sig;
+            privateKey.sign(body, SHA3_512, sig);
+            checkResult("concurrency sign/verify", true, publicKey.verify(sig, body, SHA3_512));
+            ++counter;
+            cv.notify();
+        });
+    }
+    while (cv.wait(1000ms)) {
+        if (counter >= total_tasks_count)
+            break;
+    }
+
+    cout << "testKeysConcurrency()... done!" << endl << endl;
+}
+
 void testCryptoAll() {
     testCrypto();
     testHashId();
@@ -338,4 +372,5 @@ void testCryptoAll() {
     testSafe58();
     testPackUnpackKeys();
     testAllHashTypes();
+    testKeysConcurrency();
 }
