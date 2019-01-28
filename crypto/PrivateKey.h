@@ -9,9 +9,10 @@
 #include <string>
 #include <vector>
 #include <tomcrypt.h>
-#include "PublicKey.h"
 #include "cryptoCommon.h"
 #include "../types/UBytes.h"
+
+class PublicKey;
 
 class PrivateKey {
 
@@ -31,7 +32,7 @@ public:
 
 	void decrypt(std::vector<unsigned char> &encrypted, std::vector<unsigned char> &output);
 
-	std::shared_ptr<PublicKey> getPublicKey();
+	friend class PublicKey;
 
 private:
 

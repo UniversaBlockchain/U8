@@ -10,6 +10,7 @@
 #include <random>
 #include "base64.h"
 #include "PrivateKey.h"
+#include "PublicKey.h"
 #include "HashId.h"
 #include "KeyAddress.h"
 #include "Safe58.h"
@@ -55,21 +56,21 @@ void testCrypto() {
     auto sig3384ForVerify = vector<unsigned char>(sign3384fromJava.begin(), sign3384fromJava.end());
 
     PrivateKey privateKey(strE, strP, strQ);
-    auto publicKey = privateKey.getPublicKey();
+    PublicKey publicKey(privateKey);
 
     vector<unsigned char> encrypted;
-    publicKey->encrypt(bodyForSign, encrypted);
+    publicKey.encrypt(bodyForSign, encrypted);
     cout << "encrypted: " << base64_encode(&encrypted[0], encrypted.size()) << endl;
     vector<unsigned char> decrypted;
     privateKey.decrypt(encrypted, decrypted);
     cout << "decrypted: " << base64_encode(&decrypted[0], decrypted.size()) << endl;
 
-    checkResult<bool>("sigForVerify", true, publicKey->verify(sigForVerify, bodyForSign, SHA1));
-    checkResult<bool>("sigForVerify", false, publicKey->verify(sigForVerify, bodyForSign, SHA3_256));
-    checkResult<bool>("sig512ForVerify", true, publicKey->verify(sig512ForVerify, bodyForSign, SHA512));
-    checkResult<bool>("sig512ForVerify", false, publicKey->verify(sig512ForVerify, bodyForSign, SHA3_256));
-    checkResult<bool>("sig3384ForVerify", true, publicKey->verify(sig3384ForVerify, bodyForSign, SHA3_256));
-    checkResult<bool>("sig3384ForVerify", false, publicKey->verify(sig3384ForVerify, bodyForSign, SHA512));
+    checkResult<bool>("sigForVerify", true, publicKey.verify(sigForVerify, bodyForSign, SHA1));
+    checkResult<bool>("sigForVerify", false, publicKey.verify(sigForVerify, bodyForSign, SHA3_256));
+    checkResult<bool>("sig512ForVerify", true, publicKey.verify(sig512ForVerify, bodyForSign, SHA512));
+    checkResult<bool>("sig512ForVerify", false, publicKey.verify(sig512ForVerify, bodyForSign, SHA3_256));
+    checkResult<bool>("sig3384ForVerify", true, publicKey.verify(sig3384ForVerify, bodyForSign, SHA3_256));
+    checkResult<bool>("sig3384ForVerify", false, publicKey.verify(sig3384ForVerify, bodyForSign, SHA512));
 
     vector<unsigned char> signFromCpp;
     privateKey.sign(bodyForSign, SHA1, signFromCpp);
@@ -81,12 +82,12 @@ void testCrypto() {
     privateKey.sign(bodyForSign, SHA3_256, sign3384FromCpp);
     cout << "sign3384FromCpp: " << base64_encode(&sign3384FromCpp[0], sign3384FromCpp.size()) << endl << endl;
 
-    checkResult<bool>("signFromCpp", true, publicKey->verify(signFromCpp, bodyForSign, SHA1));
-    checkResult<bool>("signFromCpp", false, publicKey->verify(signFromCpp, bodyForSign, SHA512));
-    checkResult<bool>("sign512FromCpp", true, publicKey->verify(sign512FromCpp, bodyForSign, SHA512));
-    checkResult<bool>("sign512FromCpp", false, publicKey->verify(sign512FromCpp, bodyForSign, SHA3_256));
-    checkResult<bool>("sign3384FromCpp", true, publicKey->verify(sign3384FromCpp, bodyForSign, SHA3_256));
-    checkResult<bool>("sign3384FromCpp", false, publicKey->verify(sign3384FromCpp, bodyForSign, SHA512));
+    checkResult<bool>("signFromCpp", true, publicKey.verify(signFromCpp, bodyForSign, SHA1));
+    checkResult<bool>("signFromCpp", false, publicKey.verify(signFromCpp, bodyForSign, SHA512));
+    checkResult<bool>("sign512FromCpp", true, publicKey.verify(sign512FromCpp, bodyForSign, SHA512));
+    checkResult<bool>("sign512FromCpp", false, publicKey.verify(sign512FromCpp, bodyForSign, SHA3_256));
+    checkResult<bool>("sign3384FromCpp", true, publicKey.verify(sign3384FromCpp, bodyForSign, SHA3_256));
+    checkResult<bool>("sign3384FromCpp", false, publicKey.verify(sign3384FromCpp, bodyForSign, SHA512));
 
     cout << "testCrypto()... done!" << endl << endl;
 }
@@ -219,10 +220,10 @@ void testKeyAddress() {
     auto strQ = string("132243238518154268249184631952046833494949171132278166597493094022019934205919755965484010862547916586956651043061215415694791928849764419123506916992508894879133969053226176271305106211090173517182720832250788947720397461739281147258617115635022042579209568022023702283912658756481633266987107149957718776027");
 
     PrivateKey privateKey(strE, strP, strQ);
-    auto publicKey = privateKey.getPublicKey();
+    PublicKey publicKey(privateKey);
 
-    KeyAddress keyAddressShort(*publicKey, 0, false);
-    KeyAddress keyAddressLong(*publicKey, 0, true);
+    KeyAddress keyAddressShort(publicKey, 0, false);
+    KeyAddress keyAddressLong(publicKey, 0, true);
     checkResult("keyAddressShort", string("Z7Ui6rRxiCiuCYsTV36dDiCbMaz81ttQDb3JDFkdswsMEpWojT"), keyAddressShort.toString());
     checkResult("keyAddressLong", string("J2Rhu2e6Nvyu9DjqSxTJdDruKHc64NRAVuiawdbnorNA6a7qGq8ox2xsEgnN72WJHjK2DQy3"), keyAddressLong.toString());
 
@@ -233,8 +234,8 @@ void testKeyAddress() {
     checkResult("keyAddressLongLoaded", true, keyAddressLongLoaded.operator==(keyAddressLong));
     checkResult("keyAddressLongLoaded", false, keyAddressLongLoaded.operator==(keyAddressShort));
 
-    checkResult("publicKey->getShortAddress", string("Z7Ui6rRxiCiuCYsTV36dDiCbMaz81ttQDb3JDFkdswsMEpWojT"), publicKey->getShortAddress()->toString());
-    checkResult("publicKey->getLongAddress", string("J2Rhu2e6Nvyu9DjqSxTJdDruKHc64NRAVuiawdbnorNA6a7qGq8ox2xsEgnN72WJHjK2DQy3"), publicKey->getLongAddress()->toString());
+    checkResult("publicKey->getShortAddress", string("Z7Ui6rRxiCiuCYsTV36dDiCbMaz81ttQDb3JDFkdswsMEpWojT"), publicKey.getShortAddress()->toString());
+    checkResult("publicKey->getLongAddress", string("J2Rhu2e6Nvyu9DjqSxTJdDruKHc64NRAVuiawdbnorNA6a7qGq8ox2xsEgnN72WJHjK2DQy3"), publicKey.getLongAddress()->toString());
 
     cout << "testKeyAddress()... done!" << endl << endl;
 }
@@ -274,10 +275,10 @@ void testPackUnpackKeys() {
     auto strQ = string("132243238518154268249184631952046833494949171132278166597493094022019934205919755965484010862547916586956651043061215415694791928849764419123506916992508894879133969053226176271305106211090173517182720832250788947720397461739281147258617115635022042579209568022023702283912658756481633266987107149957718776027");
 
     PrivateKey privateKey(strE, strP, strQ);
-    auto publicKey = privateKey.getPublicKey();
+    PublicKey publicKey(privateKey);
 
     auto packedPrivateKey = privateKey.pack();
-    auto packedPublicKey = publicKey->pack();
+    auto packedPublicKey = publicKey.pack();
     checkResult("packedPrivateKey", string("JgAcAQABvIDtBFjZyB1P7q19Ni0dCPs2ndCJrrVIXzYMbsLzVMNuRFv2NxiERGAZIolO948EGd+/E5tIv+1rAH6Oqoubqrx4MGXwpL2DJw+/No/pQQSqYCKA/v3BeADdaXo+XL12RCr3N87QGV0Ept9Q25GltgZuB75rZ4QN9NWMNa1ql929DbyAvFIUVIg6o9lT2JjnlIWNapM6rZNpo7c8SN/CfAFWxpm5qwqnIpJRrEl3fGUre2K+3psZDVIo0AKFGbuKAi+ZDAWpTAnuwT1R4pQqK/c0Z65HEbnwiAaWOn9HBAUw9c09AvgPoQvVgLS3YSA8/xBe+NeuqnIwl/Tw0m7EjVFSmNs="), base64_encode(&packedPrivateKey[0], packedPrivateKey.size()));
     checkResult("packedPublicKey", string("HggcAQABxAABrlsvdv82ZRGkQjvt9OS95cOqroMWvS4s0KlrJc+X96y41MKIyOCcvw2tu9R5uh67nHOFWLa4Gr5AMaCI/l6DvGu7JK4EIgX19f+WalCk9A0mzdyUWt/1571iZPh9cIm0O7oXPR1nhcDAApQFJfE7U20cW0OJ0EMNijB4s0tzNc+D6eqCDCnbfcASOw4JQ4MC838HJi5BeqGgoXdZI1UMh2CQ0xHKVzYY9DADzxZTu1Qz/kTbvCL3ust54KHbOh/8Y2eFpLO+waW1s6z11JLGJXERhOBzfB4tQppU+QbI0u7hTdv/GgGh6ED60Ggq7l8Rz5nU5DCHCYZmiYZcPhpyHw=="), base64_encode(&packedPublicKey[0], packedPublicKey.size()));
     PrivateKey unpackedPrivateKey(packedPrivateKey);
