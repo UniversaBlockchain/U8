@@ -2,6 +2,7 @@
 // Created by Sergey Chernov on 2019-01-27.
 //
 
+#include <atomic>
 #include "catch2.h"
 #include "../tools/ThreadPool.cpp"
 

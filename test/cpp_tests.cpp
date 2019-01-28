@@ -2,6 +2,7 @@
 // Created by Sergey Chernov on 2019-01-25.
 //
 #include <thread>
+#include <atomic>
 
 #define CATCH_CONFIG_MAIN
 

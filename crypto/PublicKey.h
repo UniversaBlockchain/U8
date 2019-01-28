@@ -12,6 +12,7 @@
 #include <memory>
 #include "cryptoCommon.h"
 #include "KeyAddress.h"
+#include "PrivateKey.h"
 #include "../types/UBytes.h"
 
 class PublicKey {
@@ -22,6 +23,7 @@ public:
 	PublicKey(const std::string& strE, const std::string& strN);
 	PublicKey(const UBytes& e, const UBytes& N);
 	PublicKey(const std::vector<unsigned char>& packedBinaryKey);
+	PublicKey(const PrivateKey& privateKey);
     virtual ~PublicKey();
 
 	std::vector<unsigned char> pack() const;

@@ -238,7 +238,3 @@ void PrivateKey::decrypt(std::vector<unsigned char> &encrypted, std::vector<unsi
 	output.resize(0);
 	output.insert(output.begin(), buf, buf+bufLen);
 }
-
-std::shared_ptr<PublicKey> PrivateKey::getPublicKey() {
-	return std::make_shared<PublicKey>((mpz_ptr)key.N, (mpz_ptr)key.e);
-}

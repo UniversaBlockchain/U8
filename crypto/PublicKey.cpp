@@ -59,6 +59,9 @@ PublicKey::PublicKey(const std::vector<unsigned char>& packedBinaryKey) {
 	}
 }
 
+PublicKey::PublicKey(const PrivateKey& privateKey): PublicKey((mpz_ptr)privateKey.key.N, (mpz_ptr)privateKey.key.e) {
+}
+
 PublicKey::~PublicKey() {
 	rsa_free(&key);
 }
