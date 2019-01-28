@@ -15,29 +15,25 @@
 #include "../serialization/BossSerializer.h"
 
 PublicKey::PublicKey(mpz_ptr N, mpz_ptr e) {
-	memset(&key, 0, sizeof(key));
 	size_t bin_e_len = mpz_unsigned_bin_size(e);
 	size_t bin_N_len = mpz_unsigned_bin_size(N);
 	unsigned char bin_e[bin_e_len];
 	unsigned char bin_N[bin_N_len];
 	mpz_to_unsigned_bin(e, bin_e);
 	mpz_to_unsigned_bin(N, bin_N);
-	rsa_set_key(bin_N, bin_N_len, bin_e, bin_e_len, NULL, 0, &key);
-	key.type = PK_PUBLIC;
+	rsa_set_key(bin_N, bin_N_len, bin_e, bin_e_len, NULL, 0, &key.key);
+	key.key.type = PK_PUBLIC;
 }
 
 PublicKey::PublicKey(const std::string& strE, const std::string& strN) {
-	memset(&key, 0, sizeof(key));
 	initFromDecimalStrings(strE, strN);
 }
 
 PublicKey::PublicKey(const UBytes& e, const UBytes& N) {
-	memset(&key, 0, sizeof(key));
 	initFromBytes(e, N);
 }
 
 PublicKey::PublicKey(const std::vector<unsigned char>& packedBinaryKey) {
-	memset(&key, 0, sizeof(key));
 	try {
 		UBytes uBytes(&packedBinaryKey[0], packedBinaryKey.size());
 		BossSerializer::Reader reader(uBytes);
@@ -60,11 +56,7 @@ PublicKey::PublicKey(const std::vector<unsigned char>& packedBinaryKey) {
 	}
 }
 
-PublicKey::PublicKey(const PrivateKey& privateKey): PublicKey((mpz_ptr)privateKey.key.N, (mpz_ptr)privateKey.key.e) {
-}
-
-PublicKey::~PublicKey() {
-	rsa_free(&key);
+PublicKey::PublicKey(const PrivateKey& privateKey): PublicKey((mpz_ptr)privateKey.key.key.N, (mpz_ptr)privateKey.key.key.e) {
 }
 
 void PublicKey::initFromBytes(const UBytes& eValue, const UBytes& nValue) {
@@ -79,8 +71,8 @@ void PublicKey::initFromBytes(const UBytes& eValue, const UBytes& nValue) {
 	unsigned char bin_N[bin_N_len];
 	mpz_to_unsigned_bin(&e, bin_e);
 	mpz_to_unsigned_bin(&n, bin_N);
-	rsa_set_key(bin_N, bin_N_len, bin_e, bin_e_len, NULL, 0, &key);
-	key.type = PK_PUBLIC;
+	rsa_set_key(bin_N, bin_N_len, bin_e, bin_e_len, NULL, 0, &key.key);
+	key.key.type = PK_PUBLIC;
 	mpz_clear(&e);
 	mpz_clear(&n);
 }
@@ -98,19 +90,19 @@ void PublicKey::initFromDecimalStrings(const std::string& strE, const std::strin
 	unsigned char bin_N[bin_N_len];
 	mpz_to_unsigned_bin(e, bin_e);
 	mpz_to_unsigned_bin(n, bin_N);
-	rsa_set_key(bin_N, bin_N_len, bin_e, bin_e_len, NULL, 0, &key);
-	key.type = PK_PUBLIC;
+	rsa_set_key(bin_N, bin_N_len, bin_e, bin_e_len, NULL, 0, &key.key);
+	key.key.type = PK_PUBLIC;
 	mpz_clear(e);
 	mpz_clear(n);
 }
 
 std::vector<unsigned char> PublicKey::pack() const {
-	size_t bin_e_len = mpz_unsigned_bin_size((mpz_ptr)key.e);
+	size_t bin_e_len = mpz_unsigned_bin_size((mpz_ptr)key.key.e);
 	unsigned char bin_e[bin_e_len];
-	mpz_to_unsigned_bin((mpz_ptr)key.e, bin_e);
-	size_t bin_N_len = mpz_unsigned_bin_size((mpz_ptr)key.N);
+	mpz_to_unsigned_bin((mpz_ptr)key.key.e, bin_e);
+	size_t bin_N_len = mpz_unsigned_bin_size((mpz_ptr)key.key.N);
 	unsigned char bin_N[bin_N_len];
-	mpz_to_unsigned_bin((mpz_ptr)key.N, bin_N);
+	mpz_to_unsigned_bin((mpz_ptr)key.key.N, bin_N);
 
 	auto ub = UBytes(bin_e, bin_e_len);
 
@@ -140,13 +132,13 @@ bool PublicKey::verify(const std::vector<unsigned char> &sig, const std::vector<
 	desc.process(&md, &data[0], data.size());
 	desc.done(&md, hashResult);
 
-	int saltLen = rsa_sign_saltlen_get_max_ex(LTC_PKCS_1_PSS, hash_idx, &key);
+	int saltLen = rsa_sign_saltlen_get_max_ex(LTC_PKCS_1_PSS, hash_idx, &key.key);
 
 	int stat = -1;
 	int err = rsa_verify_hash_ex(
 			&sig[0], sig.size(),
 			hashResult, desc.hashsize, hash_idx,
-			LTC_PKCS_1_PSS, mgf1hash_idx, saltLen, &stat, &key);
+			LTC_PKCS_1_PSS, mgf1hash_idx, saltLen, &stat, &key.key);
 //	if (err != CRYPT_OK)
 //		printf("  warning (rsa_verify_hash_ex): %s\n", error_to_string(err));
 	return stat != 0;
@@ -164,7 +156,7 @@ void PublicKey::encrypt(std::vector<unsigned char>& input, std::vector<unsigned 
 		buf, &bufLen,
 		NULL, 0,
 		NULL, prng_indx,
-		hash_idx, LTC_PKCS_1_OAEP, &key);
+		hash_idx, LTC_PKCS_1_OAEP, &key.key);
 	if (err != CRYPT_OK)
 		printf("rsa_encrypt_key_ex error: %i\n", err);
 
@@ -172,23 +164,23 @@ void PublicKey::encrypt(std::vector<unsigned char>& input, std::vector<unsigned 
 	output.insert(output.begin(), buf, buf+bufLen);
 }
 
-const std::unique_ptr<KeyAddress>& PublicKey::getShortAddress() {
-	if (shortAddress == nullptr)
-		shortAddress = std::make_unique<KeyAddress>(*this, 0, false);
+const KeyAddress& PublicKey::getShortAddress() {
+	if (!shortAddress.isInitialized())
+		shortAddress = KeyAddress(*this, 0, false);
 	return shortAddress;
 }
 
-const std::unique_ptr<KeyAddress>& PublicKey::getLongAddress() {
-	if (longAddress == nullptr)
-		longAddress = std::make_unique<KeyAddress>(*this, 0, true);
+const KeyAddress& PublicKey::getLongAddress() {
+	if (!longAddress.isInitialized())
+		longAddress = KeyAddress(*this, 0, true);
 	return longAddress;
 }
 
 void PublicKey::toHash(std::unordered_map<std::string, std::string>& dst) const {
 	char buf[2048];
-	gmp_snprintf(buf, sizeof(buf)/sizeof(buf[0]), "%Zx", key.N);
+	gmp_snprintf(buf, sizeof(buf)/sizeof(buf[0]), "%Zx", key.key.N);
 	dst["n"] = std::string(buf);
-	gmp_snprintf(buf, sizeof(buf)/sizeof(buf[0]), "%Zx", key.e);
+	gmp_snprintf(buf, sizeof(buf)/sizeof(buf[0]), "%Zx", key.key.e);
 	dst["e"] = std::string(buf);
 
 	// Optional fields.
@@ -197,9 +189,9 @@ void PublicKey::toHash(std::unordered_map<std::string, std::string>& dst) const 
 }
 
 long PublicKey::getPublicExponent() const {
-	size_t bin_e_len = mpz_unsigned_bin_size((mpz_ptr)key.e);
+	size_t bin_e_len = mpz_unsigned_bin_size((mpz_ptr)key.key.e);
 	unsigned char bin_e[bin_e_len];
-	mpz_to_unsigned_bin((mpz_ptr)key.e, bin_e);
+	mpz_to_unsigned_bin((mpz_ptr)key.key.e, bin_e);
 	long e = 0;
 	for (int i = 0; i < bin_e_len; ++i)
 		e = (e << 8) | bin_e[i];
@@ -207,14 +199,14 @@ long PublicKey::getPublicExponent() const {
 }
 
 int PublicKey::getBitStrength() const {
-	int modulus_bitlen = ltc_mp.count_bits(key.N);
+	int modulus_bitlen = ltc_mp.count_bits(key.key.N);
 	return modulus_bitlen;
 }
 
 void PublicKey::getKeyComponentsAsBytes(std::vector<unsigned char>& output) const {
-	int len1 = mpz_unsigned_bin_size((mpz_ptr)key.e);
-	int len2 = mpz_unsigned_bin_size((mpz_ptr)key.N);
+	int len1 = mpz_unsigned_bin_size((mpz_ptr)key.key.e);
+	int len2 = mpz_unsigned_bin_size((mpz_ptr)key.key.N);
 	output.resize(len1 + len2);
-	mpz_to_unsigned_bin((mpz_ptr)key.e, &output[0]);
-	mpz_to_unsigned_bin((mpz_ptr)key.N, &output[len1]);
+	mpz_to_unsigned_bin((mpz_ptr)key.key.e, &output[0]);
+	mpz_to_unsigned_bin((mpz_ptr)key.key.N, &output[len1]);
 }

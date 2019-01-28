@@ -5,6 +5,7 @@
 #include "Safe58.h"
 #include <string.h>
 #include <algorithm>
+#include <stdexcept>
 #include "base64.h"
 
 const char* Safe58::ALPHABET = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
@@ -91,14 +92,8 @@ void Safe58::doDecode(const std::string& input, std::vector<unsigned char>& outp
         int digit58 = -1;
         if (c >= 0)
             digit58 = INDEXES[c];
-        if (digit58 < 0) {
-            //TODO: throw new IllegalArgumentException("Not a Base58 input: " + input);
-            std::string dbgRes("Not_a_Base58_input");
-            std::vector<unsigned char> dbgRes2(dbgRes.begin(), dbgRes.end());
-            output.resize(0);
-            output.insert(output.end(), dbgRes2.begin(), dbgRes2.end());
-            return;
-        }
+        if (digit58 < 0)
+            throw std::invalid_argument(std::string("Not a Base58 input: ") + input);
         input58[i] = static_cast<unsigned char>(digit58);
     }
 

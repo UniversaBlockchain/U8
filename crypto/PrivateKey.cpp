@@ -12,17 +12,14 @@
 #include "../serialization/BossSerializer.h"
 
 PrivateKey::PrivateKey(const std::string& strE, const std::string& strP, const std::string& strQ) {
-	memset(&key, 0, sizeof(key));
 	initFromDecimalStrings(strE, strP, strQ);
 }
 
 PrivateKey::PrivateKey(const UBytes& eValue, const UBytes& pValue, const UBytes& qValue) {
-	memset(&key, 0, sizeof(key));
 	initFromBytes(eValue, pValue, qValue);
 }
 
 PrivateKey::PrivateKey(const std::vector<unsigned char>& packedBinaryKey) {
-	memset(&key, 0, sizeof(key));
 	try {
 		UBytes uBytes(&packedBinaryKey[0], packedBinaryKey.size());
 		BossSerializer::Reader reader(uBytes);
@@ -44,19 +41,6 @@ PrivateKey::PrivateKey(const std::vector<unsigned char>& packedBinaryKey) {
 	} catch (const std::exception& e) {
 		throw std::runtime_error(std::string("failed to parse private key: ") + std::string(e.what()));
 	}
-}
-
-PrivateKey::PrivateKey(const PrivateKey& copyFrom) {
-	unsigned long sz = 4*1024;
-	unsigned char buf[4*1024];
-	rsa_export(buf, &sz, copyFrom.key.type, &copyFrom.key);
-	if (sz > sizeof(buf))
-		throw std::runtime_error(std::string("rsa_export error: output buffer too small"));
-	rsa_import(buf, sz, &key);
-}
-
-PrivateKey::~PrivateKey() {
-	rsa_free(&key);
 }
 
 void PrivateKey::initFromBytes(const UBytes& eValue, const UBytes& pValue, const UBytes& qValue) {
@@ -139,16 +123,16 @@ void PrivateKey::initFromDecimalStrings(const std::string& strE, const std::stri
 	mpz_to_unsigned_bin(&dQ, bin_dq);
 	mpz_to_unsigned_bin(&qP, bin_qp);
 
-	if ((err = rsa_set_key(bin_N, bin_N_len, bin_e, bin_e_len, bin_d, bin_d_len, &key)) != CRYPT_OK)
+	if ((err = rsa_set_key(bin_N, bin_N_len, bin_e, bin_e_len, bin_d, bin_d_len, &key.key)) != CRYPT_OK)
 		printf("rsa_set_key error: %i\n", err);
 
-	if ((err = rsa_set_factors(bin_p, bin_p_len, bin_q, bin_q_len, &key)) != CRYPT_OK)
+	if ((err = rsa_set_factors(bin_p, bin_p_len, bin_q, bin_q_len, &key.key)) != CRYPT_OK)
 		printf("rsa_set_factors error: %i\n", err);
 
-	if ((err = rsa_set_crt_params(bin_dp, bin_dp_len, bin_dq, bin_dq_len, bin_qp, bin_qp_len, &key)) != CRYPT_OK)
+	if ((err = rsa_set_crt_params(bin_dp, bin_dp_len, bin_dq, bin_dq_len, bin_qp, bin_qp_len, &key.key)) != CRYPT_OK)
 		printf("rsa_set_crt_params error: %i\n", err);
 
-    key.type = PK_PRIVATE;
+    key.key.type = PK_PRIVATE;
 
 	mpz_clear(&one);
 	mpz_clear(&e);
@@ -165,15 +149,15 @@ void PrivateKey::initFromDecimalStrings(const std::string& strE, const std::stri
 }
 
 std::vector<unsigned char> PrivateKey::pack() const {
-	size_t bin_e_len = mpz_unsigned_bin_size((mpz_ptr)key.e);
+	size_t bin_e_len = mpz_unsigned_bin_size((mpz_ptr)key.key.e);
 	unsigned char bin_e[bin_e_len];
-	mpz_to_unsigned_bin((mpz_ptr)key.e, bin_e);
-	size_t bin_p_len = mpz_unsigned_bin_size((mpz_ptr)key.p);
+	mpz_to_unsigned_bin((mpz_ptr)key.key.e, bin_e);
+	size_t bin_p_len = mpz_unsigned_bin_size((mpz_ptr)key.key.p);
 	unsigned char bin_p[bin_p_len];
-	mpz_to_unsigned_bin((mpz_ptr)key.p, bin_p);
-	size_t bin_q_len = mpz_unsigned_bin_size((mpz_ptr)key.q);
+	mpz_to_unsigned_bin((mpz_ptr)key.key.p, bin_p);
+	size_t bin_q_len = mpz_unsigned_bin_size((mpz_ptr)key.key.q);
 	unsigned char bin_q[bin_q_len];
-	mpz_to_unsigned_bin((mpz_ptr)key.q, bin_q);
+	mpz_to_unsigned_bin((mpz_ptr)key.key.q, bin_q);
 
 	auto ub = UBytes(bin_e, bin_e_len);
 
@@ -206,14 +190,14 @@ void PrivateKey::sign(std::vector<unsigned char> &input, HashType hashType, std:
 	desc.process(&md, &input[0], input.size());
 	desc.done(&md, hashResult);
 
-	int saltLen = rsa_sign_saltlen_get_max_ex(LTC_PKCS_1_PSS, hash_idx, &key);
+	int saltLen = rsa_sign_saltlen_get_max_ex(LTC_PKCS_1_PSS, hash_idx, &key.key);
 
 	unsigned long tomSigLen = 512;
 	unsigned char tomSig[tomSigLen];
 	int res = rsa_sign_hash_ex(
 			hashResult, desc.hashsize, hash_idx,
 			tomSig, &tomSigLen,
-			LTC_PKCS_1_PSS, NULL, prng_indx, mgf1hash_idx, saltLen, &key);
+			LTC_PKCS_1_PSS, NULL, prng_indx, mgf1hash_idx, saltLen, &key.key);
 	if (res != CRYPT_OK)
 		printf("rsa_sign_hash_ex error: %i\n", res);
 
@@ -232,7 +216,7 @@ void PrivateKey::decrypt(std::vector<unsigned char> &encrypted, std::vector<unsi
 		&encrypted[0], encrypted.size(),
 		buf, &bufLen,
 		NULL, 0,
-		hash_idx, LTC_PKCS_1_OAEP, &stat, &key);
+		hash_idx, LTC_PKCS_1_OAEP, &stat, &key.key);
 	if (err != CRYPT_OK)
 		printf("rsa_decrypt_key_ex error: %i\n", err);
 

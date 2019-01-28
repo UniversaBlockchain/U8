@@ -243,8 +243,8 @@ void testKeyAddress() {
     checkResult("keyAddressLongLoaded", true, keyAddressLongLoaded.operator==(keyAddressLong));
     checkResult("keyAddressLongLoaded", false, keyAddressLongLoaded.operator==(keyAddressShort));
 
-    checkResult("publicKey->getShortAddress", string("Z7Ui6rRxiCiuCYsTV36dDiCbMaz81ttQDb3JDFkdswsMEpWojT"), publicKey.getShortAddress()->toString());
-    checkResult("publicKey->getLongAddress", string("J2Rhu2e6Nvyu9DjqSxTJdDruKHc64NRAVuiawdbnorNA6a7qGq8ox2xsEgnN72WJHjK2DQy3"), publicKey.getLongAddress()->toString());
+    checkResult("publicKey->getShortAddress", string("Z7Ui6rRxiCiuCYsTV36dDiCbMaz81ttQDb3JDFkdswsMEpWojT"), publicKey.getShortAddress().toString());
+    checkResult("publicKey->getLongAddress", string("J2Rhu2e6Nvyu9DjqSxTJdDruKHc64NRAVuiawdbnorNA6a7qGq8ox2xsEgnN72WJHjK2DQy3"), publicKey.getLongAddress().toString());
 
     cout << "testKeyAddress()... done!" << endl << endl;
 }
@@ -285,6 +285,8 @@ void testPackUnpackKeys() {
 
     PrivateKey privateKey(strE, strP, strQ);
     PublicKey publicKey(privateKey);
+    PrivateKey copyPrivateKey = privateKey;
+    PublicKey copyPublicKey = publicKey;
 
     auto packedPrivateKey = privateKey.pack();
     auto packedPublicKey = publicKey.pack();
@@ -299,6 +301,8 @@ void testPackUnpackKeys() {
     PublicKey publicKeyFromDecimalStrings(string("65537"), string("22010430265394139613000868285025463477074223185486244499634177887580324920686226610417706744335933359652430612916358253813893261669330316543239108965341456359299406328906270703947334961348565788596306492647710105586783859797604948705827274758276000792353907279667158525579387393368160190180439522687435755014728372815408024307255185057464905470423281347241480900464128969516046770366189515668158431102639992601462764766100062644885414927549883934897542153111731636732805845904738871223796787350437197422912764815000651812110643298420118455799835223629072584676934684617765337322899072623305931528759760022883356275231"));
     auto packedPublicKey3 = publicKeyFromDecimalStrings.pack();
     checkResult("packedPublicKey3", string("HggcAQABxAABrlsvdv82ZRGkQjvt9OS95cOqroMWvS4s0KlrJc+X96y41MKIyOCcvw2tu9R5uh67nHOFWLa4Gr5AMaCI/l6DvGu7JK4EIgX19f+WalCk9A0mzdyUWt/1571iZPh9cIm0O7oXPR1nhcDAApQFJfE7U20cW0OJ0EMNijB4s0tzNc+D6eqCDCnbfcASOw4JQ4MC838HJi5BeqGgoXdZI1UMh2CQ0xHKVzYY9DADzxZTu1Qz/kTbvCL3ust54KHbOh/8Y2eFpLO+waW1s6z11JLGJXERhOBzfB4tQppU+QbI0u7hTdv/GgGh6ED60Ggq7l8Rz5nU5DCHCYZmiYZcPhpyHw=="), base64_encode(&packedPublicKey3[0], packedPublicKey3.size()));
+    checkResult("copyPrivateKey", base64_encode(privateKey.pack()), base64_encode(copyPrivateKey.pack()));
+    checkResult("copyPublicKey", base64_encode(publicKey.pack()), base64_encode(copyPublicKey.pack()));
 
     cout << "testPackUnpackKeys()... done!" << endl << endl;
 }
