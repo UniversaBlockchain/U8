@@ -6,6 +6,7 @@
 #include "base64.h"
 #include "PrivateKey.h"
 #include "PublicKey.h"
+#include "cryptoCommonPrivate.h"
 #include "../types/UBytes.h"
 #include "../types/UArray.h"
 #include "../serialization/BossSerializer.h"

@@ -6,7 +6,7 @@
 #include "PublicKey.h"
 #include <unordered_map>
 #include <algorithm>
-#include "cryptoCommon.h"
+#include "cryptoCommonPrivate.h"
 #include "base64.h"
 #include "Safe58.h"
 

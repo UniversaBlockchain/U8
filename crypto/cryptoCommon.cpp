@@ -4,7 +4,7 @@
 
 #include "cryptoCommon.h"
 
-static int hashIndexes[5];
+static int hashIndexes[6];
 
 void initCrypto() {
     ltc_mp = gmp_desc;
@@ -14,6 +14,8 @@ void initCrypto() {
 
     if (register_hash(&sha1_desc) == -1)
         std::cout << "Error registering sha1" << std::endl;
+    if (register_hash(&sha256_desc) == -1)
+        std::cout << "Error registering sha256" << std::endl;
     if (register_hash(&sha512_desc) == -1)
         std::cout << "Error registering sha512" << std::endl;
     if (register_hash(&sha3_256_desc) == -1)
@@ -24,6 +26,7 @@ void initCrypto() {
         std::cout << "Error registering sha3_512" << std::endl;
 
     hashIndexes[SHA1] = find_hash(sha1_desc.name);
+    hashIndexes[SHA256] = find_hash(sha256_desc.name);
     hashIndexes[SHA512] = find_hash(sha512_desc.name);
     hashIndexes[SHA3_256] = find_hash(sha3_256_desc.name);
     hashIndexes[SHA3_384] = find_hash(sha3_384_desc.name);
@@ -41,16 +44,14 @@ ltc_hash_descriptor getHashDescriptor(HashType hashType) {
 const char* getJavaHashName(HashType hashType) {
     switch (hashType) {
         case HashType::SHA1:     return "SHA-1";
-        //case HashType::SHA256:   return "SHA-256";
+        case HashType::SHA256:   return "SHA-256";
         case HashType::SHA512:   return "SHA-512";
         case HashType::SHA3_256: return "SHA3-256";
         case HashType::SHA3_384: return "SHA3-384";
         case HashType::SHA3_512: return "SHA3-512";
     }
 
-    //TODO: throw error
-
-    return "UnknownHashType";
+    throw new std::invalid_argument("unknown hash type");
 }
 
 size_t mpz_unsigned_bin_size(mpz_ptr p) {
@@ -59,4 +60,32 @@ size_t mpz_unsigned_bin_size(mpz_ptr p) {
 
 void mpz_to_unsigned_bin(mpz_ptr p, unsigned char* buf) {
     mpz_export(buf, NULL, 1, 1, 1, 0, p);
+}
+
+Digest::Digest(HashType hashType) {
+    desc = getHashDescriptor(hashType);
+    desc.init(&md);
+}
+
+Digest::Digest(HashType hashType, const std::vector<unsigned char>& dataToHash): Digest(hashType) {
+    update(dataToHash);
+    doFinal();
+}
+
+void Digest::update(const std::vector<unsigned char>& data) {
+    desc.process(&md, &data[0], data.size());
+}
+
+void Digest::doFinal() {
+    out.resize(desc.hashsize);
+    desc.done(&md, &out[0]);
+    //desc.init(&md);
+}
+
+size_t Digest::getDigestSize() {
+    return desc.hashsize;
+}
+
+std::vector<unsigned char> Digest::getDigest() const {
+    return out;
 }

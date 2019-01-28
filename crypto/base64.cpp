@@ -120,3 +120,7 @@ std::string base64_decode(std::string const& encoded_string) {
 
   return ret;
 }
+
+std::string base64_encode(std::vector<unsigned char> const& v) {
+  return base64_encode(&v[0], v.size());
+}

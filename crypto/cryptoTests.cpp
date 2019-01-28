@@ -27,7 +27,7 @@ CryptoTestResults::CryptoTestResults() {
 CryptoTestResults::~CryptoTestResults() {
     if (checksCounter > 0) {
         auto os1 = (errorsCounter == 0 ? &cout : &cerr);
-        *os1 << "CryptoTestResults: errors = " << errorsCounter << " from " << checksCounter << endl;
+        *os1 << "CryptoTestResults: errors = " << errorsCounter << " (from " << checksCounter << ")" << endl;
     }
 }
 
@@ -42,10 +42,12 @@ void CryptoTestResults::incrementChecksCounter() {
 template <class T>
 void checkResult(const string& msg, const T expected, const T result) {
     cryptoTestResults.incrementChecksCounter();
-    auto os1 = (result == expected ? &cout : &cerr);
-    *os1 << "checkResult " << msg << " (expected " << expected << "): " << result << endl;
-    if (result != expected)
+    bool boolRes = result == expected;
+    auto os1 = boolRes ? &cout : &cerr;
+    if (!boolRes) {
+        *os1 << "checkResult " << msg << " (expected " << expected << "): " << result << endl;
         cryptoTestResults.incrementErrorsCounter();
+    }
 }
 
 void testCrypto() {
@@ -301,6 +303,29 @@ void testPackUnpackKeys() {
     cout << "testPackUnpackKeys()... done!" << endl << endl;
 }
 
+void testAllHashTypes() {
+    cout << "testAllHashTypes()..." << endl;
+
+    auto bodyStr = base64_decode("cXdlcnR5MTIzNDU2");
+    auto body = std::vector<unsigned char>(bodyStr.begin(), bodyStr.end());
+
+    checkResult("sha1", string("87o4G2uu9Sa/cP8iCx2kkGmJIks="), base64_encode(Digest(HashType::SHA1, body).getDigest()));
+    checkResult("sha256", string("OldFoF+H3e4dtoshfcBDv6IG0ceqod0KfddrhSpzNZc="), base64_encode(Digest(HashType::SHA256, body).getDigest()));
+    checkResult("sha512", string("4LUOOtuFzgekEZZwm6ZCiGuoKKNUrO5C6udVm8fGI5gYl/VgIGme1h+gUvR4S/N+du/wFu4GXXe8FY3Rcuq9dg=="), base64_encode(Digest(HashType::SHA512, body).getDigest()));
+    checkResult("sha3_256", string("pvZgN9IA5n4QmqvOmeXETci/nM5V5BLb/u8qexEsvYc="), base64_encode(Digest(HashType::SHA3_256, body).getDigest()));
+    checkResult("sha3_384", string("4CyM0S8zbDNE7T1po05rwZnreEpE2qrIUSzqObeZ5uRJblbAeoDhVRQVfYMX6bRh"), base64_encode(Digest(HashType::SHA3_384, body).getDigest()));
+    checkResult("sha3_512", string("LLgMxUrw59k3MZ3TFJiwk0o3GJ5oRiRe1N3wRhMY2PSQpEk7mbeSlCJIHJsO1s5XcS5VQeUUQEz+G473CeK9uA=="), base64_encode(Digest(HashType::SHA3_512, body).getDigest()));
+
+    checkResult("sha1 size", 20ul, Digest(HashType::SHA1).getDigestSize());
+    checkResult("sha256 size", 32ul, Digest(HashType::SHA256).getDigestSize());
+    checkResult("sha512 size", 64ul, Digest(HashType::SHA512).getDigestSize());
+    checkResult("sha3_256 size", 32ul, Digest(HashType::SHA3_256).getDigestSize());
+    checkResult("sha3_384 size", 48ul, Digest(HashType::SHA3_384).getDigestSize());
+    checkResult("sha3_512 size", 64ul, Digest(HashType::SHA3_512).getDigestSize());
+
+    cout << "testAllHashTypes()... done!" << endl << endl;
+}
+
 void testCryptoAll() {
     testCrypto();
     testHashId();
@@ -308,4 +333,5 @@ void testCryptoAll() {
     testKeyAddress();
     testSafe58();
     testPackUnpackKeys();
+    testAllHashTypes();
 }

@@ -8,9 +8,11 @@
 #include <iostream>
 #include <tomcrypt.h>
 #include <gmp.h>
+#include <vector>
 
 enum HashType {
     SHA1,
+    SHA256,
     SHA512,
     SHA3_256,
     SHA3_384,
@@ -20,11 +22,20 @@ enum HashType {
 static const HashType DEFAULT_MGF1_HASH = HashType::SHA1;
 
 void initCrypto();
-int getHashIndex(HashType hashType);
-ltc_hash_descriptor getHashDescriptor(HashType hashType);
 const char* getJavaHashName(HashType hashType);
 
-size_t mpz_unsigned_bin_size(mpz_ptr p);
-void mpz_to_unsigned_bin(mpz_ptr p, unsigned char* buf);
+class Digest {
+public:
+    Digest(HashType hashType);
+    Digest(HashType hashType, const std::vector<unsigned char>& dataToHash);
+    void update(const std::vector<unsigned char>& data);
+    void doFinal();
+    size_t getDigestSize();
+    std::vector<unsigned char> getDigest() const;
+private:
+    hash_state md;
+    ltc_hash_descriptor desc;
+    std::vector<unsigned char> out;
+};
 
 #endif //U8_CRYPTO_H
