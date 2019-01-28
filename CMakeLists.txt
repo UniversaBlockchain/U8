@@ -22,19 +22,21 @@ elseif (WIN32)
     set(platform "win_v8")
 endif ()
 
-add_library(u8_lib STATIC js_bindings/Scripter.cpp js_bindings/Scripter.h tools/tools.h js_bindings/basic_builtins.cpp js_bindings/basic_builtins.h
-        js_bindings/async_io_bindings.cpp js_bindings/async_io_bindings.h js_bindings/basic_builtins.h tools/tools.cpp tools/AsyncSleep.cpp
-        tools/AsyncSleep.h tools/Logging.cpp tools/Logging.h crypto/PublicKey.cpp crypto/PrivateKey.cpp crypto/base64.cpp crypto/cryptoCommon.h
-        crypto/cryptoCommon.cpp AsyncIO/AsyncIO.h AsyncIO/AsyncIO.cpp AsyncIO/AsyncIOTests.cpp AsyncIO/AsyncIOTests.h crypto/HashId.cpp crypto/HashId.h
-        crypto/cryptoTests.h crypto/cryptoTests.cpp tools/ConditionVar.h js_bindings/binding_tools.h crypto/KeyAddress.h crypto/KeyAddress.cpp
-        serialization/BaseSerializer.h serialization/BaseSerializer.cpp serialization/BossSerializer.h serialization/BossSerializer.cpp
-        serialization/SerializationTest.h serialization/SerializationTest.cpp types/UArray.h types/UArray.cpp types/UBinder.h types/UBinder.cpp
-        types/UBool.h types/UBool.cpp types/UBytes.h types/UBytes.cpp types/UDateTime.h types/UDateTime.cpp types/UDouble.h types/UDouble.cpp
-        types/UInt.h types/UInt.cpp types/UObject.h types/UObject.cpp types/UString.h types/UString.cpp types/TestComplexObject.h types/TestComplexObject.cpp
-        crypto/Safe58.h crypto/Safe58.cpp tools/vprintf.cpp tools/vprintf.h)
+file(GLOB LIBRARY_SRC
+    AsyncIO/*.h AsyncIO/*.cpp
+    crypto/*.h crypto/*.cpp
+    js_bindings/*.h js_bindings/*.cpp
+    serialization/*.h serialization/*.cpp
+    tools/*.h tools/*.cpp
+    types/*.h types/*.cpp
+)
+add_library(u8_lib STATIC ${LIBRARY_SRC})
 
-add_executable(u8_tests test/catch2.h test/cpp_tests.cpp test/test_thread_pool.cpp)
+file(GLOB TESTS_SRC
+    test/*.h test/*.cpp
+)
 
+add_executable(u8_tests ${TESTS_SRC})
 add_executable(u8 main.cpp)
 
 target_link_libraries(u8 PRIVATE u8_lib)
