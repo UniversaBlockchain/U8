@@ -56,16 +56,16 @@ void usage() {
 
 Usage:
 
-    u8 [-e "`js code to avaulate`"] | <javascript_file_name> | [--selftest]
+    u8 [-e "`js code to evaluate`"] | <javascript_file_name> | [--selftest]
 
 if -e switch present, evaluates the second command line parameter as Javascript code and
 prints out result ou stdout.
 
-Otherwise executes sctipt fromthe given .js file specified as the first parameter.
+Otherwise executes script from the given .js file specified as the first parameter.
 All other parameters are passed to the main(argv) function if present in the script file or
 if it is imported from it.
 
---sefltest run some internal tests.
+--selftest run some internal tests.
 
 )End";
 }

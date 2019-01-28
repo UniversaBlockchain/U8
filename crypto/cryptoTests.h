@@ -17,7 +17,9 @@ public:
     CryptoTestResults();
     virtual ~CryptoTestResults();
     void incrementErrorsCounter();
+    void incrementChecksCounter();
 private:
+    int checksCounter = 0;
     int errorsCounter = 0;
 };
 

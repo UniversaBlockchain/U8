@@ -25,16 +25,23 @@ CryptoTestResults::CryptoTestResults() {
 }
 
 CryptoTestResults::~CryptoTestResults() {
-    auto os1 = (errorsCounter == 0 ? &cout : &cerr);
-    *os1 << "CryptoTestResults: errors = " << errorsCounter << endl;
+    if (checksCounter > 0) {
+        auto os1 = (errorsCounter == 0 ? &cout : &cerr);
+        *os1 << "CryptoTestResults: errors = " << errorsCounter << " from " << checksCounter << endl;
+    }
 }
 
 void CryptoTestResults::incrementErrorsCounter() {
     ++errorsCounter;
 }
 
+void CryptoTestResults::incrementChecksCounter() {
+    ++checksCounter;
+}
+
 template <class T>
 void checkResult(const string& msg, const T expected, const T result) {
+    cryptoTestResults.incrementChecksCounter();
     auto os1 = (result == expected ? &cout : &cerr);
     *os1 << "checkResult " << msg << " (expected " << expected << "): " << result << endl;
     if (result != expected)
