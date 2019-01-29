@@ -64,6 +64,12 @@ async function testRSA() {
     assert(privateKey.shortAddress.toString() == publicKey.shortAddress.toString());
     assert(privateKey.longAddress.toString() == publicKey.longAddress.toString());
     assert(publicKey.shortAddress.toString().length < publicKey.longAddress.toString().length);
+
+    assert(new crypto.KeyAddress(publicKey.shortAddress.packed).toString() == publicKey.shortAddress.toString());
+    assert(new crypto.KeyAddress(publicKey.longAddress.packed).toString() == publicKey.longAddress.toString());
+
+    assert(new crypto.KeyAddress(publicKey.shortAddress.toString()).toString() == publicKey.shortAddress.toString());
+    assert(new crypto.KeyAddress(publicKey.longAddress.toString()).toString() == publicKey.longAddress.toString());
 }
 
 async function testContract() {
