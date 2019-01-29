@@ -9,6 +9,7 @@
 #include <vector>
 #include <v8.h>
 #include <libplatform/libplatform.h>
+#include <cstring>
 
 #include "../tools/Logging.h"
 #include "../tools/tools.h"

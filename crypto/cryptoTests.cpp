@@ -176,6 +176,9 @@ void testHashId() {
     checkResult<string>("hashId", "S07K7aHSYx1lwHxJQAu1Z5dCXHaxNo6SDYuCQLzrlfsk8hDJg7xF0Hh3wHXF6PZfKGz5+u0KBzMi43Kd5I1LR6/Nx+fJZA+t1UhDBmBQTRXq7RI3cmyud7JHJA4F2cz+", HashId::of(str64Tovector("VaX5QNDlVW5pAj9wFS7h66NicB9evcZp+G/WuwO2vEmHb5Mykyr2xIJmdgbx0yXJtGI6LglUejjoJUrR/yg="))->toBase64());
     checkResult<string>("hashId", "KYbgYeFfbIUJJsjt4BaGruK6xSgTPTnUbrB9YOk001SLuDDwJqAOQHs6ZS+Yr/zPzwfi9dC1hO5tLY5QyJ49m2bpCjQpPQ+SC374wBlbB8nv+JIcY1fj7daPKAIoKYCC", HashId::of(str64Tovector("1p2G8xNzmzp1281QwePpwrh6I97aZIIBypjesdZ9OT9v3XogDTgf+oUG70zA8g16m6XUnkia2ggU8HWpKTj7"))->toBase64());
 
+    auto h = HashId::of(str64Tovector("dcwrTA=="));
+    checkResult("", base64_encode(h->getDigest()), h->toBase64());
+
     cout << "testHashId()... done!" << endl << endl;
 }
 
