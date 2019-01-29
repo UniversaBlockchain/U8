@@ -323,6 +323,14 @@ public:
         args.GetReturnValue().Set(value);
     }
 
+    Local<String> v8String(string x, NewStringType t = NewStringType::kNormal) {
+        return scripter->v8String(x, t);
+    }
+
+    Local<String> v8String(const char *cstr, NewStringType t = NewStringType::kNormal) {
+        return scripter->v8String(cstr, t);
+    }
+
 //    template<class F>
 //    void lockedContext(F &&f) {
 //

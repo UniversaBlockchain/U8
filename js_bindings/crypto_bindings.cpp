@@ -42,6 +42,28 @@ static void publicKeyVerify(const FunctionCallbackInfo<Value> &args) {
     });
 }
 
+static void keyAddressToString(const FunctionCallbackInfo<Value> &args) {
+    Scripter::unwrapArgs(args, [](ArgsContext&& ac) {
+        if( ac.args.Length() == 0) {
+            auto keyAddress = unwrap<KeyAddress>(ac.args.This());
+            ac.setReturnValue(ac.v8String(keyAddress->toString()));
+            return;
+        }
+        ac.throwError("invalid arguments");
+    });
+}
+
+static void keyAddressGetPacked(const FunctionCallbackInfo<Value> &args) {
+    Scripter::unwrapArgs(args, [](ArgsContext&& ac) {
+        if( ac.args.Length() == 0) {
+            auto keyAddress = unwrap<KeyAddress>(ac.args.This());
+            ac.setReturnValue(ac.toBinary(keyAddress->getPacked()));
+            return;
+        }
+        ac.throwError("invalid arguments");
+    });
+}
+
 
 Local<FunctionTemplate> initPrivateKey(Isolate *isolate) {
     Local<FunctionTemplate> tpl = bindCppClass<PrivateKey>(
@@ -65,6 +87,46 @@ Local<FunctionTemplate> initPrivateKey(Isolate *isolate) {
     return tpl;
 }
 
+Local<FunctionTemplate> initKeyAddress(Isolate *isolate) {
+    Local<FunctionTemplate> tpl = bindCppClass<KeyAddress>(
+            isolate,
+            "KeyAddress",
+            [=](const FunctionCallbackInfo<Value> &args) -> KeyAddress* {
+                    auto a0 = args[0];
+                    if (a0->IsTypedArray() && args.Length() == 1) {
+                        // TODO: reuse data of the typed array
+                        auto v = v8ToVector(a0);
+                        if (v)
+                            return new KeyAddress(*v);
+                    }
+                    else if( a0->IsString() && args.Length() == 1 ) {
+                        String::Utf8Value s(isolate, a0);
+                        return new KeyAddress(*s);
+                    }
+                    else if( a0->IsObject() && args.Length() == 3 ) {
+                        Local<Object> obj = a0.As<Object>();
+                        String::Utf8Value className(isolate, obj->GetConstructorName());
+                        if (strcmp(*className, "PublicKey") == 0) {
+                            auto context = args.GetIsolate()->GetCurrentContext();
+                            return new KeyAddress(*unwrap<PrivateKey>(obj),
+                                    args[1]->Int32Value(context).FromJust(),
+                                    args[2]->BooleanValue(isolate));
+                        }
+                        isolate->ThrowException(
+                                Exception::TypeError(String::NewFromUtf8(isolate, "public key expected")));
+
+                    }
+                isolate->ThrowException(
+                        Exception::TypeError(String::NewFromUtf8(isolate, "bad constructor arguments")));
+                return nullptr;
+            });
+    auto prototype = tpl->PrototypeTemplate();
+    prototype->Set(isolate, "toString", FunctionTemplate::New(isolate, keyAddressToString));
+    prototype->Set(isolate, "getPacked", FunctionTemplate::New(isolate, keyAddressGetPacked));
+    return tpl;
+}
+
+
 Local<FunctionTemplate> initPublicKey(Isolate *isolate) {
     Local<FunctionTemplate> tpl = bindCppClass<PublicKey>(
             isolate,
@@ -82,7 +144,6 @@ Local<FunctionTemplate> initPublicKey(Isolate *isolate) {
                         if (strcmp(*className, "PrivateKey") == 0) {
                             return new PublicKey(*unwrap<PrivateKey>(obj));
                         }
-                        cout << "OBJECT! " << *className << endl;
                         isolate->ThrowException(
                                 Exception::TypeError(String::NewFromUtf8(isolate, "private key expected")));
 
@@ -111,6 +172,7 @@ void JsInitCrypto(Isolate *isolate, const Local<ObjectTemplate> &global) {
     auto crypto = ObjectTemplate::New(isolate);
     crypto->Set(isolate, "PrivateKey", initPrivateKey(isolate));
     crypto->Set(isolate, "PublicKey", initPublicKey(isolate));
+    crypto->Set(isolate, "KeyAddress", initKeyAddress(isolate));
     crypto->Set(isolate, "version", String::NewFromUtf8(isolate, "0.0.1"));
     global->Set(isolate, "crypto", crypto);
 

@@ -24,6 +24,8 @@ public:
 
     bool isInitialized() const;
 
+    std::vector<unsigned char> getPacked() const { return packed; }
+
 protected:
     static int mask(const PublicKey& key);
 

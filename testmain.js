@@ -54,10 +54,16 @@ async function testRSA() {
     assert(s1 != s2);
     assert(s1.length == 256);
 
-    publicKey = privateKey.publicKey;
+    let publicKey = privateKey.publicKey;
     assert(await publicKey.verify("data to sign", s1));
     assert(!await publicKey.verify("data to sign!", s1));
     assert(await publicKey.verify("data to sign!", s2));
+
+    console.log(publicKey.shortAddress.packed);
+    // console.log(publicKey.longAddress);
+    assert(privateKey.shortAddress.toString() == publicKey.shortAddress.toString());
+    assert(privateKey.longAddress.toString() == publicKey.longAddress.toString());
+    assert(publicKey.shortAddress.toString().length < publicKey.longAddress.toString().length);
 }
 
 async function testContract() {

@@ -105,15 +105,56 @@ crypto.PublicKey.prototype.verify = function(data, signature, hashType=crypto.SH
         return this.__verify(data, signature, hashType);
     else
         throw new Error("Wrong data type: "+typeof(data));
-}
+};
 
 Object.defineProperty(crypto.PrivateKey.prototype, "publicKey", {
-    get: function getPublicKey() {
+    get: function() {
         if( !this.__publicKey );
             this.__publicKey = new crypto.PublicKey(this);
         return this.__publicKey;
     }
-})
+});
+
+Object.defineProperty(crypto.PublicKey.prototype, "shortAddress", {
+    get: function() {
+        if( !this.__shortAddress );
+            this.__shortAddress = new crypto.KeyAddress(this, 0, false);
+        return this.__shortAddress;
+    }
+});
+
+Object.defineProperty(crypto.PublicKey.prototype, "longAddress", {
+    get: function() {
+        if( !this.__longAddress );
+            this.__longAddress = new crypto.KeyAddress(this, 0, true);
+        return this.__longAddress;
+    }
+});
+
+
+Object.defineProperty(crypto.PrivateKey.prototype, "shortAddress", {
+    get: function() {
+        if( !this.__shortAddress );
+            this.__shortAddress = this.publicKey.shortAddress;
+        return this.__shortAddress;
+    }
+});
+
+Object.defineProperty(crypto.PrivateKey.prototype, "longAddress", {
+    get: function() {
+        if( !this.__longAddress );
+            this.__longAddress = this.publicKey.longAddress;
+        return this.__longAddress;
+    }
+});
+
+Object.defineProperty(crypto.KeyAddress.prototype, "packed", {
+    get: function() {
+        if( !this.__packed );
+            this.__packed = this.getPacked();
+        return this.__packed;
+    }
+});
 
 
 
