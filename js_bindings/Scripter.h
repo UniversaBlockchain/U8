@@ -300,6 +300,10 @@ public:
         return args[index]->Int32Value(context).FromJust();
     }
 
+    string asString(int index) {
+        return scripter->getString(args[index]);
+    }
+
     Local<Uint8Array> toBinary(const void* result,size_t size) {
         auto ab = ArrayBuffer::New(isolate, size);
         memcpy(ab->GetContents().Data(), result, size);
@@ -313,6 +317,10 @@ public:
 
     Local<Uint8Array> toBinary(byte_vector&& result) {
         return toBinary(result.data(), result.size());
+    }
+
+    Local<String> toString(byte_vector&& result) {
+        return String::NewFromUtf8(isolate, (const char*)result.data());
     }
 
     void throwError(const char* text) {

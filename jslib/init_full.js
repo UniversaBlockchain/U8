@@ -172,7 +172,12 @@ Object.defineProperty(crypto.KeyAddress.prototype, "packed", {
     }
 });
 
+// -------------------------------------- utilities
 
+function equalArrays(a, b) {
+    if (a.byteLength !== b.byteLength) return false;
+    return a.every((val, i) => val === b[i]);
+}
 
 // async function test() {
 //     await sleep(2370);

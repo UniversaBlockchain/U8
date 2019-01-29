@@ -75,6 +75,10 @@ async function testRSA() {
     assert(new crypto.PrivateKey(packed).shortAddress.toString() == privateKey.shortAddress.toString());
     packed = publicKey.packed;
     assert(new crypto.PublicKey(packed).shortAddress.toString() == publicKey.shortAddress.toString());
+    // btoa(packed));
+    assert(equalArrays(packed, packed));
+    assert(equalArrays(packed, atob(btoa(packed))));
+
 }
 
 async function testContract() {

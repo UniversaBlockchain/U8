@@ -10,6 +10,7 @@
 #include "../crypto/PublicKey.h"
 #include "Scripter.h"
 #include "../tools/vprintf.h"
+#include "../crypto/base64.h"
 
 static void privateKeySign(const FunctionCallbackInfo<Value> &args) {
     Scripter::unwrapArgs(args, [&](ArgsContext &&ac) {
@@ -182,6 +183,30 @@ Local<FunctionTemplate> initPublicKey(Isolate *isolate) {
     return tpl;
 }
 
+static void JsA2B(const FunctionCallbackInfo<Value>& args) {
+    Scripter::unwrapArgs(args, [](ArgsContext&& ac) {
+        if( ac.args.Length() == 1) {
+            ac.setReturnValue(ac.toBinary(base64_decodeToBytes(ac.asString(0))));
+        }
+        else
+            ac.throwError("one argument required");
+    });
+}
+
+static void JsB2A(const FunctionCallbackInfo<Value>& args) {
+    Scripter::unwrapArgs(args, [](ArgsContext&& ac) {
+        if( ac.args.Length() == 1) {
+            auto v = v8ToVector(ac.args[0]);
+            if( v )
+                ac.setReturnValue(ac.v8String(base64_encode(*v)));
+            else
+                ac.throwError("Uint8Array requried as an argument");
+        }
+        else
+            ac.throwError("one argument required");
+    });
+}
+
 void JsInitCrypto(Isolate *isolate, const Local<ObjectTemplate> &global) {
 //    auto prototype = tpl->PrototypeTemplate();prototype->Set(isolate, "version", String::NewFromUtf8(isolate, "0.0.1"));
 //    prototype->Set(isolate, "open", FunctionTemplate::New(isolate, JsAsyncHandleOpen));
@@ -200,6 +225,8 @@ void JsInitCrypto(Isolate *isolate, const Local<ObjectTemplate> &global) {
     crypto->Set(isolate, "version", String::NewFromUtf8(isolate, "0.0.1"));
     global->Set(isolate, "crypto", crypto);
 
+    global->Set(isolate, "atob", FunctionTemplate::New(isolate, JsA2B));
+    global->Set(isolate, "btoa", FunctionTemplate::New(isolate, JsB2A));
 }
 
 

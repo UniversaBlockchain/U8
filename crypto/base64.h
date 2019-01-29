@@ -12,6 +12,10 @@
 std::string base64_encode(unsigned char const* , unsigned int len);
 std::string base64_decode(std::string const& s);
 
+inline
+std::string base64_encode(std::vector<unsigned char>&& v) {
+    return base64_encode(std::move(v));
+}
 std::string base64_encode(std::vector<unsigned char> const& v);
 std::vector<unsigned char> base64_decodeToBytes(std::string const& s);
 
