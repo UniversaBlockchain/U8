@@ -27,6 +27,28 @@ static void privateKeySign(const FunctionCallbackInfo<Value> &args) {
     });
 }
 
+static void privateKeyPack(const FunctionCallbackInfo<Value> &args) {
+    Scripter::unwrapArgs(args, [&](ArgsContext &&ac) {
+        if (args.Length() == 0) {
+            auto key = unwrap<PrivateKey>(args.This());
+            ac.setReturnValue(ac.toBinary(key->pack()));
+            return;
+        }
+        ac.throwError("invalid arguments");
+    });
+}
+
+static void publicKeyPack(const FunctionCallbackInfo<Value> &args) {
+    Scripter::unwrapArgs(args, [&](ArgsContext &&ac) {
+        if (args.Length() == 0) {
+            auto key = unwrap<PublicKey>(args.This());
+            ac.setReturnValue(ac.toBinary(key->pack()));
+            return;
+        }
+        ac.throwError("invalid arguments");
+    });
+}
+
 static void publicKeyVerify(const FunctionCallbackInfo<Value> &args) {
     Scripter::unwrapArgs(args, [](ArgsContext&& ac) {
         if( ac.args.Length() == 3) {
@@ -84,6 +106,7 @@ Local<FunctionTemplate> initPrivateKey(Isolate *isolate) {
             });
     auto prototype = tpl->PrototypeTemplate();
     prototype->Set(isolate, "__sign", FunctionTemplate::New(isolate, privateKeySign));
+    prototype->Set(isolate, "__pack", FunctionTemplate::New(isolate, privateKeyPack));
     return tpl;
 }
 
@@ -155,6 +178,7 @@ Local<FunctionTemplate> initPublicKey(Isolate *isolate) {
             });
     auto prototype = tpl->PrototypeTemplate();
     prototype->Set(isolate, "__verify", FunctionTemplate::New(isolate, publicKeyVerify));
+    prototype->Set(isolate, "__pack", FunctionTemplate::New(isolate, publicKeyPack));
     return tpl;
 }
 

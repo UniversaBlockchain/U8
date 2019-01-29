@@ -115,6 +115,22 @@ Object.defineProperty(crypto.PrivateKey.prototype, "publicKey", {
     }
 });
 
+Object.defineProperty(crypto.PrivateKey.prototype, "packed", {
+    get: function() {
+        if( !this.__packed );
+            this.__packed = this.__pack();
+        return this.__packed;
+    }
+});
+
+Object.defineProperty(crypto.PublicKey.prototype, "packed", {
+    get: function() {
+        if( !this.__packed );
+        this.__packed = this.__pack();
+        return this.__packed;
+    }
+});
+
 Object.defineProperty(crypto.PublicKey.prototype, "shortAddress", {
     get: function() {
         if( !this.__shortAddress );
