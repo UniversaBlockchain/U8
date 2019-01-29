@@ -63,9 +63,9 @@ void PrivateKey::initFromBytes(const UBytes& eValue, const UBytes& pValue, const
 	mpz_init(&e);
 	mpz_init(&p);
 	mpz_init(&q);
-	mpz_import(&e, eValue.get().second, 1, 1, 0, 0, eValue.get().first);
-	mpz_import(&p, pValue.get().second, 1, 1, 0, 0, pValue.get().first);
-	mpz_import(&q, qValue.get().second, 1, 1, 0, 0, qValue.get().first);
+	mpz_import(&e, eValue.get().size(), 1, 1, 0, 0, eValue.get().data());
+	mpz_import(&p, pValue.get().size(), 1, 1, 0, 0, pValue.get().data());
+	mpz_import(&q, qValue.get().size(), 1, 1, 0, 0, qValue.get().data());
 	char str_e[2048];
 	char str_p[2048];
 	char str_q[2048];
@@ -188,8 +188,8 @@ std::vector<unsigned char> PrivateKey::pack() const {
 
 	auto bb = writer.getBytes();
 	auto bbp = bb.get();
-	std::vector<unsigned char> output(bbp.second);
-	memcpy(&output[0], bbp.first, bbp.second);
+	std::vector<unsigned char> output(bbp.size());
+	memcpy(&output[0], bbp.data(), bbp.size());
 	return output;
 }
 

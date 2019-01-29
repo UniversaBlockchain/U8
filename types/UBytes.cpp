@@ -5,16 +5,13 @@
 #include <cstring>
 #include "UBytes.h"
 
-UBytes::UBytesData::UBytesData(const unsigned char *v, unsigned int size)  {
-    value.first = new unsigned char[size];
-    value.second = size;
-    memcpy(value.first,v,size*sizeof(unsigned char));
+
+UBytes::UBytesData::UBytesData(const unsigned char* v, unsigned int size)   {
+    value.assign(v,v+size);
 }
 
-UBytes::UBytesData::UBytesData(const std::pair<unsigned char*, unsigned int>& val)  {
-    value.first = new unsigned char[val.second];
-    value.second = val.second;
-    memcpy(value.first,val.first,val.second*sizeof(unsigned char));
+UBytes::UBytesData::UBytesData()  {
+
 }
 
 
@@ -37,15 +34,15 @@ const UBytes &UBytes::asInstance(const UObject &object) {
 }
 
 
-UBytes::UBytes(const unsigned char * value, unsigned int size) : UObject(std::make_shared<UBytesData>(value,size)) {
+UBytes::UBytes(const unsigned char* v, unsigned int size) : UObject(std::make_shared<UBytes::UBytesData>(v,size)) {
 
 }
 
-UBytes::UBytes(const std::pair<unsigned char*, unsigned int>& val) : UObject(std::make_shared<UBytesData>(val)) {
-
+UBytes::UBytes(std::vector<unsigned char>&& val) : UObject(std::make_shared<UBytes::UBytesData>()) {
+    data<UBytesData>().value = std::move(val);
 }
 
-const std::pair<unsigned char*, unsigned int>& UBytes::get() const {
+const std::vector<unsigned char>& UBytes::get() const {
     return data<UBytesData>().value;
 }
 

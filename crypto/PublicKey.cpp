@@ -70,8 +70,8 @@ void PublicKey::initFromBytes(const UBytes& eValue, const UBytes& nValue) {
 	MP_INT e, n;
 	mpz_init(&e);
 	mpz_init(&n);
-	mpz_import(&e, eValue.get().second, 1, 1, 0, 0, eValue.get().first);
-	mpz_import(&n, nValue.get().second, 1, 1, 0, 0, nValue.get().first);
+	mpz_import(&e, eValue.get().size(), 1, 1, 0, 0, eValue.get().data());
+	mpz_import(&n, nValue.get().size(), 1, 1, 0, 0, nValue.get().data());
 	size_t bin_e_len = mpz_unsigned_bin_size(&e);
 	size_t bin_N_len = mpz_unsigned_bin_size(&n);
 	unsigned char bin_e[bin_e_len];
@@ -123,8 +123,8 @@ std::vector<unsigned char> PublicKey::pack() const {
 	writer.writeObject(ua);
 	auto bb = writer.getBytes();
 	auto bbp = bb.get();
-	std::vector<unsigned char> output(bbp.second);
-	memcpy(&output[0], bbp.first, bbp.second);
+	std::vector<unsigned char> output(bbp.size());
+	memcpy(&output[0], bbp.data(), bbp.size());
 	return output;
 }
 

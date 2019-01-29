@@ -102,12 +102,12 @@ void BossSerializer::Writer::put(const UObject& o) {
         UBytes bytes = UBytes::asInstance(o);
 
         if (!tryWriteReference(bytes)) {
-            std::pair<unsigned char*, unsigned int> bb = bytes.get();
+            const std::vector<unsigned char>& bb = bytes.get();
 
-            writeHeader(TYPE_BIN, bb.second);
-            buf.reserve(buf.size() + bb.second);
+            writeHeader(TYPE_BIN, bb.size());
+            buf.reserve(buf.size() + bb.size());
 
-            std::copy(bb.first, bb.first + bb.second, std::back_inserter(buf));
+            std::copy(bb.data(), bb.data() + bb.size(), std::back_inserter(buf));
         }
 
     } else if (UString::isInstance(o)) {
@@ -212,7 +212,7 @@ bool BossSerializer::Writer::tryWriteReference(UBytes bytes) {
         return false;
 
     binary bb;
-    bb.assign(bytes.get().first, bytes.get().first + bytes.get().second);
+    bb.assign(bytes.get().data(), bytes.get().data() + bytes.get().size());
     cachedObject obj(CT_BIN, bb);
 
     return tryWriteReference(obj);
@@ -238,7 +238,7 @@ bool BossSerializer::Writer::tryWriteReference(UArray array) {
     UBytes bytes = arrayWriter.getBytes();
 
     binary bb;
-    bb.assign(bytes.get().first, bytes.get().first + bytes.get().second);
+    bb.assign(bytes.get().data(), bytes.get().data() + bytes.get().size());
     cachedObject obj(CT_ARRAY, bb);
 
     return tryWriteReference(obj);
@@ -253,14 +253,14 @@ bool BossSerializer::Writer::tryWriteReference(UBinder binder) {
     UBytes bytes = binderWriter.getBytes();
 
     binary bb;
-    bb.assign(bytes.get().first, bytes.get().first + bytes.get().second);
+    bb.assign(bytes.get().data(), bytes.get().data() + bytes.get().size());
     cachedObject obj(CT_BINDER, bb);
 
     return tryWriteReference(obj);
 }
 
 BossSerializer::Reader::Reader(const UBytes& data)
-: treeMode(true), bin(data.get().first), size(data.get().second) {}
+: treeMode(true), bin(data.get().data()), size(data.get().size()) {}
 
 void BossSerializer::Reader::setStreamMode() {
     cache.clear();

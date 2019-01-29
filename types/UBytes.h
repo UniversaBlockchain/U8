@@ -6,6 +6,7 @@
 #define UNITOOLS_UBYTES_H
 
 #include <memory>
+#include <vector>
 #include "UObject.h"
 
 class UBytes : public UObject {
@@ -13,13 +14,12 @@ private:
     class UBytesData : public UData {
         public:
             UBytesData(const unsigned char* v, unsigned int size);
-            UBytesData(const std::pair<unsigned char*, unsigned int>& val);
+            UBytesData();
 
             ~UBytesData() {
-                delete value.first;
             };
 
-        std::pair<unsigned char*, unsigned int> value;
+        std::vector<unsigned char> value;
     };
 
 public:
@@ -30,9 +30,9 @@ public:
     static const UBytes& asInstance(const UObject& object);
 
 
-    UBytes(const std::pair<unsigned char*, unsigned int>& val);
+    UBytes(std::vector<unsigned char>&& val);
     UBytes(const unsigned  char* value, unsigned int size);
-    const std::pair<unsigned char*, unsigned int>& get() const;
+    const std::vector<unsigned char>& get() const;
 };
 
 

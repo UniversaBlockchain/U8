@@ -150,24 +150,24 @@ void testBoss() {
     ASSERT(UBinder::asInstance(obj).getString("key4") == "some string");
     ASSERT(UBinder::asInstance(obj).getString("key5") == "Новая строка!!! №13579; ---=== NEW_DATA");
     ASSERT(UBytes::isInstance(UBinder::asInstance(obj).get("Бинарные данные")));
-    ASSERT(UBytes::asInstance(UBinder::asInstance(obj).get("Бинарные данные")).get().second == 4);
-    ASSERT(UBytes::asInstance(UBinder::asInstance(obj).get("Бинарные данные")).get().first[0] == '1');
-    ASSERT(UBytes::asInstance(UBinder::asInstance(obj).get("Бинарные данные")).get().first[1] == 'b');
-    ASSERT(UBytes::asInstance(UBinder::asInstance(obj).get("Бинарные данные")).get().first[2] == '=');
-    ASSERT(UBytes::asInstance(UBinder::asInstance(obj).get("Бинарные данные")).get().first[3] == '*');
+    ASSERT(UBytes::asInstance(UBinder::asInstance(obj).get("Бинарные данные")).get().size() == 4);
+    ASSERT(UBytes::asInstance(UBinder::asInstance(obj).get("Бинарные данные")).get().data()[0] == '1');
+    ASSERT(UBytes::asInstance(UBinder::asInstance(obj).get("Бинарные данные")).get().data()[1] == 'b');
+    ASSERT(UBytes::asInstance(UBinder::asInstance(obj).get("Бинарные данные")).get().data()[2] == '=');
+    ASSERT(UBytes::asInstance(UBinder::asInstance(obj).get("Бинарные данные")).get().data()[3] == '*');
     ASSERT(UBinder::asInstance(obj).get("=0=").isNull());
     ASSERT(UBinder::asInstance(obj).getBool("test_bool"));
     ASSERT(!UBinder::asInstance(obj).getBool("test_bool2"));
     ASSERT(UBinder::asInstance(obj).getString("") == "");
     ASSERT(UBytes::isInstance(UBinder::asInstance(obj).get(" ")));
-    ASSERT(UBytes::asInstance(UBinder::asInstance(obj).get(" ")).get().second == 0);
+    ASSERT(UBytes::asInstance(UBinder::asInstance(obj).get(" ")).get().size() == 0);
     ASSERT(UArray::isInstance(UBinder::asInstance(obj).get("_")));
     ASSERT(UArray::asInstance(UBinder::asInstance(obj).get("_")).size() == 0);
     ASSERT(UBinder::isInstance(UBinder::asInstance(obj).get("~")));
     ASSERT(UBinder::asInstance(UBinder::asInstance(obj).get("~")).size() == 0);
     ASSERT(UBinder::asInstance(obj).getString("1") == "");
     ASSERT(UBytes::isInstance(UBinder::asInstance(obj).get("2")));
-    ASSERT(UBytes::asInstance(UBinder::asInstance(obj).get("2")).get().second == 0);
+    ASSERT(UBytes::asInstance(UBinder::asInstance(obj).get("2")).get().size() == 0);
     ASSERT(UArray::isInstance(UBinder::asInstance(obj).get("3")));
     ASSERT(UArray::asInstance(UBinder::asInstance(obj).get("3")).size() == 0);
     ASSERT(UBinder::isInstance(UBinder::asInstance(obj).get("4")));
@@ -258,11 +258,11 @@ void testBoss() {
 
     // Repack test
     std::vector<unsigned char> buf;
-    buf.assign(pack.get().first, pack.get().first + pack.get().second);
+    buf.assign(pack.get().data(), pack.get().data() + pack.get().size());
 
     UBytes repack = BossSerializer::serialize(obj);
     std::vector<unsigned char> repack_buf;
-    repack_buf.assign(repack.get().first, repack.get().first + repack.get().second);
+    repack_buf.assign(repack.get().data(), repack.get().data() + repack.get().size());
 
     ASSERT(buf.size() == repack_buf.size());
 
