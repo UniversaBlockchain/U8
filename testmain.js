@@ -54,7 +54,7 @@ async function testRSA() {
     assert(s1 != s2);
     assert(s1.length == 256);
 
-    publicKey = new crypto.PublicKey(privateKey);
+    publicKey = privateKey.publicKey;
     assert(await publicKey.verify("data to sign", s1));
     assert(!await publicKey.verify("data to sign!", s1));
     assert(await publicKey.verify("data to sign!", s2));

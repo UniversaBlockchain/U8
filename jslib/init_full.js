@@ -107,6 +107,14 @@ crypto.PublicKey.prototype.verify = function(data, signature, hashType=crypto.SH
         throw new Error("Wrong data type: "+typeof(data));
 }
 
+Object.defineProperty(crypto.PrivateKey.prototype, "publicKey", {
+    get: function getPublicKey() {
+        if( !this.__publicKey );
+            this.__publicKey = new crypto.PublicKey(this);
+        return this.__publicKey;
+    }
+})
+
 
 
 // async function test() {
