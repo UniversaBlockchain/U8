@@ -28,7 +28,8 @@ public:
 	std::vector<unsigned char> pack() const;
 
 	bool verify(const std::vector<unsigned char> &sig, const std::vector<unsigned char> &data, HashType hashType);
-	void encrypt(std::vector<unsigned char>& input, std::vector<unsigned char>& output);
+	void encrypt(const std::vector<unsigned char>& input, std::vector<unsigned char>& output);
+	std::vector<unsigned char> encrypt(const std::vector<unsigned char>& input);
 
 	const KeyAddress& getShortAddress();
 	const KeyAddress& getLongAddress();

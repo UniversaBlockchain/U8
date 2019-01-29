@@ -144,7 +144,7 @@ bool PublicKey::verify(const std::vector<unsigned char> &sig, const std::vector<
 	return stat != 0;
 }
 
-void PublicKey::encrypt(std::vector<unsigned char>& input, std::vector<unsigned char>& output) {
+void PublicKey::encrypt(const std::vector<unsigned char>& input, std::vector<unsigned char>& output) {
 	int hash_idx = find_hash("sha1");
 	int prng_indx = find_prng("sprng");
 
@@ -162,6 +162,12 @@ void PublicKey::encrypt(std::vector<unsigned char>& input, std::vector<unsigned 
 
 	output.resize(0);
 	output.insert(output.begin(), buf, buf+bufLen);
+}
+
+std::vector<unsigned char> PublicKey::encrypt(const std::vector<unsigned char>& input) {
+	std::vector<unsigned char> output;
+	encrypt(input, output);
+	return output;
 }
 
 const KeyAddress& PublicKey::getShortAddress() {

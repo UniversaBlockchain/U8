@@ -364,6 +364,120 @@ void testKeysConcurrency() {
     cout << "testKeysConcurrency()... done!" << endl << endl;
 }
 
+void testGenerateNewKeys() {
+    cout << "testGenerateNewKeys()..." << endl;
+
+    auto body = base64_decodeToBytes("cXdlcnR5MTIzNDU2");
+
+    PrivateKey cpp_privateKey2048(2048);
+    PrivateKey cpp_privateKey4096(4096);
+    PublicKey cpp_publicKey2048(cpp_privateKey2048);
+    PublicKey cpp_publicKey4096(cpp_privateKey4096);
+    cout << "// Test vectors for export to java:" << endl;
+    cout << "String cpp_privateKey2048_b64 = \"" << base64_encode(cpp_privateKey2048.pack()) << "\";" << endl;
+    cout << "String cpp_privateKey4096_b64 = \"" << base64_encode(cpp_privateKey4096.pack()) << "\";" << endl;
+    cout << "String cpp_publicKey2048_b64  = \"" << base64_encode(cpp_publicKey2048.pack()) << "\";" << endl;
+    cout << "String cpp_publicKey4096_b64  = \"" << base64_encode(cpp_publicKey4096.pack()) << "\";" << endl;
+    auto cpp_encrypted2048 = cpp_publicKey2048.encrypt(body);
+    auto cpp_encrypted4096 = cpp_publicKey4096.encrypt(body);
+    cout << "String cpp_encrypted2048 = \"" << base64_encode(cpp_encrypted2048) << "\";" << endl;
+    cout << "String cpp_encrypted4096 = \"" << base64_encode(cpp_encrypted4096) << "\";" << endl;
+    auto cpp_sig2048_sha1 = cpp_privateKey2048.sign(body, HashType::SHA1);
+    auto cpp_sig2048_sha256 = cpp_privateKey2048.sign(body, HashType::SHA256);
+    auto cpp_sig2048_sha512 = cpp_privateKey2048.sign(body, HashType::SHA512);
+    auto cpp_sig2048_sha3_256 = cpp_privateKey2048.sign(body, HashType::SHA3_256);
+    auto cpp_sig2048_sha3_384 = cpp_privateKey2048.sign(body, HashType::SHA3_384);
+    auto cpp_sig2048_sha3_512 = cpp_privateKey2048.sign(body, HashType::SHA3_512);
+    cout << "String cpp_sig2048_sha1 = \"" << base64_encode(cpp_sig2048_sha1) << "\";" << endl;
+    cout << "String cpp_sig2048_sha256 = \"" << base64_encode(cpp_sig2048_sha256) << "\";" << endl;
+    cout << "String cpp_sig2048_sha512 = \"" << base64_encode(cpp_sig2048_sha512) << "\";" << endl;
+    cout << "String cpp_sig2048_sha3_256 = \"" << base64_encode(cpp_sig2048_sha3_256) << "\";" << endl;
+    cout << "String cpp_sig2048_sha3_384 = \"" << base64_encode(cpp_sig2048_sha3_384) << "\";" << endl;
+    cout << "String cpp_sig2048_sha3_512 = \"" << base64_encode(cpp_sig2048_sha3_512) << "\";" << endl;
+    auto cpp_sig4096_sha1 = cpp_privateKey4096.sign(body, HashType::SHA1);
+    auto cpp_sig4096_sha256 = cpp_privateKey4096.sign(body, HashType::SHA256);
+    auto cpp_sig4096_sha512 = cpp_privateKey4096.sign(body, HashType::SHA512);
+    auto cpp_sig4096_sha3_256 = cpp_privateKey4096.sign(body, HashType::SHA3_256);
+    auto cpp_sig4096_sha3_384 = cpp_privateKey4096.sign(body, HashType::SHA3_384);
+    auto cpp_sig4096_sha3_512 = cpp_privateKey4096.sign(body, HashType::SHA3_512);
+    cout << "String cpp_sig4096_sha1 = \"" << base64_encode(cpp_sig4096_sha1) << "\";" << endl;
+    cout << "String cpp_sig4096_sha256 = \"" << base64_encode(cpp_sig4096_sha256) << "\";" << endl;
+    cout << "String cpp_sig4096_sha512 = \"" << base64_encode(cpp_sig4096_sha512) << "\";" << endl;
+    cout << "String cpp_sig4096_sha3_256 = \"" << base64_encode(cpp_sig4096_sha3_256) << "\";" << endl;
+    cout << "String cpp_sig4096_sha3_384 = \"" << base64_encode(cpp_sig4096_sha3_384) << "\";" << endl;
+    cout << "String cpp_sig4096_sha3_512 = \"" << base64_encode(cpp_sig4096_sha3_512) << "\";" << endl;
+
+    checkResult("", body, cpp_privateKey2048.decrypt(cpp_encrypted2048));
+    checkResult("", body, cpp_privateKey4096.decrypt(cpp_encrypted4096));
+    checkResult("", true, cpp_publicKey2048.verify(cpp_sig2048_sha1, body, HashType::SHA1));
+    checkResult("", false, cpp_publicKey2048.verify(cpp_sig2048_sha1, body, HashType::SHA256));
+    checkResult("", true, cpp_publicKey2048.verify(cpp_sig2048_sha256, body, HashType::SHA256));
+    checkResult("", false, cpp_publicKey2048.verify(cpp_sig2048_sha256, body, HashType::SHA512));
+    checkResult("", true, cpp_publicKey2048.verify(cpp_sig2048_sha512, body, HashType::SHA512));
+    checkResult("", false, cpp_publicKey2048.verify(cpp_sig2048_sha512, body, HashType::SHA3_256));
+    checkResult("", true, cpp_publicKey2048.verify(cpp_sig2048_sha3_256, body, HashType::SHA3_256));
+    checkResult("", false, cpp_publicKey2048.verify(cpp_sig2048_sha3_256, body, HashType::SHA3_384));
+    checkResult("", true, cpp_publicKey2048.verify(cpp_sig2048_sha3_384, body, HashType::SHA3_384));
+    checkResult("", false, cpp_publicKey2048.verify(cpp_sig2048_sha3_384, body, HashType::SHA3_512));
+    checkResult("", true, cpp_publicKey2048.verify(cpp_sig2048_sha3_512, body, HashType::SHA3_512));
+    checkResult("", false, cpp_publicKey2048.verify(cpp_sig2048_sha3_512, body, HashType::SHA1));
+
+    checkResult("", true, cpp_publicKey4096.verify(cpp_sig4096_sha1, body, HashType::SHA1));
+    checkResult("", false, cpp_publicKey4096.verify(cpp_sig4096_sha1, body, HashType::SHA256));
+    checkResult("", true, cpp_publicKey4096.verify(cpp_sig4096_sha256, body, HashType::SHA256));
+    checkResult("", false, cpp_publicKey4096.verify(cpp_sig4096_sha256, body, HashType::SHA512));
+    checkResult("", true, cpp_publicKey4096.verify(cpp_sig4096_sha512, body, HashType::SHA512));
+    checkResult("", false, cpp_publicKey4096.verify(cpp_sig4096_sha512, body, HashType::SHA3_256));
+    checkResult("", true, cpp_publicKey4096.verify(cpp_sig4096_sha3_256, body, HashType::SHA3_256));
+    checkResult("", false, cpp_publicKey4096.verify(cpp_sig4096_sha3_256, body, HashType::SHA3_384));
+    checkResult("", true, cpp_publicKey4096.verify(cpp_sig4096_sha3_384, body, HashType::SHA3_384));
+    checkResult("", false, cpp_publicKey4096.verify(cpp_sig4096_sha3_384, body, HashType::SHA3_512));
+    checkResult("", true, cpp_publicKey4096.verify(cpp_sig4096_sha3_512, body, HashType::SHA3_512));
+    checkResult("", false, cpp_publicKey4096.verify(cpp_sig4096_sha3_512, body, HashType::SHA1));
+
+    auto java_privateKey2048bin = base64_decodeToBytes("JgAcAQABvID68AUWeWzLRTN47apRSmEH9FPhACrc8JwjQNI406VWEH2mvImnycR55lBHHMV5BHY1JqY9aDfhk75YE9LflwK3Z5+dTU74p6FlsH3JQZkrXxVVrn1q/IdjEF2MwqyRH71pxmh3LOSdSgfITXWzSq25olOKkIbcQ1bnh5uTtCDMDbyAvManuA0S7RA/jCaJYrQt5q2/xRTEuyKDkF6GBEEGNjKoK65rW7zOtyg5HANpN3amXtY2fX8/BUNLuvJ7CFFkJPJvScCp8+UaQHrwOOLeC8SDeGIEfNI1RUsttADlIAq1MRlFp70xwRW2xd2kAgoSE2lVZibbMOwhsLU3DOKe+qM=");
+    auto java_privateKey4096bin = base64_decodeToBytes("JgAcAQABxAAB20CPjBXAJr82IkKLAjexxlVu3jDEDre54rbs3e4OxHLHwwZFjVpeBfFn2debui1Zco6o52dH8WitGFGTEIDjklzlAAj519L2mVohuqe3qITXJR3YamKGQgHw0TWqxAx6oCuBLt9SHpDGcZ7vLwGCN2pKJaWh3403DV4ypT59O0wOs0/Ddhh2ywV4uwvRczF0nWi5YE9WwgKezd0vckUgPcfnM7obUdtL9ox2TzRpy2Wm5X/SMxplYgCMQE8mqfLSHF0bS9mADDS1bqm6INQTbg2FEScQ36nQQEKX0QMYiYZoL82c8nVO7joDUWC2NIrinH5MxWzUoiOlP0jPXgnB38QAAblg90Dlxf6D3TYQGPYKKiMj6/R/bnuevTyy6dtHpK73qEnBXWdMQ96WISVuDtaxqysYKK58FJb5Bqz68bji+xy0r4aIBJPtnBzEzrH4Rd/AQa0auk73duIW0KrChm8y5+3j1QsX1XabFhizSZCZb9l5MjJBoAoMia9jNd/2GPKH2JI8TFK5QP8CuqxVF0pppv3fSGtqrWP6xOdB5Tuzll4mEVn3Zk+toQhKper3PSwjHPMajZ/oACDwgSc4u9GgeM9G4670j0N828VIWqkyjjKPRy2Z06/jZyhDLZIOCV9zeuT9tpdNmmXDnR/PotBoDLj4PFLe7zmqTHge6U7zVjc=");
+    auto java_publicKey2048bin = base64_decodeToBytes("HggcAQABxAABuQr9x20z3kvp3n51gPmwDi4RNhyzbZx2N9wUo40L9gcVHW+WIFmJyx4bwej0Dwwfrei2GPIvhysB4huOnwfmW2x/MmSoNw1o4+cayKxbftyzuyLgRURDqA3ZJcLyvcfZxK1bTCIeW367H/EVJJV5if5Y3a6FKZoZ+nk9ege8xiNuIq+YNDTuZbI/jv2Cd5og+TzASTArgPaYFxOA4BLWvPPzcfXpepp8oJqIFRr1M9w/veaa8+ah0c047ODkXauTh3NrtUIVxOyb8YHy4IbhtGVAszelMIIL16qKZGHFMdmZn2u9cM2peHFyLBLe06PJU1tTgJ3dkz/2BcjxIiyeRw==");
+    auto java_publicKey4096bin = base64_decodeToBytes("HggcAQABxAACnsSztO+uYyJPbFcWQ+kct7sXDhscwjE8Gb+UShSeZ2H6qlP28uvUJOQs8KbGsqv+i9oUaVhrZ9W1j1c1WXiHK2NRWYU9iP/4MooZrf12Qs09PI7OCDPjmWwgbrR8edDuwJXtrTaTiaeVs/zFp3MgzHUNore6m7riA5/rJGVkPAl2vJ43u/Zz6gyCAj0eAS9lkvIF/FDpXW+/rXK5q1VeTMITOmP2s7ZT7BACSw+TWl+LwMv8cBXYiUacXIgtmIJhYWN9LOLu3I+IjV/Ncda1FsipPo7oSNX2LkuoAUis/Sx/sWuy0noj+LQ6ql6fBvrE3J6XGWs1EmhDJ1tJEAFmTpdyJ2ZyNMexrsSXXeXuk+XhaAJHW91YZ7VAvPWHzXgcv4ier32AFZlP+QRqfbUJg9tGjOI4/krCfeYeX3/WwTfzZ12rTIn4UI2xITDCLUgXXWp+ydkBGr2lgo7pUFpUC/BV+Sn9iIdr3Y2OIztMfBlu8yjWGW13ld8c+x9rf1ERNAYKqS342ZGdmWvw0qlj4zJ6SP8FVv2ywKZKWTRqe25aW0wBnv/bBd6mtuGnRwEEiz/pV+x2dEsUBLXW71Y7byQh45ikNqd6Wkr1ru6rITbeG5QXSuTEEVjaFwGOmGf1/Y1tI2k7Be/J4ovawaGfLsLCC5sWbONl3q0gcHPmkOk=");
+    auto java_encrypted2048 = base64_decodeToBytes("p/KxgLYKHLjhpkQO7Rue3GW1sKliw4mg6vqjis1z+Nhd45A7ttkVtsQsJczo5apwuOxpPbMCPwtvbyFy92MjUxxz5daZeogjafpN94PiyKiOY/jNduaaWM9EMUg75UyzCDYMeFve1hl6rm3CipSIqT7ee1oTmCyKkt3VaP39j489x54/bvtYa2XOE5k5zVT3cOscAty5uww9FoUUryYQEX0NLl7KKoP6pLFF7jXhM53WiyGd8Uh7PWucCQ4Wi02F4BAqe3FNqJhXYxFVg4wFhdoBG2ppFv2CsYSlg/6x+gTtVFGK4cTDK8fidW9DEI/qGwdQ7STxLOXopaPz8mzxLA==");
+    auto java_encrypted4096 = base64_decodeToBytes("bny47D3RJbViq6jZib9FFQFeJUkzZhMs9gnF0/bQXGHvD1YELRcEZV4NMrqddQuJXwfU/ffvIsPLZD5JX4XciNs4eLwSwFPYs+H8SzdrN79eP6Jp8C7TDlcOdA6vee5LT3nSRU+Y2Ei1Ht14EJzFWXaGy45jra72MV6GzsbrVG6eoeeFxiwBLEzdaOLTq7js+WbSlb7M0d+weKo8qqgYu0JLMM6FGlpWBrSu/+Ia3tsGMU+SVbE3Xzt2dx4BBsUjcD7YM6YyzB5AcJNvTD5VsioX7qJzgWb2jzuTpQ4+0+U3+pghR49m4O0fboO5EFi07qgIvxRxZwOh5z+cnmJPbLATlWEcVF/+/21uItF6igc3/eFLUMTbKCl6yUnnHkQrsW/sqoqfta8998koRu0ezgkwvLz+Wx3WaAJRJ9zR7SOfNxa0yzczWYXaRgh3dGhz/QaXDQrV8V+eYZNdudpjPHVcZZn+vcODGKDk2jrNToIQG1nArVvq7CyN2kZux22CxL36UvgC+0UFR+5IDQH/rcbFEFJFXA0irHxr823DjYP9bkUbUWRZ8jfIGPZAcfldau2M0TJAsbvNVrEZ46N2kRqDK9bsdhbd1V7tsyARWfL22/FvzT4D7EkU3i+xJ6YqrnMf7VSXuT61kyIad1ScIcTObIkhGxsBYupTqlH7G1E=");
+    auto java_sig2048_sha1 = base64_decodeToBytes("YXw319ngFechxlwJK/cA9Aet1ctjHecbyuzpiBbMFg5FHDiRw3d6nRYmSVTrIeE+bOw1Q1TzRvE/WtbbcazxS94pH6F670lSvSDvURKntvjXJN3DILH9iSGCHBsa9RY0cgH+GH4BoJYdJZ21ocEV7XlmSESjNwbMpnivdFqLn4C+f7UIA8OdZyXFDKBJzvbSIoLHCS2nA1q4MS6KxmP4mvCrzdy8IQfYcKCLsCeObWvOtjxA6dTg8GSWptM03mde3ohfpfgUogT/RHbNr+B0NHOU94uAlEU9F1QPnnuouGWqWeSPP6yzpGyhumzOjQNhq2wIq1xvMSeY15Px/m3YMQ==");
+    auto java_sig2048_sha256 = base64_decodeToBytes("dJpklD+gZ+Bw4M3yjFOlGQsqiGYL2Fhm9LB8pS91LP5aOoXe9lJYWuMHwDeaB16awj4tG5SZjYms2OLHaCkLCRJLlWJQ24TXYRyyHb8cRFZ7/5A56J3Cd+iDNUQkhfIsmmWv0/DFW1sIdiwfK2junn5qvZyTk4g/QHYJTEYeyW/yWjYztzoJDCJGEV8t063P/dEdFI2P4MSGT8hp/58Vbe49uTw/FVlpolP1f4aBr3fGqHTsGwnEZAKDtpY3Dgh+7WF4MQaI/cDFLlDNX5QVIKb+7eJf9ac3YnluIaZRbd/WDiXWS5v5Wc1r9JRu3RdLCwHbZSQ42z3FXy5Tag92TA==");
+    auto java_sig2048_sha512 = base64_decodeToBytes("TFoLcP5JKrCLwvKpkYu8YqgM3HJIy09xIh+zsbSTUR6+pQsD7CANaRZhb5m35q/85PyHWPEHtC4iwPLSn57rsvbNpTUkZ1DvV1ZUY1f0mZrOskxTJUdwCfrecJeyCUfZS5LiXii4GjqeGT9OzxDcKmz/vgmWvXKfD+UVgg/kJQKlaPR/Sp0bRiF8RNUpHExyZsBXM/heHDnCnI9F425m7pZxBbikpj+RJioYxTfKRFve5HVXkpfFOYX39WPseN/rFHYVfklX/h/SsLHDiW2iGBE7DNQRgMqkhuMfTCGPtCU2dF2pCeakRaW95nrFFRyLtkh0BhMM3jH6KwRbViqUlw==");
+    auto java_sig2048_sha3_256 = base64_decodeToBytes("LlwJlA3sJKkPQ8fVCQV5hyE7vFoqe1nARk573+rtTk4JacMa+2Kxm2cNiVPIFuU7lDZfL3AY0pplQbhUkXiKrl4IiWL61tAcYRW/6Wcc7hFJS45V6M38mIYQjj4OPfiqpLJPDhyTYwVigjowGDLP5jdULjgvkK5kPSTMITEikTm2PiCuGnAeqVKtzG0/hKLcO+cTQmRtaH2cTjukd/Ml2B8wHxdATVDInoxbUiqsZJu27CZoH5WBTY1M62uOa7OV2PmmZMAFg9715NRyQHd2AqxMk4wwVVVqCZRLZk9PpwfbO9QYtL4Bu3PBw2PFAHXNB9fVVSZ8p75CVCLaFecjwA==");
+    auto java_sig4096_sha1 = base64_decodeToBytes("nTY7SbtmebiT/f4oTEuVlbDWAN/QLxJAxzSKsoF/7NhM96DdZW3QtsQDARxqH0CXTYivbbqcE28iIRlrqAWp1fDFLUG5Mg2xG1wtNjrj4tApw6seFfGZSwRKNZQG1HNOv7yl51nDG4I/aUKT5klFuU6IM9uJhaw+Jz6t151xjHUa7ElLZk2wDK9vQ+nddKgWe93K36a85l78e84FrVQp6Cjj063x59ZvUz1hZ04Lpz+N/PK+fWsZfqNr+CEoePD58RtEwI3Uj+aFQ3+7Py/Yso2CvIpu8q0YGd3RrfXx0IWUp3sCnnmXZDXN7XrGsH3P8zWFOKLO04AHDMx/BMo+N4r26VvvI+QoXPc9BXP/PvqH7Rvd3QWCBRoloIvoiPLfjnoidGaHnjtyA1opGCee63f6bsu7lvGdyeNFpMZRa/NWMTwJc4lA1yruH9Tsaq6X+YaFJzgzlAm/rMDJ42RBJicUedsV9kc5LVGfgygRSojgTVuLgcNauNuDaexJiy/Rc1m3vQvgD/kUhMeTJKitXM1WT6348VUracXdmJpl036+CObnmBIJcY9rj+LYagEoSwmRsn+8eq1dzyubkfIgS8QmyKcSU2spjVrq4Odw+1ffLev3l7X8zmXiwQxO3ragyiteg29y+AkUN2c2s9zvUT6YCTfdf/Lfuslb4ZQUTeI=");
+    auto java_sig4096_sha256 = base64_decodeToBytes("dXJwod92qp3Y2p61oSF9dqBtIK6wRXnZf7x+gWRAjoxACLKMS6ui2TanEyW2RWi6lFnFCLKywQLzdwpMf/2S/KdIwqiVepa5ULI7tc2EJE4xbM0iyPVOxZniFXBeaxWupwvat9eYiDrZ4xViRymPGZqcZ2959CjsD9Uik7+rf36FA6tEyG3sc9Ve/9C5S/+1wb3wm9vU3WflRErNH/wEsQNEzJl4NY48fCZ7IxBsGofANRRrYW8qm9r1jvdUDIF0nexbb+WXzbbE64mAP6P1uusei7aHlJzYfEXCwkk8JGojdeLwMX2J5kbnU15HlLfP363mfd7Av+lDsyH9yNO5bwK709GCKdbBVFUfagy6JLcXsUJbxlwam0RXGtQAJHvqz8d74+uEacyJAO5cCs7A05HSb6ku78igJuoTsDAqtVmGgGzDdpvOCFL9t4YsxHdTL/mf0ELyoWy8IJgwZJbUh8ZUg3+WcXU3Yl/7WhQTqeRZCoy28rRmqyfN5VY/yMXC+RgoExggEOhbo0Hnm4uUYZ8J4mKi106vnndNvAD3SwfGCcu826nQ5/4flXmoVVYqrHSALp5kXVdXXaH9oYdzWtDAU/QeVHFBYH/lOtaF5zKOEpfCO6vhdLXXdMZaq0nrMwzMQFJgfz/UQjIkLfQFMmpJPVUe1MLptiPB39DLcuw=");
+    auto java_sig4096_sha512 = base64_decodeToBytes("WQf5xWga6CTxh7sZyyyaTXMHlS1H3YELFBJxqXpM/ITZxTKuXQcZTCYAvPxYr3+UTMytalulC6BQU2R40cS2ENyWPmDOGcfxn3Ms6kwZVOovr28AJN5E/FEZxDcVPVZ+TpjohajpdfppsbDoUIcLrW3yzCmy7hMiHBmSH2L4UQq0MNtt47oMJe8GnHtJ9j9q5YoqV/K40GWlwpwU4fENhM5cKgOB2QYGan3QEpINKuYgmkg1Cup9XPiW+jdx9upATTh6Y/KXulBosv6842iJ7PL0ROIq4cBppxfpRCGGq/BOcpwfSSFE0TeZNthrU7wcf8FItsb6zxV2c/njytA1LuqExs9zRVmzokXiwQYXG1G8pwg1C2ge7i0UsrvnuRFb9W44qd67gCMGtwjPM6zvoyHpmjQwHaI3Gw7wIOrXZ34Ljy3gig9JHbT6515JK4hjZoqIbazRSeI4Z0exacF5uQkRkRumct4EuS1pSCFH05ogVUKz76U/YW6g20X2np9oXLt7xmGKD6XBV4upi9cwL/v5M5nO/w152JA19kk97/U6SWgHslKEbmPzaz9pqb3kBy2gAD24tco0mzV/LpKERy7FIfVwDdh80iCK7EP0T/u2e4eb1ArIt6w79ydsq4N6qWRGl6G0K01KyjZ3QQON8DuGzP/HcvXgcynpbNn/KdA=");
+    auto java_sig4096_sha3_256 = base64_decodeToBytes("ASTIjeLDoP67daRzGIog5qO5YNYjRukrOSbbxyr/rnr+Sl6Cy2UlrjqpGSqlFseT3dAgHXZh/XX8qI/B5OwukuPOCkDhauSVvxiIkY4Al4Ng041ZH4Bv765r+pSNNvu0MIPQyMRfAde+oUiU7yiYfEiEq3oj0R1AiTcP/vn97hDACUVmfrWNcMgmxVosMv7mNnyAwrisPE+qFbzP3ucoXIYU11QWtwskqGdk0FcKUvrwToWDvRA6rbsqtyEGi84k4tlz419j2Asu3PU6Y6PfDQZpVWYe1iHm92z+9y7xUab+myAK9P/HQ0qE7Rycf4ma6tSW3ozZzF7TRsumvv9HkikoyU5PS9UUCxHcCzZZSZ+XuxO59twzZl/i4zKaJ3vym1gKNfdcWSPIeApEpbrn+7WIgJKdBejdJ0/XYsihgzQhvgy8Av0Z9Kr0XD7NVTJx0t1KdQejarPcgCBJOkM+i01OwfbRsA5CErONj85Z7z8/e/4J3gMM6ypyp2NPIQOlNbpSQ3ARTbyKBcHl3yRWCq6Eg+VYY1iA+a6+Nh6br6RQdAva8mW1Mpn2+msINZHfeAwOgDrhmS1IrKNTLfXxk+Suovbavg+9uUzSbI3qGP9vq4TW0k6cM6Cr8qK1S672AFYBcip2aAMzA/x9d4qxE1vLFzdgyn98Lhlwk2CLYaI=");
+
+    PrivateKey java_privateKey2048(java_privateKey2048bin);
+    PrivateKey java_privateKey4096(java_privateKey4096bin);
+    PublicKey java_publicKey2048(java_publicKey2048bin);
+    PublicKey java_publicKey4096(java_publicKey4096bin);
+
+    checkResult("", body, java_privateKey2048.decrypt(java_encrypted2048));
+    checkResult("", body, java_privateKey4096.decrypt(java_encrypted4096));
+    checkResult("", true, java_publicKey2048.verify(java_sig2048_sha1, body, HashType::SHA1));
+    checkResult("", false, java_publicKey2048.verify(java_sig2048_sha1, body, HashType::SHA256));
+    checkResult("", true, java_publicKey2048.verify(java_sig2048_sha256, body, HashType::SHA256));
+    checkResult("", false, java_publicKey2048.verify(java_sig2048_sha256, body, HashType::SHA512));
+    checkResult("", true, java_publicKey2048.verify(java_sig2048_sha512, body, HashType::SHA512));
+    checkResult("", false, java_publicKey2048.verify(java_sig2048_sha512, body, HashType::SHA3_256));
+    checkResult("", true, java_publicKey2048.verify(java_sig2048_sha3_256, body, HashType::SHA3_256));
+    checkResult("", false, java_publicKey2048.verify(java_sig2048_sha3_256, body, HashType::SHA3_384));
+
+    checkResult("", true, java_publicKey4096.verify(java_sig4096_sha1, body, HashType::SHA1));
+    checkResult("", false, java_publicKey4096.verify(java_sig4096_sha1, body, HashType::SHA256));
+    checkResult("", true, java_publicKey4096.verify(java_sig4096_sha256, body, HashType::SHA256));
+    checkResult("", false, java_publicKey4096.verify(java_sig4096_sha256, body, HashType::SHA512));
+    checkResult("", true, java_publicKey4096.verify(java_sig4096_sha512, body, HashType::SHA512));
+    checkResult("", false, java_publicKey4096.verify(java_sig4096_sha512, body, HashType::SHA3_256));
+    checkResult("", true, java_publicKey4096.verify(java_sig4096_sha3_256, body, HashType::SHA3_256));
+    checkResult("", false, java_publicKey4096.verify(java_sig4096_sha3_256, body, HashType::SHA3_384));
+
+    cout << "testGenerateNewKeys()... done!" << endl << endl;
+}
+
 void testCryptoAll() {
     testCrypto();
     testHashId();
@@ -373,4 +487,5 @@ void testCryptoAll() {
     testPackUnpackKeys();
     testAllHashTypes();
     testKeysConcurrency();
+    testGenerateNewKeys();
 }
