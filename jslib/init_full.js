@@ -80,6 +80,35 @@ function __call_main(args) {
         return result || 0;
 }
 
+// -------------------- crypto init --------------
+crypto.SHA256 = 1;
+crypto.SHA512 = 2;
+crypto.SHA3_256 = 3;
+crypto.SHA3_384 = 4;
+crypto.SHA3_512 = 5;
+
+crypto.PrivateKey.prototype.sign = function(data, hashType=crypto.SHA3_256) {
+    if( typeof(data) == 'string' ) {
+        data = utf8Encode(data);
+    }
+    if( data instanceof Uint8Array)
+        return this.__sign(data, hashType);
+    else
+        throw new Error("Wrong data type: "+typeof(data));
+};
+
+crypto.PublicKey.prototype.verify = function(data, signature, hashType=crypto.SHA3_256) {
+    if( typeof(data) == 'string' ) {
+        data = utf8Encode(data);
+    }
+    if( data instanceof Uint8Array)
+        return this.__verify(data, signature, hashType);
+    else
+        throw new Error("Wrong data type: "+typeof(data));
+}
+
+
+
 // async function test() {
 //     await sleep(2370);
 //     console.log("test1!");

@@ -104,5 +104,12 @@ void JsTypedArrayToString(const FunctionCallbackInfo<v8::Value> &args) {
     });
 }
 
+void JsStringToTypedArray(const FunctionCallbackInfo<v8::Value> &args) {
+    Scripter::unwrapArgs(args, [&](ArgsContext&& ac) {
+        String::Utf8Value s(ac.isolate, args[0]->ToString(ac.isolate));
+        args.GetReturnValue().Set(ac.toBinary(*s, s.length()));
+    });
+}
+
 
 

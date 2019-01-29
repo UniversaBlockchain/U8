@@ -11,6 +11,7 @@
 #include <libplatform/libplatform.h>
 
 #include "../tools/Logging.h"
+#include "../tools/tools.h"
 #include "../tools/AsyncSleep.h"
 #include "../tools/ConditionVar.h"
 
@@ -281,6 +282,8 @@ public:
     shared_ptr<Scripter> scripter;
     Isolate *isolate;
     Local<Context> context;
+    const FunctionCallbackInfo<Value> &args;
+
 
     ArgsContext(const shared_ptr<Scripter> &scripter_, const FunctionCallbackInfo<Value> &args_)
             : args(args_), scripter(scripter_), isolate(args_.GetIsolate()),
@@ -296,15 +299,38 @@ public:
         return args[index]->Int32Value(context).FromJust();
     }
 
-    template<class F>
-    void lockedContext(F &&f) {
-
+    Local<Uint8Array> toBinary(const void* result,size_t size) {
+        auto ab = ArrayBuffer::New(isolate, size);
+        memcpy(ab->GetContents().Data(), result, size);
+        return Uint8Array::New(ab, 0, size);
     }
+
+    Local<Uint8Array> toBinary(const byte_vector& result) {
+        return toBinary(result.data(), result.size());
+    }
+
+
+    Local<Uint8Array> toBinary(byte_vector&& result) {
+        return toBinary(result.data(), result.size());
+    }
+
+    void throwError(const char* text) {
+        scripter->throwError(text);
+    }
+
+    template <typename T>
+    void setReturnValue(T&& value) {
+        args.GetReturnValue().Set(value);
+    }
+
+//    template<class F>
+//    void lockedContext(F &&f) {
+//
+//    }
 
 private:
     Persistent<Context> *pcontext;
 
-    const FunctionCallbackInfo<Value> &args;
 };
 
 template<typename F>

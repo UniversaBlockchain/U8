@@ -126,9 +126,11 @@ void Scripter::initialize() {
     global->Set(v8String("waitExit"), functionTemplate(JsWaitExit));
     global->Set(v8String("exit"), functionTemplate(JsExit));
     global->Set(v8String("utf8Decode"), functionTemplate(JsTypedArrayToString));
+    global->Set(v8String("utf8Encode"), functionTemplate(JsStringToTypedArray));
     global->Set(v8String("$0"), v8String(ARGV0));
 
     JsInitIoHandle(pIsolate, global);
+    JsInitCrypto(pIsolate,global);
 
     // Save context and wrap weak self:
     context.Reset(pIsolate, v8::Context::New(pIsolate, nullptr, global));

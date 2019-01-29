@@ -36,7 +36,7 @@ using namespace std;
  *  in queue) tasks will be discarded.
  *
  */
-class ThreadPool : Noncopyable, Nonmovable {
+class ThreadPool : Noncopyable {
 public:
     /**
      * The callable type

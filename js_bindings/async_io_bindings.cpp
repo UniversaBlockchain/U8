@@ -9,8 +9,6 @@
 #include "../tools/tools.h"
 #include "../AsyncIO/AsyncIO.h"
 
-using asyncio::byte_vector;
-
 void JsAsyncGetErrorText(const FunctionCallbackInfo<Value> &args) {
     Scripter::unwrap(args, [&](const shared_ptr<Scripter> &se, auto isolate, auto context) {
         // args is typicalli big int, so we convert it through string

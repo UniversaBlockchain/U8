@@ -7,6 +7,8 @@
 
 #include <v8.h>
 #include <iostream>
+#include <optional>
+#include "../tools/tools.h"
 
 using namespace v8;
 using namespace std;
@@ -143,10 +145,15 @@ Local<FunctionTemplate> bindCppClass(Isolate *isolate, const char *class_name, F
                                                                                      "calling constructor as function")));
                                 } else {
                                     T *cppObject = constructor(args);
-                                    Local<Object> result = args.This();
-                                    result->SetInternalField(0, External::New(isolate, cppObject));
-                                    SimpleFinalizer(result, cppObject);
-                                    args.GetReturnValue().Set(args.This());
+                                    if( !cppObject ) {
+                                        args.GetReturnValue().SetUndefined();
+                                    }
+                                    else {
+                                        Local<Object> result = args.This();
+                                        result->SetInternalField(0, External::New(isolate, cppObject));
+                                        SimpleFinalizer(result, cppObject);
+                                        args.GetReturnValue().Set(args.This());
+                                    }
                                 }
                             }));
     tpl->InstanceTemplate()->SetInternalFieldCount(1);
@@ -168,6 +175,25 @@ template<typename T>
 Local<FunctionTemplate> bindCppClass(Isolate *isolate, const char *class_name) {
     return bindCppClass<T>(isolate, class_name, [](auto args) { return new T(); });
 }
+
+/**
+ * Convert JS TypedArray to byte_vector.
+ *
+ * @param object should be some TypedArray as for now
+ * @return converted vector or empty optional if conversion is not possible
+ */
+inline
+optional<byte_vector> v8ToVector(Local<Value> object) {
+    if (object->IsTypedArray()) {
+        auto buffer = object.As<TypedArray>()->Buffer();
+        unsigned char *data = (unsigned char *) buffer->GetContents().Data();
+        byte_vector v;
+        v.assign(data, data + buffer->ByteLength());
+        return optional<byte_vector>(v);
+    }
+    return optional<byte_vector>();
+}
+
 
 
 #endif //U8_WEAK_FINALIZERS_H
