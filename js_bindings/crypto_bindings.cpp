@@ -196,11 +196,12 @@ static void JsA2B(const FunctionCallbackInfo<Value>& args) {
 static void JsB2A(const FunctionCallbackInfo<Value>& args) {
     Scripter::unwrapArgs(args, [](ArgsContext&& ac) {
         if( ac.args.Length() == 1) {
-            auto v = v8ToVector(ac.args[0]);
-            if( v )
-                ac.setReturnValue(ac.v8String(base64_encode(*v)));
+            if( ac.args[0]->IsUint8Array() ) {
+                auto c = ac.args[0].As<Uint8Array>()->Buffer()->GetContents();
+                ac.setReturnValue(ac.v8String(base64_encode((unsigned char const*)c.Data(), c.ByteLength())));
+            }
             else
-                ac.throwError("Uint8Array requried as an argument");
+                ac.throwError("Uint8Array required");
         }
         else
             ac.throwError("one argument required");
