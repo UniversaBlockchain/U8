@@ -9,7 +9,7 @@
 #include <string>
 #include <vector>
 #include <tomcrypt.h>
-#include "cryptoCommon.h"
+#include "cryptoCommonPrivate.h"
 #include "../types/UBytes.h"
 
 class PublicKey;
@@ -21,9 +21,6 @@ public:
 	PrivateKey(const std::string& strE, const std::string& strP, const std::string& strQ);
 	PrivateKey(const UBytes& eValue, const UBytes& pValue, const UBytes& qValue);
     PrivateKey(const std::vector<unsigned char>& packedBinaryKey);
-    PrivateKey(const PrivateKey& copyFrom);
-
-	virtual ~PrivateKey();
 
 	std::vector<unsigned char> pack() const;
 
@@ -41,7 +38,7 @@ private:
 
 private:
 
-	rsa_key key;
+	RsaKeyWrapper key;
 
 };
 

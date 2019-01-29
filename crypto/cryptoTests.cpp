@@ -8,12 +8,14 @@
 #include <map>
 #include <unordered_map>
 #include <random>
+#include <atomic>
 #include "base64.h"
 #include "PrivateKey.h"
 #include "PublicKey.h"
 #include "HashId.h"
 #include "KeyAddress.h"
 #include "Safe58.h"
+#include "../tools/ThreadPool.h"
 
 using namespace std;
 
@@ -25,20 +27,29 @@ CryptoTestResults::CryptoTestResults() {
 }
 
 CryptoTestResults::~CryptoTestResults() {
-    auto os1 = (errorsCounter == 0 ? &cout : &cerr);
-    *os1 << "CryptoTestResults: errors = " << errorsCounter << endl;
+    if (checksCounter > 0) {
+        auto os1 = (errorsCounter == 0 ? &cout : &cerr);
+        *os1 << "CryptoTestResults: errors = " << errorsCounter << " (from " << checksCounter << ")" << endl;
+    }
 }
 
 void CryptoTestResults::incrementErrorsCounter() {
     ++errorsCounter;
 }
 
+void CryptoTestResults::incrementChecksCounter() {
+    ++checksCounter;
+}
+
 template <class T>
 void checkResult(const string& msg, const T expected, const T result) {
-    auto os1 = (result == expected ? &cout : &cerr);
-    *os1 << "checkResult " << msg << " (expected " << expected << "): " << result << endl;
-    if (result != expected)
+    cryptoTestResults.incrementChecksCounter();
+    bool boolRes = result == expected;
+    auto os1 = boolRes ? &cout : &cerr;
+    if (!boolRes) {
+        *os1 << "checkResult " << msg << " (expected " << expected << "): " << result << endl;
         cryptoTestResults.incrementErrorsCounter();
+    }
 }
 
 void testCrypto() {
@@ -234,8 +245,8 @@ void testKeyAddress() {
     checkResult("keyAddressLongLoaded", true, keyAddressLongLoaded.operator==(keyAddressLong));
     checkResult("keyAddressLongLoaded", false, keyAddressLongLoaded.operator==(keyAddressShort));
 
-    checkResult("publicKey->getShortAddress", string("Z7Ui6rRxiCiuCYsTV36dDiCbMaz81ttQDb3JDFkdswsMEpWojT"), publicKey.getShortAddress()->toString());
-    checkResult("publicKey->getLongAddress", string("J2Rhu2e6Nvyu9DjqSxTJdDruKHc64NRAVuiawdbnorNA6a7qGq8ox2xsEgnN72WJHjK2DQy3"), publicKey.getLongAddress()->toString());
+    checkResult("publicKey->getShortAddress", string("Z7Ui6rRxiCiuCYsTV36dDiCbMaz81ttQDb3JDFkdswsMEpWojT"), publicKey.getShortAddress().toString());
+    checkResult("publicKey->getLongAddress", string("J2Rhu2e6Nvyu9DjqSxTJdDruKHc64NRAVuiawdbnorNA6a7qGq8ox2xsEgnN72WJHjK2DQy3"), publicKey.getLongAddress().toString());
 
     cout << "testKeyAddress()... done!" << endl << endl;
 }
@@ -276,6 +287,8 @@ void testPackUnpackKeys() {
 
     PrivateKey privateKey(strE, strP, strQ);
     PublicKey publicKey(privateKey);
+    PrivateKey copyPrivateKey = privateKey;
+    PublicKey copyPublicKey = publicKey;
 
     auto packedPrivateKey = privateKey.pack();
     auto packedPublicKey = publicKey.pack();
@@ -290,8 +303,65 @@ void testPackUnpackKeys() {
     PublicKey publicKeyFromDecimalStrings(string("65537"), string("22010430265394139613000868285025463477074223185486244499634177887580324920686226610417706744335933359652430612916358253813893261669330316543239108965341456359299406328906270703947334961348565788596306492647710105586783859797604948705827274758276000792353907279667158525579387393368160190180439522687435755014728372815408024307255185057464905470423281347241480900464128969516046770366189515668158431102639992601462764766100062644885414927549883934897542153111731636732805845904738871223796787350437197422912764815000651812110643298420118455799835223629072584676934684617765337322899072623305931528759760022883356275231"));
     auto packedPublicKey3 = publicKeyFromDecimalStrings.pack();
     checkResult("packedPublicKey3", string("HggcAQABxAABrlsvdv82ZRGkQjvt9OS95cOqroMWvS4s0KlrJc+X96y41MKIyOCcvw2tu9R5uh67nHOFWLa4Gr5AMaCI/l6DvGu7JK4EIgX19f+WalCk9A0mzdyUWt/1571iZPh9cIm0O7oXPR1nhcDAApQFJfE7U20cW0OJ0EMNijB4s0tzNc+D6eqCDCnbfcASOw4JQ4MC838HJi5BeqGgoXdZI1UMh2CQ0xHKVzYY9DADzxZTu1Qz/kTbvCL3ust54KHbOh/8Y2eFpLO+waW1s6z11JLGJXERhOBzfB4tQppU+QbI0u7hTdv/GgGh6ED60Ggq7l8Rz5nU5DCHCYZmiYZcPhpyHw=="), base64_encode(&packedPublicKey3[0], packedPublicKey3.size()));
+    checkResult("copyPrivateKey", base64_encode(privateKey.pack()), base64_encode(copyPrivateKey.pack()));
+    checkResult("copyPublicKey", base64_encode(publicKey.pack()), base64_encode(copyPublicKey.pack()));
 
     cout << "testPackUnpackKeys()... done!" << endl << endl;
+}
+
+void testAllHashTypes() {
+    cout << "testAllHashTypes()..." << endl;
+
+    auto bodyStr = base64_decode("cXdlcnR5MTIzNDU2");
+    auto body = std::vector<unsigned char>(bodyStr.begin(), bodyStr.end());
+
+    checkResult("sha1", string("87o4G2uu9Sa/cP8iCx2kkGmJIks="), base64_encode(Digest(HashType::SHA1, body).getDigest()));
+    checkResult("sha256", string("OldFoF+H3e4dtoshfcBDv6IG0ceqod0KfddrhSpzNZc="), base64_encode(Digest(HashType::SHA256, body).getDigest()));
+    checkResult("sha512", string("4LUOOtuFzgekEZZwm6ZCiGuoKKNUrO5C6udVm8fGI5gYl/VgIGme1h+gUvR4S/N+du/wFu4GXXe8FY3Rcuq9dg=="), base64_encode(Digest(HashType::SHA512, body).getDigest()));
+    checkResult("sha3_256", string("pvZgN9IA5n4QmqvOmeXETci/nM5V5BLb/u8qexEsvYc="), base64_encode(Digest(HashType::SHA3_256, body).getDigest()));
+    checkResult("sha3_384", string("4CyM0S8zbDNE7T1po05rwZnreEpE2qrIUSzqObeZ5uRJblbAeoDhVRQVfYMX6bRh"), base64_encode(Digest(HashType::SHA3_384, body).getDigest()));
+    checkResult("sha3_512", string("LLgMxUrw59k3MZ3TFJiwk0o3GJ5oRiRe1N3wRhMY2PSQpEk7mbeSlCJIHJsO1s5XcS5VQeUUQEz+G473CeK9uA=="), base64_encode(Digest(HashType::SHA3_512, body).getDigest()));
+
+    checkResult("sha1 size", 20ul, Digest(HashType::SHA1).getDigestSize());
+    checkResult("sha256 size", 32ul, Digest(HashType::SHA256).getDigestSize());
+    checkResult("sha512 size", 64ul, Digest(HashType::SHA512).getDigestSize());
+    checkResult("sha3_256 size", 32ul, Digest(HashType::SHA3_256).getDigestSize());
+    checkResult("sha3_384 size", 48ul, Digest(HashType::SHA3_384).getDigestSize());
+    checkResult("sha3_512 size", 64ul, Digest(HashType::SHA3_512).getDigestSize());
+
+    cout << "testAllHashTypes()... done!" << endl << endl;
+}
+
+void testKeysConcurrency() {
+    cout << "testKeysConcurrency()..." << endl;
+
+    auto body = base64_decodeToBytes("cXdlcnR5MTIzNDU2");
+    PrivateKey privateKey(base64_decodeToBytes("JgAcAQABvIDtBFjZyB1P7q19Ni0dCPs2ndCJrrVIXzYMbsLzVMNuRFv2NxiERGAZIolO948EGd+/E5tIv+1rAH6Oqoubqrx4MGXwpL2DJw+/No/pQQSqYCKA/v3BeADdaXo+XL12RCr3N87QGV0Ept9Q25GltgZuB75rZ4QN9NWMNa1ql929DbyAvFIUVIg6o9lT2JjnlIWNapM6rZNpo7c8SN/CfAFWxpm5qwqnIpJRrEl3fGUre2K+3psZDVIo0AKFGbuKAi+ZDAWpTAnuwT1R4pQqK/c0Z65HEbnwiAaWOn9HBAUw9c09AvgPoQvVgLS3YSA8/xBe+NeuqnIwl/Tw0m7EjVFSmNs="));
+    PublicKey publicKey(privateKey);
+    std::atomic<long> counter(0);
+    ConditionVar cv;
+    long total_tasks_count = 8000;
+    ThreadPool pool(50);
+    for (int i = 0; i < total_tasks_count; ++i) {
+        pool([&](){
+            vector<unsigned char> encrypted;
+            vector<unsigned char> decrypted;
+            publicKey.encrypt(body, encrypted);
+            privateKey.decrypt(encrypted, decrypted);
+            checkResult("concurrency endcrypt/decrypt", string("cXdlcnR5MTIzNDU2"), base64_encode(decrypted));
+            vector<unsigned char> sig;
+            privateKey.sign(body, SHA3_512, sig);
+            checkResult("concurrency sign/verify", true, publicKey.verify(sig, body, SHA3_512));
+            ++counter;
+            cv.notify();
+        });
+    }
+    while (cv.wait(1000ms)) {
+        if (counter >= total_tasks_count)
+            break;
+    }
+
+    cout << "testKeysConcurrency()... done!" << endl << endl;
 }
 
 void testCryptoAll() {
@@ -301,4 +371,6 @@ void testCryptoAll() {
     testKeyAddress();
     testSafe58();
     testPackUnpackKeys();
+    testAllHashTypes();
+    testKeysConcurrency();
 }

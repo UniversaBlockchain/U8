@@ -13,13 +13,16 @@ class PublicKey;
 class KeyAddress {
 
 public:
+    KeyAddress();
     KeyAddress(const PublicKey& key, int typeMark, bool useSha3_384);
     KeyAddress(const std::string& packedString);
     KeyAddress(const std::vector<unsigned char>& packedString);
 
-    std::string toString();
+    std::string toString() const;
 
     bool operator==(const KeyAddress& other) const;
+
+    bool isInitialized() const;
 
 protected:
     static int mask(const PublicKey& key);

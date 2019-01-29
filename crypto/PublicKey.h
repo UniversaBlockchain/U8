@@ -10,7 +10,7 @@
 #include <gmp.h>
 #include <unordered_map>
 #include <memory>
-#include "cryptoCommon.h"
+#include "cryptoCommonPrivate.h"
 #include "KeyAddress.h"
 #include "PrivateKey.h"
 #include "../types/UBytes.h"
@@ -24,15 +24,14 @@ public:
 	PublicKey(const UBytes& e, const UBytes& N);
 	PublicKey(const std::vector<unsigned char>& packedBinaryKey);
 	PublicKey(const PrivateKey& privateKey);
-    virtual ~PublicKey();
 
 	std::vector<unsigned char> pack() const;
 
 	bool verify(const std::vector<unsigned char> &sig, const std::vector<unsigned char> &data, HashType hashType);
 	void encrypt(std::vector<unsigned char>& input, std::vector<unsigned char>& output);
 
-	const std::unique_ptr<KeyAddress>& getShortAddress();
-	const std::unique_ptr<KeyAddress>& getLongAddress();
+	const KeyAddress& getShortAddress();
+	const KeyAddress& getLongAddress();
 
 	void toHash(std::unordered_map<std::string, std::string>& dst) const;
 	long getPublicExponent() const;
@@ -46,11 +45,11 @@ private:
 
 private:
 
-	rsa_key key;
+	RsaKeyWrapper key;
 	HashType mgf1HashType = DEFAULT_MGF1_HASH;
 
-	std::unique_ptr<KeyAddress> shortAddress = nullptr;
-	std::unique_ptr<KeyAddress> longAddress = nullptr;
+	KeyAddress shortAddress;
+	KeyAddress longAddress;
 
 };
 

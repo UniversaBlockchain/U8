@@ -6,15 +6,17 @@
 #include "PublicKey.h"
 #include <unordered_map>
 #include <algorithm>
-#include "cryptoCommon.h"
+#include "cryptoCommonPrivate.h"
 #include "base64.h"
 #include "Safe58.h"
 
+KeyAddress::KeyAddress() {
+}
+
 KeyAddress::KeyAddress(const PublicKey& key, int typeMark, bool useSha3_384) {
     this->typeMark = typeMark;
-    if ((typeMark & 0xF0) != 0) {
-        //TODO: throw new IllegalArgumentException("type mark must be in [0..15] range");
-    }
+    if ((typeMark & 0xF0) != 0)
+        throw std::invalid_argument(std::string("type mark must be in [0..15] range"));
 
     keyMask = mask(key);
 
@@ -48,9 +50,8 @@ KeyAddress::KeyAddress(const std::vector<unsigned char>& packedSource) {
     typeMark = packedSource[0] & 0x0F;
     keyMask = (packedSource[0] & 0xFF) >> 4;
 
-    if (keyMask == 0) {
-        //TODO: throw new IllegalAddressException("keyMask is 0");
-    }
+    if (keyMask == 0)
+        throw std::invalid_argument(std::string("keyMask is 0"));
 
     isLong = packedSource.size() == 53;
 
@@ -70,9 +71,8 @@ KeyAddress::KeyAddress(const std::vector<unsigned char>& packedSource) {
     crc32packed.resize(4);
     crc32_finish(&ctx, &crc32[0], 4);
     memcpy(&crc32packed[0], &packed[digestLength1], 4);
-    if (!std::equal(crc32.begin(), crc32.end(), crc32packed.begin())) {
-        //TODO: throw new IllegalAddressException("control code failed, address is broken");
-    }
+    if (!std::equal(crc32.begin(), crc32.end(), crc32packed.begin()))
+        throw std::invalid_argument(std::string("control code failed, address is broken"));
 }
 
 int KeyAddress::mask(const PublicKey& key) {
@@ -83,11 +83,10 @@ int KeyAddress::mask(const PublicKey& key) {
         if (l == 4096 / 8)
             return 0x02;
     }
-    //TODO: throw new IllegalArgumentException("key can't be masked for address: " + i);
-    return 77;
+    throw std::invalid_argument(std::string("key can't be masked for address"));
 }
 
-std::string KeyAddress::toString() {
+std::string KeyAddress::toString() const {
     return Safe58::encode(packed);
 }
 
@@ -95,4 +94,8 @@ bool KeyAddress::operator==(const KeyAddress& other) const {
     if (packed.size() != other.packed.size())
         return false;
     return std::equal(packed.begin(), packed.end(), other.packed.begin());
+}
+
+bool KeyAddress::isInitialized() const {
+    return !packed.empty();
 }
