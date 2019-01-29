@@ -131,4 +131,15 @@ Set.prototype.add = function(value) {
         addFunc.call(this,value);
 };
 
-module.exports = {arraysEqual,valuesEqual};
+
+function randomString(length) {
+    let string = "";
+    let possible = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+
+    for (let i = 0; i < length; i++)
+        string += possible.charAt(Math.floor(Math.random() * possible.length));
+
+    return string;
+}
+
+module.exports = {arraysEqual,valuesEqual,randomString};

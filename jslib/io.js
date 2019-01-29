@@ -163,7 +163,7 @@ function InputStream(handle, buferLength = chunkSize) {
      * @returns {Promise<Uint8Array>}
      */
     this.allBytes = async function () {
-        let parts = []
+        let parts = [];
 
         if (pos >= 0) {
             // if some chunk already load, used unread part of it

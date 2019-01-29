@@ -1,6 +1,7 @@
 // this is just a test file tu run with u8
 
 let io = require("io");
+let Contract = require("contract").Contract;
 
 async function testReadLines() {
     let input = await io.openRead("../test/test.txt");
@@ -44,12 +45,18 @@ function testBoss() {
     assert(packed.toString() == writer.get().toString() );
 }
 
+async function testContract() {
+    let input = await io.openRead("../test/testcontract.unicon");
+    let sealed = await input.allBytes();
+    let contract = Contract.fromSealedBinary(sealed);
+}
 async function main() {
     // await testReadAll();
     // await testIterateBytes();
     // await testReadAll();
     // await testWriteBytes();
-    testBoss();
+    //testBoss();
+    await testContract();
     // let xx = [];//1,2,3,4,5];
     // console.log(xx.reduce((a,b) => a + b, 0));
     // await sleep(100);
