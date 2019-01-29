@@ -247,6 +247,17 @@ void testKeyAddress() {
     checkResult("keyAddressShortLoaded", false, keyAddressShortLoaded.operator==(keyAddressLong));
     checkResult("keyAddressLongLoaded", true, keyAddressLongLoaded.operator==(keyAddressLong));
     checkResult("keyAddressLongLoaded", false, keyAddressLongLoaded.operator==(keyAddressShort));
+    checkResult("keyAddressShortLoaded", true, keyAddressShortLoaded.isMatchingKeyAddress(keyAddressShort));
+    checkResult("keyAddressShortLoaded", false, keyAddressShortLoaded.isMatchingKeyAddress(keyAddressLong));
+    checkResult("keyAddressLongLoaded", true, keyAddressLongLoaded.isMatchingKeyAddress(keyAddressLong));
+    checkResult("keyAddressLongLoaded", false, keyAddressLongLoaded.isMatchingKeyAddress(keyAddressShort));
+
+    checkResult("", true, keyAddressShort.isMatchingKey(publicKey));
+    checkResult("", true, keyAddressLong.isMatchingKey(publicKey));
+    PrivateKey otherPrivateKey(2048);
+    PublicKey otherPublicKey(otherPrivateKey);
+    checkResult("", false, keyAddressShort.isMatchingKey(otherPublicKey));
+    checkResult("", false, keyAddressLong.isMatchingKey(otherPublicKey));
 
     checkResult("publicKey->getShortAddress", string("Z7Ui6rRxiCiuCYsTV36dDiCbMaz81ttQDb3JDFkdswsMEpWojT"), publicKey.getShortAddress().toString());
     checkResult("publicKey->getLongAddress", string("J2Rhu2e6Nvyu9DjqSxTJdDruKHc64NRAVuiawdbnorNA6a7qGq8ox2xsEgnN72WJHjK2DQy3"), publicKey.getLongAddress().toString());

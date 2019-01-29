@@ -21,6 +21,8 @@ public:
     std::string toString() const;
 
     bool operator==(const KeyAddress& other) const;
+    bool isMatchingKeyAddress(const KeyAddress& other) const;
+    bool isMatchingKey(const PublicKey& key) const;
 
     bool isInitialized() const;
 

@@ -96,6 +96,15 @@ bool KeyAddress::operator==(const KeyAddress& other) const {
     return std::equal(packed.begin(), packed.end(), other.packed.begin());
 }
 
+bool KeyAddress::isMatchingKeyAddress(const KeyAddress& other) const {
+    return *this == other;
+}
+
+bool KeyAddress::isMatchingKey(const PublicKey& key) const {
+    KeyAddress other(key, 0, isLong);
+    return isMatchingKeyAddress(other);
+}
+
 bool KeyAddress::isInitialized() const {
     return !packed.empty();
 }
