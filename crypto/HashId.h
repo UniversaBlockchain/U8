@@ -13,10 +13,13 @@ class HashId {
 
 public:
     HashId(const std::vector<unsigned char>& packedData);
+    HashId(void* data, size_t size);
     HashId(const HashId& copyFrom);
-    static std::shared_ptr<HashId> of(const std::vector<unsigned char>& packedData);
+    static HashId of(const std::vector<unsigned char>& packedData);
+    static HashId of(void* data, size_t size);
 
     void initWith(const std::vector<unsigned char>& packedData);
+    void initWith(void* data, size_t size);
     std::string toBase64();
     std::vector<unsigned char> getDigest();
 

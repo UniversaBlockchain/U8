@@ -68,13 +68,21 @@ Digest::Digest(HashType hashType) {
     desc.init(&md);
 }
 
-Digest::Digest(HashType hashType, const std::vector<unsigned char>& dataToHash): Digest(hashType) {
-    update(dataToHash);
+Digest::Digest(HashType hashType, const std::vector<unsigned char>& dataToHash):
+    Digest(hashType, (void*)&dataToHash[0], dataToHash.size()) {
+}
+
+Digest::Digest(HashType hashType, void* data, size_t size): Digest(hashType) {
+    update(data, size);
     doFinal();
 }
 
 void Digest::update(const std::vector<unsigned char>& data) {
-    desc.process(&md, &data[0], data.size());
+    update((void*)&data[0], data.size());
+}
+
+void Digest::update(void* data, size_t size) {
+    desc.process(&md, (unsigned char*)data, size);
 }
 
 void Digest::doFinal() {
