@@ -36,10 +36,12 @@ public:
 
 	bool isMatchingKeyAddress(const KeyAddress& other);
 
+	std::vector<unsigned char> fingerprint();
+
 	void toHash(std::unordered_map<std::string, std::string>& dst) const;
 	long getPublicExponent() const;
 	int getBitStrength() const;
-	void getKeyComponentsAsBytes(std::vector<unsigned char>& output) const;
+	std::vector<unsigned char> getKeyComponentsAsBytes() const;
 
 private:
 
@@ -48,11 +50,14 @@ private:
 
 private:
 
+	const static char FINGERPRINT_SHA256 = 7;
+
 	RsaKeyWrapper key;
 	HashType mgf1HashType = DEFAULT_MGF1_HASH;
 
 	KeyAddress shortAddress;
 	KeyAddress longAddress;
+	std::vector<unsigned char> fingerprint_;
 
 };
 

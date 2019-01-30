@@ -28,8 +28,7 @@ KeyAddress::KeyAddress(const PublicKey& key, int typeMark, bool useSha3_384) {
     packed.resize(1 + 4 + digestDesc.hashsize);
     packed[0] = (char)(((keyMask << 4) | typeMark) & 0xFF);
 
-    std::vector<unsigned char> keyComponents;
-    key.getKeyComponentsAsBytes(keyComponents);
+    auto keyComponents = key.getKeyComponentsAsBytes();
     keyDigest.resize(digestDesc.hashsize);
     unsigned long outLen = keyDigest.size();
     hash_memory(digestIndx, &keyComponents[0], keyComponents.size(), &keyDigest[0], &outLen);

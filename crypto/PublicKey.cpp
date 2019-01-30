@@ -186,6 +186,17 @@ bool PublicKey::isMatchingKeyAddress(const KeyAddress& other) {
 	return other.isLong() ? getLongAddress().isMatchingKeyAddress(other) : getShortAddress().isMatchingKeyAddress(other);
 }
 
+std::vector<unsigned char> PublicKey::fingerprint() {
+	if (fingerprint_.empty()) {
+		fingerprint_.resize(33);
+		fingerprint_[0] = FINGERPRINT_SHA256;
+		auto keyComponents = getKeyComponentsAsBytes();
+		auto digest = Digest(HashType::SHA256, keyComponents).getDigest();
+		memcpy(&fingerprint_[1], &digest[0], 32);
+	}
+	return fingerprint_;
+}
+
 void PublicKey::toHash(std::unordered_map<std::string, std::string>& dst) const {
 	char buf[2048];
 	gmp_snprintf(buf, sizeof(buf)/sizeof(buf[0]), "%Zx", key.key.N);
@@ -213,10 +224,12 @@ int PublicKey::getBitStrength() const {
 	return modulus_bitlen;
 }
 
-void PublicKey::getKeyComponentsAsBytes(std::vector<unsigned char>& output) const {
+std::vector<unsigned char> PublicKey::getKeyComponentsAsBytes() const {
+	std::vector<unsigned char> output;
 	int len1 = mpz_unsigned_bin_size((mpz_ptr)key.key.e);
 	int len2 = mpz_unsigned_bin_size((mpz_ptr)key.key.N);
 	output.resize(len1 + len2);
 	mpz_to_unsigned_bin((mpz_ptr)key.key.e, &output[0]);
 	mpz_to_unsigned_bin((mpz_ptr)key.key.N, &output[len1]);
+	return output;
 }
