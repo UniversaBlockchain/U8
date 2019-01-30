@@ -34,7 +34,7 @@ class AsyncProcessor {
  *
  * @type {number}
  */
-const chunkSize = 4096;
+const chunkSize = 2048;
 
 const hproto = IoHandle.prototype;
 
@@ -42,7 +42,12 @@ hproto.read = function (size) {
     if (size <= 0)
         throw Error("size must > 0");
     let ap = new AsyncProcessor();
-    this._read_raw(size, (data, code) => ap.process(code, data));
+    this._read_raw(size, (data, code) => {
+        // read less tham expected: slice
+        if( code > 0 && code < size )
+            data = data.slice(0, code);
+        ap.process(code, data)
+    });
     return ap.promise;
 };
 
@@ -174,7 +179,6 @@ function InputStream(handle, buferLength = chunkSize) {
             while (await loadChunk())
                 parts.push(chunk);
         }
-
         let size = parts.reduce((a, b) => a + b.length, 0);
         let result = new Uint8Array(size);
         let offset = 0;
@@ -182,7 +186,7 @@ function InputStream(handle, buferLength = chunkSize) {
         parts.forEach(x => {
             result.set(x, offset);
             offset += x.length;
-        })
+        });
         return result;
     }
 
