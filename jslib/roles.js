@@ -433,25 +433,9 @@ listRoleAdapter.serialize = function(role,serializer) {
 };
 
 
-let simpleRoleAdapter = new bs.BiAdapter();
-simpleRoleAdapter.getTag = function() {
-    return "SimpleRole";
-};
-simpleRoleAdapter.getType = function() {
-    return SimpleRole.prototype;
-};
-simpleRoleAdapter.deserialize = function(data, deserializer) {
-    let lr = new SimpleRole();
-    lr.deserialize(data,deserializer);
-    return lr;
-};
-simpleRoleAdapter.serialize = function(role,serializer) {
-    return role.serialize(serializer);
-};
-
-dbm.DefaultBiMapper.registerAdapter(roleLinkAdapter);
-dbm.DefaultBiMapper.registerAdapter(listRoleAdapter);
-dbm.DefaultBiMapper.registerAdapter(simpleRoleAdapter);
+dbm.DefaultBiMapper.registerAdapter(new bs.BiAdapter("RoleLink",RoleLink));
+dbm.DefaultBiMapper.registerAdapter(new bs.BiAdapter("ListRole",ListRole));
+dbm.DefaultBiMapper.registerAdapter(new bs.BiAdapter("SimpleRole",SimpleRole));
 
 ///////////////////////////
 //EXPORTS

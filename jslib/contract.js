@@ -6,9 +6,6 @@ const TransactionPack = require("transactionpack").TransactionPack;
 const Quantiser = require("quantiser").Quantiser;
 const Boss = require('boss.js');
 
-///////////////////////////
-//Contract
-///////////////////////////
 
 const MAX_API_LEVEL = 3;
 
@@ -122,6 +119,8 @@ function Definition(contract) {
     this.references = [];
     this.extendedType = null;
     this.permissions = new Map();
+
+    //TODO:setJS
 }
 
 Definition.prototype = Object.create(bs.BiSerializable.prototype);
@@ -225,6 +224,9 @@ Definition.prototype.addPermission = function (permission) {
 };
 
 
+///////////////////////////
+//Contract
+///////////////////////////
 
 function Contract() {
     this.revokingItems = new Set();
@@ -255,7 +257,7 @@ Contract.testQuantaLimit = -1;
 Contract.JSAPI_SCRIPT_FIELD = "scripts";
 
 Contract.fromPrivateKey = function(key) {
-
+    //TODO:
 };
 
 
@@ -287,7 +289,6 @@ Contract.fromSealedBinary = function(sealed,transactionPack) {
     result.apiLevel = data.version;
     let contractBytes = data.data;
     let payload = Boss.load(contractBytes,null);
-    console.log(JSON.stringify(payload));
     result.deserialize(payload.contract,BossBiMapper.getInstance());
 
     if(result.apiLevel < 3) {
@@ -378,9 +379,11 @@ Contract.prototype.seal = function() {
 
 Contract.fromSealedV2Binary = function(sealed,data,transactionPack) {
 
+    //TODO:
 };
 
 Contract.prototype.sealV2 = function() {
+    //TODO:
     /*byte[] theContract = Boss.pack(
         BossBiMapper.serialize(
             Binder.of(

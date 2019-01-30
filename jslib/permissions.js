@@ -464,6 +464,16 @@ SplitJoinPermission.prototype.isMergeable = function(c) {
     return c.state.data[this.fieldName] != null;
 };
 
+
+
+dbm.DefaultBiMapper.registerAdapter(new bs.BiAdapter("ChangeNumberPermission",ChangeNumberPermission));
+dbm.DefaultBiMapper.registerAdapter(new bs.BiAdapter("ChangeOwnerPermission",ChangeOwnerPermission));
+dbm.DefaultBiMapper.registerAdapter(new bs.BiAdapter("ModifyDataPermission",ModifyDataPermission));
+dbm.DefaultBiMapper.registerAdapter(new bs.BiAdapter("RevokePermission",RevokePermission));
+dbm.DefaultBiMapper.registerAdapter(new bs.BiAdapter("SplitJoinPermission",SplitJoinPermission));
+
+
+
 ///////////////////////////
 //EXPORTS
 ///////////////////////////
