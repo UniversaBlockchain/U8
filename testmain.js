@@ -2,6 +2,7 @@
 
 let io = require("io");
 let Contract = require("contract").Contract;
+let TransactionPack = require("transactionpack").TransactionPack;
 
 async function testReadLines() {
     let input = await io.openRead("../test/test.txt");
@@ -90,10 +91,30 @@ async function testRSA() {
 
 }
 
+function logContractTree(contract,prefix) {
+    if(!prefix)
+        prefix = "";
+
+    console.log(prefix+" "+contract.id.base64);
+    let i = 0;
+    for(let ri of contract.revokingItems) {
+        logContractTree(ri,prefix+".revoke["+i+"]");
+        i++;
+    }
+
+    i = 0;
+    for(let ri of contract.newItems) {
+        logContractTree(ri,prefix+".new["+i+"]");
+        i++;
+    }
+}
+
 async function testContract() {
-    let input = await io.openRead("../test/testcontract.unicon");
+    let input = await io.openRead("../test/ttt.unicon");
     let sealed = await input.allBytes();
-    let contract = Contract.fromSealedBinary(sealed);
+    let contract = TransactionPack.unpack(sealed).contract;
+
+    logContractTree(contract,"root");
 }
 
 async function testHashId() {
@@ -120,7 +141,7 @@ async function main() {
     // await testRSA();
 
     //testBoss();
-    // await testContract();
+     await testContract();
     // let xx = [];//1,2,3,4,5];
     // console.log(xx.reduce((a,b) => a + b, 0));
     // await sleep(100);

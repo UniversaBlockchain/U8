@@ -140,6 +140,28 @@ crypto.KeyAddress.prototype.equals = packedEq;
 crypto.PublicKey.prototype.equals = packedEq;
 crypto.PrivateKey.prototype.equals = packedEq;
 
+crypto.HashId.prototype.equals = function(to) {
+    if(this === to)
+        return true;
+
+    if(Object.getPrototypeOf(this) !== Object.getPrototypeOf(to))
+        return false;
+
+    return valuesEqual(this.digest,to.digest);
+};
+
+let mapGet = Map.prototype.get;
+
+Map.prototype.get = function(x) {
+    for(let k of this.keys()) {
+        if(valuesEqual(k,x)) {
+            return mapGet.call(this,k);
+        }
+    }
+    return null;
+};
+
+
 let addFunc = Set.prototype.add;
 let deleteFunc = Set.prototype.delete;
 

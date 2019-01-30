@@ -102,4 +102,18 @@ privatekeyAdapter.deserialize = function(data,d) {
 DefaultBiMapper.registerAdapter(privatekeyAdapter);
 
 
+let hashidAdapter = new bs.BiAdapter("HashId",crypto.HashId);
+hashidAdapter.serialize = function(o,s) {
+    return {
+        composite3 : s.serialize(o.digest)
+    };
+};
+
+hashidAdapter.deserialize = function(data,d) {
+    return crypto.HashId.withDigest(d.deserialize(data.composite3));
+};
+
+DefaultBiMapper.registerAdapter(hashidAdapter);
+
+
 module.exports = {DefaultBiMapper};

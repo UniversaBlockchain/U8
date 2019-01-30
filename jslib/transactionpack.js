@@ -14,8 +14,10 @@ function TransactionPack(contract) {
     this.referencedItems = new Map();
     this.keysForPack = new Set();
     this.contract = contract;
-    this.extractAllSubItemsAndReferenced(contract);
-    this.contract.transactionPack = this;
+    if(contract) {
+        this.extractAllSubItemsAndReferenced(contract);
+        this.contract.transactionPack = this;
+    }
     this.packedBinary = null;
 }
 
@@ -36,7 +38,7 @@ TransactionPack.prototype.extractAllSubItemsAndReferenced = function(contract) {
 
 
 function ContractDependencies(binary) {
-    this.id = HashId.of(binary);
+    this.id = crypto.HashId.of(binary);
     this.binary = binary;
     this.dependencies = new Set();
     let data = Boss.load(binary);
@@ -96,9 +98,9 @@ TransactionPack.prototype.deserialize = function(data,deserializer) {
             if(!found) {
                 removed = true;
                 //TODO: NContracts
-                let c = new Contract(allDeps[i],this);
+                let c = new Contract.fromSealedBinary(allDeps[i].binary,this);
                 this.subItems.set(c.id,c);
-                missingIds.remove(c.id);
+                missingIds.delete(c.id);
                 allDeps.splice(i,1);
                 i--;
             }
@@ -108,8 +110,7 @@ TransactionPack.prototype.deserialize = function(data,deserializer) {
             throw "circle deps in contracts tree";
     }
 
-    //TODO: NContracts
-    this.contract = new Contract(deserializer.deserialize(data.contract),this);
+    this.contract = Contract.fromSealedBinary(deserializer.deserialize(data.contract),this);
 
 };
 
@@ -156,7 +157,7 @@ TransactionPack.prototype.pack = function() {
 
 TransactionPack.unpack = function(bytes) {
     let x = Boss.load(bytes);
-    let res = BossBiMapper.deserialize(x);
+    let res = BossBiMapper.getInstance().deserialize(x);
     if(res instanceof TransactionPack) {
         return res;
     }

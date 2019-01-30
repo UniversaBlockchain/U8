@@ -278,6 +278,7 @@ Contract.fromSealedBinary = function(sealed,transactionPack) {
         transactionPack = new TransactionPack(result);
 
     result.sealedBinary = sealed;
+    result.id = crypto.HashId.of(sealed);
     result.transactionPack = transactionPack;
     result.isNeedVerifySealedKeys = true;
     let data = Boss.load(sealed);
@@ -307,19 +308,20 @@ Contract.fromSealedBinary = function(sealed,transactionPack) {
     } else {
         if(payload.hasOwnProperty("revoking"))
             for(let b of payload.revoking) {
-                let hid = HashId.withDigest(b.composite3);
-                let r = transactionPack.getSubItem(hid);
+                let hid = BossBiMapper.getInstance().deserialize(b);
+                let r = transactionPack.subItems.get(hid);
                 if(r != null) {
                     result.revokingItems.add(r);
                 } else {
+                    console.log(JSON.stringify(hid));
                     result.addError(Errors.BAD_REVOKE,"Revoking item was not found in the transaction pack")
                 }
             }
 
         if(payload.hasOwnProperty("new"))
             for(let b of payload.new) {
-                let hid = HashId.withDigest(b.composite3);
-                let r = transactionPack.getSubItem(hid);
+                let hid = BossBiMapper.getInstance().deserialize(b);
+                let r = transactionPack.subItems.get(hid);
                 if(r != null) {
                     result.newItems.add(r);
                 } else {
