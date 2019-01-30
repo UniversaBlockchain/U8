@@ -96,8 +96,22 @@ async function testContract() {
     let contract = Contract.fromSealedBinary(sealed);
 }
 
+async function testHashId() {
+    let x = crypto.HashId.of("hello, world");
+    console.log(x.digest);
+    console.log(x.base64);
+    let y = crypto.HashId.withDigest(x.digest);
+    assert(equalArrays(x.digest, y.digest));
+    assert(x.equals(y));
+    assert(x.base64.length > 50);
+    assert(x.base64 == y.base64);
+    let z = crypto.HashId.withBase64Digest(x.base64);
+    assert(z.equals(x));
+}
+
 async function main() {
-    await testReadAll();
+    // await testReadAll();
+    await testHashId();
     // await testIterateBytes();
     // await testReadAll();
     // await testWriteBytes();

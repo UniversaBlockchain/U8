@@ -172,8 +172,80 @@ Object.defineProperty(crypto.KeyAddress.prototype, "packed", {
     }
 });
 
+/**
+ * Universa HashId implementation.
+ *
+ * @type {crypto.HashId}
+ */
+crypto.HashId = class extends crypto.HashIdImpl {
+    /**
+     * Construct HashId for a given data
+     *
+     * @param {Uint8Array|string} data to calculate hashId of
+     *
+     * @returns {crypto.HashId}
+     */
+    static of(data) {
+        if( typeof(data) == 'string' )
+            data = utf8Encode(data);
+        return new crypto.HashId(false, data);
+    }
+
+    /**
+     * Construct HashId with pre-calculated digest.
+     *
+     * @param {Uint8Array} digest
+     * @returns {crypto.HashId}
+     */
+    static withDigest(digest) {
+        return new crypto.HashId(true, digest);
+    }
+
+    /**
+     * Construct HashId with pre-calculated digest in base64 encoded form
+     * @param {string} digest in base64 encoding
+     * @returns {crypto.HashId}
+     */
+    static withBase64Digest(digest) {
+        return new crypto.HashId(true, atob(digest));
+    }
+
+    /**
+     * Get the digest as binary array
+     * @returns {Uint8Array}
+     */
+    get digest() {
+        if( !this.__digest ) this.__digest = this.__getDigest();
+        return this.__digest;
+    }
+
+    /**
+     * Get the digest as base64-encoded string
+     * @returns {string} base64 encoded digest
+     */
+    get base64() {
+        if( !this.__base64 ) this.__base64 = this.__getBase64String();
+        return this.__base64;
+    }
+
+    /**
+     * Check that this HashId is equal to another hashId.
+     * @param anotherId anything that imlements {digest} getter.
+     * @returns {boolean}
+     */
+    equals(anotherId) {
+        return equalArrays(this.digest, anotherId.digest);
+    }
+};
+
 // -------------------------------------- utilities
 
+/**
+ * Check that two arrays have equal components, using '==='. Shallow comarison.
+ * @param a array-like object
+ * @param b array-like object
+ * @returns {boolean} true if 'arrays' have equal sizes and content.
+ */
 function equalArrays(a, b) {
     if (a.byteLength !== b.byteLength) return false;
     return a.every((val, i) => val === b[i]);
