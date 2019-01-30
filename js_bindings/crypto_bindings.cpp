@@ -88,6 +88,26 @@ static void keyAddressGetPacked(const FunctionCallbackInfo<Value> &args) {
     });
 }
 
+static void keyAddressMatch(const FunctionCallbackInfo<Value> &args) {
+    Scripter::unwrapArgs(args, [](ArgsContext &&ac) {
+        if (ac.args.Length() == 1) {
+            auto keyAddress = unwrap<KeyAddress>(ac.args.This());
+            auto isolate = ac.isolate;
+            Local<Object> obj = ac.args[0].As<Object>();
+            String::Utf8Value className(isolate, obj->GetConstructorName());
+            if (strcmp(*className, "PublicKey") == 0) {
+                PublicKey* key = unwrap<PublicKey>(obj);
+                ac.setReturnValue(keyAddress->isMatchingKey(*key));
+                return;;
+            }
+            isolate->ThrowException(
+                    Exception::TypeError(String::NewFromUtf8(isolate, "public key expected")));
+            return;
+        }
+        ac.throwError("invalid arguments");
+    });
+}
+
 static void hashIdGetDigest(const FunctionCallbackInfo<Value> &args) {
     Scripter::unwrapArgs(args, [](ArgsContext &&ac) {
         if (ac.args.Length() == 0) {
@@ -168,6 +188,7 @@ Local<FunctionTemplate> initKeyAddress(Isolate *isolate) {
     auto prototype = tpl->PrototypeTemplate();
     prototype->Set(isolate, "toString", FunctionTemplate::New(isolate, keyAddressToString));
     prototype->Set(isolate, "getPacked", FunctionTemplate::New(isolate, keyAddressGetPacked));
+    prototype->Set(isolate, "match", FunctionTemplate::New(isolate, keyAddressMatch));
     return tpl;
 }
 
