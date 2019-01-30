@@ -181,6 +181,19 @@ Object.defineProperty(crypto.KeyAddress.prototype, "packed", {
 });
 
 /**
+ * Calculate digest of a string or binary data (Uint8Array). UTF8 encoding is used if a string is given.
+ *
+ * @param type any of crypto.SHA* constants
+ * @param {string | Uint8Array} data
+ * @returns {Uint8Array} binary digest
+ */
+crypto.digest = (hashType, data) => {
+    if( typeof(data) == 'string')
+        data = utf8Encode(data);
+    return crypto.__digest(hashType,data);
+}
+
+/**
  * Universa HashId implementation.
  *
  * @type {crypto.HashId}

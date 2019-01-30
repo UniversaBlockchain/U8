@@ -50,6 +50,7 @@ const char* getJavaHashName(HashType hashType) {
         case HashType::SHA3_256: return "SHA3-256";
         case HashType::SHA3_384: return "SHA3-384";
         case HashType::SHA3_512: return "SHA3-512";
+        default: break; // to avoid -Wswitch on MIN/MAX
     }
 
     throw std::invalid_argument("unknown hash type");
