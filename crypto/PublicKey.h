@@ -21,7 +21,6 @@ public:
 
 	PublicKey(mpz_ptr N, mpz_ptr e);
 	PublicKey(const std::string& strE, const std::string& strN);
-	PublicKey(const UBytes& e, const UBytes& N);
 	PublicKey(const std::vector<unsigned char>& packedBinaryKey);
 	PublicKey(void* packedBinaryKeyData, size_t packedBinaryKeySize);
 	PublicKey(const PrivateKey& privateKey);

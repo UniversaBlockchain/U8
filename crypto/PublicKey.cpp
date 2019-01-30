@@ -29,10 +29,6 @@ PublicKey::PublicKey(const std::string& strE, const std::string& strN) {
 	initFromDecimalStrings(strE, strN);
 }
 
-PublicKey::PublicKey(const UBytes& e, const UBytes& N) {
-	initFromBytes(e, N);
-}
-
 PublicKey::PublicKey(const std::vector<unsigned char>& packedBinaryKey):
 	PublicKey((void*)&packedBinaryKey[0], packedBinaryKey.size()) {
 }

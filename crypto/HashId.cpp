@@ -18,6 +18,10 @@ HashId::HashId(const HashId& copyFrom) {
     digest = copyFrom.digest;
 }
 
+HashId::HashId(HashId&& moveFrom) {
+    digest = std::move(moveFrom.digest);
+}
+
 HashId HashId::of(const std::vector<unsigned char> &packedData) {
     return HashId(packedData);
 }
@@ -26,8 +30,15 @@ HashId HashId::of(void* data, size_t size) {
     return HashId(data, size);
 }
 
-void HashId::initWith(const std::vector<unsigned char> &packedData) {
-    initWith((void*)&packedData[0], packedData.size());
+HashId HashId::withDigest(const std::vector<unsigned char>& digestData) {
+    return withDigest((void*)&digestData[0], digestData.size());
+}
+
+HashId HashId::withDigest(void* digestData, size_t digestDataSize) {
+    HashId res;
+    res.digest.resize(digestDataSize);
+    memcpy(&res.digest[0], digestData, digestDataSize);
+    return res;
 }
 
 void HashId::initWith(void* data, size_t size) {

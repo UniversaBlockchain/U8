@@ -190,8 +190,8 @@ void testHashIdComparison() {
 
     auto body1 = str64Tovector("HQ==");
     auto body2 = str64Tovector("j28=");
-    auto hash1 = HashId(body1);
-    auto hash2 = HashId(body2);
+    auto hash1 = HashId::of(body1);
+    auto hash2 = HashId::of(body2);
     auto hash1copy = HashId(hash1);
     auto hash1of = HashId::of(body1);
     auto hash2of = HashId::of(body2);
@@ -220,6 +220,21 @@ void testHashIdComparison() {
     checkResult("m.find(hash2)", 441, m.find(hash2)->second);
     m[hash2] = 4421;
     checkResult("m.find(hash2 updated value)", 4421, m.find(hash2)->second);
+
+    auto digest1 = hash1.getDigest();
+    auto digest2 = hash2.getDigest();
+    auto digest1copy = hash1copy.getDigest();
+    checkResult("digest1 == digest2", false, digest1 == digest2);
+    checkResult("digest1 == digest1copy", true, digest1 == digest1copy);
+    auto hash1withDigest = HashId::withDigest(digest1);
+    auto hash2withDigest = HashId::withDigest(digest2);
+    auto hash1withDigestCopy = HashId::withDigest(digest1copy);
+    checkResult("hash1withDigest == hash2withDigest", false, hash1withDigest == hash2withDigest);
+    checkResult("hash1withDigest == hash1withDigestCopy", true, hash1withDigest == hash1withDigestCopy);
+
+    auto hash1moved = HashId(move(hash1));
+    checkResult("hash1 == hash1copy", false, hash1 == hash1copy);
+    checkResult("hash1moved == hash1copy", true, hash1moved == hash1copy);
 
     cout << "testHashIdComparison()... done!" << endl << endl;
 }
