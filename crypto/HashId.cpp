@@ -7,38 +7,60 @@
 #include "gost3411-2012.h"
 #include "base64.h"
 
-HashId::HashId(const std::vector<unsigned char> &packedData) {
-    initWith(packedData);
+HashId::HashId(const std::vector<unsigned char> &packedData): HashId((void*)&packedData[0], packedData.size()) {
+}
+
+HashId::HashId(void* data, size_t size) {
+    initWith(data, size);
 }
 
 HashId::HashId(const HashId& copyFrom) {
     digest = copyFrom.digest;
 }
 
-std::shared_ptr<HashId> HashId::of(const std::vector<unsigned char> &packedData) {
-    return std::make_shared<HashId>(packedData);
+HashId::HashId(HashId&& moveFrom) {
+    digest = std::move(moveFrom.digest);
 }
 
-void HashId::initWith(const std::vector<unsigned char> &packedData) {
+HashId HashId::of(const std::vector<unsigned char> &packedData) {
+    return HashId(packedData);
+}
+
+HashId HashId::of(void* data, size_t size) {
+    return HashId(data, size);
+}
+
+HashId HashId::withDigest(const std::vector<unsigned char>& digestData) {
+    return withDigest((void*)&digestData[0], digestData.size());
+}
+
+HashId HashId::withDigest(void* digestData, size_t digestDataSize) {
+    HashId res;
+    res.digest.resize(digestDataSize);
+    memcpy(&res.digest[0], digestData, digestDataSize);
+    return res;
+}
+
+void HashId::initWith(void* data, size_t size) {
     if (digest.size() == 0) {
         const unsigned long gostSize = 256;
         digest.resize(sha512_256_desc.hashsize + sha3_256_desc.hashsize + gostSize / 8);
 
         hash_state md2;
         sha512_256_init(&md2);
-        sha512_256_process(&md2, &packedData[0], packedData.size());
+        sha512_256_process(&md2, (unsigned char*)data, size);
         sha512_256_done(&md2, &digest[0]);
 
         hash_state md3;
         sha3_256_init(&md3);
-        sha3_process(&md3, &packedData[0], packedData.size());
+        sha3_process(&md3, (unsigned char*)data, size);
         sha3_done(&md3, &digest[sha512_256_desc.hashsize]);
 
         size_t len = 0;
-        gost3411_2012_get_digest(gostSize, &packedData[0], packedData.size(),
+        gost3411_2012_get_digest(gostSize, (unsigned char*)data, size,
                                  &digest[sha512_256_desc.hashsize + sha3_256_desc.hashsize], &len);
     } else {
-        //TODO: throw error
+        throw std::runtime_error("HashId is already initialized");
     }
 }
 

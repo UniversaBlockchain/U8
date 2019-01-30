@@ -29,13 +29,13 @@ PublicKey::PublicKey(const std::string& strE, const std::string& strN) {
 	initFromDecimalStrings(strE, strN);
 }
 
-PublicKey::PublicKey(const UBytes& e, const UBytes& N) {
-	initFromBytes(e, N);
+PublicKey::PublicKey(const std::vector<unsigned char>& packedBinaryKey):
+	PublicKey((void*)&packedBinaryKey[0], packedBinaryKey.size()) {
 }
 
-PublicKey::PublicKey(const std::vector<unsigned char>& packedBinaryKey) {
+PublicKey::PublicKey(void* packedBinaryKeyData, size_t packedBinaryKeySize) {
 	try {
-		UBytes uBytes(&packedBinaryKey[0], packedBinaryKey.size());
+		UBytes uBytes((unsigned char*)packedBinaryKeyData, packedBinaryKeySize);
 		BossSerializer::Reader reader(uBytes);
 		UObject uObj = reader.readObject();
 		auto uArr = UArray::asInstance(uObj);
@@ -122,6 +122,10 @@ std::vector<unsigned char> PublicKey::pack() const {
 }
 
 bool PublicKey::verify(const std::vector<unsigned char> &sig, const std::vector<unsigned char> &data, HashType hashType) {
+	return verify((void*)&sig[0], sig.size(), (void*)&data[0], data.size(), hashType);
+}
+
+bool PublicKey::verify(void* sigData, size_t sigSize, void* bodyData, size_t bodySize, HashType hashType) {
 	int mgf1hash_idx = getHashIndex(SHA1);
 	int hash_idx = getHashIndex(hashType);
 	auto desc = hash_descriptor[hash_idx];
@@ -129,14 +133,14 @@ bool PublicKey::verify(const std::vector<unsigned char> &sig, const std::vector<
 	unsigned char hashResult[desc.hashsize];
 	hash_state md;
 	desc.init(&md);
-	desc.process(&md, &data[0], data.size());
+	desc.process(&md, (unsigned char*)bodyData, bodySize);
 	desc.done(&md, hashResult);
 
 	int saltLen = rsa_sign_saltlen_get_max_ex(LTC_PKCS_1_PSS, hash_idx, &key.key);
 
 	int stat = -1;
 	int err = rsa_verify_hash_ex(
-			&sig[0], sig.size(),
+			(unsigned char*)sigData, sigSize,
 			hashResult, desc.hashsize, hash_idx,
 			LTC_PKCS_1_PSS, mgf1hash_idx, saltLen, &stat, &key.key);
 //	if (err != CRYPT_OK)
@@ -145,6 +149,16 @@ bool PublicKey::verify(const std::vector<unsigned char> &sig, const std::vector<
 }
 
 void PublicKey::encrypt(const std::vector<unsigned char>& input, std::vector<unsigned char>& output) {
+	output.resize(0);
+	auto a = encrypt(input);
+	output.insert(output.begin(), a.begin(), a.end());
+}
+
+std::vector<unsigned char> PublicKey::encrypt(const std::vector<unsigned char>& input) {
+	return encrypt((void*)&input[0], input.size());
+}
+
+std::vector<unsigned char> PublicKey::encrypt(void* data, size_t size) {
 	int hash_idx = find_hash("sha1");
 	int prng_indx = find_prng("sprng");
 
@@ -152,21 +166,16 @@ void PublicKey::encrypt(const std::vector<unsigned char>& input, std::vector<uns
 	unsigned char buf[bufLen];
 
 	int err = rsa_encrypt_key_ex(
-		&input[0], input.size(),
-		buf, &bufLen,
-		NULL, 0,
-		NULL, prng_indx,
-		hash_idx, LTC_PKCS_1_OAEP, &key.key);
+			(unsigned char*)data, size,
+			buf, &bufLen,
+			NULL, 0,
+			NULL, prng_indx,
+			hash_idx, LTC_PKCS_1_OAEP, &key.key);
 	if (err != CRYPT_OK)
 		printf("rsa_encrypt_key_ex error: %i\n", err);
 
-	output.resize(0);
-	output.insert(output.begin(), buf, buf+bufLen);
-}
-
-std::vector<unsigned char> PublicKey::encrypt(const std::vector<unsigned char>& input) {
 	std::vector<unsigned char> output;
-	encrypt(input, output);
+	output.insert(output.begin(), buf, buf+bufLen);
 	return output;
 }
 
@@ -180,6 +189,21 @@ const KeyAddress& PublicKey::getLongAddress() {
 	if (!longAddress.isInitialized())
 		longAddress = KeyAddress(*this, 0, true);
 	return longAddress;
+}
+
+bool PublicKey::isMatchingKeyAddress(const KeyAddress& other) {
+	return other.isLong() ? getLongAddress().isMatchingKeyAddress(other) : getShortAddress().isMatchingKeyAddress(other);
+}
+
+std::vector<unsigned char> PublicKey::fingerprint() {
+	if (fingerprint_.empty()) {
+		fingerprint_.resize(33);
+		fingerprint_[0] = FINGERPRINT_SHA256;
+		auto keyComponents = getKeyComponentsAsBytes();
+		auto digest = Digest(HashType::SHA256, keyComponents).getDigest();
+		memcpy(&fingerprint_[1], &digest[0], 32);
+	}
+	return fingerprint_;
 }
 
 void PublicKey::toHash(std::unordered_map<std::string, std::string>& dst) const {
@@ -209,10 +233,12 @@ int PublicKey::getBitStrength() const {
 	return modulus_bitlen;
 }
 
-void PublicKey::getKeyComponentsAsBytes(std::vector<unsigned char>& output) const {
+std::vector<unsigned char> PublicKey::getKeyComponentsAsBytes() const {
+	std::vector<unsigned char> output;
 	int len1 = mpz_unsigned_bin_size((mpz_ptr)key.key.e);
 	int len2 = mpz_unsigned_bin_size((mpz_ptr)key.key.N);
 	output.resize(len1 + len2);
 	mpz_to_unsigned_bin((mpz_ptr)key.key.e, &output[0]);
 	mpz_to_unsigned_bin((mpz_ptr)key.key.N, &output[len1]);
+	return output;
 }

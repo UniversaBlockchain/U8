@@ -28,7 +28,9 @@ class Digest {
 public:
     Digest(HashType hashType);
     Digest(HashType hashType, const std::vector<unsigned char>& dataToHash);
+    Digest(HashType hashType, void* data, size_t size);
     void update(const std::vector<unsigned char>& data);
+    void update(void* data, size_t size);
     void doFinal();
     size_t getDigestSize();
     std::vector<unsigned char> getDigest() const;

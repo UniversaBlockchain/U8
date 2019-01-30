@@ -19,9 +19,13 @@ PrivateKey::PrivateKey(const UBytes& eValue, const UBytes& pValue, const UBytes&
 	initFromBytes(eValue, pValue, qValue);
 }
 
-PrivateKey::PrivateKey(const std::vector<unsigned char>& packedBinaryKey) {
+PrivateKey::PrivateKey(const std::vector<unsigned char>& packedBinaryKey):
+	PrivateKey((void*)&packedBinaryKey[0], packedBinaryKey.size()){
+}
+
+PrivateKey::PrivateKey(void* packedBinaryKeyData, size_t packedBinaryKeySize) {
 	try {
-		UBytes uBytes(&packedBinaryKey[0], packedBinaryKey.size());
+		UBytes uBytes((unsigned char*)packedBinaryKeyData, packedBinaryKeySize);
 		BossSerializer::Reader reader(uBytes);
 		UObject uObj = reader.readObject();
 		auto uArr = UArray::asInstance(uObj);
@@ -196,6 +200,16 @@ std::vector<unsigned char> PrivateKey::pack() const {
 }
 
 void PrivateKey::sign(const std::vector<unsigned char> &input, HashType hashType, std::vector<unsigned char> &output) {
+	output.resize(0);
+	auto a = sign(input, hashType);
+	output.insert(output.begin(), a.begin(), a.end());
+}
+
+std::vector<unsigned char> PrivateKey::sign(const std::vector<unsigned char> &input, HashType hashType) {
+	return sign((void*)&input[0], input.size(), hashType);
+}
+
+std::vector<unsigned char> PrivateKey::sign(void* data, size_t size, HashType hashType) {
 	int mgf1hash_idx = getHashIndex(SHA1);
 	int hash_idx = getHashIndex(hashType);
 	auto desc = getHashDescriptor(hashType);
@@ -204,7 +218,7 @@ void PrivateKey::sign(const std::vector<unsigned char> &input, HashType hashType
 	unsigned char hashResult[desc.hashsize];
 	hash_state md;
 	desc.init(&md);
-	desc.process(&md, &input[0], input.size());
+	desc.process(&md, (unsigned char*)data, size);
 	desc.done(&md, hashResult);
 
 	int saltLen = rsa_sign_saltlen_get_max_ex(LTC_PKCS_1_PSS, hash_idx, &key.key);
@@ -218,17 +232,22 @@ void PrivateKey::sign(const std::vector<unsigned char> &input, HashType hashType
 	if (res != CRYPT_OK)
 		printf("rsa_sign_hash_ex error: %i\n", res);
 
-	output.resize(0);
-	output.insert(output.begin(), tomSig, tomSig+tomSigLen);
-}
-
-std::vector<unsigned char> PrivateKey::sign(const std::vector<unsigned char> &input, HashType hashType) {
 	std::vector<unsigned char> output;
-	sign(input, hashType, output);
+	output.insert(output.begin(), tomSig, tomSig+tomSigLen);
 	return output;
 }
 
 void PrivateKey::decrypt(const std::vector<unsigned char> &encrypted, std::vector<unsigned char> &output) {
+	output.resize(0);
+	auto a = decrypt(encrypted);
+	output.insert(output.begin(), a.begin(), a.end());
+}
+
+std::vector<unsigned char> PrivateKey::decrypt(const std::vector<unsigned char> &encrypted) {
+	return decrypt((void*)&encrypted[0], encrypted.size());
+}
+
+std::vector<unsigned char> PrivateKey::decrypt(void* data, size_t size) {
 	int hash_idx = find_hash("sha1");
 
 	size_t bufLen = 512;
@@ -236,19 +255,14 @@ void PrivateKey::decrypt(const std::vector<unsigned char> &encrypted, std::vecto
 
 	int stat = -1;
 	int err = rsa_decrypt_key_ex(
-		&encrypted[0], encrypted.size(),
-		buf, &bufLen,
-		NULL, 0,
-		hash_idx, LTC_PKCS_1_OAEP, &stat, &key.key);
+			(unsigned char*)data, size,
+			buf, &bufLen,
+			NULL, 0,
+			hash_idx, LTC_PKCS_1_OAEP, &stat, &key.key);
 	if (err != CRYPT_OK)
-		printf("rsa_decrypt_key_ex error: %i\n", err);
+		throw std::runtime_error(std::string("rsa_decrypt_key_ex error: ") + std::string(error_to_string(err)));
 
-	output.resize(0);
-	output.insert(output.begin(), buf, buf+bufLen);
-}
-
-std::vector<unsigned char> PrivateKey::decrypt(const std::vector<unsigned char> &encrypted) {
 	std::vector<unsigned char> output;
-	decrypt(encrypted, output);
+	output.insert(output.begin(), buf, buf+bufLen);
 	return output;
 }

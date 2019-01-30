@@ -11,9 +11,18 @@ async function testReadLines() {
     }
 }
 
+async function testSize(path, expectedSize) {
+    let input = await io.openRead(path);
+    let data = await input.allBytes();
+    if (data.length != expectedSize)
+        throw Error(`Size mismatch with ${path}: expected ${expectedSize} got ${data.length}`);
+}
+
 async function testReadAll() {
-    let input = await io.openRead("../test/test.txt");
-    console.log(await input.allAsString());
+        // let input = await io.openRead("../test/test.txt");
+        // console.log(await input.allAsString());
+        await testSize("../test/test.txt", 57);
+        await testSize("../test/testcontract.unicon", 2589);
 }
 
 async function testIterateBytes() {
@@ -26,7 +35,7 @@ async function testIterateBytes() {
 }
 
 async function testWriteBytes() {
-    let output = await io.openWrite("../testbytes.bin",'w', {umask: 0o777});
+    let output = await io.openWrite("../testbytes.bin", 'w', {umask: 0o777});
     await output.write([0x30, 0x31, 0x32, 0x33]);
     await output.close();
 }
@@ -34,7 +43,7 @@ async function testWriteBytes() {
 const Boss = require('boss.js');
 
 function testBoss() {
-    let src = { hello: 'world', data: [1,2,3]};
+    let src = {hello: 'world', data: [1, 2, 3]};
     let packed = Boss.dump(src);
     assert(JSON.stringify(Boss.load(packed)) == JSON.stringify(src));
     let reader = new Boss.Reader(packed);
@@ -42,16 +51,16 @@ function testBoss() {
     console.log(JSON.stringify(reader.read()));
     let writer = new Boss.Writer();
     writer.write(src);
-    assert(packed.toString() == writer.get().toString() );
+    assert(packed.toString() == writer.get().toString());
 }
 
 async function testRSA() {
     let privateBytes = await (await io.openRead("../test/pregenerated_key.private.unikey")).allBytes();
     let privateKey = new crypto.PrivateKey(privateBytes);
-    console.log("private: "+privateKey);
+    console.log("private: " + privateKey);
     let s1 = privateKey.sign("data to sign");
     let s2 = privateKey.sign("data to sign!");
-    assert(s1 != s2);
+    assert(!equalArrays(s1, s2));
     assert(s1.length == 256);
 
     let publicKey = privateKey.publicKey;
@@ -86,21 +95,27 @@ async function testContract() {
     let sealed = await input.allBytes();
     let contract = Contract.fromSealedBinary(sealed);
 }
+
 async function main() {
-    // await testReadAll();
+    await testReadAll();
     // await testIterateBytes();
     // await testReadAll();
     // await testWriteBytes();
     // testBoss();
 
-    await testRSA();
+    // await testRSA();
 
     //testBoss();
-    await testContract();
+    // await testContract();
     // let xx = [];//1,2,3,4,5];
     // console.log(xx.reduce((a,b) => a + b, 0));
     // await sleep(100);
     // gc();
-    await sleep(1);
+
+    // console.log(btoa(Uint8Array.of(1,2,3)));
+    // console.log(atob('AQID'));
+
+    await sleep(100);
+    console.log("done");
 }
 

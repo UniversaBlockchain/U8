@@ -23,6 +23,7 @@ public:
     bool operator==(const KeyAddress& other) const;
     bool isMatchingKeyAddress(const KeyAddress& other) const;
     bool isMatchingKey(const PublicKey& key) const;
+    bool isLong() const;
 
     bool isInitialized() const;
 
@@ -34,7 +35,7 @@ protected:
 private:
     int keyMask;
     std::vector<unsigned char> keyDigest;
-    bool isLong;
+    bool isLong_;
     std::vector<unsigned char> packed;
     int typeMark;
 
