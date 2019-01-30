@@ -23,13 +23,16 @@ public:
 	PublicKey(const std::string& strE, const std::string& strN);
 	PublicKey(const UBytes& e, const UBytes& N);
 	PublicKey(const std::vector<unsigned char>& packedBinaryKey);
+	PublicKey(void* packedBinaryKeyData, size_t packedBinaryKeySize);
 	PublicKey(const PrivateKey& privateKey);
 
 	std::vector<unsigned char> pack() const;
 
 	bool verify(const std::vector<unsigned char> &sig, const std::vector<unsigned char> &data, HashType hashType);
+	bool verify(void* sigData, size_t sigSize, void* bodyData, size_t bodySize, HashType hashType);
 	void encrypt(const std::vector<unsigned char>& input, std::vector<unsigned char>& output);
 	std::vector<unsigned char> encrypt(const std::vector<unsigned char>& input);
+	std::vector<unsigned char> encrypt(void* data, size_t size);
 
 	const KeyAddress& getShortAddress();
 	const KeyAddress& getLongAddress();
