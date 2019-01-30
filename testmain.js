@@ -58,7 +58,7 @@ function testBoss() {
 async function testRSA() {
     let privateBytes = await (await io.openRead("../test/pregenerated_key.private.unikey")).allBytes();
     let privateKey = new crypto.PrivateKey(privateBytes);
-    console.log("private: " + privateKey);
+    // console.log("private: " + privateKey);
     let s1 = privateKey.sign("data to sign");
     let s2 = privateKey.sign("data to sign!");
     assert(!equalArrays(s1, s2));
@@ -77,11 +77,17 @@ async function testRSA() {
     assert(new crypto.KeyAddress(publicKey.shortAddress.packed).toString() == publicKey.shortAddress.toString());
     assert(new crypto.KeyAddress(publicKey.longAddress.packed).toString() == publicKey.longAddress.toString());
 
+
+    let ska = publicKey.shortAddress;
+    let lka = publicKey.longAddress;
+    assert(ska.match(publicKey));
+    assert(lka.match(publicKey));
+
     assert(new crypto.KeyAddress(publicKey.shortAddress.toString()).toString() == publicKey.shortAddress.toString());
     assert(new crypto.KeyAddress(publicKey.longAddress.toString()).toString() == publicKey.longAddress.toString());
 
     let packed = privateKey.packed;
-    console.log(packed);
+    // console.log(packed);
     assert(new crypto.PrivateKey(packed).shortAddress.toString() == privateKey.shortAddress.toString());
     packed = publicKey.packed;
     assert(new crypto.PublicKey(packed).shortAddress.toString() == publicKey.shortAddress.toString());
@@ -89,6 +95,9 @@ async function testRSA() {
     assert(equalArrays(packed, packed));
     assert(equalArrays(packed, atob(btoa(packed))));
 
+    let fp = publicKey.fingerprints;
+    console.log(fp);
+    assert(fp.length > 10);
 }
 
 function logContractTree(contract,prefix) {
@@ -119,8 +128,8 @@ async function testContract() {
 
 async function testHashId() {
     let x = crypto.HashId.of("hello, world");
-    console.log(x.digest);
-    console.log(x.base64);
+    // console.log(x.digest);
+    // console.log(x.base64);
     let y = crypto.HashId.withDigest(x.digest);
     assert(equalArrays(x.digest, y.digest));
     assert(x.equals(y));
@@ -134,11 +143,10 @@ async function main() {
     // await testReadAll();
     await testHashId();
     // await testIterateBytes();
-    // await testReadAll();
     // await testWriteBytes();
     // testBoss();
 
-    // await testRSA();
+    await testRSA();
 
     //testBoss();
      await testContract();
