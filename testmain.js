@@ -78,7 +78,7 @@ async function testRSA() {
 
 
     let ska = publicKey.shortAddress;
-    let lka = publicKey.shortAddress;
+    let lka = publicKey.longAddress;
     assert(ska.match(publicKey));
     assert(lka.match(publicKey));
 
