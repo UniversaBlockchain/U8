@@ -5,6 +5,8 @@ const t = require("tools");
 const TransactionPack = require("transactionpack").TransactionPack;
 const Quantiser = require("quantiser").Quantiser;
 const Boss = require('boss.js');
+const roles = require('roles');
+const permissions = require('permissions');
 
 
 const MAX_API_LEVEL = 3;
@@ -257,7 +259,23 @@ Contract.testQuantaLimit = -1;
 Contract.JSAPI_SCRIPT_FIELD = "scripts";
 
 Contract.fromPrivateKey = function(key) {
-    //TODO:
+    let c = new Contract();
+    let now = new Date();
+    now.setTime(now.getTime()+90*24*3600*1000);
+    c.state.expiresAt = now;
+    let issuer = new roles.SimpleRole("issuer");
+    issuer.keyAddresses.add(key.publicKey.longAddress);
+    c.registerRole(issuer);
+    let owner = new roles.RoleLink("owner","issuer");
+    c.registerRole(owner);
+    let creator = new roles.RoleLink("owner","issuer");
+    c.registerRole(creator);
+
+    let chown = new roles.RoleLink("@change_ower_role","owner");
+    chown.contract = c;
+    c.definition.addPermission(new permissions.ChangeOwnerPermission(chown));
+    c.keysToSignWith.add(key);
+    return c;
 };
 
 
@@ -267,9 +285,9 @@ Contract.prototype.setOwnBinary = function(result) {
     } else {
         delete  result.salt;
     }
-    this.sealedBinary = Boss.pack(result);
+    this.sealedBinary = Boss.dump(result);
     this.transactionPack = null;
-    this.id = HashId.of(this.sealedBinary);
+    this.id = crypto.HashId.of(this.sealedBinary);
 }
 
 Contract.fromSealedBinary = function(sealed,transactionPack) {
@@ -352,7 +370,7 @@ Contract.prototype.seal = function() {
         newIds.push(ni.id);
     }
 
-    let forPack = BossBiMapper.serialize(
+    let forPack = BossBiMapper.getInstance().serialize(
         {
             "contract" : this,
             "revoking" : revokingIds,
@@ -419,6 +437,9 @@ Contract.prototype.serialize = function(serializer) {
         state : this.state.serialize(serializer)
     };
 
+
+    console.log(JSON.stringify(binder));
+
     if(this.transactional != null)
         binder.transactional = this.transactional.serialize(serializer);
 
@@ -434,8 +455,9 @@ Contract.prototype.deserialize = function(data,deserializer) {
         this.definition = new Definition(this);
     this.definition.deserialize(data.definition, deserializer);
 
-    if (this.state == null)
-        this.state = new State();
+
+    console.log(JSON.stringify(data));
+
     this.state.deserialize(data.state, deserializer);
 
     if (data.hasOwnProperty("transactional")) {
@@ -486,16 +508,44 @@ Contract.prototype.getRevokingItem = function(id) {
 
 Contract.prototype.addSignatureToSeal = function(x) {
     let keys;
-    if(Object.getPrototypeOf(x) === Array.prototype) {
+    let proto = Object.getPrototypeOf(x);
+    if(proto === Array.prototype || proto == Set.prototype) {
         keys = x;
-    } else if(Object.getPrototypeOf(x) === PrivateKey.prototype){
+    } else if(proto === crypto.PrivateKey.prototype){
         keys = [];
         keys.push(x);
     } else {
         throw "Invalid param " + x + ". Should be either PrivateKey or Array of PrivateKey";
     }
 
-    //TODO:
+    if(this.sealedBinary == null)
+        throw "failed to add signature: sealed binary does not exist";
+
+    keys.forEach(k => this.keysToSignWith.add(k));
+
+    let data = Boss.load(this.sealedBinary);
+    let contractBytes = data.data;
+    for (let key of keys) {
+        let signature = ExtendedSignature.sign(key, contractBytes);
+        this.addSignatureBytesToSeal(signature,key.publicKey);
+    }
+};
+
+Contract.prototype.addSignatureBytesToSeal = function(signature,publicKey) {
+    if(this.sealedBinary == null)
+        throw "failed to add signature: sealed binary does not exist";
+
+    let data = Boss.load(this.sealedBinary);
+    //console.log(Object.getPrototypeOf(data.signatures).constructor.name);
+    data.signatures.push(signature);
+
+    let contractBytes = data.data;
+    let  es = ExtendedSignature.verify(publicKey, signature, contractBytes);
+    if (es != null) {
+        this.sealedByKeys.set(publicKey, es);
+    }
+
+    this.setOwnBinary(data);
 };
 
 

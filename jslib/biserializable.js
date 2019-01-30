@@ -42,6 +42,9 @@ function BiMapper() {
 }
 
 BiMapper.prototype.deserialize = function (data) {
+    if(data == null || typeof data === "undefined")
+        return null;
+
     if(Object.getPrototypeOf(data) === Object.prototype) {
         if(data.hasOwnProperty("__type")) {
             if(this.adapters.has(data.__type)) {
@@ -68,6 +71,8 @@ BiMapper.prototype.deserialize = function (data) {
 };
 
 BiMapper.prototype.serialize = function (object) {
+    if(object == null || typeof object === "undefined")
+        return null;
     const proto = Object.getPrototypeOf(object);
 
     if(this.adapters.has(proto)) {
@@ -75,7 +80,7 @@ BiMapper.prototype.serialize = function (object) {
         let result = adapter.serialize(object,this);
         result.__type = adapter.getTag();
         return result;
-    } else if(proto == Object.prototype) {
+    } else if(proto === Object.prototype) {
         let result = {};
         for(let key of Object.keys(object)) {
             result[key] = this.serialize(object[key],this);

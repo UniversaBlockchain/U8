@@ -20,6 +20,8 @@ function valuesEqual(x,y) {
     if (x == null || y == null) return false;
     if(x instanceof Object) {
         if(y instanceof  Object) {
+            if(x.constructor.name !== y.constructor.name)
+                return false;
             return x.equals(y);
         } else {
             return false;
@@ -127,11 +129,16 @@ Object.prototype.equals = function(to) {
 
 
 const packedEq = function(to) {
+    console.log("-91")
     if(this === to)
         return true;
 
+    console.log("-92")
+
     if(Object.getPrototypeOf(this) !== Object.getPrototypeOf(to))
         return false;
+
+    console.log("-93")
 
     return valuesEqual(this.packed,to.packed);
 };

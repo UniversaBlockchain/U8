@@ -3,6 +3,8 @@
 let io = require("io");
 let Contract = require("contract").Contract;
 let TransactionPack = require("transactionpack").TransactionPack;
+let ExtendedSignature = require("extendedsignature").ExtendedSignature;
+let roles = require("roles");
 
 async function testReadLines() {
     let input = await io.openRead("../test/test.txt");
@@ -44,6 +46,10 @@ async function testWriteBytes() {
 const Boss = require('boss.js');
 
 function testBoss() {
+
+    //UNCOMMENT TO MAKE BOSS WORK
+    //delete Object.prototype.equals;
+
     let src = {hello: 'world', data: [1, 2, 3]};
     let packed = Boss.dump(src);
     assert(JSON.stringify(Boss.load(packed)) == JSON.stringify(src));
@@ -128,6 +134,20 @@ async function testContract() {
     let contract = TransactionPack.unpack(sealed).contract;
 
     logContractTree(contract,"root");
+
+
+    let privateBytes = await (await io.openRead("../test/pregenerated_key.private.unikey")).allBytes();
+    let privateKey = new crypto.PrivateKey(privateBytes);
+    let es = ExtendedSignature.verify(privateKey.publicKey,ExtendedSignature.sign(privateKey,sealed),sealed)
+    assert(es !== null);
+
+    let c = Contract.fromPrivateKey(privateKey);
+    c.seal();
+    c.transactionPack = new TransactionPack(c);
+    let tp = c.transactionPack.pack();
+
+    let c2 = TransactionPack.unpack(tp).contract;
+    //assert(t.valuesEqual(c,c2));
 }
 
 async function testHashId() {
@@ -145,16 +165,14 @@ async function testHashId() {
 
 async function main() {
     // await testReadAll();
-    await testHashId();
+    //await testHashId();
     // await testIterateBytes();
     // await testWriteBytes();
     // testBoss();
 
-    console.log("---");
-    await testRSA();
-    console.log("---");
-    //testBoss();
-     //await testContract();
+    //await testRSA();
+    testBoss();
+    //await testContract();
     // let xx = [];//1,2,3,4,5];
     // console.log(xx.reduce((a,b) => a + b, 0));
     // await sleep(100);

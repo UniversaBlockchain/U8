@@ -115,12 +115,13 @@ TransactionPack.prototype.deserialize = function(data,deserializer) {
 };
 
 TransactionPack.prototype.serialize = function(serializer) {
+
     let subItemBinaries = [];
     for(let si of this.subItems.values()) {
         subItemBinaries.push(si.sealedBinary);
     }
 
-    res = {
+    let res = {
         contract : this.contract.sealedBinary,
         subItems : subItemBinaries
     };
