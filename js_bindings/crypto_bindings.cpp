@@ -291,6 +291,28 @@ static void JsB2A(const FunctionCallbackInfo<Value> &args) {
     });
 }
 
+static void digest(const FunctionCallbackInfo<Value> &args) {
+    Scripter::unwrapArgs(args, [](ArgsContext &&ac) {
+        if (ac.args.Length() == 2) {
+            int ht = ac.asInt(0);
+            if( ht <= HashType::MIN || ht >= HashType::MAX)
+                ac.throwError("illegal hash type");
+            else {
+                if( ac.args[1]->IsTypedArray() ) {
+                    auto contents = ac.args[1].As<TypedArray>()->Buffer()->GetContents();
+                    byte_vector result = Digest((HashType)ht, contents.Data(), contents.ByteLength()).getDigest();
+                    ac.setReturnValue(ac.toBinary(result));
+                    return;
+                } else
+                    ac.throwError("typed array required");
+            }
+        } else
+            ac.throwError("two arguments required");
+
+    });
+}
+
+
 void JsInitCrypto(Isolate *isolate, const Local<ObjectTemplate> &global) {
 //    auto prototype = tpl->PrototypeTemplate();prototype->Set(isolate, "version", String::NewFromUtf8(isolate, "0.0.1"));
 //    prototype->Set(isolate, "open", FunctionTemplate::New(isolate, JsAsyncHandleOpen));
@@ -308,6 +330,7 @@ void JsInitCrypto(Isolate *isolate, const Local<ObjectTemplate> &global) {
     crypto->Set(isolate, "KeyAddress", initKeyAddress(isolate));
     crypto->Set(isolate, "version", String::NewFromUtf8(isolate, "0.0.1"));
     crypto->Set(isolate, "HashIdImpl", initHashId(isolate));
+    crypto->Set(isolate, "__digest", FunctionTemplate::New(isolate, digest));
 
     global->Set(isolate, "crypto", crypto);
 

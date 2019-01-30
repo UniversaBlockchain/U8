@@ -11,12 +11,14 @@
 #include <vector>
 
 enum HashType {
-    SHA1=0,
+    MIN = -1,
+    SHA1,
     SHA256,
     SHA512,
     SHA3_256,
     SHA3_384,
-    SHA3_512
+    SHA3_512,
+    MAX
 };
 
 static const HashType DEFAULT_MGF1_HASH = HashType::SHA1;

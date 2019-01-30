@@ -99,6 +99,9 @@ async function testRSA() {
     console.log(fp);
     assert(fp.length > 10);
     assert(Object.getPrototypeOf(fp) === Uint8Array.prototype);
+
+    let dd = crypto.digest(crypto.SHA256, "hello, world");
+    assert(btoa(dd) == "Ccp+TqpuiunH0mEWcSkYSINkTQffuny/vEyKLgg2DVs=");
 }
 
 function logContractTree(contract,prefix) {
