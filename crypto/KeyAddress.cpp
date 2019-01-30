@@ -23,7 +23,7 @@ KeyAddress::KeyAddress(const PublicKey& key, int typeMark, bool useSha3_384) {
     HashType hashType = useSha3_384 ? HashType::SHA3_384 : HashType::SHA3_256;
     auto digestIndx = getHashIndex(hashType);
     auto digestDesc = getHashDescriptor(hashType);
-    isLong = useSha3_384;
+    isLong_ = useSha3_384;
 
     packed.resize(1 + 4 + digestDesc.hashsize);
     packed[0] = (char)(((keyMask << 4) | typeMark) & 0xFF);
@@ -53,9 +53,9 @@ KeyAddress::KeyAddress(const std::vector<unsigned char>& packedSource) {
     if (keyMask == 0)
         throw std::invalid_argument(std::string("keyMask is 0"));
 
-    isLong = packedSource.size() == 53;
+    isLong_ = packedSource.size() == 53;
 
-    HashType hashType = isLong ? HashType::SHA3_384 : HashType::SHA3_256;
+    HashType hashType = isLong_ ? HashType::SHA3_384 : HashType::SHA3_256;
     auto digestDesc = getHashDescriptor(hashType);
 
     int digestLength1 = digestDesc.hashsize + 1;
@@ -101,8 +101,12 @@ bool KeyAddress::isMatchingKeyAddress(const KeyAddress& other) const {
 }
 
 bool KeyAddress::isMatchingKey(const PublicKey& key) const {
-    KeyAddress other(key, 0, isLong);
+    KeyAddress other(key, 0, isLong_);
     return isMatchingKeyAddress(other);
+}
+
+bool KeyAddress::isLong() const {
+    return isLong_;
 }
 
 bool KeyAddress::isInitialized() const {

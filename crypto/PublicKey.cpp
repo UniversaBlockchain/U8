@@ -182,6 +182,10 @@ const KeyAddress& PublicKey::getLongAddress() {
 	return longAddress;
 }
 
+bool PublicKey::isMatchingKeyAddress(const KeyAddress& other) {
+	return other.isLong() ? getLongAddress().isMatchingKeyAddress(other) : getShortAddress().isMatchingKeyAddress(other);
+}
+
 void PublicKey::toHash(std::unordered_map<std::string, std::string>& dst) const {
 	char buf[2048];
 	gmp_snprintf(buf, sizeof(buf)/sizeof(buf[0]), "%Zx", key.key.N);

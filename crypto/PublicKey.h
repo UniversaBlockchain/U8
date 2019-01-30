@@ -34,6 +34,8 @@ public:
 	const KeyAddress& getShortAddress();
 	const KeyAddress& getLongAddress();
 
+	bool isMatchingKeyAddress(const KeyAddress& other);
+
 	void toHash(std::unordered_map<std::string, std::string>& dst) const;
 	long getPublicExponent() const;
 	int getBitStrength() const;
