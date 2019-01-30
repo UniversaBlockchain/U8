@@ -1,15 +1,18 @@
-let bs = require("biserializable");
-let dbm = require("defaultbimapper");
-let t = require("tools");
-const RequiredMode = {
-    ALL_OF : "ALL_OF",
-    ANY_OF : "ANY_OF"
-};
+const bs = require("biserializable");
+const dbm = require("defaultbimapper");
+const t = require("tools");
+const KeyRecord = require("keyrecord").KeyRecord;
 
 
 ///////////////////////////
 //Role
 ///////////////////////////
+
+const RequiredMode = {
+    ALL_OF : "ALL_OF",
+    ANY_OF : "ANY_OF"
+};
+
 
 function Role(name) {
     this.name = name;
@@ -295,14 +298,11 @@ ListRole.prototype.isAllowedForKeys = function(keys) {
 function SimpleRole(name,param) {
     Role.call(this,name);
     this.keyAddresses = new Set();
-    this.anonymousIds = new Set();
     this.keyRecords = new Map();
 
-    if(param instanceof KeyAddress) {
+    if(param instanceof crypto.KeyAddress) {
         this.keyAddresses.add(param);
-    } else if(param instanceof AnonymousId) {
-        this.anonymousIds.add(param);
-    } else if(param instanceof PublicKey) {
+    } else if(param instanceof crypto.PublicKey) {
         this.keyRecords.set(param,new KeyRecord(param));
     }
 }
@@ -310,31 +310,25 @@ function SimpleRole(name,param) {
 SimpleRole.prototype = Object.create(Role.prototype);
 
 SimpleRole.prototype.isValid = function() {
-    return !this.keyRecords.isEmpty() || this.anonymousIds.size > 0 || this.keyAddresses.size > 0 ||
+    return !this.keyRecords.isEmpty() || this.keyAddresses.size > 0 ||
         this.requiredAllReferences.size > 0 || this.requiredAnyReferences.size > 0;
 };
 
-ListRole.prototype.equals = function(to) {
+SimpleRole.prototype.equals = function(to) {
     if(this === to)
         return true;
 
     if(Object.getPrototypeOf(this) !== Object.getPrototypeOf(to))
         return false;
 
-    if(!Object.getPrototypeOf(ListRole.prototype).equals.call(this,to))
+    if(!Object.getPrototypeOf(SimpleRole.prototype).equals.call(this,to))
         return false;
 
-    if(!t.valuesEqual(this.mode,to.mode))
+    if(!t.valuesEqual(this.keyRecords,to.keyRecords))
         return false;
 
-    if(this.mode === ListRoleMode.QUORUM) {
-        if(!t.valuesEqual(this.quorumSize,to.quorumSize))
-            return false;
-    }
-
-    if(!t.valuesEqual(this.roles,to.roles))
+    if(!t.valuesEqual(this.keyAddresses,to.keyAddresses))
         return false;
-
 
     return true;
 };
@@ -342,13 +336,14 @@ ListRole.prototype.equals = function(to) {
 SimpleRole.prototype.deserialize = function(data,deserializer) {
     Object.getPrototypeOf(SimpleRole.prototype).deserialize.call(this,data,deserializer);
 
-    //TODO:
+
 };
 
 SimpleRole.prototype.serialize = function(serializer) {
     let data = Object.getPrototypeOf(SimpleRole.prototype).serialize.call(this,serializer);
 
-    //TODO:
+    data.keys = serializer.serialize(new Array(this.keyRecords.values()));
+    data.addresses = serializer.serialize(this.keyAddresses);
 
     return data;
 };
@@ -359,19 +354,6 @@ SimpleRole.prototype.isAllowedForKeys = function(keys) {
     if(!Object.getPrototypeOf(Role.prototype).isAllowedForKeys(this,keys))
         return false;
 
-
-
-    for(let anonId of this.anonymousIds) {
-        let found = false;
-        for(let k of keys) {
-            if(k.isMatchingAnonymousId(anonId)) {
-                found = true;
-                break;
-            }
-        }
-        if(!found)
-            return false;
-    }
 
     for(let key of this.keyRecords.keys()) {
         let found = false;

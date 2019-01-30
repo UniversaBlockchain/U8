@@ -32,11 +32,12 @@ DefaultBiMapper.removeAdapterForTag = function (tag) {
 
 let binaryAdapter = new bs.BiAdapter("binary",Uint8Array);
 binaryAdapter.serialize = function(o,s) {
-
+    console.log(o.byteLength);
+    return {base64: btoa(o)};
 };
 
 binaryAdapter.deserialize = function(data,d) {
-
+    return atob(data.base64);
 };
 
 DefaultBiMapper.registerAdapter(binaryAdapter);
@@ -55,6 +56,50 @@ datetimeAdapter.deserialize = function(data,d) {
 };
 
 DefaultBiMapper.registerAdapter(datetimeAdapter);
+
+
+
+let keyaddressAdapter = new bs.BiAdapter("KeyAddress",crypto.KeyAddress);
+keyaddressAdapter.serialize = function(o,s) {
+    return {
+        uaddress : s.serialize(o.packed)
+    };
+};
+
+keyaddressAdapter.deserialize = function(data,d) {
+    return new crypto.KeyAddress(d.deserialize(data.uaddress));
+};
+
+DefaultBiMapper.registerAdapter(keyaddressAdapter);
+
+
+let publickeyAdapter = new bs.BiAdapter("RSAPublicKey",crypto.PublicKey);
+publickeyAdapter.serialize = function(o,s) {
+    return {
+        packed : s.serialize(o.packed)
+    };
+};
+
+publickeyAdapter.deserialize = function(data,d) {
+    return new crypto.PublicKey(d.deserialize(data.packed));
+};
+
+DefaultBiMapper.registerAdapter(publickeyAdapter);
+
+
+
+let privatekeyAdapter = new bs.BiAdapter("RSAPrivateKey",crypto.PrivateKey);
+privatekeyAdapter.serialize = function(o,s) {
+    return {
+        packed : s.serialize(o.packed)
+    };
+};
+
+privatekeyAdapter.deserialize = function(data,d) {
+    return new crypto.PrivateKey(d.deserialize(data.packed));
+};
+
+DefaultBiMapper.registerAdapter(privatekeyAdapter);
 
 
 module.exports = {DefaultBiMapper};

@@ -78,7 +78,7 @@ BiMapper.prototype.serialize = function (object) {
     } else if(proto == Object.prototype) {
         let result = {};
         for(let key of Object.keys(object)) {
-            result[key] = this.serialize(data[key],this);
+            result[key] = this.serialize(object[key],this);
         }
         return result;
     } else if(object instanceof Array) {

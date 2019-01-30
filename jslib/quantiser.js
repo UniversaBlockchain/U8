@@ -1,20 +1,51 @@
-let bs = require("biserializable");
-let dbm = require("defaultbimapper");
-let t = require("tools");
+const Tools = require("tools");
+const Config = require("config").Config;
 
 ///////////////////////////
 //TransactionPack
 ///////////////////////////
 
-function Quantiser() {
+const QuantiserProcesses = {
+    PRICE_CHECK_2048_SIG : 1,
+    PRICE_CHECK_4096_SIG : 8,
+    PRICE_APPLICABLE_PERM :1,
+    PRICE_SPLITJOIN_PERM : 2,
+    PRICE_REGISTER_VERSION: 20,
+    PRICE_REVOKE_VERSION: 20,
+    PRICE_CHECK_REFERENCED_VERSION : 1
+};
+
+function QuantiserException() {
 
 }
 
-Quantiser.prototype.reset = function(limit) {
+function Quantiser() {
+    this.quantaSum_ = 0;
+    this.quantaLimit_ = -1;
 
+}
+
+Quantiser.quantaPerU = Config.quantiser_quantaPerU;
+
+Quantiser.prototype.reset = function(limit) {
+    this.quantaSum_ = 0;
+    this.quantaLimit_ = limit;
 };
+
+Quantiser.prototype.addWorkCost = function(cost){
+    this.quantaSum_ += cost;
+    if (this.quantaLimit_ >= 0)
+        if (this.quantaSum_ > this.quantaLimit_){
+            throw new QuantiserException();
+        }
+};
+
+Quantiser.prototype.addWorkCostFrom = function(quantiser){
+    this.addWorkCost(quantiser.quantaSum_);
+};
+
 
 ///////////////////////////
 //EXPORTS
 ///////////////////////////
-module.exports = {Quantiser};
+module.exports = {QuantiserProcesses,Quantiser,QuantiserException};

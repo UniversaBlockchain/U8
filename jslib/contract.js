@@ -1,6 +1,6 @@
 const bs = require("biserializable");
-//const dbm = require("defaultbimapper");
-const BossBiMapper = require("defaultbimapper").DefaultBiMapper;
+const DefaultBiMapper = require("defaultbimapper").DefaultBiMapper;
+const BossBiMapper = require("bossbimapper").BossBiMapper;
 const t = require("tools");
 const TransactionPack = require("transactionpack").TransactionPack;
 const Quantiser = require("quantiser").Quantiser;
@@ -273,11 +273,10 @@ Contract.prototype.setOwnBinary = function(result) {
 }
 
 Contract.fromSealedBinary = function(sealed,transactionPack) {
-    if(!transactionPack)
-        transactionPack = new TransactionPack();
     let result = new Contract();
+    if(!transactionPack)
+        transactionPack = new TransactionPack(result);
 
-    result.quantiser.reset(Contract.testQuantaLimit);
     result.sealedBinary = sealed;
     result.transactionPack = transactionPack;
     result.isNeedVerifySealedKeys = true;
@@ -327,16 +326,15 @@ Contract.fromSealedBinary = function(sealed,transactionPack) {
                     result.addError(Errors.BAD_NEW_ITEM,"New item was not found in the transaction pack")
                 }
             }
-
-        if (result.context == null) {
-            result.context = new Context(result.getRevokingItem(result.state.parent));
-            result.context.siblings.add(this);
-            for(let i of result.newItems) {
-                if (i.state.parent != null && t.valuesEqual(result.state.parent,i.state.parent)) {
-                    result.context.siblings.add(i);
-                }
-                i.context = result.context;
+    }
+    if (result.context == null) {
+        result.context = new Context(result.getRevokingItem(result.state.parent));
+        result.context.siblings.add(this);
+        for(let i of result.newItems) {
+            if (i.state.parent != null && t.valuesEqual(result.state.parent,i.state.parent)) {
+                result.context.siblings.add(i);
             }
+            i.context = result.context;
         }
     }
     return result;
@@ -498,6 +496,10 @@ Contract.prototype.addSignatureToSeal = function(x) {
 
     //TODO:
 };
+
+
+
+DefaultBiMapper.registerAdapter(new bs.BiAdapter("UniversaContract",Contract));
 
 ///////////////////////////
 //EXPORTS

@@ -80,6 +80,16 @@ Object.prototype.equals = function(to) {
         return true;
     }
 
+    if(this instanceof  Uint8Array) {
+        if(this.length !== to.length) {
+            return false;
+        }
+        for (let i = 0; i < this.length; ++i) {
+            if (this[i] !== to[i]) return false;
+        }
+        return true;
+    }
+
     //Array
     if(this instanceof Array) {
         if(this.length !== to.length) {
@@ -116,7 +126,22 @@ Object.prototype.equals = function(to) {
 };
 
 
+const packedEq = function(to) {
+    if(this === to)
+        return true;
+
+    if(Object.getPrototypeOf(this) !== Object.getPrototypeOf(to))
+        return false;
+
+    return valuesEqual(this.packed,to.packed);
+};
+
+crypto.KeyAddress.prototype.equals = packedEq;
+crypto.PublicKey.prototype.equals = packedEq;
+crypto.PrivateKey.prototype.equals = packedEq;
+
 let addFunc = Set.prototype.add;
+let deleteFunc = Set.prototype.delete;
 
 Set.prototype.has = function(value) {
     for(let k of this) {
@@ -131,6 +156,19 @@ Set.prototype.add = function(value) {
         addFunc.call(this,value);
 };
 
+Set.prototype.delete = function (value) {
+    let found = null;
+    for(let k of this) {
+        if(valuesEqual(value,k)) {
+            found = k;
+            break;
+        }
+    }
+    if(found != null) {
+        deleteFunc.call(this,found);
+    }
+
+};
 
 function randomString(length) {
     let string = "";
