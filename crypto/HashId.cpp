@@ -46,6 +46,10 @@ std::string HashId::toBase64() {
     return base64_encode(&digest[0], digest.size());
 }
 
+std::vector<unsigned char> HashId::getDigest() {
+    return digest;
+}
+
 bool HashId::operator<(const HashId& other) const {
     if (digest.size() != other.digest.size()) {
         //TODO: throw error

@@ -11,6 +11,7 @@
 #include <mutex>
 
 #include "ConditionVar.h"
+#include "tools.h"
 #include "vprintf.h"
 
 using namespace std;
@@ -27,7 +28,7 @@ class QueueClosedException : public exception {
  * Thread-safe FIFO container primarily effective to pass objects between threads.
  */
 template<typename T>
-class Queue {
+class Queue : Noncopyable {
 public:
     /**
      * Create queue with optionally limited capacity.

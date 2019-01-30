@@ -5,11 +5,13 @@
 #ifndef U8_TOOLS_H
 #define U8_TOOLS_H
 
-
 #include <string>
 #include <sys/stat.h>
 #include <iterator>
 #include <vector>
+
+typedef std::vector<unsigned char> byte_vector;
+
 
 inline bool file_exists(const std::string &name) {
     struct stat buffer;

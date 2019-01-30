@@ -11,7 +11,7 @@
 #include <vector>
 
 enum HashType {
-    SHA1,
+    SHA1=0,
     SHA256,
     SHA512,
     SHA3_256,

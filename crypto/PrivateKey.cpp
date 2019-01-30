@@ -43,6 +43,10 @@ PrivateKey::PrivateKey(const std::vector<unsigned char>& packedBinaryKey) {
 	}
 }
 
+PrivateKey::PrivateKey(int bitStrength) {
+	generate(bitStrength);
+}
+
 void PrivateKey::initFromBytes(const UBytes& eValue, const UBytes& pValue, const UBytes& qValue) {
 	MP_INT e, p, q;
 	mpz_init(&e);
@@ -148,6 +152,19 @@ void PrivateKey::initFromDecimalStrings(const std::string& strE, const std::stri
 	mpz_clear(&t3);
 }
 
+void PrivateKey::generate(int bitStrength) {
+	int err;
+	long default_e = 65537l;
+//	int default_certainty = 20;
+//	HashType default_mgf1_hash = HashType::SHA1;
+//	HashType default_oaep_hash = HashType::SHA1;
+
+	if ((err = rsa_make_key(NULL, find_prng("sprng"), bitStrength/8, default_e, &key.key)) != CRYPT_OK) {
+		throw std::runtime_error(std::string("generate new private key error: ")+std::string(error_to_string(err)));
+	}
+
+}
+
 std::vector<unsigned char> PrivateKey::pack() const {
 	size_t bin_e_len = mpz_unsigned_bin_size((mpz_ptr)key.key.e);
 	unsigned char bin_e[bin_e_len];
@@ -178,7 +195,7 @@ std::vector<unsigned char> PrivateKey::pack() const {
 	return output;
 }
 
-void PrivateKey::sign(std::vector<unsigned char> &input, HashType hashType, std::vector<unsigned char> &output) {
+void PrivateKey::sign(const std::vector<unsigned char> &input, HashType hashType, std::vector<unsigned char> &output) {
 	int mgf1hash_idx = getHashIndex(SHA1);
 	int hash_idx = getHashIndex(hashType);
 	auto desc = getHashDescriptor(hashType);
@@ -205,7 +222,13 @@ void PrivateKey::sign(std::vector<unsigned char> &input, HashType hashType, std:
 	output.insert(output.begin(), tomSig, tomSig+tomSigLen);
 }
 
-void PrivateKey::decrypt(std::vector<unsigned char> &encrypted, std::vector<unsigned char> &output) {
+std::vector<unsigned char> PrivateKey::sign(const std::vector<unsigned char> &input, HashType hashType) {
+	std::vector<unsigned char> output;
+	sign(input, hashType, output);
+	return output;
+}
+
+void PrivateKey::decrypt(const std::vector<unsigned char> &encrypted, std::vector<unsigned char> &output) {
 	int hash_idx = find_hash("sha1");
 
 	size_t bufLen = 512;
@@ -222,4 +245,10 @@ void PrivateKey::decrypt(std::vector<unsigned char> &encrypted, std::vector<unsi
 
 	output.resize(0);
 	output.insert(output.begin(), buf, buf+bufLen);
+}
+
+std::vector<unsigned char> PrivateKey::decrypt(const std::vector<unsigned char> &encrypted) {
+	std::vector<unsigned char> output;
+	decrypt(encrypted, output);
+	return output;
 }

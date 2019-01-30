@@ -18,6 +18,7 @@ public:
 
     void initWith(const std::vector<unsigned char>& packedData);
     std::string toBase64();
+    std::vector<unsigned char> getDigest();
 
     bool operator<(const HashId& other) const;
     bool operator==(const HashId& other) const;
