@@ -94,6 +94,9 @@ async function testRSA() {
     assert(equalArrays(packed, packed));
     assert(equalArrays(packed, atob(btoa(packed))));
 
+    let fp = publicKey.fingerprints;
+    console.log(fp);
+    assert(fp.length > 10);
 }
 
 async function testContract() {

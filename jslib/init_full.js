@@ -147,6 +147,14 @@ Object.defineProperty(crypto.PublicKey.prototype, "longAddress", {
     }
 });
 
+Object.defineProperty(crypto.PublicKey.prototype, "fingerprints", {
+    get: function() {
+        if( !this.__fingerprints );
+            this.__fingerprints = this.__getFingerprints();
+        return this.__fingerprints;
+    }
+});
+
 
 Object.defineProperty(crypto.PrivateKey.prototype, "shortAddress", {
     get: function() {

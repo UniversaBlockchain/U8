@@ -66,6 +66,17 @@ static void publicKeyVerify(const FunctionCallbackInfo<Value> &args) {
     });
 }
 
+static void publicKeyFingerprints(const FunctionCallbackInfo<Value> &args) {
+    Scripter::unwrapArgs(args, [](ArgsContext &&ac) {
+        if (ac.args.Length() == 0) {
+            auto key = unwrap<PublicKey>(ac.args.This());
+            ac.setReturnValue(ac.toBinary(key->fingerprint()));
+            return;
+        }
+        ac.throwError("invalid arguments");
+    });
+}
+
 static void keyAddressToString(const FunctionCallbackInfo<Value> &args) {
     Scripter::unwrapArgs(args, [](ArgsContext &&ac) {
         if (ac.args.Length() == 0) {
@@ -96,7 +107,7 @@ static void keyAddressMatch(const FunctionCallbackInfo<Value> &args) {
             Local<Object> obj = ac.args[0].As<Object>();
             String::Utf8Value className(isolate, obj->GetConstructorName());
             if (strcmp(*className, "PublicKey") == 0) {
-                PublicKey* key = unwrap<PublicKey>(obj);
+                PublicKey *key = unwrap<PublicKey>(obj);
                 ac.setReturnValue(keyAddress->isMatchingKey(*key));
                 return;;
             }
@@ -222,6 +233,7 @@ Local<FunctionTemplate> initPublicKey(Isolate *isolate) {
     auto prototype = tpl->PrototypeTemplate();
     prototype->Set(isolate, "__verify", FunctionTemplate::New(isolate, publicKeyVerify));
     prototype->Set(isolate, "__pack", FunctionTemplate::New(isolate, publicKeyPack));
+    prototype->Set(isolate, "__getFingerprints", FunctionTemplate::New(isolate, publicKeyFingerprints));
     return tpl;
 }
 
@@ -235,12 +247,12 @@ Local<FunctionTemplate> initHashId(Isolate *isolate) {
             [=](const FunctionCallbackInfo<Value> &args) -> HashId * {
                 if (args.Length() == 2) {
                     bool isDigest = args[0]->BooleanValue(isolate);
-                    if( args[1]->IsTypedArray() ) {
+                    if (args[1]->IsTypedArray()) {
                         // great, we will construct it therefore
                         auto contents = args[1].As<TypedArray>()->Buffer()->GetContents();
                         void *data = contents.Data();
                         size_t size = contents.ByteLength();
-                        return new HashId(isDigest ? HashId::withDigest(data, size) : HashId::of(data,size));
+                        return new HashId(isDigest ? HashId::withDigest(data, size) : HashId::of(data, size));
                     } else {
                         isolate->ThrowException(
                                 Exception::TypeError(String::NewFromUtf8(isolate, "typed data array expected")));
