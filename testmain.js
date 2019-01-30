@@ -98,6 +98,7 @@ async function testRSA() {
     let fp = publicKey.fingerprints;
     console.log(fp);
     assert(fp.length > 10);
+    assert(Object.getPrototypeOf(fp) === Uint8Array.prototype);
 }
 
 function logContractTree(contract,prefix) {
@@ -146,10 +147,11 @@ async function main() {
     // await testWriteBytes();
     // testBoss();
 
+    console.log("---");
     await testRSA();
-
+    console.log("---");
     //testBoss();
-     await testContract();
+     //await testContract();
     // let xx = [];//1,2,3,4,5];
     // console.log(xx.reduce((a,b) => a + b, 0));
     // await sleep(100);

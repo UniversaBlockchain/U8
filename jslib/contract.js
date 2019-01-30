@@ -262,7 +262,7 @@ Contract.fromPrivateKey = function(key) {
 
 
 Contract.prototype.setOwnBinary = function(result) {
-    if(result.signatures.length == 0) {
+    if(result.signatures.length === 0) {
         result.salt = null; //TODO: 12 random bytes
     } else {
         delete  result.salt;
@@ -313,7 +313,6 @@ Contract.fromSealedBinary = function(sealed,transactionPack) {
                 if(r != null) {
                     result.revokingItems.add(r);
                 } else {
-                    console.log(JSON.stringify(hid));
                     result.addError(Errors.BAD_REVOKE,"Revoking item was not found in the transaction pack")
                 }
             }

@@ -358,7 +358,7 @@ SimpleRole.prototype.isAllowedForKeys = function(keys) {
     for(let key of this.keyRecords.keys()) {
         let found = false;
         for(let k of keys) {
-            if(k.isMatchingKey(key)) {
+            if(t.valuesEqual(k,key)) {
                 found = true;
                 break;
             }
@@ -370,7 +370,7 @@ SimpleRole.prototype.isAllowedForKeys = function(keys) {
     for(let address of this.keyAddresses) {
         let found = false;
         for(let k of keys) {
-            if(k.isMatchingKeyAddress(address)) {
+            if(address.match(k)) {
                 found = true;
                 break;
             }
@@ -379,39 +379,6 @@ SimpleRole.prototype.isAllowedForKeys = function(keys) {
             return false;
     }
     return true;
-};
-
-let roleLinkAdapter = new bs.BiAdapter();
-roleLinkAdapter.getTag = function() {
-    return "RoleLink";
-};
-roleLinkAdapter.getType = function() {
-    return RoleLink.prototype;
-};
-roleLinkAdapter.deserialize = function(data, deserializer) {
-    let rl = new RoleLink();
-    rl.deserialize(data,deserializer);
-    return rl;
-};
-roleLinkAdapter.serialize = function(role,serializer) {
-    return role.serialize(serializer);
-};
-
-
-let listRoleAdapter = new bs.BiAdapter();
-listRoleAdapter.getTag = function() {
-    return "ListRole";
-};
-listRoleAdapter.getType = function() {
-    return ListRole.prototype;
-};
-listRoleAdapter.deserialize = function(data, deserializer) {
-    let lr = new ListRole();
-    lr.deserialize(data,deserializer);
-    return lr;
-};
-listRoleAdapter.serialize = function(role,serializer) {
-    return role.serialize(serializer);
 };
 
 
