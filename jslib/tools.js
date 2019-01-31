@@ -45,9 +45,7 @@ Object.prototype.equals = function(to) {
             return false;
         }
 
-        for(let key in this) {
-            if(key === "equals")
-                continue;
+        for(let key of Object.keys(this)) {
 
             if(!to.hasOwnProperty(key))
                 return false;
@@ -128,35 +126,31 @@ Object.prototype.equals = function(to) {
 };
 
 
-const packedEq = function(to) {
-    console.log("-91")
-    if(this === to)
-        return true;
-
-    console.log("-92")
-
-    if(Object.getPrototypeOf(this) !== Object.getPrototypeOf(to))
-        return false;
-
-    console.log("-93")
-
-    return valuesEqual(this.packed,to.packed);
-};
-
-let mapGet = Map.prototype.get;
-
-Map.prototype.get = function(x) {
-    for(let k of this.keys()) {
-        if(valuesEqual(k,x)) {
-            return mapGet.call(this,k);
+class GenericMap extends Map {
+    get(x) {
+        for(let k of this.keys()) {
+            if(valuesEqual(k,x)) {
+                return super.get(k);
+            }
         }
+        return null;
     }
-    return null;
-};
+}
 
 
 let addFunc = Set.prototype.add;
 let deleteFunc = Set.prototype.delete;
+
+
+Date.prototype.equals = function(to) {
+    if(this === to)
+        return true;
+
+    if(this.prototype !== to.prototype )
+        return false;
+
+    return this.getTime() === to.getTime();
+}
 
 Set.prototype.has = function(value) {
     for(let k of this) {
@@ -214,4 +208,16 @@ const PackedEqMixin = {
     }
 };
 
-module.exports = {arraysEqual,valuesEqual,randomString, MemoiseMixin, PackedEqMixin};
+const DigestEqMixin = {
+    equals(to) {
+        if(this === to)
+            return true;
+
+        if(this.prototype !== to.prototype )
+            return false;
+
+        return arraysEqual(this.digest, to.digest);
+    }
+};
+
+module.exports = {arraysEqual,valuesEqual,randomString, MemoiseMixin, PackedEqMixin,DigestEqMixin,GenericMap};

@@ -7,7 +7,7 @@ crypto.SHA3_384 = 4;
 crypto.SHA3_512 = 5;
 
 
-import {MemoiseMixin, PackedEqMixin} from 'tools'
+import {MemoiseMixin, PackedEqMixin, DigestEqMixin} from 'tools'
 
 crypto.PrivateKey = class extends crypto.PrivateKeyImpl {
 
@@ -188,6 +188,6 @@ crypto.HashId = class extends crypto.HashIdImpl {
 };
 
 Object.assign(crypto.HashId.prototype, MemoiseMixin);
-Object.assign(crypto.HashId.prototype, PackedEqMixin);
+Object.assign(crypto.HashId.prototype, DigestEqMixin);
 
 module.exports = crypto;

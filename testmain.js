@@ -145,14 +145,6 @@ async function testContract() {
     let input = await io.openRead("../test/ttt.unicon");
     let sealed = await input.allBytes();
 
-    let data = Boss.load(sealed);
-    console.log(data.subItems.length);
-    for(let x of data.subItems) {
-        console.log(btoa(x));
-        console.log(crypto.HashId.of(x).base64);
-    }
-
-    return;
     let contract = TransactionPack.unpack(sealed).contract;
 
     logContractTree(contract,"root");
