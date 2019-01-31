@@ -868,13 +868,13 @@ Contract.prototype.basicCheck = function(prefix) {
         this.errors.push(new ErrorRecord(Errors.BAD_VALUE, prefix+"state.expires_at/definition.expires_at", "not set"));
     }
 
-    //TODO:
-    //throw "todo";
-    //if (stateExpiredAt) {
-    //    if (definitionExpiredAt) {
-    //        addError(EXPIRED, "state.expires_at");
-    //    }
-    //}
+    if(this.definition.expiresAt != null && this.definition.expiresAt.getTime() < new Date().getTime()) {
+        this.errors.push(new ErrorRecord(Errors.EXPIRED, "definition.expires_at", "is in the past"));
+    }
+
+    if(this.state.expiresAt != null && this.state.expiresAt.getTime() < new Date().getTime()) {
+        this.errors.push(new ErrorRecord(Errors.EXPIRED, "state.expires_at", "is in the past"));
+    }
 
 
     if (this.state.createdAt == null) {
@@ -941,6 +941,7 @@ Contract.prototype.checkRevokePermissions = function(revokes) {
         let found = false;
         if(permissions != null) {
             for(let p of permissions) {
+                this.quantiser.addWorkCost(QuantiserProcesses.PRICE_APPLICABLE_PERM);
                 if(p.isAllowedForKeys(this.effectiveKeys.keys())) {
                     found = true;
                     break;
