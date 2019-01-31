@@ -10,8 +10,8 @@ const Boss = require("boss");
 ///////////////////////////
 
 function TransactionPack(contract) {
-    this.subItems = new Map();
-    this.referencedItems = new Map();
+    this.subItems = new t.GenericMap();
+    this.referencedItems = new t.GenericMap();
     this.keysForPack = new Set();
     this.contract = contract;
     if(contract) {
@@ -73,7 +73,19 @@ TransactionPack.prototype.deserialize = function(data,deserializer) {
         }
     }
 
+    console.log(data.subItems.length);
+    for(let x of data.subItems) {
+        console.log(btoa(x));
+        console.log(crypto.HashId.of(x).base64);
+    }
+
+
     let subitemBinaries = deserializer.deserialize(data.subItems)
+    console.log(subitemBinaries.length);
+    for(let x of subitemBinaries) {
+        console.log(crypto.HashId.of(x).base64);
+    }
+
 
     let missingIds = new Set();
     let allDeps = [];
@@ -97,11 +109,18 @@ TransactionPack.prototype.deserialize = function(data,deserializer) {
 
             if(!found) {
                 removed = true;
+                for(let x = 0; x < allDeps.length;x++) {
+                    console.log(crypto.HashId.of(allDeps[x].binary).base64);
+                }
                 //TODO: NContracts
                 let c = new Contract.fromSealedBinary(allDeps[i].binary,this);
                 this.subItems.set(c.id,c);
                 missingIds.delete(c.id);
                 allDeps.splice(i,1);
+                console.log("======")
+                for(let x = 0; x < allDeps.length;x++) {
+                    console.log(crypto.HashId.of(allDeps[x].binary).base64);
+                }
                 i--;
             }
         }
@@ -158,6 +177,10 @@ TransactionPack.prototype.pack = function() {
 
 TransactionPack.unpack = function(bytes) {
     let x = Boss.load(bytes);
+    for(let si of x.subItems) {
+        console.log(btoa(si))
+    }
+
     let res = BossBiMapper.getInstance().deserialize(x);
     if(res instanceof TransactionPack) {
         return res;

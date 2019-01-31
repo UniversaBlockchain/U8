@@ -1,3 +1,5 @@
+
+
 function BiSerializable() {
     
 }
@@ -48,6 +50,7 @@ BiMapper.prototype.deserialize = function (data) {
     if(Object.getPrototypeOf(data) === Object.prototype) {
         if(data.hasOwnProperty("__type")) {
             if(this.adapters.has(data.__type)) {
+//                console.log(JSON.stringify(data));
                 let adapter = this.adapters.get(data.__type);
                 return adapter.deserialize(data,this);
             }
@@ -79,6 +82,13 @@ BiMapper.prototype.serialize = function (object) {
         const adapter = this.adapters.get(proto);
         let result = adapter.serialize(object,this);
         result.__type = adapter.getTag();
+        if(result.__type === "ChangeNumberPermission") {
+            let c = object.role.contract;
+            object.role.contract = null;
+            console.log("============"+JSON.stringify(object));
+
+            object.role.contract = c;
+        }
         return result;
     } else if(proto === Object.prototype) {
         let result = {};

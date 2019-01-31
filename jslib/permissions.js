@@ -46,7 +46,12 @@ Permission.prototype.serialize = function(serializer) {
         role:serializer.serialize(this.role)
     };
     if(this.params != null) {
-        for (let key in this.params) {
+//SWITCH TO THIS TO ENABLE BOSS BUG
+//        for (let key in this.params) {
+//            result[key] = this.params[key];
+//        }
+
+        for (let key of Object.keys(this.params)) {
             result[key] = this.params[key];
         }
     }
@@ -83,6 +88,7 @@ Permission.prototype.checkChanges = function(contract, changed, stateChanges, re
 ///////////////////////////
 
 function ChangeNumberPermission(role,params) {
+    console.log(JSON.stringify(params));
     Permission.call(this,"decrement_permission",role,params);
     this.initFromParams();
 }

@@ -1,10 +1,12 @@
 // this is just a test file tu run with u8
 
 let io = require("io");
+let DefaultBiMapper = require("defaultbimapper").DefaultBiMapper;
 let Contract = require("contract").Contract;
 let TransactionPack = require("transactionpack").TransactionPack;
 let ExtendedSignature = require("extendedsignature").ExtendedSignature;
 let roles = require("roles");
+let t = require("tools");
 
 async function testReadLines() {
     let input = await io.openRead("../test/test.txt");
@@ -64,6 +66,7 @@ function testBoss() {
 async function testCrypto() {
     let privateBytes = await (await io.openRead("../test/pregenerated_key.private.unikey")).allBytes();
     let privateKey = new crypto.PrivateKey(privateBytes);
+
     let pk1 = new crypto.PrivateKey(privateKey.packed);
     //
     //
@@ -134,8 +137,19 @@ function logContractTree(contract,prefix) {
 }
 
 async function testContract() {
+
+
     let input = await io.openRead("../test/ttt.unicon");
     let sealed = await input.allBytes();
+
+    let data = Boss.load(sealed);
+    console.log(data.subItems.length);
+    for(let x of data.subItems) {
+        console.log(btoa(x));
+        console.log(crypto.HashId.of(x).base64);
+    }
+
+    return;
     let contract = TransactionPack.unpack(sealed).contract;
 
     logContractTree(contract,"root");
@@ -152,7 +166,7 @@ async function testContract() {
     let tp = c.transactionPack.pack();
 
     let c2 = TransactionPack.unpack(tp).contract;
-    //assert(t.valuesEqual(c,c2));
+    assert(t.valuesEqual(c,c2));
 }
 
 async function testHashId() {
@@ -192,14 +206,14 @@ async function main() {
     testMemoise();
 
     // await testReadAll();
-    await testHashId();
+    //await testHashId();
     // await testIterateBytes();
     // await testWriteBytes();
-    // testBoss();
+    //testBoss();
 
-    await testCrypto();
+    //await testCrypto();
     // testBoss();
-    //  await testContract();
+    await testContract();
     // let xx = [];//1,2,3,4,5];
     // console.log(xx.reduce((a,b) => a + b, 0));
     // await sleep(100);

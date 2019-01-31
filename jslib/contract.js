@@ -38,6 +38,36 @@ function State(contract) {
 
 State.prototype = Object.create(bs.BiSerializable.prototype);
 
+State.prototype.equals = function(to) {
+    if(this === to)
+        return true;
+
+    if(Object.getPrototypeOf(this) !== Object.getPrototypeOf(to))
+        return false;
+
+    if(!t.valuesEqual(this.revision,to.revision))
+        return false;
+
+    if(!t.valuesEqual(this.createdAt,to.createdAt))
+        return false;
+
+    if(!t.valuesEqual(this.expiresAt,to.expiresAt))
+        return false;
+
+    if(!t.valuesEqual(this.origin,to.origin))
+        return false;
+
+    if(!t.valuesEqual(this.parent,to.parent))
+        return false;
+
+    if(!t.valuesEqual(this.data,to.data))
+        return false;
+
+    if(!t.valuesEqual(this.branchId,to.branchId))
+        return false;
+
+    return true;
+};
 
 State.prototype.serialize = function(serializer) {
     let of = {
@@ -116,6 +146,7 @@ function Definition(contract) {
     bs.BiSerializable.call(this);
     this.contract = contract;
     this.createdAt = new Date();
+    this.createdAt.setMilliseconds(0);
     this.expiresAt = null;
     this.data = {};
     this.references = [];
@@ -126,6 +157,37 @@ function Definition(contract) {
 }
 
 Definition.prototype = Object.create(bs.BiSerializable.prototype);
+
+
+Definition.prototype.equals = function(to) {
+    if(this === to)
+        return true;
+
+    if(Object.getPrototypeOf(this) !== Object.getPrototypeOf(to))
+        return false;
+
+    if(!t.valuesEqual(this.createdAt,to.createdAt))
+        return false;
+
+    if(!t.valuesEqual(this.expiresAt,to.expiresAt))
+        return false;
+
+    if(!t.valuesEqual(this.data,to.data))
+        return false;
+
+    if(!t.valuesEqual(this.references,to.references))
+        return false;
+
+    if(!t.valuesEqual(this.extendedType,to.extendedType))
+        return false;
+
+
+    if(!t.valuesEqual(this.permissions,to.permissions))
+        return false;
+
+    return true;
+
+};
 
 Definition.prototype.serialize = function(serializer) {
 
@@ -192,7 +254,7 @@ Definition.prototype.deserialize = function(data,deserializer) {
 
 
     let perms = deserializer.deserialize(data.permissions);
-    for(let pid in perms) {
+    for(let pid of Object.keys(perms)) {
         perms[pid].id = pid;
         this.addPermission(perms[pid]);
     }
@@ -244,7 +306,7 @@ function Contract() {
     this.limitedForTestnet = false;
     this.isSuitableForTestnet = false;
     this.isNeedVerifySealedKeys = false;
-    this.sealedByKeys = new Map();
+    this.sealedByKeys = new t.GenericMap();
     this.effectiveKeys = new Map();
     this.keysToSignWith = new Set();
     this.references = new Map();
@@ -261,14 +323,15 @@ Contract.JSAPI_SCRIPT_FIELD = "scripts";
 Contract.fromPrivateKey = function(key) {
     let c = new Contract();
     let now = new Date();
-    now.setTime(now.getTime()+90*24*3600*1000);
+    now.setTime((Math.floor(now.getTime()/1000)+90*24*3600)*1000);
+    now.setMilliseconds(0);
     c.state.expiresAt = now;
     let issuer = new roles.SimpleRole("issuer");
     issuer.keyAddresses.add(key.publicKey.longAddress);
     c.registerRole(issuer);
     let owner = new roles.RoleLink("owner","issuer");
     c.registerRole(owner);
-    let creator = new roles.RoleLink("owner","issuer");
+    let creator = new roles.RoleLink("creator","issuer");
     c.registerRole(creator);
 
     let chown = new roles.RoleLink("@change_ower_role","owner");
@@ -438,15 +501,19 @@ Contract.prototype.serialize = function(serializer) {
     };
 
 
-    console.log(JSON.stringify(binder));
 
     if(this.transactional != null)
         binder.transactional = this.transactional.serialize(serializer);
+
+    //    console.log(JSON.stringify(binder));
 
     return binder;
 };
 
 Contract.prototype.deserialize = function(data,deserializer) {
+    //console.log(JSON.stringify(data));
+
+
     let l = data.api_level;
     if (l > MAX_API_LEVEL)
         throw "contract api level conflict: found " + l + " my level " + this.apiLevel;
@@ -456,7 +523,6 @@ Contract.prototype.deserialize = function(data,deserializer) {
     this.definition.deserialize(data.definition, deserializer);
 
 
-    console.log(JSON.stringify(data));
 
     this.state.deserialize(data.state, deserializer);
 
@@ -549,6 +615,50 @@ Contract.prototype.addSignatureBytesToSeal = function(signature,publicKey) {
 };
 
 
+Contract.prototype.equals = function(to) {
+    if(this === to)
+        return true;
+
+    if(Object.getPrototypeOf(this) !== Object.getPrototypeOf(to))
+        return false;
+
+    if(!t.valuesEqual(this.state,to.state))
+        return false;
+
+    if(!t.valuesEqual(this.definition,to.definition))
+        return false;
+
+    if(!t.valuesEqual(this.revokingItems,to.revokingItems))
+        return false;
+
+    if(!t.valuesEqual(this.newItems,to.newItems))
+        return false;
+
+    if(!t.valuesEqual(this.roles,to.roles))
+        return false;
+
+    if(!t.valuesEqual(this.transactional,to.transactional))
+        return false;
+
+    if(!t.valuesEqual(this.sealedBinary,to.sealedBinary))
+        return false;
+
+    if(!t.valuesEqual(this.sealedByKeys,to.sealedByKeys))
+        return false;
+
+    if(!t.valuesEqual(this.references,to.references))
+        return false;
+
+    return true;
+};
+
+
+Contract.prototype.check = function(prefix) {
+    if(!prefix)
+        prefix = "";
+
+
+}
 
 DefaultBiMapper.registerAdapter(new bs.BiAdapter("UniversaContract",Contract));
 

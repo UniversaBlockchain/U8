@@ -298,7 +298,7 @@ ListRole.prototype.isAllowedForKeys = function(keys) {
 function SimpleRole(name,param) {
     Role.call(this,name);
     this.keyAddresses = new Set();
-    this.keyRecords = new Map();
+    this.keyRecords = new t.GenericMap();
 
     if(param instanceof crypto.KeyAddress) {
         this.keyAddresses.add(param);
@@ -336,13 +336,24 @@ SimpleRole.prototype.equals = function(to) {
 SimpleRole.prototype.deserialize = function(data,deserializer) {
     Object.getPrototypeOf(SimpleRole.prototype).deserialize.call(this,data,deserializer);
 
+    for(let key of deserializer.deserialize(data.keys)) {
+        this.keyRecords.set(key,new KeyRecord(key));
+    }
+
+    for(let address of deserializer.deserialize(data.addresses)) {
+        this.keyAddresses.add(address);
+    }
 
 };
 
 SimpleRole.prototype.serialize = function(serializer) {
     let data = Object.getPrototypeOf(SimpleRole.prototype).serialize.call(this,serializer);
 
-    data.keys = serializer.serialize(new Array(this.keyRecords.values()));
+    let array = [];;
+    for(let [k,v] of this.keyRecords) {
+        array.push(v);
+    }
+    data.keys = serializer.serialize(array);
     data.addresses = serializer.serialize(this.keyAddresses);
 
     return data;
@@ -351,7 +362,7 @@ SimpleRole.prototype.serialize = function(serializer) {
 
 
 SimpleRole.prototype.isAllowedForKeys = function(keys) {
-    if(!Object.getPrototypeOf(Role.prototype).isAllowedForKeys(this,keys))
+    if(!Object.getPrototypeOf(SimpleRole.prototype).isAllowedForKeys.call(this,keys))
         return false;
 
 
