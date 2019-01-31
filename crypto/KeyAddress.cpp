@@ -44,15 +44,20 @@ KeyAddress::KeyAddress(const PublicKey& key, int typeMark, bool useSha3_384) {
 KeyAddress::KeyAddress(const std::string& packedString): KeyAddress(Safe58::decode(packedString)) {
 }
 
-KeyAddress::KeyAddress(const std::vector<unsigned char>& packedSource) {
-    packed = packedSource;
-    typeMark = packedSource[0] & 0x0F;
-    keyMask = (packedSource[0] & 0xFF) >> 4;
+KeyAddress::KeyAddress(const std::vector<unsigned char>& packedSource):
+    KeyAddress((void*)&packedSource[0], packedSource.size()) {
+}
+
+KeyAddress::KeyAddress(void* packedSource, size_t packedSourceSize) {
+    packed.resize(packedSourceSize);
+    memcpy(&packed[0], packedSource, packedSourceSize);
+    typeMark = packed[0] & 0x0F;
+    keyMask = (packed[0] & 0xFF) >> 4;
 
     if (keyMask == 0)
         throw std::invalid_argument(std::string("keyMask is 0"));
 
-    isLong_ = packedSource.size() == 53;
+    isLong_ = packedSourceSize == 53;
 
     HashType hashType = isLong_ ? HashType::SHA3_384 : HashType::SHA3_256;
     auto digestDesc = getHashDescriptor(hashType);

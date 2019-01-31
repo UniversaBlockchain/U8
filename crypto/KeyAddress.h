@@ -16,7 +16,8 @@ public:
     KeyAddress();
     KeyAddress(const PublicKey& key, int typeMark, bool useSha3_384);
     KeyAddress(const std::string& packedString);
-    KeyAddress(const std::vector<unsigned char>& packedString);
+    KeyAddress(const std::vector<unsigned char>& packedSource);
+    KeyAddress(void* packedSource, size_t packedSourceSize);
 
     std::string toString() const;
 
