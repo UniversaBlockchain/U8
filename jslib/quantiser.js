@@ -45,6 +45,13 @@ Quantiser.prototype.addWorkCostFrom = function(quantiser){
 };
 
 
+Quantiser.prototype.quantasLeft = function() {
+    if (this.quantaLimit_ >= 0) {
+        return this.quantaLimit_ - this.quantiser.quantaSum_;
+    }
+    return -1;
+};
+
 ///////////////////////////
 //EXPORTS
 ///////////////////////////

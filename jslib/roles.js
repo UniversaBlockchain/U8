@@ -20,6 +20,8 @@ function Role(name) {
     bs.BiSerializable.call(this);
     this.requiredAllReferences = new Set();
     this.requiredAnyReferences = new Set();
+
+
     this.contract = null;
 }
 
@@ -158,7 +160,7 @@ RoleLink.prototype.serialize = function(serializer) {
 };
 
 RoleLink.prototype.getRole = function() {
-    return this.contract.getRole(this.name);
+    return this.contract.roles[this.roleName];
 };
 
 RoleLink.prototype.resolve = function() {
@@ -176,7 +178,7 @@ RoleLink.prototype.resolve = function() {
 };
 
 RoleLink.prototype.isAllowedForKeys = function(keys) {
-    if(!Object.getPrototypeOf(Role.prototype).isAllowedForKeys(this,keys))
+    if(!Object.getPrototypeOf(RoleLink.prototype).isAllowedForKeys.call(this,keys))
         return false;
     let r = this.resolve();
     if(r != null)
@@ -310,7 +312,7 @@ function SimpleRole(name,param) {
 SimpleRole.prototype = Object.create(Role.prototype);
 
 SimpleRole.prototype.isValid = function() {
-    return !this.keyRecords.isEmpty() || this.keyAddresses.size > 0 ||
+    return this.keyRecords.size > 0 || this.keyAddresses.size > 0 ||
         this.requiredAllReferences.size > 0 || this.requiredAnyReferences.size > 0;
 };
 
@@ -397,7 +399,39 @@ dbm.DefaultBiMapper.registerAdapter(new bs.BiAdapter("RoleLink",RoleLink));
 dbm.DefaultBiMapper.registerAdapter(new bs.BiAdapter("ListRole",ListRole));
 dbm.DefaultBiMapper.registerAdapter(new bs.BiAdapter("SimpleRole",SimpleRole));
 
+const RoleExtractor = {
+    extractKeys : function (role) {
+        if(role instanceof SimpleRole) {
+            return new Set(role.keyRecords.keys());
+        } else if(role instanceof RoleLink) {
+            return this.extractKeys(role.resolve());
+        } else if(role instanceof ListRole) {
+            let result = new Set();
+            role.roles.forEach(r => {
+                let extracted = this.extractKeys(r);
+                extracted.forEach(e => result.add(e));
+            });
+            return result;
+        }
+    },
+
+    extractAddresses : function (role) {
+        if(role instanceof SimpleRole) {
+            return role.keyAddresses;
+        } else if(role instanceof RoleLink) {
+            return this.extractAddresses(role.resolve());
+        } else if(role instanceof ListRole) {
+            let result = new Set();
+            role.roles.forEach(r => {
+                let extracted = this.extractAddresses(r);
+                extracted.forEach(e => result.add(e));
+            });
+            return result;
+        }
+    }
+};
+
 ///////////////////////////
 //EXPORTS
 ///////////////////////////
-module.exports = {RequiredMode,Role,RoleLink,ListRoleMode,ListRole,SimpleRole};
+module.exports = {RequiredMode,Role,RoleLink,ListRoleMode,ListRole,SimpleRole,RoleExtractor};

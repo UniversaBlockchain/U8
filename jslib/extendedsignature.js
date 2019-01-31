@@ -8,6 +8,28 @@ function ExtendedSignature() {
     this.signature = null;
 }
 
+ExtendedSignature.prototype.equals = function(to) {
+    if(this === to)
+        return true;
+
+    if(this.prototype !== to.prototype )
+        return false;
+
+    if(!t.valuesEqual(this.keyId,to.keyId))
+        return false;
+
+    if(!t.valuesEqual(this.createdAt,to.createdAt))
+        return false;
+
+    if(!t.valuesEqual(this.publicKey,to.publicKey))
+        return false;
+
+    if(!t.valuesEqual(this.signature,to.signature))
+        return false;
+
+    return true;
+};
+
 ExtendedSignature.sign = function (privateKey, data, savePublicKey) {
     if(typeof savePublicKey === "undefined")
         savePublicKey = true;
@@ -74,6 +96,22 @@ ExtendedSignature.verify = function(key, signature, data) {
             return es;
     }
     return null;
+};
+
+ExtendedSignature.extractPublicKey = function(signature) {
+    try {
+        return new crypto.PublicKey(Boss.load(Boss.load(signature).exts).pub_key);
+    } catch ( e) {
+        return null;
+    }
+};
+
+ExtendedSignature.extractKeyId = function(signature) {
+    try {
+        return Boss.load(Boss.load(signature).exts).key;
+    } catch ( e) {
+        return null;
+    }
 };
 
 module.exports = {ExtendedSignature};

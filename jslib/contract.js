@@ -3,10 +3,17 @@ const DefaultBiMapper = require("defaultbimapper").DefaultBiMapper;
 const BossBiMapper = require("bossbimapper").BossBiMapper;
 const t = require("tools");
 const TransactionPack = require("transactionpack").TransactionPack;
-const Quantiser = require("quantiser").Quantiser;
+const q = require("quantiser");
+const Quantiser = q.Quantiser;
+const QuantiserProcesses = q.QuantiserProcesses;
+const QuantiserException = q.QuantiserException;
 const Boss = require('boss.js');
 const roles = require('roles');
 const permissions = require('permissions');
+const e = require("errors");
+const Errors = e.Errors;
+const ErrorRecord = e.ErrorRecord;
+const Config = require("config").Config;
 
 
 const MAX_API_LEVEL = 3;
@@ -302,6 +309,7 @@ function Contract() {
     this.sealedBinary = null;
     this.apiLevel = MAX_API_LEVEL;
     this.context = null;
+    this.errors = [];
     this.shouldBeU = false;
     this.limitedForTestnet = false;
     this.isSuitableForTestnet = false;
@@ -343,14 +351,26 @@ Contract.fromPrivateKey = function(key) {
 
 
 Contract.prototype.setOwnBinary = function(result) {
+    let tpBackup = null;
+    if(this.transactionPack != null && this.transactionPack.contract === this) {
+        tpBackup = this.transactionPack;
+    }
+
     if(result.signatures.length === 0) {
         result.salt = null; //TODO: 12 random bytes
     } else {
         delete  result.salt;
     }
     this.sealedBinary = Boss.dump(result);
-    this.transactionPack = null;
     this.id = crypto.HashId.of(this.sealedBinary);
+    if(tpBackup == null) {
+        this.transactionPack = null;
+    } else {
+        this.transactionPack = new TransactionPack(this);
+        for(let [k,v] of tpBackup.referencedItems) {
+            this.transactionPack.referencedItems.set(k,v);
+        }
+    }
 }
 
 Contract.fromSealedBinary = function(sealed,transactionPack) {
@@ -430,6 +450,9 @@ Contract.prototype.seal = function() {
 
     let newIds = [];
     for(let ni of this.newItems) {
+        if(ni.sealedBinary == null) {
+            ni.seal();
+        }
         newIds.push(ni.id);
     }
 
@@ -653,12 +676,385 @@ Contract.prototype.equals = function(to) {
 };
 
 
-Contract.prototype.check = function(prefix) {
-    if(!prefix)
+Contract.prototype.check = function(prefix,contractsTree) {
+    if(typeof prefix === "undefined")
         prefix = "";
 
+    if(typeof  contractsTree === "undefined")
+        contractsTree = null;
 
+    this.quantiser.reset(this.quantiser.quantaLimit_);
+
+    if(prefix === "")
+        this.verifySignatures();
+
+    if (contractsTree == null) {
+        contractsTree = new t.GenericMap();
+        for(let [k,v] of this.transactionPack.subItems) {
+            contractsTree.set(k,v);
+        }
+
+        for(let [k,v] of this.transactionPack.referencedItems) {
+            contractsTree.set(k,v);
+        }
+        contractsTree.set(this.id,this);
+        this.setEffectiveKeys(null);
+    }
+
+    this.quantiser.addWorkCost(QuantiserProcesses.PRICE_REGISTER_VERSION);
+    this.quantiser.addWorkCost(QuantiserProcesses.PRICE_REVOKE_VERSION*this.revokingItems.size);
+    this.quantiser.addWorkCost(QuantiserProcesses.PRICE_CHECK_REFERENCED_VERSION*this.references.size);
+
+    this.checkReferencedItems(contractsTree);
+
+    this.revokingItems.forEach(ri => {
+        ri.errors = [];
+        ri.checkReferencedItems(contractsTree,true);
+        ri.errors.forEach(e => {
+            this.errors.push(e);
+        });
+    });
+
+    try {
+        this.basicCheck(prefix);
+
+        if (this.state.origin == null)
+            this.checkRootContract();
+        else
+            this.checkChangedContract();
+
+    } catch (e) {
+        if(e instanceof QuantiserException) {
+            throw e;
+        } else {
+            this.errors.push(new ErrorRecord(Errors.FAILED_CHECK, prefix, e.toString()));
+        }
+    }
+
+
+    let index = 0;
+    for (let c of this.newItems) {
+        let p = prefix + "new[" + index + "].";
+        this.checkSubItemQuantized(c, p, contractsTree);
+        c.errors.forEach(e => this.errors.push(e));
+        index++;
+    }
+
+    if(prefix === "")
+        this.checkDupesCreation(contractsTree);
+
+    this.checkTestPaymentLimitations();
+
+    return this.errors.length == 0;
+};
+
+Contract.prototype.getRevisionId = function() {
+    let parentId = this.state.parent == null ? "" : this.state.parent.base64 + "/";
+    let originId = this.state.origin == null ? this.id.base64 : this.state.origin.base64;
+    let branchId = this.state.branchId == null ? "" : "/" + this.state.branchId;
+    return originId + parentId + this.state.revision + branchId;
 }
+
+Contract.prototype.checkDupesCreation = function(contractsTree) {
+    let revisionIds = new Set();
+    for (let [id,c] of  contractsTree) {
+        let cid = c.getRevisionId();
+        if (revisionIds.has(cid)) {
+            this.errors.push(new ErrorRecord(Errors.BAD_VALUE, "", "duplicated revision id: " + cid));
+        } else
+            revisionIds.add(cid);
+    }
+};
+
+Contract.prototype.checkTestPaymentLimitations = function() {
+    let res = true;
+    // we won't check U contract
+    if (!this.shouldBeU) {
+        this.isSuitableForTestnet = true;
+        for (let key of this.effectiveKeys) {
+            if (key != null) {
+                if (key.bitStrength != 2048) {
+                    this.isSuitableForTestnet = false;
+                    if (this.limitedForTestnet) {
+                        res = false;
+                        this.errors.push(new ErrorRecord(Errors.FORBIDDEN,"", "Only 2048 keys is allowed in the test payment mode."));
+                    }
+                }
+            }
+        }
+
+        let expirationLimit = new Date();
+        expirationLimit.setTime(expirationLimit.getTime() + 24*3600*1000*Config.maxExpirationDaysInTestMode);
+
+        if (this.getExpiresAt().getTime() > expirationLimit.getTime()) {
+            this.isSuitableForTestnet = false;
+            if (this.limitedForTestnet) {
+                res = false;
+                this.errors.push(new ErrorRecord(Errors.FORBIDDEN,"", "Contracts with expiration date father then " + Config.maxExpirationDaysInTestMode + " days from now is not allowed in the test payment mode."));
+            }
+        }
+
+        for (let ni of this.newItems) {
+            if (ni.getExpiresAt().getTime() > expirationLimit.getTime()) {
+                this.isSuitableForTestnet = false;
+                if (this.limitedForTestnet()) {
+                    res = false;
+                    this.errors.push(new ErrorRecord(Errors.FORBIDDEN,"", "New items with expiration date father then " + Config.maxExpirationDaysInTestMode + " days from now is not allowed in the test payment mode."));
+                }
+            }
+        }
+
+        for (let ri of this.revokingItems) {
+            if (ri.getExpiresAt().getTime() > expirationLimit.getTime()) {
+                this.isSuitableForTestnet = false;
+                if (this.limitedForTestnet) {
+                    res = false;
+                    this.errors.push(new ErrorRecord(Errors.FORBIDDEN,"", "Revoking items with expiration date father then " + Config.maxExpirationDaysInTestMode + " days from now is not allowed in the test payment mode."));
+                }
+            }
+        }
+
+        if (this.getProcessedCostU() > Config.maxCostUInTestMode) {
+            this.isSuitableForTestnet = false;
+            if (this.limitedForTestnet) {
+                res = false;
+                this.errors.push(new ErrorRecord(Errors.FORBIDDEN,"", "Contract processing can not cost more then " + Config.maxCostUInTestMode + " U in the test payment mode."));
+            }
+        }
+    }
+
+    return res;
+};
+
+Contract.prototype.getProcessedCostU = function() {
+    return Math.ceil( this.quantiser.quantaSum_ / Quantiser.quantaPerU);
+};
+
+
+Contract.prototype.getExpiresAt = function() {
+    return this.state.expiresAt != null ? this.state.expiresAt : this.definition.expiresAt;
+};
+
+Contract.prototype.checkSubItemQuantized = function(subitem, prefix, neighbourContracts) {
+    // Add checks from subItem quanta
+    subitem.quantiser.reset(this.quantiser.quantasLeft());
+    subitem.check(prefix, neighbourContracts);
+    this.quantiser.addWorkCostFrom(subitem.quantiser);
+};
+
+Contract.prototype.basicCheck = function(prefix) {
+    if ((this.transactional != null) && (this.transactional.validUntil != null)) {
+        if (this.transactional.validUntil*1000 < new Date().getTime())
+            this.errors.push(new ErrorRecord(Errors.BAD_VALUE, prefix+"transactional.valid_until", "time for register is over"));
+        else if ((this.transactional.validUntil + Config.validUntilTailTime)*1000 < new Date().getTime())
+            this.errors.push(new ErrorRecord(Errors.BAD_VALUE, prefix+"transactional.valid_until", "time for register ends"));
+    }
+
+    if (this.definition.createdAt == null) {
+        this.errors.push(new ErrorRecord(Errors.BAD_VALUE, prefix+"definition.created_at", "invalid"));
+    }
+
+    if(this.state.origin == null){
+        if (this.definition.createdAt.getTime() > new Date().getTime()) {
+            this.errors.push(new ErrorRecord(Errors.BAD_VALUE, prefix+"definition.created_at", "invalid: in future"));
+        }
+        if(this.definition.createdAt.getTime() < new Date().getTime()-Config.maxItemCreationAge*1000) {
+            this.errors.push(new ErrorRecord(Errors.BAD_VALUE, prefix+"definition.created_at", "invalid: too old"));
+        }
+    }
+
+
+    if(this.definition.expiresAt == null && this.state.expiresAt == null) {
+        this.errors.push(new ErrorRecord(Errors.BAD_VALUE, prefix+"state.expires_at/definition.expires_at", "not set"));
+    }
+
+    //TODO:
+    //throw "todo";
+    //if (stateExpiredAt) {
+    //    if (definitionExpiredAt) {
+    //        addError(EXPIRED, "state.expires_at");
+    //    }
+    //}
+
+
+    if (this.state.createdAt == null) {
+        this.errors.push(new ErrorRecord(Errors.BAD_VALUE, prefix+"state.created_at", "invalid: not set"));
+    }
+
+    if (this.state.createdAt.getTime() > new Date().getTime()) {
+        this.errors.push(new ErrorRecord(Errors.BAD_VALUE, prefix+"state.created_at", "invalid: in future"));
+    }
+    if(this.state.createdAt.getTime() < new Date().getTime()-Config.maxItemCreationAge*1000) {
+        this.errors.push(new ErrorRecord(Errors.BAD_VALUE, prefix+"state.created_at", "invalid: too old"));
+    }
+
+
+    if (this.apiLevel < 1)
+        this.errors.push(new ErrorRecord(Errors.BAD_VALUE, prefix+"api_level", " <  1"));
+
+    if (this.roles.owner == null || !this.roles.owner.isValid())
+        this.errors.push(new ErrorRecord(Errors.MISSING_OWNER, prefix+"state.owner", "missing or invalid"));
+
+    if (this.roles.issuer == null || !this.roles.issuer.isValid())
+        this.errors.push(new ErrorRecord(Errors.MISSING_ISSUER, prefix+"definition.issuer", "missing or invalid"));
+
+    if (this.state.revision < 1)
+        this.errors.push(new ErrorRecord(Errors.BAD_VALUE, prefix+"state.revision", " < 1"));
+
+
+    if (this.roles.creator == null || !this.roles.creator.isValid())
+        this.errors.push(new ErrorRecord(Errors.BAD_VALUE, prefix+"state.created_by", "missing or invalid"));
+    else if (!this.roles.creator.isAllowedForKeys(this.effectiveKeys.keys()))
+        this.errors.push(new ErrorRecord(Errors.NOT_SIGNED, prefix, "missing creator signature(s)"));
+};
+
+Contract.prototype.checkRootContract = function(prefix) {
+    //issuer presence and validity is already checked within basicCheck
+    if(this.roles.issuer != null && this.roles.issuer.isValid()) {
+        if (!this.roles.issuer.isAllowedForKeys(this.effectiveKeys.keys())) {
+            this.errors.push(new ErrorRecord(Errors.ISSUER_MUST_CREATE, prefix, "missing issuer signature(s)"));
+        }
+    }
+    if (this.state.revision !== 1)
+        this.errors.push(new ErrorRecord(Errors.BAD_VALUE, prefix+"state.revision", "must be 1 in a root contract"));
+
+    else if (!this.state.createdAt.equals(this.definition.createdAt))
+        this.errors.push(new ErrorRecord(Errors.BAD_VALUE, prefix+"state.created_at", "should match definition.create_at in a root contract"));
+
+    if (this.state.origin != null)
+        this.errors.push(new ErrorRecord(Errors.BAD_VALUE, prefix+"state.origin", "must be empty in a root contract"));
+
+    if (this.state.parent != null)
+        this.errors.push(new ErrorRecord(Errors.BAD_VALUE, prefix+"state.parent", "must be empty in a root contract"));
+
+    this.checkRevokePermissions(this.revokingItems);
+};
+
+Contract.prototype.checkRevokePermissions = function(revokes) {
+    for (let rc of revokes) {
+
+        //check if revoking parent => no permission is needed
+        if(this.state.parent != null && rc.id.equals(this.state.parent))
+            continue;
+
+        let permissions = rc.definition.permissions.get("revoke");
+        let found = false;
+        if(permissions != null) {
+            for(let p of permissions) {
+                if(p.isAllowedForKeys(this.effectiveKeys.keys())) {
+                    found = true;
+                    break;
+                }
+            }
+        }
+
+        if (!found)
+            this.errors.push(new ErrorRecord(Errors.FORBIDDEN, "revokingItem", "revocation not permitted for item " + rc.id.base64.substring(0,6) + "..."));
+    }
+};
+
+Contract.prototype.checkChangedContract = function() {
+
+};
+
+Contract.prototype.checkReferencedItems = function(contractsTree,roleRefsOnly) {
+    if(typeof roleRefsOnly === "undefined")
+        roleRefsOnly = false;
+
+    //TODO:
+};
+
+Contract.prototype.setEffectiveKeys = function(additionalSignatures) {
+    //TODO: if we want to filter by creator keys -> do it here. it is the best place
+    this.effectiveKeys = new t.GenericMap();
+    for(let [k,v] of this.sealedByKeys) {
+        this.effectiveKeys.set(k,v);
+    }
+
+    if(additionalSignatures != null) {
+        for(let [k,v] of additionalSignatures) {
+            this.effectiveKeys.set(k,v);
+        }
+    }
+    this.newItems.forEach(c => c.setEffectiveKeys(this.effectiveKeys));
+};
+
+Contract.prototype.verifySignatures = function() {
+    this.verifySealedKeys();
+    for(let ni of this.newItems) {
+        ni.quantiser.reset(this.quantiser.quantasLeft())
+        ni.verifySignatures();
+        this.quantiser.addWorkCostFrom(ni.quantiser);
+    }
+
+    for(let ri of this.revokingItems) {
+        ri.quantiser.reset(this.quantiser.quantasLeft())
+        ri.verifySealedKeys();
+        this.quantiser.addWorkCostFrom(ri.quantiser);
+    }
+};
+
+Contract.prototype.verifySealedKeys = function(isQuantise) {
+    if(typeof isQuantise === "undefined")
+        isQuantise = true;
+
+    if (this.sealedBinary == null)
+        return;
+
+    if (!this.isNeedVerifySealedKeys) {
+        if (isQuantise) {
+            for(let key of this.sealedByKeys.keys()) {
+                this.quantiser.addWorkCost(key.bitStrength === 2048 ? QuantiserProcesses.PRICE_CHECK_2048_SIG : QuantiserProcesses.PRICE_CHECK_4096_SIG);
+            }
+        }
+        return;
+    }
+
+    let data = Boss.load(this.sealedBinary);
+    if (data.type !== "unicapsule")
+        throw "wrong object type, unicapsule required";
+
+
+    let contractBytes = data.data;
+
+    let keys = new t.GenericMap();
+
+
+    for(let roleName of Object.keys(this.roles)) {
+        roles.RoleExtractor.extractKeys(this.roles[roleName]).forEach(key=>keys.set(key.fingerprints,key));
+        roles.RoleExtractor.extractAddresses(this.roles[roleName]).forEach(ka=>{
+            for(let key of this.transactionPack.keysForPack) {
+                if(ka.match(key)) {
+                    keys.set(key.fingerprints, key);
+                    break;
+                }
+            }
+        });
+    }
+
+    // verify signatures
+    for (let signature of  data.signatures) {
+
+        let key = ExtendedSignature.extractPublicKey(signature);
+        if (key == null) {
+            let keyId = ExtendedSignature.extractKeyId(signature);
+            key = keys.get(keyId);
+        }
+
+        if (key != null) {
+            if (isQuantise)
+                this.quantiser.addWorkCost(key.bitStrength === 2048 ? QuantiserProcesses.PRICE_CHECK_2048_SIG : QuantiserProcesses.PRICE_CHECK_4096_SIG);
+
+            let es = ExtendedSignature.verify(key, signature, contractBytes);
+            if (es != null) {
+                this.sealedByKeys.set(key, es);
+            } else
+                addError(Errors.BAD_SIGNATURE, "keytag:" + key.info().getBase64Tag(), "the signature is broken");
+        }
+    }
+
+    this.isNeedVerifySealedKeys = false;
+};
 
 DefaultBiMapper.registerAdapter(new bs.BiAdapter("UniversaContract",Contract));
 

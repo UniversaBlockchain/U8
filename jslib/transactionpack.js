@@ -26,10 +26,12 @@ function TransactionPack(contract) {
 TransactionPack.prototype.extractAllSubItemsAndReferenced = function(contract) {
     for(let c of contract.revokingItems) {
         this.subItems.set(c.id,c);
+        c.transactionPack = this;
     }
 
     for(let c of contract.newItems) {
         this.subItems.set(c.id,c);
+        c.transactionPack = this;
         this.extractAllSubItemsAndReferenced(c);
     }
 

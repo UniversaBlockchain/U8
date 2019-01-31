@@ -1,3 +1,6 @@
+const dbm = require("defaultbimapper");
+const bs = require("biserializable");
+
 const Errors  = {
         NOT_SUPPORTED:"NOT_SUPPORTED",
         BAD_VALUE:"BAD_VALUE",
@@ -33,8 +36,8 @@ const Errors  = {
         BADSTATE:"BADSTATE"
         // -------------------------- other errors which are not contract-specific
         ,    /**
-     * General error of unknown type
-     */
+         * General error of unknown type
+         */
         FAILURE:"FAILURE",
         BAD_CLIENT_KEY:"BAD_CLIENT_KEY",
         UNKNOWN_COMMAND:"UNKNOWN_COMMAND",
@@ -44,4 +47,30 @@ const Errors  = {
         COMMAND_PENDING:"COMMAND_PENDING"
 };
 
-module.exports = {Errors};
+function ErrorRecord(error,objectName,message) {
+        this.error = error;
+        this.objectName = objectName;
+        this.message = message;
+}
+
+ErrorRecord.prototype.deserialize = function (data, deserializer) {
+        this.error = data.error;
+        this.objectName = data.object;
+        this.message = data.message;
+};
+
+ErrorRecord.prototype.serialize = function(serializer) {
+        return {
+                error:  this.error,
+                object: this.objectName,
+                message: this.message
+        }
+};
+
+ErrorRecord.prototype.toString = function() {
+        return JSON.stringify(this);
+}
+
+dbm.DefaultBiMapper.registerAdapter(new bs.BiAdapter("error",ErrorRecord));
+
+module.exports = {Errors,ErrorRecord};
