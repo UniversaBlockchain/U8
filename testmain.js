@@ -174,6 +174,29 @@ async function testContract() {
     assert(t.valuesEqual(c,c2));
 }
 
+async function testContract2() {
+   let input = await io.openRead("../test/sc.unicon");
+    let sealed = await input.allBytes();
+
+    let contract = TransactionPack.unpack(sealed).contract;
+    logContractTree(contract, "root");
+    contract.check();
+    console.log(JSON.stringify(contract.errors));
+    assert(contract.errors.length == 0);
+}
+
+async function testES() {
+    let bytes = await (await io.openRead("../test/bytes.bin")).allBytes();
+    let signature = await (await io.openRead("../test/signature.bin")).allBytes();
+    console.log(bytes.length);
+    console.log(signature.length);
+
+    let key = ExtendedSignature.extractPublicKey(signature);
+    console.log(key);
+
+    let es = ExtendedSignature.verify(key,signature,bytes);
+    assert(es != null);
+}
 async function testHashId() {
     let x = crypto.HashId.of("hello, world");
     // console.log(x.digest);
@@ -198,7 +221,9 @@ async function main() {
 
     //await testCrypto();
     // testBoss();
-     await testContract();
+    await testES();
+    await testContract();
+    await testContract2();
     // let xx = [];//1,2,3,4,5];
     // console.log(xx.reduce((a,b) => a + b, 0));
     // await sleep(100);

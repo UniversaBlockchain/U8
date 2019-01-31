@@ -63,13 +63,11 @@ ExtendedSignature.of = function (targetSignature, sign, sign2) {
 ExtendedSignature.verify = function(key, signature, data) {
     let src = Boss.load(signature);
     let es = new ExtendedSignature();
-
     let isSignValid = key.verify(src.exts, src.sign, crypto.SHA512);
     let  isSign2Valid = true;
     if(src.hasOwnProperty("sign2")) {
         isSign2Valid = key.verify(src.exts, src.sign2, crypto.SHA3_384);
     }
-
     if (isSignValid && isSign2Valid) {
         let b = Boss.load(src.exts);
         es.keyId = b.key;
@@ -84,7 +82,6 @@ ExtendedSignature.verify = function(key, signature, data) {
         let hash = b.sha512;
         let dataHash = crypto.digest(crypto.SHA512,data);
         let isHashValid = t.valuesEqual(hash,dataHash);
-
         let isHash2Valid = true;
 
         if(b.hasOwnProperty("sha3_384")) {

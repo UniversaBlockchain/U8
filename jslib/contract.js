@@ -14,7 +14,7 @@ const e = require("errors");
 const Errors = e.Errors;
 const ErrorRecord = e.ErrorRecord;
 const Config = require("config").Config;
-
+const ContractDelta = require("contractdelta").ContractDelta;
 
 const MAX_API_LEVEL = 3;
 
@@ -139,6 +139,7 @@ State.prototype.deserialize = function(data,deserializer) {
         this.parent = deserializer.deserialize(data.parent);
     else
         this.parent = null;
+
 
     if(data.hasOwnProperty("origin") && data.origin != null)
         this.origin = deserializer.deserialize(data.origin);
@@ -291,6 +292,7 @@ Definition.prototype.addPermission = function (permission) {
     if(!this.permissions.has(permission.name)) {
         this.permissions.set(permission.name,[]);
     }
+    permission.role.contract = this.contract;
     this.permissions.get(permission.name).push(permission);
 };
 
@@ -429,17 +431,21 @@ Contract.fromSealedBinary = function(sealed,transactionPack) {
                 }
             }
     }
-    if (result.context == null) {
-        result.context = new Context(result.getRevokingItem(result.state.parent));
-        result.context.siblings.add(this);
-        for(let i of result.newItems) {
-            if (i.state.parent != null && t.valuesEqual(result.state.parent,i.state.parent)) {
-                result.context.siblings.add(i);
+    result.updateContext();
+    return result;
+};
+
+Contract.prototype.updateContext = function() {
+    if (this.context == null) {
+        this.context = new Context(this.getRevokingItem(this.state.parent));
+        this.context.siblings.add(this);
+        for(let i of this.newItems) {
+            if (i.state.parent != null && t.valuesEqual(this.state.parent,i.state.parent)) {
+                this.context.siblings.add(i);
             }
-            i.context = result.context;
+            i.context = this.context;
         }
     }
-    return result;
 };
 
 Contract.prototype.seal = function() {
@@ -549,13 +555,13 @@ Contract.prototype.deserialize = function(data,deserializer) {
 
     this.state.deserialize(data.state, deserializer);
 
-    if (data.hasOwnProperty("transactional")) {
-        if (this.transactional == null)
-            this.transactional = new Transactional();
-        this.transactional.deserialize(data.transactional, deserializer);
-    } else {
-        this.transactional = null;
-    }
+//    if (data.hasOwnProperty("transactional")) {
+//        if (this.transactional == null)
+//            this.transactional = new Transactional();
+//        this.transactional.deserialize(data.transactional, deserializer);
+//    } else {
+//        this.transactional = null;
+//    }
 
     if (this.transactional != null && this.transactional.references != null) {
         for(let ref of this.transactional.references) {
@@ -586,7 +592,7 @@ Contract.prototype.registerRole = function(role) {
 };
 
 Contract.prototype.getRevokingItem = function(id) {
-    for(let ri in this.revokingItems) {
+    for(let ri of this.revokingItems) {
         if(t.valuesEqual(ri.id,id)) {
             return ri;
         }
@@ -728,6 +734,7 @@ Contract.prototype.check = function(prefix,contractsTree) {
             throw e;
         } else {
             this.errors.push(new ErrorRecord(Errors.FAILED_CHECK, prefix, e.toString()));
+            throw e;
         }
     }
 
@@ -797,7 +804,7 @@ Contract.prototype.checkTestPaymentLimitations = function() {
         for (let ni of this.newItems) {
             if (ni.getExpiresAt().getTime() > expirationLimit.getTime()) {
                 this.isSuitableForTestnet = false;
-                if (this.limitedForTestnet()) {
+                if (this.limitedForTestnet) {
                     res = false;
                     this.errors.push(new ErrorRecord(Errors.FORBIDDEN,"", "New items with expiration date father then " + Config.maxExpirationDaysInTestMode + " days from now is not allowed in the test payment mode."));
                 }
@@ -903,7 +910,7 @@ Contract.prototype.basicCheck = function(prefix) {
 
 
     if (this.roles.creator == null || !this.roles.creator.isValid())
-        this.errors.push(new ErrorRecord(Errors.BAD_VALUE, prefix+"state.created_by", "missing or invalid"));
+        this.errors.push(new ErrorRecord(Errors.MISSING_CREATOR, prefix+"state.created_by", "missing or invalid"));
     else if (!this.roles.creator.isAllowedForKeys(this.effectiveKeys.keys()))
         this.errors.push(new ErrorRecord(Errors.NOT_SIGNED, prefix, "missing creator signature(s)"));
 };
@@ -955,8 +962,41 @@ Contract.prototype.checkRevokePermissions = function(revokes) {
 };
 
 Contract.prototype.checkChangedContract = function() {
+    this.updateContext();
+    let parent;
+    // if exist siblings for contract (more then itself)
+    if(this.context.siblings.size > 1) {
+        parent = this.context.base;
+    } else {
+        parent = this.getRevokingItem(this.state.parent);
+    }
 
+    if (parent == null) {
+        this.errors.push(new ErrorRecord(Errors.BAD_REF, "parent", "parent contract must be included"));
+    } else {
+        // checking parent:
+        // proper origin
+
+        if (!parent.getOrigin().equals(this.state.origin)) {
+            this.errors.push(new ErrorRecord(Errors.BAD_VALUE, "state.origin", "wrong origin, should be root"));
+        }
+        if (!parent.id.equals(this.state.parent))
+            this.errors.push(new ErrorRecord(Errors.BAD_VALUE, "state.parent", "illegal parent references"));
+
+        let delta = new ContractDelta(parent, this);
+        delta.check();
+
+        this.checkRevokePermissions(delta.revokingItems);
+    }
 };
+
+Contract.prototype.getOrigin = function() {
+    if(this.state.origin == null) {
+        return this.id;
+    } else {
+        return this.state.origin;
+    }
+}
 
 Contract.prototype.checkReferencedItems = function(contractsTree,roleRefsOnly) {
     if(typeof roleRefsOnly === "undefined")
@@ -1050,7 +1090,7 @@ Contract.prototype.verifySealedKeys = function(isQuantise) {
             if (es != null) {
                 this.sealedByKeys.set(key, es);
             } else
-                addError(Errors.BAD_SIGNATURE, "keytag:" + key.info().getBase64Tag(), "the signature is broken");
+                this.errors.push(new ErrorRecord(Errors.BAD_SIGNATURE, "keytag:" + key, "the signature is broken"));
         }
     }
 

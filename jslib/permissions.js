@@ -270,7 +270,8 @@ RevokePermission.prototype = Object.create(Permission.prototype);
 
 function SplitJoinPermission(role,params) {
     Permission.call(this,"split_join",role,params);
-    this.initFromParams();
+    if(params)
+        this.initFromParams();
 }
 
 
@@ -303,7 +304,7 @@ SplitJoinPermission.prototype.serialize = function(serializer) {
         min_value : this.minValue,
         join_match_fields : this.mergeFields
     };
-    return Object.getPrototypeOf(ChangeNumberPermission.prototype).serialize().call(this,serializer);
+    return Object.getPrototypeOf(ChangeNumberPermission.prototype).serialize.call(this,serializer);
 };
 
 SplitJoinPermission.prototype.deserialize = function (data, deserializer) {

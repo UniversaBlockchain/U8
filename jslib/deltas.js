@@ -20,20 +20,22 @@ Delta.prototype.isEmpty = function() {
 };
 
 Delta.between = function (parent, oldValue, newValue) {
+    console.log("1");
     if (oldValue == null && newValue == null)
         return null;
-
+    console.log("2 " + (oldValue != null) + " " + (newValue != null));
     if (oldValue == null || newValue == null)
         return new ChangedItem(parent, oldValue, newValue);
 
+    console.log("3");
     if (oldValue instanceof Array && newValue instanceof Array)
         return ListDelta.compare(parent, oldValue, newValue);
 
-
+    console.log("4");
     if (Object.getPrototypeOf(oldValue) === Object.prototype && Object.getPrototypeOf(newValue) === Object.prototype)
         return MapDelta.compare(parent, oldValue, newValue);
 
-
+    console.log("5");
     return t.valuesEqual(oldValue,newValue) ? null : new ChangedItem(parent, oldValue, newValue);
 };
 
