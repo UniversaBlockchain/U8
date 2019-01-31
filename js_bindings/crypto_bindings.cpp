@@ -80,6 +80,17 @@ static void publicKeyFingerprints(const FunctionCallbackInfo<Value> &args) {
     });
 }
 
+static void publicKeyBitsStrength(const FunctionCallbackInfo<Value> &args) {
+    Scripter::unwrapArgs(args, [](ArgsContext &ac) {
+        if (ac.args.Length() == 0) {
+            auto key = unwrap<PublicKey>(ac.args.This());
+            ac.setReturnValue(key->getBitStrength());
+            return;
+        }
+        ac.throwError("invalid arguments");
+    });
+}
+
 static void keyAddressToString(const FunctionCallbackInfo<Value> &args) {
     Scripter::unwrapArgs(args, [](ArgsContext &ac) {
         if (ac.args.Length() == 0) {
@@ -195,6 +206,8 @@ Local<FunctionTemplate> initPublicKey(Isolate *isolate) {
     prototype->Set(isolate, "__verify", FunctionTemplate::New(isolate, publicKeyVerify));
     prototype->Set(isolate, "__pack", FunctionTemplate::New(isolate, publicKeyPack));
     prototype->Set(isolate, "__getFingerprints", FunctionTemplate::New(isolate, publicKeyFingerprints));
+    prototype->Set(isolate, "__getBitsStrength", FunctionTemplate::New(isolate, publicKeyBitsStrength));
+
     publicKeyTpl.Reset(isolate, tpl);
     return tpl;
 }
