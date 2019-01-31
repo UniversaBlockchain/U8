@@ -45,9 +45,8 @@ crypto.PrivateKey = class extends crypto.PrivateKeyImpl {
         return this.memoise("__longAddress", () => this.publicKey.longAddress);
     }
 
-    equals(anotherKey) {
-        console.log("ET "+anotherKey);
-        return anotherKey instanceof crypto.PrivateKey && this.longAddress.equals(anotherKey.longAddress);
+    get bitStrength() {
+        return this.publicKey.bitStrength;
     }
 
     toString() {
@@ -91,6 +90,10 @@ crypto.PublicKey = class extends crypto.PublicKeyImpl {
 
     get fingerprints() {
         return this.memoise('__fingerprints', () => this.__getFingerprints());
+    }
+
+    get bitStrength() {
+        return this.memoise("__bits", () => this.__getBitsStrength())
     }
 
     toString() {

@@ -68,6 +68,10 @@ async function testCrypto() {
     let privateKey = new crypto.PrivateKey(privateBytes);
 
     let pk1 = new crypto.PrivateKey(privateKey.packed);
+
+    assert(privateKey.publicKey.bitStrength == 2048);
+    assert(privateKey.bitStrength == 2048);
+
     //
     //
     assert(pk1.equals(privateKey));
@@ -194,9 +198,9 @@ async function main() {
     // await testWriteBytes();
     //testBoss();
 
-    //await testCrypto();
+    await testCrypto();
     // testBoss();
-    await testContract();
+    // await testContract();
     // let xx = [];//1,2,3,4,5];
     // console.log(xx.reduce((a,b) => a + b, 0));
     // await sleep(100);
