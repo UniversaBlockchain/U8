@@ -149,10 +149,8 @@ Local<FunctionTemplate> initPrivateKey(Isolate *isolate) {
             [=](const FunctionCallbackInfo<Value> &args) -> PrivateKey * {
                 if (args.Length() == 1) {
                     if (args[0]->IsTypedArray()) {
-                        // TODO: reuse data of the typed array
-                        auto v = v8ToVector(args[0]);
-                        if (v)
-                            return new PrivateKey(*v);
+                        auto contents = args[0].As<TypedArray>()->Buffer()->GetContents();
+                        return new PrivateKey(contents.Data(), contents.ByteLength());
                     }
                 }
                 isolate->ThrowException(
@@ -204,28 +202,29 @@ Local<FunctionTemplate> initKeyAddress(Isolate *isolate) {
 }
 
 
-Local<FunctionTemplate> initPublicKey(Isolate *isolate) {
+Local<FunctionTemplate> initPublicKey(Isolate *isolate, Local<FunctionTemplate> privateKeyTemplate) {
+    static Persistent<FunctionTemplate> pkt;
+    pkt.Reset(isolate, privateKeyTemplate);
     Local<FunctionTemplate> tpl = bindCppClass<PublicKey>(
             isolate,
             "PrivateKey",
-            [=](const FunctionCallbackInfo<Value> &args) -> PublicKey * {
+            [](const FunctionCallbackInfo<Value> &args) -> PublicKey * {
+                Isolate *isolate = args.GetIsolate();
                 if (args.Length() == 1) {
                     if (args[0]->IsTypedArray()) {
-                        // TODO: reuse data of the typed array
-                        auto v = v8ToVector(args[0]);
-                        if (v)
-                            return new PublicKey(*v);
+                        auto contents = args[0].As<TypedArray>()->Buffer()->GetContents();
+                        return new PublicKey(contents.Data(), contents.ByteLength());
                     } else if (args[0]->IsObject()) {
+                        auto
+                        privateKeyTemplate = pkt.Get(isolate);
                         Local<Object> obj = args[0].As<Object>();
-                        String::Utf8Value className(isolate, obj->GetConstructorName());
-                        if (strcmp(*className, "PrivateKey") == 0) {
+                        if( privateKeyTemplate->HasInstance(obj) )
                             return new PublicKey(*unwrap<PrivateKey>(obj));
-                        }
                         isolate->ThrowException(
                                 Exception::TypeError(String::NewFromUtf8(isolate, "private key expected")));
-
                     }
                 }
+                cout << "error1\n";
                 isolate->ThrowException(
                         Exception::TypeError(String::NewFromUtf8(isolate, "bad constructor arguments")));
                 return nullptr;
@@ -295,12 +294,12 @@ static void digest(const FunctionCallbackInfo<Value> &args) {
     Scripter::unwrapArgs(args, [](ArgsContext &&ac) {
         if (ac.args.Length() == 2) {
             int ht = ac.asInt(0);
-            if( ht <= HashType::MIN || ht >= HashType::MAX)
+            if (ht <= HashType::MIN || ht >= HashType::MAX)
                 ac.throwError("illegal hash type");
             else {
-                if( ac.args[1]->IsTypedArray() ) {
+                if (ac.args[1]->IsTypedArray()) {
                     auto contents = ac.args[1].As<TypedArray>()->Buffer()->GetContents();
-                    byte_vector result = Digest((HashType)ht, contents.Data(), contents.ByteLength()).getDigest();
+                    byte_vector result = Digest((HashType) ht, contents.Data(), contents.ByteLength()).getDigest();
                     ac.setReturnValue(ac.toBinary(result));
                     return;
                 } else
@@ -314,19 +313,10 @@ static void digest(const FunctionCallbackInfo<Value> &args) {
 
 
 void JsInitCrypto(Isolate *isolate, const Local<ObjectTemplate> &global) {
-//    auto prototype = tpl->PrototypeTemplate();prototype->Set(isolate, "version", String::NewFromUtf8(isolate, "0.0.1"));
-//    prototype->Set(isolate, "open", FunctionTemplate::New(isolate, JsAsyncHandleOpen));
-//    prototype->Set(isolate, "_read_raw", FunctionTemplate::New(isolate, JsAsyncHandleRead));
-//    prototype->Set(isolate, "_write_raw", FunctionTemplate::New(isolate, JsAsyncHandleWrite));
-//    prototype->Set(isolate, "_close_raw", FunctionTemplate::New(isolate, JsAsyncHandleClose));
-
-    // class methods
-//    tpl->Set(isolate, "getErrorText", FunctionTemplate::New(isolate, JsAsyncGetErrorText));
-
-    // register it into global namespace
     auto crypto = ObjectTemplate::New(isolate);
-    crypto->Set(isolate, "PrivateKey", initPrivateKey(isolate));
-    crypto->Set(isolate, "PublicKey", initPublicKey(isolate));
+    auto privateKey = initPrivateKey(isolate);
+    crypto->Set(isolate, "PrivateKeyImpl", privateKey);
+    crypto->Set(isolate, "PublicKey", initPublicKey(isolate, privateKey));
     crypto->Set(isolate, "KeyAddress", initKeyAddress(isolate));
     crypto->Set(isolate, "version", String::NewFromUtf8(isolate, "0.0.1"));
     crypto->Set(isolate, "HashIdImpl", initHashId(isolate));

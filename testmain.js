@@ -61,9 +61,15 @@ function testBoss() {
     assert(packed.toString() == writer.get().toString());
 }
 
-async function testRSA() {
+async function testCrypto() {
     let privateBytes = await (await io.openRead("../test/pregenerated_key.private.unikey")).allBytes();
     let privateKey = new crypto.PrivateKey(privateBytes);
+    let pk1 = new crypto.PrivateKey(privateKey.packed);
+    //
+    //
+    assert(pk1.equals(privateKey));
+    assert(privateKey.equals(pk1));
+
     // console.log("private: " + privateKey);
     let s1 = privateKey.sign("data to sign");
     let s2 = privateKey.sign("data to sign!");
@@ -102,7 +108,6 @@ async function testRSA() {
     assert(equalArrays(packed, atob(btoa(packed))));
 
     let fp = publicKey.fingerprints;
-    console.log(fp);
     assert(fp.length > 10);
     assert(Object.getPrototypeOf(fp) === Uint8Array.prototype);
 
@@ -163,16 +168,38 @@ async function testHashId() {
     assert(z.equals(x));
 }
 
+
+class TestMemoise {
+
+    counter = 0;
+    defaultValue = 42;
+
+    get value() { return memoise('value', () => {
+        this.counter++;
+        return this.defaultValue;
+    })}
+}
+
+function testMemoise() {
+    let t = new TestMemoise();
+    assert(t.value == 42);
+    assert(t.value == 42);
+    assert(t.value == 42);
+    assert(t.counter == 1);
+}
+
 async function main() {
+    testMemoise();
+
     // await testReadAll();
-    //await testHashId();
+    await testHashId();
     // await testIterateBytes();
     // await testWriteBytes();
     // testBoss();
 
-    //await testRSA();
-    testBoss();
-    //await testContract();
+    await testCrypto();
+    // testBoss();
+    //  await testContract();
     // let xx = [];//1,2,3,4,5];
     // console.log(xx.reduce((a,b) => a + b, 0));
     // await sleep(100);
@@ -181,7 +208,7 @@ async function main() {
     // console.log(btoa(Uint8Array.of(1,2,3)));
     // console.log(atob('AQID'));
 
-    await sleep(100);
+    // await sleep(100);
     console.log("done");
 }
 
