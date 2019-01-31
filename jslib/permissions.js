@@ -59,22 +59,16 @@ Permission.prototype.serialize = function(serializer) {
 };
 
 Permission.prototype.equals = function(to) {
-
     if(this === to)
         return true;
-
     if(Object.getPrototypeOf(this) !== Object.getPrototypeOf(to))
         return false;
-
     if(!t.valuesEqual(this.name,to.name))
         return false;
-
     if(!t.valuesEqual(this.role,to.role))
         return false;
-
     if(!t.valuesEqual(this.params,to.params))
         return false;
-
     return true;
 };
 
@@ -278,6 +272,8 @@ function SplitJoinPermission(role,params) {
 SplitJoinPermission.prototype = Object.create(Permission.prototype);
 
 SplitJoinPermission.prototype.initFromParams = function() {
+    this.fieldName = this.params.field_name;
+
     if(this.params.hasOwnProperty("min_value")) {
         this.minValue =this.params.min_value;
     } else {
@@ -317,7 +313,7 @@ SplitJoinPermission.prototype.checkSplitJoinCase = function(changed, revokesToRe
     // We need to find the splitted contracts
     let splitJoinSum = new BigDecimal("0");
 
-    for (let s of changed.siblings) {
+    for (let s of changed.context.siblings) {
 
 
         if (!this.isMergeable(s) || !this.validateMergeFields(changed, s) || !this.hasSimilarPermission(s, keys, false)) {
@@ -342,20 +338,22 @@ SplitJoinPermission.prototype.checkSplitJoinCase = function(changed, revokesToRe
     return rSum.cmp(splitJoinSum) === 0;
 };
 
-SplitJoinPermission.prototype.checkSplit = function(contract, changed, dataChanges, revokingItems, keys, oldValue, newValue) {
+SplitJoinPermission.prototype.checkSplit = function(changed, dataChanges, revokingItems, keys, oldValue, newValue) {
+
+
     // We need to find the splitted contracts
     let sum = new BigDecimal("0");
     let revokesToRemove = new Set();
 
-    for (let s of changed.siblings) {
 
+    for (let s of changed.context.siblings) {
 
         if (!this.isMergeable(s) || !this.validateMergeFields(changed, s) || !this.hasSimilarPermission(s, keys, false)) {
             continue;
         }
-
         sum = sum.add(new BigDecimal(s.state.data[this.fieldName]));
     }
+
 
     // total value should not be changed or check split-join case
     let isValid = sum.cmp(oldValue) === 0;
@@ -372,7 +370,7 @@ SplitJoinPermission.prototype.checkSplit = function(contract, changed, dataChang
     }
 };
 
-SplitJoinPermission.prototype.checkMerge = function(contract, changed, dataChanges, revokingItems, keys, newValue) {
+SplitJoinPermission.prototype.checkMerge = function(changed, dataChanges, revokingItems, keys, newValue) {
 
     // merge means there are mergeable contracts in the revoking items
     let sum = new BigDecimal("0");
@@ -407,13 +405,14 @@ SplitJoinPermission.prototype.checkChanges = function(contract, changed, stateCh
     if(!stateChanges.hasOwnProperty("data"))
         return;
 
-    let dataChanges = stateChanges.get("data");
+    let dataChanges = stateChanges.data.changes;
+
     if (dataChanges == null)
         return;
     if(!dataChanges.hasOwnProperty(this.fieldName))
         return;
 
-    let delta = dataChanges.changes[this.fieldName];
+    let delta = dataChanges[this.fieldName];
     if (delta != null) {
         if (!(delta instanceof dlt.ChangedItem))
             return;
@@ -434,14 +433,14 @@ SplitJoinPermission.prototype.checkChanges = function(contract, changed, stateCh
 
 
 SplitJoinPermission.prototype.hasSimilarPermission = function(contract, keys, checkAllowance) {
-    let permissions = contract.permissions["split_join"];
+    let permissions = contract.definition.permissions.get("split_join");
     if(permissions == null)
         return false;
-
     let found = false;
+    for(let p of permissions) {
 
-    for(let p in permissions) {
-        if(!this.equals(p))
+        //TODO: WHY CANT WE CALL this.equals(p)????
+        if(!Permission.prototype.equals.call(this,p))
             continue;
 
         if(checkAllowance && !p.isAllowedForKeys(keys)) {
@@ -450,7 +449,6 @@ SplitJoinPermission.prototype.hasSimilarPermission = function(contract, keys, ch
         found = true;
         break;
     }
-
     return found;
 };
 

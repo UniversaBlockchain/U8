@@ -339,7 +339,7 @@ SimpleRole.prototype.deserialize = function(data,deserializer) {
     Object.getPrototypeOf(SimpleRole.prototype).deserialize.call(this,data,deserializer);
 
     for(let key of deserializer.deserialize(data.keys)) {
-        this.keyRecords.set(key,new KeyRecord(key));
+        this.keyRecords.set(key.key,new KeyRecord(key.key));
     }
 
     for(let address of deserializer.deserialize(data.addresses)) {

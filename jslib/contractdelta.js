@@ -5,6 +5,7 @@ const ErrorRecord = require("errors").ErrorRecord;
 const Errors = require("errors").Errors;
 const Delta = require("deltas").Delta;
 const QuantiserException = require("quantiser").QuantiserException;
+const QuantiserProcesses = require("quantiser").QuantiserProcesses;
 const MapDelta = require("deltas").MapDelta;
 const SplitJoinPermission = require("permissions").SplitJoinPermission;
 
@@ -22,14 +23,8 @@ ContractDelta.insignificantKeys = new Set(["created_at", "created_by", "revision
 
 ContractDelta.prototype.check = function() {
     //try {
-        console.log("SSSS");
-        console.log(this.existing != null);
-        console.log(this.changed != null);
         let s1 = BossBiMapper.getInstance().serialize(this.existing);
         let s2 = BossBiMapper.getInstance().serialize(this.changed)
-
-        console.log(s1 != null);
-        console.log(s2 != null);
 
         let rootDelta = Delta.between(null,s1, s2);
         this.stateDelta = rootDelta.changes.state;
@@ -119,7 +114,7 @@ ContractDelta.prototype.checkStateChange = function() {
 };
 
 ContractDelta.prototype.excludePermittedChanges = function() {
-    let checkingKeys = this.changed.effectiveKeys.keys();
+    let checkingKeys = new Set(this.changed.effectiveKeys.keys());
     for (let permissions of  this.existing.definition.permissions.values()) {
         let permissionQuantized = false;
         for (let permission of permissions) {

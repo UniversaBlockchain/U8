@@ -38,7 +38,7 @@ ExtendedSignature.sign = function (privateKey, data, savePublicKey) {
 
     return ExtendedSignature.of(targetSignature,
         privateKey.sign(targetSignature, crypto.SHA512),
-        privateKey.sign(targetSignature, crypto.SHA3_384));
+        privateKey.sign(targetSignature, crypto.SHA3_256));
 };
 
 ExtendedSignature.createTargetSignature = function (publicKey, data, savePublicKey) {
@@ -66,7 +66,7 @@ ExtendedSignature.verify = function(key, signature, data) {
     let isSignValid = key.verify(src.exts, src.sign, crypto.SHA512);
     let  isSign2Valid = true;
     if(src.hasOwnProperty("sign2")) {
-        isSign2Valid = key.verify(src.exts, src.sign2, crypto.SHA3_384);
+        isSign2Valid = key.verify(src.exts, src.sign2, crypto.SHA3_256);
     }
     if (isSignValid && isSign2Valid) {
         let b = Boss.load(src.exts);

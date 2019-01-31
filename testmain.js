@@ -181,8 +181,9 @@ async function testContract2() {
     let contract = TransactionPack.unpack(sealed).contract;
     logContractTree(contract, "root");
     contract.check();
+    console.log(contract.sealedByKeys.size);
     console.log(JSON.stringify(contract.errors));
-    assert(contract.errors.length == 0);
+    assert(contract.errors.length === 0);
 }
 
 async function testES() {
@@ -221,8 +222,8 @@ async function main() {
 
     //await testCrypto();
     // testBoss();
-    await testES();
-    await testContract();
+    //await testES();
+    //await testContract();
     await testContract2();
     // let xx = [];//1,2,3,4,5];
     // console.log(xx.reduce((a,b) => a + b, 0));

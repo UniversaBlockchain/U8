@@ -448,6 +448,13 @@ Contract.prototype.updateContext = function() {
     }
 };
 
+Contract.prototype.get = function(path) {
+    //TODO:IMPLEMENT;
+    console.log("NOT IMPLEMENTED Contract.get");
+    return true;
+};
+
+
 Contract.prototype.seal = function() {
     let revokingIds = [];
     for(let ri of this.revokingItems) {
