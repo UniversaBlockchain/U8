@@ -45,7 +45,9 @@ Object.prototype.equals = function(to) {
             return false;
         }
 
-        for(let key of Object.keys(this)) {
+        for(let key in this) {
+            if(key === "equals")
+                continue;
 
             if(!to.hasOwnProperty(key))
                 return false;
@@ -77,7 +79,6 @@ Object.prototype.equals = function(to) {
             if(!found)
                 return false
         }
-
         return true;
     }
 
@@ -107,6 +108,7 @@ Object.prototype.equals = function(to) {
         if(this.size !== to.size) {
             return false;
         }
+
         for(let x1 of this) {
             let found = false;
             for(let x2 of to) {
@@ -122,62 +124,35 @@ Object.prototype.equals = function(to) {
 
     }
 
-    throw "Error: equals is not redefined for custom object"//JSON.stringify(this);
+    throw "Error: equals is not redefined for custom object " + JSON.stringify(this);
 };
 
 
 const packedEq = function(to) {
+    console.log("-91")
     if(this === to)
         return true;
 
+    console.log("-92")
 
     if(Object.getPrototypeOf(this) !== Object.getPrototypeOf(to))
         return false;
 
+    console.log("-93")
 
     return valuesEqual(this.packed,to.packed);
 };
 
-crypto.KeyAddress.prototype.equals = packedEq;
-crypto.PublicKey.prototype.equals = packedEq;
-crypto.PrivateKey.prototype.equals = packedEq;
+let mapGet = Map.prototype.get;
 
-crypto.HashId.prototype.equals = function(to) {
-    if(this === to)
-        return true;
-
-    if(Object.getPrototypeOf(this) !== Object.getPrototypeOf(to))
-        return false;
-
-    return valuesEqual(this.digest,to.digest);
-};
-
-
-Date.prototype.equals = function(to) {
-    if(this === to)
-        return true;
-
-    if(Object.getPrototypeOf(this) !== Object.getPrototypeOf(to))
-        return false;
-
-    return this.getTime() === to.getTime();
-};
-
-
-
-class GenericMap extends Map{
-
-    get(x) {
-        for(let k of this.keys()) {
-            if(valuesEqual(k,x)) {
-                return super.get(k);
-            }
+Map.prototype.get = function(x) {
+    for(let k of this.keys()) {
+        if(valuesEqual(k,x)) {
+            return mapGet.call(this,k);
         }
-        return null;
-    };
-}
-
-
+    }
+    return null;
+};
 
 
 let addFunc = Set.prototype.add;
@@ -220,4 +195,23 @@ function randomString(length) {
     return string;
 }
 
-module.exports = {arraysEqual,valuesEqual,randomString,GenericMap};
+const MemoiseMixin = {
+    memoise(name, calculate) {
+        if (!this[name]) this[name] = calculate();
+        return this[name];
+    }
+};
+
+const PackedEqMixin = {
+    equals(to) {
+        if(this === to)
+            return true;
+
+        if(this.prototype !== to.prototype )
+            return false;
+
+        return arraysEqual(this.packed, to.packed);
+    }
+};
+
+module.exports = {arraysEqual,valuesEqual,randomString, MemoiseMixin, PackedEqMixin};

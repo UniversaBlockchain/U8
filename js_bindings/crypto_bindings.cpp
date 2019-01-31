@@ -13,8 +13,11 @@
 #include "../crypto/base64.h"
 #include "../crypto/HashId.h"
 
+static Persistent<FunctionTemplate> publicKeyTpl;
+static Persistent<FunctionTemplate> privateKeyTpl;
+
 static void privateKeySign(const FunctionCallbackInfo<Value> &args) {
-    Scripter::unwrapArgs(args, [&](ArgsContext &&ac) {
+    Scripter::unwrapArgs(args, [&](ArgsContext &ac) {
         if (args.Length() == 2) {
             auto key = unwrap<PrivateKey>(args.This());
             optional<byte_vector> src = v8ToVector(args[0]);
@@ -30,7 +33,7 @@ static void privateKeySign(const FunctionCallbackInfo<Value> &args) {
 }
 
 static void privateKeyPack(const FunctionCallbackInfo<Value> &args) {
-    Scripter::unwrapArgs(args, [&](ArgsContext &&ac) {
+    Scripter::unwrapArgs(args, [&](ArgsContext &ac) {
         if (args.Length() == 0) {
             auto key = unwrap<PrivateKey>(args.This());
             ac.setReturnValue(ac.toBinary(key->pack()));
@@ -41,7 +44,7 @@ static void privateKeyPack(const FunctionCallbackInfo<Value> &args) {
 }
 
 static void publicKeyPack(const FunctionCallbackInfo<Value> &args) {
-    Scripter::unwrapArgs(args, [&](ArgsContext &&ac) {
+    Scripter::unwrapArgs(args, [&](ArgsContext &ac) {
         if (args.Length() == 0) {
             auto key = unwrap<PublicKey>(args.This());
             ac.setReturnValue(ac.toBinary(key->pack()));
@@ -52,7 +55,7 @@ static void publicKeyPack(const FunctionCallbackInfo<Value> &args) {
 }
 
 static void publicKeyVerify(const FunctionCallbackInfo<Value> &args) {
-    Scripter::unwrapArgs(args, [](ArgsContext &&ac) {
+    Scripter::unwrapArgs(args, [](ArgsContext &ac) {
         if (ac.args.Length() == 3) {
             auto key = unwrap<PublicKey>(ac.args.This());
             optional<byte_vector> src = v8ToVector(ac.args[0]);
@@ -67,7 +70,7 @@ static void publicKeyVerify(const FunctionCallbackInfo<Value> &args) {
 }
 
 static void publicKeyFingerprints(const FunctionCallbackInfo<Value> &args) {
-    Scripter::unwrapArgs(args, [](ArgsContext &&ac) {
+    Scripter::unwrapArgs(args, [](ArgsContext &ac) {
         if (ac.args.Length() == 0) {
             auto key = unwrap<PublicKey>(ac.args.This());
             ac.setReturnValue(ac.toBinary(key->fingerprint()));
@@ -78,7 +81,7 @@ static void publicKeyFingerprints(const FunctionCallbackInfo<Value> &args) {
 }
 
 static void keyAddressToString(const FunctionCallbackInfo<Value> &args) {
-    Scripter::unwrapArgs(args, [](ArgsContext &&ac) {
+    Scripter::unwrapArgs(args, [](ArgsContext &ac) {
         if (ac.args.Length() == 0) {
             auto keyAddress = unwrap<KeyAddress>(ac.args.This());
             ac.setReturnValue(ac.v8String(keyAddress->toString()));
@@ -89,7 +92,7 @@ static void keyAddressToString(const FunctionCallbackInfo<Value> &args) {
 }
 
 static void keyAddressGetPacked(const FunctionCallbackInfo<Value> &args) {
-    Scripter::unwrapArgs(args, [](ArgsContext &&ac) {
+    Scripter::unwrapArgs(args, [](ArgsContext &ac) {
         if (ac.args.Length() == 0) {
             auto keyAddress = unwrap<KeyAddress>(ac.args.This());
             ac.setReturnValue(ac.toBinary(keyAddress->getPacked()));
@@ -100,13 +103,13 @@ static void keyAddressGetPacked(const FunctionCallbackInfo<Value> &args) {
 }
 
 static void keyAddressMatch(const FunctionCallbackInfo<Value> &args) {
-    Scripter::unwrapArgs(args, [](ArgsContext &&ac) {
+    Scripter::unwrapArgs(args, [](ArgsContext &ac) {
         if (ac.args.Length() == 1) {
             auto keyAddress = unwrap<KeyAddress>(ac.args.This());
             auto isolate = ac.isolate;
+            auto pkt = publicKeyTpl.Get(isolate);
             Local<Object> obj = ac.args[0].As<Object>();
-            String::Utf8Value className(isolate, obj->GetConstructorName());
-            if (strcmp(*className, "PublicKey") == 0) {
+            if (pkt->HasInstance(obj)) {
                 PublicKey *key = unwrap<PublicKey>(obj);
                 ac.setReturnValue(keyAddress->isMatchingKey(*key));
                 return;;
@@ -120,7 +123,7 @@ static void keyAddressMatch(const FunctionCallbackInfo<Value> &args) {
 }
 
 static void hashIdGetDigest(const FunctionCallbackInfo<Value> &args) {
-    Scripter::unwrapArgs(args, [](ArgsContext &&ac) {
+    Scripter::unwrapArgs(args, [](ArgsContext &ac) {
         if (ac.args.Length() == 0) {
             auto hashId = unwrap<HashId>(ac.args.This());
             ac.setReturnValue(ac.toBinary(hashId->getDigest()));
@@ -131,7 +134,7 @@ static void hashIdGetDigest(const FunctionCallbackInfo<Value> &args) {
 }
 
 static void hashIdGetBase64String(const FunctionCallbackInfo<Value> &args) {
-    Scripter::unwrapArgs(args, [](ArgsContext &&ac) {
+    Scripter::unwrapArgs(args, [](ArgsContext &ac) {
         if (ac.args.Length() == 0) {
             auto hashId = unwrap<HashId>(ac.args.This());
             ac.setReturnValue(ac.v8String(hashId->toBase64()));
@@ -145,7 +148,7 @@ static void hashIdGetBase64String(const FunctionCallbackInfo<Value> &args) {
 Local<FunctionTemplate> initPrivateKey(Isolate *isolate) {
     Local<FunctionTemplate> tpl = bindCppClass<PrivateKey>(
             isolate,
-            "PrivateKey",
+            "PrivateKeyImpl",
             [=](const FunctionCallbackInfo<Value> &args) -> PrivateKey * {
                 if (args.Length() == 1) {
                     if (args[0]->IsTypedArray()) {
@@ -160,54 +163,14 @@ Local<FunctionTemplate> initPrivateKey(Isolate *isolate) {
     auto prototype = tpl->PrototypeTemplate();
     prototype->Set(isolate, "__sign", FunctionTemplate::New(isolate, privateKeySign));
     prototype->Set(isolate, "__pack", FunctionTemplate::New(isolate, privateKeyPack));
+    privateKeyTpl.Reset(isolate, tpl);
     return tpl;
 }
 
-Local<FunctionTemplate> initKeyAddress(Isolate *isolate) {
-    Local<FunctionTemplate> tpl = bindCppClass<KeyAddress>(
-            isolate,
-            "KeyAddress",
-            [=](const FunctionCallbackInfo<Value> &args) -> KeyAddress * {
-                auto a0 = args[0];
-                if (a0->IsTypedArray() && args.Length() == 1) {
-                    // TODO: reuse data of the typed array
-                    auto v = v8ToVector(a0);
-                    if (v)
-                        return new KeyAddress(*v);
-                } else if (a0->IsString() && args.Length() == 1) {
-                    String::Utf8Value s(isolate, a0);
-                    return new KeyAddress(*s);
-                } else if (a0->IsObject() && args.Length() == 3) {
-                    Local<Object> obj = a0.As<Object>();
-                    String::Utf8Value className(isolate, obj->GetConstructorName());
-                    if (strcmp(*className, "PublicKey") == 0) {
-                        auto context = args.GetIsolate()->GetCurrentContext();
-                        return new KeyAddress(*unwrap<PrivateKey>(obj),
-                                              args[1]->Int32Value(context).FromJust(),
-                                              args[2]->BooleanValue(isolate));
-                    }
-                    isolate->ThrowException(
-                            Exception::TypeError(String::NewFromUtf8(isolate, "public key expected")));
-
-                }
-                isolate->ThrowException(
-                        Exception::TypeError(String::NewFromUtf8(isolate, "bad constructor arguments")));
-                return nullptr;
-            });
-    auto prototype = tpl->PrototypeTemplate();
-    prototype->Set(isolate, "toString", FunctionTemplate::New(isolate, keyAddressToString));
-    prototype->Set(isolate, "getPacked", FunctionTemplate::New(isolate, keyAddressGetPacked));
-    prototype->Set(isolate, "match", FunctionTemplate::New(isolate, keyAddressMatch));
-    return tpl;
-}
-
-
-Local<FunctionTemplate> initPublicKey(Isolate *isolate, Local<FunctionTemplate> privateKeyTemplate) {
-    static Persistent<FunctionTemplate> pkt;
-    pkt.Reset(isolate, privateKeyTemplate);
+Local<FunctionTemplate> initPublicKey(Isolate *isolate) {
     Local<FunctionTemplate> tpl = bindCppClass<PublicKey>(
             isolate,
-            "PrivateKey",
+            "PublicKeyImpl",
             [](const FunctionCallbackInfo<Value> &args) -> PublicKey * {
                 Isolate *isolate = args.GetIsolate();
                 if (args.Length() == 1) {
@@ -215,10 +178,9 @@ Local<FunctionTemplate> initPublicKey(Isolate *isolate, Local<FunctionTemplate> 
                         auto contents = args[0].As<TypedArray>()->Buffer()->GetContents();
                         return new PublicKey(contents.Data(), contents.ByteLength());
                     } else if (args[0]->IsObject()) {
-                        auto
-                        privateKeyTemplate = pkt.Get(isolate);
+                        auto pkt = privateKeyTpl.Get(isolate);
                         Local<Object> obj = args[0].As<Object>();
-                        if( privateKeyTemplate->HasInstance(obj) )
+                        if( pkt->HasInstance(obj) )
                             return new PublicKey(*unwrap<PrivateKey>(obj));
                         isolate->ThrowException(
                                 Exception::TypeError(String::NewFromUtf8(isolate, "private key expected")));
@@ -233,6 +195,47 @@ Local<FunctionTemplate> initPublicKey(Isolate *isolate, Local<FunctionTemplate> 
     prototype->Set(isolate, "__verify", FunctionTemplate::New(isolate, publicKeyVerify));
     prototype->Set(isolate, "__pack", FunctionTemplate::New(isolate, publicKeyPack));
     prototype->Set(isolate, "__getFingerprints", FunctionTemplate::New(isolate, publicKeyFingerprints));
+    publicKeyTpl.Reset(isolate, tpl);
+    return tpl;
+}
+
+Local<FunctionTemplate> initKeyAddress(Isolate *isolate) {
+    Local<FunctionTemplate> tpl = bindCppClass<KeyAddress>(
+            isolate,
+            "KeyAddress",
+            [](const FunctionCallbackInfo<Value> &args) -> KeyAddress * {
+                auto isolate = args.GetIsolate();
+                auto a0 = args[0];
+                if (a0->IsTypedArray() && args.Length() == 1) {
+                    // TODO: reuse data of the typed array
+                    auto v = v8ToVector(a0);
+                    if (v)
+                        return new KeyAddress(*v);
+                } else if (a0->IsString() && args.Length() == 1) {
+                    String::Utf8Value s(isolate, a0);
+                    return new KeyAddress(*s);
+                } else if (a0->IsObject() && args.Length() == 3) {
+                    Local<Object> obj = a0.As<Object>();
+                    auto tpl = publicKeyTpl.Get(isolate);
+                    if( tpl->HasInstance(obj)) {
+                        auto context = args.GetIsolate()->GetCurrentContext();
+                        return new KeyAddress(*unwrap<PrivateKey>(obj),
+                                              args[1]->Int32Value(context).FromJust(),
+                                              args[2]->BooleanValue(isolate));
+                    }
+                    isolate->ThrowException(
+                            Exception::TypeError(String::NewFromUtf8(isolate, "public key expected")));
+                    return nullptr;
+
+                }
+                isolate->ThrowException(
+                        Exception::TypeError(String::NewFromUtf8(isolate, "bad constructor arguments")));
+                return nullptr;
+            });
+    auto prototype = tpl->PrototypeTemplate();
+    prototype->Set(isolate, "toString", FunctionTemplate::New(isolate, keyAddressToString));
+    prototype->Set(isolate, "getPacked", FunctionTemplate::New(isolate, keyAddressGetPacked));
+    prototype->Set(isolate, "match", FunctionTemplate::New(isolate, keyAddressMatch));
     return tpl;
 }
 
@@ -269,7 +272,7 @@ Local<FunctionTemplate> initHashId(Isolate *isolate) {
 }
 
 static void JsA2B(const FunctionCallbackInfo<Value> &args) {
-    Scripter::unwrapArgs(args, [](ArgsContext &&ac) {
+    Scripter::unwrapArgs(args, [](ArgsContext &ac) {
         if (ac.args.Length() == 1) {
             ac.setReturnValue(ac.toBinary(base64_decodeToBytes(ac.asString(0))));
         } else
@@ -278,7 +281,7 @@ static void JsA2B(const FunctionCallbackInfo<Value> &args) {
 }
 
 static void JsB2A(const FunctionCallbackInfo<Value> &args) {
-    Scripter::unwrapArgs(args, [](ArgsContext &&ac) {
+    Scripter::unwrapArgs(args, [](ArgsContext &ac) {
         if (ac.args.Length() == 1) {
             if (ac.args[0]->IsUint8Array()) {
                 auto c = ac.args[0].As<Uint8Array>()->Buffer()->GetContents();
@@ -291,7 +294,7 @@ static void JsB2A(const FunctionCallbackInfo<Value> &args) {
 }
 
 static void digest(const FunctionCallbackInfo<Value> &args) {
-    Scripter::unwrapArgs(args, [](ArgsContext &&ac) {
+    Scripter::unwrapArgs(args, [](ArgsContext &ac) {
         if (ac.args.Length() == 2) {
             int ht = ac.asInt(0);
             if (ht <= HashType::MIN || ht >= HashType::MAX)
@@ -314,10 +317,12 @@ static void digest(const FunctionCallbackInfo<Value> &args) {
 
 void JsInitCrypto(Isolate *isolate, const Local<ObjectTemplate> &global) {
     auto crypto = ObjectTemplate::New(isolate);
-    auto privateKey = initPrivateKey(isolate);
-    crypto->Set(isolate, "PrivateKeyImpl", privateKey);
-    crypto->Set(isolate, "PublicKey", initPublicKey(isolate, privateKey));
+
+    // order is critical!
+    crypto->Set(isolate, "PrivateKeyImpl", initPrivateKey(isolate));
+    crypto->Set(isolate, "PublicKeyImpl", initPublicKey(isolate));
     crypto->Set(isolate, "KeyAddress", initKeyAddress(isolate));
+    // endo of critical order
     crypto->Set(isolate, "version", String::NewFromUtf8(isolate, "0.0.1"));
     crypto->Set(isolate, "HashIdImpl", initHashId(isolate));
     crypto->Set(isolate, "__digest", FunctionTemplate::New(isolate, digest));

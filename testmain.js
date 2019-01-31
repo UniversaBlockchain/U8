@@ -92,7 +92,6 @@ async function testCrypto() {
     assert(new crypto.KeyAddress(publicKey.shortAddress.packed).toString() == publicKey.shortAddress.toString());
     assert(new crypto.KeyAddress(publicKey.longAddress.packed).toString() == publicKey.longAddress.toString());
 
-
     let ska = publicKey.shortAddress;
     let lka = publicKey.longAddress;
     assert(ska.match(publicKey));
@@ -104,9 +103,13 @@ async function testCrypto() {
     let packed = privateKey.packed;
     // console.log(packed);
     assert(new crypto.PrivateKey(packed).shortAddress.toString() == privateKey.shortAddress.toString());
-    packed = publicKey.packed;
-    assert(new crypto.PublicKey(packed).shortAddress.toString() == publicKey.shortAddress.toString());
-    // btoa(packed));
+
+    let packed2 = publicKey.packed;
+    assert(!equalArrays(packed, packed2));
+    // assert(new crypto.PublicKey(packed).shortAddress.toString() == publicKey.shortAddress.toString());
+    // assert(new crypto.PublicKey(packed).shortAddress.toString() == publicKey.shortAddress.toString());
+    // assert(new crypto.PublicKey(packed).shortAddress.toString() == publicKey.shortAddress.toString());
+
     assert(equalArrays(packed, packed));
     assert(equalArrays(packed, atob(btoa(packed))));
 
@@ -183,27 +186,7 @@ async function testHashId() {
 }
 
 
-class TestMemoise {
-
-    counter = 0;
-    defaultValue = 42;
-
-    get value() { return memoise('value', () => {
-        this.counter++;
-        return this.defaultValue;
-    })}
-}
-
-function testMemoise() {
-    let t = new TestMemoise();
-    assert(t.value == 42);
-    assert(t.value == 42);
-    assert(t.value == 42);
-    assert(t.counter == 1);
-}
-
 async function main() {
-    testMemoise();
 
     // await testReadAll();
     //await testHashId();

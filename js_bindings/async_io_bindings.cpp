@@ -60,7 +60,7 @@ void JsAsyncHandleOpen(const FunctionCallbackInfo<Value> &args) {
 }
 
 void JsAsyncHandleRead(const FunctionCallbackInfo<Value> &args) {
-    Scripter::unwrapArgs(args, [&](ArgsContext &&ac) {
+    Scripter::unwrapArgs(args, [&](ArgsContext &ac) {
 
         auto handle = unwrap<asyncio::IOHandle>(args.This());
         auto scripter = ac.scripter;
@@ -98,7 +98,7 @@ void JsAsyncHandleRead(const FunctionCallbackInfo<Value> &args) {
 
 // write(typedArray,cb)
 void JsAsyncHandleWrite(const FunctionCallbackInfo<Value> &args) {
-    Scripter::unwrapArgs(args, [&](ArgsContext &&ac) {
+    Scripter::unwrapArgs(args, [&](ArgsContext &ac) {
 
         auto handle = unwrap<asyncio::IOHandle>(args.This());
         auto scripter = ac.scripter;
@@ -135,7 +135,7 @@ void JsAsyncHandleWrite(const FunctionCallbackInfo<Value> &args) {
 }
 
 void JsAsyncHandleClose(const FunctionCallbackInfo<Value> &args) {
-    Scripter::unwrapArgs(args, [&](ArgsContext &&ac) {
+    Scripter::unwrapArgs(args, [&](ArgsContext &ac) {
 
         auto handle = unwrap<asyncio::IOHandle>(args.This());
         auto scripter = ac.scripter;

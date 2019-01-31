@@ -1,10 +1,20 @@
+
+
 crypto.SHA256 = 1;
 crypto.SHA512 = 2;
 crypto.SHA3_256 = 3;
 crypto.SHA3_384 = 4;
 crypto.SHA3_512 = 5;
 
+
+import {MemoiseMixin, PackedEqMixin} from 'tools'
+
 crypto.PrivateKey = class extends crypto.PrivateKeyImpl {
+
+    constructor(...args) {
+        super(...args);
+    }
+
 
     sign(data, hashType = crypto.SHA3_256) {
         if (typeof (data) == 'string') {
@@ -17,19 +27,22 @@ crypto.PrivateKey = class extends crypto.PrivateKeyImpl {
     }
 
     get packed() {
-        return memoise("__packed", () => this.__pack())
+        // if( !this.__packed) this.__packed = this.__pack();
+        // return this.__packed;
+        return this.memoise('__packed', () => this.__pack());
+
     }
 
     get publicKey() {
-        return memoise("__publicKey", () => new crypto.PublicKey(this) );
+        return this.memoise("__publicKey", () => new crypto.PublicKey(this) );
     }
 
     get shortAddress() {
-        return memoise("__shortAddress", () => this.publicKey.shortAddress);
+        return this.memoise("__shortAddress", () => this.publicKey.shortAddress);
     }
 
     get longAddress() {
-        return memoise("__longAddress", () => this.publicKey.longAddress);
+        return this.memoise("__longAddress", () => this.publicKey.longAddress);
     }
 
     equals(anotherKey) {
@@ -38,61 +51,64 @@ crypto.PrivateKey = class extends crypto.PrivateKeyImpl {
     }
 
     toString() {
-        return "Priv:"+this.longAddress.toString().slice(0,14)+"...";
+        return "Prk:"+this.longAddress.toString().slice(0,14)+"...";
+    }
+
+};
+
+Object.assign(crypto.PrivateKey.prototype, MemoiseMixin);
+Object.assign(crypto.PrivateKey.prototype, PackedEqMixin);
+
+crypto.PublicKey = class extends crypto.PublicKeyImpl {
+
+    constructor(...args) {
+        super(...args);
+        Object.assign(this, MemoiseMixin);
+    }
+
+
+    verify(data, signature, hashType = crypto.SHA3_256) {
+        if (typeof (data) == 'string') {
+            data = utf8Encode(data);
+        }
+        if (data instanceof Uint8Array)
+            return this.__verify(data, signature, hashType);
+        else
+            throw new Error("Wrong data type: " + typeof (data));
+    }
+
+    get packed() {
+        return this.memoise('__packed', () => this.__pack());
+    }
+
+    get shortAddress() {
+        return this.memoise('__shortAddress', () => new crypto.KeyAddress(this, 0, false));
+    }
+
+    get longAddress() {
+        return this.memoise('__longAddress', () => new crypto.KeyAddress(this, 0, true));
+    }
+
+    get fingerprints() {
+        return this.memoise('__fingerprints', () => this.__getFingerprints());
+    }
+
+    toString() {
+        return "Puk:"+this.longAddress.toString().slice(0,14)+"...";
     }
 };
 
-crypto.PublicKey.prototype.verify = function (data, signature, hashType = crypto.SHA3_256) {
-    if (typeof (data) == 'string') {
-        data = utf8Encode(data);
-    }
-    if (data instanceof Uint8Array)
-        return this.__verify(data, signature, hashType);
-    else
-        throw new Error("Wrong data type: " + typeof (data));
-};
-
-
-Object.defineProperty(crypto.PublicKey.prototype, "packed", {
-    get: function () {
-        if (!this.__packed) ;
-        this.__packed = this.__pack();
-        return this.__packed;
-    }
-});
-
-Object.defineProperty(crypto.PublicKey.prototype, "shortAddress", {
-    get: function () {
-        if (!this.__shortAddress) ;
-        this.__shortAddress = new crypto.KeyAddress(this, 0, false);
-        return this.__shortAddress;
-    }
-});
-
-Object.defineProperty(crypto.PublicKey.prototype, "longAddress", {
-    get: function () {
-        if (!this.__longAddress) ;
-        this.__longAddress = new crypto.KeyAddress(this, 0, true);
-        return this.__longAddress;
-    }
-});
-
-Object.defineProperty(crypto.PublicKey.prototype, "fingerprints", {
-    get: function () {
-        if (!this.__fingerprints) ;
-        this.__fingerprints = this.__getFingerprints();
-        return this.__fingerprints;
-    }
-});
-
+Object.assign(crypto.PublicKey.prototype, MemoiseMixin);
+Object.assign(crypto.PublicKey.prototype, PackedEqMixin);
 
 Object.defineProperty(crypto.KeyAddress.prototype, "packed", {
     get: function () {
-        if (!this.__packed) ;
-        this.__packed = this.getPacked();
-        return this.__packed;
+        return this.memoise('__packed', () => this.getPacked());
     }
 });
+
+Object.assign(crypto.KeyAddress.prototype, MemoiseMixin);
+Object.assign(crypto.KeyAddress.prototype, PackedEqMixin);
 
 /**
  * Calculate digest of a string or binary data (Uint8Array). UTF8 encoding is used if a string is given.
@@ -150,7 +166,7 @@ crypto.HashId = class extends crypto.HashIdImpl {
      * @returns {Uint8Array}
      */
     get digest() {
-        return memoise("__digest", () => this.__getDigest());
+        return this.memoise("__digest", () => this.__getDigest());
     }
 
     /**
@@ -158,7 +174,7 @@ crypto.HashId = class extends crypto.HashIdImpl {
      * @returns {string} base64 encoded digest
      */
     get base64() {
-        return memoise("__base64", () => this.__getBase64String());
+        return this.memoise("__base64", () => this.__getBase64String());
     }
 
     /**
@@ -170,5 +186,8 @@ crypto.HashId = class extends crypto.HashIdImpl {
         return equalArrays(this.digest, anotherId.digest);
     }
 };
+
+Object.assign(crypto.HashId.prototype, MemoiseMixin);
+Object.assign(crypto.HashId.prototype, PackedEqMixin);
 
 module.exports = crypto;

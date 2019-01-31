@@ -9,19 +9,6 @@ const console = {
 const VERSION = "4.0.0b5";
 
 /**
- * Memoise some value calculation. Works on 'this' that was in the calling closure context!
- *
- * @param name parameter name, will be cached in `this.name`
- * @param calculate lambda to calculate. Use '=>' lambda to access enclosing `this`.
- * @returns {*} whatever lambda has caclulated, cached.
- * @global
- */
-const memoise = (name, calculate) => {
-    if( !this[name] ) this[name] = calculate();
-    return this[name];
-};
-
-/**
  * Check that two arrays have equal components, using '==='. Shallow comarison.
  * @param a array-like object
  * @param b array-like object

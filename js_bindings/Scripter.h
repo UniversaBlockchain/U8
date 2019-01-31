@@ -327,6 +327,10 @@ public:
         scripter->throwError(text);
     }
 
+    void throwError(string&& text) {
+        scripter->throwError(move(text));
+    }
+
     template <typename T>
     void setReturnValue(T&& value) {
         args.GetReturnValue().Set(value);
@@ -364,7 +368,13 @@ void Scripter::unwrapArgs(
     shared_ptr<Scripter> scripter = weak->lock();
     if (scripter) {
         Context::Scope context_scope(context);
-        block(ArgsContext(scripter, args));
+        ArgsContext ac(scripter, args);
+        try {
+            block(ac);
+        }
+        catch(const exception& e) {
+            ac.throwError("unhandled C++ exception: "s + e.what());
+        }
     } else {
         cerr << "called inContext for recycled SR: ignoring" << endl;
     }

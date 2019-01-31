@@ -144,15 +144,22 @@ Local<FunctionTemplate> bindCppClass(Isolate *isolate, const char *class_name, F
                                             Exception::TypeError(String::NewFromUtf8(isolate,
                                                                                      "calling constructor as function")));
                                 } else {
-                                    T *cppObject = constructor(args);
-                                    if( !cppObject ) {
-                                        args.GetReturnValue().SetUndefined();
+                                    try {
+                                        T *cppObject = constructor(args);
+                                        if (!cppObject) {
+                                            args.GetReturnValue().SetUndefined();
+                                        } else {
+                                            Local<Object> result = args.This();
+                                            result->SetInternalField(0, External::New(isolate, cppObject));
+                                            SimpleFinalizer(result, cppObject);
+                                            args.GetReturnValue().Set(args.This());
+                                        }
                                     }
-                                    else {
-                                        Local<Object> result = args.This();
-                                        result->SetInternalField(0, External::New(isolate, cppObject));
-                                        SimpleFinalizer(result, cppObject);
-                                        args.GetReturnValue().Set(args.This());
+                                    catch(const exception& e) {
+                                        string message = "unhandled C++ exception: "s + e.what();
+                                        isolate->ThrowException(
+                                                Exception::TypeError(String::NewFromUtf8(isolate,
+                                                                                         message.data())));
                                     }
                                 }
                             }));
