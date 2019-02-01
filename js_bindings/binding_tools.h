@@ -2,8 +2,8 @@
 // Created by Sergey Chernov on 2019-01-21.
 //
 
-#ifndef U8_WEAK_FINALIZERS_H
-#define U8_WEAK_FINALIZERS_H
+#ifndef U8_BINDING_TOOLS_H
+#define U8_BINDING_TOOLS_H
 
 #include <v8.h>
 #include <iostream>
@@ -232,4 +232,4 @@ Local<Value> wrap(Persistent<FunctionTemplate>& objectTemplate, Isolate *isolate
  */
 extern ThreadPool jsThreadPool;
 
-#endif //U8_WEAK_FINALIZERS_H
+#endif //U8_BINDING_TOOLS_H
