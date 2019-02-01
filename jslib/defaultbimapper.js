@@ -32,7 +32,6 @@ DefaultBiMapper.removeAdapterForTag = function (tag) {
 
 let binaryAdapter = new bs.BiAdapter("binary",Uint8Array);
 binaryAdapter.serialize = function(o,s) {
-    console.log(o.byteLength);
     return {base64: btoa(o)};
 };
 

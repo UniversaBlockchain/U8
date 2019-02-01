@@ -221,4 +221,7 @@ const DigestEqMixin = {
     }
 };
 
-module.exports = {arraysEqual,valuesEqual,randomString, MemoiseMixin, PackedEqMixin,DigestEqMixin,GenericMap};
+const THROW_EXCEPTIONS = true;
+
+
+module.exports = {arraysEqual,valuesEqual,randomString, MemoiseMixin, PackedEqMixin,DigestEqMixin,GenericMap,THROW_EXCEPTIONS};

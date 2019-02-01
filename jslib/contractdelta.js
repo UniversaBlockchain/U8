@@ -22,7 +22,7 @@ ContractDelta.insignificantKeys = new Set(["created_at", "created_by", "revision
 
 
 ContractDelta.prototype.check = function() {
-    //try {
+    try {
         let s1 = BossBiMapper.getInstance().serialize(this.existing);
         let s2 = BossBiMapper.getInstance().serialize(this.changed)
 
@@ -45,12 +45,15 @@ ContractDelta.prototype.check = function() {
 
         // check only permitted changes in data
         this.checkStateChange();
-//    } catch (e) {
-//        if(e instanceof QuantiserException)
-//            throw e;
-//
-//        this.changed.errors.push(new ErrorRecord(Errors.FAILED_CHECK, "", "failed to compare, structure is broken or not supported:" + e));
-//    }
+    } catch (e) {
+        if(t.THROW_EXCEPTIONS)
+            throw e;
+
+        if(e instanceof QuantiserException)
+            throw e;
+
+        this.changed.errors.push(new ErrorRecord(Errors.FAILED_CHECK, "", "failed to compare, structure is broken or not supported:" + e));
+    }
 
 };
 

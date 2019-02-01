@@ -82,7 +82,6 @@ Permission.prototype.checkChanges = function(contract, changed, stateChanges, re
 ///////////////////////////
 
 function ChangeNumberPermission(role,params) {
-    console.log(JSON.stringify(params));
     Permission.call(this,"decrement_permission",role,params);
     this.initFromParams();
 }
@@ -313,19 +312,23 @@ SplitJoinPermission.prototype.checkSplitJoinCase = function(changed, revokesToRe
     // We need to find the splitted contracts
     let splitJoinSum = new BigDecimal("0");
 
-    for (let s of changed.context.siblings) {
+    let allRevoking = new t.GenericMap();
 
+    for (let s of changed.context.siblings) {
 
         if (!this.isMergeable(s) || !this.validateMergeFields(changed, s) || !this.hasSimilarPermission(s, keys, false)) {
             continue;
         }
-
         splitJoinSum = splitJoinSum.add(new BigDecimal(s.state.data[this.fieldName]));
+
+        for(let ri of s.revokingItems) {
+            allRevoking.set(ri.id,ri);
+        }
     }
 
     let rSum = new BigDecimal("0");
 
-    for (let c of changed.revokingItems) {
+    for (let c of allRevoking.values()) {
 
 
         if (!this.isMergeable(c) || !this.validateMergeFields(changed, c) || !this.hasSimilarPermission(c, keys, false)) {
@@ -394,7 +397,7 @@ SplitJoinPermission.prototype.checkMerge = function(changed, dataChanges, revoki
     }
 
     if (isValid) {
-        delete dataChanges[fieldName];
+        delete dataChanges[this.fieldName];
         for(let ri of revokesToRemove) {
             revokingItems.remove(ri);
         }
@@ -426,6 +429,8 @@ SplitJoinPermission.prototype.checkChanges = function(contract, changed, stateCh
             else if (cmp < 0)
                 this.checkMerge(changed, dataChanges, revokingItems, keys, newValue);
         } catch (err) {
+            if(t.THROW_EXCEPTIONS)
+                throw err;
             console.log("SplitJoinPermission.checkChanges:" + err.message)
         }
     }

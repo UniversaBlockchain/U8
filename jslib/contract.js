@@ -15,6 +15,7 @@ const Errors = e.Errors;
 const ErrorRecord = e.ErrorRecord;
 const Config = require("config").Config;
 const ContractDelta = require("contractdelta").ContractDelta;
+const ExtendedSignature = require("extendedsignature").ExtendedSignature;
 
 const MAX_API_LEVEL = 3;
 
@@ -22,6 +23,45 @@ function Context(base) {
     this.base = base;
     this.siblings = new Set();
 }
+
+function Transactional(contract) {
+    this.contract = contract;
+    this.id = null;
+    this.references = [];
+    this.validUntil = null;
+    this.data = {};
+}
+
+Transactional.prototype.serialize = function(serializer) {
+
+    let b = {
+        id: this.id,
+        references : serializer.serialize(this.references),
+        data : this.data,
+    };
+
+    if (this.validUntil != null)
+        b.valid_until = this.validUntil;
+
+    return b;
+};
+
+Transactional.prototype.deserialize = function(data,deserializer) {
+    if(data != null) {
+        this.id = data.id;
+        if(data.hasOwnProperty("references")) {
+            this.references = deserializer.deserialize(data.references);
+        }
+
+        if(data.hasOwnProperty("valid_until")) {
+            this.validUntil = data.valid_until;
+        }
+
+
+        this.data = data.data;
+    }
+};
+
 
 function State(contract) {
     bs.BiSerializable.call(this);
@@ -416,7 +456,8 @@ Contract.fromSealedBinary = function(sealed,transactionPack) {
                 if(r != null) {
                     result.revokingItems.add(r);
                 } else {
-                    result.addError(Errors.BAD_REVOKE,"Revoking item was not found in the transaction pack")
+
+                    result.errors.push(new ErrorRecord(Errors.BAD_REVOKE,"Revoking item was not found in the transaction pack"));
                 }
             }
 
@@ -427,7 +468,7 @@ Contract.fromSealedBinary = function(sealed,transactionPack) {
                 if(r != null) {
                     result.newItems.add(r);
                 } else {
-                    result.addError(Errors.BAD_NEW_ITEM,"New item was not found in the transaction pack")
+                    result.errors.push(new ErrorRecord(Errors.BAD_NEW_ITEM,"New item was not found in the transaction pack"));
                 }
             }
     }
@@ -448,10 +489,100 @@ Contract.prototype.updateContext = function() {
     }
 };
 
-Contract.prototype.get = function(path) {
-    //TODO:IMPLEMENT;
-    console.log("NOT IMPLEMENTED Contract.get");
-    return true;
+Contract.prototype.findReferenceByName = function(name,section) {
+    //TODO: implement
+    console.log("NOT IMPLEMENTED Contract.findReferenceByName")
+    return null;
+};
+
+Contract.prototype.get = function(name) {
+    let originalName = name;
+    if (name.startsWith("definition.")) {
+        name = name.substring(11);
+        switch (name) {
+            case "expires_at":
+                return this.definition.expiresAt;
+            case "created_at":
+                return this.definition.createdAt;
+            case "extended_type":
+                return this.definition.extendedType;
+            case "issuer":
+                return this.roles.issuer;
+            default:
+                if (name.startsWith("data."))
+                    if(this.definition.data.hasOwnProperty(name.substring(5))) {
+                        return this.definition.data[name.substring(5)];
+                    } else {
+                        return null;
+                    }
+                if (name.startsWith("references.")) {
+                    return this.findReferenceByName(name.substring(11), this.definition);
+                }
+        }
+    } else if (name.startsWith("state.")) {
+        name = name.substring(6);
+        switch (name) {
+            case "origin":
+                return this.state.origin;
+            case "created_at":
+                return this.state.createdAt;
+            case "expires_at":
+                return this.state.expiresAt;
+            case "owner":
+                return this.roles.owner;
+            case "creator":
+                return this.roles.creator;
+            case "revision":
+                return this.state.revision;
+            case "parent":
+                return this.state.parent;
+            case "branchId":
+                return this.state.branchId;
+            default:
+                if (name.startsWith("data."))
+                    if(this.state.data.hasOwnProperty(name.substring(5))) {
+                        return this.state.data[name.substring(5)];
+                    } else {
+                        return null;
+                    }
+                if (name.startsWith("references.")) {
+                    return this.findReferenceByName(name.substring(11), this.state);
+                }
+        }
+    } else if (name.startsWith("transactional.")) {
+        if (transactional != null) {
+            name = name.substring(14);
+            switch (name) {
+                case "id":
+                    return this.transactional.id;
+                case "validUntil":
+                    return this.transactional.validUntil;
+                default:
+                    if (name.startsWith("data."))
+                        if(this.transactional.data.hasOwnProperty(name.substring(5))) {
+                            return this.transactional.data[name.substring(5)];
+                        } else {
+                            return null;
+                        }
+                    if (name.startsWith("references.")) {
+                        return this.findReferenceByName(name.substring(11), this.transactional);
+                    }
+            }
+        }
+    } else switch (name) {
+        case "id":
+            return this.id;
+        case "origin":
+            return this.state.origin;
+        case "issuer":
+            return this.roles.issuer;
+        case "owner":
+            return this.roles.owner;
+        case "creator":
+            return this.roles.creator;
+    }
+    throw "bad root: " + originalName;
+
 };
 
 
@@ -562,13 +693,13 @@ Contract.prototype.deserialize = function(data,deserializer) {
 
     this.state.deserialize(data.state, deserializer);
 
-//    if (data.hasOwnProperty("transactional")) {
-//        if (this.transactional == null)
-//            this.transactional = new Transactional();
-//        this.transactional.deserialize(data.transactional, deserializer);
-//    } else {
-//        this.transactional = null;
-//    }
+    if (data.hasOwnProperty("transactional")) {
+        if (this.transactional == null)
+            this.transactional = new Transactional();
+        this.transactional.deserialize(data.transactional, deserializer);
+    } else {
+        this.transactional = null;
+    }
 
     if (this.transactional != null && this.transactional.references != null) {
         for(let ref of this.transactional.references) {
@@ -737,6 +868,9 @@ Contract.prototype.check = function(prefix,contractsTree) {
             this.checkChangedContract();
 
     } catch (e) {
+        if(t.THROW_EXCEPTIONS)
+            throw e;
+
         if(e instanceof QuantiserException) {
             throw e;
         } else {

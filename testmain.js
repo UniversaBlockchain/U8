@@ -181,7 +181,6 @@ async function testContract2() {
     let contract = TransactionPack.unpack(sealed).contract;
     logContractTree(contract, "root");
     contract.check();
-    console.log(contract.sealedByKeys.size);
     console.log(JSON.stringify(contract.errors));
     assert(contract.errors.length === 0);
 }

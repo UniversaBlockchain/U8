@@ -82,13 +82,6 @@ BiMapper.prototype.serialize = function (object) {
         const adapter = this.adapters.get(proto);
         let result = adapter.serialize(object,this);
         result.__type = adapter.getTag();
-        if(result.__type === "ChangeNumberPermission") {
-            let c = object.role.contract;
-            object.role.contract = null;
-            console.log("============"+JSON.stringify(object));
-
-            object.role.contract = c;
-        }
         return result;
     } else if(proto === Object.prototype) {
         let result = {};
