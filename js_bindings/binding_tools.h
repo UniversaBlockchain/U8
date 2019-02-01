@@ -9,6 +9,8 @@
 #include <iostream>
 #include <optional>
 #include "../tools/tools.h"
+#include "../tools/ThreadPool.h"
+#include "Scripter.h"
 
 using namespace v8;
 using namespace std;
@@ -202,5 +204,6 @@ optional<byte_vector> v8ToVector(Local<Value> object) {
 }
 
 
+extern ThreadPool jsThreadPool;
 
 #endif //U8_WEAK_FINALIZERS_H

@@ -2,25 +2,34 @@
 // Created by Sergey Chernov on 2019-01-05.
 //
 #include <iostream>
+#include <strstream>
+#include "binding_tools.h"
 #include "basic_builtins.h"
 #include "../tools/tools.h"
 
 using namespace std;
 
 void JsPrint(const v8::FunctionCallbackInfo<v8::Value> &args) {
+    auto isolate = args.GetIsolate();
+    bool isError = args[0]->BooleanValue(isolate);
+    strstream ss;
+
     bool first = true;
-    for (int i = 0; i < args.Length(); i++) {
+    for (int i = 1; i < args.Length(); i++) {
         v8::HandleScope handle_scope(args.GetIsolate());
         if (first) {
             first = false;
         } else {
-            cout << endl;
+            ss << endl;
         }
         v8::String::Utf8Value str(args.GetIsolate(), args[i]);
         const char *cstr = *str;
-        cout << (cstr ? cstr : "(undefined)");
+        ss << (cstr ? cstr : "(undefined)");
     }
-    cout << endl;
+    auto message = ss.str();
+    jsThreadPool([=](){
+        (isError ? cerr : cout) << message << endl;
+    });
 }
 
 //void withScriptEnv(std::function<void(v8::Isolate*,))
@@ -105,7 +114,7 @@ void JsTypedArrayToString(const FunctionCallbackInfo<v8::Value> &args) {
 }
 
 void JsStringToTypedArray(const FunctionCallbackInfo<v8::Value> &args) {
-    Scripter::unwrapArgs(args, [&](ArgsContext& ac) {
+    Scripter::unwrapArgs(args, [&](ArgsContext &ac) {
         String::Utf8Value s(ac.isolate, args[0]->ToString(ac.isolate));
         args.GetReturnValue().Set(ac.toBinary(*s, s.length()));
     });

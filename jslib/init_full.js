@@ -1,9 +1,9 @@
 'use strict';
 
 const console = {
-    log: __bios_print,
-    info: __bios_print,
-    error: __bios_print,
+    log(...args) { __bios_print(false, ...args); },
+    info(...args) { __bios_print(false, ...args) },
+    error(...args) { __bios_print(true, ...args) }
 };
 
 const VERSION = "4.0.0b5";
