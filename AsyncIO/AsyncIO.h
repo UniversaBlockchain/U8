@@ -14,6 +14,9 @@
 #include <any>
 
 namespace asyncio {
+
+#define WAIT_LOOP 5000000L
+
     /**
      * Exit handle for deinitialize main asynchronous loop
      */
@@ -25,13 +28,39 @@ namespace asyncio {
     extern uv_loop_t* asyncLoop;
 
     /**
+     * Handle of main asynchronous loop thread
+     */
+    extern uv_thread_t thread_loop;
+
+    /**
+     * Alarm (event notify) handle of main asynchronous loop
+     */
+    extern uv_async_t alarmHandle;
+
+    /**
      * Asynchronous request
      */
     typedef uv_fs_t ioHandle;
 
+    /**
+     * Directory entry for scan directory
+     */
     typedef uv_dirent_t ioDirEntry;
 
+    /**
+     * Struct with stats of file or directory
+     */
     typedef uv_stat_t ioStat;
+
+    /**
+     * Asynchronous loop (for auxiliary loops)
+     */
+    typedef uv_loop_t ioLoop;
+
+    /**
+     * TCP socket struct (using for accept)
+     */
+    typedef uv_tcp_t ioTCPSocket;
 
     /**
      * Byte vector
@@ -44,7 +73,8 @@ namespace asyncio {
     enum ioHandle_t {
         FILE,
         DIRECTORY,
-        TCP_SOCKET,
+        TCP_SOCKET_LISTEN,
+        TCP_SOCKET_CONNECTED,
         UDP_SOCKET
     };
 
@@ -58,41 +88,41 @@ namespace asyncio {
     typedef std::function<void(ssize_t result)> openFile_cb;
 
     /**
-     * File read callback
+     * File (or TCP socket) read callback
      *
-     * @param data is byte vector with data read from file
-     * @param result is reading result from file
+     * @param data is byte vector with data read from file (or TCP socket)
+     * @param result is reading result from file (or TCP socket)
      * If isError(result) returns true - use getError(result) to determine the error.
      * If isError(result) returns false - result is number of bytes read.
      */
-    typedef std::function<void(const byte_vector& data, ssize_t result)> readFile_cb;
+    typedef std::function<void(const byte_vector& data, ssize_t result)> read_cb;
 
     /**
-     * File read callback with initialized buffer
+     * File (or TCP socket) read callback with initialized buffer
      *
-     * @param result is reading result from file
+     * @param result is reading result from file (or TCP socket)
      * If isError(result) returns true - use getError(result) to determine the error.
      * If isError(result) returns false - result is number of bytes read.
      */
-    typedef std::function<void(ssize_t result)> readFileBuffer_cb;
+    typedef std::function<void(ssize_t result)> readBuffer_cb;
 
     /**
-     * File write callback
+     * File (or TCP socket) write callback
      *
-     * @param result is file write result
+     * @param result is file (or TCP socket) write result
      * If isError(result) returns true - use getError(result) to determine the error.
      * If isError(result) returns false - result is number of bytes wrote.
      */
-    typedef std::function<void(ssize_t result)> writeFile_cb;
+    typedef std::function<void(ssize_t result)> write_cb;
 
     /**
-     * File close callback
+     * File or socket close callback
      *
-     * @param result is file close result
+     * @param result is file close result (ignored for closing socket)
      * If isError(result) returns true - use getError(result) to determine the error.
      * If isError(result) returns false - file is closed.
      */
-    typedef std::function<void(ssize_t result)> closeFile_cb;
+    typedef std::function<void(ssize_t result)> close_cb;
 
     /**
      * Get stat callback
@@ -128,13 +158,65 @@ namespace asyncio {
      */
     typedef std::function<void(ssize_t result)> openDir_cb;
 
+    /**
+     * UDP socket receive callback
+     *
+     * @param result is receiving result
+     * If isError(result) returns true - use getError(result) to determine the error.
+     * If isError(result) returns false - result is number of received bytes.
+     * @param data is byte vector with data received from remote socket
+     * @param IP address of remote socket (IPv4 or IPv6)
+     * @param port of remote socket
+     */
+    typedef std::function<void(ssize_t result, const byte_vector& data, const char* IP, unsigned int port)> recv_cb;
+
+    /**
+     * UDP socket receive callback with initialized buffer
+     *
+     * @param result is receiving result
+     * If isError(result) returns true - use getError(result) to determine the error.
+     * If isError(result) returns false - result is number of received bytes.
+     * @param IP address of remote socket (IPv4 or IPv6)
+     * @param port of remote socket
+     */
+    typedef std::function<void(ssize_t result, const char* IP, unsigned int port)> recvBuffer_cb;
+
+    /**
+     * UDP socket send callback
+     *
+     * @param result is receiving result
+     * If isError(result) returns true - use getError(result) to determine the error.
+     * If isError(result) returns false - result is number of sent bytes.
+     */
+    typedef std::function<void(ssize_t result)> send_cb;
+
+    /**
+     * Listen socket callback. Call from IOHandle::openTCP after init, bind and listen TCP socket.
+     * Callback called when a new incoming connection is received or error.
+     *
+     * @param result is listen TCP socket result
+     * If isError(result) returns true - use getError(result) to determine the error.
+     * If isError(result) returns false - TCP socket ready to accept new connection.
+     */
+    typedef std::function<void(ssize_t result)> openTCP_cb;
+
+    /**
+     * Socket connect callback. Call from IOHandle::connect after init, bind and establish an IPv4 or IPv6 TCP connection.
+     * Callback called when the connection has been established or when a connection error.
+     *
+     * @param result is connect TCP socket result
+     * If isError(result) returns true - use getError(result) to determine the error.
+     * If isError(result) returns false - TCP socket successfully connected.
+     */
+    typedef std::function<void(ssize_t result)> connect_cb;
+
     struct openFile_data {
         openFile_cb callback;
         ioHandle* fileReq;
     };
 
-    struct readFile_data {
-        readFile_cb callback;
+    struct read_data {
+        read_cb callback;
         ioHandle* fileReq;
         uv_buf_t uvBuff;
         ssize_t result;
@@ -146,22 +228,22 @@ namespace asyncio {
         size_t readed;
     };
 
-    struct readFileBuffer_data {
-        readFileBuffer_cb callback;
+    struct readBuffer_data {
+        readBuffer_cb callback;
         ioHandle* fileReq;
         uv_buf_t uvBuff;
         ssize_t result;
     };
 
-    struct writeFile_data {
-        writeFile_cb callback;
+    struct write_data {
+        write_cb callback;
         ioHandle* fileReq;
         uv_buf_t uvBuff;
         ssize_t result;
     };
 
     struct closeFile_data {
-        closeFile_cb callback;
+        close_cb callback;
         ioHandle* fileReq;
     };
 
@@ -170,24 +252,73 @@ namespace asyncio {
         ioHandle* req;
     };
 
+    struct auxLoop_data {
+        uv_async_t* loop_exitHandle;
+        uv_async_t* loop_alarmHandle;
+        uv_thread_t* thread_auxLoop;
+    };
+
+    struct recv_data {
+        recv_cb callback;
+        std::shared_ptr<byte_vector> data;
+    };
+
+    struct recvBuffer_data {
+        recvBuffer_cb callback;
+        void* buffer;
+        size_t maxBytesToRecv;
+    };
+
+    struct send_data {
+        send_cb callback;
+        uv_udp_send_t* req;
+        uv_buf_t uvBuff;
+    };
+
+    struct closeSocket_data {
+        close_cb callback;
+    };
+
+    struct openTCP_data {
+        openTCP_cb callback;
+    };
+
+    struct connect_data {
+        connect_cb callback;
+    };
+
+    struct readTCP_data {
+        read_cb callback;
+        std::shared_ptr<byte_vector> data;
+    };
+
+    struct readBufferTCP_data {
+        readBuffer_cb callback;
+        void* buffer;
+        size_t maxBytesToRead;
+    };
+
+    struct writeTCP_data {
+        write_cb callback;
+        uv_write_t* req;
+        uv_buf_t uvBuff;
+    };
+
     /**
      * Init and run main asynchronous loop.
      * Must be called before asynchronous method calls.
      */
-    uv_loop_t* initAndRunLoop();
-
-    /**
-     * Init and run auxiliary asynchronous loop.
-     *
-     * @param ploop_exitHandle is pointer to exit handle for deinitialize auxiliary asynchronous loop
-     * @return handle of auxiliary asynchronous loop
-     */
-    uv_loop_t* initAndRunAuxLoop(uv_async_t** ploop_exitHandle);
+    ioLoop* initAndRunLoop();
 
     /**
      * Get handle of main asynchronous loop
      */
-    inline uv_loop_t* getMainLoop() { return asyncLoop; };
+    inline ioLoop* getMainLoop() { return asyncLoop; };
+
+    /**
+     * Send notification to main asynchronous loop about event
+     */
+    void alarmLoop();
 
     /**
      * Deinitialize main asynchronous loop.
@@ -196,13 +327,26 @@ namespace asyncio {
     void deinitLoop();
 
     /**
-     * Deinitialize auxiliary asynchronous loop.
+     * Init and run auxiliary asynchronous loop
+     *
+     * @return handle of auxiliary asynchronous loop
+     */
+    ioLoop* initAndRunAuxLoop();
+
+    /**
+     * Send notification to loop about event
+     *
+     * @param loop is handle of auxiliary asynchronous loop
+     */
+    void alarmAuxLoop(ioLoop* loop);
+
+    /**
+     * Uninitialize auxiliary asynchronous loop.
      * Must be called after asynchronous method calls in auxiliary asynchronous loop.
      *
      * @param loop is handle of auxiliary asynchronous loop
-     * @param loop_exitHandle is exit handle for deinitialize auxiliary asynchronous loop
      */
-    void deinitAuxLoop(uv_loop_t* loop, uv_async_t* loop_exitHandle);
+    void deinitAuxLoop(ioLoop* loop);
 
     /**
      * Check result for error
@@ -245,7 +389,7 @@ namespace asyncio {
      */
     class IOHandle {
     public:
-        IOHandle();
+        IOHandle(ioLoop* loop = asyncLoop);
         ~IOHandle();
 
         /**
@@ -284,7 +428,7 @@ namespace asyncio {
          * @param maxBytesToRead is maximum number of bytes to read from file
          * @param callback caused when reading a file or error
          */
-        void read(size_t maxBytesToRead, readFile_cb callback);
+        void read(size_t maxBytesToRead, read_cb callback);
 
         /**
          * Asynchronous read file to initialized buffer.
@@ -293,7 +437,7 @@ namespace asyncio {
          * @param maxBytesToRead is maximum number of bytes to read from file
          * @param callback caused when reading a file or error
          */
-        void read(void* buffer, size_t maxBytesToRead, readFileBuffer_cb callback);
+        void read(void* buffer, size_t maxBytesToRead, readBuffer_cb callback);
 
         /**
          * Asynchronous write file.
@@ -301,7 +445,7 @@ namespace asyncio {
          * @param data is byte vector for data written to file
          * @param callback caused when writing a file or error
          */
-        void write(const byte_vector& data, writeFile_cb callback);
+        void write(const byte_vector& data, write_cb callback);
 
         /**
          * Asynchronous write file from buffer.
@@ -310,14 +454,14 @@ namespace asyncio {
          * @param size of buffer in bytes
          * @param callback caused when writing a file or error
          */
-        void write(void* buffer, size_t size, writeFile_cb callback);
+        void write(void* buffer, size_t size, write_cb callback);
 
         /**
-         * Asynchronous close file.
+         * Asynchronous close file or socket.
          *
-         * @param callback caused when closing a file or error
+         * @param callback caused when closing a file/socket or error
          */
-        void close(closeFile_cb callback);
+        void close(close_cb callback);
 
         /**
          * Asynchronous opening of a file with callback initialization in the method IOHandle::then.
@@ -379,7 +523,7 @@ namespace asyncio {
          * @param callback is initialized callback for asynchronous reading file
          * @return pointer to open file handle
          */
-        IOHandle* then(readFile_cb callback);
+        IOHandle* then(read_cb callback);
 
         /**
          * Asynchronous open directory for scan.
@@ -415,22 +559,164 @@ namespace asyncio {
          */
         IOHandle* openDir(const char* path);
 
+        /**
+         * Initialize UPD socket and bind to IP and port
+         *
+         * @param IP address (IPv4 or IPv6)
+         * @param port for binding socket
+         * @return initialize and bind UPD socket result
+         * If isError(result) returns true - use getError(result) to determine the error.
+         * If isError(result) returns false - UPD socket successfully init and bind.
+         */
+        int openUDP(const char* IP, unsigned int port);
+
+        /**
+         * Asynchronous receive data from UDP socket.
+         *
+         * @param callback caused when receiving a data or error
+         */
+        void recv(recv_cb callback);
+
+        /**
+         * Asynchronous receive data from UDP socket to initialized buffer.
+         *
+         * @param buffer is initialized buffer for receive data from socket, buffer size must be at least maxBytesToRecv
+         * @param maxBytesToRecv is maximum number of bytes to receive from socket
+         * @param callback caused when receiving a data or error
+         */
+        void recv(void* buffer, size_t maxBytesToRecv, recvBuffer_cb callback);
+
+        /**
+         * Asynchronous send data to UDP socket.
+         *
+         * @param data is byte vector for data sent to socket
+         * @param IP address of remote socket (IPv4 or IPv6)
+         * @param port of remote socket
+         * @param callback caused when sending a data or error
+         */
+        void send(const byte_vector& data, const char* IP, unsigned int port, send_cb callback);
+
+        /**
+         * Asynchronous send data to UDP socket from buffer.
+         *
+         * @param buffer contains data sent to socket
+         * @param size of buffer in bytes
+         * @param IP address of remote socket (IPv4 or IPv6)
+         * @param port of remote socket
+         * @param callback caused when sending a data or error
+         */
+        void send(void* buffer, size_t size, const char* IP, unsigned int port, send_cb callback);
+
+        /**
+         * Stop receive data from UDP socket or read from TCP socket
+         */
+        void stopRecv();
+
+        /**
+         * Asynchronous init, bind and start listening socket for incoming connections.
+         *
+         * @param IP address (IPv4 or IPv6)
+         * @param port for binding socket
+         * @param callback is called when a new incoming connection is received or error
+         * @param maxConnections indicates the number of connections the kernel might queue
+         */
+        void openTCP(const char* IP, unsigned int port, openTCP_cb callback, int maxConnections = SOMAXCONN);
+
+        /**
+         * Asynchronous init, bind and establish an IPv4 or IPv6 TCP connection
+         *
+         * @param IP address for bind socket (IPv4 or IPv6)
+         * @param port for bind socket
+         * @param IP address of remote socket (IPv4 or IPv6)
+         * @param port of remote socket
+         * @param callback is made when the connection has been established or when a connection error
+         */
+        void connect(const char* bindIP, unsigned int bindPort, const char* IP, unsigned int port, connect_cb callback);
+
+        /**
+         * Accept connection from remote TCP socket and return his handle.
+         *
+         * @param result is pointer to accepting result (optional, ignored if nullptr)
+         * If isError(*result) returns true - use getError(*result) to determine the error.
+         * If isError(*result) returns false - connection successfully accepted.
+         * @return handle of accepted connection (@see IOHandle)
+         */
+        std::shared_ptr<IOHandle> accept(ssize_t* result = nullptr);
+
+        /**
+         * Accept connection on self TCP socket from server listening TCP socket.
+         * Method for internal usage. Use IOHandle::accept.
+         *
+         * @param listenSocket is pointer to struct with listening TCP socket
+         * @return accepting result
+         * If isError(result) returns true - use getError(result) to determine the error.
+         * If isError(result) returns false - connection successfully accepted.
+         */
+        int acceptFromListeningSocket(ioTCPSocket* listenSocket);
+
+        /**
+         * Enable keep-alive mode for TCP connection.
+         *
+         * @param delay is the initial delay in seconds
+         * @return enabling keep-alive mode result
+         * If isError(result) returns true - use getError(result) to determine the error.
+         * If isError(result) returns false - keep-alive mode successfully enabled.
+         */
+        int enableKeepAlive(unsigned int delay);
+
+        /**
+         * Disable keep-alive mode for TCP connection.
+         *
+         * @return disabling keep-alive mode result
+         * If isError(result) returns true - use getError(result) to determine the error.
+         * If isError(result) returns false - keep-alive mode successfully disabled.
+         */
+        int disableKeepAlive();
+
     private:
+        ioLoop* loop;
+
         uv_fs_t* ioReq;
+        uv_tcp_t* ioTCPSoc;
+        uv_udp_t* ioUDPSoc;
+        uv_connect_t ioConnection;
+
         bool closed = false;
+        bool bufferized = false;
         ioHandle_t type;
 
         std::packaged_task<void(openFile_cb)> task;
-        std::packaged_task<void(readFile_cb)> readTask;
+        std::packaged_task<void(read_cb)> readTask;
 
         bool initRequest();
-        void freeRequest();
+        bool initUDPSocket();
+        bool initTCPSocket();
 
-        static void open_cb(asyncio::ioHandle *req);
-        static void read_cb(asyncio::ioHandle *req);
-        static void write_cb(asyncio::ioHandle *req);
-        static void close_cb(asyncio::ioHandle *req);
-        static void readBuffer_cb(asyncio::ioHandle *req);
+        void freeRequest();
+        void freeReadData();
+
+        static bool isIPv4(const char *ip);
+
+        static void _open_cb(asyncio::ioHandle *req);
+        static void _read_cb(asyncio::ioHandle *req);
+        static void _write_cb(asyncio::ioHandle *req);
+        static void _close_cb(asyncio::ioHandle *req);
+        static void _readBuffer_cb(asyncio::ioHandle *req);
+
+        static void _alloc_cb(uv_handle_t* handle, size_t suggested_size, uv_buf_t* buf);
+        static void _allocBuffer_cb(uv_handle_t* handle, size_t suggested_size, uv_buf_t* buf);
+        static void _recv_cb(uv_udp_t* handle, ssize_t nread, const uv_buf_t* buf, const struct sockaddr* addr, unsigned flags);
+        static void _recvBuffer_cb(uv_udp_t* handle, ssize_t nread, const uv_buf_t* buf, const struct sockaddr* addr, unsigned flags);
+        static void _send_cb(uv_udp_send_t* req, int status);
+        static void _close_handle_cb(uv_handle_t* handle);
+
+        static void _listen_cb(uv_stream_t *stream, int result);
+        static void _connect_cb(uv_connect_t* connect, int result);
+        static void _alloc_tcp_cb(uv_handle_t* handle, size_t suggested_size, uv_buf_t* buf);
+        static void _allocBuffer_tcp_cb(uv_handle_t* handle, size_t suggested_size, uv_buf_t* buf);
+        static void _read_tcp_cb(uv_stream_t* stream, ssize_t nread, const uv_buf_t* buf);
+        static void _readBuffer_tcp_cb(uv_stream_t* stream, ssize_t nread, const uv_buf_t* buf);
+        static void _write_tcp_cb(uv_write_t* req, int status);
     };
 
     /**
@@ -494,7 +780,7 @@ namespace asyncio {
          * @param path to open file
          * @param callback when the file is read or an error occurs
          */
-        static void readFile(const char* path, readFile_cb callback);
+        static void readFile(const char* path, read_cb callback);
 
         /**
          * Asynchronous open and read the part of the file.
@@ -508,7 +794,7 @@ namespace asyncio {
          * @param blockSize is size of block for reading. If the timeout is reached, only read blocks are returned.
          *        If timeout is 0 - parameter is ignored. Default - 8192 bytes.
          */
-        static void readFilePart(const char* path, size_t pos, size_t maxBytesToRead, readFile_cb callback,
+        static void readFilePart(const char* path, size_t pos, size_t maxBytesToRead, read_cb callback,
                 unsigned int timeout = 0, size_t blockSize = 8192);
 
         /**
@@ -518,7 +804,7 @@ namespace asyncio {
          * @param data is byte vector for data written to file
          * @param callback when the file is wrote or an error occurs
          */
-        static void writeFile(const char* path, const byte_vector& data, writeFile_cb callback);
+        static void writeFile(const char* path, const byte_vector& data, write_cb callback);
 
         /**
          * Asynchronous get stat of a file or directory.

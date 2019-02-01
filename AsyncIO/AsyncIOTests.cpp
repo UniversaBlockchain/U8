@@ -3,14 +3,19 @@
 //
 
 #include <thread>
+#include <cstring>
+
 #include "AsyncIO.h"
+#include "AsyncIOTests.h"
 
 using namespace std;
 
 #define NUM_THREADS     5
 #define BUFF_SIZE       4096
-#define NUM_ITERATIONS  5
+#define NUM_ITERATIONS  10
 #define NUM_BLOCKS      256
+
+#define PORT            10000
 
 typedef unsigned long ulong;
 std::shared_ptr<asyncio::IOHandle> file[NUM_THREADS];
@@ -20,12 +25,33 @@ size_t fileSize[NUM_THREADS];
 int summ[NUM_THREADS];
 int block[NUM_THREADS];
 
+#define ASSERT(expr)                                      \
+ do {                                                     \
+  if (!(expr)) {                                          \
+    fprintf(stderr,                                       \
+            "Assertion failed in %s on line %d: %s\n",    \
+            __FILE__,                                     \
+            __LINE__,                                     \
+            #expr);                                       \
+    abort();                                              \
+  }                                                       \
+ } while (0)
+
+
+void allAsyncIOTests() {
+    //asyncio::initAndRunLoop(); - already init in main()
+
+    testAsyncFile();
+    testAsyncUDP();
+    testAsyncTCP();
+
+    asyncio::deinitLoop();
+}
+
 void testAsyncFile() {
     printf("testAsyncFile()...\n");
 
     vector<thread> ths;
-
-    asyncio::initAndRunLoop();
 
     printf("Write test...\n");
 
@@ -49,7 +75,7 @@ void testAsyncFile() {
 
                 file[t] = std::make_shared<asyncio::IOHandle>();
 
-                asyncio::writeFile_cb onWrite = [t, &onWrite](ssize_t result) {
+                asyncio::write_cb onWrite = [t, &onWrite](ssize_t result) {
                     if (asyncio::isError(result))
                         fprintf(stderr, "error: %s\n", asyncio::getError(result));
                     else {
@@ -118,7 +144,7 @@ void testAsyncFile() {
 
                 file[t] = std::make_shared<asyncio::IOHandle>();
 
-                asyncio::writeFile_cb onWrite = [t, &onWrite, buff](ssize_t result) {
+                asyncio::write_cb onWrite = [t, &onWrite, buff](ssize_t result) {
                     if (asyncio::isError(result))
                         fprintf(stderr, "error: %s\n", asyncio::getError(result));
                     else {
@@ -180,7 +206,7 @@ void testAsyncFile() {
                 char fileName[16];
                 snprintf(fileName, 16, "TestFile%ld.bin", t);
 
-                asyncio::readFile_cb onRead = [t, &onRead](const asyncio::byte_vector& data, ssize_t result) {
+                asyncio::read_cb onRead = [t, &onRead](const asyncio::byte_vector& data, ssize_t result) {
                     if (asyncio::isError(result))
                         fprintf(stderr, "error: %s\n", asyncio::getError(result));
                     else if (result == 0)
@@ -248,7 +274,7 @@ void testAsyncFile() {
 
                 void* buffer = malloc(BUFF_SIZE);
 
-                asyncio::readFileBuffer_cb onRead = [&](ssize_t result) {
+                asyncio::readBuffer_cb onRead = [&](ssize_t result) {
                     if (asyncio::isError(result))
                         fprintf(stderr, "error: %s\n", asyncio::getError(result));
                     else if (result == 0)
@@ -314,7 +340,7 @@ void testAsyncFile() {
                 char fileName[21];
                 snprintf(fileName, 21, "TestOpenWrite%ld.bin", t);
 
-                asyncio::writeFile_cb onWrite = [t, &onWrite](ssize_t result) {
+                asyncio::write_cb onWrite = [t, &onWrite](ssize_t result) {
                     if (asyncio::isError(result))
                         fprintf(stderr, "write error: %s\n", asyncio::getError(result));
                     else {
@@ -378,7 +404,7 @@ void testAsyncFile() {
                 char fileName[16];
                 snprintf(fileName, 16, "TestFile%ld.bin", t);
 
-                asyncio::readFile_cb onRead = [t, &onRead](const asyncio::byte_vector& data, ssize_t result) {
+                asyncio::read_cb onRead = [t, &onRead](const asyncio::byte_vector& data, ssize_t result) {
                     if (asyncio::isError(result))
                         fprintf(stderr, "read error: %s\n", asyncio::getError(result));
                     else if (result == 0)
@@ -664,11 +690,11 @@ void testAsyncFile() {
     uv_sem_wait(&stop[0]);
     uv_sem_destroy(&stop[0]);
 
-    dir = std::make_shared<asyncio::IOHandle>();
+    auto dirThen = std::make_shared<asyncio::IOHandle>();
 
     uv_sem_init(&stop[0], 0);
 
-    dir->openDir(".")->then(dirLambda);
+    dirThen->openDir(".")->then(dirLambda);
 
     uv_sem_wait(&stop[0]);
     uv_sem_destroy(&stop[0]);
@@ -751,7 +777,415 @@ void testAsyncFile() {
         uv_sem_wait(&stop[0]);
     uv_sem_destroy(&stop[0]);
 
-    asyncio::deinitLoop();
-
     printf("testAsyncFile()...done\n\n");
+}
+
+void testAsyncUDP() {
+    printf("testAsyncUDP()...\n");
+
+    vector<thread> ths;
+
+    for (long t = 0; t < NUM_THREADS; t++) {
+        ths.emplace_back([t]() {
+            asyncio::ioLoop* loop_srv = asyncio::asyncLoop;
+            asyncio::ioLoop* loop_cli = asyncio::initAndRunAuxLoop();
+
+            if (t > 0)
+                loop_srv = asyncio::initAndRunAuxLoop();
+
+            for (int i = 0; i < NUM_ITERATIONS; i++) {
+                asyncio::IOHandle srv(loop_srv);
+                asyncio::IOHandle cli(loop_cli);
+
+                uv_sem_init(&stop[t], 0);
+
+                srv.openUDP("127.0.0.1", PORT + (unsigned int)t);
+
+                srv.recv([&](ssize_t result, const asyncio::byte_vector& data, const char* IP, unsigned int port){
+                    ASSERT(result == 5);
+                    ASSERT(!memcmp("PING", data.data(), 4));
+
+                    printf("Server received: PING\n");
+
+                    srv.stopRecv();
+
+                    asyncio::byte_vector pong(5);
+                    memcpy(pong.data(), "PONG", 4);
+
+                    srv.send(pong, IP, port, [&](ssize_t result){
+                        ASSERT(result == 5);
+
+                        srv.close([t](ssize_t result){
+                            ASSERT(result >= 0);
+
+                            uv_sem_post(&stop[t]);
+                        });
+                    });
+                });
+
+                cli.openUDP("127.0.0.1", PORT + NUM_THREADS + (unsigned int)t);
+
+                asyncio::byte_vector ping(5);
+                memcpy(ping.data(), "PING", 4);
+
+                cli.send(ping, "127.0.0.1", PORT + (unsigned int)t, [&](ssize_t result){
+                    ASSERT(result == 5);
+
+                    cli.recv([&](ssize_t result, const asyncio::byte_vector& data, const char* IP, unsigned int port){
+                        ASSERT(result == 5);
+                        ASSERT(!memcmp("PONG", data.data(), 4));
+
+                        printf("Client received: PONG\n");
+
+                        cli.close([t](ssize_t result){
+                            ASSERT(result >= 0);
+
+                            uv_sem_post(&stop[t]);
+                        });
+                    });
+                });
+
+                uv_sem_wait(&stop[t]);
+                uv_sem_wait(&stop[t]);
+                uv_sem_destroy(&stop[t]);
+
+                printf("Thread %ld iteration %i\n", t, i);
+            };
+
+            if (t > 0)
+                asyncio::deinitAuxLoop(loop_srv);
+
+            asyncio::deinitAuxLoop(loop_cli);
+        });
+    }
+
+    for (int t = 0; t < NUM_THREADS; t++)
+        ths[t].join();
+
+    printf("test with byte-vectors successful\n");
+
+    ths.clear();
+
+    for (long t = 0; t < NUM_THREADS; t++) {
+        ths.emplace_back([t]() {
+            asyncio::ioLoop* loop_srv = asyncio::asyncLoop;
+            asyncio::ioLoop* loop_cli = asyncio::initAndRunAuxLoop();
+
+            if (t > 0)
+                loop_srv = asyncio::initAndRunAuxLoop();
+
+            for (int i = 0; i < NUM_ITERATIONS; i++) {
+                asyncio::IOHandle srv(loop_srv);
+                asyncio::IOHandle cli(loop_cli);
+
+                uv_sem_init(&stop[t], 0);
+
+                srv.openUDP("127.0.0.1", PORT + (unsigned int)t);
+
+                char buffer_srv[5];
+
+                srv.recv(buffer_srv, 5, [&](ssize_t result, const char* IP, unsigned int port){
+                    ASSERT(result == 5);
+                    ASSERT(!memcmp("PING", buffer_srv, 4));
+
+                    printf("Server received: PING\n");
+
+                    srv.stopRecv();
+
+                    srv.send((void*) "PONG", 5, IP, port, [&](ssize_t result){
+                        ASSERT(result == 5);
+
+                        srv.close([t](ssize_t result){
+                            ASSERT(result >= 0);
+
+                            uv_sem_post(&stop[t]);
+                        });
+                    });
+                });
+
+                char buffer_cli[5];
+
+                cli.openUDP("127.0.0.1", PORT + NUM_THREADS + (unsigned int)t);
+
+                cli.send((void*) "PING", 5, "127.0.0.1", PORT + (unsigned int)t, [&](ssize_t result){
+                    ASSERT(result == 5);
+
+                    cli.recv(buffer_cli, 5, [&](ssize_t result, const char* IP, unsigned int port){
+                        ASSERT(result == 5);
+                        ASSERT(!memcmp("PONG", buffer_cli, 4));
+
+                        printf("Client received: PONG\n");
+
+                        cli.close([t](ssize_t result){
+                            ASSERT(result >= 0);
+
+                            uv_sem_post(&stop[t]);
+                        });
+                    });
+                });
+
+                uv_sem_wait(&stop[t]);
+                uv_sem_wait(&stop[t]);
+                uv_sem_destroy(&stop[t]);
+
+                printf("Thread %ld iteration %i\n", t, i);
+            };
+
+            if (t > 0)
+                asyncio::deinitAuxLoop(loop_srv);
+
+            asyncio::deinitAuxLoop(loop_cli);
+        });
+    }
+
+    for (int t = 0; t < NUM_THREADS; t++)
+        ths[t].join();
+
+    printf("test with memory buffers successful\n");
+
+    printf("testAsyncUDP()...done\n\n");
+}
+
+void testAsyncTCP() {
+    printf("testAsyncTCP()...\n");
+
+    uv_sem_t sem_tcp_srv;
+    uv_sem_init(&sem_tcp_srv, 0);
+
+    uv_mutex_t clients_mutex;
+    uv_mutex_init(&clients_mutex);
+
+    //init TCP server
+    asyncio::IOHandle srv;
+    vector<shared_ptr<asyncio::IOHandle>> clients;
+
+    srv.openTCP("127.0.0.1", PORT, [&](ssize_t result){
+        ASSERT(result >= 0);
+
+        printf("New connection\n");
+
+        uv_mutex_lock(&clients_mutex);
+
+        unsigned long n = clients.size();
+        clients.push_back(srv.accept());
+
+        uv_mutex_unlock(&clients_mutex);
+
+        clients[n]->enableKeepAlive(60);
+
+        clients[n]->read(4096, [n, &sem_tcp_srv, &clients](const asyncio::byte_vector& data, ssize_t result){
+            ASSERT(result == 5);
+            ASSERT(!memcmp("PING", data.data(), 4));
+
+            printf("Server received: PING\n");
+
+            clients[n]->stopRecv();
+
+            asyncio::byte_vector pong(5);
+            memcpy(pong.data(), "PONG", 4);
+
+            clients[n]->write(pong, [n, &sem_tcp_srv, &clients](ssize_t result){
+                ASSERT(result == 5);
+
+                clients[n]->close([&](ssize_t result){
+                    ASSERT(result >= 0);
+
+                    uv_sem_post(&sem_tcp_srv);
+                });
+            });
+        });
+    });
+
+    //TCP client threads
+    vector<thread> clientThreads;
+
+    for (long t = 0; t < NUM_THREADS; t++) {
+        clientThreads.emplace_back([t](){
+            asyncio::ioLoop* loop = asyncio::initAndRunAuxLoop();
+
+            for (int i = 0; i < NUM_ITERATIONS; i++) {
+                uv_sem_init(&stop[t], 0);
+
+                asyncio::IOHandle cli(loop);
+
+                cli.connect("127.0.0.1", PORT + (unsigned int) t * NUM_ITERATIONS + i, "127.0.0.1", PORT, [&](ssize_t result){
+                    ASSERT(result >= 0);
+
+                    printf("Connected to server\n");
+
+                    cli.enableKeepAlive(60);
+
+                    asyncio::byte_vector ping(5);
+                    memcpy(ping.data(), "PING", 4);
+
+                    cli.write(ping, [&](ssize_t result){
+                        ASSERT(result == 5);
+
+                        cli.read(4096, [&](const asyncio::byte_vector& data, ssize_t result){
+                            ASSERT(result == 5);
+                            ASSERT(!memcmp("PONG", data.data(), 4));
+
+                            printf("Client received: PONG\n");
+
+                            cli.stopRecv();
+
+                            cli.close([&](ssize_t result){
+                                ASSERT(result >= 0);
+                                uv_sem_post(&stop[t]);
+                            });
+                        });
+                    });
+                });
+
+                uv_sem_wait(&stop[t]);
+                uv_sem_destroy(&stop[t]);
+
+                printf("Thread %ld iteration %i\n", t, i);
+            }
+
+            asyncio::deinitAuxLoop(loop);
+        });
+    }
+
+    for (long t = 0; t < NUM_THREADS; t++)
+        clientThreads[t].join();
+
+    for (int i = 0; i < NUM_THREADS * NUM_ITERATIONS; i++)
+        uv_sem_wait(&sem_tcp_srv);
+    uv_sem_destroy(&sem_tcp_srv);
+    uv_mutex_destroy(&clients_mutex);
+
+    //close TCP server
+    uv_sem_init(&sem_tcp_srv, 0);
+
+    printf("Close server\n");
+
+    srv.close([&](ssize_t result){
+        ASSERT(result >= 0);
+
+        uv_sem_post(&sem_tcp_srv);
+    });
+
+    uv_sem_wait(&sem_tcp_srv);
+    uv_sem_destroy(&sem_tcp_srv);
+
+    printf("test with byte-vectors successful\n");
+
+    clientThreads.clear();
+    clients.clear();
+
+    uv_sem_init(&sem_tcp_srv, 0);
+    uv_mutex_init(&clients_mutex);
+
+    //init TCP server
+    asyncio::IOHandle srv_buff;
+    vector<char*> buffs;
+
+    srv_buff.openTCP("127.0.0.1", PORT, [&](ssize_t result){
+        ASSERT(result >= 0);
+
+        printf("New connection\n");
+
+        uv_mutex_lock(&clients_mutex);
+
+        unsigned long n = clients.size();
+        clients.push_back(srv_buff.accept());
+
+        char* buff = (char*) malloc(5);
+        unsigned long b = buffs.size();
+        buffs.push_back(buff);
+
+        uv_mutex_unlock(&clients_mutex);
+
+        clients[n]->read(buff, 5, [n, b, &buffs, &sem_tcp_srv, &clients](ssize_t result){
+            ASSERT(result == 5);
+            ASSERT(!memcmp("PING", buffs[b], 4));
+
+            printf("Server received: PING\n");
+
+            clients[n]->stopRecv();
+
+            clients[n]->write((void*) "PONG", 5, [n, &sem_tcp_srv, &clients](ssize_t result){
+                ASSERT(result == 5);
+
+                clients[n]->close([&](ssize_t result){
+                    ASSERT(result >= 0);
+
+                    uv_sem_post(&sem_tcp_srv);
+                });
+            });
+        });
+    });
+
+    //TCP client threads
+    for (long t = 0; t < NUM_THREADS; t++) {
+        clientThreads.emplace_back([t](){
+            asyncio::ioLoop* loop = asyncio::initAndRunAuxLoop();
+
+            for (int i = 0; i < NUM_ITERATIONS; i++) {
+                uv_sem_init(&stop[t], 0);
+
+                asyncio::IOHandle cli(loop);
+
+                char buff_cli[5];
+
+                cli.connect("127.0.0.1", PORT + (unsigned int) t * NUM_ITERATIONS + i, "127.0.0.1", PORT, [&](ssize_t result){
+                    ASSERT(result >= 0);
+
+                    printf("Connected to server\n");
+
+                    cli.write((void*) "PING", 5, [&](ssize_t result){
+                        ASSERT(result == 5);
+
+                        cli.read(buff_cli, 5, [&](ssize_t result){
+                            ASSERT(result == 5);
+                            ASSERT(!memcmp("PONG", buff_cli, 4));
+
+                            printf("Client received: PONG\n");
+
+                            cli.stopRecv();
+
+                            cli.close([&](ssize_t result){
+                                ASSERT(result >= 0);
+                                uv_sem_post(&stop[t]);
+                            });
+                        });
+                    });
+                });
+
+                uv_sem_wait(&stop[t]);
+                uv_sem_destroy(&stop[t]);
+
+                printf("Thread %ld iteration %i\n", t, i);
+            }
+
+            asyncio::deinitAuxLoop(loop);
+        });
+    }
+
+    for (long t = 0; t < NUM_THREADS; t++)
+        clientThreads[t].join();
+
+    for (int i = 0; i < NUM_THREADS * NUM_ITERATIONS; i++)
+        uv_sem_wait(&sem_tcp_srv);
+    uv_sem_destroy(&sem_tcp_srv);
+    uv_mutex_destroy(&clients_mutex);
+
+    //close TCP server
+    uv_sem_init(&sem_tcp_srv, 0);
+
+    printf("Close server\n");
+
+    srv_buff.close([&](ssize_t result){
+        ASSERT(result >= 0);
+
+        uv_sem_post(&sem_tcp_srv);
+    });
+
+    uv_sem_wait(&sem_tcp_srv);
+    uv_sem_destroy(&sem_tcp_srv);
+
+    printf("test with memory buffers successful\n");
+
+    printf("testAsyncTCP()...done\n\n");
 }

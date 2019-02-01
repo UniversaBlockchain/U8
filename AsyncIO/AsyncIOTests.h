@@ -5,6 +5,9 @@
 #ifndef U8_ASYNCIOTESTS_H
 #define U8_ASYNCIOTESTS_H
 
+void allAsyncIOTests();
 void testAsyncFile();
+void testAsyncUDP();
+void testAsyncTCP();
 
 #endif //U8_ASYNCIOTESTS_H
