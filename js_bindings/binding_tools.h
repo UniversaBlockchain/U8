@@ -203,7 +203,33 @@ optional<byte_vector> v8ToVector(Local<Value> object) {
     return optional<byte_vector>();
 }
 
+/**
+ * Wrap some C++ object into new instance of some object. Important! If the object template does not have
+ * internal field space, the C++ object IS DELETED, JS  exception is thrown and UNDEFINED is returned.
+ *
+ * @tparam T
+ * @param objectTemplate persistent link to the object template
+ * @param isolate
+ * @param cppObject pointer to object to wrap
+ * @return wrapped object or undefined.
+ */
+template<typename T>
+Local<Value> wrap(Persistent<FunctionTemplate>& objectTemplate, Isolate *isolate, T *cppObject) {
+    auto tpl = objectTemplate.Get(isolate);
+    auto obj = tpl->InstanceTemplate()->NewInstance();
+    if (obj->InternalFieldCount() < 1) {
+        isolate->ThrowException(Exception::Error(String::NewFromUtf8(isolate, "no internal field")));
+        delete cppObject;
+        return Undefined(isolate);
+    } else {
+        obj->SetInternalField(0, External::New(isolate, cppObject));
+        return obj;
+    }
+}
 
+/**
+ * Threadpool to use with time-consuming operation in C++/JS bindings
+ */
 extern ThreadPool jsThreadPool;
 
 #endif //U8_WEAK_FINALIZERS_H

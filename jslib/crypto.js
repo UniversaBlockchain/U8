@@ -1,5 +1,3 @@
-
-
 crypto.SHA256 = 1;
 crypto.SHA512 = 2;
 crypto.SHA3_256 = 3;
@@ -10,6 +8,15 @@ crypto.SHA3_512 = 5;
 import {MemoiseMixin, PackedEqMixin, DigestEqMixin} from 'tools'
 
 crypto.PrivateKey = class extends crypto.PrivateKeyImpl {
+
+    static async generate(strength) {
+        return new Promise((resolve, reject) => {
+            crypto.PrivateKey.__generate(strength, (key) => {
+                key.__proto__ = crypto.PrivateKey.prototype;
+                resolve(key);
+            });
+        });
+    }
 
     constructor(...args) {
         super(...args);
@@ -34,7 +41,7 @@ crypto.PrivateKey = class extends crypto.PrivateKeyImpl {
     }
 
     get publicKey() {
-        return this.memoise("__publicKey", () => new crypto.PublicKey(this) );
+        return this.memoise("__publicKey", () => new crypto.PublicKey(this));
     }
 
     get shortAddress() {
@@ -50,7 +57,7 @@ crypto.PrivateKey = class extends crypto.PrivateKeyImpl {
     }
 
     toString() {
-        return "Prk:"+this.longAddress.toString().slice(0,14)+"...";
+        return "Prk:" + this.longAddress.toString().slice(0, 14) + "...";
     }
 
 };
@@ -97,7 +104,7 @@ crypto.PublicKey = class extends crypto.PublicKeyImpl {
     }
 
     toString() {
-        return "Puk:"+this.longAddress.toString().slice(0,14)+"...";
+        return "Puk:" + this.longAddress.toString().slice(0, 14) + "...";
     }
 };
 

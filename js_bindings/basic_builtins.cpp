@@ -2,7 +2,7 @@
 // Created by Sergey Chernov on 2019-01-05.
 //
 #include <iostream>
-#include <strstream>
+#include <sstream>
 #include "binding_tools.h"
 #include "basic_builtins.h"
 #include "../tools/tools.h"
@@ -12,7 +12,7 @@ using namespace std;
 void JsPrint(const v8::FunctionCallbackInfo<v8::Value> &args) {
     auto isolate = args.GetIsolate();
     bool isError = args[0]->BooleanValue(isolate);
-    strstream ss;
+    ostringstream ss;
 
     bool first = true;
     for (int i = 1; i < args.Length(); i++) {
@@ -22,7 +22,7 @@ void JsPrint(const v8::FunctionCallbackInfo<v8::Value> &args) {
         } else {
             ss << endl;
         }
-        v8::String::Utf8Value str(args.GetIsolate(), args[i]);
+        v8::String::Utf8Value str(args.GetIsolate(), args[i]->ToString(args.GetIsolate()));
         const char *cstr = *str;
         ss << (cstr ? cstr : "(undefined)");
     }

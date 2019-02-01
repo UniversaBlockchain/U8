@@ -43,6 +43,35 @@ static void privateKeyPack(const FunctionCallbackInfo<Value> &args) {
     });
 }
 
+static void privateKeyGenerate(const FunctionCallbackInfo<Value> &args) {
+    Scripter::unwrapArgs(args, [&](ArgsContext &ac) {
+        if (args.Length() == 2 && args[0]->IsNumber()) {
+            int strength = ac.asInt(0);
+            if (strength < 2048)
+                ac.throwError("strength must be at least 2048");
+            else {
+                auto *onReady = new Persistent<Function>(ac.isolate, ac.as<Function>(1));
+                shared_ptr<Scripter> scripter = ac.scripter;
+                jsThreadPool([=]() {
+                    auto key = new PrivateKey(strength);
+                    scripter->lockedContext([=](Local<Context> cxt) {
+                        auto fn = onReady->Get(scripter->isolate());
+                        delete onReady;
+                        if (fn->IsNull()) {
+                            scripter->throwError("null callback in PrivateKey::generate");
+                        } else {
+                            Local<Value> res[1]{ wrap( privateKeyTpl, scripter->isolate(), key) };
+                            fn->Call(fn, 1, res);
+                        }
+                    });
+                });
+                return;
+            }
+            ac.throwError("invalid arguments");
+        }
+    });
+}
+
 static void publicKeyPack(const FunctionCallbackInfo<Value> &args) {
     Scripter::unwrapArgs(args, [&](ArgsContext &ac) {
         if (args.Length() == 0) {
@@ -163,6 +192,7 @@ Local<FunctionTemplate> initPrivateKey(Isolate *isolate) {
             [=](const FunctionCallbackInfo<Value> &args) -> PrivateKey * {
                 if (args.Length() == 1) {
                     if (args[0]->IsTypedArray()) {
+                        // load from packed
                         auto contents = args[0].As<TypedArray>()->Buffer()->GetContents();
                         return new PrivateKey(contents.Data(), contents.ByteLength());
                     }
@@ -174,6 +204,9 @@ Local<FunctionTemplate> initPrivateKey(Isolate *isolate) {
     auto prototype = tpl->PrototypeTemplate();
     prototype->Set(isolate, "__sign", FunctionTemplate::New(isolate, privateKeySign));
     prototype->Set(isolate, "__pack", FunctionTemplate::New(isolate, privateKeyPack));
+
+    tpl->Set(isolate, "__generate", FunctionTemplate::New(isolate, privateKeyGenerate));
+
     privateKeyTpl.Reset(isolate, tpl);
     return tpl;
 }
@@ -191,7 +224,7 @@ Local<FunctionTemplate> initPublicKey(Isolate *isolate) {
                     } else if (args[0]->IsObject()) {
                         auto pkt = privateKeyTpl.Get(isolate);
                         Local<Object> obj = args[0].As<Object>();
-                        if( pkt->HasInstance(obj) )
+                        if (pkt->HasInstance(obj))
                             return new PublicKey(*unwrap<PrivateKey>(obj));
                         isolate->ThrowException(
                                 Exception::TypeError(String::NewFromUtf8(isolate, "private key expected")));
@@ -230,7 +263,7 @@ Local<FunctionTemplate> initKeyAddress(Isolate *isolate) {
                 } else if (a0->IsObject() && args.Length() == 3) {
                     Local<Object> obj = a0.As<Object>();
                     auto tpl = publicKeyTpl.Get(isolate);
-                    if( tpl->HasInstance(obj)) {
+                    if (tpl->HasInstance(obj)) {
                         auto context = args.GetIsolate()->GetCurrentContext();
                         return new KeyAddress(*unwrap<PrivateKey>(obj),
                                               args[1]->Int32Value(context).FromJust(),
