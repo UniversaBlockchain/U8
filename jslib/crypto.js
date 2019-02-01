@@ -28,9 +28,7 @@ crypto.PrivateKey = class extends crypto.PrivateKeyImpl {
             data = utf8Encode(data);
         }
         if (data instanceof Uint8Array)
-            return new Promise((resolve, reject) => {
-                this.__sign(data, hashType, signature => resolve(signature));
-            });
+            return new Promise((resolve) => this.__sign(data, hashType, resolve));
         else
             throw new Error("Wrong data type: " + typeof (data));
     }
@@ -80,9 +78,7 @@ crypto.PublicKey = class extends crypto.PublicKeyImpl {
             data = utf8Encode(data);
         }
         if (data instanceof Uint8Array)
-            return new Promise( (resolve, reject) => {
-                this.__verify(data, signature, hashType, ok => resolve(ok));
-            });
+            return new Promise(resolve => this.__verify(data, signature, hashType, resolve));
         else
             throw new Error("Wrong data type: " + typeof (data));
     }
