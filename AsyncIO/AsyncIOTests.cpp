@@ -76,27 +76,23 @@ void testAsyncFile() {
                 file[t] = std::make_shared<asyncio::IOHandle>();
 
                 asyncio::write_cb onWrite = [t, &onWrite](ssize_t result) {
-                    if (asyncio::isError(result))
-                        fprintf(stderr, "error: %s\n", asyncio::getError(result));
-                    else {
-                        fileSize[t] += result;
+                    ASSERT(result == 4096);
+                    fileSize[t] += result;
 
-                        if (++block[t] < NUM_BLOCKS)
-                            file[t]->write(dataBuf[t], onWrite);
-                        else
-                            file[t]->close([t](ssize_t result) {
-                                uv_sem_post(&stop[t]);
-                                printf("Close file in thread: %ld\n", t + 1);
-                            });
-                    }
+                    if (++block[t] < NUM_BLOCKS)
+                        file[t]->write(dataBuf[t], onWrite);
+                    else
+                        file[t]->close([t](ssize_t result) {
+                            uv_sem_post(&stop[t]);
+                            printf("Close file in thread: %ld\n", t + 1);
+                        });
                 };
 
                 file[t]->open(fileName, O_CREAT | O_WRONLY, S_IRWXU | S_IRWXG | S_IRWXO, [t, onWrite](ssize_t result) {
+                    ASSERT(result >= 0);
+
                     printf("Open file for writing in thread %ld\n", t + 1);
-                    if (asyncio::isError(result))
-                        fprintf(stderr, "error: %s\n", asyncio::getError(result));
-                    else
-                        file[t]->write(dataBuf[t], onWrite);
+                    file[t]->write(dataBuf[t], onWrite);
                 });
 
                 uv_sem_wait(&stop[t]);
@@ -110,8 +106,8 @@ void testAsyncFile() {
     size_t all = 0;
     for (int t = 0; t < NUM_THREADS; t++) {
         ths[t].join();
-        if (fileSize[t] != BUFF_SIZE * NUM_BLOCKS * NUM_ITERATIONS)
-            fprintf(stderr, "mismatch test file size (writing) in thread %i\n", t + 1);
+        ASSERT(fileSize[t] == BUFF_SIZE * NUM_BLOCKS * NUM_ITERATIONS);
+
         all += fileSize[t];
     }
 
@@ -145,27 +141,23 @@ void testAsyncFile() {
                 file[t] = std::make_shared<asyncio::IOHandle>();
 
                 asyncio::write_cb onWrite = [t, &onWrite, buff](ssize_t result) {
-                    if (asyncio::isError(result))
-                        fprintf(stderr, "error: %s\n", asyncio::getError(result));
-                    else {
-                        fileSize[t] += result;
+                    ASSERT(result == 4096);
+                    fileSize[t] += result;
 
-                        if (++block[t] < NUM_BLOCKS)
-                            file[t]->write(buff, BUFF_SIZE, onWrite);
-                        else
-                            file[t]->close([t](ssize_t result) {
-                                uv_sem_post(&stop[t]);
-                                printf("Close file in thread: %ld\n", t + 1);
-                            });
-                    }
+                    if (++block[t] < NUM_BLOCKS)
+                        file[t]->write(buff, BUFF_SIZE, onWrite);
+                    else
+                        file[t]->close([t](ssize_t result) {
+                            ASSERT(result >= 0);
+                            uv_sem_post(&stop[t]);
+                            printf("Close file in thread: %ld\n", t + 1);
+                        });
                 };
 
                 file[t]->open(fileName, O_CREAT | O_WRONLY, S_IRWXU | S_IRWXG | S_IRWXO, [t, onWrite, buff](ssize_t result) {
                     printf("Open file for writing in thread %ld\n", t + 1);
-                    if (asyncio::isError(result))
-                        fprintf(stderr, "error: %s\n", asyncio::getError(result));
-                    else
-                        file[t]->write(buff, BUFF_SIZE, onWrite);
+                    ASSERT(result >= 0);
+                    file[t]->write(buff, BUFF_SIZE, onWrite);
                 });
 
                 uv_sem_wait(&stop[t]);
@@ -179,8 +171,7 @@ void testAsyncFile() {
     all = 0;
     for (int t = 0; t < NUM_THREADS; t++) {
         ths[t].join();
-        if (fileSize[t] != BUFF_SIZE * NUM_BLOCKS * NUM_ITERATIONS)
-            fprintf(stderr, "mismatch test file size (writing) in thread %i\n", t + 1);
+        ASSERT(fileSize[t] == BUFF_SIZE * NUM_BLOCKS * NUM_ITERATIONS);
         all += fileSize[t];
     }
 
@@ -207,9 +198,8 @@ void testAsyncFile() {
                 snprintf(fileName, 16, "TestFile%ld.bin", t);
 
                 asyncio::read_cb onRead = [t, &onRead](const asyncio::byte_vector& data, ssize_t result) {
-                    if (asyncio::isError(result))
-                        fprintf(stderr, "error: %s\n", asyncio::getError(result));
-                    else if (result == 0)
+                    ASSERT(result >= 0);
+                    if (result == 0)
                         file[t]->close([t](ssize_t result) {
                             uv_sem_post(&stop[t]);
                             printf("Close file in thread: %ld\n", t + 1);
@@ -226,9 +216,7 @@ void testAsyncFile() {
 
                 file[t]->open(fileName, O_RDONLY, 0, [t, onRead](ssize_t result) {
                     printf("Open file in thread %ld\n", t + 1);
-                    if (asyncio::isError(result))
-                        fprintf(stderr, "error: %s\n", asyncio::getError(result));
-                    else
+                    ASSERT(result >= 0);
                         file[t]->read(BUFF_SIZE, onRead);
                 });
 
@@ -243,10 +231,8 @@ void testAsyncFile() {
     all = 0;
     for (long t = 0; t < NUM_THREADS; t++) {
         ths[t].join();
-        if (fileSize[t] != BUFF_SIZE * NUM_BLOCKS * NUM_ITERATIONS)
-            fprintf(stderr, "mismatch test file size in thread %ld\n", t + 1);
-        if (summ[t] != -BUFF_SIZE * NUM_BLOCKS * NUM_ITERATIONS / 2)
-            fprintf(stderr, "mismatch test file sum in thread %ld\n", t + 1);
+        ASSERT(fileSize[t] == BUFF_SIZE * NUM_BLOCKS * NUM_ITERATIONS);
+        ASSERT(summ[t] == -BUFF_SIZE * NUM_BLOCKS * NUM_ITERATIONS / 2);
         all += fileSize[t];
     }
 
@@ -275,9 +261,8 @@ void testAsyncFile() {
                 void* buffer = malloc(BUFF_SIZE);
 
                 asyncio::readBuffer_cb onRead = [&](ssize_t result) {
-                    if (asyncio::isError(result))
-                        fprintf(stderr, "error: %s\n", asyncio::getError(result));
-                    else if (result == 0)
+                    ASSERT(result >= 0);
+                    if (result == 0)
                         file[t]->close([=](ssize_t result) {
                             free(buffer);
                             uv_sem_post(&stop[t]);
@@ -294,10 +279,8 @@ void testAsyncFile() {
 
                 file[t]->open(fileName, O_RDONLY, 0, [=](ssize_t result) {
                     printf("Open file in thread %ld\n", t + 1);
-                    if (asyncio::isError(result))
-                        fprintf(stderr, "error: %s\n", asyncio::getError(result));
-                    else
-                        file[t]->read(buffer, BUFF_SIZE, onRead);
+                    ASSERT(result >= 0);
+                    file[t]->read(buffer, BUFF_SIZE, onRead);
                 });
 
                 uv_sem_wait(&stop[t]);
@@ -311,10 +294,10 @@ void testAsyncFile() {
     all = 0;
     for (long t = 0; t < NUM_THREADS; t++) {
         ths[t].join();
-        if (fileSize[t] != BUFF_SIZE * NUM_BLOCKS * NUM_ITERATIONS)
-            fprintf(stderr, "mismatch test file size in thread %ld\n", t + 1);
-        if (summ[t] != -BUFF_SIZE * NUM_BLOCKS * NUM_ITERATIONS / 2)
-            fprintf(stderr, "mismatch test file sum in thread %ld\n", t + 1);
+
+        ASSERT(fileSize[t] == BUFF_SIZE * NUM_BLOCKS * NUM_ITERATIONS);
+        ASSERT(summ[t] == -BUFF_SIZE * NUM_BLOCKS * NUM_ITERATIONS / 2);
+
         all += fileSize[t];
     }
 
@@ -341,29 +324,23 @@ void testAsyncFile() {
                 snprintf(fileName, 21, "TestOpenWrite%ld.bin", t);
 
                 asyncio::write_cb onWrite = [t, &onWrite](ssize_t result) {
-                    if (asyncio::isError(result))
-                        fprintf(stderr, "write error: %s\n", asyncio::getError(result));
-                    else {
-                        fileSize[t] += result;
+                    ASSERT(result == 4096);
+                    fileSize[t] += result;
 
-                        if (++block[t] < NUM_BLOCKS)
-                            file[t]->write(dataBuf[t], onWrite);
-                        else
-                            file[t]->close([t](ssize_t result) {
-                                uv_sem_post(&stop[t]);
-                                printf("Close file in thread: %ld\n", t + 1);
-                            });
-                    }
+                    if (++block[t] < NUM_BLOCKS)
+                        file[t]->write(dataBuf[t], onWrite);
+                    else
+                        file[t]->close([t](ssize_t result) {
+                            uv_sem_post(&stop[t]);
+                            printf("Close file in thread: %ld\n", t + 1);
+                        });
                 };
 
                 asyncio::file::openWrite(fileName, [t, onWrite](std::shared_ptr<asyncio::IOHandle> handle, ssize_t result) {
                     printf("Open file for writing in thread %ld\n", t + 1);
-                    if (asyncio::isError(result))
-                        fprintf(stderr, "open error: %s\n", asyncio::getError(result));
-                    else {
-                        file[t] = handle;
-                        file[t]->write(dataBuf[t], onWrite);
-                    }
+                    ASSERT(result >= 0);
+                    file[t] = handle;
+                    file[t]->write(dataBuf[t], onWrite);
                 });
 
                 uv_sem_wait(&stop[t]);
@@ -377,8 +354,9 @@ void testAsyncFile() {
     all = 0;
     for (int t = 0; t < NUM_THREADS; t++) {
         ths[t].join();
-        if (fileSize[t] != BUFF_SIZE * NUM_BLOCKS * NUM_ITERATIONS)
-            fprintf(stderr, "mismatch test file size (writing) in thread %i\n", t + 1);
+
+        ASSERT(fileSize[t] == BUFF_SIZE * NUM_BLOCKS * NUM_ITERATIONS);
+
         all += fileSize[t];
     }
 
@@ -405,9 +383,8 @@ void testAsyncFile() {
                 snprintf(fileName, 16, "TestFile%ld.bin", t);
 
                 asyncio::read_cb onRead = [t, &onRead](const asyncio::byte_vector& data, ssize_t result) {
-                    if (asyncio::isError(result))
-                        fprintf(stderr, "read error: %s\n", asyncio::getError(result));
-                    else if (result == 0)
+                    ASSERT(result >= 0);
+                    if (result == 0)
                         file[t]->close([t](ssize_t result) {
                             uv_sem_post(&stop[t]);
                             printf("Close file in thread: %ld\n", t + 1);
@@ -424,12 +401,9 @@ void testAsyncFile() {
 
                 asyncio::file::openRead(fileName, [t, onRead](std::shared_ptr<asyncio::IOHandle> handle, ssize_t result) {
                     printf("Open file in thread %ld\n", t + 1);
-                    if (asyncio::isError(result))
-                        fprintf(stderr, "open error: %s\n", asyncio::getError(result));
-                    else {
+                    ASSERT(result >= 0);
                         file[t] = handle;
                         file[t]->read(BUFF_SIZE, onRead);
-                    }
                 });
 
                 uv_sem_wait(&stop[t]);
@@ -443,10 +417,10 @@ void testAsyncFile() {
     all = 0;
     for (long t = 0; t < NUM_THREADS; t++) {
         ths[t].join();
-        if (fileSize[t] != BUFF_SIZE * NUM_BLOCKS * NUM_ITERATIONS)
-            fprintf(stderr, "mismatch test file size in thread %ld\n", t + 1);
-        if (summ[t] != -BUFF_SIZE * NUM_BLOCKS * NUM_ITERATIONS / 2)
-            fprintf(stderr, "mismatch test file sum in thread %ld\n", t + 1);
+
+        ASSERT(fileSize[t] == BUFF_SIZE * NUM_BLOCKS * NUM_ITERATIONS);
+        ASSERT(summ[t] == -BUFF_SIZE * NUM_BLOCKS * NUM_ITERATIONS / 2);
+
         all += fileSize[t];
     }
 
@@ -468,6 +442,7 @@ void testAsyncFile() {
         for (int i = 0; i < NUM_ITERATIONS; i++)
             asyncio::file::readFile(fileName, [](const asyncio::byte_vector& data, ssize_t result) {
                 printf("Read file. Size = %i. Result = %i\n", (int) data.size(), (int) result);
+                ASSERT(result >= 0);
 
                 long sum = 0;
                 ulong size = data.size();
@@ -475,8 +450,7 @@ void testAsyncFile() {
                 for (int n = 0; n < size; n++)
                     sum += buf[n];
 
-                if (sum != -BUFF_SIZE * NUM_BLOCKS / 2)
-                    fprintf(stderr, "mismatch test file sum in readFileCallback\n");
+                ASSERT(sum == -BUFF_SIZE * NUM_BLOCKS / 2);
 
                 uv_sem_post(&stop[0]);
             });
@@ -502,6 +476,7 @@ void testAsyncFile() {
 
         asyncio::file::writeFile(fileName, dataBuf[t], [](ssize_t result) {
             printf("Wrote file. Result = %i\n", (int) result);
+            ASSERT(result >= 0);
 
             uv_sem_post(&stop[0]);
         });
@@ -528,8 +503,7 @@ void testAsyncFile() {
         for (int n = 0; n < size; n++)
             sum += buf[n];
 
-        if (sum != (10 + 19) * 5)
-            fprintf(stderr, "mismatch the part of file sum in readFilePartCallback\n");
+        ASSERT(sum == (10 + 19) * 5);
 
         uv_sem_post(&stop[0]);
     });
@@ -543,10 +517,8 @@ void testAsyncFile() {
         for (int n = 0; n < size; n++)
             sum += buf[n];
 
-        if (size != 256)
-            fprintf(stderr, "mismatch the part of file size in readFilePartCallback\n");
-        if (sum != -128)
-            fprintf(stderr, "mismatch the part of file sum in readFilePartCallback\n");
+        ASSERT(size == 256);
+        ASSERT(sum == -128);
 
         uv_sem_post(&stop[0]);
     });
@@ -566,6 +538,7 @@ void testAsyncFile() {
         asyncio::file::readFilePart(fileName, 10, BUFF_SIZE * NUM_BLOCKS,
                 [](const asyncio::byte_vector& data, ssize_t result) {
             printf("Read the part of file with timeout. Size = %i. Result = %i\n", (int) data.size(), (int) result);
+            ASSERT(result >= 0);
 
             long sum = 0;
             ulong size = data.size();
@@ -578,8 +551,7 @@ void testAsyncFile() {
             for (int i = 0; i < result % 256; i++)
                 expected += x++;
 
-            if (sum != expected)
-                fprintf(stderr, "mismatch the part of file sum in readFilePart with timeout\n");
+            ASSERT(sum == expected);
 
             uv_sem_post(&stop[0]);
         }, 10, (size_t) 8192 / (t + 1));
@@ -596,16 +568,16 @@ void testAsyncFile() {
     auto fc = std::make_shared<asyncio::IOHandle>();
 
     fc->open("TestFile0.bin", O_RDWR, 0, [&](ssize_t result) {
-        if (!asyncio::isError(result))
-            printf("File open\n");
+        ASSERT(result >= 0);
+        printf("File open\n");
 
         fc->read(1000, [&](const asyncio::byte_vector& data, ssize_t result) {
-            if (!asyncio::isError(result))
-                printf("Read %ld bytes\n", result);
+            ASSERT(result >= 0);
+            printf("Read %ld bytes\n", result);
 
             fc->write(data, [&](ssize_t result) {
-                if (!asyncio::isError(result))
-                    printf("Wrote %ld bytes\n", result);
+                ASSERT(result >= 0);
+                printf("Wrote %ld bytes\n", result);
 
                 uv_sem_post(&stop[0]);
             });
@@ -629,20 +601,20 @@ void testAsyncFile() {
     auto f = std::make_shared<asyncio::IOHandle>();
 
     f->open("TestFile0.bin", O_RDWR, 0)->then([&](ssize_t result) {
-        if (!asyncio::isError(result))
-            printf("File open\n");
+        ASSERT(result >= 0);
+        printf("File open\n");
 
         f->read(100)->then([&](const asyncio::byte_vector& data, ssize_t result) {
-            if (!asyncio::isError(result))
-                printf("Read %ld bytes\n", result);
+            ASSERT(result >= 0);
+            printf("Read %ld bytes\n", result);
 
             f->write(data)->then([&](ssize_t result) {
-                if (!asyncio::isError(result))
-                    printf("Wrote %ld bytes\n", result);
+                ASSERT(result >= 0);
+                printf("Wrote %ld bytes\n", result);
 
                 f->close()->then([&](ssize_t result) {
-                    if (!asyncio::isError(result))
-                        printf("File closed\n");
+                    ASSERT(result >= 0);
+                    printf("File closed\n");
 
                     uv_sem_post(&stop[0]);
                 });
@@ -708,8 +680,8 @@ void testAsyncFile() {
         snprintf(fileName, 22, "TestFile%i.bin", t);
 
         asyncio::file::remove(fileName, [=](ssize_t result) {
-            if (!asyncio::isError(result))
-                printf("File %s deleted.\n", fileName);
+            ASSERT(result >= 0);
+            printf("File %s deleted.\n", fileName);
 
             uv_sem_post(&stop[0]);
         });
@@ -717,8 +689,8 @@ void testAsyncFile() {
         snprintf(fileName, 22, "TestEntireFile%i.bin", t);
 
         asyncio::file::remove(fileName, [=](ssize_t result) {
-            if (!asyncio::isError(result))
-                printf("File %s deleted.\n", fileName);
+            ASSERT(result >= 0);
+            printf("File %s deleted.\n", fileName);
 
             uv_sem_post(&stop[0]);
         });
@@ -726,8 +698,8 @@ void testAsyncFile() {
         snprintf(fileName, 22, "TestOpenWrite%i.bin", t);
 
         asyncio::file::remove(fileName, [=](ssize_t result) {
-            if (!asyncio::isError(result))
-                printf("File %s deleted.\n", fileName);
+            ASSERT(result >= 0);
+            printf("File %s deleted.\n", fileName);
 
             uv_sem_post(&stop[0]);
         });
@@ -746,8 +718,8 @@ void testAsyncFile() {
         snprintf(dirName, 12, "TestDir%i", t);
 
         asyncio::dir::createDir(dirName, S_IRWXU | S_IRWXG | S_IRWXO, [=](ssize_t result) {
-            if (!asyncio::isError(result))
-                printf("Directory %s created.\n", dirName);
+            ASSERT(result >= 0);
+            printf("Directory %s created.\n", dirName);
 
             uv_sem_post(&stop[0]);
         });
@@ -766,8 +738,8 @@ void testAsyncFile() {
         snprintf(dirName, 12, "TestDir%i", t);
 
         asyncio::dir::removeDir(dirName, [=](ssize_t result) {
-            if (!asyncio::isError(result))
-                printf("Directory %s removed.\n", dirName);
+            ASSERT(result >= 0);
+            printf("Directory %s removed.\n", dirName);
 
             uv_sem_post(&stop[0]);
         });
