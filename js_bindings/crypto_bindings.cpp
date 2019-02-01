@@ -18,14 +18,33 @@ static Persistent<FunctionTemplate> privateKeyTpl;
 
 static void privateKeySign(const FunctionCallbackInfo<Value> &args) {
     Scripter::unwrapArgs(args, [&](ArgsContext &ac) {
-        if (args.Length() == 2) {
+        // __signd(data, hashType, callback)
+        if (args.Length() == 3) {
             auto key = unwrap<PrivateKey>(args.This());
-            optional<byte_vector> src = v8ToVector(args[0]);
-            if (src) {
-                byte_vector result;
-                key->sign(*src, (HashType) ac.asInt(1), result);
-                args.GetReturnValue().Set(ac.toBinary(result));
-                return;
+            if (args[0]->IsTypedArray()) {
+                auto contents = ac.as<Uint8Array>(0)->Buffer()->GetContents();
+                // these parameters will only be copied in lambda (and key, sure)
+                void *data = contents.Data();
+                if (data != nullptr) {
+                    auto isolate = ac.isolate;
+                    auto size = contents.ByteLength();
+                    auto ht = (HashType) ac.asInt(1);
+                    auto *onReady = new Persistent<Function>(ac.isolate, ac.as<Function>(2));
+                    shared_ptr<Scripter> scripter = ac.scripter;
+
+                    jsThreadPool([=]() {
+                        auto signature = key->sign(data, size, ht);
+                        scripter->lockedContext([=](Local<Context> cxt) {
+                            auto fn = onReady->Get(scripter->isolate());
+                            delete onReady;
+                            if (fn->IsFunction()) {
+                                Local<Value> result = vectorToV8(isolate, signature);
+                                fn->Call(fn, 1, &result);
+                            }
+                        });
+                    });
+                    return;
+                }
             }
         }
         ac.throwError("invalid arguments");
@@ -60,7 +79,7 @@ static void privateKeyGenerate(const FunctionCallbackInfo<Value> &args) {
                         if (fn->IsNull()) {
                             scripter->throwError("null callback in PrivateKey::generate");
                         } else {
-                            Local<Value> res[1]{ wrap( privateKeyTpl, scripter->isolate(), key) };
+                            Local<Value> res[1]{wrap(privateKeyTpl, scripter->isolate(), key)};
                             fn->Call(fn, 1, res);
                         }
                     });
@@ -85,12 +104,33 @@ static void publicKeyPack(const FunctionCallbackInfo<Value> &args) {
 
 static void publicKeyVerify(const FunctionCallbackInfo<Value> &args) {
     Scripter::unwrapArgs(args, [](ArgsContext &ac) {
-        if (ac.args.Length() == 3) {
+        if (ac.args.Length() == 4) {
             auto key = unwrap<PublicKey>(ac.args.This());
-            optional<byte_vector> src = v8ToVector(ac.args[0]);
-            optional<byte_vector> signature = v8ToVector(ac.args[1]);
-            if (src && signature) {
-                ac.setReturnValue(key->verify(*signature, *src, (HashType) ac.asInt(2)));
+            auto dataContents = ac.as<TypedArray>(0)->Buffer()->GetContents();
+            auto sigContents = ac.as<TypedArray>(1)->Buffer()->GetContents();
+            auto dataData = dataContents.Data();
+            auto sigData = sigContents.Data();
+            if (sigData && dataData) {
+                auto sigSize = sigContents.ByteLength();
+                auto dataSize = dataContents.ByteLength();
+                auto ht = (HashType) ac.asInt(2);
+                auto isolate = ac.isolate;
+                auto *onReady = new Persistent<Function>(ac.isolate, ac.as<Function>(3));
+                shared_ptr<Scripter> scripter = ac.scripter;
+
+                jsThreadPool([=]() {
+                    bool result = key->verify(sigData, sigSize, dataData, dataSize, ht);
+                    scripter->lockedContext([=](Local<Context> cxt) {
+                        auto fn = onReady->Get(isolate);
+                        delete onReady;
+                        if (fn->IsFunction()) {
+                            Local<Value> res = Boolean::New(isolate, result);
+                            fn->Call(fn, 1, &res);
+                        } else {
+                            cerr << "publicKey::verify: callback is not a function\n";
+                        }
+                    });
+                });
                 return;
             }
         }

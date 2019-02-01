@@ -23,12 +23,14 @@ crypto.PrivateKey = class extends crypto.PrivateKeyImpl {
     }
 
 
-    sign(data, hashType = crypto.SHA3_256) {
+    async sign(data, hashType = crypto.SHA3_256) {
         if (typeof (data) == 'string') {
             data = utf8Encode(data);
         }
         if (data instanceof Uint8Array)
-            return this.__sign(data, hashType);
+            return new Promise((resolve, reject) => {
+                this.__sign(data, hashType, signature => resolve(signature));
+            });
         else
             throw new Error("Wrong data type: " + typeof (data));
     }
@@ -73,12 +75,14 @@ crypto.PublicKey = class extends crypto.PublicKeyImpl {
     }
 
 
-    verify(data, signature, hashType = crypto.SHA3_256) {
+    async verify(data, signature, hashType = crypto.SHA3_256) {
         if (typeof (data) == 'string') {
             data = utf8Encode(data);
         }
         if (data instanceof Uint8Array)
-            return this.__verify(data, signature, hashType);
+            return new Promise( (resolve, reject) => {
+                this.__verify(data, signature, hashType, ok => resolve(ok));
+            });
         else
             throw new Error("Wrong data type: " + typeof (data));
     }

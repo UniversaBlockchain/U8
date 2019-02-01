@@ -83,8 +83,8 @@ async function testCrypto() {
     assert(privateKey.equals(pk1));
 
     // console.log("private: " + privateKey);
-    let s1 = privateKey.sign("data to sign");
-    let s2 = privateKey.sign("data to sign!");
+    let s1 = await privateKey.sign("data to sign");
+    let s2 = await privateKey.sign("data to sign!");
     assert(!equalArrays(s1, s2));
     assert(s1.length == 256);
 

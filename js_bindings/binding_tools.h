@@ -203,6 +203,12 @@ optional<byte_vector> v8ToVector(Local<Value> object) {
     return optional<byte_vector>();
 }
 
+inline Local<Uint8Array> vectorToV8(Isolate* isolate, const byte_vector& data) {
+    auto buff = ArrayBuffer::New(isolate, data.size());
+    memcpy(buff->GetContents().Data(), data.data(), data.size() );
+    return Uint8Array::New(buff, 0, data.size());
+}
+
 /**
  * Wrap some C++ object into new instance of some object. Important! If the object template does not have
  * internal field space, the C++ object IS DELETED, JS  exception is thrown and UNDEFINED is returned.
