@@ -290,6 +290,7 @@ namespace asyncio {
     struct readTCP_data {
         read_cb callback;
         std::shared_ptr<byte_vector> data;
+        size_t maxBytesToRead;
     };
 
     struct readBufferTCP_data {
@@ -423,36 +424,42 @@ namespace asyncio {
         void open(const char* path, int flags, int mode, openFile_cb callback);
 
         /**
-         * Asynchronous read file.
+         * Asynchronous read file or TCP socket.
          *
-         * @param maxBytesToRead is maximum number of bytes to read from file.
-         * @param callback caused when reading a file or error.
+         * For TCP socket: callback of this method can be called multiple times, each time data is received,
+         * until the method IOHandle::stopRecv is called.
+         *
+         * @param maxBytesToRead is maximum number of bytes to read from file or TCP socket.
+         * @param callback caused when reading a file or TCP socket or error.
          */
         void read(size_t maxBytesToRead, read_cb callback);
 
         /**
-         * Asynchronous read file to initialized buffer.
+         * Asynchronous read file or TCP socket to initialized buffer.
          *
-         * @param buffer is initialized buffer for read from file, buffer size must be at least maxBytesToRead.
-         * @param maxBytesToRead is maximum number of bytes to read from file.
-         * @param callback caused when reading a file or error.
+         * For TCP socket: callback of this method can be called multiple times, each time data is received,
+         * until the method IOHandle::stopRecv is called.
+         *
+         * @param buffer is initialized buffer for read from file or TCP socket, buffer size must be at least maxBytesToRead.
+         * @param maxBytesToRead is maximum number of bytes to read from file or TCP socket.
+         * @param callback caused when reading a file or TCP socket or error.
          */
         void read(void* buffer, size_t maxBytesToRead, readBuffer_cb callback);
 
         /**
-         * Asynchronous write file.
+         * Asynchronous write file or TCP socket.
          *
-         * @param data is byte vector for data written to file.
-         * @param callback caused when writing a file or error.
+         * @param data is byte vector for data written to file or TCP socket.
+         * @param callback caused when writing a file or TCP socket or error.
          */
         void write(const byte_vector& data, write_cb callback);
 
         /**
-         * Asynchronous write file from buffer.
+         * Asynchronous write file or TCP socket from buffer.
          *
-         * @param buffer contains data written to file.
+         * @param buffer contains data written to file or TCP socket.
          * @param size of buffer in bytes.
-         * @param callback caused when writing a file or error.
+         * @param callback caused when writing a file or TCP socket or error.
          */
         void write(void* buffer, size_t size, write_cb callback);
 
@@ -572,6 +579,8 @@ namespace asyncio {
 
         /**
          * Asynchronous receive data from UDP socket.
+         * Callback of this method can be called multiple times, each time data is received,
+         * until the method IOHandle::stopRecv is called.
          *
          * @param callback caused when receiving a data or error.
          */
@@ -579,6 +588,8 @@ namespace asyncio {
 
         /**
          * Asynchronous receive data from UDP socket to initialized buffer.
+         * Callback of this method can be called multiple times, each time data is received,
+         * until the method IOHandle::stopRecv is called.
          *
          * @param buffer is initialized buffer for receive data from socket, buffer size must be at least maxBytesToRecv.
          * @param maxBytesToRecv is maximum number of bytes to receive from socket.

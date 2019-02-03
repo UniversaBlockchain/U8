@@ -580,9 +580,9 @@ void testAsyncFile() {
                 printf("Wrote %ld bytes\n", result);
 
                 uv_sem_post(&stop[0]);
-            });
 
-            fc.reset();
+                fc.reset();
+            });
         });
     });
 
@@ -1158,6 +1158,99 @@ void testAsyncTCP() {
     uv_sem_destroy(&sem_tcp_srv);
 
     printf("test with memory buffers successful\n");
+
+    //init TCP server
+    asyncio::IOHandle srv_part;
+    int packet_srv = 0;
+
+    uv_sem_init(&sem_tcp_srv, 0);
+
+    uv_mutex_t packet_mutex;
+    uv_mutex_init(&packet_mutex);
+
+    clientThreads.clear();
+    clients.clear();
+
+    srv_part.openTCP("127.0.0.1", PORT, [&](ssize_t result){
+        ASSERT(result >= 0);
+
+        printf("New connection\n");
+
+        clients.push_back(srv_part.accept());
+
+        clients[0]->read(3, [&](const asyncio::byte_vector& data, ssize_t result){
+            uv_mutex_lock(&packet_mutex);
+
+            int packet = packet_srv++;
+
+            uv_mutex_unlock(&packet_mutex);
+
+            ASSERT((result == 3) || ((packet == 3) && (result == 1)));
+
+            if (packet == 0) {
+                ASSERT(!memcmp("ABC", data.data(), 3));
+                printf("Server received: ABC\n");
+            } else if (packet == 1) {
+                ASSERT(!memcmp("DEF", data.data(), 3));
+                printf("Server received: DEF\n");
+            } else if (packet == 2) {
+                ASSERT(!memcmp("GHI", data.data(), 3));
+                printf("Server received: GHI\n");
+            } else if (packet == 3) {
+                ASSERT(!memcmp("J", data.data(), 1));
+                printf("Server received: J\n");
+
+                clients[0]->stopRecv();
+
+                clients[0]->close([&](ssize_t result){
+                    ASSERT(result >= 0);
+
+                    uv_sem_post(&sem_tcp_srv);
+                });
+            }
+        });
+    });
+
+    //init TCP client
+    asyncio::ioLoop* loop = asyncio::initAndRunAuxLoop();
+    asyncio::IOHandle cli(loop);
+
+    cli.connect("127.0.0.1", PORT + 1, "127.0.0.1", PORT, [&](ssize_t result){
+        ASSERT(result >= 0);
+
+        printf("Connected to server\n");
+
+        cli.write((void*) "ABCDEFGHIJ", 10, [&](ssize_t result){
+            ASSERT(result == 10);
+
+            cli.close([&](ssize_t result){
+                ASSERT(result >= 0);
+                uv_sem_post(&sem_tcp_srv);
+            });
+        });
+    });
+
+    uv_sem_wait(&sem_tcp_srv);
+    uv_sem_wait(&sem_tcp_srv);
+    uv_sem_destroy(&sem_tcp_srv);
+
+    uv_mutex_destroy(&packet_mutex);
+
+    //close TCP server
+    uv_sem_init(&sem_tcp_srv, 0);
+
+    printf("Close server\n");
+
+    srv_part.close([&](ssize_t result){
+        ASSERT(result >= 0);
+
+        uv_sem_post(&sem_tcp_srv);
+    });
+
+    uv_sem_wait(&sem_tcp_srv);
+    uv_sem_destroy(&sem_tcp_srv);
+
+    printf("partial read test successful\n");
 
     printf("testAsyncTCP()...done\n\n");
 }

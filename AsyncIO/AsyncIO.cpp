@@ -301,6 +301,7 @@ namespace asyncio {
             auto read_data = new readTCP_data();
 
             read_data->callback = std::move(callback);
+            read_data->maxBytesToRead = maxBytesToRead;
 
             ioTCPSoc->data = read_data;
             bufferized = false;
@@ -740,6 +741,13 @@ namespace asyncio {
     void IOHandle::_recv_cb(uv_udp_t* handle, ssize_t nread, const uv_buf_t* buf, const struct sockaddr* addr, unsigned flags) {
         auto rcv_data = (recv_data*) handle->data;
 
+        if (!nread) {
+            rcv_data->callback(0, byte_vector(), nullptr, 0);
+
+            rcv_data->data.reset();
+            return;
+        }
+
         const char *ip;
         char ipv6[INET6_ADDRSTRLEN];
         unsigned short int port;
@@ -763,6 +771,11 @@ namespace asyncio {
 
     void IOHandle::_recvBuffer_cb(uv_udp_t* handle, ssize_t nread, const uv_buf_t* buf, const struct sockaddr* addr, unsigned flags) {
         auto recv_data = (recvBuffer_data*) handle->data;
+
+        if (!nread) {
+            recv_data->callback(0, nullptr, 0);
+            return;
+        }
 
         const char *ip;
         char ipv6[INET6_ADDRSTRLEN];
@@ -999,8 +1012,12 @@ namespace asyncio {
     void IOHandle::_alloc_tcp_cb(uv_handle_t* handle, size_t suggested_size, uv_buf_t* buf) {
         auto rcv_data = (readTCP_data*) handle->data;
 
-        rcv_data->data = std::make_shared<byte_vector>(suggested_size);
-        *buf = uv_buf_init((char*) rcv_data->data->data(), (unsigned int) suggested_size);
+        size_t vector_size = suggested_size;
+        if (vector_size > rcv_data->maxBytesToRead)
+            vector_size = rcv_data->maxBytesToRead;
+
+        rcv_data->data = std::make_shared<byte_vector>(vector_size);
+        *buf = uv_buf_init((char*) rcv_data->data->data(), (unsigned int) vector_size);
     }
 
     void IOHandle::_allocBuffer_tcp_cb(uv_handle_t* handle, size_t suggested_size, uv_buf_t* buf) {
