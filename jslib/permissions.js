@@ -41,6 +41,8 @@ Permission.prototype.deserialize = function (data, deserializer) {
 };
 
 Permission.prototype.serialize = function(serializer) {
+    console.log(typeof serializer);
+
     let result = {
         name:this.name,
         role:serializer.serialize(this.role)
@@ -196,7 +198,7 @@ ModifyDataPermission.prototype.initFromParams = function() {
 };
 
 ModifyDataPermission.prototype.serialize = function(serializer) {
-    let data =  Object.getPrototypeOf(ChangeNumberPermission.prototype).serialize().call(this,serializer);
+    let data =  Object.getPrototypeOf(ChangeNumberPermission.prototype).serialize.call(this,serializer);
     data.fields = serializer.serialize(this.fields);
     return data;
 };
@@ -212,7 +214,7 @@ ModifyDataPermission.prototype.acceptsChange = function(field,value) {
             return true;
         } else {
             let acceptedValues = this.fields[field];
-            for (let v in acceptedValues) {
+            for (let v of acceptedValues) {
                 if (t.valuesEqual(v, value)) {
                     return true;
                 }
@@ -226,7 +228,7 @@ ModifyDataPermission.prototype.checkChanges = function(contract, changed, stateC
     if(!stateChanges.hasOwnProperty("data"))
         return;
 
-    let dataChanges = stateChanges.get("data");
+    let dataChanges = stateChanges.data;
     if (dataChanges != null && dataChanges instanceof dlt.MapDelta) {
         for(let key of Object.keys(dataChanges.changes)) {
             let item = dataChanges.changes[key];
