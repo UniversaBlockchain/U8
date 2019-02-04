@@ -83,7 +83,8 @@ Permission.prototype.checkChanges = function(contract, changed, stateChanges, re
 
 function ChangeNumberPermission(role,params) {
     Permission.call(this,"decrement_permission",role,params);
-    this.initFromParams();
+    if(params)
+        this.initFromParams();
 }
 
 
@@ -182,7 +183,8 @@ ChangeOwnerPermission.prototype.checkChanges = function(contract, changed, state
 
 function ModifyDataPermission(role,params) {
     Permission.call(this,"modify_data",role,params);
-    this.initFromParams();
+    if(params)
+        this.initFromParams();
     this.rootFields = ["references", "expires_at"];
 }
 
