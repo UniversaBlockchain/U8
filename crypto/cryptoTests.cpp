@@ -377,6 +377,7 @@ void testKeysConcurrency() {
     auto body = base64_decodeToBytes("cXdlcnR5MTIzNDU2");
     PrivateKey privateKey(base64_decodeToBytes("JgAcAQABvIDtBFjZyB1P7q19Ni0dCPs2ndCJrrVIXzYMbsLzVMNuRFv2NxiERGAZIolO948EGd+/E5tIv+1rAH6Oqoubqrx4MGXwpL2DJw+/No/pQQSqYCKA/v3BeADdaXo+XL12RCr3N87QGV0Ept9Q25GltgZuB75rZ4QN9NWMNa1ql929DbyAvFIUVIg6o9lT2JjnlIWNapM6rZNpo7c8SN/CfAFWxpm5qwqnIpJRrEl3fGUre2K+3psZDVIo0AKFGbuKAi+ZDAWpTAnuwT1R4pQqK/c0Z65HEbnwiAaWOn9HBAUw9c09AvgPoQvVgLS3YSA8/xBe+NeuqnIwl/Tw0m7EjVFSmNs="));
     PublicKey publicKey(privateKey);
+    SymmetricKey symmetricKey(base64_decodeToBytes("9xZQWv3x+jq4th+llGZLJsuAc3lbYFz91LWXuHZVIkE="));
     std::atomic<long> counter(0);
     ConditionVar cv;
     long total_tasks_count = 8000;
@@ -391,6 +392,9 @@ void testKeysConcurrency() {
             vector<unsigned char> sig;
             privateKey.sign(body, SHA3_512, sig);
             checkResult("concurrency sign/verify", true, publicKey.verify(sig, body, SHA3_512));
+            auto symmEncrypted = symmetricKey.etaEncrypt(body);
+            auto symmDecrypted = symmetricKey.etaDecrypt(symmEncrypted);
+            checkResult("concurrency symmetric encrypt/decrypt", string("cXdlcnR5MTIzNDU2"), base64_encode(symmDecrypted));
             ++counter;
             cv.notify();
         });
