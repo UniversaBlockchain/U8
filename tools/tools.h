@@ -9,6 +9,7 @@
 #include <sys/stat.h>
 #include <iterator>
 #include <vector>
+#include <iostream>
 
 typedef std::vector<unsigned char> byte_vector;
 
@@ -36,7 +37,7 @@ public:
 template <typename T>
 std::ostream& operator<< (std::ostream& out, const std::vector<T>& v) {
     if ( !v.empty() ) {
-        out << '[';
+        out << "[";
         std::copy (v.begin(), v.end(), std::ostream_iterator<T>(out, ", "));
         out << "\b\b]";
     }
