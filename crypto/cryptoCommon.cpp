@@ -26,6 +26,9 @@ void initCrypto() {
     if (register_hash(&sha3_512_desc) == -1)
         throw std::runtime_error("Error registering sha3_512");
 
+    if (register_cipher(&aes_desc) == -1)
+        throw std::runtime_error("Error registering aes");
+
     hashIndexes[SHA1] = find_hash(sha1_desc.name);
     hashIndexes[SHA256] = find_hash(sha256_desc.name);
     hashIndexes[SHA512] = find_hash(sha512_desc.name);

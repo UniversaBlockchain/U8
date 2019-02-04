@@ -9,6 +9,7 @@
 #include <unordered_map>
 #include <random>
 #include <atomic>
+#include <queue>
 #include "base64.h"
 #include "PrivateKey.h"
 #include "PublicKey.h"
@@ -16,6 +17,7 @@
 #include "KeyAddress.h"
 #include "Safe58.h"
 #include "../tools/ThreadPool.h"
+#include "SymmetricKey.h"
 
 using namespace std;
 
@@ -27,7 +29,7 @@ CryptoTestResults::CryptoTestResults() {
 }
 
 CryptoTestResults::~CryptoTestResults() {
-    if (checksCounter > 0) {
+    if (errorsCounter > 0) {
         auto os1 = (errorsCounter == 0 ? &cout : &cerr);
         *os1 << "CryptoTestResults: errors = " << errorsCounter << " (from " << checksCounter << ")" << endl;
     }
@@ -385,7 +387,7 @@ void testKeysConcurrency() {
             vector<unsigned char> decrypted;
             publicKey.encrypt(body, encrypted);
             privateKey.decrypt(encrypted, decrypted);
-            checkResult("concurrency endcrypt/decrypt", string("cXdlcnR5MTIzNDU2"), base64_encode(decrypted));
+            checkResult("concurrency encrypt/decrypt", string("cXdlcnR5MTIzNDU2"), base64_encode(decrypted));
             vector<unsigned char> sig;
             privateKey.sign(body, SHA3_512, sig);
             checkResult("concurrency sign/verify", true, publicKey.verify(sig, body, SHA3_512));
@@ -524,6 +526,30 @@ void testGenerateNewKeys() {
     cout << "testGenerateNewKeys()... done!" << endl << endl;
 }
 
+void testSymmetricKeys() {
+    cout << "testSymmetricKeys()..." << endl;
+
+    auto body = base64_decodeToBytes("cXdlcnR5MTIzNDU2");
+    body.insert(body.end(), body.begin(), body.end());
+    auto javaKey = base64_decodeToBytes("9xZQWv3x+jq4th+llGZLJsuAc3lbYFz91LWXuHZVIkE=");
+    auto javaEncrypted = base64_decodeToBytes("8yR802VTo0Oo68ca4Y55K2ff4PeQ9tkwlsN+HJyIeVcABoGvDVZZt44NNTfV7XAdJ1wTYUe1e7ERotKH0gLnOc7Z3lK0bTyJ");
+
+    SymmetricKey symmetricKeyJava(javaKey);
+    auto javaDecrypted = symmetricKeyJava.etaDecrypt(javaEncrypted);
+    //printf("javaDecrypted: %s\n", base64_encode(javaDecrypted).c_str());
+    checkResult("javaDecrypted", body, javaDecrypted);
+
+    SymmetricKey symmetricKeyCpp;
+    printf("cppKey: %s\n", base64_encode(symmetricKeyCpp.pack()).c_str());
+    auto cppEncrypted = symmetricKeyCpp.etaEncrypt(body);
+    printf("cppEncrypted: %s\n", base64_encode(cppEncrypted).c_str());
+    auto cppDecrypted = symmetricKeyCpp.etaDecrypt(cppEncrypted);
+    //printf("cppDecrypted: %s\n", base64_encode(cppDecrypted).c_str());
+    checkResult("cppDecrypted", body, cppDecrypted);
+
+    cout << "testSymmetricKeys()... done!" << endl << endl;
+}
+
 void testCryptoAll() {
     testCrypto();
     testHashId();
@@ -534,4 +560,5 @@ void testCryptoAll() {
     testAllHashTypes();
     testKeysConcurrency();
     testGenerateNewKeys();
+    testSymmetricKeys();
 }
