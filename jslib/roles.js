@@ -268,7 +268,7 @@ ListRole.prototype.serialize = function(serializer) {
 };
 
 ListRole.prototype.isAllowedForKeys = function(keys) {
-    if(!Object.getPrototypeOf(Role.prototype).isAllowedForKeys(this,keys))
+    if(!Object.getPrototypeOf(ListRole.prototype).isAllowedForKeys.call(this,keys))
         return false;
 
     let valid = 0;
@@ -279,7 +279,7 @@ ListRole.prototype.isAllowedForKeys = function(keys) {
         required = 1;
     else if(this.mode === ListRoleMode.QUORUM)
         required = this.quorumSize;
-
+    keys = new Set(keys);
     for(let r of this.roles) {
         if(r.isAllowedForKeys(keys)) {
             valid++;

@@ -1052,14 +1052,14 @@ Contract.prototype.basicCheck = function(prefix) {
 
     if (this.roles.creator == null || !this.roles.creator.isValid())
         this.errors.push(new ErrorRecord(Errors.MISSING_CREATOR, prefix+"state.created_by", "missing or invalid"));
-    else if (!this.roles.creator.isAllowedForKeys(this.effectiveKeys.keys()))
+    else if (!this.roles.creator.isAllowedForKeys(new Set(this.effectiveKeys.keys())))
         this.errors.push(new ErrorRecord(Errors.NOT_SIGNED, prefix, "missing creator signature(s)"));
 };
 
 Contract.prototype.checkRootContract = function(prefix) {
     //issuer presence and validity is already checked within basicCheck
     if(this.roles.issuer != null && this.roles.issuer.isValid()) {
-        if (!this.roles.issuer.isAllowedForKeys(this.effectiveKeys.keys())) {
+        if (!this.roles.issuer.isAllowedForKeys(new Set(this.effectiveKeys.keys()))) {
             this.errors.push(new ErrorRecord(Errors.ISSUER_MUST_CREATE, prefix, "missing issuer signature(s)"));
         }
     }
@@ -1090,7 +1090,7 @@ Contract.prototype.checkRevokePermissions = function(revokes) {
         if(permissions != null) {
             for(let p of permissions) {
                 this.quantiser.addWorkCost(QuantiserProcesses.PRICE_APPLICABLE_PERM);
-                if(p.isAllowedForKeys(this.effectiveKeys.keys())) {
+                if(p.isAllowedForKeys(new Set(this.effectiveKeys.keys()))) {
                     found = true;
                     break;
                 }

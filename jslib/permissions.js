@@ -41,7 +41,6 @@ Permission.prototype.deserialize = function (data, deserializer) {
 };
 
 Permission.prototype.serialize = function(serializer) {
-    console.log(typeof serializer);
 
     let result = {
         name:this.name,
