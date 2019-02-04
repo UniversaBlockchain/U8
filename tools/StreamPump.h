@@ -11,6 +11,10 @@
 
 using namespace std;
 
+/**
+ * The utility to do packground print in some output stream keeping the order. Each pump use its own
+ * thread to pass (non blocking) strings to the output stream that can (and will) block.
+ */
 class StreamPump {
 public:
     StreamPump(ostream& s);

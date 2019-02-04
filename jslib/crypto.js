@@ -10,8 +10,19 @@ crypto.Exception = class extends Error {
 
 import {MemoiseMixin, PackedEqMixin, DigestEqMixin} from 'tools'
 
+/**
+ * Universa private fast async key implementation (C++ bindings). Keys could be compared with `key.equals(anotherKey)`.
+ *
+ * @type {crypto.PrivateKey}
+ */
 crypto.PrivateKey = class extends crypto.PrivateKeyImpl {
 
+    /**
+     * Generate random key of a given strength.
+     *
+     * @param strength
+     * @returns {Promise<PrivateKey>}
+     */
     static async generate(strength) {
         return new Promise((resolve, reject) => {
             crypto.PrivateKey.__generate(strength, (key) => {
@@ -21,11 +32,22 @@ crypto.PrivateKey = class extends crypto.PrivateKeyImpl {
         });
     }
 
-    constructor(...args) {
-        super(...args);
+    /**
+     * Construct new key from its packed binary Universa representation
+     * @param {Uint8Array} packed key
+     */
+    constructor(packed) {
+        super(packed);
     }
 
 
+    /**
+     * Asynchronous signature calculation.
+     * @param data to sign
+     * @param hashType to use to hash the data
+     *
+     * @returns {Promise<Uint8Array>} the calculated signature
+     */
     async sign(data, hashType = crypto.SHA3_256) {
         if (typeof (data) == 'string') {
             data = utf8Encode(data);
@@ -36,31 +58,56 @@ crypto.PrivateKey = class extends crypto.PrivateKeyImpl {
             throw new Error("Wrong data type: " + typeof (data));
     }
 
+    /**
+     * Decrypt the cpiherText encrypted with {crypto.PublicKey#encrypt()}.
+     *
+     * @param cipherText encrypted data
+     * @returns {Promise<Uint8Array>} decrypted data
+     * @throws crypto.Exception if the cipherText seems to be corrupted and can not be properly decrypted
+     */
     async decrypt(cipherText) {
         return new Promise( (resolve, reject) => this.__decrypt(cipherText, resolve, () =>{
             reject(new crypto.Exception("PrivateKey decryption failed"));
         }));
     }
 
+    /**
+     * Pack the key to its Universa binary representation. Caches the result.
+     * @returns {Uint8Array} packed key.
+     */
     get packed() {
-        // if( !this.__packed) this.__packed = this.__pack();
-        // return this.__packed;
         return this.memoise('__packed', () => this.__pack());
 
     }
 
+    /**
+     * Extract the public key. Caches the result.
+     * @returns {crypto.PublicKey} instance
+     */
     get publicKey() {
         return this.memoise("__publicKey", () => new crypto.PublicKey(this));
     }
 
+    /**
+     * Get the short Universa address of this key (actually, of its public key). Caches the result.
+     * @returns {crypto.KeyAddress}
+     */
     get shortAddress() {
         return this.memoise("__shortAddress", () => this.publicKey.shortAddress);
     }
 
+    /**
+     * Get the long Universa address of this key (actually, of its public key). Caches the result.
+     * @returns {crypto.KeyAddress}
+     */
     get longAddress() {
         return this.memoise("__longAddress", () => this.publicKey.longAddress);
     }
 
+    /**
+     * Returns bits streng (for example, 2048)
+     * @returns {Number} integer number
+     */
     get bitStrength() {
         return this.publicKey.bitStrength;
     }
