@@ -156,9 +156,9 @@ async function testContract() {
 
     let contract = TransactionPack.unpack(sealed).contract;
     logContractTree(contract,"root");
-    contract.check();
+    await contract.check();
     console.log(JSON.stringify(contract.errors));
-    assert(contract.errors.length == 5);
+    assert(contract.errors.length === 5);
 
 
     let privateBytes = await (await io.openRead("../test/pregenerated_key.private.unikey")).allBytes();
@@ -167,14 +167,14 @@ async function testContract() {
     assert(es !== null);
 
     let c = Contract.fromPrivateKey(privateKey);
-    c.seal();
+    await c.seal();
     c.transactionPack = new TransactionPack(c);
     let tp = c.transactionPack.pack();
 
     let c2 = TransactionPack.unpack(tp).contract;
-    c2.check();
+    await c2.check();
     console.log(JSON.stringify(c2.errors));
-    assert(c2.errors.length == 0);
+    assert(c2.errors.length === 0);
 
     assert(t.valuesEqual(c,c2));
 }
@@ -185,7 +185,7 @@ async function testContract2() {
 
     let contract = TransactionPack.unpack(sealed).contract;
     logContractTree(contract, "root");
-    contract.check();
+    await contract.check();
     console.log(JSON.stringify(contract.errors));
     assert(contract.errors.length === 0);
 }

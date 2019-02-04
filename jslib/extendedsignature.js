@@ -30,15 +30,15 @@ ExtendedSignature.prototype.equals = function(to) {
     return true;
 };
 
-ExtendedSignature.sign = function (privateKey, data, savePublicKey) {
+ExtendedSignature.sign = async function (privateKey, data, savePublicKey) {
     if(typeof savePublicKey === "undefined")
         savePublicKey = true;
 
     let targetSignature = ExtendedSignature.createTargetSignature(privateKey.publicKey,data,savePublicKey);
 
     return ExtendedSignature.of(targetSignature,
-        privateKey.sign(targetSignature, crypto.SHA512),
-        privateKey.sign(targetSignature, crypto.SHA3_256));
+        await privateKey.sign(targetSignature, crypto.SHA512),
+        await privateKey.sign(targetSignature, crypto.SHA3_256));
 };
 
 ExtendedSignature.createTargetSignature = function (publicKey, data, savePublicKey) {
@@ -60,13 +60,13 @@ ExtendedSignature.of = function (targetSignature, sign, sign2) {
 };
 
 
-ExtendedSignature.verify = function(key, signature, data) {
+ExtendedSignature.verify = async function(key, signature, data) {
     let src = Boss.load(signature);
     let es = new ExtendedSignature();
-    let isSignValid = key.verify(src.exts, src.sign, crypto.SHA512);
+    let isSignValid = await key.verify(src.exts, src.sign, crypto.SHA512);
     let  isSign2Valid = true;
     if(src.hasOwnProperty("sign2")) {
-        isSign2Valid = key.verify(src.exts, src.sign2, crypto.SHA3_256);
+        isSign2Valid = await key.verify(src.exts, src.sign2, crypto.SHA3_256);
     }
     if (isSignValid && isSign2Valid) {
         let b = Boss.load(src.exts);

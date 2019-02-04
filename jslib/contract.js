@@ -586,7 +586,7 @@ Contract.prototype.get = function(name) {
 };
 
 
-Contract.prototype.seal = function() {
+Contract.prototype.seal = async function() {
     let revokingIds = [];
     for(let ri of this.revokingItems) {
         revokingIds.push(ri.id);
@@ -595,7 +595,7 @@ Contract.prototype.seal = function() {
     let newIds = [];
     for(let ni of this.newItems) {
         if(ni.sealedBinary == null) {
-            ni.seal();
+            await ni.seal();
         }
         newIds.push(ni.id);
     }
@@ -619,10 +619,10 @@ Contract.prototype.seal = function() {
     }
     this.setOwnBinary(result);
 
-    this.addSignatureToSeal(this.keysToSignWith);
+    await this.addSignatureToSeal(this.keysToSignWith);
 
     return this.sealedBinary;
-}
+};
 
 Contract.fromSealedV2Binary = function(sealed,data,transactionPack) {
 
@@ -739,7 +739,7 @@ Contract.prototype.getRevokingItem = function(id) {
     return null;
 };
 
-Contract.prototype.addSignatureToSeal = function(x) {
+Contract.prototype.addSignatureToSeal = async function(x) {
     let keys;
     let proto = Object.getPrototypeOf(x);
     if(proto === Array.prototype || proto == Set.prototype) {
@@ -759,12 +759,12 @@ Contract.prototype.addSignatureToSeal = function(x) {
     let data = Boss.load(this.sealedBinary);
     let contractBytes = data.data;
     for (let key of keys) {
-        let signature = ExtendedSignature.sign(key, contractBytes);
-        this.addSignatureBytesToSeal(signature,key.publicKey);
+        let signature = await ExtendedSignature.sign(key, contractBytes);
+        await this.addSignatureBytesToSeal(signature,key.publicKey);
     }
 };
 
-Contract.prototype.addSignatureBytesToSeal = function(signature,publicKey) {
+Contract.prototype.addSignatureBytesToSeal = async function(signature,publicKey) {
     if(this.sealedBinary == null)
         throw "failed to add signature: sealed binary does not exist";
 
@@ -773,7 +773,7 @@ Contract.prototype.addSignatureBytesToSeal = function(signature,publicKey) {
     data.signatures.push(signature);
 
     let contractBytes = data.data;
-    let  es = ExtendedSignature.verify(publicKey, signature, contractBytes);
+    let  es = await ExtendedSignature.verify(publicKey, signature, contractBytes);
     if (es != null) {
         this.sealedByKeys.set(publicKey, es);
     }
@@ -820,7 +820,7 @@ Contract.prototype.equals = function(to) {
 };
 
 
-Contract.prototype.check = function(prefix,contractsTree) {
+Contract.prototype.check = async function(prefix,contractsTree) {
     if(typeof prefix === "undefined")
         prefix = "";
 
@@ -830,7 +830,7 @@ Contract.prototype.check = function(prefix,contractsTree) {
     this.quantiser.reset(this.quantiser.quantaLimit_);
 
     if(prefix === "")
-        this.verifySignatures();
+        await this.verifySignatures();
 
     if (contractsTree == null) {
         contractsTree = new t.GenericMap();
@@ -901,7 +901,7 @@ Contract.prototype.getRevisionId = function() {
     let originId = this.state.origin == null ? this.id.base64 : this.state.origin.base64;
     let branchId = this.state.branchId == null ? "" : "/" + this.state.branchId;
     return originId + parentId + this.state.revision + branchId;
-}
+};
 
 Contract.prototype.checkDupesCreation = function(contractsTree) {
     let revisionIds = new Set();
@@ -1161,22 +1161,22 @@ Contract.prototype.setEffectiveKeys = function(additionalSignatures) {
     this.newItems.forEach(c => c.setEffectiveKeys(this.effectiveKeys));
 };
 
-Contract.prototype.verifySignatures = function() {
-    this.verifySealedKeys();
+Contract.prototype.verifySignatures = async function() {
+    await this.verifySealedKeys();
     for(let ni of this.newItems) {
         ni.quantiser.reset(this.quantiser.quantasLeft())
-        ni.verifySignatures();
+        await ni.verifySignatures();
         this.quantiser.addWorkCostFrom(ni.quantiser);
     }
 
     for(let ri of this.revokingItems) {
         ri.quantiser.reset(this.quantiser.quantasLeft())
-        ri.verifySealedKeys();
+        await ri.verifySealedKeys();
         this.quantiser.addWorkCostFrom(ri.quantiser);
     }
 };
 
-Contract.prototype.verifySealedKeys = function(isQuantise) {
+Contract.prototype.verifySealedKeys = async function(isQuantise) {
     if(typeof isQuantise === "undefined")
         isQuantise = true;
 
@@ -1227,7 +1227,7 @@ Contract.prototype.verifySealedKeys = function(isQuantise) {
             if (isQuantise)
                 this.quantiser.addWorkCost(key.bitStrength === 2048 ? QuantiserProcesses.PRICE_CHECK_2048_SIG : QuantiserProcesses.PRICE_CHECK_4096_SIG);
 
-            let es = ExtendedSignature.verify(key, signature, contractBytes);
+            let es = await ExtendedSignature.verify(key, signature, contractBytes);
             if (es != null) {
                 this.sealedByKeys.set(key, es);
             } else
