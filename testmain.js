@@ -128,7 +128,14 @@ async function testCrypto() {
 
     let dd = crypto.digest(crypto.SHA256, "hello, world");
     assert(btoa(dd) == "Ccp+TqpuiunH0mEWcSkYSINkTQffuny/vEyKLgg2DVs=");
-}
+
+    let plain = "fucked up beyond all recognition";
+    let cipherText = await publicKey.encrypt(plain);
+    let plain1 = utf8Decode(await privateKey.decrypt(cipherText));
+    assert(plain == plain1);
+
+
+} // ------------------ tetscrypto
 
 function logContractTree(contract,prefix) {
     if(!prefix)

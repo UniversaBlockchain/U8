@@ -33,6 +33,10 @@ crypto.PrivateKey = class extends crypto.PrivateKeyImpl {
             throw new Error("Wrong data type: " + typeof (data));
     }
 
+    async decrypt(cipherText) {
+        return new Promise( resolve => this.__decrypt(cipherText, resolve));
+    }
+
     get packed() {
         // if( !this.__packed) this.__packed = this.__pack();
         // return this.__packed;
@@ -81,6 +85,11 @@ crypto.PublicKey = class extends crypto.PublicKeyImpl {
             return new Promise(resolve => this.__verify(data, signature, hashType, resolve));
         else
             throw new Error("Wrong data type: " + typeof (data));
+    }
+
+    async encrypt(plainText) {
+        let data = typeof(plainText) == 'string' ? utf8Encode(plainText) : plainText;
+        return new Promise( resolve => this.__encrypt(data, resolve));
     }
 
     get packed() {
