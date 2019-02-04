@@ -17,7 +17,7 @@ static const char *ARGV0 = nullptr;
 std::unique_ptr<v8::Platform> Scripter::initV8(const char *argv0) {
 
     int _argc = 2;
-    char* _argv[] = { (char*)argv0, (char*) "--expose_gc"};
+    char* _argv[] = { (char*)argv0, (char*) "--expose_gc", (char*)"--async-stack-traces"};
 
     v8::V8::InitializeICUDefaultLocation(argv0);
     v8::V8::InitializeExternalStartupData(argv0);

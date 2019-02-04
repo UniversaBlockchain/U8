@@ -18,7 +18,7 @@ void ThreadPool::addWorker() {
                 try {
                     queue.get()();
                 }
-                catch (QueueClosedException) {
+                catch (const QueueClosedException& x) {
                     break;
                 }
                 catch (const exception &e) {

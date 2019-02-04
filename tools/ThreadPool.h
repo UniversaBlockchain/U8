@@ -62,13 +62,25 @@ public:
      * schedule a taks: execute a block in first available thread of the pool
      * @param block labmda to execute.
      */
-    void execute(callable &&block) { queue.put(block); }
+    void execute(callable &&block) {
+        try {
+            queue.put(block);
+        } catch (const QueueClosedException &e) {
+            cerr << "ThreadPool: execute on closed pool\n";
+        }
+    }
 
     /**
      * schedule a taks: execute a block in first available thread of the pool
      * @param block labmda to execute.
      */
-    void execute(callable &block) { queue.put(block); }
+    void execute(callable &block) {
+        try {
+            queue.put(block);
+        } catch (const QueueClosedException &e) {
+            cerr << "ThreadPool: execute on closed pool is ignored\n";
+        }
+    }
 
     /**
      * schedule a taks: execute a block in first available thread of the pool

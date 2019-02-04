@@ -20,7 +20,7 @@ void JsPrint(const v8::FunctionCallbackInfo<v8::Value> &args) {
         if (first) {
             first = false;
         } else {
-            ss << endl;
+            ss << ' ';
         }
         v8::String::Utf8Value str(args.GetIsolate(), args[i]->ToString(args.GetIsolate()));
         const char *cstr = *str;
@@ -28,7 +28,7 @@ void JsPrint(const v8::FunctionCallbackInfo<v8::Value> &args) {
     }
     auto message = ss.str();
     jsThreadPool([=](){
-        (isError ? cerr : cout) << message << endl;
+        (isError ? cerr : cout) << message;
     });
 }
 

@@ -4,6 +4,9 @@ crypto.SHA3_256 = 3;
 crypto.SHA3_384 = 4;
 crypto.SHA3_512 = 5;
 
+crypto.Exception = class extends Error {
+
+};
 
 import {MemoiseMixin, PackedEqMixin, DigestEqMixin} from 'tools'
 
@@ -34,7 +37,9 @@ crypto.PrivateKey = class extends crypto.PrivateKeyImpl {
     }
 
     async decrypt(cipherText) {
-        return new Promise( resolve => this.__decrypt(cipherText, resolve));
+        return new Promise( (resolve, reject) => this.__decrypt(cipherText, resolve, () =>{
+            reject(new crypto.Exception("PrivateKey decryption failed"));
+        }));
     }
 
     get packed() {
@@ -133,6 +138,15 @@ crypto.SymmetricKey = class extends crypto.SymmetricKeyImpl {
 
     etaEncrypt(plainText) {
         return super.etaEncrypt(typeof(plainText) == 'string' ? utf8Encode(plainText) : plainText);
+    }
+
+    etaDecrypt(cipherText) {
+        try {
+            return super.etaDecrypt(cipherText);
+        }
+        catch(e) {
+            throw new crypto.Exception("ETA decryption failed");
+        }
     }
 
     get packed() {

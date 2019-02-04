@@ -1,9 +1,10 @@
 'use strict';
 
 const console = {
-    log(...args) { __bios_print(false, ...args); },
-    info(...args) { __bios_print(false, ...args) },
-    error(...args) { __bios_print(true, ...args) }
+    log(...args) { __bios_print(false, ...args, "\n"); },
+    logPut(...args) { __bios_print(false, ...args); },
+    info(...args) { __bios_print(false, ...args, "\n"); },
+    error(...args) { __bios_print(true, ...args, "\n"); }
 };
 
 const VERSION = "4.0.0b5";
@@ -35,7 +36,9 @@ function safeEval(module, sourceUrl, src) {
 }
 
 function __fix_imports(source) {
-    return source.replace(/^import\s+{(.*)}\s+from\s+(.*['"]);?$/mg, "let {$1} = {...require($2)};");
+    return source
+        .replace(/^import\s+{(.*)}\s+from\s+(.*['"]);?$/mg, "let {$1} = {...require($2)};")
+        .replace(/^import\s+\*\s+as\s+(.*)\s+from\s+(.*['"]);?$/mg, "let $1 = require($2);");
 }
 
 const require = (function () {

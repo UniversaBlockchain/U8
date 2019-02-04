@@ -57,7 +57,7 @@ static void privateKeySign(const FunctionCallbackInfo<Value> &args) {
 static void privateKeyDecrypt(const FunctionCallbackInfo<Value> &args) {
     Scripter::unwrapArgs(args, [&](ArgsContext &ac) {
         // __decrypt(data, callback)
-        if (args.Length() == 2) {
+        if (args.Length() == 3) {
             auto key = unwrap<PrivateKey>(args.This());
             if (args[0]->IsTypedArray()) {
                 auto contents = ac.as<Uint8Array>(0)->Buffer()->GetContents();
@@ -67,19 +67,38 @@ static void privateKeyDecrypt(const FunctionCallbackInfo<Value> &args) {
                     auto isolate = ac.isolate;
                     auto size = contents.ByteLength();
                     auto *onReady = new Persistent<Function>(ac.isolate, ac.as<Function>(1));
+                    auto *onError = new Persistent<Function>(ac.isolate, ac.as<Function>(2));
                     auto scripter = ac.scripter;
                     jsThreadPool([=]() {
-                        auto plain = key->decrypt(data, size);
-                        scripter->lockedContext([=](Local<Context> cxt) {
-                            auto fn = onReady->Get(scripter->isolate());
-                            delete onReady;
-                            if (fn->IsFunction()) {
-                                Local<Value> result = vectorToV8(isolate, plain);
-                                fn->Call(fn, 1, &result);
-                            } else {
-                                cerr << "PrivateKey::decrypt invalid callback\n";
-                            }
-                        });
+                        string errorString;
+                        try {
+                            auto plain = key->decrypt(data, size);
+                            scripter->lockedContext([=](Local<Context> cxt) {
+                                auto fn = onReady->Get(scripter->isolate());
+                                delete onReady;
+                                delete onError;
+                                if (fn->IsFunction()) {
+                                    Local<Value> result = vectorToV8(isolate, plain);
+                                    fn->Call(fn, 1, &result);
+                                } else {
+                                    cerr << "PrivateKey::decrypt invalid callback\n";
+                                }
+                            });
+                        }
+                        catch(const exception &e) {
+                            scripter->lockedContext([=](Local<Context> cxt) {
+                                auto fn = onError->Get(scripter->isolate());
+                                delete onReady;
+                                delete onError;
+                                if (fn->IsFunction()) {
+                                    Local<Value> result = scripter->v8String(e.what());
+                                    fn->Call(fn, 1, &result);
+                                } else {
+                                    cerr << "PrivateKey::decrypt invalid reject callback\n";
+                                }
+                            });
+
+                        }
                     });
                     return;
                 }
