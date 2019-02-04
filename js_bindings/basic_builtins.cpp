@@ -6,8 +6,14 @@
 #include "binding_tools.h"
 #include "basic_builtins.h"
 #include "../tools/tools.h"
+#include "../tools/StreamPump.h"
 
 using namespace std;
+
+// We want to avoid destructing of these pump with application shutdown as it causes
+// problems with stdlib++ as for now:
+StreamPump *cout_pump = new StreamPump(cout);
+StreamPump *cerr_pump = new StreamPump(cerr);
 
 void JsPrint(const v8::FunctionCallbackInfo<v8::Value> &args) {
     auto isolate = args.GetIsolate();
@@ -27,9 +33,7 @@ void JsPrint(const v8::FunctionCallbackInfo<v8::Value> &args) {
         ss << (cstr ? cstr : "(undefined)");
     }
     auto message = ss.str();
-    jsThreadPool([=](){
-        (isError ? cerr : cout) << message;
-    });
+    *(isError ? cerr_pump : cout_pump) << message;
 }
 
 //void withScriptEnv(std::function<void(v8::Isolate*,))
