@@ -17,7 +17,7 @@ void usage();
 
 int main(int argc, const char **argv) {
 
-    initCrypto();
+    crypto::initCrypto();
     asyncio::initAndRunLoop();
 
     if (argc == 2 && strcmp(argv[1], "--selftest") == 0) {

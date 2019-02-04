@@ -8,37 +8,48 @@
 #include <vector>
 #include <string>
 
-class PublicKey;
+namespace crypto {
 
-class KeyAddress {
+    class PublicKey;
 
-public:
-    KeyAddress();
-    KeyAddress(const PublicKey& key, int typeMark, bool useSha3_384);
-    KeyAddress(const std::string& packedString);
-    KeyAddress(const std::vector<unsigned char>& packedSource);
-    KeyAddress(void* packedSource, size_t packedSourceSize);
+    class KeyAddress {
 
-    std::string toString() const;
+    public:
+        KeyAddress();
 
-    bool operator==(const KeyAddress& other) const;
-    bool isMatchingKeyAddress(const KeyAddress& other) const;
-    bool isMatchingKey(const PublicKey& key) const;
-    bool isLong() const;
+        KeyAddress(const PublicKey &key, int typeMark, bool useSha3_384);
 
-    bool isInitialized() const;
+        KeyAddress(const std::string &packedString);
 
-    std::vector<unsigned char> getPacked() const { return packed; }
+        KeyAddress(const std::vector<unsigned char> &packedSource);
 
-protected:
-    static int mask(const PublicKey& key);
+        KeyAddress(void *packedSource, size_t packedSourceSize);
 
-private:
-    int keyMask;
-    std::vector<unsigned char> keyDigest;
-    bool isLong_;
-    std::vector<unsigned char> packed;
-    int typeMark;
+        std::string toString() const;
+
+        bool operator==(const KeyAddress &other) const;
+
+        bool isMatchingKeyAddress(const KeyAddress &other) const;
+
+        bool isMatchingKey(const PublicKey &key) const;
+
+        bool isLong() const;
+
+        bool isInitialized() const;
+
+        std::vector<unsigned char> getPacked() const { return packed; }
+
+    protected:
+        static int mask(const PublicKey &key);
+
+    private:
+        int keyMask;
+        std::vector<unsigned char> keyDigest;
+        bool isLong_;
+        std::vector<unsigned char> packed;
+        int typeMark;
+
+    };
 
 };
 

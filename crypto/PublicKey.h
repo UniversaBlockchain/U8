@@ -15,53 +15,69 @@
 #include "PrivateKey.h"
 #include "../types/UBytes.h"
 
-class PublicKey {
+namespace crypto {
 
-public:
+	class PublicKey {
 
-	PublicKey(mpz_ptr N, mpz_ptr e);
-	PublicKey(const std::string& strE, const std::string& strN);
-	PublicKey(const std::vector<unsigned char>& packedBinaryKey);
-	PublicKey(void* packedBinaryKeyData, size_t packedBinaryKeySize);
-	PublicKey(const PrivateKey& privateKey);
+	public:
 
-	std::vector<unsigned char> pack() const;
+		PublicKey(mpz_ptr N, mpz_ptr e);
 
-	bool verify(const std::vector<unsigned char> &sig, const std::vector<unsigned char> &data, HashType hashType);
-	bool verify(void* sigData, size_t sigSize, void* bodyData, size_t bodySize, HashType hashType);
-	void encrypt(const std::vector<unsigned char>& input, std::vector<unsigned char>& output);
-	std::vector<unsigned char> encrypt(const std::vector<unsigned char>& input);
-	std::vector<unsigned char> encrypt(void* data, size_t size);
+		PublicKey(const std::string &strE, const std::string &strN);
 
-	const KeyAddress& getShortAddress();
-	const KeyAddress& getLongAddress();
+		PublicKey(const std::vector<unsigned char> &packedBinaryKey);
 
-	bool isMatchingKeyAddress(const KeyAddress& other);
+		PublicKey(void *packedBinaryKeyData, size_t packedBinaryKeySize);
 
-	std::vector<unsigned char> fingerprint();
+		PublicKey(const PrivateKey &privateKey);
 
-	void toHash(std::unordered_map<std::string, std::string>& dst) const;
-	long getPublicExponent() const;
-	int getBitStrength() const;
-	std::vector<unsigned char> getKeyComponentsAsBytes() const;
+		std::vector<unsigned char> pack() const;
 
-private:
+		bool verify(const std::vector<unsigned char> &sig, const std::vector<unsigned char> &data, HashType hashType);
 
-	void initFromBytes(const UBytes& eValue, const UBytes& nValue);
-	void initFromDecimalStrings(const std::string& strE, const std::string& strN);
+		bool verify(void *sigData, size_t sigSize, void *bodyData, size_t bodySize, HashType hashType);
 
-private:
+		void encrypt(const std::vector<unsigned char> &input, std::vector<unsigned char> &output);
 
-	const static char FINGERPRINT_SHA256 = 7;
+		std::vector<unsigned char> encrypt(const std::vector<unsigned char> &input);
 
-	RsaKeyWrapper key;
-	HashType mgf1HashType = DEFAULT_MGF1_HASH;
+		std::vector<unsigned char> encrypt(void *data, size_t size);
 
-	KeyAddress shortAddress;
-	KeyAddress longAddress;
-	std::vector<unsigned char> fingerprint_;
+		const KeyAddress &getShortAddress();
+
+		const KeyAddress &getLongAddress();
+
+		bool isMatchingKeyAddress(const KeyAddress &other);
+
+		std::vector<unsigned char> fingerprint();
+
+		void toHash(std::unordered_map<std::string, std::string> &dst) const;
+
+		long getPublicExponent() const;
+
+		int getBitStrength() const;
+
+		std::vector<unsigned char> getKeyComponentsAsBytes() const;
+
+	private:
+
+		void initFromBytes(const UBytes &eValue, const UBytes &nValue);
+
+		void initFromDecimalStrings(const std::string &strE, const std::string &strN);
+
+	private:
+
+		const static char FINGERPRINT_SHA256 = 7;
+
+		RsaKeyWrapper key;
+		HashType mgf1HashType = DEFAULT_MGF1_HASH;
+
+		KeyAddress shortAddress;
+		KeyAddress longAddress;
+		std::vector<unsigned char> fingerprint_;
+
+	};
 
 };
-
 
 #endif //UNITOOLS_PUBLICKEY_H

@@ -14,6 +14,8 @@
 #include "../crypto/HashId.h"
 #include "../crypto/SymmetricKey.h"
 
+using namespace crypto;
+
 static Persistent<FunctionTemplate> publicKeyTpl;
 static Persistent<FunctionTemplate> privateKeyTpl;
 

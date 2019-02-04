@@ -10,36 +10,49 @@
 #include <gmp.h>
 #include <vector>
 
-enum HashType {
-    MIN = -1,
-    SHA1,
-    SHA256,
-    SHA512,
-    SHA3_256,
-    SHA3_384,
-    SHA3_512,
-    MAX
-};
+namespace crypto {
 
-static const HashType DEFAULT_MGF1_HASH = HashType::SHA1;
+    enum HashType {
+        MIN = -1,
+        SHA1,
+        SHA256,
+        SHA512,
+        SHA3_256,
+        SHA3_384,
+        SHA3_512,
+        MAX
+    };
 
-void initCrypto();
-const char* getJavaHashName(HashType hashType);
+    static const HashType DEFAULT_MGF1_HASH = HashType::SHA1;
 
-class Digest {
-public:
-    Digest(HashType hashType);
-    Digest(HashType hashType, const std::vector<unsigned char>& dataToHash);
-    Digest(HashType hashType, void* data, size_t size);
-    void update(const std::vector<unsigned char>& data);
-    void update(void* data, size_t size);
-    void doFinal();
-    size_t getDigestSize();
-    std::vector<unsigned char> getDigest() const;
-private:
-    hash_state md;
-    ltc_hash_descriptor desc;
-    std::vector<unsigned char> out;
+    void initCrypto();
+
+    const char *getJavaHashName(HashType hashType);
+
+    class Digest {
+    public:
+        Digest(HashType hashType);
+
+        Digest(HashType hashType, const std::vector<unsigned char> &dataToHash);
+
+        Digest(HashType hashType, void *data, size_t size);
+
+        void update(const std::vector<unsigned char> &data);
+
+        void update(void *data, size_t size);
+
+        void doFinal();
+
+        size_t getDigestSize();
+
+        std::vector<unsigned char> getDigest() const;
+
+    private:
+        hash_state md;
+        ltc_hash_descriptor desc;
+        std::vector<unsigned char> out;
+    };
+
 };
 
 #endif //U8_CRYPTO_H

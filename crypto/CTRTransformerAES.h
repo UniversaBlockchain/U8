@@ -8,30 +8,37 @@
 #include <vector>
 #include "../tools/tools.h"
 
-class CTRTransformerAES {
+namespace crypto {
 
-public:
+    class CTRTransformerAES {
 
-    CTRTransformerAES(const byte_vector& key);
-    CTRTransformerAES(const byte_vector& key, const byte_vector& iv);
+    public:
 
-    unsigned char transformByte(unsigned char source);
-    byte_vector getIV();
+        CTRTransformerAES(const byte_vector &key);
 
-private:
-    unsigned char nextByte();
-    void prepareBlock();
+        CTRTransformerAES(const byte_vector &key, const byte_vector &iv);
 
-private:
-    byte_vector key;
-    int counter;
-    int index = 0;
-    const int blockSize;
-    byte_vector source;
-    byte_vector nonce;
-    byte_vector counterBytes;
+        unsigned char transformByte(unsigned char source);
+
+        byte_vector getIV();
+
+    private:
+        unsigned char nextByte();
+
+        void prepareBlock();
+
+    private:
+        byte_vector key;
+        int counter;
+        int index = 0;
+        const int blockSize;
+        byte_vector source;
+        byte_vector nonce;
+        byte_vector counterBytes;
+    };
+
+    void applyXor(byte_vector &source, int offset, const byte_vector &mask);
+
 };
-
-void applyXor(byte_vector& source, int offset, const byte_vector& mask);
 
 #endif //U8_CTRTRANSFORMERAES_H

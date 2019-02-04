@@ -8,53 +8,57 @@
 #include <tomcrypt.h>
 #include "../tools/tools.h"
 
-class SymmetricKey {
+namespace crypto {
 
-public:
+    class SymmetricKey {
 
-    /**
-     * Create random symmetric key (AES256, CTR)
-     */
-    SymmetricKey();
+    public:
 
-    /**
-     * Create symmetric key from a packed data
-     */
-    SymmetricKey(const byte_vector& key);
+        /**
+         * Create random symmetric key (AES256, CTR)
+         */
+        SymmetricKey();
 
-    /**
-     * \see SymmetricKey(const byte_vector& key)
-     */
-    SymmetricKey(void* keyData, size_t keyDataSize);
+        /**
+         * Create symmetric key from a packed data
+         */
+        SymmetricKey(const byte_vector &key);
 
-    /**
-     * Returns packed key data
-     */
-    byte_vector pack();
+        /**
+         * \see SymmetricKey(const byte_vector& key)
+         */
+        SymmetricKey(void *keyData, size_t keyDataSize);
 
-    /**
-     * Encrypt data using AE (EtA) with HMAC based on SHA256
-     */
-    byte_vector etaDecrypt(const byte_vector& data);
+        /**
+         * Returns packed key data
+         */
+        byte_vector pack();
 
-    /**
-     * \see byte_vector etaDecrypt(const byte_vector& data)
-     */
-    byte_vector etaDecrypt(void* data, size_t size);
+        /**
+         * Encrypt data using AE (EtA) with HMAC based on SHA256
+         */
+        byte_vector etaDecrypt(const byte_vector &data);
 
-    /**
-     * Decrypt data using AE (EtA) with SHA256-based HMAC
-     */
-    byte_vector etaEncrypt(const byte_vector& data);
+        /**
+         * \see byte_vector etaDecrypt(const byte_vector& data)
+         */
+        byte_vector etaDecrypt(void *data, size_t size);
 
-    /**
-     * \see byte_vector etaEncrypt(const byte_vector& data)
-     */
-    byte_vector etaEncrypt(void* data, size_t size);
+        /**
+         * Decrypt data using AE (EtA) with SHA256-based HMAC
+         */
+        byte_vector etaEncrypt(const byte_vector &data);
 
-private:
-    const ltc_cipher_descriptor cipher_desc = aes_desc;
-    byte_vector key;
+        /**
+         * \see byte_vector etaEncrypt(const byte_vector& data)
+         */
+        byte_vector etaEncrypt(void *data, size_t size);
+
+    private:
+        const ltc_cipher_descriptor cipher_desc = aes_desc;
+        byte_vector key;
+
+    };
 
 };
 

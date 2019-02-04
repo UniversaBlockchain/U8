@@ -7,22 +7,27 @@
 
 #include "cryptoCommon.h"
 
+namespace crypto {
 
-int getHashIndex(HashType hashType);
+    int getHashIndex(HashType hashType);
 
-ltc_hash_descriptor getHashDescriptor(HashType hashType);
+    ltc_hash_descriptor getHashDescriptor(HashType hashType);
 
-size_t mpz_unsigned_bin_size(mpz_ptr p);
+    size_t mpz_unsigned_bin_size(mpz_ptr p);
 
-void mpz_to_unsigned_bin(mpz_ptr p, unsigned char* buf);
+    void mpz_to_unsigned_bin(mpz_ptr p, unsigned char *buf);
 
-class RsaKeyWrapper {
-public:
-    rsa_key key;
-    RsaKeyWrapper();
-    RsaKeyWrapper(const RsaKeyWrapper& copyFrom);
-    ~RsaKeyWrapper();
+    class RsaKeyWrapper {
+    public:
+        rsa_key key;
+
+        RsaKeyWrapper();
+
+        RsaKeyWrapper(const RsaKeyWrapper &copyFrom);
+
+        ~RsaKeyWrapper();
+    };
+
 };
-
 
 #endif //U8_CRYPTOCOMMONPRIVATE_H

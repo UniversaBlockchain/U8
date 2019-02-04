@@ -12,40 +12,54 @@
 #include "cryptoCommonPrivate.h"
 #include "../types/UBytes.h"
 
-class PublicKey;
+namespace crypto {
 
-class PrivateKey {
+	class PublicKey;
 
-public:
+	class PrivateKey {
 
-	PrivateKey(const std::string& strE, const std::string& strP, const std::string& strQ);
-	PrivateKey(const UBytes& eValue, const UBytes& pValue, const UBytes& qValue);
-    PrivateKey(const std::vector<unsigned char>& packedBinaryKey);
-	PrivateKey(void* packedBinaryKeyData, size_t packedBinaryKeySize);
-    PrivateKey(int bitStrength);
+	public:
 
-	std::vector<unsigned char> pack() const;
+		PrivateKey(const std::string &strE, const std::string &strP, const std::string &strQ);
 
-	// Signature is created using RSA-PSS as described in PKCS# 1 v 2.1.
-	void sign(const std::vector<unsigned char> &input, HashType hashType, std::vector<unsigned char> &output);
-	std::vector<unsigned char> sign(const std::vector<unsigned char> &input, HashType hashType);
-	std::vector<unsigned char> sign(void* data, size_t size, HashType hashType);
+		PrivateKey(const UBytes &eValue, const UBytes &pValue, const UBytes &qValue);
 
-	void decrypt(const std::vector<unsigned char> &encrypted, std::vector<unsigned char> &output);
-	std::vector<unsigned char> decrypt(const std::vector<unsigned char> &encrypted);
-	std::vector<unsigned char> decrypt(void* data, size_t size);
+		PrivateKey(const std::vector<unsigned char> &packedBinaryKey);
 
-	friend class PublicKey;
+		PrivateKey(void *packedBinaryKeyData, size_t packedBinaryKeySize);
 
-private:
+		PrivateKey(int bitStrength);
 
-	void initFromBytes(const UBytes& eValue, const UBytes& pValue, const UBytes& qValue);
-	void initFromDecimalStrings(const std::string& strE, const std::string& strP, const std::string& strQ);
-	void generate(int bitStrength);
+		std::vector<unsigned char> pack() const;
 
-private:
+		// Signature is created using RSA-PSS as described in PKCS# 1 v 2.1.
+		void sign(const std::vector<unsigned char> &input, HashType hashType, std::vector<unsigned char> &output);
 
-	RsaKeyWrapper key;
+		std::vector<unsigned char> sign(const std::vector<unsigned char> &input, HashType hashType);
+
+		std::vector<unsigned char> sign(void *data, size_t size, HashType hashType);
+
+		void decrypt(const std::vector<unsigned char> &encrypted, std::vector<unsigned char> &output);
+
+		std::vector<unsigned char> decrypt(const std::vector<unsigned char> &encrypted);
+
+		std::vector<unsigned char> decrypt(void *data, size_t size);
+
+		friend class PublicKey;
+
+	private:
+
+		void initFromBytes(const UBytes &eValue, const UBytes &pValue, const UBytes &qValue);
+
+		void initFromDecimalStrings(const std::string &strE, const std::string &strP, const std::string &strQ);
+
+		void generate(int bitStrength);
+
+	private:
+
+		RsaKeyWrapper key;
+
+	};
 
 };
 

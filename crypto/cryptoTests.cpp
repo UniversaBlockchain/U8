@@ -20,6 +20,7 @@
 #include "SymmetricKey.h"
 
 using namespace std;
+using namespace crypto;
 
 CryptoTestResults cryptoTestResults;
 std::minstd_rand minstdRand;

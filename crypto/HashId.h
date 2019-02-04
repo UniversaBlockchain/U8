@@ -9,6 +9,8 @@
 #include <string>
 #include <memory>
 
+namespace crypto {
+
 /**
  * Hash-based identity v3.
  * <p>
@@ -43,55 +45,65 @@
  * <p>
  * Created by sergeych on 16/07/2017.
  */
-class HashId {
+    class HashId {
 
-public:
+    public:
 
-    /**
-     * Return new HashId calculating composite digest hash of the data.
-     */
-    static HashId of(const std::vector<unsigned char>& packedData);
+        /**
+         * Return new HashId calculating composite digest hash of the data.
+         */
+        static HashId of(const std::vector<unsigned char> &packedData);
 
-    /**
-     * \see HashId of(const std::vector<unsigned char>& packedData);
-     */
-    static HashId of(void* packedData, size_t packedDataSize);
+        /**
+         * \see HashId of(const std::vector<unsigned char>& packedData);
+         */
+        static HashId of(void *packedData, size_t packedDataSize);
 
-    /**
-     * Create instance from a saved digest (obtained before with getDigest())
-     */
-    static HashId withDigest(const std::vector<unsigned char>& digestData);
+        /**
+         * Create instance from a saved digest (obtained before with getDigest())
+         */
+        static HashId withDigest(const std::vector<unsigned char> &digestData);
 
-    /**
-     * \see HashId withDigest(const std::vector<unsigned char>& digestData);
-     */
-    static HashId withDigest(void* digestData, size_t digestDataSize);
+        /**
+         * \see HashId withDigest(const std::vector<unsigned char>& digestData);
+         */
+        static HashId withDigest(void *digestData, size_t digestDataSize);
 
-    HashId(const HashId& copyFrom);
-    HashId(HashId&& moveFrom);
+        HashId(const HashId &copyFrom);
 
-    std::string toBase64();
-    std::vector<unsigned char> getDigest();
+        HashId(HashId &&moveFrom);
 
-    bool operator<(const HashId& other) const;
-    bool operator==(const HashId& other) const;
-    size_t hashCode() const;
+        std::string toBase64();
 
-public:
-    /**
-     * Use it with unordered_map, e.g.:
-     * unordered_map&lt;HashId, int, HashId::UnorderedHash&gt;
-     */
-    struct UnorderedHash {
-        size_t operator()(const HashId& val) const;
+        std::vector<unsigned char> getDigest();
+
+        bool operator<(const HashId &other) const;
+
+        bool operator==(const HashId &other) const;
+
+        size_t hashCode() const;
+
+    public:
+        /**
+         * Use it with unordered_map, e.g.:
+         * unordered_map&lt;HashId, int, HashId::UnorderedHash&gt;
+         */
+        struct UnorderedHash {
+            size_t operator()(const HashId &val) const;
+        };
+
+    private:
+        std::vector<unsigned char> digest;
+
+        HashId() {}
+
+        HashId(const std::vector<unsigned char> &packedData);
+
+        HashId(void *data, size_t size);
+
+        void initWith(void *data, size_t size);
+
     };
-
-private:
-    std::vector<unsigned char> digest;
-    HashId() {}
-    HashId(const std::vector<unsigned char>& packedData);
-    HashId(void* data, size_t size);
-    void initWith(void* data, size_t size);
 
 };
 
