@@ -12,6 +12,7 @@
 #include "../tools/vprintf.h"
 #include "../crypto/base64.h"
 #include "../crypto/HashId.h"
+#include "../crypto/SymmetricKey.h"
 
 static Persistent<FunctionTemplate> publicKeyTpl;
 static Persistent<FunctionTemplate> privateKeyTpl;
@@ -73,8 +74,7 @@ static void privateKeyDecrypt(const FunctionCallbackInfo<Value> &args) {
                             if (fn->IsFunction()) {
                                 Local<Value> result = vectorToV8(isolate, plain);
                                 fn->Call(fn, 1, &result);
-                            }
-                            else {
+                            } else {
                                 cerr << "PrivateKey::decrypt invalid callback\n";
                             }
                         });
@@ -181,7 +181,7 @@ static void publicKeyEncrypt(const FunctionCallbackInfo<Value> &args) {
             auto contents = ac.as<TypedArray>(0)->Buffer()->GetContents();
             auto data = contents.Data();
             auto size = contents.ByteLength();
-            if( data ) {
+            if (data) {
                 auto isolate = ac.isolate;
                 auto *onReady = new Persistent<Function>(ac.isolate, ac.as<Function>(1));
                 shared_ptr<Scripter> scripter = ac.scripter;
@@ -426,6 +426,91 @@ Local<FunctionTemplate> initHashId(Isolate *isolate) {
     return tpl;
 }
 
+
+static void symmetricKeyEncrypt(const FunctionCallbackInfo<Value> &args) {
+    Scripter::unwrapArgs(args, [](ArgsContext &ac) {
+        if (ac.args.Length() == 1 && ac.args[0]->IsTypedArray()) {
+            auto key = unwrap<SymmetricKey>(ac.args.This());
+            auto c = ac.as<TypedArray>(0)->Buffer()->GetContents();
+            auto data = c.Data();
+            auto size = c.ByteLength();
+            ac.setReturnValue(ac.toBinary(key->etaEncrypt(data, size)));
+            return;
+        }
+        ac.throwError("invalid arguments");
+    });
+}
+
+static void symmetricKeyDecrypt(const FunctionCallbackInfo<Value> &args) {
+    Scripter::unwrapArgs(args, [](ArgsContext &ac) {
+        if (ac.args.Length() == 1 && ac.args[0]->IsTypedArray()) {
+            auto key = unwrap<SymmetricKey>(ac.args.This());
+            auto c = ac.as<TypedArray>(0)->Buffer()->GetContents();
+            auto data = c.Data();
+            auto size = c.ByteLength();
+            ac.setReturnValue(ac.toBinary(key->etaDecrypt(data, size)));
+            return;
+        }
+        ac.throwError("invalid arguments");
+    });
+}
+
+static void symmetricKeyPack(const FunctionCallbackInfo<Value> &args) {
+    Scripter::unwrapArgs(args, [](ArgsContext &ac) {
+        if (ac.args.Length() == 0) {
+            auto key = unwrap<SymmetricKey>(ac.args.This());
+            ac.setReturnValue(ac.toBinary(key->pack()));
+            return;
+        }
+        ac.throwError("invalid arguments");
+    });
+}
+
+/**
+ * Symmetric key constructor:
+ * \code
+ *  new SymmetricKey();       // random
+ *  new SymmetricKey(packed); // existing key
+ * \endcode
+ * @param isolate
+ * @return
+ */
+Local<FunctionTemplate> initSymmetricKey(Isolate *isolate) {
+    Local<FunctionTemplate>
+            tpl = bindCppClass<SymmetricKey>(
+            isolate,
+            "SymmetricKey",
+            [=](const FunctionCallbackInfo<Value> &args) -> SymmetricKey * {
+                switch (args.Length()) {
+                    case 1:
+                        if (args[0]->IsTypedArray()) {
+                            // great, we will construct it therefore
+                            auto contents = args[0].As<TypedArray>()->Buffer()->GetContents();
+                            void *data = contents.Data();
+                            size_t size = contents.ByteLength();
+                            return new SymmetricKey(data, size);
+                        } else {
+                            isolate->ThrowException(
+                                    Exception::TypeError(String::NewFromUtf8(isolate, "typed data array expected")));
+                            return nullptr;
+                        }
+                    case 0:
+                        return new SymmetricKey();
+                    default:
+                        break;
+                }
+                isolate->ThrowException(
+                        Exception::TypeError(String::NewFromUtf8(isolate, "bad constructor arguments")));
+                return nullptr;
+            });
+    auto prototype = tpl->PrototypeTemplate();
+    prototype->Set(isolate, "etaEncrypt", FunctionTemplate::New(isolate, symmetricKeyEncrypt));
+    prototype->Set(isolate, "etaDecrypt", FunctionTemplate::New(isolate, symmetricKeyDecrypt));
+    prototype->Set(isolate, "getPacked", FunctionTemplate::New(isolate, symmetricKeyPack));
+    return tpl;
+}
+
+
 static void JsA2B(const FunctionCallbackInfo<Value> &args) {
     Scripter::unwrapArgs(args, [](ArgsContext &ac) {
         if (ac.args.Length() == 1) {
@@ -477,6 +562,7 @@ void JsInitCrypto(Isolate *isolate, const Local<ObjectTemplate> &global) {
     crypto->Set(isolate, "PrivateKeyImpl", initPrivateKey(isolate));
     crypto->Set(isolate, "PublicKeyImpl", initPublicKey(isolate));
     crypto->Set(isolate, "KeyAddress", initKeyAddress(isolate));
+    crypto->Set(isolate, "SymmetricKeyImpl", initSymmetricKey(isolate));
     // endo of critical order
     crypto->Set(isolate, "version", String::NewFromUtf8(isolate, "0.0.1"));
     crypto->Set(isolate, "HashIdImpl", initHashId(isolate));

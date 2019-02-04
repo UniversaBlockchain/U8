@@ -134,7 +134,14 @@ async function testCrypto() {
     let plain1 = utf8Decode(await privateKey.decrypt(cipherText));
     assert(plain == plain1);
 
+    let sk1 = new crypto.SymmetricKey();
+    let sk2 = new crypto.SymmetricKey();
+    assert(!equalArrays(sk1.packed, sk2.packed));
+    let sk11 = new crypto.SymmetricKey(sk1.packed);
+    assert(sk1.equals(sk11));
 
+    cipherText = sk1.etaEncrypt(plain);
+    assert(utf8Decode(sk11.etaDecrypt(cipherText)) == plain);
 } // ------------------ tetscrypto
 
 function logContractTree(contract,prefix) {

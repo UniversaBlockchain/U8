@@ -129,6 +129,21 @@ Object.defineProperty(crypto.KeyAddress.prototype, "packed", {
 Object.assign(crypto.KeyAddress.prototype, MemoiseMixin);
 Object.assign(crypto.KeyAddress.prototype, PackedEqMixin);
 
+crypto.SymmetricKey = class extends crypto.SymmetricKeyImpl {
+
+    etaEncrypt(plainText) {
+        return super.etaEncrypt(typeof(plainText) == 'string' ? utf8Encode(plainText) : plainText);
+    }
+
+    get packed() {
+        return this.memoise('__packed', () => this.getPacked());
+    }
+}
+
+Object.assign(crypto.SymmetricKey.prototype, MemoiseMixin);
+Object.assign(crypto.SymmetricKey.prototype, PackedEqMixin);
+
+
 /**
  * Calculate digest of a string or binary data (Uint8Array). UTF8 encoding is used if a string is given.
  *
