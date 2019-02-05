@@ -16,12 +16,6 @@ async function testReadLines() {
     }
 }
 
-async function testSize(path, expectedSize) {
-    let input = await io.openRead(path);
-    let data = await input.allBytes();
-    if (data.length != expectedSize)
-        throw Error(`Size mismatch with ${path}: expected ${expectedSize} got ${data.length}`);
-}
 
 
 const Boss = require('boss.js');

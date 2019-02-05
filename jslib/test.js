@@ -27,6 +27,12 @@ const unit = {
                 failedTestsCount++;
             }
         }
+        let totalTests = failedTestsCount + passedTestsCount;
+        if( failedTestsCount > 0) {
+            console.error(`----- TESTS FAILED: ${failedTestsCount} of ${totalTests}, ${failedTestsCount/totalTests*100}% ------`);
+        }
+        else
+            console.log(`all tests passed: ${totalTests} test(s), ${passedChecksCount} check(s).`);
         return failedTestsCount > 0 ? 1000 : 0;
     }
 };

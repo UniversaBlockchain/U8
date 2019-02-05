@@ -1,5 +1,12 @@
 import {unit, expect, assert} from 'test'
 
+
+async function testSize(path, expectedSize) {
+    let input = await io.openRead(path);
+    let data = await input.allBytes();
+    expect.equal(data.length, expectedSize);
+}
+
 unit.test("file read all", async () => {
     // let input = await io.openRead("../test/test.txt");
     // console.log(await input.allAsString());
