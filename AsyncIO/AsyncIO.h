@@ -658,12 +658,12 @@ namespace asyncio {
          * Accept connection on self TCP socket from server listening TCP socket.
          * Method for internal usage. Use IOHandle::accept.
          *
-         * @param listenSocket is pointer to struct with listening TCP socket.
+         * @param listenSocket is pointer to handle of listening TCP socket.
          * @return accepting result.
          * If isError(result) returns true - use getError(result) to determine the error.
          * If isError(result) returns false - connection successfully accepted.
          */
-        int acceptFromListeningSocket(ioTCPSocket* listenSocket);
+        int acceptFromListeningSocket(IOHandle* listenSocket);
 
         /**
          * Enable keep-alive mode for TCP connection.
@@ -683,6 +683,13 @@ namespace asyncio {
          * If isError(result) returns false - keep-alive mode successfully disabled.
          */
         int disableKeepAlive();
+
+        /**
+         * Get pointer to struct with TCP socket.
+         *
+         * @return pointer to struct with TCP socket.
+         */
+        ioTCPSocket* getTCPSocket();
 
     private:
         ioLoop* loop;

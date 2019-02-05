@@ -1162,7 +1162,7 @@ namespace asyncio {
 
         std::shared_ptr<asyncio::IOHandle> client = std::make_shared<asyncio::IOHandle>(loop);
 
-        int res = client->acceptFromListeningSocket(ioTCPSoc);
+        int res = client->acceptFromListeningSocket(this);
 
         if (result)
             *result = res;
@@ -1170,7 +1170,7 @@ namespace asyncio {
         return (res >= 0) ? client : nullptr;
     }
 
-    int IOHandle::acceptFromListeningSocket(ioTCPSocket* listenSocket) {
+    int IOHandle::acceptFromListeningSocket(IOHandle* listenSocket) {
         if (!initTCPSocket())
             throw std::logic_error("ERROR: IOHandle already initialized. Close opened handle.");
 
@@ -1181,7 +1181,7 @@ namespace asyncio {
             return result;
         }
 
-        result = uv_accept((uv_stream_t*) listenSocket, (uv_stream_t*) ioTCPSoc);
+        result = uv_accept((uv_stream_t*) listenSocket->getTCPSocket(), (uv_stream_t*) ioTCPSoc);
 
         if (result < 0)
             freeRequest();
@@ -1231,6 +1231,10 @@ namespace asyncio {
 
             ioTCPSoc->data = nullptr;
         }
+    }
+
+    ioTCPSocket* IOHandle::getTCPSocket() {
+        return ioTCPSoc;
     }
 
     //===========================================================================================
