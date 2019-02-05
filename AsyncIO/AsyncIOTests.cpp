@@ -1237,6 +1237,11 @@ void testAsyncTCP() {
 
     uv_mutex_destroy(&packet_mutex);
 
+    asyncio::IOHandle nonexistentClient;
+
+    int result = nonexistentClient.acceptFromListeningSocket(&srv_part);
+    printf("Check accept nonexistent client result: %i what: %s\n", result, asyncio::getError(result));
+
     //close TCP server
     uv_sem_init(&sem_tcp_srv, 0);
 
