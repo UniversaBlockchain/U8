@@ -10,14 +10,14 @@ const console = {
 const VERSION = "4.0.0b5";
 
 /**
- * Check that two arrays have equal components, using '==='. Shallow comarison.
+ * Check that two arrays (any kind) have equal components, using '=='. Shallow comparison.
  * @param a array-like object
  * @param b array-like object
  * @returns {boolean} true if 'arrays' have equal sizes and content.
  */
 function equalArrays(a, b) {
-    if (a.byteLength !== b.byteLength) return false;
-    return a.every((val, i) => val === b[i]);
+    if (a.length !== b.length) return false;
+    return a.every((val, i) => val == b[i]);
 }
 
 /**

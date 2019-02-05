@@ -15,6 +15,7 @@
 #include "../tools/tools.h"
 #include "../tools/AsyncSleep.h"
 #include "../tools/ConditionVar.h"
+#include "binding_tools.h"
 
 using namespace std;
 using namespace v8;
@@ -133,6 +134,24 @@ public:
         Local<Context> cxt = context.Get(pIsolate);
         v8::Context::Scope context_scope(cxt);
         return block(cxt);
+    }
+
+    /**
+     * Execute block in the foreign thread from the JS pool. To use
+     * from async handlers, other threads and like, to not to block calling thread.
+     *
+     * @param block to execute
+     */
+    template<typename F>
+    void inPool(F block) {
+        jsThreadPool([=](){
+            v8::Locker locker(pIsolate);
+            Isolate::Scope iscope(pIsolate);
+            v8::HandleScope handle_scope(pIsolate);
+            Local<Context> cxt = context.Get(pIsolate);
+            v8::Context::Scope context_scope(cxt);
+            block(cxt);
+        });
     }
 
     /**

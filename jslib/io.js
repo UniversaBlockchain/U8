@@ -285,5 +285,52 @@ async function openWrite(url, mode = "w", {bufferLength = chunkSize, umask = 0o6
     return ap.promise
 }
 
+class TcpConnection {
+
+    constructor(handle, bufferLength=chunkSize) {
+        this._handle = handle;
+        this.input = new InputStream(this,bufferLength);
+        this.output = new InputStream(this,bufferLength);
+    }
+
+    async close() {
+        this._handle.close();
+    }
+}
+
+const tcp = {
+    /**
+     *
+     * @param port to listen
+     * @param bindIp interface to use
+     * @param bufferLength of the stream
+     * @returns {Promise<void>}
+     */
+    async connect({port, bindIp="0.0.0.0", bindPort=0, bufferLength=chunkSize}) {
+        throw "not yet ready";
+        // let handle = new IoHandle();
+        // let ap = AsyncProcessor();
+        // handle._connect(bindIp, bindPort, host, port, code => ap.process(code, new TcpConnection(handle, bufferLength)));
+        // return ap.promise;
+    },
+    /**
+     * Await for incoming connections. awaits for incoming connections which are returned via Promise. Note that
+     * this method while simple does not allow closing the listening port.
+     *
+     * @param bindIp local interface to use, defaults to all
+     * @param port local port to listen
+     * @param maxConnections 0 to maximum allowed
+     * @param bufferLength of the streams.
+     * @returns {Promise<any>}
+     */
+    async listen({bindIp="0.0.0.0",port,maxConnections=0,bufferLength=chunkSize}) {
+        throw "not yet ready";
+        // let handle = new IoHandle();
+        // let ap = AsyncProcessor();
+        // handle._listen(bindIp, post, code => ap.process(code, new TcpConnection(handle, bufferLength)), maxConnections);
+        // return ap.promise;
+    }
+
+}
 
 module.exports = {openRead, openWrite, InputStream, OutputStream};

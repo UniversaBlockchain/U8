@@ -40,7 +40,7 @@ void JsAsyncHandleOpen(const FunctionCallbackInfo<Value> &args) {
 
         if (openMode >= 0) {
             h->open(file_name.data(), openMode, umask, [=](auto result) {
-                se->lockedContext([=](Local<Context> &context) {
+                se->inPool([=](Local<Context> &context) {
                     auto fn = pcb->Get(context->GetIsolate());
                     if (fn->IsNull()) {
                         se->throwError("null callback in IoHandle::open");
@@ -74,8 +74,8 @@ void JsAsyncHandleRead(const FunctionCallbackInfo<Value> &args) {
 
         handle->read(ab->GetContents().Data(), max_size,
                      [=](ssize_t result) {
-                         // here we are in another thread
-                         scripter->lockedContext([=](auto context) {
+                         // here we are in the async dispatcher thread we should not lock:
+                         scripter->inPool([=](auto context) {
                              Isolate *isolate = context->GetIsolate();
                              auto fn = pcb->Get(isolate);
                              if (fn->IsNull()) {
@@ -122,7 +122,7 @@ void JsAsyncHandleWrite(const FunctionCallbackInfo<Value> &args) {
         handle->write(bytes, size,
                       [=](ssize_t result) {
                           // here we are in another thread
-                          scripter->lockedContext([=](auto context) {
+                          scripter->inPool([=](auto context) {
                               Isolate *isolate = context->GetIsolate();
                               auto fn = pcb->Get(isolate);
                               Local<Value> res = Integer::New(isolate, result);
@@ -148,18 +148,78 @@ void JsAsyncHandleClose(const FunctionCallbackInfo<Value> &args) {
         Persistent<Function> *pcb = new Persistent<Function>(ac.isolate, fn);
 
         handle->close([=](ssize_t result) {
-                          // here we are in another thread
-                          scripter->lockedContext([=](auto context) {
-                              Isolate *isolate = context->GetIsolate();
-                              auto fn = pcb->Get(isolate);
-                              Local<Value> res = Integer::New(isolate, result);
-                              fn->Call(fn, 1, &res);
-                              delete pcb;
-                          });
-                      });
+            // here we are in another thread
+            scripter->inPool([=](auto context) {
+                Isolate *isolate = context->GetIsolate();
+                auto fn = pcb->Get(isolate);
+                Local<Value> res = Integer::New(isolate, result);
+                fn->Call(fn, 1, &res);
+                delete pcb;
+            });
+        });
     });
 }
 
+// TCP listen         0            1                   2                          3
+// void openTCP(const char* IP, unsigned int port, openTCP_cb callback, int maxConnections);
+void JsAsyncHandleListen(const FunctionCallbackInfo<Value> &args) {
+    Scripter::unwrapArgs(args, [&](ArgsContext &ac) {
+        auto scripter = ac.scripter;
+        if (args.Length() == 4) {
+            if ( !ac.args[2]->IsFunction() ) {
+                scripter->throwError("invalid callback");
+                return;
+            }
+            auto handle = unwrap<asyncio::IOHandle>(args.This());
+            auto isolate = ac.isolate;
+            Persistent<Function> *onReady = new Persistent<Function>(ac.isolate, ac.as<Function>(2));
+            int maxConnections = ac.asInt(3);
+            if( maxConnections <= 0 ) maxConnections = SOMAXCONN;
+            handle->openTCP(ac.asString(0).data(), ac.asInt(1), [=](ssize_t result) {
+                scripter->lockedContext([=](auto context) {
+                    auto fn = onReady->Get(isolate);
+                    delete onReady;
+                    Local<Value> jsResult = Integer::New(isolate, result);
+                    fn->Call(fn, 1, &jsResult);
+                });
+            }, maxConnections);
+        } else {
+            scripter->throwError("invalid number of arguments");
+        }
+    });
+}
+
+//                       0                     1                 2                3              4
+// void connect(const char* bindIP, unsigned int bindPort, const char* IP, unsigned int port, connect_cb callback);
+void JsAsyncHandleConnect(const FunctionCallbackInfo<Value> &args) {
+    Scripter::unwrapArgs(args, [&](ArgsContext &ac) {
+        auto scripter = ac.scripter;
+        if (args.Length() == 5) {
+            if ( !ac.args[4]->IsFunction() ) {
+                scripter->throwError("invalid callback");
+                return;
+            }
+            auto handle = unwrap<asyncio::IOHandle>(args.This());
+            auto isolate = ac.isolate;
+            Persistent<Function> *onReady = new Persistent<Function>(ac.isolate,  ac.as<Function>(4));
+            auto bindIp = ac.asString(0);
+            auto bindPort = ac.asInt(1);
+            auto connectToHost = ac.asString(2);
+            auto connectToPort = ac.asInt(3);
+
+            handle->connect(bindIp.data(), bindPort, connectToHost.data(), connectToPort, [=](ssize_t result) {
+                scripter->lockedContext([=](auto context) {
+                    auto fn = onReady->Get(isolate);
+                    delete onReady;
+                    Local<Value> jsResult = Integer::New(isolate, result);
+                    fn->Call(fn, 1, &jsResult);
+                });
+            });
+        } else {
+            scripter->throwError("invalid number of arguments");
+        }
+    });
+}
 
 void JsInitIoHandle(Isolate *isolate, const Local<ObjectTemplate> &global) {
     // Bind object with default constructor
@@ -172,6 +232,8 @@ void JsInitIoHandle(Isolate *isolate, const Local<ObjectTemplate> &global) {
     prototype->Set(isolate, "_read_raw", FunctionTemplate::New(isolate, JsAsyncHandleRead));
     prototype->Set(isolate, "_write_raw", FunctionTemplate::New(isolate, JsAsyncHandleWrite));
     prototype->Set(isolate, "_close_raw", FunctionTemplate::New(isolate, JsAsyncHandleClose));
+    prototype->Set(isolate, "_listen", FunctionTemplate::New(isolate, JsAsyncHandleListen));
+    prototype->Set(isolate, "_connect", FunctionTemplate::New(isolate, JsAsyncHandleConnect));
 
     // class methods
     tpl->Set(isolate, "getErrorText", FunctionTemplate::New(isolate, JsAsyncGetErrorText));
