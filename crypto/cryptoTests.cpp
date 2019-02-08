@@ -18,6 +18,8 @@
 #include "Safe58.h"
 #include "../tools/ThreadPool.h"
 #include "SymmetricKey.h"
+#include "../network/UDPAdapter.h"
+#include "../network/NodeInfo.h"
 
 using namespace std;
 using namespace crypto;
@@ -555,15 +557,53 @@ void testSymmetricKeys() {
     cout << "testSymmetricKeys()... done!" << endl << endl;
 }
 
+void udpAdapterHelloWorld() {
+    cout << "udpAdapterHelloWorld()..." << endl;
+
+    string body0("packet from node-0");
+    string body1("some data from node-1");
+    string body2("data from node-2");
+
+    PrivateKey node0key(2048);
+    PrivateKey node1key(2048);
+    PrivateKey node2key(2048);
+    network::NodeInfo nodeInfo0(PublicKey(node0key), 0, "node-0", "127.0.0.1", "127.0.0.1", 14000, 16000, 18000);
+    network::NodeInfo nodeInfo1(PublicKey(node1key), 1, "node-1", "127.0.0.1", "127.0.0.1", 14001, 16001, 18001);
+    network::NodeInfo nodeInfo2(PublicKey(node2key), 2, "node-2", "127.0.0.1", "127.0.0.1", 14002, 16002, 18002);
+    network::NetConfig netConfig;
+    netConfig.addNode(nodeInfo0);
+    netConfig.addNode(nodeInfo1);
+    netConfig.addNode(nodeInfo2);
+
+    network::UDPAdapter udpAdapter0(node0key, 0, netConfig, [](const byte_vector& packet){
+        cout << "node-0 receive data, size=" << packet.size() << ": " << string(packet.begin(), packet.end()) << endl;
+    });
+    network::UDPAdapter udpAdapter1(node1key, 1, netConfig, [](const byte_vector& packet){
+        cout << "node-1 receive data, size=" << packet.size() << ": " << string(packet.begin(), packet.end()) << endl;
+    });
+    network::UDPAdapter udpAdapter2(node2key, 2, netConfig, [](const byte_vector& packet){
+        cout << "node-2 receive data, size=" << packet.size() << ": " << string(packet.begin(), packet.end()) << endl;
+    });
+
+    udpAdapter0.send(1, byte_vector(body0.begin(), body0.end()));
+    udpAdapter1.send(2, byte_vector(body1.begin(), body1.end()));
+    udpAdapter2.send(0, byte_vector(body2.begin(), body2.end()));
+    std::this_thread::sleep_for(2000ms);
+
+    cout << "udpAdapterHelloWorld()... done!" << endl << endl;
+}
+
 void testCryptoAll() {
-    testCrypto();
-    testHashId();
-    testHashIdComparison();
-    testKeyAddress();
-    testSafe58();
-    testPackUnpackKeys();
-    testAllHashTypes();
-    testKeysConcurrency();
-    testGenerateNewKeys();
-    testSymmetricKeys();
+//    testCrypto();
+//    testHashId();
+//    testHashIdComparison();
+//    testKeyAddress();
+//    testSafe58();
+//    testPackUnpackKeys();
+//    testAllHashTypes();
+//    testKeysConcurrency();
+//    testGenerateNewKeys();
+//    testSymmetricKeys();
+    udpAdapterHelloWorld();
+    exit(0);
 }
