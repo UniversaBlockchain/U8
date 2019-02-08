@@ -37,6 +37,7 @@ file(GLOB LIBRARY_SRC
     AsyncIO/*.h AsyncIO/*.cpp
     crypto/*.h crypto/*.cpp
     js_bindings/*.h js_bindings/*.cpp
+    network/*.h network/*.cpp
     serialization/*.h serialization/*.cpp
     tools/*.h tools/*.cpp
     types/*.h types/*.cpp
