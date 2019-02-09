@@ -9,5 +9,6 @@ void allAsyncIOTests();
 void testAsyncFile();
 void testAsyncUDP();
 void testAsyncTCP();
+void testUnifyFileAndTCPread();
 
 #endif //U8_ASYNCIOTESTS_H

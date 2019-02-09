@@ -44,6 +44,7 @@ void allAsyncIOTests() {
     testAsyncFile();
     testAsyncUDP();
     testAsyncTCP();
+    testUnifyFileAndTCPread();
 
     asyncio::deinitLoop();
 }
@@ -952,8 +953,6 @@ void testAsyncTCP() {
 
             printf("Server received: PING\n");
 
-            clients[n]->stopRecv();
-
             asyncio::byte_vector pong(5);
             memcpy(pong.data(), "PONG", 4);
 
@@ -999,8 +998,6 @@ void testAsyncTCP() {
                             ASSERT(!memcmp("PONG", data.data(), 4));
 
                             printf("Client received: PONG\n");
-
-                            cli.stopRecv();
 
                             cli.close([&](ssize_t result){
                                 ASSERT(!asyncio::isError(result));
@@ -1076,8 +1073,6 @@ void testAsyncTCP() {
 
             printf("Server received: PING\n");
 
-            clients[n]->stopRecv();
-
             clients[n]->write((void*) "PONG", 5, [n, &sem_tcp_srv, &clients](ssize_t result){
                 ASSERT(result == 5);
 
@@ -1115,8 +1110,6 @@ void testAsyncTCP() {
                             ASSERT(!memcmp("PONG", buff_cli, 4));
 
                             printf("Client received: PONG\n");
-
-                            cli.stopRecv();
 
                             cli.close([&](ssize_t result){
                                 ASSERT(!asyncio::isError(result));
@@ -1160,17 +1153,13 @@ void testAsyncTCP() {
 
     printf("test with memory buffers successful\n");
 
-    //init TCP server
-    asyncio::IOHandle srv_part;
-    int packet_srv = 0;
-
-    uv_sem_init(&sem_tcp_srv, 0);
-
-    uv_mutex_t packet_mutex;
-    uv_mutex_init(&packet_mutex);
-
     clientThreads.clear();
     clients.clear();
+
+    //init TCP server
+    asyncio::IOHandle srv_part;
+
+    uv_sem_init(&sem_tcp_srv, 0);
 
     srv_part.openTCP("127.0.0.1", PORT, [&](ssize_t result){
         ASSERT(!asyncio::isError(result));
@@ -1180,35 +1169,37 @@ void testAsyncTCP() {
         clients.push_back(srv_part.accept());
 
         clients[0]->read(3, [&](const asyncio::byte_vector& data, ssize_t result){
-            uv_mutex_lock(&packet_mutex);
+            ASSERT(result == 3);
+            ASSERT(!memcmp("ABC", data.data(), 3));
 
-            int packet = packet_srv++;
+            printf("Server received: ABC\n");
 
-            uv_mutex_unlock(&packet_mutex);
-
-            ASSERT((result == 3) || ((packet == 3) && (result == 1)));
-
-            if (packet == 0) {
-                ASSERT(!memcmp("ABC", data.data(), 3));
-                printf("Server received: ABC\n");
-            } else if (packet == 1) {
+            clients[0]->read(3, [&](const asyncio::byte_vector& data, ssize_t result){
+                ASSERT(result == 3);
                 ASSERT(!memcmp("DEF", data.data(), 3));
+
                 printf("Server received: DEF\n");
-            } else if (packet == 2) {
-                ASSERT(!memcmp("GHI", data.data(), 3));
-                printf("Server received: GHI\n");
-            } else if (packet == 3) {
-                ASSERT(!memcmp("J", data.data(), 1));
-                printf("Server received: J\n");
 
-                clients[0]->stopRecv();
+                clients[0]->read(3, [&](const asyncio::byte_vector& data, ssize_t result){
+                    ASSERT(result == 3);
+                    ASSERT(!memcmp("GHI", data.data(), 3));
 
-                clients[0]->close([&](ssize_t result){
-                    ASSERT(!asyncio::isError(result));
+                    printf("Server received: GHI\n");
 
-                    uv_sem_post(&sem_tcp_srv);
+                    clients[0]->read(3, [&](const asyncio::byte_vector& data, ssize_t result){
+                        ASSERT(result == 1);
+
+                        ASSERT(!memcmp("J", data.data(), 1));
+                        printf("Server received: J\n");
+
+                        clients[0]->close([&](ssize_t result){
+                            ASSERT(!asyncio::isError(result));
+
+                            uv_sem_post(&sem_tcp_srv);
+                        });
+                    });
                 });
-            }
+            });
         });
     });
 
@@ -1235,12 +1226,21 @@ void testAsyncTCP() {
     uv_sem_wait(&sem_tcp_srv);
     uv_sem_destroy(&sem_tcp_srv);
 
-    uv_mutex_destroy(&packet_mutex);
-
     asyncio::IOHandle nonexistentClient;
 
     int result = nonexistentClient.acceptFromListeningSocket(&srv_part);
     printf("Check accept nonexistent client result: %i what: %s\n", result, asyncio::getError(result));
+
+    uv_sem_init(&sem_tcp_srv, 0);
+
+    nonexistentClient.close([&](ssize_t result){
+        ASSERT(!asyncio::isError(result));
+
+        uv_sem_post(&sem_tcp_srv);
+    });
+
+    uv_sem_wait(&sem_tcp_srv);
+    uv_sem_destroy(&sem_tcp_srv);
 
     //close TCP server
     uv_sem_init(&sem_tcp_srv, 0);
@@ -1258,5 +1258,173 @@ void testAsyncTCP() {
 
     printf("partial read test successful\n");
 
+    clients.clear();
+
+    asyncio::deinitAuxLoop(loop);
+
     printf("testAsyncTCP()...done\n\n");
+}
+
+void testUnifyFileAndTCPread() {
+    printf("testUnifyFileAndTCPread()...\n");
+
+    uv_sem_t sem;
+    uv_sem_init(&sem, 0);
+
+    // FILE
+    asyncio::IOHandle file;
+
+    file.open("UnifyTest.txt", O_CREAT | O_WRONLY, S_IRWXU | S_IRWXG | S_IRWXO, [&](ssize_t result) {
+        ASSERT(!asyncio::isError(result));
+
+        file.write((void*) "ABCDEFGHIJ", 10, [&](ssize_t result){
+            ASSERT(result == 10);
+
+            file.close([&](ssize_t result) {
+                ASSERT(!asyncio::isError(result));
+
+                uv_sem_post(&sem);
+            });
+        });
+    });
+
+    uv_sem_wait(&sem);
+    uv_sem_destroy(&sem);
+
+    char buff[3];
+
+    file.open("UnifyTest.txt", O_RDONLY, 0, [&](ssize_t result) {
+        ASSERT(!asyncio::isError(result));
+
+        file.read(buff, 3, [&](ssize_t result){
+            ASSERT(result == 3);
+            ASSERT(!memcmp("ABC", buff, 3));
+
+            printf("Read from file: ABC\n");
+
+            file.read(buff, 3, [&](ssize_t result){
+                ASSERT(result == 3);
+                ASSERT(!memcmp("DEF", buff, 3));
+
+                printf("Read from file: DEF\n");
+
+                file.read(buff, 3, [&](ssize_t result){
+                    ASSERT(result == 3);
+                    ASSERT(!memcmp("GHI", buff, 3));
+
+                    printf("Read from file: GHI\n");
+
+                    file.read(buff, 3, [&](ssize_t result){
+                        ASSERT(result == 1);
+                        ASSERT(!memcmp("J", buff, 1));
+
+                        printf("Read from file: J\n");
+
+                        file.close([&](ssize_t result){
+                            ASSERT(!asyncio::isError(result));
+
+                            uv_sem_post(&sem);
+                        });
+                    });
+                });
+            });
+        });
+    });
+
+    uv_sem_wait(&sem);
+    uv_sem_destroy(&sem);
+
+    printf("unify file read test successful\n");
+
+    // TCP
+    asyncio::IOHandle srv;
+    asyncio::IOHandle acc;
+
+    uv_sem_init(&sem, 0);
+
+    srv.openTCP("127.0.0.1", PORT, [&](ssize_t result){
+        ASSERT(!asyncio::isError(result));
+
+        printf("New connection\n");
+
+        int res = acc.acceptFromListeningSocket(&srv);
+        ASSERT(!asyncio::isError(res));
+
+        acc.read(buff, 3, [&](ssize_t result){
+            ASSERT(result == 3);
+            ASSERT(!memcmp("ABC", buff, 3));
+
+            printf("Server received: ABC\n");
+
+            acc.read(buff, 3, [&](ssize_t result){
+                ASSERT(result == 3);
+                ASSERT(!memcmp("DEF", buff, 3));
+
+                printf("Server received: DEF\n");
+
+                acc.read(buff, 3, [&](ssize_t result){
+                    ASSERT(result == 3);
+                    ASSERT(!memcmp("GHI", buff, 3));
+
+                    printf("Server received: GHI\n");
+
+                    acc.read(buff, 3, [&](ssize_t result){
+                        ASSERT(result == 1);
+
+                        ASSERT(!memcmp("J", buff, 1));
+                        printf("Server received: J\n");
+
+                        acc.close([&](ssize_t result){
+                            ASSERT(!asyncio::isError(result));
+
+                            uv_sem_post(&sem);
+                        });
+                    });
+                });
+            });
+        });
+    });
+
+    asyncio::ioLoop* loop = asyncio::initAndRunAuxLoop();
+    asyncio::IOHandle cli(loop);
+
+    cli.connect("127.0.0.1", PORT + 1, "127.0.0.1", PORT, [&](ssize_t result){
+        ASSERT(!asyncio::isError(result));
+
+        printf("Connected to server\n");
+
+        cli.write((void*) "ABCDEFGHIJ", 10, [&](ssize_t result){
+            ASSERT(result == 10);
+
+            cli.close([&](ssize_t result){
+                ASSERT(!asyncio::isError(result));
+
+                uv_sem_post(&sem);
+            });
+        });
+    });
+
+    uv_sem_wait(&sem);
+    uv_sem_wait(&sem);
+    uv_sem_destroy(&sem);
+
+    //close TCP server
+    uv_sem_init(&sem, 0);
+
+    printf("Close server\n");
+
+    srv.close([&](ssize_t result){
+        ASSERT(!asyncio::isError(result));
+
+        uv_sem_post(&sem);
+    });
+
+    uv_sem_wait(&sem);
+    uv_sem_destroy(&sem);
+
+    printf("unify tcp read test successful\n");
+
+    asyncio::deinitAuxLoop(loop);
+
+    printf("testUnifyFileAndTCPread()...done\n\n");
 }

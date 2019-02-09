@@ -75,7 +75,9 @@ namespace asyncio {
         DIRECTORY,
         TCP_SOCKET_LISTEN,
         TCP_SOCKET_CONNECTED,
-        UDP_SOCKET
+        UDP_SOCKET,
+        TCP_SOCKET_ERROR,
+        UDP_SOCKET_ERROR
     };
 
     /**
@@ -210,6 +212,8 @@ namespace asyncio {
      */
     typedef std::function<void(ssize_t result)> connect_cb;
 
+    class IOHandle;
+
     struct openFile_data {
         openFile_cb callback;
         ioHandle* fileReq;
@@ -291,18 +295,25 @@ namespace asyncio {
         read_cb callback;
         std::shared_ptr<byte_vector> data;
         size_t maxBytesToRead;
+        IOHandle* handle;
     };
 
     struct readBufferTCP_data {
         readBuffer_cb callback;
         void* buffer;
         size_t maxBytesToRead;
+        IOHandle* handle;
     };
 
     struct writeTCP_data {
         write_cb callback;
         uv_write_t* req;
         uv_buf_t uvBuff;
+    };
+
+    struct tcpRead_data {
+        void* data;
+        bool bufferized;
     };
 
     /**
@@ -426,9 +437,6 @@ namespace asyncio {
         /**
          * Asynchronous read file or TCP socket.
          *
-         * For TCP socket: callback of this method can be called multiple times, each time data is received,
-         * until the method IOHandle::stopRecv is called.
-         *
          * @param maxBytesToRead is maximum number of bytes to read from file or TCP socket.
          * @param callback caused when reading a file or TCP socket or error.
          */
@@ -436,9 +444,6 @@ namespace asyncio {
 
         /**
          * Asynchronous read file or TCP socket to initialized buffer.
-         *
-         * For TCP socket: callback of this method can be called multiple times, each time data is received,
-         * until the method IOHandle::stopRecv is called.
          *
          * @param buffer is initialized buffer for read from file or TCP socket, buffer size must be at least maxBytesToRead.
          * @param maxBytesToRead is maximum number of bytes to read from file or TCP socket.
@@ -691,6 +696,12 @@ namespace asyncio {
          */
         ioTCPSocket* getTCPSocket();
 
+        /**
+         * Check read queue on TCP socket and start next read task if necessary.
+         * For internal usage.
+         */
+        void checkReadQueue();
+
     private:
         ioLoop* loop;
 
@@ -701,10 +712,13 @@ namespace asyncio {
 
         bool closed = false;
         bool bufferized = false;
+        std::atomic<bool> tcpReading = false;
         ioHandle_t type;
 
         std::packaged_task<void(openFile_cb)> task;
         std::packaged_task<void(read_cb)> readTask;
+
+        std::queue<tcpRead_data> readQueue;
 
         bool initRequest();
         bool initUDPSocket();

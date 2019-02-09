@@ -171,22 +171,26 @@ namespace asyncio {
     }
 
     IOHandle::~IOHandle() {
-        if (ioReq && (type == FILE) && !closed)
-            close([](ssize_t result){
+        if (ioReq && (type == FILE) && !closed) {
+            close([&](ssize_t result) {
                 //printf("---AUTO_CLOSING---\n");
+                freeRequest();
             });
 
-        if (ioUDPSoc && (type == UDP_SOCKET) && !closed)
-            close([](ssize_t result){
+        } else if (ioUDPSoc && ((type == UDP_SOCKET) || (type == UDP_SOCKET_ERROR)) && !closed) {
+            close([&](ssize_t result) {
                 //printf("---AUTO_CLOSING_UDP---\n");
+                freeRequest();
             });
 
-        if (ioTCPSoc && ((type == TCP_SOCKET_LISTEN) || (type == TCP_SOCKET_CONNECTED)) && !closed)
-            close([](ssize_t result){
+        } else if (ioTCPSoc && ((type == TCP_SOCKET_LISTEN) || (type == TCP_SOCKET_CONNECTED) || (type == TCP_SOCKET_ERROR)) && !closed) {
+            close([&](ssize_t result) {
                 //printf("---AUTO_CLOSING_TCP---\n");
+                freeRequest();
             });
 
-        freeRequest();
+        } else
+            freeRequest();
     }
 
     void IOHandle::freeRequest() {
@@ -297,24 +301,29 @@ namespace asyncio {
             }
 
         } else if (type == TCP_SOCKET_CONNECTED) {
-            freeReadData();
+            //freeReadData();
             auto read_data = new readTCP_data();
 
             read_data->callback = std::move(callback);
             read_data->maxBytesToRead = maxBytesToRead;
+            read_data->handle = this;
 
-            ioTCPSoc->data = read_data;
-            bufferized = false;
+            if (readQueue.empty() && !tcpReading) {
+                tcpReading = true;
 
-            int result = uv_read_start((uv_stream_t*) ioTCPSoc, _alloc_tcp_cb, _read_tcp_cb);
+                ioTCPSoc->data = read_data;
 
-            if (result < 0) {
-                read_data->callback(byte_vector(), result);
+                int result = uv_read_start((uv_stream_t*) ioTCPSoc, _alloc_tcp_cb, _read_tcp_cb);
 
-                delete read_data;
-                ioTCPSoc->data = nullptr;
+                if (result < 0) {
+                    read_data->callback(byte_vector(), result);
+
+                    delete read_data;
+                    ioTCPSoc->data = nullptr;
+                } else
+                    alarmAuxLoop(loop);
             } else
-                alarmAuxLoop(loop);
+                readQueue.push({read_data, false});
         }
     }
 
@@ -348,20 +357,65 @@ namespace asyncio {
             }
 
         } else if (type == TCP_SOCKET_CONNECTED) {
-            freeReadData();
+            //freeReadData();
             auto read_data = new readBufferTCP_data();
 
             read_data->callback = std::move(callback);
             read_data->buffer = buffer;
             read_data->maxBytesToRead = maxBytesToRead;
+            read_data->handle = this;
+
+            if (readQueue.empty() && !tcpReading) {
+                tcpReading = true;
+
+                ioTCPSoc->data = read_data;
+
+                int result = uv_read_start((uv_stream_t*) ioTCPSoc, _allocBuffer_tcp_cb, _readBuffer_tcp_cb);
+
+                if (result < 0) {
+                    read_data->callback(result);
+
+                    delete read_data;
+                    ioTCPSoc->data = nullptr;
+                } else
+                    alarmAuxLoop(loop);
+            } else
+                readQueue.push({read_data, true});
+        }
+    }
+
+    void IOHandle::checkReadQueue() {
+        if (readQueue.empty()) {
+            tcpReading = false;
+            return;
+        }
+
+        auto tcp_read_data = readQueue.front();
+        readQueue.pop();
+
+        if (tcp_read_data.bufferized) {
+            auto read_data = (readBufferTCP_data*) tcp_read_data.data;
 
             ioTCPSoc->data = read_data;
-            bufferized = true;
 
             int result = uv_read_start((uv_stream_t*) ioTCPSoc, _allocBuffer_tcp_cb, _readBuffer_tcp_cb);
 
             if (result < 0) {
                 read_data->callback(result);
+
+                delete read_data;
+                ioTCPSoc->data = nullptr;
+            } else
+                alarmAuxLoop(loop);
+        } else {
+            auto read_data = (readTCP_data*) tcp_read_data.data;
+
+            ioTCPSoc->data = read_data;
+
+            int result = uv_read_start((uv_stream_t*) ioTCPSoc, _alloc_tcp_cb, _read_tcp_cb);
+
+            if (result < 0) {
+                read_data->callback(byte_vector(), result);
 
                 delete read_data;
                 ioTCPSoc->data = nullptr;
@@ -473,14 +527,15 @@ namespace asyncio {
     }
 
     void IOHandle::close(close_cb callback) {
-        if ((type != FILE) && (type != UDP_SOCKET) && (type != TCP_SOCKET_LISTEN) && (type != TCP_SOCKET_CONNECTED))
+        if ((type != FILE) && (type != UDP_SOCKET) && (type != TCP_SOCKET_LISTEN) && (type != TCP_SOCKET_CONNECTED) &&
+            (type != UDP_SOCKET_ERROR) && (type != TCP_SOCKET_ERROR))
             throw std::logic_error("ERROR: IOHandle not file or socket type.");
 
         if ((type == FILE) && !ioReq)
             throw std::logic_error("ERROR: IOHandle not initialized. Open file first.");
 
-        if (((type == UDP_SOCKET) && !ioUDPSoc) ||
-           (((type == TCP_SOCKET_LISTEN) || (type == TCP_SOCKET_CONNECTED)) && !ioTCPSoc))
+        if ((((type == UDP_SOCKET) || (type == UDP_SOCKET_ERROR)) && !ioUDPSoc) ||
+            (((type == TCP_SOCKET_LISTEN) || (type == TCP_SOCKET_CONNECTED) || (type == TCP_SOCKET_ERROR)) && !ioTCPSoc))
             throw std::logic_error("ERROR: IOHandle not initialized. Open socket first.");
 
         if (type == FILE) {
@@ -509,18 +564,24 @@ namespace asyncio {
 
             socket_data->callback = std::move(callback);
 
-            uv_handle_t* handle = (type == UDP_SOCKET) ? (uv_handle_t*) ioUDPSoc : (uv_handle_t*) ioTCPSoc;
+            uv_handle_t* handle = ((type == UDP_SOCKET) || (type == UDP_SOCKET_ERROR)) ? (uv_handle_t*) ioUDPSoc : (uv_handle_t*) ioTCPSoc;
 
             if (handle->data && (type == TCP_SOCKET_LISTEN))
                 delete (openTCP_data*) handle->data;
 
             handle->data = socket_data;
 
-            uv_close(handle, _close_handle_cb);
-
             closed = true;
 
-            alarmAuxLoop(loop);
+            if (!uv_is_closing(handle)) {
+                uv_close(handle, _close_handle_cb);
+
+                alarmAuxLoop(loop);
+            } else {
+                socket_data->callback(0);
+
+                delete socket_data;
+            }
         }
     }
 
@@ -832,7 +893,7 @@ namespace asyncio {
         }
 
         if (result < 0)
-            freeRequest();
+            type = UDP_SOCKET_ERROR;
         else
             type = UDP_SOCKET;
 
@@ -1027,6 +1088,8 @@ namespace asyncio {
     }
 
     void IOHandle::_read_tcp_cb(uv_stream_t* stream, ssize_t nread, const uv_buf_t* buf) {
+        uv_read_stop(stream);
+
         auto read_data = (readTCP_data*) stream->data;
 
         if ((nread > 0) && (nread < read_data->data->size()))
@@ -1035,12 +1098,26 @@ namespace asyncio {
         read_data->callback(*read_data->data, nread);
 
         read_data->data.reset();
+
+        IOHandle* handle = read_data->handle;
+
+        delete read_data;
+
+        handle->checkReadQueue();
     }
 
     void IOHandle::_readBuffer_tcp_cb(uv_stream_t* stream, ssize_t nread, const uv_buf_t* buf) {
+        uv_read_stop(stream);
+
         auto read_data = (readBufferTCP_data*) stream->data;
 
         read_data->callback(nread);
+
+        IOHandle* handle = read_data->handle;
+
+        delete read_data;
+
+        handle->checkReadQueue();
     }
 
     void IOHandle::openTCP(const char* IP, unsigned int port, openTCP_cb callback, int maxConnections) {
@@ -1060,6 +1137,7 @@ namespace asyncio {
             delete socket_data;
             ioTCPSoc->data = nullptr;
             freeRequest();
+            return;
         }
 
         sockaddr_in addr;
@@ -1078,7 +1156,8 @@ namespace asyncio {
 
             delete socket_data;
             ioTCPSoc->data = nullptr;
-            freeRequest();
+            type = TCP_SOCKET_ERROR;
+            return;
         }
 
         result = uv_listen((uv_stream_t *) ioTCPSoc, maxConnections, _listen_cb);
@@ -1088,7 +1167,7 @@ namespace asyncio {
 
             delete socket_data;
             ioTCPSoc->data = nullptr;
-            freeRequest();
+            type = TCP_SOCKET_ERROR;
         } else {
             type = TCP_SOCKET_LISTEN;
             alarmAuxLoop(loop);
@@ -1112,6 +1191,7 @@ namespace asyncio {
             delete socket_data;
             ioTCPSoc->data = nullptr;
             freeRequest();
+            return;
         }
 
         sockaddr_in addr;
@@ -1130,7 +1210,8 @@ namespace asyncio {
 
             delete socket_data;
             ioTCPSoc->data = nullptr;
-            freeRequest();
+            type = TCP_SOCKET_ERROR;
+            return;
         }
 
         if (isIPv4(IP)) {
@@ -1146,7 +1227,7 @@ namespace asyncio {
 
             delete socket_data;
             ioTCPSoc->data = nullptr;
-            freeRequest();
+            type = TCP_SOCKET_ERROR;
         } else {
             type = TCP_SOCKET_CONNECTED;
             alarmAuxLoop(loop);
@@ -1183,9 +1264,9 @@ namespace asyncio {
 
         result = uv_accept((uv_stream_t*) listenSocket->getTCPSocket(), (uv_stream_t*) ioTCPSoc);
 
-        if (result < 0)
-            freeRequest();
-        else {
+        if (result < 0) {
+            type = TCP_SOCKET_ERROR;
+        } else {
             type = TCP_SOCKET_CONNECTED;
             alarmAuxLoop(loop);
         }
@@ -1223,14 +1304,14 @@ namespace asyncio {
             ioUDPSoc->data = nullptr;
         }
 
-        if ((type == TCP_SOCKET_CONNECTED) && (ioTCPSoc->data)) {
+        /*if ((type == TCP_SOCKET_CONNECTED) && (ioTCPSoc->data)) {
             if (bufferized)
                 delete (readBufferTCP_data*) ioTCPSoc->data;
             else
                 delete (readTCP_data*) ioTCPSoc->data;
 
             ioTCPSoc->data = nullptr;
-        }
+        }*/
     }
 
     ioTCPSocket* IOHandle::getTCPSocket() {
