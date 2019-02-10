@@ -1055,10 +1055,11 @@ namespace asyncio {
     void IOHandle::_connect_cb(uv_connect_t* connect, int result) {
         auto socket_data = (connect_data*) connect->handle->data;
 
+        connect->handle->data = nullptr;
+
         socket_data->callback(result);
 
         delete socket_data;
-        connect->handle->data = nullptr;
     }
 
     void IOHandle::_write_tcp_cb(uv_write_t* req, int status) {
