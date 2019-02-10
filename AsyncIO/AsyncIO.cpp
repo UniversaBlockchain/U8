@@ -1090,6 +1090,9 @@ namespace asyncio {
     void IOHandle::_read_tcp_cb(uv_stream_t* stream, ssize_t nread, const uv_buf_t* buf) {
         uv_read_stop(stream);
 
+        if (nread == UV_EOF)
+            nread = 0;
+
         auto read_data = (readTCP_data*) stream->data;
 
         if ((nread > 0) && (nread < read_data->data->size()))
@@ -1108,6 +1111,9 @@ namespace asyncio {
 
     void IOHandle::_readBuffer_tcp_cb(uv_stream_t* stream, ssize_t nread, const uv_buf_t* buf) {
         uv_read_stop(stream);
+
+        if (nread == UV_EOF)
+            nread = 0;
 
         auto read_data = (readBufferTCP_data*) stream->data;
 
