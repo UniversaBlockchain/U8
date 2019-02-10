@@ -460,6 +460,7 @@ namespace asyncio {
             write_data->callback = std::move(callback);
             write_data->req = req;
             write_data->uvBuff = uv_buf_init((char*) data.data(), (unsigned int) data.size());
+            write_data->connReset = connReset;
 
             req->data = write_data;
 
@@ -470,8 +471,11 @@ namespace asyncio {
 
                 delete req;
                 delete write_data;
-            } else
+            } else {
+                connReset = false;
+
                 alarmAuxLoop(loop);
+            }
         }
     }
 
@@ -511,6 +515,7 @@ namespace asyncio {
             write_data->callback = std::move(callback);
             write_data->req = req;
             write_data->uvBuff = uv_buf_init((char*) buffer, (unsigned int) size);
+            write_data->connReset = connReset;
 
             req->data = write_data;
 
@@ -521,8 +526,11 @@ namespace asyncio {
 
                 delete write_data;
                 delete req;
-            } else
+            } else {
+                connReset = false;
+
                 alarmAuxLoop(loop);
+            }
         }
     }
 
@@ -563,6 +571,7 @@ namespace asyncio {
             auto socket_data = new closeSocket_data();
 
             socket_data->callback = std::move(callback);
+            socket_data->connReset = connReset;
 
             uv_handle_t* handle = ((type == UDP_SOCKET) || (type == UDP_SOCKET_ERROR)) ? (uv_handle_t*) ioUDPSoc : (uv_handle_t*) ioTCPSoc;
 
@@ -578,10 +587,12 @@ namespace asyncio {
 
                 alarmAuxLoop(loop);
             } else {
-                socket_data->callback(0);
+                socket_data->callback(connReset ? UV_ECONNRESET : 0);
 
                 delete socket_data;
             }
+
+            connReset = false;
         }
     }
 
@@ -866,7 +877,7 @@ namespace asyncio {
     void IOHandle::_close_handle_cb(uv_handle_t* handle) {
         auto socket_data = (closeSocket_data*) handle->data;
 
-        socket_data->callback(0);
+        socket_data->callback(socket_data->connReset ? UV_ECONNRESET : 0);
 
         delete socket_data;
     }
@@ -1065,6 +1076,9 @@ namespace asyncio {
     void IOHandle::_write_tcp_cb(uv_write_t* req, int status) {
         auto write_data = (writeTCP_data*) req->data;
 
+        if (write_data->connReset)
+            status = UV_ECONNRESET;
+
         write_data->callback((status < 0) ? status : write_data->uvBuff.len);
 
         delete write_data;
@@ -1096,6 +1110,11 @@ namespace asyncio {
 
         auto read_data = (readTCP_data*) stream->data;
 
+        if (nread == UV_ECONNRESET) {
+            nread = 0;
+            read_data->handle->setConnectionReset();
+        }
+
         if ((nread > 0) && (nread < read_data->data->size()))
             read_data->data->resize((unsigned long) nread);
 
@@ -1117,6 +1136,11 @@ namespace asyncio {
             nread = 0;
 
         auto read_data = (readBufferTCP_data*) stream->data;
+
+        if (nread == UV_ECONNRESET) {
+            nread = 0;
+            read_data->handle->setConnectionReset();
+        }
 
         read_data->callback(nread);
 
@@ -1323,6 +1347,10 @@ namespace asyncio {
 
     ioTCPSocket* IOHandle::getTCPSocket() {
         return ioTCPSoc;
+    }
+
+    void IOHandle::setConnectionReset() {
+        connReset = true;
     }
 
     //===========================================================================================

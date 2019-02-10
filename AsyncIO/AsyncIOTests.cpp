@@ -45,6 +45,7 @@ void allAsyncIOTests() {
     testAsyncUDP();
     testAsyncTCP();
     testUnifyFileAndTCPread();
+    testClientWriteWithouthRead();
 
     asyncio::deinitLoop();
 }
@@ -1427,4 +1428,107 @@ void testUnifyFileAndTCPread() {
     asyncio::deinitAuxLoop(loop);
 
     printf("testUnifyFileAndTCPread()...done\n\n");
+}
+
+void testClientWriteWithouthRead() {
+    printf("testClientWriteWithouthRead()...\n");
+
+    uv_sem_t sem;
+
+    asyncio::IOHandle srv;
+    asyncio::IOHandle acc;
+
+    uv_sem_init(&sem, 0);
+
+    srv.openTCP("127.0.0.1", PORT, [&](ssize_t result){
+        ASSERT(!asyncio::isError(result));
+
+        printf("New connection\n");
+
+        int res = acc.acceptFromListeningSocket(&srv);
+        ASSERT(!asyncio::isError(res));
+
+        acc.write((void*) "ABCDEFGH", 8, [&](ssize_t result){
+            ASSERT(result == 8);
+        });
+    });
+
+    char buff[2048];
+
+    asyncio::ioLoop* loop = asyncio::initAndRunAuxLoop();
+    asyncio::IOHandle cli(loop);
+
+    cli.connect("127.0.0.1", PORT + 1, "127.0.0.1", PORT, [&](ssize_t result){
+        ASSERT(!asyncio::isError(result));
+
+        printf("Connected to server\n");
+
+        cli.write((void*) "foobar\n", 8, [&](ssize_t result){
+            ASSERT(result == 8);
+
+            cli.read(buff, 2048, [&](ssize_t result){
+                ASSERT(result == 8);
+                ASSERT(!memcmp("ABCDEFGH", buff, 8));
+
+                printf("Server received: ABCDEFGH\n");
+
+                cli.read(buff, 2048, [&](ssize_t result){
+                    ASSERT(result == 0);
+
+                    printf("Server finished receiving\n");
+                });
+            });
+        });
+    });
+
+    thread th_acc([&](){
+        nanosleep((const struct timespec[]){{0, 100000000}}, nullptr);
+
+        printf("Close accepted socket\n");
+
+        acc.close([&](ssize_t result){
+            ASSERT(!asyncio::isError(result));
+
+            uv_sem_post(&sem);
+        });
+    });
+
+    thread th_cli([&](){
+        nanosleep((const struct timespec[]){{0, 150000000}}, nullptr);
+
+        printf("Close client socket\n");
+
+        cli.close([&](ssize_t result){
+            ASSERT(result == UV_ECONNRESET);
+
+            uv_sem_post(&sem);
+        });
+    });
+
+    uv_sem_wait(&sem);
+    uv_sem_wait(&sem);
+    uv_sem_destroy(&sem);
+
+    //close TCP server
+    uv_sem_init(&sem, 0);
+
+    printf("Close server\n");
+
+    srv.close([&](ssize_t result){
+        ASSERT(!asyncio::isError(result));
+
+        uv_sem_post(&sem);
+    });
+
+    uv_sem_wait(&sem);
+    uv_sem_destroy(&sem);
+
+    th_acc.join();
+    th_cli.join();
+
+    printf("client write without read test successful\n");
+
+    asyncio::deinitAuxLoop(loop);
+
+    printf("testClientWriteWithouthRead()...done\n\n");
 }

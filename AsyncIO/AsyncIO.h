@@ -281,6 +281,7 @@ namespace asyncio {
 
     struct closeSocket_data {
         close_cb callback;
+        bool connReset;
     };
 
     struct openTCP_data {
@@ -309,6 +310,7 @@ namespace asyncio {
         write_cb callback;
         uv_write_t* req;
         uv_buf_t uvBuff;
+        bool connReset;
     };
 
     struct tcpRead_data {
@@ -702,6 +704,12 @@ namespace asyncio {
          */
         void checkReadQueue();
 
+        /**
+         * Set connection reset flag.
+         * For internal usage.
+         */
+        void setConnectionReset();
+
     private:
         ioLoop* loop;
 
@@ -710,9 +718,10 @@ namespace asyncio {
         uv_udp_t* ioUDPSoc;
         uv_connect_t ioConnection;
 
-        bool closed = false;
-        bool bufferized = false;
+        std::atomic<bool> closed = false;
+        std::atomic<bool> bufferized = false;
         std::atomic<bool> tcpReading = false;
+        std::atomic<bool> connReset = false;
         ioHandle_t type;
 
         std::packaged_task<void(openFile_cb)> task;

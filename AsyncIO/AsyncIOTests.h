@@ -10,5 +10,6 @@ void testAsyncFile();
 void testAsyncUDP();
 void testAsyncTCP();
 void testUnifyFileAndTCPread();
+void testClientWriteWithouthRead();
 
 #endif //U8_ASYNCIOTESTS_H
