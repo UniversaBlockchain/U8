@@ -13,6 +13,8 @@
 #include "NodeInfo.h"
 #include "NetConfig.h"
 #include "../tools/TimerThread.h"
+#include "UDPAdapterPrivate.h"
+#include "../crypto/SymmetricKey.h"
 
 namespace network {
 
@@ -42,11 +44,47 @@ namespace network {
 
     private:
         void onReceive(const byte_vector& data);
-        void sendData(const NodeInfo& dest, const byte_vector& data);
+
+        /**
+         * All packets data Packet.payload of type PacketTypes::DATA
+         * must be encrypted with sessionKey (SymmetricKey).
+         * This method implements encryption procedure for it.
+         */
+        byte_vector preparePayloadForSession(const crypto::SymmetricKey& sessionKey, const byte_vector& payload);
+
+        /**
+         * Creates Packet of type PacketTypes and sends it to network, initiates retransmission.
+         * It is normal data sending procedure when Session with remote node is already established.
+         */
+        void sendPayload(Session& session, const byte_vector& payload);
+
+        void sendPacket(const NodeInfo& dest, const byte_vector& data); //<------------------- dbg
+
         int getNextPacketId();
+
+        /**
+         * Calls from timer
+         */
         void restartHandshakeIfNeeded();
+
+        /**
+         * Checks time of active handshake procedures and restarts them if time is up HANDSHAKE_TIMEOUT_MILLIS
+         */
+        void restartHandshakeIfNeeded(Session& session, long now);
+
         void pulseRetransmit();
+
         void clearProtectionFromDupleBuffers();
+
+        /**
+         * If session for remote node is already created - returns it, otherwise creates new Session
+         */
+        Session& getOrCreateSession(const NodeInfo& destination);
+
+        /**
+         * This is first step of creation and installation of the session.
+         */
+        void sendHello(Session& session);
 
     public:
         /**
@@ -70,13 +108,31 @@ namespace network {
          */
         const static size_t RETRANSMIT_MAX_ATTEMPTS = 20;
 
+        /**
+         * Maximum number of data blocks in the retransmit queue after which new
+         * sending blocks are delayed in output queue.
+         */
+        const static size_t MAX_RETRANSMIT_QUEUE_SIZE = 5000;
+
+        /**
+         * Maximum number of data blocks in the sending queue after which oldest
+         * items are discarded and overflow flag is set.
+         */
+        const static size_t MAX_QUEUE_SIZE = 50000;
+
+        /**
+         * Time limit for handshaking procedure. If handshake is not complete for this time, it will be restarted.
+         */
+        const static size_t HANDSHAKE_TIMEOUT_MILLIS = 10000;
+
     private:
+        crypto::SymmetricKey sessionKey_;
         NetConfig netConfig_;
         asyncio::IOHandle socket_;
         TReceiveCallback receiveCallback_;
         int nextPacketId_;
         TimerThread timer_;
-
+        std::unordered_map<int, Session> sessionsByRemoteId;
     };
 
 };

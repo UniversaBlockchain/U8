@@ -9,6 +9,8 @@
 #include <unordered_set>
 #include <unordered_map>
 #include <random>
+#include <atomic>
+#include <queue>
 #include "../tools/tools.h"
 #include "NodeInfo.h"
 #include "../crypto/SymmetricKey.h"
@@ -64,11 +66,26 @@ namespace network {
      */
     class DupleProtection {
     public:
+        DupleProtection() {}
+        DupleProtection(const DupleProtection&) = default;
+        DupleProtection(DupleProtection&&) = default;
         bool protectFromDuples(int packetId);
         void clearOldestBuffer();
     private:
         std::unordered_set<int> buffer0;
         std::unordered_set<int> buffer1;
+    };
+
+    /**
+     * Item for accumulating in Session.outputQueue
+     */
+    class OutputQueueItem {
+    public:
+        NodeInfo destination;
+        byte_vector payload;
+        OutputQueueItem(const NodeInfo& newDestination, const byte_vector& newPayload);
+        OutputQueueItem(const OutputQueueItem&) = default;
+        OutputQueueItem(OutputQueueItem&&) = default;
     };
 
     /**
@@ -92,8 +109,11 @@ namespace network {
     /**
      * Implements packet retransmission algorithm.
      */
-    class Retransmitter: private DupleProtection {
+    class Retransmitter: public DupleProtection {
     public:
+        Retransmitter(const NodeInfo& newRemoteNodeInfo);
+        Retransmitter(const Retransmitter&) = default;
+        Retransmitter(Retransmitter&&) = default;
         std::unordered_map<int, RetransmitItem> retransmitMap;
         NodeInfo remoteNodeInfo;
         crypto::SymmetricKey sessionKey;
@@ -105,7 +125,40 @@ namespace network {
      * Session uses for handshaking and for transmit PacketTypes::DATA.
      * SessionReader uses for handshaking and for receive PacketTypes::DATA
      */
-    class Session {
+    class Session: public Retransmitter {
+
+    public:
+        enum class SessionState {STATE_HANDSHAKE, STATE_EXCHANGING};
+        enum class HandshakeState {HANDSHAKE_STEP_INIT, HANDSHAKE_STEP_WAIT_FOR_WELCOME, HANDSHAKE_STEP_WAIT_FOR_SESSION};
+
+    public:
+        Session(const NodeInfo& newRemoteNodeInfo);
+        Session(const Session& copyFrom) = default;
+        Session(Session&& moveFrom) = default;
+        /** Reconstruct key from got byte array. Calls when we receive session key from remote party. */
+        void reconstructSessionKey(const byte_vector& key);
+        SessionState getState();
+        /** If we send some payload into session, but session state is STATE_HANDSHAKE - it accumulates in outputQueue. */
+        void addPayloadToOutputQueue(const NodeInfo& destination, const byte_vector& payload);
+        /** When handshake procedure completes, we should send all accumulated messages. */
+        void sendAllFromOutputQueue();
+        /** Changes session's state to STATE_HANDSHAKE */
+        void startHandshake();
+
+    public:
+        friend class UDPAdapter;
+
+    private:
+        byte_vector localNonce;
+        byte_vector remoteNonce;
+        std::queue<OutputQueueItem> outputQueue;
+
+        SessionState state;
+        HandshakeState handshakeStep;
+        long handshakeExpiresAt;
+        byte_vector handshake_sessionPart1;
+        byte_vector handshake_sessionPart2;
+        long lastHandshakeRestartTime;
     };
 
 
@@ -115,6 +168,12 @@ namespace network {
      * \see Session
      */
     class SessionReader {
+    public:
+        byte_vector localNonce;
+        long nextLocalNonceGenerationTime;
+        byte_vector remoteNonce;
+        byte_vector handshake_keyReqPart1;
+        byte_vector handshake_keyReqPart2;
     };
 
 

@@ -9,6 +9,8 @@
 
 namespace crypto {
 
+    const static ltc_cipher_descriptor cipher_desc = aes_desc;
+
     SymmetricKey::SymmetricKey() {
         this->key.resize(32);
         sprng_read(&key[0], 32, NULL);
@@ -27,11 +29,11 @@ namespace crypto {
         return key;
     }
 
-    byte_vector SymmetricKey::etaDecrypt(const byte_vector &data) {
+    byte_vector SymmetricKey::etaDecrypt(const byte_vector &data) const {
         return etaDecrypt((void *) &data[0], data.size());
     }
 
-    byte_vector SymmetricKey::etaDecrypt(void *data, size_t size) {
+    byte_vector SymmetricKey::etaDecrypt(void *data, size_t size) const {
         byte_vector output;
 
         if (size < cipher_desc.block_length + sha256_desc.hashsize)
@@ -71,11 +73,11 @@ namespace crypto {
         return output;
     }
 
-    byte_vector SymmetricKey::etaEncrypt(const byte_vector &data) {
+    byte_vector SymmetricKey::etaEncrypt(const byte_vector &data) const {
         return etaEncrypt((void *) &data[0], data.size());
     }
 
-    byte_vector SymmetricKey::etaEncrypt(void *data, size_t size) {
+    byte_vector SymmetricKey::etaEncrypt(void *data, size_t size) const {
         byte_vector output;
 
         hmac_state hs;
