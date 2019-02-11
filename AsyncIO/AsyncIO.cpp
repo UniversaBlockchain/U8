@@ -794,7 +794,7 @@ namespace asyncio {
         if (result > 0)
             return false;
 
-        throw std::invalid_argument("Uncorrect IP address");
+        throw std::invalid_argument("Incorrect IP address");
     }
 
     void IOHandle::_alloc_cb(uv_handle_t* handle, size_t suggested_size, uv_buf_t* buf) {

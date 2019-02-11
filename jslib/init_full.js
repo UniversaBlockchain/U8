@@ -1,13 +1,42 @@
 'use strict';
 
 const console = {
-    log(...args) { __bios_print(false, ...args, "\n"); },
-    logPut(...args) { __bios_print(false, ...args); },
-    info(...args) { __bios_print(false, ...args, "\n"); },
-    error(...args) { __bios_print(true, ...args, "\n"); }
+    log(...args) {
+        __bios_print(false, ...args, "\n");
+    },
+    logPut(...args) {
+        __bios_print(false, ...args);
+    },
+    info(...args) {
+        __bios_print(false, ...args, "\n");
+    },
+    error(...args) {
+        if (args[0] instanceof Error)
+            __bios_print(true, "Error: ", args[0].message, ...args.slice(1), "\n", args[0].stack, "\n");
+        else
+            __bios_print(true, ...args, "\n");
+    }
 };
 
 const VERSION = "4.0.0b5";
+
+/**
+ * Remove all trailing newline characters. Just a chomp :)
+ *
+ * @param str string to remove trailing spaces.
+ * @returns {String}
+ */
+function chomp(str) {
+    while(true) {
+        const last = str.slice(-1);
+        if (last == "\n" || last == "\r")
+            str = str.slice(0, -1);
+        else
+            break;
+    }
+    return str;
+}
+
 
 /**
  * Check that two arrays (any kind) have equal components, using '=='. Shallow comparison.
@@ -70,7 +99,7 @@ const require = (function () {
     }
 })();
 
-function assert(condition, text="assertion failed") {
+function assert(condition, text = "assertion failed") {
     if (!condition) throw Error(text);
 }
 
@@ -86,11 +115,10 @@ function __call_main(args) {
         result
             .then(code => exit(code))
             .catch((error) => {
-                if( error.stack ) {
+                if (error.stack) {
                     console.error(error.stack);
-                }
-                else
-                    console.error("execution of aysnc main failed: "+error);
+                } else
+                    console.error("execution of aysnc main failed: " + error);
                 exit(1000);
             });
         return 0;

@@ -3,11 +3,12 @@
  */
 class IoError extends Error {
     constructor(reason) {
-        if (reason instanceof String) {
+        let code = +reason;
+        if (code != reason) {
             super(reason);
             this.code = undefined;
         } else {
-            super(`${IoHandle.getErrorText(reason)} (${reason})`);
+            super(`${IoHandle.getErrorText(code)} (${code})`);
             this.code = reason;
         }
     }
@@ -43,7 +44,7 @@ hproto.read = function (size) {
         throw Error("size must > 0");
     let ap = new AsyncProcessor();
     this._read_raw(size, (data, code) => {
-        // read less tham expected: slice
+        // read less than expected: slice
         if( code > 0 && code < size )
             data = data.slice(0, code);
         ap.process(code, data)
@@ -52,8 +53,9 @@ hproto.read = function (size) {
 };
 
 hproto.write = function (data) {
-    if (!(data instanceof Uint8Array))
+    if (!(data instanceof Uint8Array)) {
         data = Uint8Array.from(data);
+    }
     let ap = new AsyncProcessor();
     this._write_raw(data, code => ap.process(code))
     return ap.promise;
@@ -130,6 +132,8 @@ function InputStream(handle, buferLength = chunkSize) {
 
     this.nextByte = nextByte;
     this.nextLine = nextLine;
+    this.readLine = nextLine;
+    this.readByte = nextByte;
 
     /**
      * Async iterator for remainig bytes. Iterate bytes as numbers.
@@ -188,7 +192,13 @@ function InputStream(handle, buferLength = chunkSize) {
             offset += x.length;
         });
         return result;
-    }
+    };
+
+    /**
+     * Read the rest of the stream as bytes. Same as {#allBytes()}
+     * @type {(function(): Uint8Array)}
+     */
+    this.readAll = this.allBytes;
 
     /**
      * Read up to specified number of bytes or until the end of the stream.
@@ -206,13 +216,17 @@ function InputStream(handle, buferLength = chunkSize) {
         }
 
         if (pos >= 0) {
-            if (chunk)
+            if (chunk) {
                 push(chunk.subarray(pos, size + pos));
+                pos += size;
+            }
             while (actualSize < size) {
                 if (!await loadChunk())
                     break;
-                if (chunk.length + actualSize <= size)
+                if (chunk.length + actualSize <= size) {
                     push(chunk)
+                    pos = chunk.length;
+                }
                 else {
                     let left = size - actualSize;
                     // left first bytes of the chunk to copy
@@ -221,6 +235,7 @@ function InputStream(handle, buferLength = chunkSize) {
                 }
             }
         }
+        // console.log(`read outcome: chunk: ${chunk.length}: ${utf8Decode(chunk)}, pos: ${pos}, result: ${utf8Decode(result)}`);
         return result;
     };
 
@@ -231,7 +246,13 @@ function InputStream(handle, buferLength = chunkSize) {
      */
     this.allAsString = async function () {
         return utf8Decode(await this.allBytes());
-    }
+    };
+
+    /**
+     * Read the rest of the stream as a UTF8 string.
+     * @type {(function(): String)}
+     */
+    this.readAllAsString = this.allAsString;
 
     return this;
 }
@@ -258,6 +279,8 @@ async function openRead(url, {bufferLength = chunkSize}={}) {
 
 function OutputStream(handle, bufferSize = chunkSize) {
     this.write = async function (data) {
+        if( typeof(data) == 'string')
+            data = utf8Encode(data);
         await handle.write(data);
     };
 
@@ -285,52 +308,4 @@ async function openWrite(url, mode = "w", {bufferLength = chunkSize, umask = 0o6
     return ap.promise
 }
 
-class TcpConnection {
-
-    constructor(handle, bufferLength=chunkSize) {
-        this._handle = handle;
-        this.input = new InputStream(this,bufferLength);
-        this.output = new InputStream(this,bufferLength);
-    }
-
-    async close() {
-        this._handle.close();
-    }
-}
-
-const tcp = {
-    /**
-     *
-     * @param port to listen
-     * @param bindIp interface to use
-     * @param bufferLength of the stream
-     * @returns {Promise<void>}
-     */
-    async connect({port, bindIp="0.0.0.0", bindPort=0, bufferLength=chunkSize}) {
-        throw "not yet ready";
-        // let handle = new IoHandle();
-        // let ap = AsyncProcessor();
-        // handle._connect(bindIp, bindPort, host, port, code => ap.process(code, new TcpConnection(handle, bufferLength)));
-        // return ap.promise;
-    },
-    /**
-     * Await for incoming connections. awaits for incoming connections which are returned via Promise. Note that
-     * this method while simple does not allow closing the listening port.
-     *
-     * @param bindIp local interface to use, defaults to all
-     * @param port local port to listen
-     * @param maxConnections 0 to maximum allowed
-     * @param bufferLength of the streams.
-     * @returns {Promise<any>}
-     */
-    async listen({bindIp="0.0.0.0",port,maxConnections=0,bufferLength=chunkSize}) {
-        throw "not yet ready";
-        // let handle = new IoHandle();
-        // let ap = AsyncProcessor();
-        // handle._listen(bindIp, post, code => ap.process(code, new TcpConnection(handle, bufferLength)), maxConnections);
-        // return ap.promise;
-    }
-
-}
-
-module.exports = {openRead, openWrite, InputStream, OutputStream};
+module.exports = {openRead, openWrite, InputStream, OutputStream, AsyncProcessor, IoError};

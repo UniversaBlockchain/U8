@@ -7,7 +7,6 @@
 using namespace std;
 
 StreamPump::StreamPump(ostream &s) : outs(s) {
-    cout << "startpump";
     worker = thread([this]() {
         try {
             while (1) outs << queue.get();

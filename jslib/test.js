@@ -7,36 +7,6 @@ let failedTestsCount = 0;
 
 const allTests = []
 
-const unit = {
-    test(name, block) {
-        allTests.push([name, block]);
-    },
-    TestFailed: class extends Error {
-    },
-    async perform() {
-        for (let [name, block] of allTests) {
-            try {
-                console.logPut(`[${name}]`);
-                currentTest = name;
-                await block();
-                passedTestsCount++;
-                console.log("ok");
-            } catch (e) {
-                console.log("FAILED!");
-                console.error(e.stack);
-                failedTestsCount++;
-            }
-        }
-        let totalTests = failedTestsCount + passedTestsCount;
-        if( failedTestsCount > 0) {
-            console.error(`----- TESTS FAILED: ${failedTestsCount} of ${totalTests}, ${failedTestsCount/totalTests*100}% ------`);
-        }
-        else
-            console.log(`all tests passed: ${totalTests} test(s), ${passedChecksCount} check(s).`);
-        return failedTestsCount > 0 ? 1000 : 0;
-    }
-};
-
 
 function checkPassed() {
     passedChecksCount++;
@@ -91,6 +61,43 @@ const expect = {
             checkPassed();
     }
 };
+
+const unit = {
+    test(name, block) {
+        allTests.push([name, block]);
+    },
+    TestFailed: class extends Error {
+    },
+    async perform() {
+        for (let [name, block] of allTests) {
+            try {
+                console.logPut(`[${name}]`);
+                currentTest = name;
+                await block();
+                passedTestsCount++;
+                console.log("ok");
+            } catch (e) {
+                console.log("FAILED!");
+                console.error(e.stack);
+                failedTestsCount++;
+            }
+        }
+        let totalTests = failedTestsCount + passedTestsCount;
+        if( failedTestsCount > 0) {
+            console.error(`----- TESTS FAILED: ${failedTestsCount} of ${totalTests}, ${failedTestsCount/totalTests*100}% ------`);
+        }
+        else
+            console.log(`all tests passed: ${totalTests} test(s), ${passedChecksCount} check(s).`);
+        return failedTestsCount > 0 ? 1000 : 0;
+    },
+    fail(message) {
+        checkFailed(message);
+    }
+}
+
+// shortcuts
+expect.eq = expect.equal;
+expect.ne = expect.notEqual;
 
 let assert = expect.that;
 

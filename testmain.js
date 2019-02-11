@@ -17,7 +17,6 @@ async function testReadLines() {
 }
 
 
-
 const Boss = require('boss.js');
 
 function testBoss() {

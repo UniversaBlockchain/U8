@@ -31,7 +31,6 @@ function valuesEqual(x,y) {
 
 }
 
-
 Object.prototype.equals = function(to) {
     if(this === to)
         return true;
