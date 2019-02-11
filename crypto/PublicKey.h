@@ -33,15 +33,15 @@ namespace crypto {
 
 		std::vector<unsigned char> pack() const;
 
-		bool verify(const std::vector<unsigned char> &sig, const std::vector<unsigned char> &data, HashType hashType);
+		bool verify(const std::vector<unsigned char> &sig, const std::vector<unsigned char> &data, HashType hashType) const;
 
-		bool verify(void *sigData, size_t sigSize, void *bodyData, size_t bodySize, HashType hashType);
+		bool verify(void *sigData, size_t sigSize, void *bodyData, size_t bodySize, HashType hashType) const;
 
-		void encrypt(const std::vector<unsigned char> &input, std::vector<unsigned char> &output);
+		void encrypt(const std::vector<unsigned char> &input, std::vector<unsigned char> &output) const;
 
-		std::vector<unsigned char> encrypt(const std::vector<unsigned char> &input);
+		std::vector<unsigned char> encrypt(const std::vector<unsigned char> &input) const;
 
-		std::vector<unsigned char> encrypt(void *data, size_t size);
+		std::vector<unsigned char> encrypt(void *data, size_t size) const;
 
 		const KeyAddress &getShortAddress();
 

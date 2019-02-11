@@ -58,6 +58,11 @@ namespace network {
         buffer0.clear();
     }
 
+    OutputQueueItem::OutputQueueItem(const NodeInfo& newDestination, const byte_vector& newPayload)
+        :destination(newDestination)
+        ,payload(newPayload) {
+    }
+
     RetransmitItem::RetransmitItem(const Packet& newPacket, const byte_vector& newSourcePayload)
         :packet(newPacket)
         ,retransmitCounter(0)
@@ -76,6 +81,37 @@ namespace network {
         maxRetransmitDelay *= UDPAdapter::RETRANSMIT_TIME;
         maxRetransmitDelay += UDPAdapter::RETRANSMIT_TIME/2;
         nextRetransmitTimeMillis = getCurrentTimeMillis() + minstdRand_() % maxRetransmitDelay;
+    }
+
+    Retransmitter::Retransmitter(const NodeInfo& newRemoteNodeInfo): remoteNodeInfo(newRemoteNodeInfo) {
+    }
+
+    Session::Session(const NodeInfo& newRemoteNodeInfo): Retransmitter(newRemoteNodeInfo) {
+        localNonce.resize(64);
+        sprng_read(&localNonce[0], 64, NULL);
+        state = SessionState::STATE_HANDSHAKE;
+        handshakeStep = HandshakeState::HANDSHAKE_STEP_INIT;
+        handshakeExpiresAt = getCurrentTimeMillis() - UDPAdapter::HANDSHAKE_TIMEOUT_MILLIS;
+    }
+
+    void Session::reconstructSessionKey(const byte_vector& key) {
+        sessionKey = crypto::SymmetricKey(key);
+    }
+
+    Session::SessionState Session::getState() {
+        return state;
+    }
+
+    void Session::addPayloadToOutputQueue(const NodeInfo& destination, const byte_vector& payload) {
+        if (outputQueue.size() >= UDPAdapter::MAX_QUEUE_SIZE)
+            outputQueue.pop();
+        outputQueue.push(OutputQueueItem(destination, payload));
+    }
+
+    void Session::sendAllFromOutputQueue() {
+    }
+
+    void Session::startHandshake() {
     }
 
 };
