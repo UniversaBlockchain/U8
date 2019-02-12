@@ -16,15 +16,15 @@ namespace network {
 
     UDPAdapter::UDPAdapter(const crypto::PrivateKey& ownPrivateKey, int ownNodeNumber, const NetConfig& netConfig,
                            const TReceiveCallback& receiveCallback)
-       :netConfig_(netConfig) {
+       :netConfig_(netConfig)
+       ,ownNodeInfo_(netConfig.getInfo(ownNodeNumber)) {
 
         unsigned int seed = std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now().time_since_epoch()).count();
         std::minstd_rand minstdRand(static_cast<int>(seed));
         nextPacketId_ = minstdRand();
 
         receiveCallback_ = receiveCallback;
-        auto ownNodeInfo = netConfig.getInfo(ownNodeNumber);
-        socket_.openUDP(ownNodeInfo.getNodeAddress().host.c_str(), ownNodeInfo.getNodeAddress().port);
+        socket_.openUDP(ownNodeInfo_.getNodeAddress().host.c_str(), ownNodeInfo_.getNodeAddress().port);
         socket_.recv([&](ssize_t result, const asyncio::byte_vector& data, const char* IP, unsigned int port) {
             if (result > 0)
                 onReceive(data);
@@ -56,7 +56,7 @@ namespace network {
         auto dest = netConfig_.getInfo(destNodeNumber);
 
         Session& session = getOrCreateSession(dest);
-        if (session.getState() == Session::SessionState::STATE_HANDSHAKE) {
+        if (session.getState() == SessionState::STATE_HANDSHAKE) {
             session.addPayloadToOutputQueue(dest, payload);
         } else {
             if (session.retransmitMap.size() > MAX_RETRANSMIT_QUEUE_SIZE)
@@ -70,7 +70,22 @@ namespace network {
     }
 
     void UDPAdapter::onReceive(const byte_vector& data) {
-        receiveCallback_(data);
+        std::unique_lock lock(sendMutex);
+        Packet packet(data);
+        switch (packet.getType()) {
+            case PacketTypes::HELLO:
+                onReceiveHello(packet);
+                break;
+        }
+        //receiveCallback_(data);
+    }
+
+    void UDPAdapter::onReceiveHello(const Packet& packet) {
+        writeLog(isLogEnabled, "onReceiveHello, packetId=", packet.getPacketId());
+    }
+
+    void UDPAdapter::onReceiveWelcome(const Packet& packet) {
+        writeLog(isLogEnabled, "onReceiveWelcome, packetId=", packet.getPacketId());
     }
 
     byte_vector UDPAdapter::preparePayloadForSession(const crypto::SymmetricKey& sessionKey, const byte_vector& payload) {
@@ -94,6 +109,7 @@ namespace network {
     }
 
     void UDPAdapter::sendPacket(const NodeInfo& dest, const byte_vector& data) {
+        std::unique_lock lock(sendMutex);
         if (data.size() > MAX_PACKET_SIZE)
             throw std::invalid_argument(std::string("datagram size too long, MAX_PACKET_SIZE is ") + std::to_string(MAX_PACKET_SIZE));
         socket_.send(data, dest.getNodeAddress().host.c_str(), dest.getNodeAddress().port, [&](ssize_t result){});
@@ -110,14 +126,14 @@ namespace network {
 
     void UDPAdapter::restartHandshakeIfNeeded() {
         long now = getCurrentTimeMillis();
-        for (auto it : sessionsByRemoteId)
+        for (auto& it : sessionsByRemoteId)
             restartHandshakeIfNeeded(it.second, now);
     }
 
     void UDPAdapter::restartHandshakeIfNeeded(Session& session, long now) {
-        if (session.getState() == Session::SessionState::STATE_HANDSHAKE) {
+        if (session.getState() == SessionState::STATE_HANDSHAKE) {
             if (session.handshakeExpiresAt < now) {
-                session.handshakeStep = Session::HandshakeState::HANDSHAKE_STEP_WAIT_FOR_WELCOME;
+                session.handshakeStep = HandshakeState::HANDSHAKE_STEP_WAIT_FOR_WELCOME;
                 session.handshakeExpiresAt = now + HANDSHAKE_TIMEOUT_MILLIS;
                 sendHello(session);
             }
@@ -125,11 +141,14 @@ namespace network {
     }
 
     void UDPAdapter::pulseRetransmit() {
-        //printf("pulseRetransmit\n");
+        for (auto& s : sessionsByRemoteId)
+            s.second.pulseRetransmit([this](const NodeInfo& dest, const Packet& packet){
+                sendPacket(dest, packet.makeByteArray());
+            });
     }
 
     void UDPAdapter::clearProtectionFromDupleBuffers() {
-        //printf("clearProtectionFromDupleBuffers\n");
+        //log("clearProtectionFromDupleBuffers");
     }
 
     Session& UDPAdapter::getOrCreateSession(const NodeInfo& destination) {
@@ -146,8 +165,9 @@ namespace network {
         byte_vector helloNonce(64);
         sprng_read(&helloNonce[0], 64, NULL);
         auto encryptedPayload = session.remoteNodeInfo.getPublicKey().encrypt(helloNonce);
-        sendPacket(session.remoteNodeInfo, encryptedPayload);
-        session.addPayloadToOutputQueue(session.remoteNodeInfo, helloNonce);
+        Packet helloPacket(getNextPacketId(), ownNodeInfo_.getNumber(), session.remoteNodeInfo.getNumber(), PacketTypes::HELLO, encryptedPayload);
+        sendPacket(session.remoteNodeInfo, helloPacket.makeByteArray());
+        session.addPacketToRetransmitMap(helloPacket.getPacketId(), helloPacket, helloNonce);
     }
 
 };

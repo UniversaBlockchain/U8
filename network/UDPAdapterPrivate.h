@@ -11,6 +11,7 @@
 #include <random>
 #include <atomic>
 #include <queue>
+#include <functional>
 #include "../tools/tools.h"
 #include "NodeInfo.h"
 #include "../crypto/SymmetricKey.h"
@@ -46,11 +47,11 @@ namespace network {
         /**
          * Pack header and payload to bytes array.
          */
-        byte_vector makeByteArray();
+        byte_vector makeByteArray() const;
 
-        int getReceiverNodeId() {return receiverNodeId_;}
-        int getPacketId() {return packetId_;}
-        int getType() {return type_;}
+        int getReceiverNodeId() const {return receiverNodeId_;}
+        int getPacketId() const {return packetId_;}
+        int getType() const {return type_;}
 
     private:
         int senderNodeId_;
@@ -101,10 +102,17 @@ namespace network {
         int type;
         long nextRetransmitTimeMillis;
         RetransmitItem(const Packet& newPacket, const byte_vector& newSourcePayload);
+        RetransmitItem(const RetransmitItem&) = default;
+        RetransmitItem(RetransmitItem&&) = default;
+        RetransmitItem& operator=(const RetransmitItem&) = default;
+        RetransmitItem& operator=(RetransmitItem &&) = default;
         void updateNextRetransmitTime();
     private:
         std::minstd_rand minstdRand_;
     };
+
+    enum class SessionState {STATE_HANDSHAKE, STATE_EXCHANGING};
+    enum class HandshakeState {HANDSHAKE_STEP_INIT, HANDSHAKE_STEP_WAIT_FOR_WELCOME, HANDSHAKE_STEP_WAIT_FOR_SESSION};
 
     /**
      * Implements packet retransmission algorithm.
@@ -117,6 +125,11 @@ namespace network {
         std::unordered_map<int, RetransmitItem> retransmitMap;
         NodeInfo remoteNodeInfo;
         crypto::SymmetricKey sessionKey;
+        void addPacketToRetransmitMap(int packetId, const Packet& packet, const byte_vector& sourcePayload);
+        void pulseRetransmit(std::function<void(const NodeInfo&, const Packet&)> funcSendPacket);
+
+    protected:
+        virtual SessionState getState();
     };
 
     /**
@@ -128,16 +141,12 @@ namespace network {
     class Session: public Retransmitter {
 
     public:
-        enum class SessionState {STATE_HANDSHAKE, STATE_EXCHANGING};
-        enum class HandshakeState {HANDSHAKE_STEP_INIT, HANDSHAKE_STEP_WAIT_FOR_WELCOME, HANDSHAKE_STEP_WAIT_FOR_SESSION};
-
-    public:
         Session(const NodeInfo& newRemoteNodeInfo);
         Session(const Session& copyFrom) = default;
         Session(Session&& moveFrom) = default;
         /** Reconstruct key from got byte array. Calls when we receive session key from remote party. */
         void reconstructSessionKey(const byte_vector& key);
-        SessionState getState();
+        SessionState getState() override;
         /** If we send some payload into session, but session state is STATE_HANDSHAKE - it accumulates in outputQueue. */
         void addPayloadToOutputQueue(const NodeInfo& destination, const byte_vector& payload);
         /** When handshake procedure completes, we should send all accumulated messages. */
@@ -176,6 +185,11 @@ namespace network {
         byte_vector handshake_keyReqPart2;
     };
 
+    template<typename ...Args>
+    void writeLog(bool enabled, Args && ...args) {
+        if (enabled)
+            (std::cout << ... << args) << std::endl;
+    }
 
 };
 

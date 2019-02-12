@@ -6,6 +6,7 @@
 #define U8_UDPADAPTER_H
 
 #include <functional>
+#include <mutex>
 #include "../tools/tools.h"
 #include "../crypto/PrivateKey.h"
 #include "../crypto/SymmetricKey.h"
@@ -42,8 +43,23 @@ namespace network {
          */
         void send(int destNodeNumber, const byte_vector& payload);
 
+        void enableLog(bool enabled) {isLogEnabled = enabled;}
+
     private:
+        /**
+         * Main listener for incoming udp packets.
+         */
         void onReceive(const byte_vector& data);
+
+        /**
+         * We have received PacketTypes::HELLO packet. Should create localNonce and send it in reply.
+         */
+        void onReceiveHello(const Packet& packet);
+
+        /**
+         * We have received PacketTypes#WELCOME packet. Now we should request session key.
+         */
+        void onReceiveWelcome(const Packet& packet);
 
         /**
          * All packets data Packet.payload of type PacketTypes::DATA
@@ -126,13 +142,16 @@ namespace network {
         const static size_t HANDSHAKE_TIMEOUT_MILLIS = 10000;
 
     private:
+        bool isLogEnabled = false;
         crypto::SymmetricKey sessionKey_;
         NetConfig netConfig_;
         asyncio::IOHandle socket_;
+        NodeInfo ownNodeInfo_;
         TReceiveCallback receiveCallback_;
         int nextPacketId_;
         TimerThread timer_;
         std::unordered_map<int, Session> sessionsByRemoteId;
+        std::recursive_mutex sendMutex;
     };
 
 };
