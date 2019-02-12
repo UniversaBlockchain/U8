@@ -244,6 +244,7 @@ namespace asyncio {
         ioHandle* fileReq;
         uv_buf_t uvBuff;
         ssize_t result;
+        std::shared_ptr<byte_vector> data;
     };
 
     struct closeFile_data {
@@ -277,6 +278,7 @@ namespace asyncio {
         send_cb callback;
         uv_udp_send_t* req;
         uv_buf_t uvBuff;
+        std::shared_ptr<byte_vector> data;
     };
 
     struct closeSocket_data {
@@ -310,6 +312,7 @@ namespace asyncio {
         write_cb callback;
         uv_write_t* req;
         uv_buf_t uvBuff;
+        std::shared_ptr<byte_vector> data;
         bool connReset;
     };
 

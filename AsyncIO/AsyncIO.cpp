@@ -440,7 +440,8 @@ namespace asyncio {
 
             file_data->callback = std::move(callback);
             file_data->fileReq = ioReq;
-            file_data->uvBuff = uv_buf_init((char*) data.data(), (unsigned int) data.size());
+            file_data->data = std::make_shared<byte_vector>(data);
+            file_data->uvBuff = uv_buf_init((char*) file_data->data->data(), (unsigned int) file_data->data->size());
 
             req->data = file_data;
 
@@ -459,7 +460,8 @@ namespace asyncio {
 
             write_data->callback = std::move(callback);
             write_data->req = req;
-            write_data->uvBuff = uv_buf_init((char*) data.data(), (unsigned int) data.size());
+            write_data->data = std::make_shared<byte_vector>(data);
+            write_data->uvBuff = uv_buf_init((char*) write_data->data->data(), (unsigned int) write_data->data->size());
             write_data->connReset = connReset;
 
             req->data = write_data;
@@ -495,6 +497,7 @@ namespace asyncio {
 
             file_data->callback = std::move(callback);
             file_data->fileReq = ioReq;
+            file_data->data = nullptr;
             file_data->uvBuff = uv_buf_init((char*) buffer, (unsigned int) size);
 
             req->data = file_data;
@@ -515,6 +518,7 @@ namespace asyncio {
             write_data->callback = std::move(callback);
             write_data->req = req;
             write_data->uvBuff = uv_buf_init((char*) buffer, (unsigned int) size);
+            write_data->data = nullptr;
             write_data->connReset = connReset;
 
             req->data = write_data;
@@ -632,6 +636,9 @@ namespace asyncio {
     void IOHandle::_write_cb(asyncio::ioHandle *req) {
         uv_fs_req_cleanup(req);
         auto file_data = (write_data*) req->data;
+
+        if (file_data->data)
+            file_data->data.reset();
 
         file_data->callback(req->result);
 
@@ -868,6 +875,9 @@ namespace asyncio {
     void IOHandle::_send_cb(uv_udp_send_t* req, int status) {
         auto snd_data = (send_data*) req->data;
 
+        if (snd_data->data)
+            snd_data->data.reset();
+
         snd_data->callback((status < 0) ? status : snd_data->uvBuff.len);
 
         delete snd_data;
@@ -979,7 +989,8 @@ namespace asyncio {
 
         snd_data->callback = std::move(callback);
         snd_data->req = req;
-        snd_data->uvBuff = uv_buf_init((char*) data.data(), (unsigned int) data.size());
+        snd_data->data = std::make_shared<byte_vector>(data);
+        snd_data->uvBuff = uv_buf_init((char*) snd_data->data->data(), (unsigned int) snd_data->data->size());
 
         req->data = snd_data;
 
@@ -1016,6 +1027,7 @@ namespace asyncio {
         snd_data->callback = std::move(callback);
         snd_data->req = req;
         snd_data->uvBuff = uv_buf_init((char*) buffer, (unsigned int) size);
+        snd_data->data = nullptr;
 
         req->data = snd_data;
 
@@ -1078,6 +1090,9 @@ namespace asyncio {
 
         if (write_data->connReset)
             status = UV_ECONNRESET;
+
+        if (write_data->data)
+            write_data->data.reset();
 
         write_data->callback((status < 0) ? status : write_data->uvBuff.len);
 
