@@ -12,9 +12,9 @@
     },
     "templates": {
         "logo": {
-            "url": "../1x1.png",
-            "width": "37px",
-            "height": "17px",
+            "url": "../uni_logo.png",
+            "width": "102px",
+            "height": "39px",
             "link": "https://beta.universa.io"
         },
         "cleverLinks": false,
@@ -23,6 +23,14 @@
             "outputSourceFiles": true
         },
         "name": "U8 JS Doc",
-        "footerText": "Universa blockchain"
+        "footerText": "Universa blockchain",
+        "default": {
+            "staticFiles": {
+                "include": ["static/"]
+            }
+        },
+        "css": [
+            "styles/tui-doc.css"
+        ]
     }
 }
