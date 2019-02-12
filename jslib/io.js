@@ -135,7 +135,7 @@ function InputStream(handle, buferLength = chunkSize) {
     this.readLine = nextLine;
     this.readByte = nextByte;
 
-    /**
+    /***
      * Async iterator for remainig bytes. Iterate bytes as numbers.
      *
      * @type {{[Symbol.asyncIterator]: Function}}
@@ -150,7 +150,7 @@ function InputStream(handle, buferLength = chunkSize) {
         }
     };
 
-    /**
+    /***
      * Async iterator for remaining lines of the input. Iteration start from the cirrent position in the input
      *
      * @type {{[Symbol.asyncIterator]: Function}}

@@ -1,5 +1,6 @@
 cmake-build-debug/
 .idea/
 ext/
+doc/docjs/out
 download_libs.stamp
 download_libs/

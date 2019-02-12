@@ -22,6 +22,9 @@ elseif (WIN32)
     set(platform "win_v8")
 endif ()
 
+add_subdirectory(doc/docjs)
+set_target_properties(docjs PROPERTIES FOLDER "Tools")
+
 file(GLOB LIBRARY_SRC
     AsyncIO/*.h AsyncIO/*.cpp
     crypto/*.h crypto/*.cpp
