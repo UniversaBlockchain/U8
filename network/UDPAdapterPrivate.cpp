@@ -27,10 +27,9 @@ namespace network {
         receiverNodeId_ = int(UInt::asInstance(uArr.at(2)).get());
         type_ = int(UInt::asInstance(uArr.at(3)).get());
         payload_ = UBytes::asInstance(uArr.at(4)).get();
-
     }
 
-    byte_vector Packet::makeByteArray() {
+    byte_vector Packet::makeByteArray() const {
         UArray ua = {
                 UInt(packetId_),
                 UInt(senderNodeId_),
@@ -86,6 +85,45 @@ namespace network {
     Retransmitter::Retransmitter(const NodeInfo& newRemoteNodeInfo): remoteNodeInfo(newRemoteNodeInfo) {
     }
 
+    void Retransmitter::addPacketToRetransmitMap(int packetId, const Packet& packet, const byte_vector& sourcePayload) {
+        retransmitMap.insert(make_pair(packetId, RetransmitItem(packet, sourcePayload)));
+    }
+
+    void Retransmitter::pulseRetransmit(std::function<void(const NodeInfo&, const Packet&)> funcSendPacket) {
+        if (getState() == SessionState::STATE_EXCHANGING) {
+            for (auto& item : retransmitMap) {
+                if (item.second.nextRetransmitTimeMillis < getCurrentTimeMillis()) {
+                    item.second.updateNextRetransmitTime();
+                    if (item.second.type == PacketTypes::DATA) {
+//                        if (item.second.packet == null) {
+//                            byte[] dataToSend = preparePayloadForSession(sessionKey, item.sourcePayload);
+//                            item.packet = new Packet(item.packetId, myNodeInfo.getNumber(), item.receiverNodeId, item.type, dataToSend);
+//                        }
+                        funcSendPacket(remoteNodeInfo, item.second.packet);
+                        if (item.second.retransmitCounter++ >= UDPAdapter::RETRANSMIT_MAX_ATTEMPTS)
+                            retransmitMap.erase(item.first);
+                        //TODO: move '.erase' up one block
+                    }
+                }
+            }
+        } else {
+            for (auto& item : retransmitMap) {
+                if (item.second.nextRetransmitTimeMillis < getCurrentTimeMillis()) {
+                    item.second.updateNextRetransmitTime();
+                    //if (item.packet != null) {
+                    funcSendPacket(remoteNodeInfo, item.second.packet);
+                    if (item.second.retransmitCounter++ >= UDPAdapter::RETRANSMIT_MAX_ATTEMPTS)
+                        retransmitMap.erase(item.first);
+                    //else
+                }
+            }
+        }
+    }
+
+    SessionState Retransmitter::getState() {
+        return SessionState::STATE_HANDSHAKE;
+    }
+
     Session::Session(const NodeInfo& newRemoteNodeInfo): Retransmitter(newRemoteNodeInfo) {
         localNonce.resize(64);
         sprng_read(&localNonce[0], 64, NULL);
@@ -98,7 +136,7 @@ namespace network {
         sessionKey = crypto::SymmetricKey(key);
     }
 
-    Session::SessionState Session::getState() {
+    SessionState Session::getState() {
         return state;
     }
 
