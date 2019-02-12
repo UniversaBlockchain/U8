@@ -1,0 +1,28 @@
+{
+    "tags": {
+        "allowUnknownTags": true
+    },
+    "source": {
+        "includePattern": ".+\\.js(doc|x)?$",
+        "excludePattern": "(^|\\/|\\\\)_"
+    },
+    "plugins": [],
+    "opts": {
+        "template": "node_modules/tui-jsdoc-template"
+    },
+    "templates": {
+        "logo": {
+            "url": "../1x1.png",
+            "width": "37px",
+            "height": "17px",
+            "link": "https://beta.universa.io"
+        },
+        "cleverLinks": false,
+        "monospaceLinks": false,
+        "default": {
+            "outputSourceFiles": true
+        },
+        "name": "U8 JS Doc",
+        "footerText": "Universa blockchain"
+    }
+}
