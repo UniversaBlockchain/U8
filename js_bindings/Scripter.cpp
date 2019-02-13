@@ -133,7 +133,8 @@ void Scripter::initialize() {
     global->Set(v8String("utf8Encode"), functionTemplate(JsStringToTypedArray));
     global->Set(v8String("$0"), v8String(ARGV0));
 
-    JsInitIoHandle(pIsolate, global);
+    JsInitIOFile(pIsolate, global);
+    JsInitIOTCP(pIsolate, global);
     JsInitCrypto(pIsolate,global);
 
     // Save context and wrap weak self:

@@ -18,7 +18,7 @@
 #include "Safe58.h"
 #include "../tools/ThreadPool.h"
 #include "SymmetricKey.h"
-#include "../AsyncIO/AsyncIO.h"
+#include "../AsyncIO/IOUDP.h"
 
 using namespace std;
 using namespace crypto;
@@ -563,11 +563,11 @@ void udpAdapterHelloWorld() {
     string body1("some data from node-1");
     string body2("data from node-2");
 
-    asyncio::IOHandle socket0;
-    asyncio::IOHandle socket1;
+    asyncio::IOUDP socket0;
+    asyncio::IOUDP socket1;
 
-    socket0.openUDP("127.0.0.1", 4040);
-    socket1.openUDP("127.0.0.1", 4041);
+    socket0.open("127.0.0.1", 4040);
+    socket1.open("127.0.0.1", 4041);
 
     socket0.recv([&](ssize_t result, const asyncio::byte_vector& data, const char* IP, unsigned int port) {
         if (data.size() > 0)

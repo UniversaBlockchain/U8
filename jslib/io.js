@@ -8,7 +8,7 @@ class IoError extends Error {
             super(reason);
             this.code = undefined;
         } else {
-            super(`${IoHandle.getErrorText(code)} (${code})`);
+            super(`${IOFile.getErrorText(code)} (${code})`);
             this.code = reason;
         }
     }
@@ -37,9 +37,10 @@ class AsyncProcessor {
  */
 const chunkSize = 2048;
 
-const hproto = IoHandle.prototype;
+const file_proto = IOFile.prototype;
+const tcp_proto = IOTCP.prototype;
 
-hproto.read = function (size) {
+file_proto.read = tcp_proto.read = function (size) {
     if (size <= 0)
         throw Error("size must > 0");
     let ap = new AsyncProcessor();
@@ -52,7 +53,7 @@ hproto.read = function (size) {
     return ap.promise;
 };
 
-hproto.write = function (data) {
+file_proto.write = tcp_proto.write = function (data) {
     if (!(data instanceof Uint8Array)) {
         data = Uint8Array.from(data);
     }
@@ -61,7 +62,7 @@ hproto.write = function (data) {
     return ap.promise;
 }
 
-hproto.close = function() {
+file_proto.close = tcp_proto.close = function() {
     let ap = new AsyncProcessor();
     this._close_raw(code => ap.process(code))
     return ap.promise;
@@ -271,7 +272,7 @@ async function openRead(url, {bufferLength = chunkSize}={}) {
     if (match)
         url = match[1];
     // todo: more protcols
-    let handle = new IoHandle();
+    let handle = new IOFile();
     let ap = new AsyncProcessor();
     handle.open(url, 'r', 0, code => ap.process(code, new InputStream(handle, bufferLength)));
     return ap.promise
@@ -302,7 +303,7 @@ async function openWrite(url, mode = "w", {bufferLength = chunkSize, umask = 0o6
     if (match)
         url = match[1];
     // todo: more protcols
-    let handle = new IoHandle();
+    let handle = new IOFile();
     let ap = new AsyncProcessor();
     handle.open(url, mode, umask, code => ap.process(code, new OutputStream(handle, bufferLength)));
     return ap.promise

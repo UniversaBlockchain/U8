@@ -6,6 +6,10 @@
 #include <cstring>
 
 #include "AsyncIO.h"
+#include "IOFile.h"
+#include "IODir.h"
+#include "IOUDP.h"
+#include "IOTCP.h"
 #include "AsyncIOTests.h"
 
 using namespace std;
@@ -18,7 +22,7 @@ using namespace std;
 #define PORT            10000
 
 typedef unsigned long ulong;
-std::shared_ptr<asyncio::IOHandle> file[NUM_THREADS];
+std::shared_ptr<asyncio::IOFile> file[NUM_THREADS];
 asyncio::byte_vector dataBuf[NUM_THREADS];
 uv_sem_t stop[NUM_THREADS];
 size_t fileSize[NUM_THREADS];
@@ -75,7 +79,7 @@ void testAsyncFile() {
                 char fileName[16];
                 snprintf(fileName, 16, "TestFile%ld.bin", t);
 
-                file[t] = std::make_shared<asyncio::IOHandle>();
+                file[t] = std::make_shared<asyncio::IOFile>();
 
                 asyncio::write_cb onWrite = [t, &onWrite](ssize_t result) {
                     ASSERT(result == 4096);
@@ -140,7 +144,7 @@ void testAsyncFile() {
                 char fileName[16];
                 snprintf(fileName, 16, "TestFile%ld.bin", t);
 
-                file[t] = std::make_shared<asyncio::IOHandle>();
+                file[t] = std::make_shared<asyncio::IOFile>();
 
                 asyncio::write_cb onWrite = [t, &onWrite, buff](ssize_t result) {
                     ASSERT(result == 4096);
@@ -339,7 +343,7 @@ void testAsyncFile() {
                         });
                 };
 
-                asyncio::file::openWrite(fileName, [t, onWrite](std::shared_ptr<asyncio::IOHandle> handle, ssize_t result) {
+                asyncio::IOFile::openWrite(fileName, [t, onWrite](std::shared_ptr<asyncio::IOFile> handle, ssize_t result) {
                     printf("Open file for writing in thread %ld\n", t + 1);
                     ASSERT(!asyncio::isError(result));
                     file[t] = handle;
@@ -402,7 +406,7 @@ void testAsyncFile() {
                     }
                 };
 
-                asyncio::file::openRead(fileName, [t, onRead](std::shared_ptr<asyncio::IOHandle> handle, ssize_t result) {
+                asyncio::IOFile::openRead(fileName, [t, onRead](std::shared_ptr<asyncio::IOFile> handle, ssize_t result) {
                     printf("Open file in thread %ld\n", t + 1);
                     ASSERT(!asyncio::isError(result));
                     file[t] = handle;
@@ -443,7 +447,7 @@ void testAsyncFile() {
         snprintf(fileName, 16, "TestFile%i.bin", t);
 
         for (int i = 0; i < NUM_ITERATIONS; i++)
-            asyncio::file::readFile(fileName, [](const asyncio::byte_vector& data, ssize_t result) {
+            asyncio::IOFile::readFile(fileName, [](const asyncio::byte_vector& data, ssize_t result) {
                 printf("Read file. Size = %i. Result = %i\n", (int) data.size(), (int) result);
                 ASSERT(!asyncio::isError(result));
 
@@ -477,7 +481,7 @@ void testAsyncFile() {
         char fileName[22];
         snprintf(fileName, 22, "TestEntireFile%i.bin", t);
 
-        asyncio::file::writeFile(fileName, dataBuf[t], [](ssize_t result) {
+        asyncio::IOFile::writeFile(fileName, dataBuf[t], [](ssize_t result) {
             printf("Wrote file. Result = %i\n", (int) result);
             ASSERT(!asyncio::isError(result));
 
@@ -497,7 +501,7 @@ void testAsyncFile() {
 
     uv_sem_init(&stop[0], 0);
 
-    asyncio::file::readFilePart("TestEntireFile0.bin", 10, 10, [](const asyncio::byte_vector& data, ssize_t result) {
+    asyncio::IOFile::readFilePart("TestEntireFile0.bin", 10, 10, [](const asyncio::byte_vector& data, ssize_t result) {
         printf("Read the part of file. Size = %i. Result = %i\n", (int) data.size(), (int) result);
 
         long sum = 0;
@@ -511,7 +515,7 @@ void testAsyncFile() {
         uv_sem_post(&stop[0]);
     });
 
-    asyncio::file::readFilePart("TestFile0.bin", BUFF_SIZE * NUM_BLOCKS - 256, 500, [](const asyncio::byte_vector& data, ssize_t result) {
+    asyncio::IOFile::readFilePart("TestFile0.bin", BUFF_SIZE * NUM_BLOCKS - 256, 500, [](const asyncio::byte_vector& data, ssize_t result) {
         printf("Read the part of file. Size = %i. Result = %i\n", (int) data.size(), (int) result);
 
         long sum = 0;
@@ -538,7 +542,7 @@ void testAsyncFile() {
         char fileName[16];
         snprintf(fileName, 16, "TestFile%i.bin", t);
 
-        asyncio::file::readFilePart(fileName, 10, BUFF_SIZE * NUM_BLOCKS,
+        asyncio::IOFile::readFilePart(fileName, 10, BUFF_SIZE * NUM_BLOCKS,
                 [](const asyncio::byte_vector& data, ssize_t result) {
             printf("Read the part of file with timeout. Size = %i. Result = %i\n", (int) data.size(), (int) result);
             ASSERT(!asyncio::isError(result));
@@ -568,7 +572,7 @@ void testAsyncFile() {
 
     uv_sem_init(&stop[0], 0);
 
-    auto fc = std::make_shared<asyncio::IOHandle>();
+    auto fc = std::make_shared<asyncio::IOFile>();
 
     fc->open("TestFile0.bin", O_RDWR, 0, [&](ssize_t result) {
         ASSERT(!asyncio::isError(result));
@@ -601,21 +605,21 @@ void testAsyncFile() {
 
     uv_sem_init(&stop[0], 0);
 
-    auto f = std::make_shared<asyncio::IOHandle>();
+    auto f = std::make_shared<asyncio::IOFile>();
 
-    f->open("TestFile0.bin", O_RDWR, 0)->then([&](ssize_t result) {
+    f->prepareOpen("TestFile0.bin", O_RDWR, 0)->then([&](ssize_t result) {
         ASSERT(!asyncio::isError(result));
         printf("File open\n");
 
-        f->read(100)->then([&](const asyncio::byte_vector& data, ssize_t result) {
+        f->prepareRead(100)->then([&](const asyncio::byte_vector& data, ssize_t result) {
             ASSERT(!asyncio::isError(result));
             printf("Read %ld bytes\n", result);
 
-            f->write(data)->then([&](ssize_t result) {
+            f->prepareWrite(data)->then([&](ssize_t result) {
                 ASSERT(!asyncio::isError(result));
                 printf("Wrote %ld bytes\n", result);
 
-                f->close()->then([&](ssize_t result) {
+                f->prepareClose()->then([&](ssize_t result) {
                     ASSERT(!asyncio::isError(result));
                     printf("File closed\n");
 
@@ -630,7 +634,7 @@ void testAsyncFile() {
 
     printf("Scan directory test (and get stat of content)...\n");
 
-    auto dir = std::make_shared<asyncio::IOHandle>();
+    auto dir = std::make_shared<asyncio::IODir>();
 
     auto dirLambda = [&](ssize_t result) {
         if (!asyncio::isError(result))
@@ -648,7 +652,7 @@ void testAsyncFile() {
 
             std::string name = entry.name;
 
-            asyncio::file::stat(name.data(), [=](asyncio::ioStat stat, ssize_t result) {
+            asyncio::IOFile::stat(name.data(), [=](asyncio::ioStat stat, ssize_t result) {
                 printf("%s: %s. Size = %lu Mode = %lu\n", type.data(), name.data(),
                         (unsigned long) stat.st_size, (unsigned long) stat.st_mode);
             });
@@ -660,16 +664,16 @@ void testAsyncFile() {
     // check 2 types syntax
     uv_sem_init(&stop[0], 0);
 
-    dir->openDir(".", dirLambda);
+    dir->open(".", dirLambda);
 
     uv_sem_wait(&stop[0]);
     uv_sem_destroy(&stop[0]);
 
-    auto dirThen = std::make_shared<asyncio::IOHandle>();
+    auto dirThen = std::make_shared<asyncio::IODir>();
 
     uv_sem_init(&stop[0], 0);
 
-    dirThen->openDir(".")->then(dirLambda);
+    dirThen->prepareOpen(".")->then(dirLambda);
 
     uv_sem_wait(&stop[0]);
     uv_sem_destroy(&stop[0]);
@@ -682,7 +686,7 @@ void testAsyncFile() {
         char fileName[22];
         snprintf(fileName, 22, "TestFile%i.bin", t);
 
-        asyncio::file::remove(fileName, [=](ssize_t result) {
+        asyncio::IOFile::remove(fileName, [=](ssize_t result) {
             ASSERT(!asyncio::isError(result));
             printf("File %s deleted.\n", fileName);
 
@@ -691,7 +695,7 @@ void testAsyncFile() {
 
         snprintf(fileName, 22, "TestEntireFile%i.bin", t);
 
-        asyncio::file::remove(fileName, [=](ssize_t result) {
+        asyncio::IOFile::remove(fileName, [=](ssize_t result) {
             ASSERT(!asyncio::isError(result));
             printf("File %s deleted.\n", fileName);
 
@@ -700,7 +704,7 @@ void testAsyncFile() {
 
         snprintf(fileName, 22, "TestOpenWrite%i.bin", t);
 
-        asyncio::file::remove(fileName, [=](ssize_t result) {
+        asyncio::IOFile::remove(fileName, [=](ssize_t result) {
             ASSERT(!asyncio::isError(result));
             printf("File %s deleted.\n", fileName);
 
@@ -720,7 +724,7 @@ void testAsyncFile() {
         char dirName[12];
         snprintf(dirName, 12, "TestDir%i", t);
 
-        asyncio::dir::createDir(dirName, S_IRWXU | S_IRWXG | S_IRWXO, [=](ssize_t result) {
+        asyncio::IODir::createDir(dirName, S_IRWXU | S_IRWXG | S_IRWXO, [=](ssize_t result) {
             ASSERT(!asyncio::isError(result));
             printf("Directory %s created.\n", dirName);
 
@@ -740,7 +744,7 @@ void testAsyncFile() {
         char dirName[12];
         snprintf(dirName, 12, "TestDir%i", t);
 
-        asyncio::dir::removeDir(dirName, [=](ssize_t result) {
+        asyncio::IODir::removeDir(dirName, [=](ssize_t result) {
             ASSERT(!asyncio::isError(result));
             printf("Directory %s removed.\n", dirName);
 
@@ -769,12 +773,12 @@ void testAsyncUDP() {
                 loop_srv = asyncio::initAndRunAuxLoop();
 
             for (int i = 0; i < NUM_ITERATIONS; i++) {
-                asyncio::IOHandle srv(loop_srv);
-                asyncio::IOHandle cli(loop_cli);
+                asyncio::IOUDP srv(loop_srv);
+                asyncio::IOUDP cli(loop_cli);
 
                 uv_sem_init(&stop[t], 0);
 
-                srv.openUDP("127.0.0.1", PORT + (unsigned int)t);
+                srv.open("127.0.0.1", PORT + (unsigned int)t);
 
                 srv.recv([&](ssize_t result, const asyncio::byte_vector& data, const char* IP, unsigned int port){
                     ASSERT(result == 5);
@@ -798,7 +802,7 @@ void testAsyncUDP() {
                     });
                 });
 
-                cli.openUDP("127.0.0.1", PORT + NUM_THREADS + (unsigned int)t);
+                cli.open("127.0.0.1", PORT + NUM_THREADS + (unsigned int)t);
 
                 asyncio::byte_vector ping(5);
                 memcpy(ping.data(), "PING", 4);
@@ -850,12 +854,12 @@ void testAsyncUDP() {
                 loop_srv = asyncio::initAndRunAuxLoop();
 
             for (int i = 0; i < NUM_ITERATIONS; i++) {
-                asyncio::IOHandle srv(loop_srv);
-                asyncio::IOHandle cli(loop_cli);
+                asyncio::IOUDP srv(loop_srv);
+                asyncio::IOUDP cli(loop_cli);
 
                 uv_sem_init(&stop[t], 0);
 
-                srv.openUDP("127.0.0.1", PORT + (unsigned int)t);
+                srv.open("127.0.0.1", PORT + (unsigned int)t);
 
                 char buffer_srv[5];
 
@@ -880,7 +884,7 @@ void testAsyncUDP() {
 
                 char buffer_cli[5];
 
-                cli.openUDP("127.0.0.1", PORT + NUM_THREADS + (unsigned int)t);
+                cli.open("127.0.0.1", PORT + NUM_THREADS + (unsigned int)t);
 
                 cli.send((void*) "PING", 5, "127.0.0.1", PORT + (unsigned int)t, [&](ssize_t result){
                     ASSERT(result == 5);
@@ -918,6 +922,170 @@ void testAsyncUDP() {
 
     printf("test with memory buffers successful\n");
 
+    ths.clear();
+
+    for (long t = 0; t < NUM_THREADS; t++) {
+        ths.emplace_back([t]() {
+            asyncio::ioLoop* loop_srv = asyncio::asyncLoop;
+            asyncio::ioLoop* loop_cli = asyncio::initAndRunAuxLoop();
+
+            if (t > 0)
+                loop_srv = asyncio::initAndRunAuxLoop();
+
+            for (int i = 0; i < NUM_ITERATIONS; i++) {
+                asyncio::IOUDP srv(loop_srv);
+                asyncio::IOUDP cli(loop_cli);
+
+                uv_sem_init(&stop[t], 0);
+
+                srv.open("127.0.0.1", PORT + (unsigned int)t);
+
+                srv.setDefaultAddress("127.0.0.1", PORT + NUM_THREADS + (unsigned int)t);
+
+                srv.read(4096, [&](const asyncio::byte_vector& data, ssize_t result){
+                    ASSERT(result == 5);
+                    ASSERT(!memcmp("PING", data.data(), 4));
+
+                    printf("Server received: PING\n");
+
+                    asyncio::byte_vector pong(5);
+                    memcpy(pong.data(), "PONG", 4);
+
+                    srv.write(pong, [&](ssize_t result){
+                        ASSERT(result == 5);
+
+                        srv.close([t](ssize_t result){
+                            ASSERT(!asyncio::isError(result));
+
+                            uv_sem_post(&stop[t]);
+                        });
+                    });
+                });
+
+                cli.open("127.0.0.1", PORT + NUM_THREADS + (unsigned int)t);
+
+                asyncio::byte_vector ping(5);
+                memcpy(ping.data(), "PING", 4);
+
+                cli.setDefaultAddress("127.0.0.1", PORT + (unsigned int)t);
+
+                cli.write(ping, [&](ssize_t result){
+                    ASSERT(result == 5);
+
+                    cli.read(4096, [&](const asyncio::byte_vector& data, ssize_t result){
+                        ASSERT(result == 5);
+                        ASSERT(!memcmp("PONG", data.data(), 4));
+
+                        printf("Client received: PONG\n");
+
+                        cli.close([t](ssize_t result){
+                            ASSERT(!asyncio::isError(result));
+
+                            uv_sem_post(&stop[t]);
+                        });
+                    });
+                });
+
+                uv_sem_wait(&stop[t]);
+                uv_sem_wait(&stop[t]);
+                uv_sem_destroy(&stop[t]);
+
+                printf("Thread %ld iteration %i\n", t, i);
+            };
+
+            if (t > 0)
+                asyncio::deinitAuxLoop(loop_srv);
+
+            asyncio::deinitAuxLoop(loop_cli);
+        });
+    }
+
+    for (int t = 0; t < NUM_THREADS; t++)
+        ths[t].join();
+
+    printf("test read/write with byte-vectors successful\n");
+
+    ths.clear();
+
+    for (long t = 0; t < NUM_THREADS; t++) {
+        ths.emplace_back([t]() {
+            asyncio::ioLoop* loop_srv = asyncio::asyncLoop;
+            asyncio::ioLoop* loop_cli = asyncio::initAndRunAuxLoop();
+
+            if (t > 0)
+                loop_srv = asyncio::initAndRunAuxLoop();
+
+            for (int i = 0; i < NUM_ITERATIONS; i++) {
+                asyncio::IOUDP srv(loop_srv);
+                asyncio::IOUDP cli(loop_cli);
+
+                uv_sem_init(&stop[t], 0);
+
+                srv.open("127.0.0.1", PORT + (unsigned int)t);
+
+                srv.setDefaultAddress("127.0.0.1", PORT + NUM_THREADS + (unsigned int)t);
+
+                char buffer_srv[5];
+
+                srv.read(buffer_srv, 5, [&](ssize_t result){
+                    ASSERT(result == 5);
+                    ASSERT(!memcmp("PING", buffer_srv, 4));
+
+                    printf("Server received: PING\n");
+
+                    srv.write((void*) "PONG", 5, [&](ssize_t result){
+                        ASSERT(result == 5);
+
+                        srv.close([t](ssize_t result){
+                            ASSERT(!asyncio::isError(result));
+
+                            uv_sem_post(&stop[t]);
+                        });
+                    });
+                });
+
+                char buffer_cli[5];
+
+                cli.open("127.0.0.1", PORT + NUM_THREADS + (unsigned int)t);
+
+                cli.setDefaultAddress("127.0.0.1", PORT + (unsigned int)t);
+
+                cli.write((void*) "PING", 5, [&](ssize_t result){
+                    ASSERT(result == 5);
+
+                    cli.read(buffer_cli, 5, [&](ssize_t result){
+                        ASSERT(result == 5);
+                        ASSERT(!memcmp("PONG", buffer_cli, 4));
+
+                        printf("Client received: PONG\n");
+
+                        cli.close([t](ssize_t result){
+                            ASSERT(!asyncio::isError(result));
+
+                            uv_sem_post(&stop[t]);
+                        });
+                    });
+                });
+
+                uv_sem_wait(&stop[t]);
+                uv_sem_wait(&stop[t]);
+                uv_sem_destroy(&stop[t]);
+
+                printf("Thread %ld iteration %i\n", t, i);
+            };
+
+            if (t > 0)
+                asyncio::deinitAuxLoop(loop_srv);
+
+            asyncio::deinitAuxLoop(loop_cli);
+        });
+    }
+
+    for (int t = 0; t < NUM_THREADS; t++)
+        ths[t].join();
+
+    printf("test read/write with memory buffers successful\n");
+
     printf("testAsyncUDP()...done\n\n");
 }
 
@@ -931,10 +1099,10 @@ void testAsyncTCP() {
     uv_mutex_init(&clients_mutex);
 
     //init TCP server
-    asyncio::IOHandle srv;
-    vector<shared_ptr<asyncio::IOHandle>> clients;
+    asyncio::IOTCP srv;
+    vector<asyncio::IOTCP*> clients;
 
-    srv.openTCP("127.0.0.1", PORT, [&](ssize_t result){
+    srv.open("127.0.0.1", PORT, [&](ssize_t result){
         ASSERT(!asyncio::isError(result));
 
         printf("New connection\n");
@@ -979,7 +1147,7 @@ void testAsyncTCP() {
             for (int i = 0; i < NUM_ITERATIONS; i++) {
                 uv_sem_init(&stop[t], 0);
 
-                asyncio::IOHandle cli(loop);
+                asyncio::IOTCP cli(loop);
 
                 cli.connect("127.0.0.1", PORT + (unsigned int) t * NUM_ITERATIONS + i, "127.0.0.1", PORT, [&](ssize_t result){
                     ASSERT(!asyncio::isError(result));
@@ -1049,10 +1217,10 @@ void testAsyncTCP() {
     uv_mutex_init(&clients_mutex);
 
     //init TCP server
-    asyncio::IOHandle srv_buff;
+    asyncio::IOTCP srv_buff;
     vector<char*> buffs;
 
-    srv_buff.openTCP("127.0.0.1", PORT, [&](ssize_t result){
+    srv_buff.open("127.0.0.1", PORT, [&](ssize_t result){
         ASSERT(!asyncio::isError(result));
 
         printf("New connection\n");
@@ -1094,7 +1262,7 @@ void testAsyncTCP() {
             for (int i = 0; i < NUM_ITERATIONS; i++) {
                 uv_sem_init(&stop[t], 0);
 
-                asyncio::IOHandle cli(loop);
+                asyncio::IOTCP cli(loop);
 
                 char buff_cli[5];
 
@@ -1158,11 +1326,11 @@ void testAsyncTCP() {
     clients.clear();
 
     //init TCP server
-    asyncio::IOHandle srv_part;
+    asyncio::IOTCP srv_part;
 
     uv_sem_init(&sem_tcp_srv, 0);
 
-    srv_part.openTCP("127.0.0.1", PORT, [&](ssize_t result){
+    srv_part.open("127.0.0.1", PORT, [&](ssize_t result){
         ASSERT(!asyncio::isError(result));
 
         printf("New connection\n");
@@ -1206,7 +1374,7 @@ void testAsyncTCP() {
 
     //init TCP client
     asyncio::ioLoop* loop = asyncio::initAndRunAuxLoop();
-    asyncio::IOHandle cli(loop);
+    asyncio::IOTCP cli(loop);
 
     cli.connect("127.0.0.1", PORT + 1, "127.0.0.1", PORT, [&](ssize_t result){
         ASSERT(!asyncio::isError(result));
@@ -1227,7 +1395,7 @@ void testAsyncTCP() {
     uv_sem_wait(&sem_tcp_srv);
     uv_sem_destroy(&sem_tcp_srv);
 
-    asyncio::IOHandle nonexistentClient;
+    asyncio::IOTCP nonexistentClient;
 
     int result = nonexistentClient.acceptFromListeningSocket(&srv_part);
     printf("Check accept nonexistent client result: %i what: %s\n", result, asyncio::getError(result));
@@ -1273,7 +1441,7 @@ void testUnifyFileAndTCPread() {
     uv_sem_init(&sem, 0);
 
     // FILE
-    asyncio::IOHandle file;
+    asyncio::IOFile file;
 
     file.open("UnifyTest.txt", O_CREAT | O_WRONLY, S_IRWXU | S_IRWXG | S_IRWXO, [&](ssize_t result) {
         ASSERT(!asyncio::isError(result));
@@ -1335,15 +1503,15 @@ void testUnifyFileAndTCPread() {
     uv_sem_wait(&sem);
     uv_sem_destroy(&sem);
 
-    printf("unify file read test successful\n");
+    printf("unify file test successful\n");
 
     // TCP
-    asyncio::IOHandle srv;
-    asyncio::IOHandle acc;
+    asyncio::IOTCP srv;
+    asyncio::IOTCP acc;
 
     uv_sem_init(&sem, 0);
 
-    srv.openTCP("127.0.0.1", PORT, [&](ssize_t result){
+    srv.open("127.0.0.1", PORT, [&](ssize_t result){
         ASSERT(!asyncio::isError(result));
 
         printf("New connection\n");
@@ -1363,7 +1531,7 @@ void testUnifyFileAndTCPread() {
     });
 
     asyncio::ioLoop* loop = asyncio::initAndRunAuxLoop();
-    asyncio::IOHandle cli(loop);
+    asyncio::IOTCP cli(loop);
 
     cli.connect("127.0.0.1", PORT + 1, "127.0.0.1", PORT, [&](ssize_t result){
         ASSERT(!asyncio::isError(result));
@@ -1374,25 +1542,25 @@ void testUnifyFileAndTCPread() {
             ASSERT(result == 3);
             ASSERT(!memcmp("ABC", buff, 3));
 
-            printf("Server received: ABC\n");
+            printf("Client received: ABC\n");
 
             cli.read(buff, 3, [&](ssize_t result){
                 ASSERT(result == 3);
                 ASSERT(!memcmp("DEF", buff, 3));
 
-                printf("Server received: DEF\n");
+                printf("Client received: DEF\n");
 
                 cli.read(buff, 3, [&](ssize_t result){
                     ASSERT(result == 3);
                     ASSERT(!memcmp("GHI", buff, 3));
 
-                    printf("Server received: GHI\n");
+                    printf("Client received: GHI\n");
 
                     cli.read(buff, 3, [&](ssize_t result){
                         ASSERT(result == 1);
 
                         ASSERT(!memcmp("J", buff, 1));
-                        printf("Server received: J\n");
+                        printf("Client received: J\n");
 
                         cli.close([&](ssize_t result){
                             ASSERT(!asyncio::isError(result));
@@ -1423,7 +1591,7 @@ void testUnifyFileAndTCPread() {
     uv_sem_wait(&sem);
     uv_sem_destroy(&sem);
 
-    printf("unify tcp read test successful\n");
+    printf("unify TCP test successful\n");
 
     asyncio::deinitAuxLoop(loop);
 
@@ -1435,12 +1603,12 @@ void testClientWriteWithouthRead() {
 
     uv_sem_t sem;
 
-    asyncio::IOHandle srv;
-    asyncio::IOHandle acc;
+    asyncio::IOTCP srv;
+    asyncio::IOTCP acc;
 
     uv_sem_init(&sem, 0);
 
-    srv.openTCP("127.0.0.1", PORT, [&](ssize_t result){
+    srv.open("127.0.0.1", PORT, [&](ssize_t result){
         ASSERT(!asyncio::isError(result));
 
         printf("New connection\n");
@@ -1456,7 +1624,7 @@ void testClientWriteWithouthRead() {
     char buff[2048];
 
     asyncio::ioLoop* loop = asyncio::initAndRunAuxLoop();
-    asyncio::IOHandle cli(loop);
+    asyncio::IOTCP cli(loop);
 
     cli.connect("127.0.0.1", PORT + 1, "127.0.0.1", PORT, [&](ssize_t result){
         ASSERT(!asyncio::isError(result));

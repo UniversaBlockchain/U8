@@ -7,7 +7,8 @@
 #include "async_io_bindings.h"
 #include "binding_tools.h"
 #include "../tools/tools.h"
-#include "../AsyncIO/AsyncIO.h"
+#include "../AsyncIO/IOFile.h"
+#include "../AsyncIO/IOTCP.h"
 
 static Persistent<FunctionTemplate> handleTemplate;
 
@@ -20,11 +21,11 @@ void JsAsyncGetErrorText(const FunctionCallbackInfo<Value> &args) {
     });
 }
 
-void JsAsyncHandleOpen(const FunctionCallbackInfo<Value> &args) {
+void JsAsyncFileOpen(const FunctionCallbackInfo<Value> &args) {
     Scripter::unwrap(args, [&](const shared_ptr<Scripter> &se, auto isolate, auto context) {
         auto file_name = se->getString(args[0]);
         auto mode = se->getString(args[1]);
-        auto h = unwrap<asyncio::IOHandle>(args.This());
+        auto h = unwrap<asyncio::IOFile>(args.This());
         Persistent<Function> *pcb = new Persistent<Function>(isolate, args[3].As<Function>());
 
         int openMode = -1;
@@ -45,7 +46,7 @@ void JsAsyncHandleOpen(const FunctionCallbackInfo<Value> &args) {
                 se->inPool([=](Local<Context> &context) {
                     auto fn = pcb->Get(context->GetIsolate());
                     if (fn->IsNull()) {
-                        se->throwError("null callback in IoHandle::open");
+                        se->throwError("null callback in IOFile::open");
                     } else {
                         Local<Value> res = BigInt::New(isolate, result);
                         fn->Call(fn, 1, &res);
@@ -169,7 +170,7 @@ void JsAsyncHandleClose(const FunctionCallbackInfo<Value> &args) {
 
 // TCP listen         0            1                   2                          3
 // void openTCP(const char* IP, unsigned int port, openTCP_cb callback, int maxConnections);
-void JsAsyncHandleListen(const FunctionCallbackInfo<Value> &args) {
+void JsAsyncTCPListen(const FunctionCallbackInfo<Value> &args) {
     Scripter::unwrapArgs(args, [&](ArgsContext &ac) {
         auto scripter = ac.scripter;
         if (args.Length() == 4) {
@@ -177,12 +178,12 @@ void JsAsyncHandleListen(const FunctionCallbackInfo<Value> &args) {
                 scripter->throwError("invalid callback");
                 return;
             }
-            auto handle = unwrap<asyncio::IOHandle>(args.This());
+            auto handle = unwrap<asyncio::IOTCP>(args.This());
             auto isolate = ac.isolate;
             Persistent<Function> *onReady = new Persistent<Function>(ac.isolate, ac.as<Function>(2));
             int maxConnections = ac.asInt(3);
             if (maxConnections <= 0) maxConnections = SOMAXCONN;
-            handle->openTCP(ac.asString(0).data(), ac.asInt(1), [=](ssize_t result) {
+            handle->open(ac.asString(0).data(), ac.asInt(1), [=](ssize_t result) {
                 scripter->lockedContext([=](auto context) {
                     auto fn = onReady->Get(isolate);
                     delete onReady;
@@ -198,7 +199,7 @@ void JsAsyncHandleListen(const FunctionCallbackInfo<Value> &args) {
 
 //                       0                     1                 2                3              4
 // void connect(const char* bindIP, unsigned int bindPort, const char* IP, unsigned int port, connect_cb callback);
-void JsAsyncHandleConnect(const FunctionCallbackInfo<Value> &args) {
+void JsAsyncTCPConnect(const FunctionCallbackInfo<Value> &args) {
     Scripter::unwrapArgs(args, [&](ArgsContext &ac) {
         auto scripter = ac.scripter;
         if (args.Length() == 5) {
@@ -206,7 +207,7 @@ void JsAsyncHandleConnect(const FunctionCallbackInfo<Value> &args) {
                 scripter->throwError("invalid callback");
                 return;
             }
-            auto handle = unwrap<asyncio::IOHandle>(args.This());
+            auto handle = unwrap<asyncio::IOTCP>(args.This());
             auto isolate = ac.isolate;
             Persistent<Function> *onReady = new Persistent<Function>(ac.isolate, ac.as<Function>(4));
             auto bindIp = ac.asString(0);
@@ -229,7 +230,7 @@ void JsAsyncHandleConnect(const FunctionCallbackInfo<Value> &args) {
 }
 
 // accept(serverHandle)
-void JsAsyncHandleAccept(const FunctionCallbackInfo<Value> &args) {
+void JsAsyncTCPAccept(const FunctionCallbackInfo<Value> &args) {
     Scripter::unwrapArgs(args, [&](ArgsContext &ac) {
         auto scripter = ac.scripter;
         if (args.Length() == 1) {
@@ -238,8 +239,8 @@ void JsAsyncHandleAccept(const FunctionCallbackInfo<Value> &args) {
             if (!obj->IsObject() || !tpl->HasInstance(obj)) {
                 ac.throwError("required IoHandle argument");
             } else {
-                auto connectionHandle = unwrap<asyncio::IOHandle>(obj);
-                auto serverHandle = unwrap<asyncio::IOHandle>(args.This());
+                auto connectionHandle = unwrap<asyncio::IOTCP>(obj);
+                auto serverHandle = unwrap<asyncio::IOTCP>(args.This());
                 int code = serverHandle->acceptFromListeningSocket(connectionHandle);
                 ac.setReturnValue(code);
             };
@@ -249,27 +250,44 @@ void JsAsyncHandleAccept(const FunctionCallbackInfo<Value> &args) {
     });
 }
 
-void JsInitIoHandle(Isolate *isolate, const Local<ObjectTemplate> &global) {
+void JsInitIOFile(Isolate *isolate, const Local<ObjectTemplate> &global) {
     // Bind object with default constructor
-    Local<FunctionTemplate> tpl = bindCppClass<asyncio::IOHandle>(isolate, "IoHandle");
+    Local<FunctionTemplate> tpl = bindCppClass<asyncio::IOFile>(isolate, "IOFile");
 
     // instance methods
     auto prototype = tpl->PrototypeTemplate();
     prototype->Set(isolate, "version", String::NewFromUtf8(isolate, "0.0.1"));
-    prototype->Set(isolate, "open", FunctionTemplate::New(isolate, JsAsyncHandleOpen));
+    prototype->Set(isolate, "open", FunctionTemplate::New(isolate, JsAsyncFileOpen));
     prototype->Set(isolate, "_read_raw", FunctionTemplate::New(isolate, JsAsyncHandleRead));
     prototype->Set(isolate, "_write_raw", FunctionTemplate::New(isolate, JsAsyncHandleWrite));
     prototype->Set(isolate, "_close_raw", FunctionTemplate::New(isolate, JsAsyncHandleClose));
-    prototype->Set(isolate, "_listen", FunctionTemplate::New(isolate, JsAsyncHandleListen));
-    prototype->Set(isolate, "_connect", FunctionTemplate::New(isolate, JsAsyncHandleConnect));
-    prototype->Set(isolate, "_accept", FunctionTemplate::New(isolate, JsAsyncHandleAccept));
 
     // class methods
     tpl->Set(isolate, "getErrorText", FunctionTemplate::New(isolate, JsAsyncGetErrorText));
 
     // register it into global namespace
     handleTemplate.Reset(isolate, tpl);
-    global->Set(isolate, "IoHandle", tpl);
+    global->Set(isolate, "IOFile", tpl);
 }
 
+void JsInitIOTCP(Isolate *isolate, const Local<ObjectTemplate> &global) {
+    // Bind object with default constructor
+    Local<FunctionTemplate> tpl = bindCppClass<asyncio::IOTCP>(isolate, "IOTCP");
 
+    // instance methods
+    auto prototype = tpl->PrototypeTemplate();
+    prototype->Set(isolate, "version", String::NewFromUtf8(isolate, "0.0.1"));
+    prototype->Set(isolate, "_read_raw", FunctionTemplate::New(isolate, JsAsyncHandleRead));
+    prototype->Set(isolate, "_write_raw", FunctionTemplate::New(isolate, JsAsyncHandleWrite));
+    prototype->Set(isolate, "_close_raw", FunctionTemplate::New(isolate, JsAsyncHandleClose));
+    prototype->Set(isolate, "_listen", FunctionTemplate::New(isolate, JsAsyncTCPListen));
+    prototype->Set(isolate, "_connect", FunctionTemplate::New(isolate, JsAsyncTCPConnect));
+    prototype->Set(isolate, "_accept", FunctionTemplate::New(isolate, JsAsyncTCPAccept));
+
+    // class methods
+    tpl->Set(isolate, "getErrorText", FunctionTemplate::New(isolate, JsAsyncGetErrorText));
+
+    // register it into global namespace
+    handleTemplate.Reset(isolate, tpl);
+    global->Set(isolate, "IOTCP", tpl);
+}
