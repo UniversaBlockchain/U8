@@ -345,7 +345,6 @@ namespace network {
         auto iter = sessionsByRemoteId.find(destination.getNumber());
         if (iter == sessionsByRemoteId.end()) {
             Session session(destination);
-            //session.sessionKey = sessionKey_;
             iter = sessionsByRemoteId.insert(std::make_pair(destination.getNumber(), session)).first;
         }
         return iter->second;

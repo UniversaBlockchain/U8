@@ -236,7 +236,6 @@ namespace network {
     private:
         bool isLogEnabled_ = false;
         std::string logLabel_;
-        crypto::SymmetricKey sessionKey_;
         NetConfig netConfig_;
         asyncio::IOUDP socket_;
         crypto::PrivateKey ownPrivateKey_;
