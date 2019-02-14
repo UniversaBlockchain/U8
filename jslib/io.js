@@ -3,11 +3,12 @@
  */
 class IoError extends Error {
     constructor(reason) {
-        if (reason instanceof String) {
+        let code = +reason;
+        if (code != reason) {
             super(reason);
             this.code = undefined;
         } else {
-            super(`${IoHandle.getErrorText(reason)} (${reason})`);
+            super(`${IOFile.getErrorText(code)} (${code})`);
             this.code = reason;
         }
     }
@@ -36,14 +37,15 @@ class AsyncProcessor {
  */
 const chunkSize = 2048;
 
-const hproto = IoHandle.prototype;
+const file_proto = IOFile.prototype;
+const tcp_proto = IOTCP.prototype;
 
-hproto.read = function (size) {
+file_proto.read = tcp_proto.read = function (size) {
     if (size <= 0)
         throw Error("size must > 0");
     let ap = new AsyncProcessor();
     this._read_raw(size, (data, code) => {
-        // read less tham expected: slice
+        // read less than expected: slice
         if( code > 0 && code < size )
             data = data.slice(0, code);
         ap.process(code, data)
@@ -51,15 +53,16 @@ hproto.read = function (size) {
     return ap.promise;
 };
 
-hproto.write = function (data) {
-    if (!(data instanceof Uint8Array))
+file_proto.write = tcp_proto.write = function (data) {
+    if (!(data instanceof Uint8Array)) {
         data = Uint8Array.from(data);
+    }
     let ap = new AsyncProcessor();
     this._write_raw(data, code => ap.process(code))
     return ap.promise;
 }
 
-hproto.close = function() {
+file_proto.close = tcp_proto.close = function() {
     let ap = new AsyncProcessor();
     this._close_raw(code => ap.process(code))
     return ap.promise;
@@ -130,8 +133,10 @@ function InputStream(handle, buferLength = chunkSize) {
 
     this.nextByte = nextByte;
     this.nextLine = nextLine;
+    this.readLine = nextLine;
+    this.readByte = nextByte;
 
-    /**
+    /***
      * Async iterator for remainig bytes. Iterate bytes as numbers.
      *
      * @type {{[Symbol.asyncIterator]: Function}}
@@ -146,7 +151,7 @@ function InputStream(handle, buferLength = chunkSize) {
         }
     };
 
-    /**
+    /***
      * Async iterator for remaining lines of the input. Iteration start from the cirrent position in the input
      *
      * @type {{[Symbol.asyncIterator]: Function}}
@@ -188,7 +193,13 @@ function InputStream(handle, buferLength = chunkSize) {
             offset += x.length;
         });
         return result;
-    }
+    };
+
+    /**
+     * Read the rest of the stream as bytes. Same as {#allBytes()}
+     * @type {(function(): Uint8Array)}
+     */
+    this.readAll = this.allBytes;
 
     /**
      * Read up to specified number of bytes or until the end of the stream.
@@ -206,13 +217,17 @@ function InputStream(handle, buferLength = chunkSize) {
         }
 
         if (pos >= 0) {
-            if (chunk)
+            if (chunk) {
                 push(chunk.subarray(pos, size + pos));
+                pos += size;
+            }
             while (actualSize < size) {
                 if (!await loadChunk())
                     break;
-                if (chunk.length + actualSize <= size)
+                if (chunk.length + actualSize <= size) {
                     push(chunk)
+                    pos = chunk.length;
+                }
                 else {
                     let left = size - actualSize;
                     // left first bytes of the chunk to copy
@@ -221,6 +236,7 @@ function InputStream(handle, buferLength = chunkSize) {
                 }
             }
         }
+        // console.log(`read outcome: chunk: ${chunk.length}: ${utf8Decode(chunk)}, pos: ${pos}, result: ${utf8Decode(result)}`);
         return result;
     };
 
@@ -231,7 +247,13 @@ function InputStream(handle, buferLength = chunkSize) {
      */
     this.allAsString = async function () {
         return utf8Decode(await this.allBytes());
-    }
+    };
+
+    /**
+     * Read the rest of the stream as a UTF8 string.
+     * @type {(function(): String)}
+     */
+    this.readAllAsString = this.allAsString;
 
     return this;
 }
@@ -250,7 +272,7 @@ async function openRead(url, {bufferLength = chunkSize}={}) {
     if (match)
         url = match[1];
     // todo: more protcols
-    let handle = new IoHandle();
+    let handle = new IOFile();
     let ap = new AsyncProcessor();
     handle.open(url, 'r', 0, code => ap.process(code, new InputStream(handle, bufferLength)));
     return ap.promise
@@ -258,6 +280,8 @@ async function openRead(url, {bufferLength = chunkSize}={}) {
 
 function OutputStream(handle, bufferSize = chunkSize) {
     this.write = async function (data) {
+        if( typeof(data) == 'string')
+            data = utf8Encode(data);
         await handle.write(data);
     };
 
@@ -279,11 +303,10 @@ async function openWrite(url, mode = "w", {bufferLength = chunkSize, umask = 0o6
     if (match)
         url = match[1];
     // todo: more protcols
-    let handle = new IoHandle();
+    let handle = new IOFile();
     let ap = new AsyncProcessor();
     handle.open(url, mode, umask, code => ap.process(code, new OutputStream(handle, bufferLength)));
     return ap.promise
 }
 
-
-module.exports = {openRead, openWrite, InputStream, OutputStream};
+module.exports = {openRead, openWrite, InputStream, OutputStream, AsyncProcessor, IoError};

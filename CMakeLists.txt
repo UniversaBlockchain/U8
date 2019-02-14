@@ -22,6 +22,17 @@ elseif (WIN32)
     set(platform "win_v8")
 endif ()
 
+macro(find_npm)
+    find_program(NPM_EXECUTABLE "npm")
+endmacro()
+
+find_npm()
+
+if (NPM_EXECUTABLE)
+    add_subdirectory(doc/docjs)
+    set_target_properties(docjs PROPERTIES FOLDER "Tools")
+endif()
+
 file(GLOB LIBRARY_SRC
     AsyncIO/*.h AsyncIO/*.cpp
     crypto/*.h crypto/*.cpp

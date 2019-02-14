@@ -18,6 +18,7 @@
 #include "Safe58.h"
 #include "../tools/ThreadPool.h"
 #include "SymmetricKey.h"
+#include "../AsyncIO/IOUDP.h"
 
 using namespace std;
 using namespace crypto;
@@ -555,6 +556,46 @@ void testSymmetricKeys() {
     cout << "testSymmetricKeys()... done!" << endl << endl;
 }
 
+void udpAdapterHelloWorld() {
+    cout << "udpAdapterHelloWorld()..." << endl;
+
+    string body0("packet from node-0");
+    string body1("some data from node-1");
+    string body2("data from node-2");
+
+    asyncio::IOUDP socket0;
+    asyncio::IOUDP socket1;
+
+    socket0.open("127.0.0.1", 4040);
+    socket1.open("127.0.0.1", 4041);
+
+    socket0.recv([&](ssize_t result, const asyncio::byte_vector& data, const char* IP, unsigned int port) {
+        if (data.size() > 0)
+            cout << "socket0 receive data, result=" << result << ", size=" << data.size() << ": " << string(data.begin(), data.end()) << endl;
+    });
+    socket1.recv([&](ssize_t result, const asyncio::byte_vector& data, const char* IP, unsigned int port) {
+        if (data.size() > 0) {
+            cout << "socket1 receive data, result=" << result << ", size=" << data.size() << ": "
+                 << string(data.begin(), data.end()) << endl;
+            checkResult("udp", body0, string(data.begin(), data.end()));
+        }
+    });
+
+    for (int i = 0; i < 1000; ++i) {
+        socket0.send(byte_vector(body0.begin(), body0.end()), "127.0.0.1", 4041, [](ssize_t result) {});
+    }
+
+    std::this_thread::sleep_for(2000ms);
+
+    socket0.stopRecv();
+    socket1.stopRecv();
+    socket0.close([&](ssize_t result){});
+    socket1.close([&](ssize_t result){});
+    std::this_thread::sleep_for(1000ms);
+
+    cout << "udpAdapterHelloWorld()... done!" << endl << endl;
+}
+
 void testCryptoAll() {
     testCrypto();
     testHashId();
@@ -566,4 +607,5 @@ void testCryptoAll() {
     testKeysConcurrency();
     testGenerateNewKeys();
     testSymmetricKeys();
+    udpAdapterHelloWorld();
 }

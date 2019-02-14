@@ -16,34 +16,6 @@ async function testReadLines() {
     }
 }
 
-async function testSize(path, expectedSize) {
-    let input = await io.openRead(path);
-    let data = await input.allBytes();
-    if (data.length != expectedSize)
-        throw Error(`Size mismatch with ${path}: expected ${expectedSize} got ${data.length}`);
-}
-
-async function testReadAll() {
-        // let input = await io.openRead("../test/test.txt");
-        // console.log(await input.allAsString());
-        await testSize("../test/test.txt", 57);
-        await testSize("../test/testcontract.unicon", 2589);
-}
-
-async function testIterateBytes() {
-    let input = await io.openRead("../test/test.txt");
-    await input.nextByte()
-    await input.nextByte()
-    let x = await input.read(12);
-    assert("this is a te" == utf8Decode(x));
-    assert(x.length == 12);
-}
-
-async function testWriteBytes() {
-    let output = await io.openWrite("../testbytes.bin", 'w', {umask: 0o777});
-    await output.write([0x30, 0x31, 0x32, 0x33]);
-    await output.close();
-}
 
 const Boss = require('boss.js');
 
@@ -138,20 +110,11 @@ async function testES() {
     let es = ExtendedSignature.verify(key,signature,bytes);
     assert(es != null);
 }
-async function testHashId() {
-    let x = crypto.HashId.of("hello, world");
-    // console.log(x.digest);
-    // console.log(x.base64);
-    let y = crypto.HashId.withDigest(x.digest);
-    assert(equalArrays(x.digest, y.digest));
-    assert(x.equals(y));
-    assert(x.base64.length > 50);
-    assert(x.base64 == y.base64);
-    let z = crypto.HashId.withBase64Digest(x.base64);
-    assert(z.equals(x));
-}
 
 require('unit_tests/crypto_test')
+require('unit_tests/network_test');
+require('unit_tests/file_tests');
+
 require('unit_tests/deltas_test')
 require('unit_tests/role_test')
 require('unit_tests/simplerole_test')
@@ -160,10 +123,6 @@ require('unit_tests/linkrole_test')
 
 async function main() {
 
-    // await testReadAll();
-    //await testHashId();
-    // await testIterateBytes();
-    // await testWriteBytes();
     //testBoss();
 
     // testBoss();

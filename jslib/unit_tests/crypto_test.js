@@ -87,3 +87,16 @@ unit.test("digest", async () => {
     let dd = crypto.digest(crypto.SHA256, "hello, world");
     assert(btoa(dd) == "Ccp+TqpuiunH0mEWcSkYSINkTQffuny/vEyKLgg2DVs=");
 });
+
+unit.test("HashId", () => {
+    let x = crypto.HashId.of("hello, world");
+    // console.log(x.digest);
+    // console.log(x.base64);
+    let y = crypto.HashId.withDigest(x.digest);
+    assert(equalArrays(x.digest, y.digest));
+    assert(x.equals(y));
+    assert(x.base64.length > 50);
+    assert(x.base64 == y.base64);
+    let z = crypto.HashId.withBase64Digest(x.base64);
+    assert(z.equals(x));
+});
