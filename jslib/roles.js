@@ -319,7 +319,7 @@ function SimpleRole(name,param) {
         this.keyAddresses.add(param);
     } else if(param instanceof crypto.PublicKey) {
         this.keyRecords.set(param,new KeyRecord(param));
-    } else if(param instanceof Array) {
+    } else if(param instanceof Array || param instanceof Set) {
         for(let p of param) {
             if(p instanceof crypto.KeyAddress) {
                 this.keyAddresses.add(p);

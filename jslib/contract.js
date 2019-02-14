@@ -704,21 +704,21 @@ Contract.prototype.deserialize = function(data,deserializer) {
     if (this.transactional != null && this.transactional.references != null) {
         for(let ref of this.transactional.references) {
             ref.setContract(this);
-            this.references.put(ref.name, ref);
+            this.references.set(ref.name, ref);
         }
     }
 
     if (this.definition != null && this.definition.references != null) {
         for(let ref of this.definition.references) {
             ref.setContract(this);
-            this.references.put(ref.name, ref);
+            this.references.set(ref.name, ref);
         }
     }
 
     if (this.state != null && this.state.references != null) {
         for(let ref of this.state.references) {
             ref.setContract(this);
-            this.references.put(ref.name, ref);
+            this.references.set(ref.name, ref);
         }
     }
 };
@@ -1236,6 +1236,46 @@ Contract.prototype.verifySealedKeys = async function(isQuantise) {
     }
 
     this.isNeedVerifySealedKeys = false;
+};
+
+Contract.prototype.copy = function() {
+    return DefaultBiMapper.getInstance().deserialize(DefaultBiMapper.getInstance().serialize(this));
+
+};
+Contract.prototype.createRevision = function(keys) {
+    let newRevision = this.copy();
+
+    newRevision.state.revision = this.state.revision + 1;
+    newRevision.state.createdAt = new Date();
+    newRevision.state.parent = this.id;
+    newRevision.state.origin = this.state.revision == 1 ? this.id : this.state.origin;
+    newRevision.revokingItems.add(this);
+    newRevision.transactional = null;
+
+    if (newRevision.definition != null && newRevision.definition.references != null){
+        for(let ref of  newRevision.definition.references) {
+            ref.setContract(newRevision);
+            newRevision.references.set(ref.name, ref);
+        }
+    }
+    if (newRevision.state != null && newRevision.state.references != null){
+        for(let ref of newRevision.state.references) {
+            ref.setContract(newRevision);
+            newRevision.references.set(ref.name, ref);
+        }
+    }
+
+    if(keys) {
+        let addresses = new Set();
+        for(let k of keys) {
+            addresses.add(k.publicKey.longAddress);
+            newRevision.keysToSignWith.add(k);
+        }
+        let creator = new roles.SimpleRole("creator",addresses);
+        newRevision.registerRole(creator);
+    }
+
+    return newRevision;
 };
 
 DefaultBiMapper.registerAdapter(new bs.BiAdapter("UniversaContract",Contract));

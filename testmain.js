@@ -120,6 +120,7 @@ require('unit_tests/role_test')
 require('unit_tests/simplerole_test')
 require('unit_tests/listrole_test')
 require('unit_tests/linkrole_test')
+require('unit_tests/changenumberpermission_test')
 
 async function main() {
 

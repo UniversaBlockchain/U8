@@ -127,7 +127,7 @@ ChangeNumberPermission.prototype.serialize = function(serializer) {
         max_value : this.maxValue,
         min_value : this.minValue
     };
-    return Object.getPrototypeOf(ChangeNumberPermission.prototype).serialize().call(this,serializer);
+    return Object.getPrototypeOf(ChangeNumberPermission.prototype).serialize.call(this,serializer);
 };
 
 ChangeNumberPermission.prototype.deserialize = function (data, deserializer) {
@@ -142,18 +142,23 @@ ChangeNumberPermission.prototype.checkChanges = function(contract, changed, stat
     let dataChanges = stateChanges.data;
     if (dataChanges == null)
         return;
-    if (dataChanges.hasOwnProperty(this.fieldName)) {
-        let delta = dataChanges[this.fieldName];
+
+    if (dataChanges instanceof dlt.MapDelta && dataChanges.changes.hasOwnProperty(this.fieldName)) {
+
+        let delta = dataChanges.changes[this.fieldName];
         if (delta != null) {
             if (!(delta instanceof dlt.ChangedItem))
                 return;
 
+
             //TODO: big decimal?
             let valueDelta = delta.newValue - delta.oldValue;
 
+
             if (valueDelta >= this.minStep && valueDelta <= this.maxStep) {
+
                 if (delta.newValue <= this.maxValue && delta.newValue >= this.minValue)
-                    delete dataChanges[this.fieldName];
+                    delete dataChanges.changes[this.fieldName];
             }
         }
     }
