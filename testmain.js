@@ -152,6 +152,11 @@ async function testHashId() {
 }
 
 require('unit_tests/crypto_test')
+require('unit_tests/deltas_test')
+require('unit_tests/role_test')
+require('unit_tests/simplerole_test')
+require('unit_tests/listrole_test')
+require('unit_tests/linkrole_test')
 
 async function main() {
 
