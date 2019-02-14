@@ -111,9 +111,16 @@ async function testES() {
     assert(es != null);
 }
 
-require('unit_tests/crypto_test');
+require('unit_tests/crypto_test')
 require('unit_tests/network_test');
 require('unit_tests/file_tests');
+
+require('unit_tests/deltas_test')
+require('unit_tests/role_test')
+require('unit_tests/simplerole_test')
+require('unit_tests/listrole_test')
+require('unit_tests/linkrole_test')
+require('unit_tests/changenumberpermission_test')
 
 async function main() {
 

@@ -7,9 +7,12 @@
 #include "async_io_bindings.h"
 #include "binding_tools.h"
 #include "../tools/tools.h"
-#include "../AsyncIO/AsyncIO.h"
+#include "../AsyncIO/IOFile.h"
+#include "../AsyncIO/IOTCP.h"
 
-static Persistent<FunctionTemplate> handleTemplate;
+static Persistent<FunctionTemplate> FileTemplate;
+static Persistent<FunctionTemplate> TCPTemplate;
+static Persistent<FunctionTemplate> UDPTemplate;
 
 void JsAsyncGetErrorText(const FunctionCallbackInfo<Value> &args) {
     Scripter::unwrap(args, [&](const shared_ptr<Scripter> &se, auto isolate, auto context) {
@@ -20,11 +23,11 @@ void JsAsyncGetErrorText(const FunctionCallbackInfo<Value> &args) {
     });
 }
 
-void JsAsyncHandleOpen(const FunctionCallbackInfo<Value> &args) {
+void JsAsyncFileOpen(const FunctionCallbackInfo<Value> &args) {
     Scripter::unwrap(args, [&](const shared_ptr<Scripter> &se, auto isolate, auto context) {
         auto file_name = se->getString(args[0]);
         auto mode = se->getString(args[1]);
-        auto h = unwrap<asyncio::IOHandle>(args.This());
+        auto h = unwrap<asyncio::IOFile>(args.This());
         Persistent<Function> *pcb = new Persistent<Function>(isolate, args[3].As<Function>());
 
         int openMode = -1;
@@ -45,7 +48,7 @@ void JsAsyncHandleOpen(const FunctionCallbackInfo<Value> &args) {
                 se->inPool([=](Local<Context> &context) {
                     auto fn = pcb->Get(context->GetIsolate());
                     if (fn->IsNull()) {
-                        se->throwError("null callback in IoHandle::open");
+                        se->throwError("null callback in IOFile::open");
                     } else {
                         Local<Value> res = BigInt::New(isolate, result);
                         fn->Call(fn, 1, &res);
@@ -64,44 +67,41 @@ void JsAsyncHandleOpen(const FunctionCallbackInfo<Value> &args) {
 void JsAsyncHandleRead(const FunctionCallbackInfo<Value> &args) {
     Scripter::unwrapArgs(args, [&](ArgsContext &ac) {
 
-                             auto handle = unwrap<asyncio::IOHandle>(args.This());
-                             auto scripter = ac.scripter;
+         auto handle = unwrap<asyncio::IOHandle>(args.This());
+         auto scripter = ac.scripter;
 
-                             Persistent<Function> *pcb = new Persistent<Function>(ac.isolate, ac.as<Function>(1));
+         Persistent<Function> *pcb = new Persistent<Function>(ac.isolate, ac.as<Function>(1));
 
-                             // avoid copying results
-                             auto max_size = ac.asInt(0);
-                             auto ab = ArrayBuffer::New(ac.isolate, max_size);
-                             unsigned char *pdata = (unsigned char *) ab->GetContents().Data();
-                             auto pResult = new Persistent<Uint8Array>(ac.isolate, Uint8Array::New(ab, 0, max_size));
-                             // not sure whether we actually need it:
-                             auto pBuffer = new Persistent<ArrayBuffer>(ac.isolate, ab);
+         // avoid copying results
+         auto max_size = ac.asInt(0);
+         auto ab = ArrayBuffer::New(ac.isolate, max_size);
+         unsigned char *pdata = (unsigned char *) ab->GetContents().Data();
+         auto pResult = new Persistent<Uint8Array>(ac.isolate, Uint8Array::New(ab, 0, max_size));
+         // not sure whether we actually need it:
+         auto pBuffer = new Persistent<ArrayBuffer>(ac.isolate, ab);
 
-                             handle->read(pdata, max_size,
-                                          [=](ssize_t result) {
-                                              // here we are in the async dispatcher thread we should not lock:
-                                              scripter->inPool([=](auto context) {
-                                                  Isolate *isolate = context->GetIsolate();
-                                                  auto fn = pcb->Get(isolate);
-                                                  if (fn->IsNull()) {
-                                                      scripter->throwError("null callback in IoHandle::read");
-                                                  } else {
-                                                      if (result > 0) {
-                                                          Local<Value> res[2]{pResult->Get(isolate), Integer::New(isolate, result)};
-                                                          fn->Call(fn, 2, res);
-                                                      } else {
-                                                          Local<Value> res[] = {Undefined(isolate), Integer::New(isolate, result)};
-                                                          fn->Call(fn, 2, res);
-                                                      }
-                                                  }
-                                                  delete pcb;
-                                                  delete pResult;
-                                                  delete pBuffer;
-                                              });
-                                          });
-                         }
-
-    );
+         handle->read(pdata, max_size, [=](ssize_t result) {
+              // here we are in the async dispatcher thread we should not lock:
+              scripter->inPool([=](auto context) {
+                  Isolate *isolate = context->GetIsolate();
+                  auto fn = pcb->Get(isolate);
+                  if (fn->IsNull()) {
+                      scripter->throwError("null callback in IoHandle::read");
+                  } else {
+                      if (result > 0) {
+                          Local<Value> res[2]{pResult->Get(isolate), Integer::New(isolate, result)};
+                          fn->Call(fn, 2, res);
+                      } else {
+                          Local<Value> res[] = {Undefined(isolate), Integer::New(isolate, result)};
+                          fn->Call(fn, 2, res);
+                      }
+                  }
+                  delete pcb;
+                  delete pResult;
+                  delete pBuffer;
+              });
+         });
+    });
 }
 
 // write(typedArray,cb)
@@ -126,18 +126,17 @@ void JsAsyncHandleWrite(const FunctionCallbackInfo<Value> &args) {
         // We'll need it with a shared buffer
         auto pBuffer = new Persistent<ArrayBuffer>(ac.isolate, source->Buffer());
 
-        handle->write(bytes, size,
-                      [=](ssize_t result) {
-                          // here we are in another thread
-                          scripter->inPool([=](auto context) {
-                              Isolate *isolate = context->GetIsolate();
-                              auto fn = pcb->Get(isolate);
-                              Local<Value> res = Integer::New(isolate, result);
-                              fn->Call(fn, 1, &res);
-                              delete pcb;
-                              delete pBuffer;
-                          });
-                      });
+        handle->write(bytes, size, [=](ssize_t result) {
+              // here we are in another thread
+              scripter->inPool([=](auto context) {
+                  Isolate *isolate = context->GetIsolate();
+                  auto fn = pcb->Get(isolate);
+                  Local<Value> res = Integer::New(isolate, result);
+                  fn->Call(fn, 1, &res);
+                  delete pcb;
+                  delete pBuffer;
+              });
+        });
     });
 }
 
@@ -167,9 +166,9 @@ void JsAsyncHandleClose(const FunctionCallbackInfo<Value> &args) {
     });
 }
 
-// TCP listen         0            1                   2                          3
-// void openTCP(const char* IP, unsigned int port, openTCP_cb callback, int maxConnections);
-void JsAsyncHandleListen(const FunctionCallbackInfo<Value> &args) {
+// TCP listen      0            1                   2                          3
+// void open(const char* IP, unsigned int port, openTCP_cb callback, int maxConnections);
+void JsAsyncTCPListen(const FunctionCallbackInfo<Value> &args) {
     Scripter::unwrapArgs(args, [&](ArgsContext &ac) {
         auto scripter = ac.scripter;
         if (args.Length() == 4) {
@@ -177,12 +176,12 @@ void JsAsyncHandleListen(const FunctionCallbackInfo<Value> &args) {
                 scripter->throwError("invalid callback");
                 return;
             }
-            auto handle = unwrap<asyncio::IOHandle>(args.This());
+            auto handle = unwrap<asyncio::IOTCP>(args.This());
             auto isolate = ac.isolate;
             Persistent<Function> *onReady = new Persistent<Function>(ac.isolate, ac.as<Function>(2));
             int maxConnections = ac.asInt(3);
             if (maxConnections <= 0) maxConnections = SOMAXCONN;
-            handle->openTCP(ac.asString(0).data(), ac.asInt(1), [=](ssize_t result) {
+            handle->open(ac.asString(0).data(), ac.asInt(1), [=](ssize_t result) {
                 scripter->lockedContext([=](auto context) {
                     auto fn = onReady->Get(isolate);
                     delete onReady;
@@ -198,7 +197,7 @@ void JsAsyncHandleListen(const FunctionCallbackInfo<Value> &args) {
 
 //                       0                     1                 2                3              4
 // void connect(const char* bindIP, unsigned int bindPort, const char* IP, unsigned int port, connect_cb callback);
-void JsAsyncHandleConnect(const FunctionCallbackInfo<Value> &args) {
+void JsAsyncTCPConnect(const FunctionCallbackInfo<Value> &args) {
     Scripter::unwrapArgs(args, [&](ArgsContext &ac) {
         auto scripter = ac.scripter;
         if (args.Length() == 5) {
@@ -206,7 +205,7 @@ void JsAsyncHandleConnect(const FunctionCallbackInfo<Value> &args) {
                 scripter->throwError("invalid callback");
                 return;
             }
-            auto handle = unwrap<asyncio::IOHandle>(args.This());
+            auto handle = unwrap<asyncio::IOTCP>(args.This());
             auto isolate = ac.isolate;
             Persistent<Function> *onReady = new Persistent<Function>(ac.isolate, ac.as<Function>(4));
             auto bindIp = ac.asString(0);
@@ -229,17 +228,17 @@ void JsAsyncHandleConnect(const FunctionCallbackInfo<Value> &args) {
 }
 
 // accept(serverHandle)
-void JsAsyncHandleAccept(const FunctionCallbackInfo<Value> &args) {
+void JsAsyncTCPAccept(const FunctionCallbackInfo<Value> &args) {
     Scripter::unwrapArgs(args, [&](ArgsContext &ac) {
         auto scripter = ac.scripter;
         if (args.Length() == 1) {
             auto obj = ac.as<Object>(0);
-            auto tpl = handleTemplate.Get(ac.isolate);
+            auto tpl = TCPTemplate.Get(ac.isolate);
             if (!obj->IsObject() || !tpl->HasInstance(obj)) {
-                ac.throwError("required IoHandle argument");
+                ac.throwError("required IOTCP argument");
             } else {
-                auto connectionHandle = unwrap<asyncio::IOHandle>(obj);
-                auto serverHandle = unwrap<asyncio::IOHandle>(args.This());
+                auto connectionHandle = unwrap<asyncio::IOTCP>(obj);
+                auto serverHandle = unwrap<asyncio::IOTCP>(args.This());
                 int code = serverHandle->acceptFromListeningSocket(connectionHandle);
                 ac.setReturnValue(code);
             };
@@ -249,27 +248,173 @@ void JsAsyncHandleAccept(const FunctionCallbackInfo<Value> &args) {
     });
 }
 
-void JsInitIoHandle(Isolate *isolate, const Local<ObjectTemplate> &global) {
+// UDP open         0                1
+// void open(const char* IP, unsigned int port)
+void JsAsyncUDPOpen(const FunctionCallbackInfo<Value> &args) {
+    Scripter::unwrapArgs(args, [&](ArgsContext &ac) {
+        auto scripter = ac.scripter;
+        if (args.Length() == 2) {
+            auto handle = unwrap<asyncio::IOUDP>(args.This());
+            handle->open(ac.asString(0).data(), ac.asInt(1));
+        } else {
+            scripter->throwError("invalid number of arguments");
+        }
+    });
+}
+
+// UDP recv         0                1                      2
+// void recv(void* buffer, size_t maxBytesToRecv, recvBuffer_cb callback)
+void JsAsyncUDPRecv(const FunctionCallbackInfo<Value> &args) {
+    Scripter::unwrapArgs(args, [&](ArgsContext &ac) {
+
+        auto handle = unwrap<asyncio::IOUDP>(args.This());
+        auto scripter = ac.scripter;
+
+        Persistent<Function> *pcb = new Persistent<Function>(ac.isolate, ac.as<Function>(1));
+
+        // avoid copying results
+        auto max_size = ac.asInt(0);
+        auto ab = ArrayBuffer::New(ac.isolate, max_size);
+        unsigned char *pdata = (unsigned char *) ab->GetContents().Data();
+        auto pResult = new Persistent<Uint8Array>(ac.isolate, Uint8Array::New(ab, 0, max_size));
+        // not sure whether we actually need it:
+        auto pBuffer = new Persistent<ArrayBuffer>(ac.isolate, ab);
+
+        handle->recv(pdata, max_size, [=](ssize_t result, const char* IP, unsigned int port) {
+            // here we are in the async dispatcher thread we should not lock:
+            scripter->inPool([=](auto context) {
+                Isolate *isolate = context->GetIsolate();
+                auto fn = pcb->Get(isolate);
+                if (fn->IsNull() || fn->IsUndefined()) {
+                    scripter->throwError("null callback in IOUDP::recv");
+                } else {
+                    if (result > 0) {
+                        Local<Value> res[4]{pResult->Get(isolate), Integer::New(isolate, result),
+                                            String::NewFromUtf8(isolate, IP), Integer::New(isolate, port)};
+                        fn->Call(fn, 4, res);
+                    } else {
+                        Local<Value> res[] = {Undefined(isolate), Integer::New(isolate, result),
+                                              Undefined(isolate), Undefined(isolate)};
+                        fn->Call(fn, 4, res);
+                    }
+                }
+                delete pcb;
+                delete pResult;
+                delete pBuffer;
+            });
+        });
+    });
+}
+
+// UDP send         0            1             2                 3               4
+// void send(void* buffer, size_t size, const char* IP, unsigned int port, send_cb callback)
+void JsAsyncUDPSend(const FunctionCallbackInfo<Value> &args) {
+    Scripter::unwrapArgs(args, [&](ArgsContext &ac) {
+
+        auto handle = unwrap<asyncio::IOUDP>(args.This());
+        auto scripter = ac.scripter;
+
+        auto source = ac.as<TypedArray>(0);
+        auto buffer =  source->Buffer();
+        auto size = buffer->ByteLength();
+        auto bytes = (uint8_t *) buffer->GetContents().Data();
+
+        auto fn = ac.as<Function>(3);
+        if (fn->IsNull() || fn->IsUndefined()) {
+            scripter->throwError("null callback in IOUDP::send");
+            return;
+        }
+        Persistent<Function> *pcb = new Persistent<Function>(ac.isolate, fn);
+
+        // We'll need it with a shared buffer
+        auto pBuffer = new Persistent<ArrayBuffer>(ac.isolate, source->Buffer());
+
+        handle->send(bytes, size, ac.asString(1).data(), ac.asInt(2), [=](ssize_t result) {
+            // here we are in another thread
+            scripter->inPool([=](auto context) {
+                Isolate *isolate = context->GetIsolate();
+                auto fn = pcb->Get(isolate);
+                Local<Value> res = Integer::New(isolate, result);
+                fn->Call(fn, 1, &res);
+                delete pcb;
+                delete pBuffer;
+            });
+        });
+    });
+}
+
+// UDP stopRecv
+void JsAsyncUDPStopRecv(const FunctionCallbackInfo<Value> &args) {
+    Scripter::unwrapArgs(args, [&](ArgsContext &ac) {
+        auto scripter = ac.scripter;
+        if (args.Length() == 0) {
+            auto handle = unwrap<asyncio::IOUDP>(args.This());
+            handle->stopRecv();
+        } else {
+            scripter->throwError("invalid number of arguments");
+        }
+    });
+}
+
+void JsInitIOFile(Isolate *isolate, const Local<ObjectTemplate> &global) {
     // Bind object with default constructor
-    Local<FunctionTemplate> tpl = bindCppClass<asyncio::IOHandle>(isolate, "IoHandle");
+    Local<FunctionTemplate> tpl = bindCppClass<asyncio::IOFile>(isolate, "IOFile");
 
     // instance methods
     auto prototype = tpl->PrototypeTemplate();
     prototype->Set(isolate, "version", String::NewFromUtf8(isolate, "0.0.1"));
-    prototype->Set(isolate, "open", FunctionTemplate::New(isolate, JsAsyncHandleOpen));
+    prototype->Set(isolate, "open", FunctionTemplate::New(isolate, JsAsyncFileOpen));
     prototype->Set(isolate, "_read_raw", FunctionTemplate::New(isolate, JsAsyncHandleRead));
     prototype->Set(isolate, "_write_raw", FunctionTemplate::New(isolate, JsAsyncHandleWrite));
     prototype->Set(isolate, "_close_raw", FunctionTemplate::New(isolate, JsAsyncHandleClose));
-    prototype->Set(isolate, "_listen", FunctionTemplate::New(isolate, JsAsyncHandleListen));
-    prototype->Set(isolate, "_connect", FunctionTemplate::New(isolate, JsAsyncHandleConnect));
-    prototype->Set(isolate, "_accept", FunctionTemplate::New(isolate, JsAsyncHandleAccept));
 
     // class methods
     tpl->Set(isolate, "getErrorText", FunctionTemplate::New(isolate, JsAsyncGetErrorText));
 
     // register it into global namespace
-    handleTemplate.Reset(isolate, tpl);
-    global->Set(isolate, "IoHandle", tpl);
+    FileTemplate.Reset(isolate, tpl);
+    global->Set(isolate, "IOFile", tpl);
 }
 
+void JsInitIOTCP(Isolate *isolate, const Local<ObjectTemplate> &global) {
+    // Bind object with default constructor
+    Local<FunctionTemplate> tpl = bindCppClass<asyncio::IOTCP>(isolate, "IOTCP");
 
+    // instance methods
+    auto prototype = tpl->PrototypeTemplate();
+    prototype->Set(isolate, "version", String::NewFromUtf8(isolate, "0.0.1"));
+    prototype->Set(isolate, "_read_raw", FunctionTemplate::New(isolate, JsAsyncHandleRead));
+    prototype->Set(isolate, "_write_raw", FunctionTemplate::New(isolate, JsAsyncHandleWrite));
+    prototype->Set(isolate, "_close_raw", FunctionTemplate::New(isolate, JsAsyncHandleClose));
+    prototype->Set(isolate, "_listen", FunctionTemplate::New(isolate, JsAsyncTCPListen));
+    prototype->Set(isolate, "_connect", FunctionTemplate::New(isolate, JsAsyncTCPConnect));
+    prototype->Set(isolate, "_accept", FunctionTemplate::New(isolate, JsAsyncTCPAccept));
+
+    // class methods
+    tpl->Set(isolate, "getErrorText", FunctionTemplate::New(isolate, JsAsyncGetErrorText));
+
+    // register it into global namespace
+    TCPTemplate.Reset(isolate, tpl);
+    global->Set(isolate, "IOTCP", tpl);
+}
+
+void JsInitIOUDP(Isolate *isolate, const Local<ObjectTemplate> &global) {
+    // Bind object with default constructor
+    Local<FunctionTemplate> tpl = bindCppClass<asyncio::IOUDP>(isolate, "IOUDP");
+
+    // instance methods
+    auto prototype = tpl->PrototypeTemplate();
+    prototype->Set(isolate, "version", String::NewFromUtf8(isolate, "0.0.1"));
+    prototype->Set(isolate, "_udp_open", FunctionTemplate::New(isolate, JsAsyncUDPOpen));
+    prototype->Set(isolate, "_recv_raw", FunctionTemplate::New(isolate, JsAsyncUDPRecv));
+    prototype->Set(isolate, "_send_raw", FunctionTemplate::New(isolate, JsAsyncUDPSend));
+    prototype->Set(isolate, "_stop_recv", FunctionTemplate::New(isolate, JsAsyncUDPStopRecv));
+    prototype->Set(isolate, "_close_raw", FunctionTemplate::New(isolate, JsAsyncHandleClose));
+
+    // class methods
+    tpl->Set(isolate, "getErrorText", FunctionTemplate::New(isolate, JsAsyncGetErrorText));
+
+    // register it into global namespace
+    UDPTemplate.Reset(isolate, tpl);
+    global->Set(isolate, "IOUDP", tpl);
+}

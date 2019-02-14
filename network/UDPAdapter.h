@@ -16,6 +16,7 @@
 #include "../tools/TimerThread.h"
 #include "UDPAdapterPrivate.h"
 #include "../crypto/SymmetricKey.h"
+#include "../AsyncIO/IOUDP.h"
 
 namespace network {
 
@@ -237,7 +238,7 @@ namespace network {
         std::string logLabel_;
         crypto::SymmetricKey sessionKey_;
         NetConfig netConfig_;
-        asyncio::IOHandle socket_;
+        asyncio::IOUDP socket_;
         crypto::PrivateKey ownPrivateKey_;
         NodeInfo ownNodeInfo_;
         TReceiveCallback receiveCallback_;

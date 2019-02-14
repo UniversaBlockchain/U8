@@ -57,13 +57,13 @@ class TcpServer {
      * @param reject callback to process errors. After it is called, the server may stop processing incoming connections.
      */
     accept(resolve, reject) {
-        this.handle = new IoHandle();
+        this.handle = new IOTCP();
         this.handle._listen(this.bindIp, this.port, (code) => {
             if (code < 0)
                 reject(new IoError(code));
             else {
                 try {
-                    let connectionHandle = new IoHandle();
+                    let connectionHandle = new IOTCP();
                     let result = connectionHandle._accept(this.handle);
                     if (result < 0)
                         reject(new IoError(result));
@@ -95,7 +95,7 @@ let tcp = {
      */
     async connect({host, port, bindIp = "0.0.0.0", bindPort = 0, bufferLength = chunkSize}) {
         try {
-            let handle = new IoHandle();
+            let handle = new IOTCP();
             let ap = new AsyncProcessor();
             if (!host || !port)
                 throw Error("missing host/port");

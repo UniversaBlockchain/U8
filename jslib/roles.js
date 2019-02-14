@@ -35,6 +35,7 @@ Role.prototype.equals = function(to) {
     if(this === to)
         return true;
 
+
     if(Object.getPrototypeOf(this) !== Object.getPrototypeOf(to))
         return false;
 
@@ -46,7 +47,8 @@ Role.prototype.equals = function(to) {
 
     if(!t.valuesEqual(this.requiredAllReferences,to.requiredAllReferences))
         return false;
-    if(!t.valuesEqual(this.requiredAllReferences,to.requiredAnyReferences))
+
+    if(!t.valuesEqual(this.requiredAnyReferences,to.requiredAnyReferences))
         return false;
 
     return true;
@@ -102,7 +104,19 @@ Role.prototype.deserialize = function (data, deserializer) {
 };
 
 Role.prototype.serialize = function(serializer) {
-    return {name:this.name};
+    let res = {name:this.name};
+    if(this.requiredAnyReferences.size + this.requiredAllReferences.size > 0) {
+        let required = {};
+        if(this.requiredAnyReferences.size > 0) {
+            required[RequiredMode.ANY_OF] = serializer.serialize(this.requiredAnyReferences);
+        }
+
+        if(this.requiredAllReferences.size > 0) {
+            required[RequiredMode.ALL_OF] = serializer.serialize(this.requiredAllReferences);
+        }
+        res.required = required;
+    }
+    return res;
 };
 
 Role.prototype.linkAs = function (linkName) {
@@ -232,9 +246,8 @@ ListRole.prototype.equals = function(to) {
             return false;
     }
 
-    if(!t.valuesEqual(this.roles,to.roles))
+    if(!t.valuesEqual(new Set(this.roles),new Set(to.roles)))
         return false;
-
 
     return true;
 };
@@ -306,6 +319,14 @@ function SimpleRole(name,param) {
         this.keyAddresses.add(param);
     } else if(param instanceof crypto.PublicKey) {
         this.keyRecords.set(param,new KeyRecord(param));
+    } else if(param instanceof Array || param instanceof Set) {
+        for(let p of param) {
+            if(p instanceof crypto.KeyAddress) {
+                this.keyAddresses.add(p);
+            } else if(p instanceof crypto.PublicKey) {
+                this.keyRecords.set(p,new KeyRecord(p));
+            }
+        }
     }
 }
 
@@ -380,6 +401,7 @@ SimpleRole.prototype.isAllowedForKeys = function(keys) {
             return false;
     }
 
+
     for(let address of this.keyAddresses) {
         let found = false;
         for(let k of keys) {
@@ -391,6 +413,7 @@ SimpleRole.prototype.isAllowedForKeys = function(keys) {
         if(!found)
             return false;
     }
+
     return true;
 };
 
