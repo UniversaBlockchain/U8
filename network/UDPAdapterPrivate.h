@@ -49,9 +49,11 @@ namespace network {
          */
         byte_vector makeByteArray() const;
 
+        int getSenderNodeId() const {return senderNodeId_;}
         int getReceiverNodeId() const {return receiverNodeId_;}
         int getPacketId() const {return packetId_;}
         int getType() const {return type_;}
+        const byte_vector& getPayloadRef() const {return payload_;}
 
     private:
         int senderNodeId_;
@@ -125,6 +127,7 @@ namespace network {
         std::unordered_map<int, RetransmitItem> retransmitMap;
         NodeInfo remoteNodeInfo;
         crypto::SymmetricKey sessionKey;
+        void removeHandshakePacketsFromRetransmitMap();
         void addPacketToRetransmitMap(int packetId, const Packet& packet, const byte_vector& sourcePayload);
         void pulseRetransmit(std::function<void(const NodeInfo&, const Packet&)> funcSendPacket);
 
@@ -176,8 +179,11 @@ namespace network {
      * SessionReader uses for handshaking and for receive PacketTypes::DATA
      * \see Session
      */
-    class SessionReader {
+    class SessionReader: public Retransmitter {
     public:
+        SessionReader(const NodeInfo& newRemoteNodeInfo);
+        SessionReader(const SessionReader&) = default;
+        SessionReader(SessionReader&&) = default;
         byte_vector localNonce;
         long nextLocalNonceGenerationTime;
         byte_vector remoteNonce;
@@ -189,6 +195,12 @@ namespace network {
     void writeLog(bool enabled, Args && ...args) {
         if (enabled)
             (std::cout << ... << args) << std::endl;
+    }
+
+    template<typename ...Args>
+    void writeErr(bool enabled, Args && ...args) {
+        if (enabled)
+            (std::cerr << ... << args) << std::endl;
     }
 
 };

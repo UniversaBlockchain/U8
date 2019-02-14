@@ -43,7 +43,7 @@ namespace network {
          */
         void send(int destNodeNumber, const byte_vector& payload);
 
-        void enableLog(bool enabled) {isLogEnabled = enabled;}
+        void enableLog(bool enabled) {isLogEnabled_ = enabled;}
 
     private:
         /**
@@ -62,6 +62,46 @@ namespace network {
         void onReceiveWelcome(const Packet& packet);
 
         /**
+         * We have received KEY_REQ_PART1 packet. Waiting for part2 or continue if it has got already.
+         */
+        void onReceiveKeyReqPart1(const Packet& packet);
+
+        /**
+         * We have received KEY_REQ_PART2 packet. Waiting for part1 or continue if it has got already.
+         */
+        void onReceiveKeyReqPart2(const Packet& packet);
+
+        /**
+         * Here we checks that both parts of KEY_REQ are received.
+         * Now we should create sessionKey and send it to handshake's initiator.
+         * sessionReader is ready for receiving packets from remote session now,
+         * so remove it from candidates list by call acceptSessionReaderCandidate(SessionReader)
+         */
+        void onReceiveKeyReq(SessionReader& sessionReader);
+
+        /**
+         * We have received SESSION_PART1 packet. Waiting for part2 or continue if it has got already.
+         */
+        void onReceiveSessionPart1(const Packet& packet);
+
+        /**
+         * We have received SESSION_PART2 packet. Waiting for part1 or continue if it has got already.
+         */
+        void onReceiveSessionPart2(const Packet& packet);
+
+        /**
+         * Here we checks that both parts of SESSION are received.
+         * Handshake has completed now, so change session's state to STATE_EXCHANGING.
+         * Also, reply with SESSION_ACK
+         */
+        void onReceiveSession(Session& session);
+
+        /**
+         * We have received SESSION_ACK packet. Need to stop retransmitting of any handshake packets.
+         */
+        void onReceiveSessionAck(const Packet& packet);
+
+        /**
          * All packets data Packet.payload of type PacketTypes::DATA
          * must be encrypted with sessionKey (SymmetricKey).
          * This method implements encryption procedure for it.
@@ -74,8 +114,14 @@ namespace network {
          */
         void sendPayload(Session& session, const byte_vector& payload);
 
-        void sendPacket(const NodeInfo& dest, const byte_vector& data); //<------------------- dbg
+        /**
+         * Sends raw data in udp socket.
+         */
+        void sendPacket(const NodeInfo& dest, const byte_vector& data);
 
+        /**
+         * Id generator for udp datagrams.
+         */
         int getNextPacketId();
 
         /**
@@ -88,8 +134,14 @@ namespace network {
          */
         void restartHandshakeIfNeeded(Session& session, long now);
 
+        /**
+         * Calls from timer
+         */
         void pulseRetransmit();
 
+        /**
+         * Calls from timer
+         */
         void clearProtectionFromDupleBuffers();
 
         /**
@@ -98,9 +150,48 @@ namespace network {
         Session& getOrCreateSession(const NodeInfo& destination);
 
         /**
+         * If sessionReader for remote node is already created - returns it, otherwise creates new SessionReader
+         */
+        SessionReader& getOrCreateSessionReaderCandidate(int remoteId);
+
+        /**
+         * Returns SessionReader from working readers list.
+         */
+        SessionReader& getSessionReader(int remoteId);
+
+        /**
+         * When handshake completed, sessionReader moves from candidates list to working readers list.
+         */
+        void acceptSessionReaderCandidate(SessionReader& sessionReader);
+
+        /**
          * This is first step of creation and installation of the session.
          */
         void sendHello(Session& session);
+
+        /**
+         * When someone send us PacketTypes::HELLO typed Packet, we should respond with PacketTypes::WELCOME.
+         */
+        void sendWelcome(SessionReader& sessionReader);
+
+        /**
+         * We have sent HELLO, and have got WELCOME - it means we can continue handshake and send
+         * request for session's keys. KEY_REQ's payload is more than 512 bytes, so used two parts here.
+         */
+        void sendKeyReq(Session& session);
+
+        /**
+         * Someone who sent HELLO, send us new KEY_REQ - if all is ok we send session keys to.
+         * SESSION's payload is more than 512 bytes, so used two parts here.
+         * From now we ready to data exchange.
+         */
+        void sendSessionKey(SessionReader& sessionReader);
+
+        /**
+         * ACK packets are used only for respond to DATA packets. Retransmission of handshake's packet types stops on each
+         * next handshake step. But last step need to be ACK-ed. For this used SESSION_ACK packet.
+         */
+        void sendSessionAck(Session& session);
 
     public:
         /**
@@ -142,15 +233,19 @@ namespace network {
         const static size_t HANDSHAKE_TIMEOUT_MILLIS = 10000;
 
     private:
-        bool isLogEnabled = false;
+        bool isLogEnabled_ = false;
+        std::string logLabel_;
         crypto::SymmetricKey sessionKey_;
         NetConfig netConfig_;
         asyncio::IOHandle socket_;
+        crypto::PrivateKey ownPrivateKey_;
         NodeInfo ownNodeInfo_;
         TReceiveCallback receiveCallback_;
         int nextPacketId_;
         TimerThread timer_;
         std::unordered_map<int, Session> sessionsByRemoteId;
+        std::unordered_map<int, SessionReader> sessionReaders;
+        std::unordered_map<int, SessionReader> sessionReaderCandidates;
         std::recursive_mutex sendMutex;
     };
 

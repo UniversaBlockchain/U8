@@ -45,7 +45,7 @@ namespace network {
     }
 
     bool DupleProtection::protectFromDuples(int packetId) {
-        if ((buffer0.find(packetId) != buffer0.end()) && (buffer1.find(packetId) != buffer1.end())) {
+        if ((buffer0.find(packetId) == buffer0.end()) && (buffer1.find(packetId) == buffer1.end())) {
             buffer0.insert(packetId);
             return true;
         }
@@ -83,6 +83,15 @@ namespace network {
     }
 
     Retransmitter::Retransmitter(const NodeInfo& newRemoteNodeInfo): remoteNodeInfo(newRemoteNodeInfo) {
+    }
+
+    void Retransmitter::removeHandshakePacketsFromRetransmitMap() {
+        std::vector<decltype(retransmitMap)::key_type> vec;
+        for (auto& p : retransmitMap)
+            if (p.second.type != PacketTypes::DATA)
+                vec.push_back(p.first);
+        for (auto& key : vec)
+            retransmitMap.erase(key);
     }
 
     void Retransmitter::addPacketToRetransmitMap(int packetId, const Packet& packet, const byte_vector& sourcePayload) {
@@ -150,6 +159,10 @@ namespace network {
     }
 
     void Session::startHandshake() {
+    }
+
+    SessionReader::SessionReader(const NodeInfo& newRemoteNodeInfo): Retransmitter(newRemoteNodeInfo) {
+        nextLocalNonceGenerationTime = getCurrentTimeMillis() - UDPAdapter::HANDSHAKE_TIMEOUT_MILLIS;
     }
 
 };
