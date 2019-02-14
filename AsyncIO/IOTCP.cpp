@@ -216,6 +216,8 @@ namespace asyncio {
         if (!ioTCPSoc)
             throw std::logic_error("TCP socket not initialized. Open socket first.");
 
+        stopRead();
+
         auto socket_data = new closeSocket_data();
 
         socket_data->callback = std::move(callback);

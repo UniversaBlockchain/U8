@@ -135,6 +135,7 @@ void Scripter::initialize() {
 
     JsInitIOFile(pIsolate, global);
     JsInitIOTCP(pIsolate, global);
+    JsInitIOUDP(pIsolate, global);
     JsInitCrypto(pIsolate,global);
 
     // Save context and wrap weak self:
