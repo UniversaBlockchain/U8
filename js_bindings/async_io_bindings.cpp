@@ -255,7 +255,8 @@ void JsAsyncUDPOpen(const FunctionCallbackInfo<Value> &args) {
         auto scripter = ac.scripter;
         if (args.Length() == 2) {
             auto handle = unwrap<asyncio::IOUDP>(args.This());
-            handle->open(ac.asString(0).data(), ac.asInt(1));
+            int code = handle->open(ac.asString(0).data(), ac.asInt(1));
+            ac.setReturnValue(code);
         } else {
             scripter->throwError("invalid number of arguments");
         }
@@ -280,6 +281,11 @@ void JsAsyncUDPRecv(const FunctionCallbackInfo<Value> &args) {
         // not sure whether we actually need it:
         auto pBuffer = new Persistent<ArrayBuffer>(ac.isolate, ab);
 
+        // save pointers for delete after stopping recv
+        args.This()->Set(String::NewFromUtf8(ac.isolate, "_pcb"), BigInt::NewFromUnsigned(ac.isolate, (uint64_t) pcb));
+        args.This()->Set(String::NewFromUtf8(ac.isolate, "_pResult"), BigInt::NewFromUnsigned(ac.isolate, (uint64_t) pResult));
+        args.This()->Set(String::NewFromUtf8(ac.isolate, "_pBuffer"), BigInt::NewFromUnsigned(ac.isolate, (uint64_t) pBuffer));
+
         handle->recv(pdata, max_size, [=](ssize_t result, const char* IP, unsigned int port) {
             // here we are in the async dispatcher thread we should not lock:
             scripter->inPool([=](auto context) {
@@ -298,9 +304,9 @@ void JsAsyncUDPRecv(const FunctionCallbackInfo<Value> &args) {
                         fn->Call(fn, 4, res);
                     }
                 }
-                delete pcb;
-                delete pResult;
-                delete pBuffer;
+                //delete pcb;
+                //delete pResult;
+                //delete pBuffer;
             });
         });
     });
@@ -343,6 +349,28 @@ void JsAsyncUDPSend(const FunctionCallbackInfo<Value> &args) {
     });
 }
 
+void deleteUDPRecvPersistents(const FunctionCallbackInfo<Value> &args, const ArgsContext &ac) {
+    Local<Value> pcb = args.This()->Get(String::NewFromUtf8(ac.isolate, "_pcb"));
+    //printf("!!!\n");
+    if (!pcb->IsNullOrUndefined()) {
+        //printf("===\n");
+        //delete (Persistent<Function>*) pcb->ToBigInt(ac.context).ToLocalChecked()->Uint64Value();
+        //args.This()->Set(String::NewFromUtf8(ac.isolate, "_pcb"), Undefined(ac.isolate));
+    }
+
+    Local<Value> pResult = args.This()->Get(String::NewFromUtf8(ac.isolate, "_pResult"));
+    if (!pResult->IsNullOrUndefined()) {
+        //delete (Persistent<Uint8Array>*) pResult->ToBigInt(ac.context).ToLocalChecked()->Uint64Value();
+        //args.This()->Set(String::NewFromUtf8(ac.isolate, "_pResult"), Undefined(ac.isolate));
+    }
+
+    Local<Value> pBuffer = args.This()->Get(String::NewFromUtf8(ac.isolate, "_pBuffer"));
+    if (!pBuffer->IsNullOrUndefined()) {
+        //delete (Persistent<ArrayBuffer>*) pBuffer->ToBigInt(ac.context).ToLocalChecked()->Uint64Value();
+        //args.This()->Set(String::NewFromUtf8(ac.isolate, "_pBuffer"), Undefined(ac.isolate));
+    }
+}
+
 // UDP stopRecv
 void JsAsyncUDPStopRecv(const FunctionCallbackInfo<Value> &args) {
     Scripter::unwrapArgs(args, [&](ArgsContext &ac) {
@@ -350,9 +378,40 @@ void JsAsyncUDPStopRecv(const FunctionCallbackInfo<Value> &args) {
         if (args.Length() == 0) {
             auto handle = unwrap<asyncio::IOUDP>(args.This());
             handle->stopRecv();
+
+            // delete recv persistents
+            deleteUDPRecvPersistents(args, ac);
         } else {
             scripter->throwError("invalid number of arguments");
         }
+    });
+}
+
+void JsAsyncUDPClose(const FunctionCallbackInfo<Value> &args) {
+    Scripter::unwrapArgs(args, [&](ArgsContext &ac) {
+        auto handle = unwrap<asyncio::IOHandle>(args.This());
+        auto scripter = ac.scripter;
+
+        auto fn = ac.as<Function>(0);
+        if (fn->IsNull() || fn->IsUndefined()) {
+            scripter->throwError("null callback in IOUDP::close");
+            return;
+        }
+        Persistent<Function> *pcb = new Persistent<Function>(ac.isolate, fn);
+
+        handle->close([=](ssize_t result) {
+            // here we are in another thread
+            scripter->inPool([=](auto context) {
+                Isolate *isolate = context->GetIsolate();
+                auto fn = pcb->Get(isolate);
+                Local<Value> res = Integer::New(isolate, result);
+                fn->Call(fn, 1, &res);
+                delete pcb;
+            });
+        });
+
+        // delete recv persistents
+        deleteUDPRecvPersistents(args, ac);
     });
 }
 
@@ -405,11 +464,11 @@ void JsInitIOUDP(Isolate *isolate, const Local<ObjectTemplate> &global) {
     // instance methods
     auto prototype = tpl->PrototypeTemplate();
     prototype->Set(isolate, "version", String::NewFromUtf8(isolate, "0.0.1"));
-    prototype->Set(isolate, "_udp_open", FunctionTemplate::New(isolate, JsAsyncUDPOpen));
-    prototype->Set(isolate, "_recv_raw", FunctionTemplate::New(isolate, JsAsyncUDPRecv));
-    prototype->Set(isolate, "_send_raw", FunctionTemplate::New(isolate, JsAsyncUDPSend));
+    prototype->Set(isolate, "_open", FunctionTemplate::New(isolate, JsAsyncUDPOpen));
+    prototype->Set(isolate, "_recv", FunctionTemplate::New(isolate, JsAsyncUDPRecv));
+    prototype->Set(isolate, "_send", FunctionTemplate::New(isolate, JsAsyncUDPSend));
     prototype->Set(isolate, "_stop_recv", FunctionTemplate::New(isolate, JsAsyncUDPStopRecv));
-    prototype->Set(isolate, "_close_raw", FunctionTemplate::New(isolate, JsAsyncHandleClose));
+    prototype->Set(isolate, "_close_raw", FunctionTemplate::New(isolate, JsAsyncUDPClose));
 
     // class methods
     tpl->Set(isolate, "getErrorText", FunctionTemplate::New(isolate, JsAsyncGetErrorText));

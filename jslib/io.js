@@ -39,6 +39,7 @@ const chunkSize = 2048;
 
 const file_proto = IOFile.prototype;
 const tcp_proto = IOTCP.prototype;
+const udp_proto = IOUDP.prototype;
 
 file_proto.read = tcp_proto.read = function (size) {
     if (size <= 0)
@@ -58,15 +59,15 @@ file_proto.write = tcp_proto.write = function (data) {
         data = Uint8Array.from(data);
     }
     let ap = new AsyncProcessor();
-    this._write_raw(data, code => ap.process(code))
+    this._write_raw(data, code => ap.process(code));
     return ap.promise;
-}
+};
 
-file_proto.close = tcp_proto.close = function() {
+file_proto.close = tcp_proto.close = udp_proto.close = function() {
     let ap = new AsyncProcessor();
-    this._close_raw(code => ap.process(code))
+    this._close_raw(code => ap.process(code));
     return ap.promise;
-}
+};
 
 /**
  * The InputStream allows effectively read text and binary data from handle-like

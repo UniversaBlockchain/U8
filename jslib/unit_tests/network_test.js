@@ -1,5 +1,5 @@
 import {expect, unit} from 'test'
-import {tcp} from 'network'
+import {tcp, udp} from 'network'
 
 async function report(block) {
     try {
@@ -32,4 +32,42 @@ unit.test("simple tcp", async () => {
     expect.equal(ss, "hello!")
     expect.equal(serverReads, "foobar");
     server.close();
+});
+
+unit.test("simple udp", async () => {
+    let udpProcessor1 = async (sock1) => {
+        await sock1.recv(100, async (data, IP, port) => {
+            await report(async () => {
+                //expect.equal(data, "qwerty");
+            });
+        }, (error) => {
+            unit.fail("recv failed: " + error);
+        });
+
+        await sock1.send("123", {port: 18158});
+
+        await sock1.close();
+    };
+
+    let udpProcessor2 = async (sock2) => {
+        await sock2.recv(100, async (data, IP, port) => {
+            await report(async () => {
+                //expect.equal(data, "123");
+            });
+        }, (error) => {
+            unit.fail("recv failed: " + error);
+        });
+
+        await sock2.send("qwerty", {port: 18157});
+
+        await sock2.close();
+    };
+
+    udp.open({port: 18157}, udpProcessor1, (error) => {
+        unit.fail("open failed: " + error);
+    });
+
+    udp.open({port: 18158}, udpProcessor2, (error) => {
+        unit.fail("open failed: " + error);
+    });
 });

@@ -119,4 +119,72 @@ let tcp = {
     }
 };
 
-module.exports = {tcp, TcpServer}
+/**
+ * The UDP socket class.
+ */
+class UdpSocket {
+
+    constructor(handle) {
+        this._handle = handle;
+    }
+
+    async send(data, {port, IP = "0.0.0.0"}) {
+        if (!(data instanceof Uint8Array)) {
+            data = Uint8Array.from(data);
+        }
+        let ap = new AsyncProcessor();
+        this._handle._send(data, IP, port, code => ap.process(code));
+        return ap.promise;
+    }
+
+    recv(size, resolve, reject) {
+        if (size <= 0)
+            throw Error("size must > 0");
+        this._handle._recv(size, (data, code, IP, port) => {
+            if (code < 0)
+                reject(new IoError(code));
+            else {
+                // recv less than expected: slice
+                if( code > 0 && code < size )
+                    data = data.slice(0, code);
+
+                resolve(data, IP, port);
+            }
+        });
+    }
+
+    /**
+     * Close the socket
+     * @returns {Promise<void>}
+     */
+    async close() {
+        this._handle.close();
+    }
+}
+
+let udp = {
+
+    /**
+     * Open and bind UDP socket.
+     *
+     * @param port for binding UDP socket
+     * @param IP address for binding UDP socket
+     * @param resolve callback to process usage opened UDP socket
+     * @param reject callback to process errors
+     */
+    open({port, IP = "0.0.0.0"}, resolve, reject) {
+        try {
+            let handle = new IOUDP();
+
+            let result = handle._open(IP, port);
+            if (result < 0)
+                reject(new IoError(result));
+            else
+                resolve(new UdpSocket(handle));
+        } catch (e) {
+            throw new IoError(e.message);
+        }
+    }
+};
+
+module.exports = {tcp, TcpServer, udp, UdpSocket}
