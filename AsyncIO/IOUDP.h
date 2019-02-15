@@ -47,7 +47,6 @@ namespace asyncio {
 
     struct recv_data {
         recv_cb callback;
-        std::shared_ptr<byte_vector> data;
     };
 
     struct recvBuffer_data {

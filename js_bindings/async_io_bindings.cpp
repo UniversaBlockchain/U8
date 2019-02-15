@@ -271,22 +271,11 @@ void JsAsyncUDPRecv(const FunctionCallbackInfo<Value> &args) {
         auto handle = unwrap<asyncio::IOUDP>(args.This());
         auto scripter = ac.scripter;
 
-        Persistent<Function> *pcb = new Persistent<Function>(ac.isolate, ac.as<Function>(1));
+        Persistent<Function> *pcb = new Persistent<Function>(ac.isolate, ac.as<Function>(0));
 
-        // avoid copying results
-        auto max_size = ac.asInt(0);
-        auto ab = ArrayBuffer::New(ac.isolate, max_size);
-        unsigned char *pdata = (unsigned char *) ab->GetContents().Data();
-        auto pResult = new Persistent<Uint8Array>(ac.isolate, Uint8Array::New(ab, 0, max_size));
-        // not sure whether we actually need it:
-        auto pBuffer = new Persistent<ArrayBuffer>(ac.isolate, ab);
-
-        // save pointers for delete after stopping recv
         args.This()->Set(String::NewFromUtf8(ac.isolate, "_pcb"), BigInt::NewFromUnsigned(ac.isolate, (uint64_t) pcb));
-        args.This()->Set(String::NewFromUtf8(ac.isolate, "_pResult"), BigInt::NewFromUnsigned(ac.isolate, (uint64_t) pResult));
-        args.This()->Set(String::NewFromUtf8(ac.isolate, "_pBuffer"), BigInt::NewFromUnsigned(ac.isolate, (uint64_t) pBuffer));
 
-        handle->recv(pdata, max_size, [=](ssize_t result, const char* IP, unsigned int port) {
+        handle->recv([=](ssize_t result, const byte_vector& data, const char* IP, unsigned int port) {
             // here we are in the async dispatcher thread we should not lock:
             scripter->inPool([=](auto context) {
                 Isolate *isolate = context->GetIsolate();
@@ -295,18 +284,29 @@ void JsAsyncUDPRecv(const FunctionCallbackInfo<Value> &args) {
                     scripter->throwError("null callback in IOUDP::recv");
                 } else {
                     if (result > 0) {
+                        auto ab = ArrayBuffer::New(isolate, data.size());
+                        unsigned char *pdata = (unsigned char *) ab->GetContents().Data();
+
+                        memcpy(pdata, data.data(), data.size());
+
+                        auto pResult = new Persistent<Uint8Array>(isolate, Uint8Array::New(ab, 0, data.size()));
+                        // not sure whether we actually need it:
+                        auto pBuffer = new Persistent<ArrayBuffer>(isolate, ab);
+
                         Local<Value> res[4]{pResult->Get(isolate), Integer::New(isolate, result),
                                             String::NewFromUtf8(isolate, IP), Integer::New(isolate, port)};
                         fn->Call(fn, 4, res);
+
+                        delete pResult;
+                        delete pBuffer;
                     } else {
                         Local<Value> res[] = {Undefined(isolate), Integer::New(isolate, result),
                                               Undefined(isolate), Undefined(isolate)};
                         fn->Call(fn, 4, res);
                     }
                 }
+                // delete after stopping recv:
                 //delete pcb;
-                //delete pResult;
-                //delete pBuffer;
             });
         });
     });
@@ -349,25 +349,11 @@ void JsAsyncUDPSend(const FunctionCallbackInfo<Value> &args) {
     });
 }
 
-void deleteUDPRecvPersistents(const FunctionCallbackInfo<Value> &args, const ArgsContext &ac) {
+void deleteUDPRecvPersistent(const FunctionCallbackInfo<Value> &args, const ArgsContext &ac) {
     Local<Value> pcb = args.This()->Get(String::NewFromUtf8(ac.isolate, "_pcb"));
-    //printf("!!!\n");
     if (!pcb->IsNullOrUndefined()) {
-        //printf("===\n");
-        //delete (Persistent<Function>*) pcb->ToBigInt(ac.context).ToLocalChecked()->Uint64Value();
-        //args.This()->Set(String::NewFromUtf8(ac.isolate, "_pcb"), Undefined(ac.isolate));
-    }
-
-    Local<Value> pResult = args.This()->Get(String::NewFromUtf8(ac.isolate, "_pResult"));
-    if (!pResult->IsNullOrUndefined()) {
-        //delete (Persistent<Uint8Array>*) pResult->ToBigInt(ac.context).ToLocalChecked()->Uint64Value();
-        //args.This()->Set(String::NewFromUtf8(ac.isolate, "_pResult"), Undefined(ac.isolate));
-    }
-
-    Local<Value> pBuffer = args.This()->Get(String::NewFromUtf8(ac.isolate, "_pBuffer"));
-    if (!pBuffer->IsNullOrUndefined()) {
-        //delete (Persistent<ArrayBuffer>*) pBuffer->ToBigInt(ac.context).ToLocalChecked()->Uint64Value();
-        //args.This()->Set(String::NewFromUtf8(ac.isolate, "_pBuffer"), Undefined(ac.isolate));
+        delete (Persistent<Function>*) pcb->ToBigInt(ac.context).ToLocalChecked()->Uint64Value();
+        args.This()->Set(String::NewFromUtf8(ac.isolate, "_pcb"), Undefined(ac.isolate));
     }
 }
 
@@ -379,8 +365,8 @@ void JsAsyncUDPStopRecv(const FunctionCallbackInfo<Value> &args) {
             auto handle = unwrap<asyncio::IOUDP>(args.This());
             handle->stopRecv();
 
-            // delete recv persistents
-            deleteUDPRecvPersistents(args, ac);
+            // delete recv persistent
+            deleteUDPRecvPersistent(args, ac);
         } else {
             scripter->throwError("invalid number of arguments");
         }
@@ -410,8 +396,8 @@ void JsAsyncUDPClose(const FunctionCallbackInfo<Value> &args) {
             });
         });
 
-        // delete recv persistents
-        deleteUDPRecvPersistents(args, ac);
+        // delete recv persistent
+        deleteUDPRecvPersistent(args, ac);
     });
 }
 

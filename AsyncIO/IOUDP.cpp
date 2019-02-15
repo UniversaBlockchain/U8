@@ -229,10 +229,7 @@ namespace asyncio {
     }
 
     void IOUDP::_alloc_cb(uv_handle_t* handle, size_t suggested_size, uv_buf_t* buf) {
-        auto rcv_data = (recv_data*) handle->data;
-
-        rcv_data->data = std::make_shared<byte_vector>(suggested_size);
-        *buf = uv_buf_init((char*) rcv_data->data->data(), (unsigned int) suggested_size);
+        *buf = uv_buf_init((char*) malloc(suggested_size), (unsigned int) suggested_size);
     }
 
     void IOUDP::_allocBuffer_cb(uv_handle_t* handle, size_t suggested_size, uv_buf_t* buf) {
@@ -244,10 +241,8 @@ namespace asyncio {
     void IOUDP::_recv_cb(uv_udp_t* handle, ssize_t nread, const uv_buf_t* buf, const struct sockaddr* addr, unsigned flags) {
         auto rcv_data = (recv_data*) handle->data;
 
-        if (!nread) {
-            rcv_data->callback(0, byte_vector(), nullptr, 0);
+        if (!nread)
             return;
-        }
 
         const char *ip;
         char ipv6[INET6_ADDRSTRLEN];
@@ -262,19 +257,24 @@ namespace asyncio {
         } else
             throw std::logic_error("Unknown socket address family");
 
-        if ((nread > 0) && (nread < rcv_data->data->size()))
-            rcv_data->data->resize((unsigned long) nread);
+        if (nread < 0) {
+            rcv_data->callback(nread, byte_vector(), nullptr, 0);
+            return;
+        }
 
-        rcv_data->callback(nread, *rcv_data->data, ip, port);
+        byte_vector data((unsigned long) nread);
+        data.assign(buf->base, buf->base + nread);
+
+        rcv_data->callback(nread, data, ip, port);
+
+        free(buf->base);
     }
 
     void IOUDP::_recvBuffer_cb(uv_udp_t* handle, ssize_t nread, const uv_buf_t* buf, const struct sockaddr* addr, unsigned flags) {
         auto recv_data = (recvBuffer_data*) handle->data;
 
-        if (!nread) {
-            recv_data->callback(0, nullptr, 0);
+        if (!nread)
             return;
-        }
 
         const char *ip;
         char ipv6[INET6_ADDRSTRLEN];
@@ -602,11 +602,8 @@ namespace asyncio {
         if (ioUDPSoc->data) {
             if (bufferized)
                 delete (recvBuffer_data*) ioUDPSoc->data;
-            else {
+            else
                 delete (recv_data *) ioUDPSoc->data;
-
-                ((recv_data*) ioUDPSoc->data)->data.reset();
-            }
 
             ioUDPSoc->data = nullptr;
         }

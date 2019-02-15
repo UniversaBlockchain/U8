@@ -12,7 +12,7 @@ namespace asyncio {
     }
 
     IOTCP::~IOTCP() {
-       if (ioTCPSoc && !closed) {
+        if (ioTCPSoc && !closed) {
             close([&](ssize_t result) {
                 //printf("---AUTO_CLOSING_TCP---\n");
                 freeRequest();
