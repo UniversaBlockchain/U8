@@ -103,6 +103,17 @@ namespace network {
         void onReceiveSessionAck(const Packet& packet);
 
         /**
+         * We have received DATA packet. Need to check crc32, decrypt payload with sessionKey,
+         * call our main callback, and reply with ACK or NACK according to success or fail.
+         */
+        void onReceiveData(const Packet& packet);
+
+        /**
+         * We have received ACK packet. Need to stop retransmitting of ack-ed packet.
+         */
+        void onReceiveAck(const Packet& packet);
+
+        /**
          * All packets data Packet.payload of type PacketTypes::DATA
          * must be encrypted with sessionKey (SymmetricKey).
          * This method implements encryption procedure for it.
@@ -194,6 +205,18 @@ namespace network {
          */
         void sendSessionAck(Session& session);
 
+        /**
+         * Each adapter will try to send blocks until have got special Packet with type ACK,
+         * that means receiver have got block. So when we got packet and all is ok - call this method.
+         */
+        void sendAck(SessionReader& sessionReader, int packetId);
+
+        /**
+         * Each adapter will try to send blocks until have got special Packet with type ACK,
+         * that means receiver have got block. So when we got block, but something went wrong - call this method.
+         */
+        void sendNack(SessionReader& sessionReader, int packetId);
+
     public:
         /**
          * Maximum packet size in bytes. Adapter should try to send several blocks together as long as the overall encoded
@@ -247,6 +270,7 @@ namespace network {
         std::unordered_map<int, SessionReader> sessionReaders;
         std::unordered_map<int, SessionReader> sessionReaderCandidates;
         std::recursive_mutex sendMutex;
+        std::recursive_mutex receiveMutex;
     };
 
 };

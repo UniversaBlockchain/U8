@@ -131,6 +131,7 @@ namespace network {
         crypto::SymmetricKey sessionKey;
         void removeHandshakePacketsFromRetransmitMap();
         void addPacketToRetransmitMap(int packetId, const Packet& packet, const byte_vector& sourcePayload);
+        void removePacketFromRetransmitMap(int packetId);
         void pulseRetransmit(std::function<void(const NodeInfo&, const Packet&)> funcSendPacket);
 
     protected:

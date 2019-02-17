@@ -98,12 +98,17 @@ namespace network {
         retransmitMap.insert(make_pair(packetId, RetransmitItem(packet, sourcePayload)));
     }
 
+    void Retransmitter::removePacketFromRetransmitMap(int packetId) {
+        retransmitMap.erase(packetId);
+    }
+
     void Retransmitter::pulseRetransmit(std::function<void(const NodeInfo&, const Packet&)> funcSendPacket) {
         if (getState() == SessionState::STATE_EXCHANGING) {
             for (auto& item : retransmitMap) {
                 if (item.second.nextRetransmitTimeMillis < getCurrentTimeMillis()) {
                     item.second.updateNextRetransmitTime();
                     if (item.second.type == PacketTypes::DATA) {
+                        //TODO: is it needed?
 //                        if (item.second.packet == null) {
 //                            byte[] dataToSend = preparePayloadForSession(sessionKey, item.sourcePayload);
 //                            item.packet = new Packet(item.packetId, myNodeInfo.getNumber(), item.receiverNodeId, item.type, dataToSend);
@@ -118,6 +123,7 @@ namespace network {
             for (auto& item : retransmitMap) {
                 if (item.second.nextRetransmitTimeMillis < getCurrentTimeMillis()) {
                     item.second.updateNextRetransmitTime();
+                    //TODO: is it needed?
                     //if (item.packet != null) {
                     funcSendPacket(remoteNodeInfo, item.second.packet);
                     if (item.second.retransmitCounter++ >= UDPAdapter::RETRANSMIT_MAX_ATTEMPTS)

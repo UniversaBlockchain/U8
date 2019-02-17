@@ -37,7 +37,7 @@ namespace network {
         long dupleProtectionPeriod = 2 * RETRANSMIT_TIME_GROW_FACTOR * RETRANSMIT_TIME * RETRANSMIT_MAX_ATTEMPTS;
         long protectionFromDuple_prevTime = getCurrentTimeMillis();
         timer_.scheduleAtFixedRate([this, protectionFromDuple_prevTime, dupleProtectionPeriod]()mutable{
-            std::unique_lock lock(sendMutex);
+            std::unique_lock lock(receiveMutex);
             restartHandshakeIfNeeded();
             pulseRetransmit();
             if (getCurrentTimeMillis() - protectionFromDuple_prevTime >= dupleProtectionPeriod) {
@@ -58,8 +58,9 @@ namespace network {
     }
 
     void UDPAdapter::send(int destNodeNumber, const byte_vector& payload) {
-        auto dest = netConfig_.getInfo(destNodeNumber);
+        std::unique_lock lock(sendMutex);
 
+        auto dest = netConfig_.getInfo(destNodeNumber);
         Session& session = getOrCreateSession(dest);
         if (session.getState() == SessionState::STATE_HANDSHAKE) {
             session.addPayloadToOutputQueue(dest, payload);
@@ -69,13 +70,10 @@ namespace network {
             else
                 sendPayload(session, payload);
         }
-
-        //sendPacket(dest, payload);
-        //sendPayload(session, payload);
     }
 
     void UDPAdapter::onReceive(const byte_vector& data) {
-        std::unique_lock lock(sendMutex);
+        std::unique_lock lock(receiveMutex);
         Packet packet(data);
         switch (packet.getType()) {
             case PacketTypes::HELLO:
@@ -98,6 +96,12 @@ namespace network {
                 break;
             case PacketTypes::SESSION_ACK:
                 onReceiveSessionAck(packet);
+                break;
+            case PacketTypes::DATA:
+                onReceiveData(packet);
+                break;
+            case PacketTypes::ACK:
+                onReceiveAck(packet);
                 break;
             default:
                 writeErr(true, logLabel_, "received unknown packet type: ", packet.getType());
@@ -269,8 +273,70 @@ namespace network {
 
     void UDPAdapter::onReceiveSessionAck(const Packet& packet) {
         writeLog(isLogEnabled_, logLabel_, "received session_ack from ", packet.getSenderNodeId());
-        SessionReader& sessionReader = getSessionReader(packet.getSenderNodeId());
-        sessionReader.removeHandshakePacketsFromRetransmitMap();
+        try {
+            SessionReader &sessionReader = getSessionReader(packet.getSenderNodeId());
+            sessionReader.removeHandshakePacketsFromRetransmitMap();
+        } catch (const std::exception& e) {
+            writeErr(true, logLabel_, "onReceiveSessionAck exception: ", e.what());
+        }
+
+    }
+
+    void UDPAdapter::onReceiveData(const Packet& packet) {
+        writeLog(isLogEnabled_, logLabel_, "received data from ", packet.getSenderNodeId());
+        byte_vector packet_crc32(4);
+        const byte_vector& payload = packet.getPayloadRef();
+        if (payload.size() <= 4) {
+            writeErr(true, logLabel_, "onReceiveData error: received too small packet, crc32 missing");
+            return;
+        }
+        memcpy(&packet_crc32[0], &payload[payload.size()-4], 4);
+        byte_vector encryptedPayload(payload);
+        encryptedPayload.resize(payload.size()-4);
+
+        byte_vector calculated_crc32(4);
+        crc32_state ctx;
+        crc32_init(&ctx);
+        crc32_update(&ctx, &payload[0], payload.size()-4);
+        crc32_finish(&ctx, &calculated_crc32[0], 4);
+
+        if (packet_crc32 == calculated_crc32) {
+            try {
+                SessionReader &sessionReader = getSessionReader(packet.getSenderNodeId());
+                byte_vector decrypted = sessionReader.sessionKey.etaDecrypt(encryptedPayload);
+                if (decrypted.size() > 2) {
+                    decrypted.resize(decrypted.size() - 2);
+                    sendAck(sessionReader, packet.getPacketId());
+                    if (sessionReader.protectFromDuples(packet.getPacketId()))
+                        receiveCallback_(decrypted);
+                } else {
+                    writeErr(true, logLabel_, "onReceiveData error: decrypted payload too short");
+                }
+            } catch (const std::exception& e) {
+                writeErr(true, logLabel_, "onReceiveData exception: ", e.what());
+            }
+        } else {
+            writeErr(true, logLabel_, "onReceiveData error: crc32 mismatch");
+        }
+    }
+
+    void UDPAdapter::onReceiveAck(const Packet& packet) {
+        writeLog(isLogEnabled_, logLabel_, "received ack from ", packet.getSenderNodeId());
+        auto nodeInfo = netConfig_.getInfo(packet.getSenderNodeId());
+        Session& session = getOrCreateSession(nodeInfo);
+        if (session.state == SessionState::STATE_EXCHANGING) {
+            try {
+                byte_vector decrypted = session.sessionKey.etaDecrypt(packet.getPayloadRef());
+                UBytes ub(std::move(decrypted));
+                BossSerializer::Reader reader(ub);
+                UObject uo = reader.readObject();
+                int ackPacketId = UInt::asInstance(uo).get();
+                session.removePacketFromRetransmitMap(ackPacketId);
+
+            } catch (const std::exception& e) {
+                writeErr(true, logLabel_, "onReceiveAck exception: ", e.what());
+            }
+        }
     }
 
     byte_vector UDPAdapter::preparePayloadForSession(const crypto::SymmetricKey& sessionKey, const byte_vector& payload) {
@@ -295,9 +361,8 @@ namespace network {
     }
 
     void UDPAdapter::sendPacket(const NodeInfo& dest, const byte_vector& data) {
-        //std::unique_lock lock(sendMutex);
         if (data.size() > MAX_PACKET_SIZE)
-            throw std::invalid_argument(std::string("datagram size too long, MAX_PACKET_SIZE is ") + std::to_string(MAX_PACKET_SIZE));
+            writeErr(true, logLabel_, std::string("datagram size too long, MAX_PACKET_SIZE is ") + std::to_string(MAX_PACKET_SIZE));
         socket_.send(data, dest.getNodeAddress().host.c_str(), dest.getNodeAddress().port, [&](ssize_t result){});
     }
 
@@ -471,5 +536,20 @@ namespace network {
         Packet packet(getNextPacketId(), ownNodeInfo_.getNumber(), session.remoteNodeInfo.getNumber(), PacketTypes::SESSION_ACK, session.sessionKey.etaEncrypt(someRandomPayload));
         sendPacket(session.remoteNodeInfo, packet.makeByteArray());
     }
+
+    void UDPAdapter::sendAck(SessionReader& sessionReader, int packetId) {
+        writeLog(isLogEnabled_, logLabel_, "send ack to ", sessionReader.remoteNodeInfo.getNumber());
+        BossSerializer::Writer writer;
+        writer.writeObject(UInt(packetId));
+        UBytes ub = writer.getBytes();
+        byte_vector bv = ub.get();
+        Packet packet(0, ownNodeInfo_.getNumber(), sessionReader.remoteNodeInfo.getNumber(), PacketTypes::ACK, sessionReader.sessionKey.etaEncrypt(bv));
+        sendPacket(sessionReader.remoteNodeInfo, packet.makeByteArray());
+    }
+
+    void UDPAdapter::sendNack(SessionReader& sessionReader, int packetId) {
+        //TODO:...
+    }
+
 
 };
