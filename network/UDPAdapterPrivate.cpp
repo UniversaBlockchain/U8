@@ -109,10 +109,9 @@ namespace network {
 //                            item.packet = new Packet(item.packetId, myNodeInfo.getNumber(), item.receiverNodeId, item.type, dataToSend);
 //                        }
                         funcSendPacket(remoteNodeInfo, item.second.packet);
-                        if (item.second.retransmitCounter++ >= UDPAdapter::RETRANSMIT_MAX_ATTEMPTS)
-                            retransmitMap.erase(item.first);
-                        //TODO: move '.erase' up one block
                     }
+                    if (item.second.retransmitCounter++ >= UDPAdapter::RETRANSMIT_MAX_ATTEMPTS)
+                        retransmitMap.erase(item.first);
                 }
             }
         } else {
@@ -155,7 +154,19 @@ namespace network {
         outputQueue.push(OutputQueueItem(destination, payload));
     }
 
-    void Session::sendAllFromOutputQueue() {
+    void Session::sendAllFromOutputQueue(std::function<void(const NodeInfo&, const byte_vector&)> funcSend) {
+        //writeLog(isLogEnabled, "sendAllFromOutputQueue");
+        if (state != SessionState::STATE_HANDSHAKE) {
+            int maxOutputs = UDPAdapter::MAX_RETRANSMIT_QUEUE_SIZE - retransmitMap.size();
+            int i = 0;
+            while (!outputQueue.empty()) {
+                const auto& q = outputQueue.front();
+                funcSend(q.destination, q.payload);
+                outputQueue.pop();
+                if (i++ > maxOutputs)
+                    break;
+            }
+        }
     }
 
     void Session::startHandshake() {

@@ -250,7 +250,7 @@ namespace network {
                         sendSessionAck(session);
                         session.reconstructSessionKey(sessionKey);
                         session.state = SessionState::STATE_EXCHANGING;
-                        session.sendAllFromOutputQueue();
+                        //session.sendAllFromOutputQueue();
                         session.pulseRetransmit([this](const NodeInfo &dest, const Packet &packet) {
                             sendPacket(dest, packet.makeByteArray());
                         });
@@ -289,8 +289,9 @@ namespace network {
 
     void UDPAdapter::sendPayload(Session& session, const byte_vector& payload) {
         auto dataToSend = preparePayloadForSession(session.sessionKey, payload);
-        sendPacket(session.remoteNodeInfo, dataToSend);
-        session.addPayloadToOutputQueue(session.remoteNodeInfo, payload);
+        Packet packet(getNextPacketId(), ownNodeInfo_.getNumber(), session.remoteNodeInfo.getNumber(), PacketTypes::DATA, dataToSend);
+        sendPacket(session.remoteNodeInfo, packet.makeByteArray());
+        session.addPacketToRetransmitMap(packet.getPacketId(), packet, payload);
     }
 
     void UDPAdapter::sendPacket(const NodeInfo& dest, const byte_vector& data) {
@@ -330,11 +331,23 @@ namespace network {
             s.second.pulseRetransmit([this](const NodeInfo& dest, const Packet& packet){
                 sendPacket(dest, packet.makeByteArray());
             });
+        for (auto& s : sessionReaders)
+            s.second.pulseRetransmit([this](const NodeInfo& dest, const Packet& packet){
+                sendPacket(dest, packet.makeByteArray());
+            });
+        for (auto& s : sessionReaderCandidates)
+            s.second.pulseRetransmit([this](const NodeInfo& dest, const Packet& packet){
+                sendPacket(dest, packet.makeByteArray());
+            });
+        for (auto& s : sessionsByRemoteId)
+            s.second.sendAllFromOutputQueue([this](const NodeInfo& dest, const byte_vector& data){
+                send(dest.getNumber(), data);
+            });
     }
 
     void UDPAdapter::clearProtectionFromDupleBuffers() {
-        //TODO: sessionReaders
-
+        for (auto& s : sessionReaders)
+            s.second.clearOldestBuffer();
         for (auto& s : sessionReaderCandidates)
             s.second.clearOldestBuffer();
         for (auto& s : sessionsByRemoteId)

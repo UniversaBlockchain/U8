@@ -43,6 +43,8 @@ namespace network {
     public:
         Packet(int packetId, int senderNodeId, int receiverNodeId, int type, const byte_vector& payload);
         Packet(const byte_vector& packedData);
+        Packet(const Packet&) = default;
+        Packet(Packet&&) = default;
 
         /**
          * Pack header and payload to bytes array.
@@ -153,7 +155,7 @@ namespace network {
         /** If we send some payload into session, but session state is STATE_HANDSHAKE - it accumulates in outputQueue. */
         void addPayloadToOutputQueue(const NodeInfo& destination, const byte_vector& payload);
         /** When handshake procedure completes, we should send all accumulated messages. */
-        void sendAllFromOutputQueue();
+        void sendAllFromOutputQueue(std::function<void(const NodeInfo&, const byte_vector&)> funcSend);
         /** Changes session's state to STATE_HANDSHAKE */
         void startHandshake();
 
