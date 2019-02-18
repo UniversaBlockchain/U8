@@ -569,23 +569,32 @@ void udpAdapterHelloWorld() {
     socket0.open("127.0.0.1", 4040);
     socket1.open("127.0.0.1", 4041);
 
+    long countToSend = 40000;
+    atomic<long> counter(0);
+
     socket0.recv([&](ssize_t result, const asyncio::byte_vector& data, const char* IP, unsigned int port) {
         if (data.size() > 0)
             cout << "socket0 receive data, result=" << result << ", size=" << data.size() << ": " << string(data.begin(), data.end()) << endl;
     });
     socket1.recv([&](ssize_t result, const asyncio::byte_vector& data, const char* IP, unsigned int port) {
         if (data.size() > 0) {
-            cout << "socket1 receive data, result=" << result << ", size=" << data.size() << ": "
-                 << string(data.begin(), data.end()) << endl;
+//            cout << "socket1 receive data, result=" << result << ", size=" << data.size() << ": "
+//                 << string(data.begin(), data.end()) << endl;
             checkResult("udp", body0, string(data.begin(), data.end()));
+            ++counter;
         }
     });
 
-    for (int i = 0; i < 1000; ++i) {
+    for (int i = 0; i < countToSend; ++i) {
         socket0.send(byte_vector(body0.begin(), body0.end()), "127.0.0.1", 4041, [](ssize_t result) {});
+        //std::this_thread::sleep_for(100ns);
+        cout << "i: " << i << endl;
     }
 
-    std::this_thread::sleep_for(2000ms);
+    while (counter < countToSend) {
+        cout << "counter: " << counter << endl;
+        std::this_thread::sleep_for(500ms);
+    }
 
     socket0.stopRecv();
     socket1.stopRecv();
