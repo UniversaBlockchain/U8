@@ -575,8 +575,11 @@ void udpAdapterHelloWorld() {
     netConfig.addNode(nodeInfo1);
     netConfig.addNode(nodeInfo2);
 
-    network::UDPAdapter udpAdapter0(node0key, 0, netConfig, [](const byte_vector& packet){
+    atomic<long> counter0(0);
+
+    network::UDPAdapter udpAdapter0(node0key, 0, netConfig, [&counter0](const byte_vector& packet){
         cout << "node-0 receive data, size=" << packet.size() << ": " << string(packet.begin(), packet.end()) << endl;
+        ++counter0;
     });
     network::UDPAdapter udpAdapter1(node1key, 1, netConfig, [](const byte_vector& packet){
         cout << "node-1 receive data, size=" << packet.size() << ": " << string(packet.begin(), packet.end()) << endl;
@@ -588,14 +591,20 @@ void udpAdapterHelloWorld() {
     //udpAdapter1.enableLog(true);
     //udpAdapter2.enableLog(true);
 
+    long sendTo0count = 4;
+
     udpAdapter0.send(1, byte_vector(body0.begin(), body0.end()));
     udpAdapter1.send(2, byte_vector(body1.begin(), body1.end()));
-    for (int i = 0; i < 1; ++i) {
+    for (int i = 0; i < sendTo0count; ++i) {
         std::string s = body2 + ": i=" + std::to_string(i);
         udpAdapter2.send(0, byte_vector(s.begin(), s.end()));
     }
-    printf("sending done\n");
-    std::this_thread::sleep_for(6000ms);
+    printf("async sending done\n");
+
+    while (counter0 < sendTo0count) {
+        std::this_thread::sleep_for(500ms);
+        cout << "counter0: " << counter0 << endl;
+    }
 
     cout << "udpAdapterHelloWorld()... done!" << endl << endl;
 }

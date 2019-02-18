@@ -269,8 +269,7 @@ namespace network {
         std::unordered_map<int, Session> sessionsByRemoteId;
         std::unordered_map<int, SessionReader> sessionReaders;
         std::unordered_map<int, SessionReader> sessionReaderCandidates;
-        std::recursive_mutex sendMutex;
-        std::recursive_mutex receiveMutex;
+        std::recursive_mutex socketMutex;
     };
 
 };

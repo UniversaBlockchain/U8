@@ -29,7 +29,7 @@ namespace network {
 
         receiveCallback_ = receiveCallback;
         socket_.open(ownNodeInfo_.getNodeAddress().host.c_str(), ownNodeInfo_.getNodeAddress().port);
-        socket_.recv([&](ssize_t result, const asyncio::byte_vector& data, const char* IP, unsigned int port) {
+        socket_.recv([=](ssize_t result, const asyncio::byte_vector& data, const char* IP, unsigned int port) {
             if (result > 0)
                 onReceive(data);
         });
@@ -37,7 +37,7 @@ namespace network {
         long dupleProtectionPeriod = 2 * RETRANSMIT_TIME_GROW_FACTOR * RETRANSMIT_TIME * RETRANSMIT_MAX_ATTEMPTS;
         long protectionFromDuple_prevTime = getCurrentTimeMillis();
         timer_.scheduleAtFixedRate([this, protectionFromDuple_prevTime, dupleProtectionPeriod]()mutable{
-            std::unique_lock lock(receiveMutex);
+            std::unique_lock lock(socketMutex);
             restartHandshakeIfNeeded();
             pulseRetransmit();
             if (getCurrentTimeMillis() - protectionFromDuple_prevTime >= dupleProtectionPeriod) {
@@ -58,7 +58,7 @@ namespace network {
     }
 
     void UDPAdapter::send(int destNodeNumber, const byte_vector& payload) {
-        std::unique_lock lock(sendMutex);
+        std::unique_lock lock(socketMutex);
 
         auto dest = netConfig_.getInfo(destNodeNumber);
         Session& session = getOrCreateSession(dest);
@@ -73,41 +73,44 @@ namespace network {
     }
 
     void UDPAdapter::onReceive(const byte_vector& data) {
-        std::unique_lock lock(receiveMutex);
-        Packet packet(data);
-        switch (packet.getType()) {
-            case PacketTypes::HELLO:
-                onReceiveHello(packet);
-                break;
-            case PacketTypes::WELCOME:
-                onReceiveWelcome(packet);
-                break;
-            case PacketTypes::KEY_REQ_PART1:
-                onReceiveKeyReqPart1(packet);
-                break;
-            case PacketTypes::KEY_REQ_PART2:
-                onReceiveKeyReqPart2(packet);
-                break;
-            case PacketTypes::SESSION_PART1:
-                onReceiveSessionPart1(packet);
-                break;
-            case PacketTypes::SESSION_PART2:
-                onReceiveSessionPart2(packet);
-                break;
-            case PacketTypes::SESSION_ACK:
-                onReceiveSessionAck(packet);
-                break;
-            case PacketTypes::DATA:
-                onReceiveData(packet);
-                break;
-            case PacketTypes::ACK:
-                onReceiveAck(packet);
-                break;
-            default:
-                writeErr(true, logLabel_, "received unknown packet type: ", packet.getType());
-                break;
+        std::unique_lock lock(socketMutex);
+        try {
+            Packet packet(data);
+            switch (packet.getType()) {
+                case PacketTypes::HELLO:
+                    onReceiveHello(packet);
+                    break;
+                case PacketTypes::WELCOME:
+                    onReceiveWelcome(packet);
+                    break;
+                case PacketTypes::KEY_REQ_PART1:
+                    onReceiveKeyReqPart1(packet);
+                    break;
+                case PacketTypes::KEY_REQ_PART2:
+                    onReceiveKeyReqPart2(packet);
+                    break;
+                case PacketTypes::SESSION_PART1:
+                    onReceiveSessionPart1(packet);
+                    break;
+                case PacketTypes::SESSION_PART2:
+                    onReceiveSessionPart2(packet);
+                    break;
+                case PacketTypes::SESSION_ACK:
+                    onReceiveSessionAck(packet);
+                    break;
+                case PacketTypes::DATA:
+                    onReceiveData(packet);
+                    break;
+                case PacketTypes::ACK:
+                    onReceiveAck(packet);
+                    break;
+                default:
+                    writeErr(true, logLabel_, "received unknown packet type: ", packet.getType());
+                    break;
+            }
+        } catch (const std::exception& e) {
+            writeErr(true, logLabel_, "onReceive exception: ", e.what());
         }
-        //receiveCallback_(data);
     }
 
     void UDPAdapter::onReceiveHello(const Packet& packet) {
