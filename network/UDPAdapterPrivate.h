@@ -15,6 +15,8 @@
 #include "../tools/tools.h"
 #include "NodeInfo.h"
 #include "../crypto/SymmetricKey.h"
+#include "../types/UArray.h"
+#include "../serialization/BossSerializer.h"
 
 namespace network {
 
@@ -56,6 +58,9 @@ namespace network {
         int getPacketId() const {return packetId_;}
         int getType() const {return type_;}
         const byte_vector& getPayloadRef() const {return payload_;}
+        bool isEmpty() const {return payload_.empty();}
+        void nullify() {payload_.clear();}
+        void updatePayload(byte_vector&& newPayload) {payload_ = newPayload;}
 
     private:
         int senderNodeId_;
@@ -204,6 +209,24 @@ namespace network {
     void writeErr(bool enabled, Args && ...args) {
         if (enabled)
             (std::cerr << ... << args) << std::endl;
+    }
+
+    inline
+    byte_vector bossDumpArray(const UArray& arr) {
+        BossSerializer::Writer writer;
+        writer.writeObject(arr);
+        auto bb = writer.getBytes();
+        byte_vector bv = bb.get();
+        return bv;
+    }
+
+    inline
+    UArray bossLoadArray(const byte_vector& bytes) {
+        UBytes uBytes(&bytes[0], bytes.size());
+        BossSerializer::Reader reader(uBytes);
+        UObject uObj = reader.readObject();
+        UArray uArr = UArray::asInstance(uObj);
+        return uArr;
     }
 
 };

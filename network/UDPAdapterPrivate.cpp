@@ -18,10 +18,7 @@ namespace network {
     }
 
     Packet::Packet(const byte_vector& packedData) {
-        UBytes uBytes(&packedData[0], packedData.size());
-        BossSerializer::Reader reader(uBytes);
-        UObject uObj = reader.readObject();
-        auto uArr = UArray::asInstance(uObj);
+        UArray uArr = bossLoadArray(packedData);
         packetId_ = int(UInt::asInstance(uArr.at(0)).get());
         senderNodeId_ = int(UInt::asInstance(uArr.at(1)).get());
         receiverNodeId_ = int(UInt::asInstance(uArr.at(2)).get());
@@ -37,11 +34,7 @@ namespace network {
                 UInt(type_),
                 UBytes(&payload_[0], payload_.size())
         };
-
-        BossSerializer::Writer writer;
-        writer.writeObject(ua);
-        auto bb = writer.getBytes();
-        return bb.get();
+        return bossDumpArray(ua);
     }
 
     bool DupleProtection::protectFromDuples(int packetId) {
@@ -108,11 +101,10 @@ namespace network {
                 if (item.second.nextRetransmitTimeMillis < getCurrentTimeMillis()) {
                     item.second.updateNextRetransmitTime();
                     if (item.second.type == PacketTypes::DATA) {
-                        //TODO: is it needed?
-//                        if (item.second.packet == null) {
-//                            byte[] dataToSend = preparePayloadForSession(sessionKey, item.sourcePayload);
-//                            item.packet = new Packet(item.packetId, myNodeInfo.getNumber(), item.receiverNodeId, item.type, dataToSend);
-//                        }
+                        if (item.second.packet.isEmpty()) {
+                            byte_vector dataToSend = UDPAdapter::preparePayloadForSession(sessionKey, item.second.sourcePayload);
+                            item.second.packet.updatePayload(std::move(dataToSend));
+                        }
                         funcSendPacket(remoteNodeInfo, item.second.packet);
                     }
                     if (item.second.retransmitCounter++ >= UDPAdapter::RETRANSMIT_MAX_ATTEMPTS)
@@ -123,12 +115,12 @@ namespace network {
             for (auto& item : retransmitMap) {
                 if (item.second.nextRetransmitTimeMillis < getCurrentTimeMillis()) {
                     item.second.updateNextRetransmitTime();
-                    //TODO: is it needed?
-                    //if (item.packet != null) {
-                    funcSendPacket(remoteNodeInfo, item.second.packet);
-                    if (item.second.retransmitCounter++ >= UDPAdapter::RETRANSMIT_MAX_ATTEMPTS)
-                        retransmitMap.erase(item.first);
-                    //else
+                    if (item.second.type != PacketTypes::DATA) {
+                        if (!item.second.packet.isEmpty())
+                            funcSendPacket(remoteNodeInfo, item.second.packet);
+                        if (item.second.retransmitCounter++ >= UDPAdapter::RETRANSMIT_MAX_ATTEMPTS)
+                            retransmitMap.erase(item.first);
+                    }
                 }
             }
         }
@@ -176,6 +168,21 @@ namespace network {
     }
 
     void Session::startHandshake() {
+        if (lastHandshakeRestartTime + UDPAdapter::HANDSHAKE_TIMEOUT_MILLIS < getCurrentTimeMillis()) {
+            for (auto& it : retransmitMap) {
+                it.second.retransmitCounter = 0;
+                it.second.packet.nullify();
+                it.second.nextRetransmitTimeMillis = getCurrentTimeMillis();
+            }
+            removeHandshakePacketsFromRetransmitMap();
+            handshakeStep = HandshakeState::HANDSHAKE_STEP_INIT;
+            handshakeExpiresAt = getCurrentTimeMillis() - UDPAdapter::HANDSHAKE_TIMEOUT_MILLIS;
+            state = SessionState::STATE_HANDSHAKE;
+            lastHandshakeRestartTime = getCurrentTimeMillis();
+        } else {
+            //TODO: debug, remove this printf
+            printf("(startHandshake) too short time after previous startHandshake\n");
+        }
     }
 
     SessionReader::SessionReader(const NodeInfo& newRemoteNodeInfo): Retransmitter(newRemoteNodeInfo) {

@@ -114,11 +114,17 @@ namespace network {
         void onReceiveAck(const Packet& packet);
 
         /**
+         * We have received NACK packet. Means that session is broken, e.g. remote node was
+         * rebooted. Need to restart handshake procedure immediately.
+         */
+        void onReceiveNack(const Packet& packet);
+
+        /**
          * All packets data Packet.payload of type PacketTypes::DATA
          * must be encrypted with sessionKey (SymmetricKey).
          * This method implements encryption procedure for it.
          */
-        byte_vector preparePayloadForSession(const crypto::SymmetricKey& sessionKey, const byte_vector& payload);
+        static byte_vector preparePayloadForSession(const crypto::SymmetricKey& sessionKey, const byte_vector& payload);
 
         /**
          * Creates Packet of type PacketTypes and sends it to network, initiates retransmission.
@@ -243,7 +249,7 @@ namespace network {
          * Maximum number of data blocks in the retransmit queue after which new
          * sending blocks are delayed in output queue.
          */
-        const static size_t MAX_RETRANSMIT_QUEUE_SIZE = 5000;
+        const static size_t MAX_RETRANSMIT_QUEUE_SIZE = 5;//5000; //TODO: set release value here
 
         /**
          * Maximum number of data blocks in the sending queue after which oldest
@@ -270,6 +276,7 @@ namespace network {
         std::unordered_map<int, SessionReader> sessionReaders;
         std::unordered_map<int, SessionReader> sessionReaderCandidates;
         std::recursive_mutex socketMutex;
+        friend class Retransmitter;
     };
 
 };

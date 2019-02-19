@@ -104,6 +104,9 @@ namespace network {
                 case PacketTypes::ACK:
                     onReceiveAck(packet);
                     break;
+                case PacketTypes::NACK:
+                    onReceiveNack(packet);
+                    break;
                 default:
                     writeErr(true, logLabel_, "received unknown packet type: ", packet.getType());
                     break;
@@ -136,11 +139,7 @@ namespace network {
         if (session.protectFromDuples(packet.getPacketId())) {
             if ((session.state == SessionState::STATE_HANDSHAKE) && (session.handshakeStep == HandshakeState::HANDSHAKE_STEP_WAIT_FOR_WELCOME)) {
                 try {
-                    const byte_vector &packetPayloadRef = packet.getPayloadRef();
-                    UBytes uBytes(&packetPayloadRef[0], packetPayloadRef.size());
-                    BossSerializer::Reader reader(uBytes);
-                    UObject uObj = reader.readObject();
-                    auto uArr = UArray::asInstance(uObj);
+                    UArray uArr = bossLoadArray(packet.getPayloadRef());
                     byte_vector remoteNonce = UBytes::asInstance(uArr.at(0)).get();
                     byte_vector packetSign = UBytes::asInstance(uArr.at(1)).get();
                     if (session.remoteNodeInfo.getPublicKey().verify(packetSign, remoteNonce,
@@ -181,12 +180,8 @@ namespace network {
             try {
                 writeLog(isLogEnabled_, logLabel_, "received both parts of key_req from ",
                          sessionReader.remoteNodeInfo.getNumber());
-                byte_vector packed = ownPrivateKey_.decrypt(sessionReader.handshake_keyReqPart1);
 
-                UBytes uBytes(&packed[0], packed.size());
-                BossSerializer::Reader reader(uBytes);
-                UObject uObj = reader.readObject();
-                auto uArr = UArray::asInstance(uObj);
+                UArray uArr = bossLoadArray(ownPrivateKey_.decrypt(sessionReader.handshake_keyReqPart1));
                 byte_vector packet_senderNonce = UBytes::asInstance(uArr.at(0)).get();
                 byte_vector packet_remoteNonce = UBytes::asInstance(uArr.at(1)).get();
 
@@ -243,12 +238,7 @@ namespace network {
                      session.remoteNodeInfo.getNumber());
             if (session.remoteNodeInfo.getPublicKey().verify(session.handshake_sessionPart2, session.handshake_sessionPart1, crypto::HashType::SHA512)) {
                 try {
-                    byte_vector decryptedData = ownPrivateKey_.decrypt(session.handshake_sessionPart1);
-
-                    UBytes uBytes(&decryptedData[0], decryptedData.size());
-                    BossSerializer::Reader reader(uBytes);
-                    UObject uObj = reader.readObject();
-                    auto uArr = UArray::asInstance(uObj);
+                    UArray uArr = bossLoadArray(ownPrivateKey_.decrypt(session.handshake_sessionPart1));
                     byte_vector sessionKey = UBytes::asInstance(uArr.at(0)).get();
                     byte_vector nonce = UBytes::asInstance(uArr.at(1)).get();
 
@@ -287,6 +277,7 @@ namespace network {
 
     void UDPAdapter::onReceiveData(const Packet& packet) {
         writeLog(isLogEnabled_, logLabel_, "received data from ", packet.getSenderNodeId());
+
         byte_vector packet_crc32(4);
         const byte_vector& payload = packet.getPayloadRef();
         if (payload.size() <= 4) {
@@ -303,9 +294,10 @@ namespace network {
         crc32_update(&ctx, &payload[0], payload.size()-4);
         crc32_finish(&ctx, &calculated_crc32[0], 4);
 
+        SessionReader &sessionReader = getSessionReader(packet.getSenderNodeId());
+
         if (packet_crc32 == calculated_crc32) {
             try {
-                SessionReader &sessionReader = getSessionReader(packet.getSenderNodeId());
                 byte_vector decrypted = sessionReader.sessionKey.etaDecrypt(encryptedPayload);
                 if (decrypted.size() > 2) {
                     decrypted.resize(decrypted.size() - 2);
@@ -314,9 +306,11 @@ namespace network {
                         receiveCallback_(decrypted);
                 } else {
                     writeErr(true, logLabel_, "onReceiveData error: decrypted payload too short");
+                    sendNack(sessionReader, packet.getPacketId());
                 }
             } catch (const std::exception& e) {
                 writeErr(true, logLabel_, "onReceiveData exception: ", e.what());
+                sendNack(sessionReader, packet.getPacketId());
             }
         } else {
             writeErr(true, logLabel_, "onReceiveData error: crc32 mismatch");
@@ -338,6 +332,29 @@ namespace network {
 
             } catch (const std::exception& e) {
                 writeErr(true, logLabel_, "onReceiveAck exception: ", e.what());
+            }
+        }
+    }
+
+    void UDPAdapter::onReceiveNack(const Packet& packet) {
+        writeLog(isLogEnabled_, logLabel_, "received nack from ", packet.getSenderNodeId());
+        auto nodeInfo = netConfig_.getInfo(packet.getSenderNodeId());
+        Session& session = getOrCreateSession(nodeInfo);
+        if (session.state == SessionState::STATE_EXCHANGING) {
+            try {
+                UArray dataList = bossLoadArray(packet.getPayloadRef());
+                byte_vector data = UBytes::asInstance(dataList.at(0)).get();
+                byte_vector sign = UBytes::asInstance(dataList.at(1)).get();
+                if (session.remoteNodeInfo.getPublicKey().verify(sign, data, crypto::HashType::SHA512)) {
+                    UArray nackPacketIdList = bossLoadArray(data);
+                    int nackPacketId = UInt::asInstance(nackPacketIdList.at(0)).get();
+                    if (session.retransmitMap.find(nackPacketId) != session.retransmitMap.end()) {
+                        session.startHandshake();
+                        restartHandshakeIfNeeded(session, getCurrentTimeMillis());
+                    }
+                }
+            } catch (const std::exception& e) {
+                //incorrect nack received. skip it silently
             }
         }
     }
@@ -467,14 +484,10 @@ namespace network {
         writeLog(isLogEnabled_, logLabel_, "send welcome to ", sessionReader.remoteNodeInfo.getNumber());
         byte_vector sign = ownPrivateKey_.sign(sessionReader.localNonce, crypto::HashType::SHA512);
 
-        UArray ua = {
-                UBytes(&sessionReader.localNonce[0], sessionReader.localNonce.size()),
-                UBytes(&sign[0], sign.size()),
-        };
-        BossSerializer::Writer writer;
-        writer.writeObject(ua);
-        auto bb = writer.getBytes();
-        byte_vector payload = bb.get();
+        byte_vector payload = bossDumpArray(UArray({
+            UBytes(&sessionReader.localNonce[0], sessionReader.localNonce.size()),
+            UBytes(&sign[0], sign.size()),
+        }));
 
         Packet welcomePacket(getNextPacketId(), ownNodeInfo_.getNumber(), sessionReader.remoteNodeInfo.getNumber(), PacketTypes::WELCOME, payload);
         sendPacket(sessionReader.remoteNodeInfo, welcomePacket.makeByteArray());
@@ -487,14 +500,11 @@ namespace network {
         session.localNonce.resize(64);
         sprng_read(&session.localNonce[0], 64, NULL);
 
-        UArray ua = {
-                UBytes(&session.localNonce[0], session.localNonce.size()),
-                UBytes(&session.remoteNonce[0], session.remoteNonce.size()),
-        };
-        BossSerializer::Writer writer;
-        writer.writeObject(ua);
-        auto bb = writer.getBytes();
-        byte_vector packed = bb.get();
+        byte_vector packed = bossDumpArray(UArray({
+            UBytes(&session.localNonce[0], session.localNonce.size()),
+            UBytes(&session.remoteNonce[0], session.remoteNonce.size()),
+        }));
+
         byte_vector encrypted = session.remoteNodeInfo.getPublicKey().encrypt(packed);
         byte_vector sign = ownPrivateKey_.sign(encrypted, crypto::HashType::SHA512);
 
@@ -513,14 +523,11 @@ namespace network {
         writeLog(isLogEnabled_, logLabel_, "send session_key to ", sessionReader.remoteNodeInfo.getNumber());
 
         byte_vector key = sessionReader.sessionKey.pack();
-        UArray ua = {
-                UBytes(&key[0], key.size()),
-                UBytes(&sessionReader.remoteNonce[0], sessionReader.remoteNonce.size()),
-        };
-        BossSerializer::Writer writer;
-        writer.writeObject(ua);
-        auto bb = writer.getBytes();
-        byte_vector packed = bb.get();
+        byte_vector packed = bossDumpArray(UArray({
+            UBytes(&key[0], key.size()),
+            UBytes(&sessionReader.remoteNonce[0], sessionReader.remoteNonce.size()),
+        }));
+
         byte_vector encrypted = sessionReader.remoteNodeInfo.getPublicKey().encrypt(packed);
         byte_vector sign = ownPrivateKey_.sign(encrypted, crypto::HashType::SHA512);
 
@@ -551,7 +558,14 @@ namespace network {
     }
 
     void UDPAdapter::sendNack(SessionReader& sessionReader, int packetId) {
-        //TODO:...
+        writeLog(isLogEnabled_, logLabel_, "send nack to ", sessionReader.remoteNodeInfo.getNumber());
+        byte_vector randomSeed(64);
+        sprng_read(&randomSeed[0], 64, NULL);
+        byte_vector data = bossDumpArray(UArray({UInt(packetId), UBytes(&randomSeed[0], randomSeed.size())}));
+        byte_vector sign = ownPrivateKey_.sign(data, crypto::HashType::SHA512);
+        byte_vector payload = bossDumpArray(UArray({UBytes(&data[0], data.size()), UBytes(&sign[0], sign.size())}));
+        Packet packet(0, ownNodeInfo_.getNumber(), sessionReader.remoteNodeInfo.getNumber(), PacketTypes::NACK, payload);
+        sendPacket(sessionReader.remoteNodeInfo, packet.makeByteArray());
     }
 
 
