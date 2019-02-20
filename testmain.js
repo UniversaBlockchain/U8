@@ -110,23 +110,29 @@ async function testES() {
     let es = ExtendedSignature.verify(key,signature,bytes);
     assert(es != null);
 }
-require('unit_tests/contract_test')
-require('unit_tests/changenumberpermission_test')
-require('unit_tests/changeownerpermission_test')
-require('unit_tests/modifydatapermission_test')
-require('unit_tests/revokepermission_test')
-require('unit_tests/splitjoinpermission_test')
+
+
 
 /*require('unit_tests/crypto_test')
 require('unit_tests/network_test');
 require('unit_tests/file_tests');
+*/
 
+require('unit_tests/contract_test')
+
+/*
 require('unit_tests/deltas_test')
 require('unit_tests/role_test')
 require('unit_tests/simplerole_test')
 require('unit_tests/listrole_test')
 require('unit_tests/linkrole_test')
-require('unit_tests/changenumberpermission_test')*/
+require('unit_tests/changenumberpermission_test')
+require('unit_tests/changeownerpermission_test')
+require('unit_tests/modifydatapermission_test')
+require('unit_tests/revokepermission_test')
+require('unit_tests/splitjoinpermission_test')*/
+
+
 
 async function main() {
 
@@ -145,8 +151,7 @@ async function main() {
     // console.log(atob('AQID'));
 
     // await sleep(100);
-    let res = await unit.perform();
-    await sleep(3000);
-    return res;
+    return await unit.perform();
+
 }
 

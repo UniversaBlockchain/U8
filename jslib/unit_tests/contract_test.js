@@ -10,8 +10,18 @@ import * as t from 'tools'
 import * as d from 'deltas'
 
 
+unit.test("contract basic test", async () => {
+    for(let xx = 0; xx < 1000; xx++) {
+        console.log(xx);
+        let k = await crypto.PrivateKey.generate(2048);
+        //let c = cnt.Contract.fromPrivateKey(k);
+        //c.keysToSignWith.clear()
+        //await c.seal(true);
+        //assert(await c.check());
+    }
 
-
+});
+/*
 unit.test("contract copy test", async () => {
     let k = await crypto.PrivateKey.generate(2048);
     let c1 = cnt.Contract.fromPrivateKey(k);
@@ -42,5 +52,5 @@ unit.test("contract copy test", async () => {
 
     assert(t.valuesEqual(ds1,ds2));
     assert(d.Delta.between(null,ds1,ds2) == null);
-});
+});*/
 
