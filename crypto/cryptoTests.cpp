@@ -566,8 +566,8 @@ void udpAdapterHelloWorld() {
     asyncio::IOUDP socket0;
     asyncio::IOUDP socket1;
 
-    socket0.open("127.0.0.1", 4040);
-    socket1.open("127.0.0.1", 4041);
+    socket0.open("127.0.0.1", 4040, 4000000);
+    socket1.open("127.0.0.1", 4041, 4000000);
 
     long countToSend = 40000;
     atomic<long> counter(0);

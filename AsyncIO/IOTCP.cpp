@@ -6,8 +6,16 @@
 
 namespace asyncio {
 
-    IOTCP::IOTCP(ioLoop* loop) {
-        this->loop = loop;
+    IOTCP::IOTCP(AsyncLoop* loop) {
+        if (!loop) {
+            aloop = new AsyncLoop();
+            ownLoop = true;
+        } else {
+            aloop = loop;
+            ownLoop = false;
+        }
+
+        this->loop = aloop->getLoop();
         ioTCPSoc = nullptr;
     }
 
@@ -56,6 +64,7 @@ namespace asyncio {
 
         if (readQueue.empty() && !tcpReading) {
             tcpReading = true;
+            bufferized = false;
 
             ioTCPSoc->data = read_data;
 
@@ -89,6 +98,7 @@ namespace asyncio {
 
         if (readQueue.empty() && !tcpReading) {
             tcpReading = true;
+            bufferized = true;
 
             ioTCPSoc->data = read_data;
 
@@ -115,7 +125,8 @@ namespace asyncio {
         auto tcp_read_data = readQueue.front();
         readQueue.pop();
 
-        if (tcp_read_data.bufferized) {
+        bufferized = tcp_read_data.bufferized;
+        if (bufferized) {
             auto read_data = (readBufferTCP_data*) tcp_read_data.data;
 
             ioTCPSoc->data = read_data;
@@ -486,7 +497,7 @@ namespace asyncio {
         if (type != TCP_SOCKET_LISTEN)
             throw std::logic_error("TCP socket not listen.");
 
-        auto client = new IOTCP(loop);
+        auto client = new IOTCP(aloop);
 
         int res = client->acceptFromListeningSocket(this);
 
@@ -552,5 +563,27 @@ namespace asyncio {
             throw std::logic_error("TCP socket not initialized. Open socket first.");
 
         uv_read_stop((uv_stream_t*) ioTCPSoc);
+
+        // free read queue
+        while (!readQueue.empty()) {
+            auto tcp_read_data = readQueue.front();
+            readQueue.pop();
+
+            if (tcp_read_data.bufferized)
+                delete (readBufferTCP_data*) tcp_read_data.data;
+            else
+                delete (readTCP_data*) tcp_read_data.data;
+        }
+    }
+
+    void IOTCP::freeReadData() {
+        if (ioTCPSoc->data) {
+            if (bufferized)
+                delete (readBufferTCP_data*) ioTCPSoc->data;
+            else
+                delete (readTCP_data *) ioTCPSoc->data;
+
+            ioTCPSoc->data = nullptr;
+        }
     }
 }

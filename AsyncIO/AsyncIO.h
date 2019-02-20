@@ -12,11 +12,13 @@
 #include <future>
 #include <queue>
 #include <any>
+#include "AsyncLoop.h"
 
 namespace asyncio {
 
 #define WAIT_LOOP 5000000L
 
+    extern AsyncLoop* aLoop;
     /**
      * Exit handle for deinitialize main asynchronous loop.
      */

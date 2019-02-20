@@ -34,6 +34,11 @@ namespace asyncio {
 
     class IOTCP;
 
+    struct TCPSocket_data {
+        void* read;
+        void* close;
+    };
+
     struct openTCP_data {
         openTCP_cb callback;
     };
@@ -69,7 +74,7 @@ namespace asyncio {
      */
     class IOTCP : public IOHandleThen {
     public:
-        IOTCP(ioLoop* loop = asyncLoop);
+        IOTCP(AsyncLoop* loop = nullptr);
         ~IOTCP();
 
         /**
@@ -204,14 +209,20 @@ namespace asyncio {
         uv_connect_t ioConnection;
 
         std::atomic<bool> closed = false;
+        std::atomic<bool> bufferized = false;
         std::atomic<bool> tcpReading = false;
         std::atomic<bool> connReset = false;
         ioHandle_t type;
 
         std::queue<socketRead_data> readQueue;
 
+        AsyncLoop* aloop = nullptr;
+        bool ownLoop;
+
         bool initTCPSocket();
         void freeRequest();
+
+        void freeReadData();
 
         static bool isIPv4(const char *ip);
 

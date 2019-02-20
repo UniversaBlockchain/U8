@@ -6,8 +6,10 @@
 #define U8_IOUDP_H
 
 #include "AsyncIO.h"
+#include "AsyncLoop.h"
 #include "IOHandle.h"
 #include "IOHandleThen.h"
+#include "../tools/ThreadPool.h"
 
 namespace asyncio {
 
@@ -44,6 +46,12 @@ namespace asyncio {
     typedef std::function<void(ssize_t result)> send_cb;
 
     class IOUDP;
+
+    struct UDPSocket_data {
+        void* recv;
+        void* read;
+        void* close;
+    };
 
     struct recv_data {
         recv_cb callback;
@@ -96,7 +104,7 @@ namespace asyncio {
      */
     class IOUDP : public IOHandleThen {
     public:
-        IOUDP(ioLoop* loop = asyncLoop);
+        IOUDP(AsyncLoop* loop = nullptr);
         ~IOUDP();
 
         /**
@@ -145,11 +153,12 @@ namespace asyncio {
          *
          * @param IP address (IPv4 or IPv6).
          * @param port for binding socket.
+         * @param bufferSize is size of sending and receiving buffers in bytes. Set to 0 if resizing is not required.
          * @return initialize and bind UPD socket result.
          * If isError(result) returns true - use getError(result) to determine the error.
          * If isError(result) returns false - UPD socket successfully init and bind.
          */
-        int open(const char* IP, unsigned int port);
+        int open(const char* IP, unsigned int port, unsigned int bufferSize = 0);
 
         /**
          * Asynchronous receive data from UDP socket.
@@ -237,11 +246,25 @@ namespace asyncio {
 
         std::queue<socketRead_data> readQueue;
 
+        AsyncLoop* aloop = nullptr;
+        bool ownLoop;
+
         bool initUDPSocket();
         void freeRequest();
+
         void freeRecvData();
+        void freeReadData();
 
         static bool isIPv4(const char *ip);
+
+        // async works
+        void _read(size_t maxBytesToRead, read_cb callback);
+        void _read(void* buffer, size_t maxBytesToRead, readBuffer_cb callback);
+        void _recv(recv_cb callback);
+        void _recv(void* buffer, size_t maxBytesToRecv, recvBuffer_cb callback);
+        void _send(const byte_vector& data, const char* IP, unsigned int port, send_cb callback);
+        void _send(void* buffer, size_t size, const char* IP, unsigned int port, send_cb callback);
+        void _close(close_cb callback);
 
         static void _alloc_cb(uv_handle_t* handle, size_t suggested_size, uv_buf_t* buf);
         static void _allocBuffer_cb(uv_handle_t* handle, size_t suggested_size, uv_buf_t* buf);

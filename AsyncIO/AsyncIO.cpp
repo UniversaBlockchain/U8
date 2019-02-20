@@ -7,6 +7,7 @@
 
 namespace asyncio {
 
+    AsyncLoop* aLoop = nullptr;
     uv_loop_t* asyncLoop = nullptr;
     uv_async_t exitHandle;
     uv_async_t alarmHandle;
@@ -19,6 +20,9 @@ namespace asyncio {
     ioLoop* initAndRunLoop() {
 
         umask(000);
+
+        if (!aLoop)
+            aLoop = new AsyncLoop();
 
         if (!asyncLoop) {
             asyncLoop = uv_loop_new();
@@ -57,6 +61,9 @@ namespace asyncio {
     }
 
     void deinitLoop() {
+        if (aLoop)
+            delete aLoop;
+
         if (asyncLoop) {
             uv_async_send(&exitHandle);
             //uv_thread_join(&thread_loop);
