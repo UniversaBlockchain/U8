@@ -113,14 +113,10 @@ async function testES() {
 
 
 
-/*require('unit_tests/crypto_test')
+require('unit_tests/crypto_test')
 require('unit_tests/network_test');
 require('unit_tests/file_tests');
-*/
-
 require('unit_tests/contract_test')
-
-/*
 require('unit_tests/deltas_test')
 require('unit_tests/role_test')
 require('unit_tests/simplerole_test')
@@ -130,7 +126,7 @@ require('unit_tests/changenumberpermission_test')
 require('unit_tests/changeownerpermission_test')
 require('unit_tests/modifydatapermission_test')
 require('unit_tests/revokepermission_test')
-require('unit_tests/splitjoinpermission_test')*/
+require('unit_tests/splitjoinpermission_test')
 
 
 
