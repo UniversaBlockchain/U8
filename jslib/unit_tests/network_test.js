@@ -1,7 +1,7 @@
 import {expect, assert, unit} from 'test'
 import {tcp, udp} from 'network'
 
-async function report(block) {
+async function reportErrors(block) {
     try {
         return await block()
     } catch (e) {
@@ -15,7 +15,7 @@ unit.test("simple tcp", async () => {
     let serverReads;
 
     let connectionProcessor = async (connection) => {
-        await report(async () => {
+        await reportErrors(async () => {
             serverReads = await connection.input.readLine();
             await connection.output.write("hello!\n");
             connection.close();
