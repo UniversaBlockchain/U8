@@ -8,6 +8,18 @@ import  * as tp from 'transactionpack'
 import * as t from 'tools'
 
 
+unit.test("change number permission serialization", async () => {
+    let k = await crypto.PrivateKey.generate(2048);
+    let role = new roles.SimpleRole("name",k.publicKey);
+    role.keyAddresses.add(k.publicKey.shortAddress);
+    let cnp = new perm.ChangeNumberPermission(role,{field_name:"field1",min_step: -1, max_step: 2, min_value:500, max_value: 1000});
+    let cnp2 = dbm.DefaultBiMapper.getInstance().deserialize(dbm.DefaultBiMapper.getInstance().serialize(cnp));
+    let cnp3 = new perm.ChangeNumberPermission(role,{field_name:"field1",min_step: 1, max_step: 2, min_value:500, max_value: 1000});
+    assert(t.valuesEqual(cnp,cnp2));
+    assert(!t.valuesEqual(cnp,cnp3));
+
+
+});
 
 unit.test("change number permission step", async () => {
     let k = await crypto.PrivateKey.generate(2048);

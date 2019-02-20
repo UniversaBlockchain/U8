@@ -56,6 +56,14 @@ Object.prototype.equals = function(to) {
         return true;
     }
 
+    if(this instanceof String) {
+        return this === to;
+    }
+
+    if(this instanceof Number) {
+        return this === to;
+    }
+
     //Map
     if(this instanceof Map) {
         if(this.size !== to.size) {
@@ -121,7 +129,7 @@ Object.prototype.equals = function(to) {
 
     }
 
-    console.log("Error: equals is not redefined for custom object " + this.constructor.name);
+    console.log("Error: equals is not redefined for custom object " + JSON.stringify(this));
     throw "Error: equals is not redefined for custom object "; //+ JSON.stringify(this);
 };
 

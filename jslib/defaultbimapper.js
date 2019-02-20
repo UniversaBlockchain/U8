@@ -8,9 +8,9 @@ function DefaultBiMapper() {
 DefaultBiMapper.prototype = Object.create(bs.BiMapper.prototype);
 
 DefaultBiMapper.getInstance = function () {
-    if(!this.instance)
-        this.instance = new DefaultBiMapper();
-    return this.instance;
+    if(!DefaultBiMapper.instance)
+        DefaultBiMapper.instance = new DefaultBiMapper();
+    return DefaultBiMapper.instance;
 };
 
 DefaultBiMapper.registerAdapter = function (adapter) {

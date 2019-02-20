@@ -9,18 +9,20 @@ function BossBiMapper() {
 BossBiMapper.prototype = Object.create(bs.BiMapper.prototype);
 
 BossBiMapper.getInstance = function () {
-    if(!this.instance) {
-        this.instance = new BossBiMapper();
+    if(!BossBiMapper.instance) {
+        BossBiMapper.instance = new BossBiMapper();
 
         let dbmAdapters = dbm.DefaultBiMapper.getInstance().adapters;
         for(let [key,value] of dbmAdapters) {
-            this.instance.adapters.set(key,value);
+            if(value.getTag() === "binary")
+                continue;
+            if(value.getTag() === "unixtime")
+                continue;
+            BossBiMapper.instance.adapters.set(key,value);
         }
 
-        this.instance.removeAdapterForTag("binary");
-        this.instance.removeAdapterForTag("unixtime");
     }
-    return this.instance;
+    return BossBiMapper.instance;
 };
 
 

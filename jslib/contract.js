@@ -116,6 +116,19 @@ State.prototype.equals = function(to) {
     return true;
 };
 
+State.prototype.getBranchRevision = function() {
+    if (this.branchId == null)
+        return 0;
+    else
+        return parseInt(this.branchId.split(":")[0])
+}
+
+
+State.prototype.setBranchNumber = function (number) {
+    this.branchId = this.revision + ":" + number;
+}
+
+
 State.prototype.serialize = function(serializer) {
     let of = {
         created_at: this.createdAt,
@@ -246,7 +259,7 @@ Definition.prototype.serialize = function(serializer) {
                 throw "permission without id: " + perm;
             if (pb.hasOwnProperty(perm.id))
                 throw "permission: duplicate permission id found: " + perm;
-            pb[perm.id] = perm;
+            pb[perm.id] = serializer.serialize(perm);
         }
     }
 
@@ -550,7 +563,7 @@ Contract.prototype.get = function(name) {
                 }
         }
     } else if (name.startsWith("transactional.")) {
-        if (transactional != null) {
+        if (this.transactional != null) {
             name = name.substring(14);
             switch (name) {
                 case "id":
@@ -586,7 +599,7 @@ Contract.prototype.get = function(name) {
 };
 
 
-Contract.prototype.seal = async function() {
+Contract.prototype.seal = async function(isTransactionRoot) {
     let revokingIds = [];
     for(let ri of this.revokingItems) {
         revokingIds.push(ri.id);
@@ -620,6 +633,9 @@ Contract.prototype.seal = async function() {
     this.setOwnBinary(result);
 
     await this.addSignatureToSeal(this.keysToSignWith);
+
+    if(isTransactionRoot)
+        this.transactionPack = new TransactionPack(this);
 
     return this.sealedBinary;
 };
@@ -1239,7 +1255,9 @@ Contract.prototype.verifySealedKeys = async function(isQuantise) {
 };
 
 Contract.prototype.copy = function() {
-    return DefaultBiMapper.getInstance().deserialize(DefaultBiMapper.getInstance().serialize(this));
+    let bbm = BossBiMapper.getInstance();
+
+    return bbm.deserialize(bbm.serialize(this));
 
 };
 Contract.prototype.createRevision = function(keys) {
@@ -1277,6 +1295,35 @@ Contract.prototype.createRevision = function(keys) {
 
     return newRevision;
 };
+
+
+Contract.prototype.split = function(count) {
+    // we can split only the new revision and only once this time
+    if (this.state.getBranchRevision() === this.state.revision)
+        throw "this revision is already split";
+    if (count < 1)
+        throw "split: count should be > 0";
+
+    // initialize context if not yet
+    this.updateContext();
+
+    this.state.setBranchNumber(0);
+    let results = [];
+    for (let i = 0; i < count; i++) {
+        // we can't create revision as this is already a new revision, so we copy self:
+        let c = this.copy();
+        // keys are not COPIED by default
+        this.keysToSignWith.forEach(k => c.keysToSignWith.add(k));
+        // save branch information
+        c.state.setBranchNumber(i + 1);
+        // and it should refer the same parent to and set of siblings
+        c.context = this.context;
+        this.context.siblings.add(c);
+        this.newItems.add(c);
+        results.push(c);
+    }
+    return results;
+}
 
 DefaultBiMapper.registerAdapter(new bs.BiAdapter("UniversaContract",Contract));
 

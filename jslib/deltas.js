@@ -34,6 +34,10 @@ Delta.between = function (parent, oldValue, newValue) {
     return t.valuesEqual(oldValue,newValue) ? null : new ChangedItem(parent, oldValue, newValue);
 };
 
+Delta.prototype.toString = function () {
+    return "Delta";
+};
+
 
 //ChangedItem/////////////////
 
@@ -44,6 +48,11 @@ ChangedItem.prototype = Object.create(Delta.prototype);
 
 ChangedItem.prototype.isEmpty = function() {
     return false;
+};
+
+
+ChangedItem.prototype.toString = function () {
+    return "ChangedItem";
 };
 
 //CreatedItem/////////////////
@@ -58,6 +67,9 @@ CreatedItem.prototype.isEmpty = function() {
 };
 
 
+CreatedItem.prototype.toString = function () {
+    return "CreatedItem";
+};
 //RemovedItem/////////////////
 
 function RemovedItem(parent, oldValue, newValue) {
@@ -69,6 +81,10 @@ RemovedItem.prototype.isEmpty = function() {
     return false;
 };
 
+
+RemovedItem.prototype.toString = function () {
+    return "RemovedItem";
+};
 
 //MapDelta/////////////////
 
@@ -116,6 +132,10 @@ MapDelta.compare = function(parent, oldMap, newMap) {
 };
 
 
+MapDelta.prototype.toString = function () {
+    return "MapDelta";
+};
+
 
 //ListDelta/////////////////
 
@@ -153,5 +173,10 @@ ListDelta.compare = function(parent, oldValue, newValue) {
         return ld;
 };
 
+
+
+ListDelta.prototype.toString = function () {
+    return "ListDelta";
+};
 
 module.exports = {ListDelta,MapDelta,Delta,CreatedItem,ChangedItem,RemovedItem};

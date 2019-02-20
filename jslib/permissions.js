@@ -3,6 +3,7 @@ let dbm = require("defaultbimapper");
 let t = require("tools");
 let dlt = require("deltas");
 let err = require("errors");
+let roles = require("roles")
 let BigDecimal  = require("big").Big;
 
 ///////////////////////////
@@ -32,8 +33,7 @@ Permission.prototype.deserialize = function (data, deserializer) {
     for (let key in data) {
         if(key === "name")
             continue;
-        if(key === "role" +
-            "")
+        if(key === "role")
             continue;
         this[key] = data[key];
     }
@@ -47,11 +47,6 @@ Permission.prototype.serialize = function(serializer) {
         role:serializer.serialize(this.role)
     };
     if(this.params != null) {
-//SWITCH TO THIS TO ENABLE BOSS BUG
-//        for (let key in this.params) {
-//            result[key] = this.params[key];
-//        }
-
         for (let key of Object.keys(this.params)) {
             result[key] = this.params[key];
         }
@@ -202,13 +197,13 @@ ModifyDataPermission.prototype.initFromParams = function() {
 };
 
 ModifyDataPermission.prototype.serialize = function(serializer) {
-    let data =  Object.getPrototypeOf(ChangeNumberPermission.prototype).serialize.call(this,serializer);
+    let data =  Object.getPrototypeOf(ModifyDataPermission.prototype).serialize.call(this,serializer);
     data.fields = serializer.serialize(this.fields);
     return data;
 };
 
 ModifyDataPermission.prototype.deserialize = function (data, deserializer) {
-    Object.getPrototypeOf(ChangeNumberPermission.prototype).deserialize.call(this,data,deserializer);
+    Object.getPrototypeOf(ModifyDataPermission.prototype).deserialize.call(this,data,deserializer);
     this.initFromParams();
 };
 
@@ -339,13 +334,13 @@ SplitJoinPermission.prototype.checkSplitJoinCase = function(changed, revokesToRe
     for (let c of allRevoking.values()) {
 
 
-        if (!this.isMergeable(c) || !this.validateMergeFields(changed, c) || !this.hasSimilarPermission(c, keys, false)) {
+        if (!this.isMergeable(c) || !this.validateMergeFields(changed, c) || !this.hasSimilarPermission(c, keys, true)) {
             continue;
         }
+        revokesToRemove.add(c);
 
         rSum = rSum.add(new BigDecimal(c.state.data[this.fieldName]));
     }
-
     return rSum.cmp(splitJoinSum) === 0;
 };
 
@@ -375,8 +370,9 @@ SplitJoinPermission.prototype.checkSplit = function(changed, dataChanges, revoki
 
     if (isValid && newValue.gte(this.minValue) && newValue.ulp().cmp(this.minUnit) >= 0) {
         delete dataChanges[this.fieldName];
+
         for(let ri of revokesToRemove) {
-            revokingItems.remove(ri);
+            revokingItems.delete(ri);
         }
     }
 };
@@ -407,8 +403,9 @@ SplitJoinPermission.prototype.checkMerge = function(changed, dataChanges, revoki
     if (isValid) {
         delete dataChanges[this.fieldName];
         for(let ri of revokesToRemove) {
-            revokingItems.remove(ri);
+            revokingItems.delete(ri);
         }
+
     }
 };
 
@@ -452,8 +449,7 @@ SplitJoinPermission.prototype.hasSimilarPermission = function(contract, keys, ch
     let found = false;
     for(let p of permissions) {
 
-        //TODO: WHY CANT WE CALL this.equals(p)????
-        if(!Permission.prototype.equals.call(this,p))
+        if(!t.valuesEqual(this.params,p.params))
             continue;
 
         if(checkAllowance && !p.isAllowedForKeys(keys)) {
@@ -470,7 +466,7 @@ SplitJoinPermission.prototype.validateMergeFields = function(c1, c2) {
     for (let field of this.mergeFields) {
         let v1 = c1.get(field);
         let v2 = c2.get(field);
-        if (!v1.equals(v2))
+        if (!t.valuesEqual(v1,v2))
             return false;
     }
     return true;
