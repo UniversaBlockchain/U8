@@ -12,20 +12,21 @@
 #include <future>
 #include <queue>
 #include <any>
+#include "AsyncLoop.h"
 
 namespace asyncio {
 
 #define WAIT_LOOP 5000000L
 
     /**
+    * Handle of main asynchronous loop.
+    */
+    extern uv_loop_t* asyncLoop;
+
+    /**
      * Exit handle for deinitialize main asynchronous loop.
      */
     extern uv_async_t exitHandle;
-
-    /**
-     * Handle of main asynchronous loop.
-     */
-    extern uv_loop_t* asyncLoop;
 
     /**
      * Handle of main asynchronous loop thread.
@@ -80,12 +81,6 @@ namespace asyncio {
         UDP_SOCKET_ERROR
     };
 
-    struct auxLoop_data {
-        uv_async_t* loop_exitHandle;
-        uv_async_t* loop_alarmHandle;
-        uv_thread_t* thread_auxLoop;
-    };
-
     /**
      * Init and run main asynchronous loop.
      * Must be called before asynchronous method calls.
@@ -98,37 +93,10 @@ namespace asyncio {
     inline ioLoop* getMainLoop() { return asyncLoop; };
 
     /**
-     * Send notification to main asynchronous loop about event.
-     */
-    void alarmLoop();
-
-    /**
      * Deinitialize main asynchronous loop.
      * Must be called after asynchronous method calls.
      */
     void deinitLoop();
-
-    /**
-     * Init and run auxiliary asynchronous loop.
-     *
-     * @return handle of auxiliary asynchronous loop.
-     */
-    ioLoop* initAndRunAuxLoop();
-
-    /**
-     * Send notification to loop about event.
-     *
-     * @param loop is handle of auxiliary asynchronous loop.
-     */
-    void alarmAuxLoop(ioLoop* loop);
-
-    /**
-     * Deinitialize auxiliary asynchronous loop.
-     * Must be called after asynchronous method calls in auxiliary asynchronous loop.
-     *
-     * @param loop is handle of auxiliary asynchronous loop.
-     */
-    void deinitAuxLoop(ioLoop* loop);
 
     /**
      * Check result for error.

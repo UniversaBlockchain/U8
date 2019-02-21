@@ -67,9 +67,11 @@ void testAsyncFile() {
         fileSize[t] = 0;
 
         //Init test buffer
-        dataBuf[t].reserve(BUFF_SIZE);
-        for (uint i = 0; i < BUFF_SIZE; i++)
-            dataBuf[t].push_back((uint8_t) i & 0xFF);
+        if (!dataBuf[t].size()) {
+            dataBuf[t].reserve(BUFF_SIZE);
+            for (uint i = 0; i < BUFF_SIZE; i++)
+                dataBuf[t].push_back((uint8_t) i & 0xFF);
+        }
 
         ths.emplace_back([t](){
             for (int i = 0; i < NUM_ITERATIONS; i++) {
@@ -766,15 +768,9 @@ void testAsyncUDP() {
 
     for (long t = 0; t < NUM_THREADS; t++) {
         ths.emplace_back([t]() {
-            asyncio::ioLoop* loop_srv = asyncio::asyncLoop;
-            asyncio::ioLoop* loop_cli = asyncio::initAndRunAuxLoop();
-
-            if (t > 0)
-                loop_srv = asyncio::initAndRunAuxLoop();
-
             for (int i = 0; i < NUM_ITERATIONS; i++) {
-                asyncio::IOUDP srv(loop_srv);
-                asyncio::IOUDP cli(loop_cli);
+                asyncio::IOUDP srv;
+                asyncio::IOUDP cli;
 
                 uv_sem_init(&stop[t], 0);
 
@@ -830,11 +826,6 @@ void testAsyncUDP() {
 
                 printf("Thread %ld iteration %i\n", t, i);
             };
-
-            if (t > 0)
-                asyncio::deinitAuxLoop(loop_srv);
-
-            asyncio::deinitAuxLoop(loop_cli);
         });
     }
 
@@ -847,15 +838,9 @@ void testAsyncUDP() {
 
     for (long t = 0; t < NUM_THREADS; t++) {
         ths.emplace_back([t]() {
-            asyncio::ioLoop* loop_srv = asyncio::asyncLoop;
-            asyncio::ioLoop* loop_cli = asyncio::initAndRunAuxLoop();
-
-            if (t > 0)
-                loop_srv = asyncio::initAndRunAuxLoop();
-
             for (int i = 0; i < NUM_ITERATIONS; i++) {
-                asyncio::IOUDP srv(loop_srv);
-                asyncio::IOUDP cli(loop_cli);
+                asyncio::IOUDP srv;
+                asyncio::IOUDP cli;
 
                 uv_sem_init(&stop[t], 0);
 
@@ -909,11 +894,6 @@ void testAsyncUDP() {
 
                 printf("Thread %ld iteration %i\n", t, i);
             };
-
-            if (t > 0)
-                asyncio::deinitAuxLoop(loop_srv);
-
-            asyncio::deinitAuxLoop(loop_cli);
         });
     }
 
@@ -926,15 +906,9 @@ void testAsyncUDP() {
 
     for (long t = 0; t < NUM_THREADS; t++) {
         ths.emplace_back([t]() {
-            asyncio::ioLoop* loop_srv = asyncio::asyncLoop;
-            asyncio::ioLoop* loop_cli = asyncio::initAndRunAuxLoop();
-
-            if (t > 0)
-                loop_srv = asyncio::initAndRunAuxLoop();
-
             for (int i = 0; i < NUM_ITERATIONS; i++) {
-                asyncio::IOUDP srv(loop_srv);
-                asyncio::IOUDP cli(loop_cli);
+                asyncio::IOUDP srv;
+                asyncio::IOUDP cli;
 
                 uv_sem_init(&stop[t], 0);
 
@@ -992,11 +966,6 @@ void testAsyncUDP() {
 
                 printf("Thread %ld iteration %i\n", t, i);
             };
-
-            if (t > 0)
-                asyncio::deinitAuxLoop(loop_srv);
-
-            asyncio::deinitAuxLoop(loop_cli);
         });
     }
 
@@ -1009,15 +978,9 @@ void testAsyncUDP() {
 
     for (long t = 0; t < NUM_THREADS; t++) {
         ths.emplace_back([t]() {
-            asyncio::ioLoop* loop_srv = asyncio::asyncLoop;
-            asyncio::ioLoop* loop_cli = asyncio::initAndRunAuxLoop();
-
-            if (t > 0)
-                loop_srv = asyncio::initAndRunAuxLoop();
-
             for (int i = 0; i < NUM_ITERATIONS; i++) {
-                asyncio::IOUDP srv(loop_srv);
-                asyncio::IOUDP cli(loop_cli);
+                asyncio::IOUDP srv;
+                asyncio::IOUDP cli;
 
                 uv_sem_init(&stop[t], 0);
 
@@ -1073,11 +1036,6 @@ void testAsyncUDP() {
 
                 printf("Thread %ld iteration %i\n", t, i);
             };
-
-            if (t > 0)
-                asyncio::deinitAuxLoop(loop_srv);
-
-            asyncio::deinitAuxLoop(loop_cli);
         });
     }
 
@@ -1142,12 +1100,10 @@ void testAsyncTCP() {
 
     for (long t = 0; t < NUM_THREADS; t++) {
         clientThreads.emplace_back([t](){
-            asyncio::ioLoop* loop = asyncio::initAndRunAuxLoop();
-
             for (int i = 0; i < NUM_ITERATIONS; i++) {
                 uv_sem_init(&stop[t], 0);
 
-                asyncio::IOTCP cli(loop);
+                asyncio::IOTCP cli;
 
                 cli.connect("127.0.0.1", PORT + (unsigned int) t * NUM_ITERATIONS + i, "127.0.0.1", PORT, [&](ssize_t result){
                     ASSERT(!asyncio::isError(result));
@@ -1181,8 +1137,6 @@ void testAsyncTCP() {
 
                 printf("Thread %ld iteration %i\n", t, i);
             }
-
-            asyncio::deinitAuxLoop(loop);
         });
     }
 
@@ -1257,12 +1211,10 @@ void testAsyncTCP() {
     //TCP client threads
     for (long t = 0; t < NUM_THREADS; t++) {
         clientThreads.emplace_back([t](){
-            asyncio::ioLoop* loop = asyncio::initAndRunAuxLoop();
-
             for (int i = 0; i < NUM_ITERATIONS; i++) {
                 uv_sem_init(&stop[t], 0);
 
-                asyncio::IOTCP cli(loop);
+                asyncio::IOTCP cli;
 
                 char buff_cli[5];
 
@@ -1293,8 +1245,6 @@ void testAsyncTCP() {
 
                 printf("Thread %ld iteration %i\n", t, i);
             }
-
-            asyncio::deinitAuxLoop(loop);
         });
     }
 
@@ -1373,8 +1323,7 @@ void testAsyncTCP() {
     });
 
     //init TCP client
-    asyncio::ioLoop* loop = asyncio::initAndRunAuxLoop();
-    asyncio::IOTCP cli(loop);
+    asyncio::IOTCP cli;
 
     cli.connect("127.0.0.1", PORT + 1, "127.0.0.1", PORT, [&](ssize_t result){
         ASSERT(!asyncio::isError(result));
@@ -1428,8 +1377,6 @@ void testAsyncTCP() {
     printf("partial read test successful\n");
 
     clients.clear();
-
-    asyncio::deinitAuxLoop(loop);
 
     printf("testAsyncTCP()...done\n\n");
 }
@@ -1530,8 +1477,7 @@ void testUnifyFileAndTCPread() {
         });
     });
 
-    asyncio::ioLoop* loop = asyncio::initAndRunAuxLoop();
-    asyncio::IOTCP cli(loop);
+    asyncio::IOTCP cli;
 
     cli.connect("127.0.0.1", PORT + 1, "127.0.0.1", PORT, [&](ssize_t result){
         ASSERT(!asyncio::isError(result));
@@ -1593,8 +1539,6 @@ void testUnifyFileAndTCPread() {
 
     printf("unify TCP test successful\n");
 
-    asyncio::deinitAuxLoop(loop);
-
     printf("testUnifyFileAndTCPread()...done\n\n");
 }
 
@@ -1623,8 +1567,7 @@ void testClientWriteWithouthRead() {
 
     char buff[2048];
 
-    asyncio::ioLoop* loop = asyncio::initAndRunAuxLoop();
-    asyncio::IOTCP cli(loop);
+    asyncio::IOTCP cli;
 
     cli.connect("127.0.0.1", PORT + 1, "127.0.0.1", PORT, [&](ssize_t result){
         ASSERT(!asyncio::isError(result));
@@ -1640,6 +1583,8 @@ void testClientWriteWithouthRead() {
 
                 printf("Server received: ABCDEFGH\n");
 
+                uv_sem_post(&sem);
+
                 cli.read(buff, 2048, [&](ssize_t result){
                     ASSERT(result == 0);
 
@@ -1649,9 +1594,14 @@ void testClientWriteWithouthRead() {
         });
     });
 
-    thread th_acc([&](){
-        nanosleep((const struct timespec[]){{0, 100000000}}, nullptr);
+    uv_sem_wait(&sem);
+    uv_sem_destroy(&sem);
 
+    uv_sem_init(&sem, 0);
+
+    std::this_thread::sleep_for(100ms);
+
+    thread th_acc([&](){
         printf("Close accepted socket\n");
 
         acc.close([&](ssize_t result){
@@ -1661,9 +1611,14 @@ void testClientWriteWithouthRead() {
         });
     });
 
-    thread th_cli([&](){
-        nanosleep((const struct timespec[]){{0, 150000000}}, nullptr);
+    uv_sem_wait(&sem);
+    uv_sem_destroy(&sem);
 
+    uv_sem_init(&sem, 0);
+
+    std::this_thread::sleep_for(100ms);
+
+    thread th_cli([&](){
         printf("Close client socket\n");
 
         cli.close([&](ssize_t result){
@@ -1673,7 +1628,6 @@ void testClientWriteWithouthRead() {
         });
     });
 
-    uv_sem_wait(&sem);
     uv_sem_wait(&sem);
     uv_sem_destroy(&sem);
 
@@ -1695,8 +1649,6 @@ void testClientWriteWithouthRead() {
     th_cli.join();
 
     printf("client write without read test successful\n");
-
-    asyncio::deinitAuxLoop(loop);
 
     printf("testClientWriteWithouthRead()...done\n\n");
 }

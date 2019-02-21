@@ -566,8 +566,8 @@ void udpAdapterHelloWorld() {
     asyncio::IOUDP socket0;
     asyncio::IOUDP socket1;
 
-    socket0.open("127.0.0.1", 4040);
-    socket1.open("127.0.0.1", 4041);
+    socket0.open("127.0.0.1", 4040, 4000000);
+    socket1.open("127.0.0.1", 4041, 4000000);
 
     long countToSend = 40000;
     atomic<long> counter(0);
@@ -587,7 +587,7 @@ void udpAdapterHelloWorld() {
 
     for (int i = 0; i < countToSend; ++i) {
         socket0.send(byte_vector(body0.begin(), body0.end()), "127.0.0.1", 4041, [](ssize_t result) {});
-        //std::this_thread::sleep_for(100ns);
+        std::this_thread::sleep_for(100ns);
         cout << "i: " << i << endl;
     }
 

@@ -257,7 +257,6 @@ namespace asyncio {
         uv_fs_t* ioReq;
 
         std::atomic<bool> closed = false;
-        std::atomic<bool> bufferized = false;
 
         bool initRequest();
 

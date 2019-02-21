@@ -6,7 +6,7 @@
 
 namespace asyncio {
 
-    IOFile::IOFile(ioLoop *loop) {
+    IOFile::IOFile(ioLoop* loop) {
         this->loop = loop;
         ioReq = nullptr;
     }
