@@ -29,6 +29,11 @@ namespace crypto {
          */
         SymmetricKey(void *keyData, size_t keyDataSize);
 
+        SymmetricKey(const SymmetricKey&) = default;
+        SymmetricKey(SymmetricKey&&) = default;
+        SymmetricKey& operator=(const SymmetricKey&) = default;
+        SymmetricKey& operator=(SymmetricKey &&) = default;
+
         /**
          * Returns packed key data
          */
@@ -37,25 +42,24 @@ namespace crypto {
         /**
          * Encrypt data using AE (EtA) with HMAC based on SHA256
          */
-        byte_vector etaDecrypt(const byte_vector &data);
+        byte_vector etaDecrypt(const byte_vector &data) const;
 
         /**
          * \see byte_vector etaDecrypt(const byte_vector& data)
          */
-        byte_vector etaDecrypt(void *data, size_t size);
+        byte_vector etaDecrypt(void *data, size_t size) const;
 
         /**
          * Decrypt data using AE (EtA) with SHA256-based HMAC
          */
-        byte_vector etaEncrypt(const byte_vector &data);
+        byte_vector etaEncrypt(const byte_vector &data) const;
 
         /**
          * \see byte_vector etaEncrypt(const byte_vector& data)
          */
-        byte_vector etaEncrypt(void *data, size_t size);
+        byte_vector etaEncrypt(void *data, size_t size) const;
 
     private:
-        const ltc_cipher_descriptor cipher_desc = aes_desc;
         byte_vector key;
 
     };

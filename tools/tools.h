@@ -10,6 +10,7 @@
 #include <iterator>
 #include <vector>
 #include <iostream>
+#include <chrono>
 
 typedef std::vector<unsigned char> byte_vector;
 
@@ -63,5 +64,10 @@ private:
     Nonmovable(Nonmovable&&) = delete;
     Nonmovable& operator=(Nonmovable&&) = delete;
 };
+
+inline
+long getCurrentTimeMillis() {
+    return std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now().time_since_epoch()).count();
+}
 
 #endif //U8_TOOLS_H

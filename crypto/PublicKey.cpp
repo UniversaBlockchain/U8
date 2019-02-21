@@ -125,11 +125,11 @@ namespace crypto {
 	}
 
 	bool PublicKey::verify(const std::vector<unsigned char> &sig, const std::vector<unsigned char> &data,
-						   HashType hashType) {
+						   HashType hashType) const {
 		return verify((void *) &sig[0], sig.size(), (void *) &data[0], data.size(), hashType);
 	}
 
-	bool PublicKey::verify(void *sigData, size_t sigSize, void *bodyData, size_t bodySize, HashType hashType) {
+	bool PublicKey::verify(void *sigData, size_t sigSize, void *bodyData, size_t bodySize, HashType hashType) const {
 		int mgf1hash_idx = getHashIndex(SHA1);
 		int hash_idx = getHashIndex(hashType);
 		auto desc = hash_descriptor[hash_idx];
@@ -152,17 +152,17 @@ namespace crypto {
 		return stat != 0;
 	}
 
-	void PublicKey::encrypt(const std::vector<unsigned char> &input, std::vector<unsigned char> &output) {
+	void PublicKey::encrypt(const std::vector<unsigned char> &input, std::vector<unsigned char> &output) const {
 		output.resize(0);
 		auto a = encrypt(input);
 		output.insert(output.begin(), a.begin(), a.end());
 	}
 
-	std::vector<unsigned char> PublicKey::encrypt(const std::vector<unsigned char> &input) {
+	std::vector<unsigned char> PublicKey::encrypt(const std::vector<unsigned char> &input) const {
 		return encrypt((void *) &input[0], input.size());
 	}
 
-	std::vector<unsigned char> PublicKey::encrypt(void *data, size_t size) {
+	std::vector<unsigned char> PublicKey::encrypt(void *data, size_t size) const {
 		int hash_idx = find_hash("sha1");
 		int prng_indx = find_prng("sprng");
 
