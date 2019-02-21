@@ -263,7 +263,7 @@ namespace network {
          * Maximum number of data blocks in the sending queue after which oldest
          * items are discarded and overflow flag is set.
          */
-        const static size_t MAX_QUEUE_SIZE = 5000000;//50000;
+        const static size_t MAX_QUEUE_SIZE = 50000;
 
         /**
          * Time limit for handshaking procedure. If handshake is not complete for this time, it will be restarted.
