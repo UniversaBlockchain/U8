@@ -244,7 +244,7 @@ namespace asyncio {
         std::string defaultIP;
         unsigned int defaultPort = 0;
 
-        std::queue<socketRead_data> readQueue;
+        Queue<socketRead_data> readQueue;
 
         AsyncLoop* aloop = nullptr;
         bool ownLoop;
@@ -258,12 +258,10 @@ namespace asyncio {
         static bool isIPv4(const char *ip);
 
         // async works
-        void _read(size_t maxBytesToRead, read_cb callback);
-        void _read(void* buffer, size_t maxBytesToRead, readBuffer_cb callback);
         void _recv(recv_cb callback);
         void _recv(void* buffer, size_t maxBytesToRecv, recvBuffer_cb callback);
-        void _send(const byte_vector& data, const char* IP, unsigned int port, send_cb callback);
-        void _send(void* buffer, size_t size, const char* IP, unsigned int port, send_cb callback);
+        void _send(const byte_vector& data, std::string IP, unsigned int port, send_cb callback);
+        void _send(void* buffer, size_t size, std::string IP, unsigned int port, send_cb callback);
         void _close(close_cb callback);
 
         static void _alloc_cb(uv_handle_t* handle, size_t suggested_size, uv_buf_t* buf);

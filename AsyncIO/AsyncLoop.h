@@ -11,6 +11,10 @@
 #include "../tools/Queue.h"
 
 namespace asyncio {
+
+    /**
+     * Asynchronous loop class with task queue.
+     */
     class AsyncLoop {
     public:
         AsyncLoop();
@@ -24,7 +28,7 @@ namespace asyncio {
             try {
                 queue.put(block);
             } catch (const QueueClosedException &e) {
-                cerr << "ThreadPool: execute on closed queue\n";
+                cerr << "AsyncLoop: execute on closed queue\n";
             }
         }
 
@@ -36,10 +40,14 @@ namespace asyncio {
             try {
                 queue.put(block);
             } catch (const QueueClosedException &e) {
-                cerr << "ThreadPool: execute on closed queue is ignored\n";
+                cerr << "AsyncLoop: execute on closed queue is ignored\n";
             }
         }
 
+        /**
+         * Get a handle of asynchronous loop
+         * @return handle of asynchronous loop.
+         */
         uv_loop_t* getLoop() { return loop; }
 
     private:

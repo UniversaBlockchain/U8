@@ -6,8 +6,16 @@
 
 namespace asyncio {
 
-    IOFile::IOFile(ioLoop *loop) {
-        this->loop = loop;
+    IOFile::IOFile(AsyncLoop* loop) {
+        if (!loop) {
+            aloop = new AsyncLoop();
+            ownLoop = true;
+        } else {
+            aloop = loop;
+            ownLoop = false;
+        }
+
+        this->loop = aloop->getLoop();
         ioReq = nullptr;
     }
 
@@ -16,10 +24,17 @@ namespace asyncio {
             close([&](ssize_t result) {
                 //printf("---AUTO_CLOSING---\n");
                 freeRequest();
+
+                if (ownLoop)
+                    delete aloop;
             });
 
-        } else
+        } else {
             freeRequest();
+
+            if (ownLoop)
+                delete aloop;
+        }
     }
 
     void IOFile::freeRequest() {

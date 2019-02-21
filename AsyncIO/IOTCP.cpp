@@ -24,10 +24,17 @@ namespace asyncio {
             close([&](ssize_t result) {
                 //printf("---AUTO_CLOSING_TCP---\n");
                 freeRequest();
+
+                if (ownLoop)
+                    delete aloop;
             });
 
-        } else
+        } else {
             freeRequest();
+
+            if (ownLoop)
+                delete aloop;
+        }
     }
 
     void IOTCP::freeRequest() {
@@ -68,18 +75,22 @@ namespace asyncio {
 
             ioTCPSoc->data = read_data;
 
-            int result = uv_read_start((uv_stream_t*) ioTCPSoc, _alloc_tcp_cb, _read_tcp_cb);
+            if (aloop)
+                aloop->addWork([=]{
+                    int result = uv_read_start((uv_stream_t*) ioTCPSoc, _alloc_tcp_cb, _read_tcp_cb);
 
-            if (result < 0) {
-                ioTCPSoc->data = nullptr;
+                    if (result < 0) {
+                        ioTCPSoc->data = nullptr;
 
-                read_data->callback(byte_vector(), result);
+                        read_data->callback(byte_vector(), result);
 
-                delete read_data;
-            } else
-                alarmAuxLoop(loop);
+                        delete read_data;
+                    }
+                });
+            else
+                throw std::logic_error("Async loop not initialized.");
         } else
-            readQueue.push({read_data, false});
+            readQueue.put({read_data, false});
     }
 
     void IOTCP::read(void* buffer, size_t maxBytesToRead, readBuffer_cb callback) {
@@ -102,18 +113,22 @@ namespace asyncio {
 
             ioTCPSoc->data = read_data;
 
-            int result = uv_read_start((uv_stream_t*) ioTCPSoc, _allocBuffer_tcp_cb, _readBuffer_tcp_cb);
+            if (aloop)
+                aloop->addWork([=]{
+                    int result = uv_read_start((uv_stream_t*) ioTCPSoc, _allocBuffer_tcp_cb, _readBuffer_tcp_cb);
 
-            if (result < 0) {
-                ioTCPSoc->data = nullptr;
+                    if (result < 0) {
+                        ioTCPSoc->data = nullptr;
 
-                read_data->callback(result);
+                        read_data->callback(result);
 
-                delete read_data;
-            } else
-                alarmAuxLoop(loop);
+                        delete read_data;
+                    }
+                });
+            else
+                throw std::logic_error("Async loop not initialized.");
         } else
-            readQueue.push({read_data, true});
+            readQueue.put({read_data, true});
     }
 
     void IOTCP::checkReadQueue() {
@@ -122,8 +137,7 @@ namespace asyncio {
             return;
         }
 
-        auto tcp_read_data = readQueue.front();
-        readQueue.pop();
+        auto tcp_read_data = readQueue.get();
 
         bufferized = tcp_read_data.bufferized;
         if (bufferized) {
@@ -131,35 +145,52 @@ namespace asyncio {
 
             ioTCPSoc->data = read_data;
 
-            int result = uv_read_start((uv_stream_t*) ioTCPSoc, _allocBuffer_tcp_cb, _readBuffer_tcp_cb);
+            if (aloop)
+                aloop->addWork([=]{
+                    int result = uv_read_start((uv_stream_t*) ioTCPSoc, _allocBuffer_tcp_cb, _readBuffer_tcp_cb);
 
-            if (result < 0) {
-                ioTCPSoc->data = nullptr;
+                    if (result < 0) {
+                        ioTCPSoc->data = nullptr;
 
-                read_data->callback(result);
+                        read_data->callback(result);
 
-                delete read_data;
-            } else
-                alarmAuxLoop(loop);
+                        delete read_data;
+                    }
+                });
+            else
+                throw std::logic_error("Async loop not initialized.");
         } else {
             auto read_data = (readTCP_data*) tcp_read_data.data;
 
             ioTCPSoc->data = read_data;
 
-            int result = uv_read_start((uv_stream_t*) ioTCPSoc, _alloc_tcp_cb, _read_tcp_cb);
+            if (aloop)
+                aloop->addWork([=]{
+                    int result = uv_read_start((uv_stream_t*) ioTCPSoc, _alloc_tcp_cb, _read_tcp_cb);
 
-            if (result < 0) {
-                ioTCPSoc->data = nullptr;
+                    if (result < 0) {
+                        ioTCPSoc->data = nullptr;
 
-                read_data->callback(byte_vector(), result);
+                        read_data->callback(byte_vector(), result);
 
-                delete read_data;
-            } else
-                alarmAuxLoop(loop);
+                        delete read_data;
+                    }
+                });
+            else
+                throw std::logic_error("Async loop not initialized.");
         }
     }
 
     void IOTCP::write(const byte_vector& data, write_cb callback) {
+        if (aloop)
+            aloop->addWork([=]{
+                _write(data, callback);
+            });
+        else
+            throw std::logic_error("Async loop not initialized.");
+    }
+
+    void IOTCP::_write(const byte_vector& data, write_cb callback) {
         if (!ioTCPSoc)
             throw std::logic_error("TCP socket not initialized. Open socket first.");
 
@@ -184,14 +215,20 @@ namespace asyncio {
 
             delete req;
             delete write_data;
-        } else {
+        } else
             connReset = false;
-
-            alarmAuxLoop(loop);
-        }
     }
 
     void IOTCP::write(void* buffer, size_t size, write_cb callback) {
+        if (aloop)
+            aloop->addWork([=]{
+                _write(buffer, size, callback);
+            });
+        else
+            throw std::logic_error("Async loop not initialized.");
+    }
+
+    void IOTCP::_write(void* buffer, size_t size, write_cb callback) {
         if (!ioTCPSoc)
             throw std::logic_error("TCP socket not initialized. Open socket first.");
 
@@ -216,14 +253,20 @@ namespace asyncio {
 
             delete write_data;
             delete req;
-        } else {
+        } else
             connReset = false;
-
-            alarmAuxLoop(loop);
-        }
     }
 
     void IOTCP::close(close_cb callback) {
+        if (aloop)
+            aloop->addWork([=]{
+                _close(callback);
+            });
+        else
+            throw std::logic_error("Async loop not initialized.");
+    }
+
+    void IOTCP::_close(close_cb callback) {
         if (!ioTCPSoc)
             throw std::logic_error("TCP socket not initialized. Open socket first.");
 
@@ -245,8 +288,6 @@ namespace asyncio {
 
         if (!uv_is_closing(handle)) {
             uv_close(handle, _close_handle_cb);
-
-            alarmAuxLoop(loop);
         } else {
             socket_data->callback(connReset ? UV_ECONNRESET : 0);
 
@@ -424,13 +465,22 @@ namespace asyncio {
             delete socket_data;
             ioTCPSoc->data = nullptr;
             type = TCP_SOCKET_ERROR;
-        } else {
+        } else
             type = TCP_SOCKET_LISTEN;
-            alarmAuxLoop(loop);
-        }
     }
 
     void IOTCP::connect(const char* bindIP, unsigned int bindPort, const char* IP, unsigned int port, connect_cb callback) {
+        std::string strBindIP = bindIP;
+        std::string strIP = IP;
+        if (aloop)
+            aloop->addWork([=]{
+                _connect(strBindIP, bindPort, strIP, port, callback);
+            });
+        else
+            throw std::logic_error("Async loop not initialized.");
+    }
+
+    void IOTCP::_connect(std::string bindIP, unsigned int bindPort, std::string IP, unsigned int port, connect_cb callback) {
         if (!initTCPSocket())
             throw std::logic_error("TCP socket already initialized. Close socket first.");
 
@@ -453,11 +503,11 @@ namespace asyncio {
         sockaddr_in addr;
         sockaddr_in6 addr6;
 
-        if (isIPv4(bindIP)) {
-            uv_ip4_addr(bindIP, bindPort, &addr);
+        if (isIPv4(bindIP.data())) {
+            uv_ip4_addr(bindIP.data(), bindPort, &addr);
             result = uv_tcp_bind(ioTCPSoc, (const struct sockaddr *) &addr, 0);
         } else {
-            uv_ip6_addr(bindIP, bindPort, &addr6);
+            uv_ip6_addr(bindIP.data(), bindPort, &addr6);
             result = uv_tcp_bind(ioTCPSoc, (const struct sockaddr *) &addr6, 0);
         }
 
@@ -470,11 +520,11 @@ namespace asyncio {
             return;
         }
 
-        if (isIPv4(IP)) {
-            uv_ip4_addr(IP, port, &addr);
+        if (isIPv4(IP.data())) {
+            uv_ip4_addr(IP.data(), port, &addr);
             result = uv_tcp_connect(&ioConnection, ioTCPSoc, (const sockaddr*) &addr, _connect_cb);
         } else {
-            uv_ip6_addr(IP, port, &addr6);
+            uv_ip6_addr(IP.data(), port, &addr6);
             result = uv_tcp_connect(&ioConnection, ioTCPSoc, (const sockaddr*) &addr6, _connect_cb);
         }
 
@@ -484,10 +534,8 @@ namespace asyncio {
             delete socket_data;
             ioTCPSoc->data = nullptr;
             type = TCP_SOCKET_ERROR;
-        } else {
+        } else
             type = TCP_SOCKET_CONNECTED;
-            alarmAuxLoop(loop);
-        }
     }
 
     IOTCP* IOTCP::accept(ssize_t* result) {
@@ -522,10 +570,8 @@ namespace asyncio {
 
         if (result < 0) {
             type = TCP_SOCKET_ERROR;
-        } else {
+        } else
             type = TCP_SOCKET_CONNECTED;
-            alarmAuxLoop(loop);
-        }
 
         return result;
     }
@@ -566,8 +612,7 @@ namespace asyncio {
 
         // free read queue
         while (!readQueue.empty()) {
-            auto tcp_read_data = readQueue.front();
-            readQueue.pop();
+            auto tcp_read_data = readQueue.get();
 
             if (tcp_read_data.bufferized)
                 delete (readBufferTCP_data*) tcp_read_data.data;

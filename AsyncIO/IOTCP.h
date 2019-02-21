@@ -214,7 +214,7 @@ namespace asyncio {
         std::atomic<bool> connReset = false;
         ioHandle_t type;
 
-        std::queue<socketRead_data> readQueue;
+        Queue<socketRead_data> readQueue;
 
         AsyncLoop* aloop = nullptr;
         bool ownLoop;
@@ -225,6 +225,12 @@ namespace asyncio {
         void freeReadData();
 
         static bool isIPv4(const char *ip);
+
+        // async works
+        void _write(const byte_vector& data, write_cb callback);
+        void _write(void* buffer, size_t size, write_cb callback);
+        void _close(close_cb callback);
+        void _connect(std::string bindIP, unsigned int bindPort, std::string IP, unsigned int port, connect_cb callback);
 
         static void _listen_cb(uv_stream_t *stream, int result);
         static void _connect_cb(uv_connect_t* connect, int result);

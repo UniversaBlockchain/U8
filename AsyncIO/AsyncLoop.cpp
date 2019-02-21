@@ -5,6 +5,7 @@
 #include "AsyncLoop.h"
 
 namespace asyncio {
+
     AsyncLoop::AsyncLoop() {
         loop = uv_loop_new();
         loop->data = nullptr;

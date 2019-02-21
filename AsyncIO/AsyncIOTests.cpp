@@ -46,7 +46,6 @@ void allAsyncIOTests() {
     //asyncio::initAndRunLoop(); - already init in main()
 
     testAsyncFile();
-    //for (int i = 0; i < 1000; i++)
     testAsyncUDP();
     testAsyncTCP();
     testUnifyFileAndTCPread();
@@ -68,9 +67,11 @@ void testAsyncFile() {
         fileSize[t] = 0;
 
         //Init test buffer
-        dataBuf[t].reserve(BUFF_SIZE);
-        for (uint i = 0; i < BUFF_SIZE; i++)
-            dataBuf[t].push_back((uint8_t) i & 0xFF);
+        if (!dataBuf[t].size()) {
+            dataBuf[t].reserve(BUFF_SIZE);
+            for (uint i = 0; i < BUFF_SIZE; i++)
+                dataBuf[t].push_back((uint8_t) i & 0xFF);
+        }
 
         ths.emplace_back([t](){
             for (int i = 0; i < NUM_ITERATIONS; i++) {
@@ -1582,6 +1583,8 @@ void testClientWriteWithouthRead() {
 
                 printf("Server received: ABCDEFGH\n");
 
+                uv_sem_post(&sem);
+
                 cli.read(buff, 2048, [&](ssize_t result){
                     ASSERT(result == 0);
 
@@ -1591,9 +1594,14 @@ void testClientWriteWithouthRead() {
         });
     });
 
-    thread th_acc([&](){
-        nanosleep((const struct timespec[]){{0, 100000000}}, nullptr);
+    uv_sem_wait(&sem);
+    uv_sem_destroy(&sem);
 
+    uv_sem_init(&sem, 0);
+
+    std::this_thread::sleep_for(100ms);
+
+    thread th_acc([&](){
         printf("Close accepted socket\n");
 
         acc.close([&](ssize_t result){
@@ -1603,9 +1611,14 @@ void testClientWriteWithouthRead() {
         });
     });
 
-    thread th_cli([&](){
-        nanosleep((const struct timespec[]){{0, 150000000}}, nullptr);
+    uv_sem_wait(&sem);
+    uv_sem_destroy(&sem);
 
+    uv_sem_init(&sem, 0);
+
+    std::this_thread::sleep_for(100ms);
+
+    thread th_cli([&](){
         printf("Close client socket\n");
 
         cli.close([&](ssize_t result){
@@ -1615,7 +1628,6 @@ void testClientWriteWithouthRead() {
         });
     });
 
-    uv_sem_wait(&sem);
     uv_sem_wait(&sem);
     uv_sem_destroy(&sem);
 
