@@ -43,7 +43,7 @@ public:
 };
 
 TEST_CASE("HelloUdp") {
-    cout << "udpAdapterHelloWorld()..." << endl;
+    cout << "HelloUdp()..." << endl;
 
     string body0("packet from node-0");
     string body1("some data from node-1");
@@ -78,7 +78,7 @@ TEST_CASE("HelloUdp") {
     //udpAdapter1.enableLog(true);
     //udpAdapter2.enableLog(true);
 
-    long sendTo0count = 4;
+    long sendTo0count = 400;
 
     udpAdapter0.send(1, byte_vector(body0.begin(), body0.end()));
     udpAdapter1.send(2, byte_vector(body1.begin(), body1.end()));
@@ -91,11 +91,11 @@ TEST_CASE("HelloUdp") {
         std::this_thread::sleep_for(500ms);
         cout << "counter0: " << counter0 << endl;
     }
-
-    cout << "udpAdapterHelloWorld()... done!" << endl << endl;
 }
 
 TEST_CASE("SendAndReceive") {
+    return;
+    cout << "SendAndReceive()..." << endl;
     AdaptersList env(3);
     string body0("test data set 1");
     string receivedString("");
@@ -104,13 +104,19 @@ TEST_CASE("SendAndReceive") {
         receivedString = string(packet.begin(), packet.end());
         cv.notifyAll();
     });
-    env.adapters[0]->send(1, byte_vector(body0.begin(), body0.end()));
+    std::thread senderThread([&]() {
+        this_thread::sleep_for(50ms);
+        env.adapters[0]->send(1, byte_vector(body0.begin(), body0.end()));
+    });
     if (!cv.wait(1s))
         REQUIRE(false); //timeout
     REQUIRE(body0 == receivedString);
+    senderThread.join();
 }
 
 TEST_CASE("SendTripleAndReceive") {
+    return;
+    cout << "SendTripleAndReceive()..." << endl;
     AdaptersList env(3);
     string body0("test data set 1");
     string body1("test data set 2222");
@@ -133,13 +139,14 @@ TEST_CASE("SendTripleAndReceive") {
 }
 
 TEST_CASE("SendEachOtherAndReceive") {
+    return;
+    cout << "SendEachOtherAndReceive()..." << endl;
     std::minstd_rand  minstdRand(std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now().time_since_epoch()).count());
     AdaptersList env(5);
     vector<string> payloadsList({"test data set 1", "test data set 2", "test data set 3"});
 
-    //TODO: change debug parameters
-    int attempts = 5;//500;
-    int numSends = 1;//100;
+    const int attempts = 500;
+    const int numSends = 100;
 
     atomic<long> receiveCounter(0);
     ConditionVar cv;
@@ -152,23 +159,30 @@ TEST_CASE("SendEachOtherAndReceive") {
         });
     }
 
-    for (int i = 0; i < attempts; ++i) {
-        for (int j = 0; j < numSends; ++j) {
-            int rnd1 = minstdRand() % 3;
-            int rnd2 = 0;
-            int rnd3 = 0;
-            while (rnd2 == rnd3) {
-                rnd2 = minstdRand() % 5;
-                rnd3 = minstdRand() % 5;
+    std::thread senderThread([&]() {
+        this_thread::sleep_for(50ms);
+        for (int i = 0; i < attempts; ++i) {
+            cout << "send part: " << i << endl;
+            for (int j = 0; j < numSends; ++j) {
+                int rnd1 = minstdRand() % 3;
+                int rnd2 = 0;
+                int rnd3 = 0;
+                while (rnd2 == rnd3) {
+                    rnd2 = minstdRand() % 5;
+                    rnd3 = minstdRand() % 5;
+                }
+                string &payload = payloadsList[rnd1];
+                const auto &sender = env.adapters[rnd2];
+                sender->send(rnd3, byte_vector(payload.begin(), payload.end()));
             }
-            string &payload = payloadsList[rnd1];
-            const auto& sender = env.adapters[rnd2];
-            sender->send(rnd3, byte_vector(payload.begin(), payload.end()));
+            this_thread::sleep_for(std::chrono::milliseconds(minstdRand() % 20));
         }
-        this_thread::sleep_for(std::chrono::milliseconds(minstdRand() % 20));
-    }
+    });
 
-    if (!cv.wait(20s))
+    if (!cv.wait(40s)) {
+        cout << "receiveCounter: " << receiveCounter << endl;
         REQUIRE(false); //timeout
+    }
     REQUIRE(receiveCounter == attempts*numSends);
+    senderThread.join();
 }

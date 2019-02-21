@@ -49,12 +49,14 @@ namespace network {
     }
 
     UDPAdapter::~UDPAdapter() {
+        timer_.stop();
         socket_.stopRecv();
         ConditionVar cv;
         socket_.close([&](ssize_t result){
             cv.notifyAll();
         });
         cv.wait(9000ms);
+        this_thread::sleep_for(1000ms);
     }
 
     void UDPAdapter::send(int destNodeNumber, const byte_vector& payload) {
@@ -485,8 +487,8 @@ namespace network {
         byte_vector sign = ownPrivateKey_.sign(sessionReader.localNonce, crypto::HashType::SHA512);
 
         byte_vector payload = bossDumpArray(UArray({
-            UBytes(&sessionReader.localNonce[0], sessionReader.localNonce.size()),
-            UBytes(&sign[0], sign.size()),
+            UBytesFromByteVector(sessionReader.localNonce),
+            UBytesFromByteVector(sign),
         }));
 
         Packet welcomePacket(getNextPacketId(), ownNodeInfo_.getNumber(), sessionReader.remoteNodeInfo.getNumber(), PacketTypes::WELCOME, payload);
@@ -501,8 +503,8 @@ namespace network {
         sprng_read(&session.localNonce[0], 64, NULL);
 
         byte_vector packed = bossDumpArray(UArray({
-            UBytes(&session.localNonce[0], session.localNonce.size()),
-            UBytes(&session.remoteNonce[0], session.remoteNonce.size()),
+            UBytesFromByteVector(session.localNonce),
+            UBytesFromByteVector(session.remoteNonce),
         }));
 
         byte_vector encrypted = session.remoteNodeInfo.getPublicKey().encrypt(packed);
@@ -524,8 +526,8 @@ namespace network {
 
         byte_vector key = sessionReader.sessionKey.pack();
         byte_vector packed = bossDumpArray(UArray({
-            UBytes(&key[0], key.size()),
-            UBytes(&sessionReader.remoteNonce[0], sessionReader.remoteNonce.size()),
+            UBytesFromByteVector(key),
+            UBytesFromByteVector(sessionReader.remoteNonce),
         }));
 
         byte_vector encrypted = sessionReader.remoteNodeInfo.getPublicKey().encrypt(packed);
@@ -561,9 +563,9 @@ namespace network {
         writeLog(isLogEnabled_, logLabel_, "send nack to ", sessionReader.remoteNodeInfo.getNumber());
         byte_vector randomSeed(64);
         sprng_read(&randomSeed[0], 64, NULL);
-        byte_vector data = bossDumpArray(UArray({UInt(packetId), UBytes(&randomSeed[0], randomSeed.size())}));
+        byte_vector data = bossDumpArray(UArray({UInt(packetId), UBytesFromByteVector(randomSeed)}));
         byte_vector sign = ownPrivateKey_.sign(data, crypto::HashType::SHA512);
-        byte_vector payload = bossDumpArray(UArray({UBytes(&data[0], data.size()), UBytes(&sign[0], sign.size())}));
+        byte_vector payload = bossDumpArray(UArray({UBytesFromByteVector(data), UBytesFromByteVector(sign)}));
         Packet packet(0, ownNodeInfo_.getNumber(), sessionReader.remoteNodeInfo.getNumber(), PacketTypes::NACK, payload);
         sendPacket(sessionReader.remoteNodeInfo, packet.makeByteArray());
     }

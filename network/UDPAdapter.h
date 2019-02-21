@@ -257,13 +257,13 @@ namespace network {
          * Maximum number of data blocks in the retransmit queue after which new
          * sending blocks are delayed in output queue.
          */
-        const static size_t MAX_RETRANSMIT_QUEUE_SIZE = 5;//5000; //TODO: set release value here
+        const static size_t MAX_RETRANSMIT_QUEUE_SIZE = 5000;
 
         /**
          * Maximum number of data blocks in the sending queue after which oldest
          * items are discarded and overflow flag is set.
          */
-        const static size_t MAX_QUEUE_SIZE = 50000;
+        const static size_t MAX_QUEUE_SIZE = 5000000;//50000;
 
         /**
          * Time limit for handshaking procedure. If handshake is not complete for this time, it will be restarted.

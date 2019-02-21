@@ -32,7 +32,7 @@ namespace network {
                 UInt(senderNodeId_),
                 UInt(receiverNodeId_),
                 UInt(type_),
-                UBytes(&payload_[0], payload_.size())
+                UBytesFromByteVector(payload_)
         };
         return bossDumpArray(ua);
     }
@@ -96,6 +96,7 @@ namespace network {
     }
 
     void Retransmitter::pulseRetransmit(std::function<void(const NodeInfo&, const Packet&)> funcSendPacket) {
+        std::vector<decltype(retransmitMap)::key_type> vecToErase;
         if (getState() == SessionState::STATE_EXCHANGING) {
             for (auto& item : retransmitMap) {
                 if (item.second.nextRetransmitTimeMillis < getCurrentTimeMillis()) {
@@ -108,7 +109,7 @@ namespace network {
                         funcSendPacket(remoteNodeInfo, item.second.packet);
                     }
                     if (item.second.retransmitCounter++ >= UDPAdapter::RETRANSMIT_MAX_ATTEMPTS)
-                        retransmitMap.erase(item.first);
+                        vecToErase.push_back(item.first);
                 }
             }
         } else {
@@ -119,11 +120,13 @@ namespace network {
                         if (!item.second.packet.isEmpty())
                             funcSendPacket(remoteNodeInfo, item.second.packet);
                         if (item.second.retransmitCounter++ >= UDPAdapter::RETRANSMIT_MAX_ATTEMPTS)
-                            retransmitMap.erase(item.first);
+                            vecToErase.push_back(item.first);
                     }
                 }
             }
         }
+        for (auto& key : vecToErase)
+            retransmitMap.erase(key);
     }
 
     SessionState Retransmitter::getState() {

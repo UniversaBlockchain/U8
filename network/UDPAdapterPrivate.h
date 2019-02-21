@@ -229,6 +229,12 @@ namespace network {
         return uArr;
     }
 
+    inline
+    UBytes UBytesFromByteVector(const byte_vector& bytes) {
+        byte_vector copy(bytes);
+        return UBytes(&copy[0], copy.size());
+    }
+
 };
 
 #endif //U8_UDPADAPTERPRIVATE_H
