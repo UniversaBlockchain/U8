@@ -568,5 +568,9 @@ namespace network {
         sendPacket(sessionReader.remoteNodeInfo, packet.makeByteArray());
     }
 
+    void UDPAdapter::setReceiveCallback(const TReceiveCallback& callback) {
+        std::unique_lock lock(socketMutex);
+        receiveCallback_ = callback;
+    }
 
 };

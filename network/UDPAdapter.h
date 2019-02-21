@@ -44,7 +44,15 @@ namespace network {
          */
         void send(int destNodeNumber, const byte_vector& payload);
 
+        /**
+         * Switches logger on or off for this instance of UDPAdapter.
+         */
         void enableLog(bool enabled) {isLogEnabled_ = enabled;}
+
+        /**
+         * Change current callback for incoming packets. Useful for debug.
+         */
+        void setReceiveCallback(const TReceiveCallback& callback);
 
     private:
         /**
