@@ -84,7 +84,7 @@ namespace asyncio {
      */
     class IOFile : public IOHandleThen {
     public:
-        IOFile(AsyncLoop* loop = aLoop);
+        IOFile(ioLoop* loop = asyncLoop);
         ~IOFile();
 
         /**
@@ -257,9 +257,6 @@ namespace asyncio {
         uv_fs_t* ioReq;
 
         std::atomic<bool> closed = false;
-
-        AsyncLoop* aloop = nullptr;
-        bool ownLoop;
 
         bool initRequest();
 

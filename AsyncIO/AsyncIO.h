@@ -16,15 +16,27 @@
 
 namespace asyncio {
 
-    /**
-     * Example of class main asynchronous loop.
-     */
-    extern AsyncLoop* aLoop;
+#define WAIT_LOOP 5000000L
 
     /**
-     * Handle of main asynchronous loop.
-     */
+    * Handle of main asynchronous loop.
+    */
     extern uv_loop_t* asyncLoop;
+
+    /**
+     * Exit handle for deinitialize main asynchronous loop.
+     */
+    extern uv_async_t exitHandle;
+
+    /**
+     * Handle of main asynchronous loop thread.
+     */
+    extern uv_thread_t thread_loop;
+
+    /**
+     * Alarm (event notify) handle of main asynchronous loop.
+     */
+    extern uv_async_t alarmHandle;
 
     /**
      * Asynchronous request for file operations.
@@ -72,9 +84,8 @@ namespace asyncio {
     /**
      * Init and run main asynchronous loop.
      * Must be called before asynchronous method calls.
-     * @return class of main asynchronous loop. @see AsyncLoop.
      */
-    AsyncLoop* initAndRunLoop();
+    ioLoop* initAndRunLoop();
 
     /**
      * Get handle of main asynchronous loop.

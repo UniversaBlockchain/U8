@@ -154,6 +154,7 @@ namespace asyncio {
          * @param IP address (IPv4 or IPv6).
          * @param port for binding socket.
          * @param bufferSize is size of sending and receiving buffers in bytes. Set to 0 if resizing is not required.
+         *        If bufferSize more than system max buffer size, system max buffer size will be set.
          * @return initialize and bind UPD socket result.
          * If isError(result) returns true - use getError(result) to determine the error.
          * If isError(result) returns false - UPD socket successfully init and bind.
@@ -236,7 +237,8 @@ namespace asyncio {
         uv_udp_t* ioUDPSoc;
 
         std::atomic<bool> closed = false;
-        std::atomic<bool> bufferized = false;
+        std::atomic<bool> bufferizedRecv = false;
+        std::atomic<bool> bufferizedRead = false;
         std::atomic<bool> readMode = false;
         std::atomic<bool> recvMode = false;
         ioHandle_t type;

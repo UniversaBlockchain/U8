@@ -39,6 +39,19 @@ namespace asyncio {
 
     void IOTCP::freeRequest() {
         if (ioTCPSoc) {
+            if (ioTCPSoc->data) {
+                auto sockData = (TCPSocket_data*) ioTCPSoc->data;
+
+                if (sockData->read) {
+                    if (bufferized)
+                        delete (readUDPBuffer_data*) sockData->read;
+                    else
+                        delete (readUDP_data *) sockData->read;
+                }
+
+                delete sockData;
+            }
+
             delete ioTCPSoc;
             ioTCPSoc = nullptr;
         }
@@ -57,7 +70,7 @@ namespace asyncio {
     }
 
     void IOTCP::read(size_t maxBytesToRead, read_cb callback) {
-        if (!ioTCPSoc)
+        if (!ioTCPSoc || closed)
             throw std::logic_error("TCP socket not initialized. Open socket first.");
 
         if (type != TCP_SOCKET_CONNECTED)
@@ -73,14 +86,22 @@ namespace asyncio {
             tcpReading = true;
             bufferized = false;
 
-            ioTCPSoc->data = read_data;
+            if (!ioTCPSoc->data) {
+                auto sockData = new TCPSocket_data();
+                sockData->read = sockData->close = nullptr;
+                ioTCPSoc->data = sockData;
+            }
+
+            freeReadData();
+
+            ((TCPSocket_data*) ioTCPSoc->data)->read = read_data;
 
             if (aloop)
                 aloop->addWork([=]{
                     int result = uv_read_start((uv_stream_t*) ioTCPSoc, _alloc_tcp_cb, _read_tcp_cb);
 
                     if (result < 0) {
-                        ioTCPSoc->data = nullptr;
+                        ((TCPSocket_data*) ioTCPSoc->data)->read = nullptr;
 
                         read_data->callback(byte_vector(), result);
 
@@ -94,7 +115,7 @@ namespace asyncio {
     }
 
     void IOTCP::read(void* buffer, size_t maxBytesToRead, readBuffer_cb callback) {
-        if (!ioTCPSoc)
+        if (!ioTCPSoc || closed)
             throw std::logic_error("TCP socket not initialized. Open socket first.");
 
         if (type != TCP_SOCKET_CONNECTED)
@@ -111,14 +132,22 @@ namespace asyncio {
             tcpReading = true;
             bufferized = true;
 
-            ioTCPSoc->data = read_data;
+            if (!ioTCPSoc->data) {
+                auto sockData = new TCPSocket_data();
+                sockData->read = sockData->close = nullptr;
+                ioTCPSoc->data = sockData;
+            }
+
+            freeReadData();
+
+            ((TCPSocket_data*) ioTCPSoc->data)->read = read_data;
 
             if (aloop)
                 aloop->addWork([=]{
                     int result = uv_read_start((uv_stream_t*) ioTCPSoc, _allocBuffer_tcp_cb, _readBuffer_tcp_cb);
 
                     if (result < 0) {
-                        ioTCPSoc->data = nullptr;
+                        ((TCPSocket_data*) ioTCPSoc->data)->read = nullptr;
 
                         read_data->callback(result);
 
@@ -137,20 +166,23 @@ namespace asyncio {
             return;
         }
 
+        if (((TCPSocket_data*) ioTCPSoc->data)->read)
+            throw std::logic_error("Error deleting read data.");
+
         auto tcp_read_data = readQueue.get();
 
         bufferized = tcp_read_data.bufferized;
         if (bufferized) {
             auto read_data = (readBufferTCP_data*) tcp_read_data.data;
 
-            ioTCPSoc->data = read_data;
+            ((TCPSocket_data*) ioTCPSoc->data)->read = read_data;
 
             if (aloop)
                 aloop->addWork([=]{
                     int result = uv_read_start((uv_stream_t*) ioTCPSoc, _allocBuffer_tcp_cb, _readBuffer_tcp_cb);
 
                     if (result < 0) {
-                        ioTCPSoc->data = nullptr;
+                        ((TCPSocket_data*) ioTCPSoc->data)->read = nullptr;
 
                         read_data->callback(result);
 
@@ -162,14 +194,14 @@ namespace asyncio {
         } else {
             auto read_data = (readTCP_data*) tcp_read_data.data;
 
-            ioTCPSoc->data = read_data;
+            ((TCPSocket_data*) ioTCPSoc->data)->read = read_data;
 
             if (aloop)
                 aloop->addWork([=]{
                     int result = uv_read_start((uv_stream_t*) ioTCPSoc, _alloc_tcp_cb, _read_tcp_cb);
 
                     if (result < 0) {
-                        ioTCPSoc->data = nullptr;
+                        ((TCPSocket_data*) ioTCPSoc->data)->read = nullptr;
 
                         read_data->callback(byte_vector(), result);
 
@@ -191,7 +223,7 @@ namespace asyncio {
     }
 
     void IOTCP::_write(const byte_vector& data, write_cb callback) {
-        if (!ioTCPSoc)
+        if (!ioTCPSoc || closed)
             throw std::logic_error("TCP socket not initialized. Open socket first.");
 
         if (type != TCP_SOCKET_CONNECTED)
@@ -229,7 +261,7 @@ namespace asyncio {
     }
 
     void IOTCP::_write(void* buffer, size_t size, write_cb callback) {
-        if (!ioTCPSoc)
+        if (!ioTCPSoc || closed)
             throw std::logic_error("TCP socket not initialized. Open socket first.");
 
         if (type != TCP_SOCKET_CONNECTED)
@@ -267,7 +299,7 @@ namespace asyncio {
     }
 
     void IOTCP::_close(close_cb callback) {
-        if (!ioTCPSoc)
+        if (!ioTCPSoc || closed)
             throw std::logic_error("TCP socket not initialized. Open socket first.");
 
         stopRead();
@@ -279,16 +311,26 @@ namespace asyncio {
 
         auto handle = (uv_handle_t*) ioTCPSoc;
 
-        if (handle->data && (type == TCP_SOCKET_LISTEN))
-            delete (openTCP_data*) handle->data;
+        if (handle->data && (type == TCP_SOCKET_LISTEN)) {
+            delete (openTCP_data *) handle->data;
+            handle->data = nullptr;
+        }
 
-        handle->data = socket_data;
+        if (!handle->data) {
+            auto sockData = new TCPSocket_data();
+            sockData->read = sockData->close = nullptr;
+            handle->data = sockData;
+        }
+
+        ((TCPSocket_data*) handle->data)->close = socket_data;
 
         closed = true;
 
         if (!uv_is_closing(handle)) {
             uv_close(handle, _close_handle_cb);
         } else {
+            ((TCPSocket_data*) handle->data)->close = nullptr;
+
             socket_data->callback(connReset ? UV_ECONNRESET : 0);
 
             delete socket_data;
@@ -343,7 +385,7 @@ namespace asyncio {
     }
 
     void IOTCP::_alloc_tcp_cb(uv_handle_t* handle, size_t suggested_size, uv_buf_t* buf) {
-        auto rcv_data = (readTCP_data*) handle->data;
+        auto rcv_data = (readTCP_data*) ((TCPSocket_data*) handle->data)->read;
 
         size_t vector_size = suggested_size;
         if (vector_size > rcv_data->maxBytesToRead)
@@ -354,7 +396,7 @@ namespace asyncio {
     }
 
     void IOTCP::_allocBuffer_tcp_cb(uv_handle_t* handle, size_t suggested_size, uv_buf_t* buf) {
-        auto recv_data = (readBufferTCP_data*) handle->data;
+        auto recv_data = (readBufferTCP_data*) ((TCPSocket_data*) handle->data)->read;
 
         *buf = uv_buf_init((char*) recv_data->buffer, (unsigned int) recv_data->maxBytesToRead);
     }
@@ -365,7 +407,7 @@ namespace asyncio {
         if (nread == UV_EOF)
             nread = 0;
 
-        auto read_data = (readTCP_data*) stream->data;
+        auto read_data = (readTCP_data*) ((TCPSocket_data*) stream->data)->read;
 
         if (nread == UV_ECONNRESET) {
             nread = 0;
@@ -376,7 +418,7 @@ namespace asyncio {
             read_data->data->resize((unsigned long) nread);
 
         IOTCP* TCPHandle = read_data->handle;
-        stream->data = nullptr;
+        ((TCPSocket_data*) stream->data)->read = nullptr;
 
         read_data->callback(*read_data->data, nread);
 
@@ -392,7 +434,7 @@ namespace asyncio {
         if (nread == UV_EOF)
             nread = 0;
 
-        auto read_data = (readBufferTCP_data*) stream->data;
+        auto read_data = (readBufferTCP_data*) ((TCPSocket_data*) stream->data)->read;
 
         if (nread == UV_ECONNRESET) {
             nread = 0;
@@ -400,7 +442,7 @@ namespace asyncio {
         }
 
         IOTCP* TCPHandle = read_data->handle;
-        stream->data = nullptr;
+        ((TCPSocket_data*) stream->data)->read = nullptr;
 
         read_data->callback(nread);
 
@@ -410,7 +452,9 @@ namespace asyncio {
     }
 
     void IOTCP::_close_handle_cb(uv_handle_t* handle) {
-        auto socket_data = (closeSocket_data*) handle->data;
+        auto socket_data = (closeSocket_data*) ((TCPSocket_data*) handle->data)->close;
+
+        ((TCPSocket_data*) handle->data)->close = nullptr;
 
         socket_data->callback(socket_data->connReset ? UV_ECONNRESET : 0);
 
@@ -429,10 +473,11 @@ namespace asyncio {
 
         int result = uv_tcp_init(loop, ioTCPSoc);
         if (result < 0) {
+            ioTCPSoc->data = nullptr;
+
             socket_data->callback(result);
 
             delete socket_data;
-            ioTCPSoc->data = nullptr;
             freeRequest();
             return;
         }
@@ -449,10 +494,11 @@ namespace asyncio {
         }
 
         if (result < 0) {
+            ioTCPSoc->data = nullptr;
+
             socket_data->callback(result);
 
             delete socket_data;
-            ioTCPSoc->data = nullptr;
             type = TCP_SOCKET_ERROR;
             return;
         }
@@ -460,10 +506,11 @@ namespace asyncio {
         result = uv_listen((uv_stream_t *) ioTCPSoc, maxConnections, _listen_cb);
 
         if (result < 0) {
+            ioTCPSoc->data = nullptr;
+
             socket_data->callback(result);
 
             delete socket_data;
-            ioTCPSoc->data = nullptr;
             type = TCP_SOCKET_ERROR;
         } else
             type = TCP_SOCKET_LISTEN;
@@ -492,10 +539,11 @@ namespace asyncio {
 
         int result = uv_tcp_init(loop, ioTCPSoc);
         if (result < 0) {
+            ioTCPSoc->data = nullptr;
+
             socket_data->callback(result);
 
             delete socket_data;
-            ioTCPSoc->data = nullptr;
             freeRequest();
             return;
         }
@@ -512,10 +560,11 @@ namespace asyncio {
         }
 
         if (result < 0) {
+            ioTCPSoc->data = nullptr;
+
             socket_data->callback(result);
 
             delete socket_data;
-            ioTCPSoc->data = nullptr;
             type = TCP_SOCKET_ERROR;
             return;
         }
@@ -529,17 +578,18 @@ namespace asyncio {
         }
 
         if (result < 0) {
+            ioTCPSoc->data = nullptr;
+
             socket_data->callback(result);
 
             delete socket_data;
-            ioTCPSoc->data = nullptr;
             type = TCP_SOCKET_ERROR;
         } else
             type = TCP_SOCKET_CONNECTED;
     }
 
     IOTCP* IOTCP::accept(ssize_t* result) {
-        if (!ioTCPSoc)
+        if (!ioTCPSoc || closed)
             throw std::logic_error("TCP socket not initialized. Open socket first.");
 
         if (type != TCP_SOCKET_LISTEN)
@@ -577,7 +627,7 @@ namespace asyncio {
     }
 
     int IOTCP::enableKeepAlive(unsigned int delay) {
-        if (!ioTCPSoc)
+        if (!ioTCPSoc || closed)
             throw std::logic_error("TCP socket not initialized. Open socket first.");
 
         if (type != TCP_SOCKET_CONNECTED)
@@ -587,7 +637,7 @@ namespace asyncio {
     }
 
     int IOTCP::disableKeepAlive() {
-        if (!ioTCPSoc)
+        if (!ioTCPSoc || closed)
             throw std::logic_error("TCP socket not initialized. Open socket first.");
 
         if (type != TCP_SOCKET_CONNECTED)
@@ -605,7 +655,7 @@ namespace asyncio {
     }
 
     void IOTCP::stopRead() {
-        if (!ioTCPSoc)
+        if (!ioTCPSoc || closed)
             throw std::logic_error("TCP socket not initialized. Open socket first.");
 
         uv_read_stop((uv_stream_t*) ioTCPSoc);
@@ -622,13 +672,17 @@ namespace asyncio {
     }
 
     void IOTCP::freeReadData() {
-        if (ioTCPSoc->data) {
-            if (bufferized)
-                delete (readBufferTCP_data*) ioTCPSoc->data;
-            else
-                delete (readTCP_data *) ioTCPSoc->data;
+        if (ioTCPSoc && ioTCPSoc->data) {
+            auto sockData = (TCPSocket_data*) ioTCPSoc->data;
 
-            ioTCPSoc->data = nullptr;
+            if (sockData->read) {
+                if (bufferized)
+                    delete (readBufferTCP_data*) sockData->read;
+                else
+                    delete (readTCP_data *) sockData->read;
+
+                sockData->read = nullptr;
+            }
         }
     }
 }
