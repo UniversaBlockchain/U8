@@ -88,7 +88,7 @@ async function testContract() {
 }
 
 async function testContract2() {
-   let input = await io.openRead("../test/sc.unicon");
+    let input = await io.openRead("../test/sc.unicon");
     let sealed = await input.allBytes();
 
     let contract = TransactionPack.unpack(sealed).contract;
@@ -127,7 +127,7 @@ require('unit_tests/changeownerpermission_test')
 require('unit_tests/modifydatapermission_test')
 require('unit_tests/revokepermission_test')
 require('unit_tests/splitjoinpermission_test')
-
+require('unit_tests/constraint_test')
 
 
 async function main() {
@@ -150,4 +150,3 @@ async function main() {
     return await unit.perform();
 
 }
-
