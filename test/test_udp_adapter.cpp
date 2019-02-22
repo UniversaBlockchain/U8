@@ -78,7 +78,7 @@ TEST_CASE("HelloUdp") {
     //udpAdapter1.enableLog(true);
     //udpAdapter2.enableLog(true);
 
-    long sendTo0count = 400;
+    const long sendTo0count = 400;
 
     udpAdapter0.send(1, byte_vector(body0.begin(), body0.end()));
     udpAdapter1.send(2, byte_vector(body1.begin(), body1.end()));
@@ -91,55 +91,53 @@ TEST_CASE("HelloUdp") {
         std::this_thread::sleep_for(500ms);
         cout << "counter0: " << counter0 << endl;
     }
+    cout << "HelloUdp()... done!" << endl;
 }
 
 TEST_CASE("SendAndReceive") {
-    return;
     cout << "SendAndReceive()..." << endl;
     AdaptersList env(3);
     string body0("test data set 1");
     string receivedString("");
-    ConditionVar cv;
+    timed_mutex mtx;
+    mtx.lock();
     env.adapters[1]->setReceiveCallback([&](const byte_vector& packet){
         receivedString = string(packet.begin(), packet.end());
-        cv.notifyAll();
+        mtx.unlock();
     });
-    std::thread senderThread([&]() {
-        this_thread::sleep_for(50ms);
-        env.adapters[0]->send(1, byte_vector(body0.begin(), body0.end()));
-    });
-    if (!cv.wait(1s))
+    env.adapters[0]->send(1, byte_vector(body0.begin(), body0.end()));
+    if (!mtx.try_lock_for(5s))
         REQUIRE(false); //timeout
     REQUIRE(body0 == receivedString);
-    senderThread.join();
+    cout << "SendAndReceive()... done!" << endl;
 }
 
 TEST_CASE("SendTripleAndReceive") {
-    return;
     cout << "SendTripleAndReceive()..." << endl;
     AdaptersList env(3);
     string body0("test data set 1");
     string body1("test data set 2222");
     string body2("test data set 333333333333333");
     set<string> receivedStrings;
-    ConditionVar cv;
+    timed_mutex mtx;
+    mtx.lock();
     env.adapters[1]->setReceiveCallback([&](const byte_vector& packet){
         receivedStrings.insert(string(packet.begin(), packet.end()));
         if (receivedStrings.size() >= 3)
-            cv.notifyAll();
+            mtx.unlock();
     });
     env.adapters[0]->send(1, byte_vector(body0.begin(), body0.end()));
     env.adapters[0]->send(1, byte_vector(body1.begin(), body1.end()));
     env.adapters[0]->send(1, byte_vector(body2.begin(), body2.end()));
-    if (!cv.wait(5s))
+    if (!mtx.try_lock_for(5s))
         REQUIRE(false); //timeout
     REQUIRE(receivedStrings.find(body0) != receivedStrings.end());
     REQUIRE(receivedStrings.find(body1) != receivedStrings.end());
     REQUIRE(receivedStrings.find(body2) != receivedStrings.end());
+    cout << "SendTripleAndReceive()... done!" << endl;
 }
 
 TEST_CASE("SendEachOtherAndReceive") {
-    return;
     cout << "SendEachOtherAndReceive()..." << endl;
     std::minstd_rand  minstdRand(std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now().time_since_epoch()).count());
     AdaptersList env(5);
@@ -149,20 +147,21 @@ TEST_CASE("SendEachOtherAndReceive") {
     const int numSends = 100;
 
     atomic<long> receiveCounter(0);
-    ConditionVar cv;
+    timed_mutex mtx;
+    mtx.lock();
 
     for (int i = 0; i < 5; ++i) {
         env.adapters[i]->setReceiveCallback([&](const byte_vector &packet) {
             ++receiveCounter;
             if (receiveCounter >= attempts * numSends)
-                cv.notifyAll();
+                mtx.unlock();
         });
     }
 
     std::thread senderThread([&]() {
-        this_thread::sleep_for(50ms);
         for (int i = 0; i < attempts; ++i) {
-            cout << "send part: " << i << endl;
+            if (i % 100 == 0)
+                cout << "send part: " << i << "..." << i+99 << endl;
             for (int j = 0; j < numSends; ++j) {
                 int rnd1 = minstdRand() % 3;
                 int rnd2 = 0;
@@ -179,10 +178,11 @@ TEST_CASE("SendEachOtherAndReceive") {
         }
     });
 
-    if (!cv.wait(40s)) {
+    if (!mtx.try_lock_for(40s)) {
         cout << "receiveCounter: " << receiveCounter << endl;
         REQUIRE(false); //timeout
     }
     REQUIRE(receiveCounter == attempts*numSends);
     senderThread.join();
+    cout << "SendEachOtherAndReceive()... done!" << endl;
 }

@@ -9,7 +9,6 @@
 #include "UDPAdapterPrivate.h"
 #include "../AsyncIO/AsyncIO.h"
 #include "../crypto/base64.h"
-#include "../tools/ConditionVar.h"
 #include "../crypto/SymmetricKey.h"
 #include "../types/UArray.h"
 #include "../serialization/BossSerializer.h"
@@ -49,14 +48,16 @@ namespace network {
     }
 
     UDPAdapter::~UDPAdapter() {
+        std::unique_lock lock(socketMutex);
         timer_.stop();
         socket_.stopRecv();
-        ConditionVar cv;
+        timed_mutex mtx;
+        mtx.lock();
         socket_.close([&](ssize_t result){
-            cv.notifyAll();
+            mtx.unlock();
         });
-        cv.wait(9000ms);
-        this_thread::sleep_for(1000ms);
+        if (!mtx.try_lock_for(20000ms))
+            writeErr(true, logLabel_, "~UDPAdapter(): timeout");
     }
 
     void UDPAdapter::send(int destNodeNumber, const byte_vector& payload) {
