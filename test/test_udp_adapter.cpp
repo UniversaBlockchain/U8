@@ -43,8 +43,6 @@ public:
 };
 
 TEST_CASE("HelloUdp") {
-    cout << "HelloUdp()..." << endl;
-
     string body0("packet from node-0");
     string body1("some data from node-1");
     string body2("data from node-2");
@@ -91,11 +89,9 @@ TEST_CASE("HelloUdp") {
         std::this_thread::sleep_for(500ms);
         cout << "counter0: " << counter0 << endl;
     }
-    cout << "HelloUdp()... done!" << endl;
 }
 
 TEST_CASE("SendAndReceive") {
-    cout << "SendAndReceive()..." << endl;
     AdaptersList env(3);
     string body0("test data set 1");
     string receivedString("");
@@ -106,14 +102,12 @@ TEST_CASE("SendAndReceive") {
         mtx.unlock();
     });
     env.adapters[0]->send(1, byte_vector(body0.begin(), body0.end()));
-    if (!mtx.try_lock_for(5s))
+    if (!mtx.try_lock_for(15s))
         REQUIRE(false); //timeout
     REQUIRE(body0 == receivedString);
-    cout << "SendAndReceive()... done!" << endl;
 }
 
 TEST_CASE("SendTripleAndReceive") {
-    cout << "SendTripleAndReceive()..." << endl;
     AdaptersList env(3);
     string body0("test data set 1");
     string body1("test data set 2222");
@@ -129,16 +123,14 @@ TEST_CASE("SendTripleAndReceive") {
     env.adapters[0]->send(1, byte_vector(body0.begin(), body0.end()));
     env.adapters[0]->send(1, byte_vector(body1.begin(), body1.end()));
     env.adapters[0]->send(1, byte_vector(body2.begin(), body2.end()));
-    if (!mtx.try_lock_for(5s))
+    if (!mtx.try_lock_for(15s))
         REQUIRE(false); //timeout
     REQUIRE(receivedStrings.find(body0) != receivedStrings.end());
     REQUIRE(receivedStrings.find(body1) != receivedStrings.end());
     REQUIRE(receivedStrings.find(body2) != receivedStrings.end());
-    cout << "SendTripleAndReceive()... done!" << endl;
 }
 
 TEST_CASE("SendEachOtherAndReceive") {
-    cout << "SendEachOtherAndReceive()..." << endl;
     std::minstd_rand  minstdRand(std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now().time_since_epoch()).count());
     AdaptersList env(5);
     vector<string> payloadsList({"test data set 1", "test data set 2", "test data set 3"});
@@ -174,7 +166,7 @@ TEST_CASE("SendEachOtherAndReceive") {
                 const auto &sender = env.adapters[rnd2];
                 sender->send(rnd3, byte_vector(payload.begin(), payload.end()));
             }
-            this_thread::sleep_for(std::chrono::milliseconds(minstdRand() % 20));
+            this_thread::sleep_for(std::chrono::milliseconds(minstdRand() % 10));
         }
     });
 
@@ -184,5 +176,4 @@ TEST_CASE("SendEachOtherAndReceive") {
     }
     REQUIRE(receiveCounter == attempts*numSends);
     senderThread.join();
-    cout << "SendEachOtherAndReceive()... done!" << endl;
 }

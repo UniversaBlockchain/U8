@@ -110,14 +110,12 @@ namespace network {
         int packetId;
         int type;
         long nextRetransmitTimeMillis;
-        RetransmitItem(const Packet& newPacket, const byte_vector& newSourcePayload);
+        RetransmitItem(const Packet& newPacket, const byte_vector& newSourcePayload, int randomValue);
         RetransmitItem(const RetransmitItem&) = default;
         RetransmitItem(RetransmitItem&&) = default;
         RetransmitItem& operator=(const RetransmitItem&) = default;
         RetransmitItem& operator=(RetransmitItem &&) = default;
-        void updateNextRetransmitTime();
-    private:
-        std::minstd_rand minstdRand_;
+        void updateNextRetransmitTime(int randomValue);
     };
 
     enum class SessionState {STATE_HANDSHAKE, STATE_EXCHANGING};
@@ -141,6 +139,9 @@ namespace network {
 
     protected:
         virtual SessionState getState();
+
+    private:
+        std::minstd_rand minstdRand_;
     };
 
     /**

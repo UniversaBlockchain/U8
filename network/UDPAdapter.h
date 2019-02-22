@@ -257,7 +257,7 @@ namespace network {
          * Maximum number of data blocks in the retransmit queue after which new
          * sending blocks are delayed in output queue.
          */
-        const static size_t MAX_RETRANSMIT_QUEUE_SIZE = 5000;
+        const static size_t MAX_RETRANSMIT_QUEUE_SIZE = 1500;
 
         /**
          * Maximum number of data blocks in the sending queue after which oldest
