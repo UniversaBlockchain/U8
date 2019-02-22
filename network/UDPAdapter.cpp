@@ -48,7 +48,6 @@ namespace network {
     }
 
     UDPAdapter::~UDPAdapter() {
-        std::unique_lock lock(socketMutex);
         timer_.stop();
         socket_.stopRecv();
         timed_mutex mtx;
@@ -56,8 +55,9 @@ namespace network {
         socket_.close([&](ssize_t result){
             mtx.unlock();
         });
-        if (!mtx.try_lock_for(20000ms))
+        if (!mtx.try_lock_for(9000ms))
             writeErr(true, logLabel_, "~UDPAdapter(): timeout");
+        //this_thread::sleep_for(400ms);
     }
 
     void UDPAdapter::send(int destNodeNumber, const byte_vector& payload) {
