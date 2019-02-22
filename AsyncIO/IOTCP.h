@@ -49,7 +49,6 @@ namespace asyncio {
 
     struct readTCP_data {
         read_cb callback;
-        std::shared_ptr<byte_vector> data;
         size_t maxBytesToRead;
         IOTCP* handle;
     };

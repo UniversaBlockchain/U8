@@ -258,15 +258,6 @@ namespace asyncio {
     }
 
     void IOUDP::close(close_cb callback) {
-        if (aloop)
-            aloop->addWork([=]{
-                _close(callback);
-            });
-        else
-            throw std::logic_error("Async loop not initialized.");
-    }
-
-    void IOUDP::_close(close_cb callback) {
         if (!ioUDPSoc || closed)
             throw std::logic_error("UDP socket not initialized. Open socket first.");
 
@@ -276,6 +267,15 @@ namespace asyncio {
         if (recvMode)
             stopRecv();
 
+        if (aloop)
+            aloop->addWork([=]{
+                _close(callback);
+            });
+        else
+            throw std::logic_error("Async loop not initialized.");
+    }
+
+    void IOUDP::_close(close_cb callback) {
         auto socket_data = new closeSocket_data();
 
         socket_data->callback = std::move(callback);
@@ -325,8 +325,10 @@ namespace asyncio {
     void IOUDP::_recv_cb(uv_udp_t* handle, ssize_t nread, const uv_buf_t* buf, const struct sockaddr* addr, unsigned flags) {
         auto rcv_data = (recv_data*) ((UDPSocket_data*) handle->data)->recv;
 
-        if (!nread)
+        if (!nread) {
+            free(buf->base);
             return;
+        }
 
         const char *ip;
         char ipv6[INET6_ADDRSTRLEN];
@@ -342,6 +344,7 @@ namespace asyncio {
             throw std::logic_error("Unknown socket address family");
 
         if (nread < 0) {
+            free(buf->base);
             rcv_data->callback(nread, byte_vector(), nullptr, 0);
             return;
         }
@@ -379,12 +382,11 @@ namespace asyncio {
     void IOUDP::_alloc_read_cb(uv_handle_t* handle, size_t suggested_size, uv_buf_t* buf) {
         auto read_data = (readUDP_data*) ((UDPSocket_data*) handle->data)->read;
 
-        size_t vector_size = suggested_size;
-        if (vector_size > read_data->maxBytesToRead)
-            vector_size = read_data->maxBytesToRead;
+        size_t size = suggested_size;
+        if (size > read_data->maxBytesToRead)
+            size = read_data->maxBytesToRead;
 
-        read_data->data = std::make_shared<byte_vector>(vector_size);
-        *buf = uv_buf_init((char*) read_data->data->data(), (unsigned int) vector_size);
+        *buf = uv_buf_init((char*) malloc(size), (unsigned int) size);
     }
 
     void IOUDP::_alloc_readBuffer_cb(uv_handle_t* handle, size_t suggested_size, uv_buf_t* buf) {
@@ -396,8 +398,10 @@ namespace asyncio {
     void IOUDP::_read_cb(uv_udp_t* handle, ssize_t nread, const uv_buf_t* buf, const struct sockaddr* addr, unsigned flags) {
         auto read_data = (readUDP_data*) ((UDPSocket_data*) handle->data)->read;
 
-        if (!nread)
+        if (!nread) {
+            free(buf->base);
             return;
+        }
 
         const char *ip;
         char ipv6[INET6_ADDRSTRLEN];
@@ -416,19 +420,27 @@ namespace asyncio {
         if ((read_data->IP == ip) && (read_data->port == port)) {
             uv_udp_recv_stop(handle);
 
-            if ((nread > 0) && (nread < read_data->data->size()))
-                read_data->data->resize((unsigned long) nread);
-
             IOUDP* UDPHandle = read_data->handle;
             ((UDPSocket_data*) handle->data)->read = nullptr;
 
-            read_data->callback(*read_data->data, nread);
+            if (nread > 0) {
+                ssize_t vector_size = nread;
+                if (vector_size > read_data->maxBytesToRead)
+                    vector_size = read_data->maxBytesToRead;
 
-            read_data->data.reset();
+                byte_vector data((unsigned long) vector_size);
+                data.assign(buf->base, buf->base + vector_size);
+
+                read_data->callback(data, vector_size);
+            } else
+                read_data->callback(byte_vector(), nread);
+
             delete read_data;
 
             UDPHandle->checkReadQueue();
         }
+
+        free(buf->base);
     }
 
     void IOUDP::_readBuffer_cb(uv_udp_t* handle, ssize_t nread, const uv_buf_t* buf, const struct sockaddr* addr, unsigned flags) {
@@ -529,15 +541,6 @@ namespace asyncio {
     }
 
     void IOUDP::recv(recv_cb callback) {
-        if (aloop)
-            aloop->addWork([=]{
-                _recv(callback);
-            });
-        else
-            throw std::logic_error("Async loop not initialized.");
-    }
-
-    void IOUDP::_recv(recv_cb callback) {
         if (!ioUDPSoc || closed)
             throw std::logic_error("UDP socket not initialized. Open socket first.");
 
@@ -550,6 +553,15 @@ namespace asyncio {
         if (recvMode)
             throw std::logic_error("UDP socket already in receive mode. Before use method stopRecv for stop receiving.");
 
+        if (aloop)
+            aloop->addWork([=]{
+                _recv(callback);
+            });
+        else
+            throw std::logic_error("Async loop not initialized.");
+    }
+
+    void IOUDP::_recv(recv_cb callback) {
         freeRecvData();
 
         auto rcv_data = new recv_data();
@@ -572,15 +584,6 @@ namespace asyncio {
     }
 
     void IOUDP::recv(void* buffer, size_t maxBytesToRecv, recvBuffer_cb callback) {
-        if (aloop)
-            aloop->addWork([=]{
-                _recv(buffer, maxBytesToRecv, callback);
-            });
-        else
-            throw std::logic_error("Async loop not initialized.");
-    }
-
-    void IOUDP::_recv(void* buffer, size_t maxBytesToRecv, recvBuffer_cb callback) {
         if (!ioUDPSoc || closed)
             throw std::logic_error("UDP socket not initialized. Open socket first.");
 
@@ -593,6 +596,15 @@ namespace asyncio {
         if (recvMode)
             throw std::logic_error("UDP socket already in receive mode. Before use method stopRecv for stop receiving.");
 
+        if (aloop)
+            aloop->addWork([=]{
+                _recv(buffer, maxBytesToRecv, callback);
+            });
+        else
+            throw std::logic_error("Async loop not initialized.");
+    }
+
+    void IOUDP::_recv(void* buffer, size_t maxBytesToRecv, recvBuffer_cb callback) {
         freeRecvData();
 
         auto recv_data = new recvBuffer_data();
@@ -617,6 +629,12 @@ namespace asyncio {
     }
 
     void IOUDP::send(const byte_vector& data, const char* IP, unsigned int port, send_cb callback) {
+        if (!ioUDPSoc || closed)
+            throw std::logic_error("UDP socket not initialized. Open socket first.");
+
+        if (type == UDP_SOCKET_ERROR)
+            throw std::logic_error("UDP socket initialized with error. Close and open socket.");
+
         std::string ip = IP;
         if (aloop)
             aloop->addWork([=]{
@@ -627,12 +645,6 @@ namespace asyncio {
     }
 
     void IOUDP::_send(const byte_vector& data, std::string IP, unsigned int port, send_cb callback) {
-        if (!ioUDPSoc || closed)
-            throw std::logic_error("UDP socket not initialized. Open socket first.");
-
-        if (type == UDP_SOCKET_ERROR)
-            throw std::logic_error("UDP socket initialized with error. Close and open socket.");
-
         auto req = new uv_udp_send_t();
         auto snd_data = new send_data();
 
@@ -663,6 +675,12 @@ namespace asyncio {
     }
 
     void IOUDP::send(void* buffer, size_t size, const char* IP, unsigned int port, send_cb callback) {
+        if (!ioUDPSoc || closed)
+            throw std::logic_error("UDP socket not initialized. Open socket first.");
+
+        if (type == UDP_SOCKET_ERROR)
+            throw std::logic_error("UDP socket initialized with error. Close and open socket.");
+
         std::string ip = IP;
         if (aloop)
             aloop->addWork([=]{
@@ -673,12 +691,6 @@ namespace asyncio {
     }
 
     void IOUDP::_send(void* buffer, size_t size, std::string IP, unsigned int port, send_cb callback) {
-        if (!ioUDPSoc || closed)
-            throw std::logic_error("UDP socket not initialized. Open socket first.");
-
-        if (type == UDP_SOCKET_ERROR)
-            throw std::logic_error("UDP socket initialized with error. Close and open socket.");
-
         auto req = new uv_udp_send_t();
         auto snd_data = new send_data();
 
@@ -715,9 +727,14 @@ namespace asyncio {
         if (readMode)
             throw std::logic_error("UDP socket in read mode. Wait read datagram or use method stopRead for stop reading.");
 
-        uv_udp_recv_stop(ioUDPSoc);
+        if (aloop)
+            aloop->addWork([=]{
+                uv_udp_recv_stop(ioUDPSoc);
 
-        recvMode = false;
+                recvMode = false;
+            });
+        else
+            throw std::logic_error("Async loop not initialized.");
     }
 
     void IOUDP::stopRead() {
@@ -727,19 +744,24 @@ namespace asyncio {
         if (recvMode)
             throw std::logic_error("UDP socket in receive mode. Use method stopRecv for stop receiving.");
 
-        uv_udp_recv_stop(ioUDPSoc);
+        if (aloop)
+            aloop->addWork([=]{
+                uv_udp_recv_stop(ioUDPSoc);
 
-        // free read queue
-        while (!readQueue.empty()) {
-            auto udp_read_data = readQueue.get();
+                // free read queue
+                while (!readQueue.empty()) {
+                    auto udp_read_data = readQueue.get();
 
-            if (udp_read_data.bufferized)
-                delete (readUDPBuffer_data*) udp_read_data.data;
-            else
-                delete (readUDP_data*) udp_read_data.data;
-        }
+                    if (udp_read_data.bufferized)
+                        delete (readUDPBuffer_data*) udp_read_data.data;
+                    else
+                        delete (readUDP_data*) udp_read_data.data;
+                }
 
-        readMode = false;
+                readMode = false;
+            });
+        else
+            throw std::logic_error("Async loop not initialized.");
     }
 
     void IOUDP::freeRecvData() {

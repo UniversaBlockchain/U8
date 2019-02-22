@@ -214,6 +214,12 @@ namespace asyncio {
     }
 
     void IOTCP::write(const byte_vector& data, write_cb callback) {
+        if (!ioTCPSoc || closed)
+            throw std::logic_error("TCP socket not initialized. Open socket first.");
+
+        if (type != TCP_SOCKET_CONNECTED)
+            throw std::logic_error("TCP socket not connected.");
+
         if (aloop)
             aloop->addWork([=]{
                 _write(data, callback);
@@ -223,12 +229,6 @@ namespace asyncio {
     }
 
     void IOTCP::_write(const byte_vector& data, write_cb callback) {
-        if (!ioTCPSoc || closed)
-            throw std::logic_error("TCP socket not initialized. Open socket first.");
-
-        if (type != TCP_SOCKET_CONNECTED)
-            throw std::logic_error("TCP socket not connected.");
-
         auto req = new uv_write_t();
         auto write_data = new writeTCP_data();
 
@@ -252,6 +252,12 @@ namespace asyncio {
     }
 
     void IOTCP::write(void* buffer, size_t size, write_cb callback) {
+        if (!ioTCPSoc || closed)
+            throw std::logic_error("TCP socket not initialized. Open socket first.");
+
+        if (type != TCP_SOCKET_CONNECTED)
+            throw std::logic_error("TCP socket not connected.");
+
         if (aloop)
             aloop->addWork([=]{
                 _write(buffer, size, callback);
@@ -261,12 +267,6 @@ namespace asyncio {
     }
 
     void IOTCP::_write(void* buffer, size_t size, write_cb callback) {
-        if (!ioTCPSoc || closed)
-            throw std::logic_error("TCP socket not initialized. Open socket first.");
-
-        if (type != TCP_SOCKET_CONNECTED)
-            throw std::logic_error("TCP socket not connected.");
-
         auto req = new uv_write_t();
         auto write_data = new writeTCP_data();
 
@@ -290,6 +290,11 @@ namespace asyncio {
     }
 
     void IOTCP::close(close_cb callback) {
+        if (!ioTCPSoc || closed)
+            throw std::logic_error("TCP socket not initialized. Open socket first.");
+
+        stopRead();
+
         if (aloop)
             aloop->addWork([=]{
                 _close(callback);
@@ -299,11 +304,6 @@ namespace asyncio {
     }
 
     void IOTCP::_close(close_cb callback) {
-        if (!ioTCPSoc || closed)
-            throw std::logic_error("TCP socket not initialized. Open socket first.");
-
-        stopRead();
-
         auto socket_data = new closeSocket_data();
 
         socket_data->callback = std::move(callback);
@@ -385,14 +385,13 @@ namespace asyncio {
     }
 
     void IOTCP::_alloc_tcp_cb(uv_handle_t* handle, size_t suggested_size, uv_buf_t* buf) {
-        auto rcv_data = (readTCP_data*) ((TCPSocket_data*) handle->data)->read;
+        auto read_data = (readTCP_data*) ((TCPSocket_data*) handle->data)->read;
 
-        size_t vector_size = suggested_size;
-        if (vector_size > rcv_data->maxBytesToRead)
-            vector_size = rcv_data->maxBytesToRead;
+        size_t size = suggested_size;
+        if (size > read_data->maxBytesToRead)
+            size = read_data->maxBytesToRead;
 
-        rcv_data->data = std::make_shared<byte_vector>(vector_size);
-        *buf = uv_buf_init((char*) rcv_data->data->data(), (unsigned int) vector_size);
+        *buf = uv_buf_init((char*) malloc(size), (unsigned int) size);
     }
 
     void IOTCP::_allocBuffer_tcp_cb(uv_handle_t* handle, size_t suggested_size, uv_buf_t* buf) {
@@ -414,16 +413,24 @@ namespace asyncio {
             read_data->handle->setConnectionReset();
         }
 
-        if ((nread > 0) && (nread < read_data->data->size()))
-            read_data->data->resize((unsigned long) nread);
-
         IOTCP* TCPHandle = read_data->handle;
         ((TCPSocket_data*) stream->data)->read = nullptr;
 
-        read_data->callback(*read_data->data, nread);
+        if (nread > 0) {
+            ssize_t vector_size = nread;
+            if (vector_size > read_data->maxBytesToRead)
+                vector_size = read_data->maxBytesToRead;
 
-        read_data->data.reset();
+            byte_vector data((unsigned long) vector_size);
+            data.assign(buf->base, buf->base + vector_size);
+
+            read_data->callback(data, vector_size);
+        } else
+            read_data->callback(byte_vector(), nread);
+
         delete read_data;
+
+        free(buf->base);
 
         TCPHandle->checkReadQueue();
     }
@@ -517,6 +524,9 @@ namespace asyncio {
     }
 
     void IOTCP::connect(const char* bindIP, unsigned int bindPort, const char* IP, unsigned int port, connect_cb callback) {
+        if (!initTCPSocket())
+            throw std::logic_error("TCP socket already initialized. Close socket first.");
+
         std::string strBindIP = bindIP;
         std::string strIP = IP;
         if (aloop)
@@ -528,9 +538,6 @@ namespace asyncio {
     }
 
     void IOTCP::_connect(std::string bindIP, unsigned int bindPort, std::string IP, unsigned int port, connect_cb callback) {
-        if (!initTCPSocket())
-            throw std::logic_error("TCP socket already initialized. Close socket first.");
-
         auto socket_data = new connect_data();
 
         socket_data->callback = std::move(callback);
@@ -658,17 +665,22 @@ namespace asyncio {
         if (!ioTCPSoc || closed)
             throw std::logic_error("TCP socket not initialized. Open socket first.");
 
-        uv_read_stop((uv_stream_t*) ioTCPSoc);
+        if (aloop)
+            aloop->addWork([=]{
+                uv_read_stop((uv_stream_t*) ioTCPSoc);
 
-        // free read queue
-        while (!readQueue.empty()) {
-            auto tcp_read_data = readQueue.get();
+                // free read queue
+                while (!readQueue.empty()) {
+                    auto tcp_read_data = readQueue.get();
 
-            if (tcp_read_data.bufferized)
-                delete (readBufferTCP_data*) tcp_read_data.data;
-            else
-                delete (readTCP_data*) tcp_read_data.data;
-        }
+                    if (tcp_read_data.bufferized)
+                        delete (readBufferTCP_data*) tcp_read_data.data;
+                    else
+                        delete (readTCP_data*) tcp_read_data.data;
+                }
+            });
+        else
+            throw std::logic_error("Async loop not initialized.");
     }
 
     void IOTCP::freeReadData() {
