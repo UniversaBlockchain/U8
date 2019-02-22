@@ -32,9 +32,9 @@ const NO_CONVERSION = 0;
 const CONVERSION_BIG_DECIMAL = 1;
 
 const compareOperandType = {
-    FIELD : "FIELD",
-    CONSTSTR  : "CONSTSTR",
-    CONSTOTHER : "CONSTOTHER"
+    FIELD : 0,
+    CONSTSTR  : 1,
+    CONSTOTHER : 2
 };
 
 //Constraints types
@@ -161,44 +161,7 @@ Constraint.prototype.setConditions = function(conditions) {
 
 /*var toType = function(obj) {
     return ({}).toString.call(obj).match(/\s([a-zA-Z]+)/)[1].toLowerCase()
-}*/
-
-/*Constrain.prototype.isObjectMayCastToDouble = function (obj) {
-    return obj.endsWith("Float") || obj.endsWith("Double");
-};
-
-Constrain.prototype.isObjectMayCastToLong = function (obj) {
-    return obj.getClass().getName().endsWith("Byte") || obj.getClass().getName().endsWith("Short") ||
-        obj.getClass().getName().endsWith("Integer") || obj.getClass().getName().endsWith("Long");
-};
-
-Constrain.prototype.objectCastToDouble = function (obj) {
-    let val;
-
-    if (obj.getClass().getName().endsWith("Float") || obj.getClass().getName().endsWith("Double"))
-        val = (double) obj;
-    else
-        throw "Expected floating point number operand in condition.";
-
-    return val;
-};
-
-private long objectCastToLong(Object obj) throws Exception {
-    long val;
-
-    if (obj.getClass().getName().endsWith("Byte"))
-        val = (byte) obj;
-else if (obj.getClass().getName().endsWith("Short"))
-        val = (short) obj;
-else if (obj.getClass().getName().endsWith("Integer"))
-        val = (int) obj;
-else if (obj.getClass().getName().endsWith("Long"))
-        val = (long) obj;
-else
-    throw new IllegalArgumentException("Expected number operand in condition.");
-
-    return val;
-};
+}
 
 private long objectCastToTimeSeconds(Object obj, String operand, compareOperandType typeOfOperand) throws Exception {
     long val;
@@ -220,25 +183,22 @@ else if ((obj != null) && isObjectMayCastToLong(obj))
         throw new IllegalArgumentException("Error parsing DateTime from operand: " + operand);
 
     return val;
-};
+};*/
 
-private BigDecimal objectCastToBigDecimal(Object obj, String operand, compareOperandType typeOfOperand) throws Exception {
-    BigDecimal val;
+Constraint.prototype.objectCastToBigDecimal = function(obj, operand, typeOfOperand) {
+    let val;
+    if ((obj == null) && (typeOfOperand === compareOperandType.FIELD))
+        throw "Error getting operand: " + operand;
 
-    if ((obj == null) && (typeOfOperand == compareOperandType.FIELD))
-        throw new IllegalArgumentException("Error getting operand: " + operand);
-
-    if ((obj != null) && obj.getClass().getName().endsWith("String"))
-        val = new BigDecimal((String) obj);
-    else if ((obj != null) && isObjectMayCastToLong(obj))
-        val = new BigDecimal(objectCastToLong(obj));
-    else if ((typeOfOperand == compareOperandType.CONSTSTR) || (typeOfOperand == compareOperandType.CONSTOTHER))
+    if ((obj != null) && ((typeof obj === "string") || (typeof obj === "number")))
+        val = new BigDecimal(obj);
+    else if ((typeOfOperand === compareOperandType.CONSTSTR) || (typeOfOperand === compareOperandType.CONSTOTHER))
         val = new BigDecimal(operand);
     else
-        throw new IllegalArgumentException("Error parsing DateTime from operand: " + operand);
+        throw "Error parsing BigDecimal from operand: " + operand;
 
     return val;
-};*/
+};
 
 Constraint.prototype.compareOperands = function(refContract,
                                                 leftOperand,
@@ -269,22 +229,22 @@ Constraint.prototype.compareOperands = function(refContract,
                 leftOperand = leftOperand.substring(4);
                 leftOperandContract = refContract;
             } else if (leftOperand.startsWith("this.")) {
-                if (baseContract == null)
+                if (this.baseContract == null)
                     throw "Use left operand in condition: " + leftOperand + ". But this contract not initialized.";
 
                 leftOperand = leftOperand.substring(5);
-                leftOperandContract = baseContract;
+                leftOperandContract = this.baseContract;
             } else if ((firstPointPos = leftOperand.indexOf(".")) > 0) {
-                if (baseContract == null)
+                if (this.baseContract == null)
                     throw "Use left operand in condition: " + leftOperand + ". But this contract not initialized.";
 
-                let ref = baseContract.findReferenceByName(leftOperand.substring(0, firstPointPos));
+                let ref = this.baseContract.findReferenceByName(leftOperand.substring(0, firstPointPos));
                 if (ref == null)
                     throw "Not found reference: " + leftOperand.substring(0, firstPointPos);
 
                 for (let checkedContract of contracts)
-                if (ref.isMatchingWith(checkedContract, contracts, iteration + 1))
-                    leftOperandContract = checkedContract;
+                    if (ref.isMatchingWith(checkedContract, contracts, iteration + 1))
+                        leftOperandContract = checkedContract;
 
                 if (leftOperandContract == null)
                     return false;
@@ -292,32 +252,33 @@ Constraint.prototype.compareOperands = function(refContract,
                 leftOperand = leftOperand.substring(firstPointPos + 1);
             } else
                 throw "Invalid format of left operand in condition: " + leftOperand + ". Missing contract field.";
+
         } else if (typeOfLeftOperand === compareOperandType.CONSTOTHER) {
             if (indxOperator === CAN_PLAY) {
-                if (leftOperand.equals("ref")) {
+                if (leftOperand === "ref") {
                     leftOperandContract = refContract;
-                } else if (leftOperand.equals("this")) {
-                    if (baseContract == null)
+                } else if (leftOperand === "this") {
+                    if (this.baseContract == null)
                         throw "Use left operand in condition: " + leftOperand + ". But this contract not initialized.";
 
-                    leftOperandContract = baseContract;
+                    leftOperandContract = this.baseContract;
                 } else {
-                    if (baseContract == null)
+                    if (this.baseContract == null)
                         throw "Use left operand in condition: " + leftOperand + ". But this contract not initialized.";
 
-                    let ref = baseContract.findReferenceByName(leftOperand);
+                    let ref = this.baseContract.findReferenceByName(leftOperand);
                     if (ref == null)
                         throw "Not found reference: " + leftOperand;
 
                     for (let checkedContract of contracts)
-                    if (ref.isMatchingWith(checkedContract, contracts, iteration + 1))
-                        leftOperandContract = checkedContract;
+                        if (ref.isMatchingWith(checkedContract, contracts, iteration + 1))
+                            leftOperandContract = checkedContract;
 
                     if (leftOperandContract == null)
                         return false;
                 }
-            } else if (leftOperand.equals("now"))
-                left = Math.floor(Date.now()/1000);
+            } else if (leftOperand === "now")
+                left = Math.floor(Date.now() / 1000);
         }
     }
 
@@ -327,22 +288,22 @@ Constraint.prototype.compareOperands = function(refContract,
                 rightOperand = rightOperand.substring(4);
                 rightOperandContract = refContract;
             } else if (rightOperand.startsWith("this.")) {
-                if (baseContract == null)
+                if (this.baseContract == null)
                     throw "Use right operand in condition: " + rightOperand + ". But this contract not initialized.";
 
                 rightOperand = rightOperand.substring(5);
-                rightOperandContract = baseContract;
+                rightOperandContract = this.baseContract;
             } else if ((firstPointPos = rightOperand.indexOf(".")) > 0) {
-                if (baseContract == null)
+                if (this.baseContract == null)
                     throw "Use right operand in condition: " + rightOperand + ". But this contract not initialized.";
 
-                let ref = baseContract.findReferenceByName(rightOperand.substring(0, firstPointPos));
+                let ref = this.baseContract.findReferenceByName(rightOperand.substring(0, firstPointPos));
                 if (ref == null)
                     throw "Not found reference: " + rightOperand.substring(0, firstPointPos);
 
                 for (let checkedContract of contracts)
-                if (ref.isMatchingWith(checkedContract, contracts, iteration + 1))
-                    rightOperandContract = checkedContract;
+                    if (ref.isMatchingWith(checkedContract, contracts, iteration + 1))
+                        rightOperandContract = checkedContract;
 
                 if (rightOperandContract == null)
                     return false;
@@ -352,8 +313,8 @@ Constraint.prototype.compareOperands = function(refContract,
             else
                 throw "Invalid format of right operand in condition: " + rightOperand + ". Missing contract field.";
         } else if (typeOfRightOperand === compareOperandType.CONSTOTHER) {
-            if (rightOperand.equals("now"))
-                right = Math.floor(Date.now()/1000);
+            if (rightOperand === "now")
+                right = Math.floor(Date.now() / 1000);
         }
 
         if ((leftOperandContract != null) && (indxOperator !== CAN_PLAY))
@@ -373,17 +334,17 @@ Constraint.prototype.compareOperands = function(refContract,
                     if (typeOfRightOperand === compareOperandType.FIELD && right == null)
                         break;
 
-                    /*if (isBigDecimalConversion) { // todo that's another story
-                        leftBigDecimal = objectCastToBigDecimal(left, leftOperand, typeOfLeftOperand);
-                        rightBigDecimal = objectCastToBigDecimal(right, rightOperand, typeOfRightOperand);
+                    if (isBigDecimalConversion) {
+                        leftBigDecimal = this.objectCastToBigDecimal(left, leftOperand, typeOfLeftOperand);
+                        rightBigDecimal = this.objectCastToBigDecimal(right, rightOperand, typeOfRightOperand);
 
-                        if (((indxOperator === LESS) && (leftBigDecimal.compareTo(rightBigDecimal) === -1)) ||
-                            ((indxOperator === MORE) && (leftBigDecimal.compareTo(rightBigDecimal) === 1)) ||
-                            ((indxOperator === LESS_OR_EQUAL) && (leftBigDecimal.compareTo(rightBigDecimal) < 1)) ||
-                            ((indxOperator === MORE_OR_EQUAL) && (leftBigDecimal.compareTo(rightBigDecimal) > -1)))
+                        if (((indxOperator === LESS) && (leftBigDecimal.cmp(rightBigDecimal) === -1)) ||
+                            ((indxOperator === MORE) && (leftBigDecimal.cmp(rightBigDecimal) === 1)) ||
+                            ((indxOperator === LESS_OR_EQUAL) && (leftBigDecimal.cmp(rightBigDecimal) < 1)) ||
+                            ((indxOperator === MORE_OR_EQUAL) && (leftBigDecimal.cmp(rightBigDecimal) > -1)))
                             ret = true;
-                    }*/
-                     else if (((left != null) && left instanceof Date) ||      //todo or Object.prototype.toString.call(date) === '[object Date]'
+
+                    } else if (((left != null) && left instanceof Date) ||      //todo or Object.prototype.toString.call(date) === '[object Date]'
                         ((right != null) && right instanceof Date)) {
                         let leftTime = objectCastToTimeSeconds(left, leftOperand, typeOfLeftOperand);
                         let rightTime = objectCastToTimeSeconds(right, rightOperand, typeOfRightOperand);
@@ -724,39 +685,6 @@ Constraint.prototype.compareOperands = function(refContract,
     return ret;
 };
 
-Constraint.prototype.packCondition = function(operator,
-                                              leftOperand,
-                                              rightOperand,
-                                              typeOfLeftOperand,
-                                              typeOfRightOperand,
-                                              leftConversion,
-                                              rightConversion) {
-    let packedCondition = {
-        operator: this.operator,
-        leftOperand: this.leftOperand,
-        rightOperand: this.rightOperand
-    };
-
-    if (typeOfLeftOperand === compareOperandType.FIELD)
-        packedCondition.typeOfLeftOperand = 0;
-    else if (typeOfLeftOperand === compareOperandType.CONSTSTR)
-        packedCondition.typeOfLeftOperand = 1;
-    else
-        packedCondition.typeOfLeftOperand = 2;
-
-    if (typeOfRightOperand === compareOperandType.FIELD)
-        packedCondition.typeOfRightOperand = 0;
-    else if (typeOfRightOperand === compareOperandType.CONSTSTR)
-        packedCondition.typeOfRightOperand = 1;
-    else
-        packedCondition.typeOfRightOperand = 2;
-
-    packedCondition.leftConversion = leftConversion;
-    packedCondition.rightConversion = rightConversion;
-
-    return packedCondition;
-};
-
 Constraint.prototype.parseCondition = function(condition) {
 
     let leftConversion = NO_CONVERSION;
@@ -767,14 +695,22 @@ Constraint.prototype.parseCondition = function(condition) {
 
         if ((operPos >= 0) && (condition.length - operators[i].length === operPos)) {
 
-            let leftOperand = condition.substring(0, operPos).replaceAll("\\s+", "");
+            let leftOperand = condition.substring(0, operPos).replace(/\s/g, "");
 
             if (leftOperand.endsWith("::number")) {
                 leftConversion = CONVERSION_BIG_DECIMAL;
                 leftOperand = leftOperand.substring(0, leftOperand.length - 8);
             }
 
-            return packCondition(i, leftOperand, null, compareOperandType.FIELD, compareOperandType.CONSTOTHER, leftConversion, rightConversion);
+            return {
+                operator: i,
+                leftOperand: leftOperand,
+                rightOperand: null,
+                typeOfLeftOperand: compareOperandType.FIELD,
+                typeOfRightOperand: compareOperandType.CONSTOTHER,
+                leftConversion: leftConversion,
+                rightConversion: rightConversion
+            };
         }
     }
 
@@ -810,12 +746,12 @@ Constraint.prototype.parseCondition = function(condition) {
             typeLeftOperand = compareOperandType.CONSTSTR;
         }
         else {
-            leftOperand = subStrL.replaceAll("\\s+", "");
+            leftOperand = subStrL.replace(/\s/g, "");
             let firstPointPos;
             if (((firstPointPos = leftOperand.indexOf(".")) > 0) &&
                 (leftOperand.length > firstPointPos + 1) &&
                 ((leftOperand.charAt(firstPointPos + 1) < '0') ||
-                    (leftOperand.charAt(firstPointPos + 1) > '9')))
+                 (leftOperand.charAt(firstPointPos + 1) > '9')))
                 typeLeftOperand = compareOperandType.FIELD;
         }
 
@@ -838,12 +774,12 @@ Constraint.prototype.parseCondition = function(condition) {
             typeRightOperand = compareOperandType.CONSTSTR;
         }
         else {
-            rightOperand = subStrR.replaceAll("\\s+", "");
+            rightOperand = subStrR.replace(/\s/g, "");
             let firstPointPos;
             if (((firstPointPos = rightOperand.indexOf(".")) > 0) &&
                 (rightOperand.length > firstPointPos + 1) &&
                 ((rightOperand.charAt(firstPointPos + 1) < '0') ||
-                    (rightOperand.charAt(firstPointPos + 1) > '9')))
+                 (rightOperand.charAt(firstPointPos + 1) > '9')))
                 typeRightOperand = compareOperandType.FIELD;
         }
 
@@ -857,7 +793,15 @@ Constraint.prototype.parseCondition = function(condition) {
             rightOperand = rightOperand.substring(0, rightOperand.length - 8);
         }
 
-        return packCondition(i, leftOperand, rightOperand, typeLeftOperand, typeRightOperand, leftConversion, rightConversion);
+        return {
+            operator: i,
+            leftOperand: leftOperand,
+            rightOperand: rightOperand,
+            typeOfLeftOperand: typeLeftOperand,
+            typeOfRightOperand: typeRightOperand,
+            leftConversion: leftConversion,
+            rightConversion: rightConversion
+        };
     }
 
     for (let i = INHERITS; i <= INHERIT; i++) {
@@ -868,14 +812,22 @@ Constraint.prototype.parseCondition = function(condition) {
             if (subStrR.length === 0)
                 throw "Invalid format of condition: " + condition + ". Missing right operand.";
 
-            let rightOperand = subStrR.replaceAll("\\s+", "");
+            let rightOperand = subStrR.replace(/\s/g, "");
 
             if (rightOperand.endsWith("::number")) {
                 rightConversion = CONVERSION_BIG_DECIMAL;
                 rightOperand = rightOperand.substring(0, rightOperand.length - 8);
             }
 
-            return packCondition(i, null, rightOperand, compareOperandType.FIELD, compareOperandType.FIELD, leftConversion, rightConversion);
+            return {
+                operator: i,
+                leftOperand: null,
+                rightOperand: rightOperand,
+                typeOfLeftOperand: compareOperandType.FIELD,
+                typeOfRightOperand: compareOperandType.FIELD,
+                leftConversion: leftConversion,
+                rightConversion: rightConversion
+            };
         }
     }
 
@@ -886,8 +838,8 @@ Constraint.prototype.parseCondition = function(condition) {
         if (subStrL.length === 0)
             throw "Invalid format of condition: " + condition + ". Missing left operand.";
 
-        let leftOperand = subStrL.replaceAll("\\s+", "");
-        if (leftOperand.indexOf("."))
+        let leftOperand = subStrL.replace(/\s/g, "");
+        if (~leftOperand.indexOf("."))
             throw "Invalid format of condition: " + condition + ". Left operand must be a reference to a contract.";
 
         let subStrR = condition.substring(operPos + operators[CAN_PLAY].length);
@@ -895,15 +847,23 @@ Constraint.prototype.parseCondition = function(condition) {
             throw "Invalid format of condition: " + condition + ". Missing right operand.";
 
         // Parsing right operand
-        let rightOperand = subStrR.replaceAll("\\s+", "");
+        let rightOperand = subStrR.replace(/\s/g, "");
         let firstPointPos;
         if (!(((firstPointPos = rightOperand.indexOf(".")) > 0) &&
             (rightOperand.length > firstPointPos + 1) &&
             ((rightOperand.charAt(firstPointPos + 1) < '0') ||
-                (rightOperand.charAt(firstPointPos + 1) > '9'))))
+             (rightOperand.charAt(firstPointPos + 1) > '9'))))
             throw "Invalid format of condition: " + condition + ". Right operand must be a role field.";
 
-        return packCondition(CAN_PLAY, leftOperand, rightOperand, compareOperandType.CONSTOTHER, compareOperandType.FIELD, leftConversion, rightConversion);
+        return {
+            operator: CAN_PLAY,
+            leftOperand: leftOperand,
+            rightOperand: rightOperand,
+            typeOfLeftOperand: compareOperandType.CONSTOTHER,
+            typeOfRightOperand: compareOperandType.FIELD,
+            leftConversion: leftConversion,
+            rightConversion: rightConversion
+        };
     }
 
     throw "Invalid format of condition: " + condition;
@@ -966,14 +926,7 @@ Constraint.prototype.parseConditions = function(conds) {
 
         for (let item of condList) {
             if (typeof item === "string")
-                parsedList.push(item);// TODO: parsedList.push(this.parseCondition(item));
-        /*else if (item.getClass().getName().endsWith("LinkedHashMap")) { //todo postponed until test
-                LinkedHashMap<String, Binder> insideHashMap = (LinkedHashMap<String, Binder>) item;
-                //Binder insideBinder = new Binder(insideHashMap);
-                let insideBinder;
-                let parsed = parseConditions(insideBinder);
-                if (parsed != null)
-                    parsedList.add(parsed);*/
+                parsedList.push(this.parseCondition(item));
             else {
                 let parsed = this.parseConditions(item);
                 if ((parsed != null) && (parsed !== {}))
