@@ -36,7 +36,7 @@ public:
             nc.addNode(nodeInfo);
         }
         for (int i = 0; i < count; ++i) {
-            auto udpAdapter = make_shared<UDPAdapter>(privKeys[i], i, nc, [&](const byte_vector& packet){});
+            auto udpAdapter = make_shared<UDPAdapter>(privKeys[i], i, nc, [&](const byte_vector& packet){}, true);
             adapters.push_back(udpAdapter);
         }
     }
@@ -63,15 +63,15 @@ TEST_CASE("HelloUdp") {
     network::UDPAdapter udpAdapter0(node0key, 0, netConfig, [&counter0](const byte_vector& packet){
         //cout << "node-0 receive data, size=" << packet.size() << ": " << string(packet.begin(), packet.end()) << endl;
         ++counter0;
-    });
+    }, true);
     network::UDPAdapter udpAdapter1(node1key, 1, netConfig, [&](const byte_vector& packet){
         REQUIRE(packet.size() == 18);
         REQUIRE(string(packet.begin(), packet.end()) == body0);
-    });
+    }, true);
     network::UDPAdapter udpAdapter2(node2key, 2, netConfig, [&](const byte_vector& packet){
         REQUIRE(packet.size() == 21);
         REQUIRE(string(packet.begin(), packet.end()) == body1);
-    });
+    }, true);
     //udpAdapter0.enableLog(true);
     //udpAdapter1.enableLog(true);
     //udpAdapter2.enableLog(true);

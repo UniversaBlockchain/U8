@@ -16,10 +16,11 @@
 namespace network {
 
     UDPAdapter::UDPAdapter(const crypto::PrivateKey& ownPrivateKey, int ownNodeNumber, const NetConfig& netConfig,
-                           const TReceiveCallback& receiveCallback)
+                           const TReceiveCallback& receiveCallback, bool throwErrors)
        :netConfig_(netConfig)
        ,ownNodeInfo_(netConfig.getInfo(ownNodeNumber))
-       ,ownPrivateKey_(ownPrivateKey) {
+       ,ownPrivateKey_(ownPrivateKey)
+       ,throwErrors_(throwErrors) {
         logLabel_ = std::string("UDP") + std::to_string(ownNodeNumber) + std::string(": ");
 
         unsigned int seed = std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now().time_since_epoch()).count();
@@ -44,7 +45,6 @@ namespace network {
                 protectionFromDuple_prevTime = getCurrentTimeMillis();
             }
         }, RETRANSMIT_TIME, RETRANSMIT_TIME);
-
     }
 
     UDPAdapter::~UDPAdapter() {
@@ -56,8 +56,7 @@ namespace network {
             mtx.unlock();
         });
         if (!mtx.try_lock_for(9000ms))
-            writeErr(true, logLabel_, "~UDPAdapter(): timeout");
-        //this_thread::sleep_for(400ms);
+            writeErr("~UDPAdapter(): timeout");
     }
 
     void UDPAdapter::send(int destNodeNumber, const byte_vector& payload) {
@@ -111,16 +110,16 @@ namespace network {
                     onReceiveNack(packet);
                     break;
                 default:
-                    writeErr(true, logLabel_, "received unknown packet type: ", packet.getType());
+                    writeErr("received unknown packet type: ", packet.getType());
                     break;
             }
         } catch (const std::exception& e) {
-            writeErr(true, logLabel_, "onReceive exception: ", e.what());
+            writeErr("onReceive exception: ", e.what());
         }
     }
 
     void UDPAdapter::onReceiveHello(const Packet& packet) {
-        writeLog(isLogEnabled_, logLabel_, "received hello from ", packet.getSenderNodeId());
+        writeLog("received hello from ", packet.getSenderNodeId());
         const NodeInfo& nodeInfo = netConfig_.getInfo(packet.getSenderNodeId());
         SessionReader& sessionReader = getOrCreateSessionReaderCandidate(packet.getSenderNodeId());
         if (sessionReader.protectFromDuples(packet.getPacketId())) {
@@ -136,7 +135,7 @@ namespace network {
     }
 
     void UDPAdapter::onReceiveWelcome(const Packet& packet) {
-        writeLog(isLogEnabled_, logLabel_, "received welcome from ", packet.getSenderNodeId());
+        writeLog("received welcome from ", packet.getSenderNodeId());
         const NodeInfo& nodeInfo = netConfig_.getInfo(packet.getSenderNodeId());
         Session& session = getOrCreateSession(nodeInfo);
         if (session.protectFromDuples(packet.getPacketId())) {
@@ -152,14 +151,14 @@ namespace network {
                         sendKeyReq(session);
                     }
                 } catch (const std::exception& e) {
-                    writeErr(true, logLabel_, "onReceiveWelcome exception: ", e.what());
+                    writeErr("onReceiveWelcome exception: ", e.what());
                 }
             }
         }
     }
 
     void UDPAdapter::onReceiveKeyReqPart1(const Packet& packet) {
-        writeLog(isLogEnabled_, logLabel_, "received key_req_part1 from ", packet.getSenderNodeId());
+        writeLog("received key_req_part1 from ", packet.getSenderNodeId());
         SessionReader& sessionReader = getOrCreateSessionReaderCandidate(packet.getSenderNodeId());
         if (sessionReader.protectFromDuples(packet.getPacketId())) {
             sessionReader.removeHandshakePacketsFromRetransmitMap();
@@ -169,7 +168,7 @@ namespace network {
     }
 
     void UDPAdapter::onReceiveKeyReqPart2(const Packet& packet) {
-        writeLog(isLogEnabled_, logLabel_, "received key_req_part2 from ", packet.getSenderNodeId());
+        writeLog("received key_req_part2 from ", packet.getSenderNodeId());
         SessionReader& sessionReader = getOrCreateSessionReaderCandidate(packet.getSenderNodeId());
         if (sessionReader.protectFromDuples(packet.getPacketId())) {
             sessionReader.removeHandshakePacketsFromRetransmitMap();
@@ -181,8 +180,7 @@ namespace network {
     void UDPAdapter::onReceiveKeyReq(SessionReader& sessionReader) {
         if (!sessionReader.handshake_keyReqPart1.empty() && !sessionReader.handshake_keyReqPart2.empty()) {
             try {
-                writeLog(isLogEnabled_, logLabel_, "received both parts of key_req from ",
-                         sessionReader.remoteNodeInfo.getNumber());
+                writeLog("received both parts of key_req from ", sessionReader.remoteNodeInfo.getNumber());
 
                 UArray uArr = bossLoadArray(ownPrivateKey_.decrypt(sessionReader.handshake_keyReqPart1));
                 byte_vector packet_senderNonce = UBytes::asInstance(uArr.at(0)).get();
@@ -190,27 +188,27 @@ namespace network {
 
                 if (packet_remoteNonce == sessionReader.localNonce) {
                     if (sessionReader.remoteNodeInfo.getPublicKey().verify(sessionReader.handshake_keyReqPart2, sessionReader.handshake_keyReqPart1, crypto::HashType::SHA512)) {
-                        writeLog(isLogEnabled_, logLabel_, "key_req successfully verified");
+                        writeLog("key_req successfully verified");
                         sessionReader.remoteNonce = packet_senderNonce;
                         sessionReader.sessionKey = crypto::SymmetricKey();
                         auto remoteNodeId = sessionReader.remoteNodeInfo.getNumber();
                         acceptSessionReaderCandidate(sessionReader);
                         sendSessionKey(getSessionReader(remoteNodeId));
                     } else {
-                        writeErr(true, logLabel_, "onReceiveKeyReq: verify fails");
+                        writeErr("onReceiveKeyReq: verify fails");
                     }
                 } else {
-                    writeLog(isLogEnabled_, logLabel_, "onReceiveKeyReq: remoteNonce mismatch (it's maybe datagram duplicate)");
+                    writeLog("onReceiveKeyReq: remoteNonce mismatch (it's maybe datagram duplicate)");
                 }
 
             } catch (const std::exception& e) {
-                writeErr(true, logLabel_, "onReceiveKeyReq exception: ", e.what());
+                writeErr("onReceiveKeyReq exception: ", e.what());
             }
         }
     }
 
     void UDPAdapter::onReceiveSessionPart1(const Packet& packet) {
-        writeLog(isLogEnabled_, logLabel_, "received session_part1 from ", packet.getSenderNodeId());
+        writeLog("received session_part1 from ", packet.getSenderNodeId());
         auto nodeInfo = netConfig_.getInfo(packet.getSenderNodeId());
         Session& session = getOrCreateSession(nodeInfo);
         if (session.protectFromDuples(packet.getPacketId())) {
@@ -223,7 +221,7 @@ namespace network {
     }
 
     void UDPAdapter::onReceiveSessionPart2(const Packet& packet) {
-        writeLog(isLogEnabled_, logLabel_, "received session_part2 from ", packet.getSenderNodeId());
+        writeLog("received session_part2 from ", packet.getSenderNodeId());
         auto nodeInfo = netConfig_.getInfo(packet.getSenderNodeId());
         Session& session = getOrCreateSession(nodeInfo);
         if (session.protectFromDuples(packet.getPacketId())) {
@@ -237,8 +235,7 @@ namespace network {
 
     void UDPAdapter::onReceiveSession(Session& session) {
         if (!session.handshake_sessionPart1.empty() && !session.handshake_sessionPart2.empty()) {
-            writeLog(isLogEnabled_, logLabel_, "received both parts of session from ",
-                     session.remoteNodeInfo.getNumber());
+            writeLog("received both parts of session from ", session.remoteNodeInfo.getNumber());
             if (session.remoteNodeInfo.getPublicKey().verify(session.handshake_sessionPart2, session.handshake_sessionPart1, crypto::HashType::SHA512)) {
                 try {
                     UArray uArr = bossLoadArray(ownPrivateKey_.decrypt(session.handshake_sessionPart1));
@@ -246,7 +243,7 @@ namespace network {
                     byte_vector nonce = UBytes::asInstance(uArr.at(1)).get();
 
                     if (nonce == session.localNonce) {
-                        writeLog(isLogEnabled_, logLabel_, "session successfully verified");
+                        writeLog("session successfully verified");
                         sendSessionAck(session);
                         session.reconstructSessionKey(sessionKey);
                         session.state = SessionState::STATE_EXCHANGING;
@@ -255,36 +252,36 @@ namespace network {
                             sendPacket(dest, packet.makeByteArray());
                         });
                     } else {
-                        writeLog(isLogEnabled_, logLabel_, "onReceiveSession: localNonce mismatch");
+                        writeLog("onReceiveSession: localNonce mismatch");
                     }
 
                 } catch (const std::exception& e) {
-                    writeErr(true, logLabel_, "onReceiveSession exception: ", e.what());
+                    writeErr("onReceiveSession exception: ", e.what());
                 }
             } else {
-                writeErr(true, logLabel_, "onReceiveSession: verify fails");
+                writeErr("onReceiveSession: verify fails");
             }
         }
     }
 
     void UDPAdapter::onReceiveSessionAck(const Packet& packet) {
-        writeLog(isLogEnabled_, logLabel_, "received session_ack from ", packet.getSenderNodeId());
+        writeLog("received session_ack from ", packet.getSenderNodeId());
         try {
             SessionReader &sessionReader = getSessionReader(packet.getSenderNodeId());
             sessionReader.removeHandshakePacketsFromRetransmitMap();
         } catch (const std::exception& e) {
-            writeErr(true, logLabel_, "onReceiveSessionAck exception: ", e.what());
+            writeErr("onReceiveSessionAck exception: ", e.what());
         }
 
     }
 
     void UDPAdapter::onReceiveData(const Packet& packet) {
-        writeLog(isLogEnabled_, logLabel_, "received data from ", packet.getSenderNodeId());
+        writeLog("received data from ", packet.getSenderNodeId());
 
         byte_vector packet_crc32(4);
         const byte_vector& payload = packet.getPayloadRef();
         if (payload.size() <= 4) {
-            writeErr(true, logLabel_, "onReceiveData error: received too small packet, crc32 missing");
+            writeErr("onReceiveData error: received too small packet, crc32 missing");
             return;
         }
         memcpy(&packet_crc32[0], &payload[payload.size()-4], 4);
@@ -308,20 +305,20 @@ namespace network {
                     if (sessionReader.protectFromDuples(packet.getPacketId()))
                         receiveCallback_(decrypted);
                 } else {
-                    writeErr(true, logLabel_, "onReceiveData error: decrypted payload too short");
+                    writeErr("onReceiveData error: decrypted payload too short");
                     sendNack(sessionReader, packet.getPacketId());
                 }
             } catch (const std::exception& e) {
-                writeErr(true, logLabel_, "onReceiveData exception: ", e.what());
+                writeErr("onReceiveData exception: ", e.what());
                 sendNack(sessionReader, packet.getPacketId());
             }
         } else {
-            writeErr(true, logLabel_, "onReceiveData error: crc32 mismatch");
+            writeErr("onReceiveData error: crc32 mismatch");
         }
     }
 
     void UDPAdapter::onReceiveAck(const Packet& packet) {
-        writeLog(isLogEnabled_, logLabel_, "received ack from ", packet.getSenderNodeId());
+        writeLog("received ack from ", packet.getSenderNodeId());
         auto nodeInfo = netConfig_.getInfo(packet.getSenderNodeId());
         Session& session = getOrCreateSession(nodeInfo);
         if (session.state == SessionState::STATE_EXCHANGING) {
@@ -334,13 +331,13 @@ namespace network {
                 session.removePacketFromRetransmitMap(ackPacketId);
 
             } catch (const std::exception& e) {
-                writeErr(true, logLabel_, "onReceiveAck exception: ", e.what());
+                writeErr("onReceiveAck exception: ", e.what());
             }
         }
     }
 
     void UDPAdapter::onReceiveNack(const Packet& packet) {
-        writeLog(isLogEnabled_, logLabel_, "received nack from ", packet.getSenderNodeId());
+        writeLog("received nack from ", packet.getSenderNodeId());
         auto nodeInfo = netConfig_.getInfo(packet.getSenderNodeId());
         Session& session = getOrCreateSession(nodeInfo);
         if (session.state == SessionState::STATE_EXCHANGING) {
@@ -385,7 +382,7 @@ namespace network {
 
     void UDPAdapter::sendPacket(const NodeInfo& dest, const byte_vector& data) {
         if (data.size() > MAX_PACKET_SIZE)
-            writeErr(true, logLabel_, std::string("datagram size too long, MAX_PACKET_SIZE is ") + std::to_string(MAX_PACKET_SIZE));
+            writeErr(std::string("datagram size too long, MAX_PACKET_SIZE is ") + std::to_string(MAX_PACKET_SIZE));
         socket_.send(data, dest.getNodeAddress().host.c_str(), dest.getNodeAddress().port, [&](ssize_t result){});
     }
 
@@ -474,7 +471,7 @@ namespace network {
     }
 
     void UDPAdapter::sendHello(Session& session) {
-        writeLog(isLogEnabled_, logLabel_, "send hello to ", session.remoteNodeInfo.getNumber());
+        writeLog("send hello to ", session.remoteNodeInfo.getNumber());
         byte_vector helloNonce(64);
         sprng_read(&helloNonce[0], 64, NULL);
         auto encryptedPayload = session.remoteNodeInfo.getPublicKey().encrypt(helloNonce);
@@ -484,7 +481,7 @@ namespace network {
     }
 
     void UDPAdapter::sendWelcome(SessionReader& sessionReader) {
-        writeLog(isLogEnabled_, logLabel_, "send welcome to ", sessionReader.remoteNodeInfo.getNumber());
+        writeLog("send welcome to ", sessionReader.remoteNodeInfo.getNumber());
         byte_vector sign = ownPrivateKey_.sign(sessionReader.localNonce, crypto::HashType::SHA512);
 
         byte_vector payload = bossDumpArray(UArray({
@@ -499,7 +496,7 @@ namespace network {
     }
 
     void UDPAdapter::sendKeyReq(Session& session) {
-        writeLog(isLogEnabled_, logLabel_, "send key_req to ", session.remoteNodeInfo.getNumber());
+        writeLog("send key_req to ", session.remoteNodeInfo.getNumber());
         session.localNonce.resize(64);
         sprng_read(&session.localNonce[0], 64, NULL);
 
@@ -523,7 +520,7 @@ namespace network {
     }
 
     void UDPAdapter::sendSessionKey(SessionReader& sessionReader) {
-        writeLog(isLogEnabled_, logLabel_, "send session_key to ", sessionReader.remoteNodeInfo.getNumber());
+        writeLog("send session_key to ", sessionReader.remoteNodeInfo.getNumber());
 
         byte_vector key = sessionReader.sessionKey.pack();
         byte_vector packed = bossDumpArray(UArray({
@@ -543,7 +540,7 @@ namespace network {
     }
 
     void UDPAdapter::sendSessionAck(Session& session) {
-        writeLog(isLogEnabled_, logLabel_, "send session_ack to ", session.remoteNodeInfo.getNumber());
+        writeLog("send session_ack to ", session.remoteNodeInfo.getNumber());
         byte_vector someRandomPayload(32);
         sprng_read(&someRandomPayload[0], 32, NULL);
         Packet packet(getNextPacketId(), ownNodeInfo_.getNumber(), session.remoteNodeInfo.getNumber(), PacketTypes::SESSION_ACK, session.sessionKey.etaEncrypt(someRandomPayload));
@@ -551,7 +548,7 @@ namespace network {
     }
 
     void UDPAdapter::sendAck(SessionReader& sessionReader, int packetId) {
-        writeLog(isLogEnabled_, logLabel_, "send ack to ", sessionReader.remoteNodeInfo.getNumber());
+        writeLog("send ack to ", sessionReader.remoteNodeInfo.getNumber());
         BossSerializer::Writer writer;
         writer.writeObject(UInt(packetId));
         UBytes ub = writer.getBytes();
@@ -561,7 +558,7 @@ namespace network {
     }
 
     void UDPAdapter::sendNack(SessionReader& sessionReader, int packetId) {
-        writeLog(isLogEnabled_, logLabel_, "send nack to ", sessionReader.remoteNodeInfo.getNumber());
+        writeLog("send nack to ", sessionReader.remoteNodeInfo.getNumber());
         byte_vector randomSeed(64);
         sprng_read(&randomSeed[0], 64, NULL);
         byte_vector data = bossDumpArray(UArray({UInt(packetId), UBytesFromByteVector(randomSeed)}));

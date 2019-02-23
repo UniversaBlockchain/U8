@@ -12,6 +12,7 @@
 #include <atomic>
 #include <queue>
 #include <functional>
+#include <sstream>
 #include "../tools/tools.h"
 #include "NodeInfo.h"
 #include "../crypto/SymmetricKey.h"
@@ -199,18 +200,6 @@ namespace network {
         byte_vector handshake_keyReqPart1;
         byte_vector handshake_keyReqPart2;
     };
-
-    template<typename ...Args>
-    void writeLog(bool enabled, Args && ...args) {
-        if (enabled)
-            (std::cout << ... << args) << std::endl;
-    }
-
-    template<typename ...Args>
-    void writeErr(bool enabled, Args && ...args) {
-        if (enabled)
-            (std::cerr << ... << args) << std::endl;
-    }
 
     inline
     byte_vector bossDumpArray(const UArray& arr) {

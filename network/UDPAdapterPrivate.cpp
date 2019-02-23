@@ -156,7 +156,6 @@ namespace network {
     }
 
     void Session::sendAllFromOutputQueue(std::function<void(const NodeInfo&, const byte_vector&)> funcSend) {
-        //writeLog(isLogEnabled, "sendAllFromOutputQueue");
         if (state != SessionState::STATE_HANDSHAKE) {
             int maxOutputs = UDPAdapter::MAX_RETRANSMIT_QUEUE_SIZE - retransmitMap.size();
             int i = 0;
