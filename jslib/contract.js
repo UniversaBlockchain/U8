@@ -27,7 +27,7 @@ function Context(base) {
 function Transactional(contract) {
     this.contract = contract;
     this.id = null;
-    this.references = [];
+    this.constraints = [];
     this.validUntil = null;
     this.data = {};
 }
@@ -36,7 +36,7 @@ Transactional.prototype.serialize = function(serializer) {
 
     let b = {
         id: this.id,
-        references : serializer.serialize(this.references),
+        constraints : serializer.serialize(this.constraints),
         data : this.data,
     };
 
@@ -49,9 +49,11 @@ Transactional.prototype.serialize = function(serializer) {
 Transactional.prototype.deserialize = function(data,deserializer) {
     if(data != null) {
         this.id = data.id;
-        if(data.hasOwnProperty("references")) {
-            this.references = deserializer.deserialize(data.references);
-        }
+
+        if (data.hasOwnProperty("constraints"))
+            this.constraints = deserializer.deserialize(data.constraints);
+        else if (data.hasOwnProperty("references"))
+            this.constraints = deserializer.deserialize(data.references);
 
         if(data.hasOwnProperty("valid_until")) {
             this.validUntil = data.valid_until;
@@ -77,7 +79,7 @@ function State(contract) {
     this.parent = null;
     this.data = {};
     this.branchId = null;
-    this.references = [];
+    this.constraints = [];
 
     //TODO:setJS
 }
@@ -144,8 +146,8 @@ State.prototype.serialize = function(serializer) {
     if (this.expiresAt != null)
         of.expires_at = this.expiresAt;
 
-    if (this.references != null)
-        of.references = this.references;
+    if (this.constraints != null)
+        of.constraints = this.constraints;
 
     return serializer.serialize(of);
 };
@@ -161,11 +163,12 @@ State.prototype.deserialize = function(data,deserializer) {
     if (this.revision <= 0)
         throw "illegal revision number: " + this.revision;
 
-
-    if(data.hasOwnProperty("references"))
-        this.references = deserializer.deserialize(data.references);
+    if (data.hasOwnProperty("constraints"))
+        this.constraints = deserializer.deserialize(data.constraints);
+    else if (data.hasOwnProperty("references"))
+        this.constraints = deserializer.deserialize(data.references);
     else
-        this.references = [];
+        this.constraints = [];
 
     let r = this.contract.registerRole(deserializer.deserialize(data.owner))
     if(r.name !== "owner")
@@ -210,7 +213,7 @@ function Definition(contract) {
     this.createdAt.setMilliseconds(0);
     this.expiresAt = null;
     this.data = {};
-    this.references = [];
+    this.constraints = [];
     this.extendedType = null;
     this.permissions = new Map();
 
@@ -236,7 +239,7 @@ Definition.prototype.equals = function(to) {
     if(!t.valuesEqual(this.data,to.data))
         return false;
 
-    if(!t.valuesEqual(this.references,to.references))
+    if(!t.valuesEqual(this.constraints,to.constraints))
         return false;
 
     if(!t.valuesEqual(this.extendedType,to.extendedType))
@@ -273,8 +276,8 @@ Definition.prototype.serialize = function(serializer) {
     if (this.expiresAt != null)
         of.expires_at = this.expiresAt;
 
-    if (this.references != null)
-        of.references = this.references;
+    if (this.constraints != null)
+        of.constraints = this.constraints;
 
     if (this.extendedType != null)
         of.extended_type = this.extendedType;
@@ -300,19 +303,18 @@ Definition.prototype.deserialize = function(data,deserializer) {
         this.extendedType = null;
     }
 
-
     if(data.hasOwnProperty("data")) {
         this.data = data.data;
     } else {
         this.data = {};
     }
 
-    if(data.hasOwnProperty("references")) {
-        this.references = deserializer.deserialize(data.references);
-    } else {
-        this.references = [];
-    }
-
+    if (data.hasOwnProperty("constraints"))
+        this.constraints = deserializer.deserialize(data.constraints);
+    else if (data.hasOwnProperty("references"))
+        this.constraints = deserializer.deserialize(data.references);
+    else
+        this.constraints = [];
 
     let perms = deserializer.deserialize(data.permissions);
     for(let pid of Object.keys(perms)) {
@@ -372,10 +374,10 @@ function Contract() {
     this.sealedByKeys = new t.GenericMap();
     this.effectiveKeys = new Map();
     this.keysToSignWith = new Set();
-    this.references = new Map();
+    this.constraints = new Map();
     this.id = null;
     this.transactionPack = null;
-    this.validRoleReferences = new Set();
+    this.validRoleConstraints = new Set();
     this.quantiser = new Quantiser();
 }
 
@@ -502,9 +504,38 @@ Contract.prototype.updateContext = function() {
     }
 };
 
-Contract.prototype.findReferenceByName = function(name,section) {
-    //TODO: implement
-    console.log("NOT IMPLEMENTED Contract.findReferenceByName")
+Contract.prototype.findConstraintByName = function(name, section) {
+    if (section.equals("definition")) {
+        if (this.definition.constraints == null)
+            return null;
+
+        let listRefs = this.definition.constraints;
+        for (let ref of listRefs)
+        if (ref.getName().equals(name))
+            return ref;
+
+        return null;
+    } else if (section.equals("state")) {
+        if (this.state.constraints == null)
+            return null;
+
+        let listRefs = this.state.constraints;
+        for (let ref of listRefs)
+        if (ref.getName().equals(name))
+            return ref;
+
+        return null;
+    } else if (section.equals("transactional")) {
+        if (this.transactional.constraints == null)
+            return null;
+
+        let listRefs = this.transactional.constraints;
+        for (let ref of listRefs)
+        if (ref.getName().equals(name))
+            return ref;
+
+        return null;
+    }
     return null;
 };
 
@@ -528,9 +559,11 @@ Contract.prototype.get = function(name) {
                     } else {
                         return null;
                     }
-                if (name.startsWith("references.")) {
-                    return this.findReferenceByName(name.substring(11), this.definition);
-                }
+
+                if (name.startsWith("constraints."))
+                    return this.findConstraintByName(name.substring(12), this.definition);
+                else if (name.startsWith("references."))
+                    return this.findConstraintByName(name.substring(11), this.definition);
         }
     } else if (name.startsWith("state.")) {
         name = name.substring(6);
@@ -558,9 +591,10 @@ Contract.prototype.get = function(name) {
                     } else {
                         return null;
                     }
-                if (name.startsWith("references.")) {
-                    return this.findReferenceByName(name.substring(11), this.state);
-                }
+                if (name.startsWith("constraints."))
+                    return this.findConstraintByName(name.substring(12), this.state);
+                else if (name.startsWith("references."))
+                    return this.findConstraintByName(name.substring(11), this.state);
         }
     } else if (name.startsWith("transactional.")) {
         if (this.transactional != null) {
@@ -577,9 +611,10 @@ Contract.prototype.get = function(name) {
                         } else {
                             return null;
                         }
-                    if (name.startsWith("references.")) {
-                        return this.findReferenceByName(name.substring(11), this.transactional);
-                    }
+                    if (name.startsWith("constraints."))
+                        return this.findConstraintByName(name.substring(12), this.transactional);
+                    else if (name.startsWith("references."))
+                        return this.findConstraintByName(name.substring(11), this.transactional);
             }
         }
     } else switch (name) {
@@ -717,7 +752,7 @@ Contract.prototype.deserialize = function(data,deserializer) {
         this.transactional = null;
     }
 
-    if (this.transactional != null && this.transactional.references != null) {
+   /* if (this.transactional != null && this.transactional.references != null) {
         for(let ref of this.transactional.references) {
             ref.setContract(this);
             this.references.set(ref.name, ref);
@@ -736,7 +771,28 @@ Contract.prototype.deserialize = function(data,deserializer) {
             ref.setContract(this);
             this.references.set(ref.name, ref);
         }
-    }
+    }*/
+
+     if (this.transactional != null && this.transactional.constraints != null) { //todo !! ref
+         for(let ref of this.transactional.constraints) {
+             ref.setContract(this);
+             this.constraints.set(ref.name, ref);
+         }
+     }
+
+     if (this.definition != null && this.definition.constraints != null) {
+         for(let ref of this.definition.constraints) {
+             ref.setContract(this);
+             this.constraints.set(ref.name, ref);
+         }
+     }
+
+     if (this.state != null && this.state.constraints != null) {
+         for(let ref of this.state.constraints) {
+             ref.setContract(this);
+             this.constraints.set(ref.name, ref);
+         }
+     }
 };
 
 Contract.prototype.registerRole = function(role) {
@@ -829,7 +885,7 @@ Contract.prototype.equals = function(to) {
     if(!t.valuesEqual(this.sealedByKeys,to.sealedByKeys))
         return false;
 
-    if(!t.valuesEqual(this.references,to.references))
+    if(!t.valuesEqual(this.constraints,to.constraints))
         return false;
 
     return true;
@@ -863,13 +919,14 @@ Contract.prototype.check = async function(prefix,contractsTree) {
 
     this.quantiser.addWorkCost(QuantiserProcesses.PRICE_REGISTER_VERSION);
     this.quantiser.addWorkCost(QuantiserProcesses.PRICE_REVOKE_VERSION*this.revokingItems.size);
-    this.quantiser.addWorkCost(QuantiserProcesses.PRICE_CHECK_REFERENCED_VERSION*this.references.size);
+    //this.quantiser.addWorkCost(QuantiserProcesses.PRICE_CHECK_REFERENCED_VERSION*this.references.size);
+    this.quantiser.addWorkCost(QuantiserProcesses.PRICE_CHECK_REFERENCED_VERSION*this.constraints.size); // todo !!
 
-    this.checkReferencedItems(contractsTree);
+    this.checkConstraintItems(contractsTree);
 
     this.revokingItems.forEach(ri => {
         ri.errors = [];
-        ri.checkReferencedItems(contractsTree,true);
+        ri.checkConstraintItems(contractsTree,true);
         ri.errors.forEach(e => {
             this.errors.push(e);
         });
@@ -1155,7 +1212,7 @@ Contract.prototype.getOrigin = function() {
     }
 }
 
-Contract.prototype.checkReferencedItems = function(contractsTree,roleRefsOnly) {
+Contract.prototype.checkConstraintItems = function(contractsTree,roleRefsOnly) {
     if(typeof roleRefsOnly === "undefined")
         roleRefsOnly = false;
 
@@ -1270,16 +1327,16 @@ Contract.prototype.createRevision = function(keys) {
     newRevision.revokingItems.add(this);
     newRevision.transactional = null;
 
-    if (newRevision.definition != null && newRevision.definition.references != null){
-        for(let ref of  newRevision.definition.references) {
+    if (newRevision.definition != null && newRevision.definition.constraints != null){
+        for(let ref of  newRevision.definition.constraints) {
             ref.setContract(newRevision);
-            newRevision.references.set(ref.name, ref);
+            newRevision.constraints.set(ref.name, ref);
         }
     }
-    if (newRevision.state != null && newRevision.state.references != null){
-        for(let ref of newRevision.state.references) {
+    if (newRevision.state != null && newRevision.state.constraints != null){
+        for(let ref of newRevision.state.constraints) {
             ref.setContract(newRevision);
-            newRevision.references.set(ref.name, ref);
+            newRevision.constraints.set(ref.name, ref);
         }
     }
 

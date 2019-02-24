@@ -18,8 +18,8 @@ function Role(name) {
     this.name = name;
     this.comment = null;
     bs.BiSerializable.call(this);
-    this.requiredAllReferences = new Set();
-    this.requiredAnyReferences = new Set();
+    this.requiredAllConstraints = new Set();
+    this.requiredAnyConstraints = new Set();
 
 
     this.contract = null;
@@ -45,32 +45,32 @@ Role.prototype.equals = function(to) {
     if(!t.valuesEqual(this.comment,to.comment))
         return false;
 
-    if(!t.valuesEqual(this.requiredAllReferences,to.requiredAllReferences))
+    if(!t.valuesEqual(this.requiredAllConstraints,to.requiredAllConstraints))
         return false;
 
-    if(!t.valuesEqual(this.requiredAnyReferences,to.requiredAnyReferences))
+    if(!t.valuesEqual(this.requiredAnyConstraints,to.requiredAnyConstraints))
         return false;
 
     return true;
 };
 
 Role.prototype.isAllowedForKeys = function(keys) {
-    return this.isAllowedForReferences(this.contract == null ? new Set() : this.contract.validRoleReferences)
+    return this.isAllowedForConstraints(this.contract == null ? new Set() : this.contract.validRoleConstraints)
 };
 
-Role.prototype.isAllowedForReferences = function(references) {
+Role.prototype.isAllowedForConstraints = function(constraints) {
 
-    for(let ref of this.requiredAllReferences) {
-        if (!references.has(ref)) {
+    for(let ref of this.requiredAllConstraints) {
+        if (!constraints.has(ref)) {
             return false;
         }
     }
 
-    if(this.requiredAnyReferences.size == 0)
+    if(this.requiredAnyConstraints.size == 0)
         return true;
 
-    for(let ref of this.requiredAnyReferences) {
-        if (references.has(ref)) {
+    for(let ref of this.requiredAnyConstraints) {
+        if (constraints.has(ref)) {
             return true;
         }
     }
@@ -92,12 +92,12 @@ Role.prototype.deserialize = function (data, deserializer) {
         if(required != null) {
             if(required.hasOwnProperty(RequiredMode.ALL_OF)) {
                 let array = deserializer.deserialize(required[RequiredMode.ALL_OF]);
-                array.forEach(item => this.requiredAllReferences.add(item))
+                array.forEach(item => this.requiredAllConstraints.add(item))
             }
 
             if(required.hasOwnProperty(RequiredMode.ANY_OF)) {
                 let array = deserializer.deserialize(required[RequiredMode.ANY_OF]);
-                array.forEach(item => this.requiredAnyReferences.add(item))
+                array.forEach(item => this.requiredAnyConstraints.add(item))
             }
         }
     }
@@ -105,14 +105,14 @@ Role.prototype.deserialize = function (data, deserializer) {
 
 Role.prototype.serialize = function(serializer) {
     let res = {name:this.name};
-    if(this.requiredAnyReferences.size + this.requiredAllReferences.size > 0) {
+    if(this.requiredAnyConstraints.size + this.requiredAllConstraints.size > 0) {
         let required = {};
-        if(this.requiredAnyReferences.size > 0) {
-            required[RequiredMode.ANY_OF] = serializer.serialize(this.requiredAnyReferences);
+        if(this.requiredAnyConstraints.size > 0) {
+            required[RequiredMode.ANY_OF] = serializer.serialize(this.requiredAnyConstraints);
         }
 
-        if(this.requiredAllReferences.size > 0) {
-            required[RequiredMode.ALL_OF] = serializer.serialize(this.requiredAllReferences);
+        if(this.requiredAllConstraints.size > 0) {
+            required[RequiredMode.ALL_OF] = serializer.serialize(this.requiredAllConstraints);
         }
         res.required = required;
     }
@@ -334,7 +334,7 @@ SimpleRole.prototype = Object.create(Role.prototype);
 
 SimpleRole.prototype.isValid = function() {
     return this.keyRecords.size > 0 || this.keyAddresses.size > 0 ||
-        this.requiredAllReferences.size > 0 || this.requiredAnyReferences.size > 0;
+        this.requiredAllConstraints.size > 0 || this.requiredAnyConstraints.size > 0;
 };
 
 SimpleRole.prototype.equals = function(to) {

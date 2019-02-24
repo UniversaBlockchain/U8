@@ -75,13 +75,13 @@ unit.test("map with subitems", () => {
     let a7 = {role:new roles.Role("role1")};
     let b7 = {role:new roles.Role("role1")};
     let d7 = deltas.Delta.between(null,a7,b7);
-    a7.role.requiredAnyReferences.add("ref1");
-    b7.role.requiredAnyReferences.add("ref1");
+    a7.role.requiredAnyConstraints.add("ref1");
+    b7.role.requiredAnyConstraints.add("ref1");
 
     assert(d7==null);
 
-    a7.role.requiredAnyReferences.add("ref2");
-    b7.role.requiredAnyReferences.add("ref3");
+    a7.role.requiredAnyConstraints.add("ref2");
+    b7.role.requiredAnyConstraints.add("ref3");
 
     let d8 = deltas.Delta.between(null,a7,b7);
 

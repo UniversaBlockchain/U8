@@ -238,7 +238,7 @@ Constraint.prototype.compareOperands = function(refContract,
                 if (this.baseContract == null)
                     throw "Use left operand in condition: " + leftOperand + ". But this contract not initialized.";
 
-                let ref = this.baseContract.findReferenceByName(leftOperand.substring(0, firstPointPos));
+                let ref = this.baseContract.findConstraintByName(leftOperand.substring(0, firstPointPos));
                 if (ref == null)
                     throw "Not found reference: " + leftOperand.substring(0, firstPointPos);
 
@@ -266,7 +266,7 @@ Constraint.prototype.compareOperands = function(refContract,
                     if (this.baseContract == null)
                         throw "Use left operand in condition: " + leftOperand + ". But this contract not initialized.";
 
-                    let ref = this.baseContract.findReferenceByName(leftOperand);
+                    let ref = this.baseContract.findConstraintByName(leftOperand);
                     if (ref == null)
                         throw "Not found reference: " + leftOperand;
 
@@ -297,7 +297,7 @@ Constraint.prototype.compareOperands = function(refContract,
                 if (this.baseContract == null)
                     throw "Use right operand in condition: " + rightOperand + ". But this contract not initialized.";
 
-                let ref = this.baseContract.findReferenceByName(rightOperand.substring(0, firstPointPos));
+                let ref = this.baseContract.findConstraintByName(rightOperand.substring(0, firstPointPos));
                 if (ref == null)
                     throw "Not found reference: " + rightOperand.substring(0, firstPointPos);
 
@@ -958,11 +958,11 @@ Constraint.prototype.checkConditions =  function(conditions, ref, contracts, ite
         result = true;
         for (let item of condList) {
             if (item instanceof String)
-                result = result && checkCondition(item, ref, contracts, iteration);      // not pre-parsed (old) version
+                result = result && this.checkCondition(item, ref, contracts, iteration);      // not pre-parsed (old) version
             /*else                                                                       //todo postponed until test
                 //LinkedHashMap<String, Binder> insideHashMap = (LinkedHashMap<String, Binder>) item;
                 //Binder insideBinder = new Binder(insideHashMap);
-                result = result && checkConditions(item, ref, contracts, iteration);*/
+                result = result && this.checkConditions(item, ref, contracts, iteration);*/
         }
     }
     else if (conditions.hasOwnProperty(conditionsModeType.any_of))
@@ -975,15 +975,15 @@ Constraint.prototype.checkConditions =  function(conditions, ref, contracts, ite
         result = false;
         for (let item of condList) {
             if (item instanceof String)
-                result = result || checkCondition(item, ref, contracts, iteration);        // not pre-parsed (old) version
+                result = result || this.checkCondition(item, ref, contracts, iteration);        // not pre-parsed (old) version
             /*else                                                                          //todo postponed until test
                 //LinkedHashMap<String, Binder> insideHashMap = (LinkedHashMap<String, Binder>) item;
                 //Binder insideBinder = new Binder(insideHashMap);
-                result = result || checkConditions((Binder) item, ref, contracts, iteration);*/
+                result = result || this.checkConditions((Binder) item, ref, contracts, iteration);*/
         }
     }
     else if (conds.hasOwnProperty("operator"))                                                    // pre-parsed version
-        result = checkCondition(conditions, ref, contracts, iteration);
+        result = this.checkCondition(conditions, ref, contracts, iteration);
     else
         throw "Expected all_of or any_of";
 
@@ -1033,7 +1033,7 @@ Constraint.prototype.isMatchingWithIteration = function(contract, contracts, ite
 
         //check conditions
         if (result)
-            result = checkConditions(this.conditions, contract, contracts, iteration);
+            result = this.checkConditions(this.conditions, contract, contracts, iteration);
     }
 
     return result;
@@ -1059,17 +1059,17 @@ Constraint.prototype.isInherited = function (conditions, ref, refContract, contr
             throw "Expected any_of conditions";
     }
     else if (conditions.hasOwnProperty("operator"))
-        return isInheritedParsed(conditions, ref, refContract, contracts, iteration);
+        return this.isInheritedParsed(conditions, ref, refContract, contracts, iteration);
     else
         throw "Expected all_of or any_of";
 
     if (condList != null)
         for (let item of condList)
     if (item instanceof String) {
-        if (isInherited(item, ref, refContract, contracts, iteration))
+        if (this.isInherited(item, ref, refContract, contracts, iteration))
         return true;
     }
-    //else if (isInherited((Binder) item, ref, refContract, contracts, iteration)) //todo postponed until test
+    //else if (this.isInherited((Binder) item, ref, refContract, contracts, iteration)) //todo postponed until test
     //return true;
 
     return false;
@@ -1081,7 +1081,7 @@ Constraint.prototype.isInheritedParsed = function (condition, ref, refContract, 
     let rightOperand = condition.rightOperand;
 
     if (((operator === INHERITS) || (operator === INHERIT)) && (rightOperand != null))
-        return isInheritedOperand(rightOperand, ref, refContract, contracts, iteration);
+        return this.isInheritedOperand(rightOperand, ref, refContract, contracts, iteration);
 
     return false;
 };
@@ -1098,7 +1098,7 @@ Constraint.prototype.isInherited = function (condition, ref, refContract, contra
 
             let rightOperand = subStrR.replaceAll("\\s+", ""); // todo replaceAll
 
-            return isInheritedOperand(rightOperand, ref, refContract, contracts, iteration);
+            return this.isInheritedOperand(rightOperand, ref, refContract, contracts, iteration);
         }
     }
 
@@ -1116,16 +1116,16 @@ Constraint.prototype.isInheritedOperand = function (rightOperand, ref, refContra
         rightOperand = rightOperand.substring(4);
         rightOperandContract = refContract;
     } else if (rightOperand.startsWith("this.")) {
-        if (baseContract == null)
+        if (this.baseContract == null)
             throw "Use right operand in condition: " + rightOperand + ". But this contract not initialized.";
 
         rightOperand = rightOperand.substring(5);
-        rightOperandContract = baseContract;
+        rightOperandContract = this.baseContract;
     } else if ((firstPointPos = rightOperand.indexOf(".")) > 0) {
-        if (baseContract == null)
+        if (this.baseContract == null)
             throw "Use right operand in condition: " + rightOperand + ". But this contract not initialized.";
 
-        let refLink = baseContract.findReferenceByName(rightOperand.substring(0, firstPointPos));
+        let refLink = this.baseContract.findConstraintByName(rightOperand.substring(0, firstPointPos));
         if (refLink == null)
             throw "Not found reference: " + rightOperand.substring(0, firstPointPos);
 
@@ -1232,11 +1232,11 @@ Constrain.prototype.assemblyConditions = function(conds) {
                 if (item.getClass().getName().endsWith("LinkedHashMap")) {
                     LinkedHashMap<String, Binder> insideHashMap = (LinkedHashMap<String, Binder>) item;
                     Binder insideBinder = new Binder(insideHashMap);
-                    parsed = assemblyConditions(insideBinder);
+                    parsed = this.assemblyConditions(insideBinder);
                 } else if (((Binder) item).hasOwnProperty("operator"))
-                cond = assemblyCondition((Binder) item);
+                cond = this.assemblyCondition((Binder) item);
             else
-                parsed = assemblyConditions((Binder) item);
+                parsed = this.assemblyConditions((Binder) item);
 
                 if (parsed != null)
                     assembledList.add(parsed);
