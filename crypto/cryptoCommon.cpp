@@ -4,6 +4,9 @@
 
 #include "cryptoCommon.h"
 #include "cryptoCommonPrivate.h"
+#include "PrivateKey.h"
+#include "PublicKey.h"
+#include "../tools/tools.h"
 
 namespace crypto {
 
@@ -37,6 +40,22 @@ namespace crypto {
         hashIndexes[SHA3_256] = find_hash(sha3_256_desc.name);
         hashIndexes[SHA3_384] = find_hash(sha3_384_desc.name);
         hashIndexes[SHA3_512] = find_hash(sha3_512_desc.name);
+
+        {
+            // Hack: sometimes we have got sigsegv immediately after start program.
+            // It occurs at threads collision of first call rsa_sign_hash_ex
+            // (fails deeper on call of mpz_random, what is not thread save).
+            // All next calls of rsa_sign_hash_ex works fine, so maybe it is a bug in libtomcrypt.
+            // To avoid this crash, we calls this function at initialization step.
+            PrivateKey pk(2048);
+            byte_vector data(64);
+            memset(&data[0], 0, 64);
+            byte_vector sig = pk.sign(data, HashType::SHA512);
+            PublicKey pub(pk);
+            bool verifyRes = pub.verify(sig, data, HashType::SHA512);
+            if (!verifyRes)
+                throw std::runtime_error("Error self test at crypto initialization.");
+        }
     }
 
     int getHashIndex(HashType hashType) {
