@@ -60,8 +60,8 @@ Role.prototype.isAllowedForKeys = function(keys) {
 
 Role.prototype.isAllowedForConstraints = function(constraints) {
 
-    for(let ref of this.requiredAllConstraints) {
-        if (!constraints.has(ref)) {
+    for(let constr of this.requiredAllConstraints) {
+        if (!constraints.has(constr)) {
             return false;
         }
     }
@@ -69,8 +69,8 @@ Role.prototype.isAllowedForConstraints = function(constraints) {
     if(this.requiredAnyConstraints.size == 0)
         return true;
 
-    for(let ref of this.requiredAnyConstraints) {
-        if (constraints.has(ref)) {
+    for(let constr of this.requiredAnyConstraints) {
+        if (constraints.has(constr)) {
             return true;
         }
     }

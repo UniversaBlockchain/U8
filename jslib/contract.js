@@ -505,34 +505,31 @@ Contract.prototype.updateContext = function() {
 };
 
 Contract.prototype.findConstraintByName = function(name, section) {
-    if (section.equals("definition")) {
+    if (section === "definition") {
         if (this.definition.constraints == null)
             return null;
 
-        let listRefs = this.definition.constraints;
-        for (let ref of listRefs)
-        if (ref.getName().equals(name))
-            return ref;
+        for (let constr of this.definition.constraints)
+            if (constr.name === name)
+                return constr;
 
         return null;
-    } else if (section.equals("state")) {
+    } else if (section === "state") {
         if (this.state.constraints == null)
             return null;
 
-        let listRefs = this.state.constraints;
-        for (let ref of listRefs)
-        if (ref.getName().equals(name))
-            return ref;
+        for (let constr of this.state.constraints)
+            if (constr.name === name)
+                return constr;
 
         return null;
-    } else if (section.equals("transactional")) {
+    } else if (section === "transactional") {
         if (this.transactional.constraints == null)
             return null;
 
-        let listRefs = this.transactional.constraints;
-        for (let ref of listRefs)
-        if (ref.getName().equals(name))
-            return ref;
+        for (let constr of this.transactional.constraints)
+            if (constr.name === name)
+                return constr;
 
         return null;
     }
@@ -773,24 +770,24 @@ Contract.prototype.deserialize = function(data,deserializer) {
         }
     }*/
 
-     if (this.transactional != null && this.transactional.constraints != null) { //todo !! ref
-         for(let ref of this.transactional.constraints) {
-             ref.setContract(this);
-             this.constraints.set(ref.name, ref);
+     if (this.transactional != null && this.transactional.constraints != null) {
+         for(let constr of this.transactional.constraints) {
+             constr.setContract(this);
+             this.constraints.set(constr.name, constr);
          }
      }
 
      if (this.definition != null && this.definition.constraints != null) {
-         for(let ref of this.definition.constraints) {
-             ref.setContract(this);
-             this.constraints.set(ref.name, ref);
+         for(let constr of this.definition.constraints) {
+             constr.setContract(this);
+             this.constraints.set(constr.name, constr);
          }
      }
 
      if (this.state != null && this.state.constraints != null) {
-         for(let ref of this.state.constraints) {
-             ref.setContract(this);
-             this.constraints.set(ref.name, ref);
+         for(let constr of this.state.constraints) {
+             constr.setContract(this);
+             this.constraints.set(constr.name, constr);
          }
      }
 };
@@ -1328,15 +1325,15 @@ Contract.prototype.createRevision = function(keys) {
     newRevision.transactional = null;
 
     if (newRevision.definition != null && newRevision.definition.constraints != null){
-        for(let ref of  newRevision.definition.constraints) {
-            ref.setContract(newRevision);
-            newRevision.constraints.set(ref.name, ref);
+        for(let constr of  newRevision.definition.constraints) {
+            constr.setContract(newRevision);
+            newRevision.constraints.set(constr.name, constr);
         }
     }
     if (newRevision.state != null && newRevision.state.constraints != null){
-        for(let ref of newRevision.state.constraints) {
-            ref.setContract(newRevision);
-            newRevision.constraints.set(ref.name, ref);
+        for(let constr of newRevision.state.constraints) {
+            constr.setContract(newRevision);
+            newRevision.constraints.set(constr.name, constr);
         }
     }
 
