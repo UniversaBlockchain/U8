@@ -28,7 +28,7 @@ namespace network {
         nextPacketId_ = minstdRand();
 
         receiveCallback_ = receiveCallback;
-        socket_.open(ownNodeInfo_.getNodeAddress().host.c_str(), ownNodeInfo_.getNodeAddress().port);
+        socket_.open(ownNodeInfo_.getNodeAddress().host.c_str(), ownNodeInfo_.getNodeAddress().port, UDP_BUFFER_SIZE);
         socket_.recv([=](ssize_t result, const asyncio::byte_vector& data, const char* IP, unsigned int port) {
             if (result > 0)
                 onReceive(data);

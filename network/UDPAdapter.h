@@ -294,6 +294,13 @@ namespace network {
          */
         const static size_t HANDSHAKE_TIMEOUT_MILLIS = 10000;
 
+        /**
+         * Size of sending and receiving buffers in bytes.
+         * If it more than system max buffer size, system max buffer size will be set.
+         * Set to 0 for default buffer sizes.
+         */
+        const static size_t UDP_BUFFER_SIZE = 8*1024*1024;
+
     private:
         bool isLogEnabled_ = false;
         bool throwErrors_ = false;
