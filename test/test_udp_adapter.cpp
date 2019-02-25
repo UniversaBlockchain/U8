@@ -429,3 +429,63 @@ TEST_CASE("LostPackets") {
     REQUIRE(long(receiveCounter1) == countToSend);
 
 }
+
+TEST_CASE("SendBadNetConfig") {
+    NetConfig nc;
+    PrivateKey pk0(2048);
+    PrivateKey pk1(2048);
+    PrivateKey pk2(2048);
+    PrivateKey pk3(2048);
+    PrivateKey pk3bad(2048);
+    NodeInfo nodeInfo0(PublicKey(pk0), 0, "node-0", "127.0.0.1", "127.0.0.1", 14000, 16000, 18000);
+    nc.addNode(nodeInfo0);
+    NodeInfo nodeInfo1(PublicKey(pk1), 1, "node-1", "127.0.0.1", "127.0.0.1", 14001, 16001, 18001);
+    nc.addNode(nodeInfo1);
+    NodeInfo nodeInfo2(PublicKey(pk2), 2, "node-2", "127.0.0.1", "127.0.0.1", 14002, 16002, 18002);
+    nc.addNode(nodeInfo2);
+    NodeInfo nodeInfo3(PublicKey(pk3), 3, "node-3", "127.0.0.1", "127.0.0.1", 14003, 16003, 18003);
+    nc.addNode(nodeInfo3);
+
+    const long countToSend = 3;
+
+    atomic<long> receiveCounter1(0);
+    timed_mutex mtx1;
+    mtx1.lock();
+    atomic<long> receiveCounter3(0);
+    timed_mutex mtx3;
+    mtx3.lock();
+
+    UDPAdapter d0 = UDPAdapter(pk0, 0, nc, [&](const byte_vector& packet, const NodeInfo& fromNode){}, true);
+    UDPAdapter d1 = UDPAdapter(pk1, 1, nc, [&](const byte_vector& packet, const NodeInfo& fromNode){
+        ++receiveCounter1;
+        if (receiveCounter1 >= 3)
+            mtx1.unlock();
+    }, true);
+    //UDPAdapter d2 is missing;
+    UDPAdapter d3 = UDPAdapter(pk3bad, 3, nc, [&](const byte_vector& packet, const NodeInfo& fromNode){
+        ++receiveCounter3;
+        if (receiveCounter3 >= 3)
+            mtx3.unlock();
+    }, true);
+
+    string payloadA("test data set 1");
+
+    //send to missing node, its should not affect other sessions
+    for (long i = 0; i < countToSend; ++i)
+        d0.send(2, byte_vector(payloadA.begin(), payloadA.end()));
+
+    //send to node with wrong private key, should not deliver
+    for (long i = 0; i < countToSend; ++i)
+        d0.send(3, byte_vector(payloadA.begin(), payloadA.end()));
+
+    //send to normal node, should works fine
+    for (long i = 0; i < countToSend; ++i)
+        d0.send(1, byte_vector(payloadA.begin(), payloadA.end()));
+
+    if (!mtx1.try_lock_for(15s))
+        REQUIRE(false); //timeout
+    REQUIRE(long(receiveCounter1) == countToSend);
+    if (mtx3.try_lock_for(5s))
+        REQUIRE(false); //packets has delivered, but it should not
+    REQUIRE(long(receiveCounter3) == 0);
+}
