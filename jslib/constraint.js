@@ -49,7 +49,7 @@ Constraint.conditionsModeType = {
 };
 
 ///////////////////////////
-//Constraints
+//Constraint
 ///////////////////////////
 
 function Constraint(contract) {
@@ -157,6 +157,10 @@ Constraint.prototype.copy = function() {
 
 Constraint.prototype.setConditions = function(conditions) {
     this.conditions = this.parseConditions(conditions);
+};
+
+Constraint.prototype.setContract = function(contract) {
+    this.baseContract = contract;
 };
 
 /*var toType = function(obj) {

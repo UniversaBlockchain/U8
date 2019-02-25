@@ -66,7 +66,7 @@ Role.prototype.isAllowedForConstraints = function(constraints) {
         }
     }
 
-    if(this.requiredAnyConstraints.size == 0)
+    if(this.requiredAnyConstraints.size === 0)
         return true;
 
     for(let constr of this.requiredAnyConstraints) {

@@ -147,7 +147,7 @@ State.prototype.serialize = function(serializer) {
         of.expires_at = this.expiresAt;
 
     if (this.constraints != null)
-        of.constraints = this.constraints;
+        of.constraints = serializer.serialize(this.constraints);
 
     return serializer.serialize(of);
 };
@@ -277,7 +277,7 @@ Definition.prototype.serialize = function(serializer) {
         of.expires_at = this.expiresAt;
 
     if (this.constraints != null)
-        of.constraints = this.constraints;
+        of.constraints = serializer.serialize(this.constraints);
 
     if (this.extendedType != null)
         of.extended_type = this.extendedType;
@@ -524,7 +524,7 @@ Contract.prototype.findConstraintByName = function(name, section) {
 
         return null;
     } else if (section === "transactional") {
-        if (this.transactional.constraints == null)
+        if ((this.transactional == null) || (this.transactional.constraints == null))
             return null;
 
         for (let constr of this.transactional.constraints)
@@ -749,47 +749,26 @@ Contract.prototype.deserialize = function(data,deserializer) {
         this.transactional = null;
     }
 
-   /* if (this.transactional != null && this.transactional.references != null) {
-        for(let ref of this.transactional.references) {
-            ref.setContract(this);
-            this.references.set(ref.name, ref);
+    if (this.transactional != null && this.transactional.constraints != null) {
+        for(let constr of this.transactional.constraints) {
+            constr.setContract(this);
+            this.constraints.set(constr.name, constr);
         }
     }
 
-    if (this.definition != null && this.definition.references != null) {
-        for(let ref of this.definition.references) {
-            ref.setContract(this);
-            this.references.set(ref.name, ref);
+    if (this.definition != null && this.definition.constraints != null) {
+        for(let constr of this.definition.constraints) {
+            constr.setContract(this);
+            this.constraints.set(constr.name, constr);
         }
     }
 
-    if (this.state != null && this.state.references != null) {
-        for(let ref of this.state.references) {
-            ref.setContract(this);
-            this.references.set(ref.name, ref);
+    if (this.state != null && this.state.constraints != null) {
+        for(let constr of this.state.constraints) {
+            constr.setContract(this);
+            this.constraints.set(constr.name, constr);
         }
-    }*/
-
-     if (this.transactional != null && this.transactional.constraints != null) {
-         for(let constr of this.transactional.constraints) {
-             constr.setContract(this);
-             this.constraints.set(constr.name, constr);
-         }
-     }
-
-     if (this.definition != null && this.definition.constraints != null) {
-         for(let constr of this.definition.constraints) {
-             constr.setContract(this);
-             this.constraints.set(constr.name, constr);
-         }
-     }
-
-     if (this.state != null && this.state.constraints != null) {
-         for(let constr of this.state.constraints) {
-             constr.setContract(this);
-             this.constraints.set(constr.name, constr);
-         }
-     }
+    }
 };
 
 Contract.prototype.registerRole = function(role) {
@@ -916,14 +895,13 @@ Contract.prototype.check = async function(prefix,contractsTree) {
 
     this.quantiser.addWorkCost(QuantiserProcesses.PRICE_REGISTER_VERSION);
     this.quantiser.addWorkCost(QuantiserProcesses.PRICE_REVOKE_VERSION*this.revokingItems.size);
-    //this.quantiser.addWorkCost(QuantiserProcesses.PRICE_CHECK_REFERENCED_VERSION*this.references.size);
-    this.quantiser.addWorkCost(QuantiserProcesses.PRICE_CHECK_REFERENCED_VERSION*this.constraints.size); // todo !!
+    this.quantiser.addWorkCost(QuantiserProcesses.PRICE_CHECK_CONSTRAINT*this.constraints.size);
 
-    this.checkConstraintItems(contractsTree);
+    this.checkConstraints(contractsTree);
 
     this.revokingItems.forEach(ri => {
         ri.errors = [];
-        ri.checkConstraintItems(contractsTree,true);
+        ri.checkConstraints(contractsTree,true);
         ri.errors.forEach(e => {
             this.errors.push(e);
         });
@@ -963,7 +941,7 @@ Contract.prototype.check = async function(prefix,contractsTree) {
 
     this.checkTestPaymentLimitations();
 
-    return this.errors.length == 0;
+    return this.errors.length === 0;
 };
 
 Contract.prototype.getRevisionId = function() {
@@ -1192,7 +1170,7 @@ Contract.prototype.checkChangedContract = function() {
             this.errors.push(new ErrorRecord(Errors.BAD_VALUE, "state.origin", "wrong origin, should be root"));
         }
         if (!parent.id.equals(this.state.parent))
-            this.errors.push(new ErrorRecord(Errors.BAD_VALUE, "state.parent", "illegal parent references"));
+            this.errors.push(new ErrorRecord(Errors.BAD_VALUE, "state.parent", "illegal parent reference"));
 
         let delta = new ContractDelta(parent, this);
         delta.check();
@@ -1209,7 +1187,7 @@ Contract.prototype.getOrigin = function() {
     }
 }
 
-Contract.prototype.checkConstraintItems = function(contractsTree,roleRefsOnly) {
+Contract.prototype.checkConstraints = function(contractsTree,roleRefsOnly) {
     if(typeof roleRefsOnly === "undefined")
         roleRefsOnly = false;
 
@@ -1320,17 +1298,17 @@ Contract.prototype.createRevision = function(keys) {
     newRevision.state.revision = this.state.revision + 1;
     newRevision.state.createdAt = new Date();
     newRevision.state.parent = this.id;
-    newRevision.state.origin = this.state.revision == 1 ? this.id : this.state.origin;
+    newRevision.state.origin = this.state.revision === 1 ? this.id : this.state.origin;
     newRevision.revokingItems.add(this);
     newRevision.transactional = null;
 
-    if (newRevision.definition != null && newRevision.definition.constraints != null){
-        for(let constr of  newRevision.definition.constraints) {
+    if (newRevision.definition != null && newRevision.definition.constraints != null) {
+        for(let constr of newRevision.definition.constraints) {
             constr.setContract(newRevision);
             newRevision.constraints.set(constr.name, constr);
         }
     }
-    if (newRevision.state != null && newRevision.state.constraints != null){
+    if (newRevision.state != null && newRevision.state.constraints != null) {
         for(let constr of newRevision.state.constraints) {
             constr.setContract(newRevision);
             newRevision.constraints.set(constr.name, constr);
