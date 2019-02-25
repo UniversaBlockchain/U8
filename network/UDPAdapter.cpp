@@ -61,7 +61,7 @@ namespace network {
     void UDPAdapter::send(int destNodeNumber, const byte_vector& payload) {
         std::unique_lock lock(socketMutex_);
 
-        auto dest = netConfig_.getInfo(destNodeNumber);
+        const auto& dest = netConfig_.getInfo(destNodeNumber);
         Session& session = getOrCreateSession(dest);
         if (session.getState() == SessionState::STATE_HANDSHAKE) {
             session.addPayloadToOutputQueue(dest, payload);
@@ -208,7 +208,7 @@ namespace network {
 
     void UDPAdapter::onReceiveSessionPart1(const Packet& packet) {
         writeLog("received session_part1 from ", packet.getSenderNodeId());
-        auto nodeInfo = netConfig_.getInfo(packet.getSenderNodeId());
+        const auto& nodeInfo = netConfig_.getInfo(packet.getSenderNodeId());
         Session& session = getOrCreateSession(nodeInfo);
         if (session.protectFromDuples(packet.getPacketId())) {
             session.removeHandshakePacketsFromRetransmitMap();
@@ -221,7 +221,7 @@ namespace network {
 
     void UDPAdapter::onReceiveSessionPart2(const Packet& packet) {
         writeLog("received session_part2 from ", packet.getSenderNodeId());
-        auto nodeInfo = netConfig_.getInfo(packet.getSenderNodeId());
+        const auto& nodeInfo = netConfig_.getInfo(packet.getSenderNodeId());
         Session& session = getOrCreateSession(nodeInfo);
         if (session.protectFromDuples(packet.getPacketId())) {
             session.removeHandshakePacketsFromRetransmitMap();
@@ -322,7 +322,7 @@ namespace network {
 
     void UDPAdapter::onReceiveAck(const Packet& packet) {
         writeLog("received ack from ", packet.getSenderNodeId());
-        auto nodeInfo = netConfig_.getInfo(packet.getSenderNodeId());
+        const auto& nodeInfo = netConfig_.getInfo(packet.getSenderNodeId());
         Session& session = getOrCreateSession(nodeInfo);
         if (session.state == SessionState::STATE_EXCHANGING) {
             try {
@@ -341,7 +341,7 @@ namespace network {
 
     void UDPAdapter::onReceiveNack(const Packet& packet) {
         writeLog("received nack from ", packet.getSenderNodeId());
-        auto nodeInfo = netConfig_.getInfo(packet.getSenderNodeId());
+        const auto& nodeInfo = netConfig_.getInfo(packet.getSenderNodeId());
         Session& session = getOrCreateSession(nodeInfo);
         if (session.state == SessionState::STATE_EXCHANGING) {
             try {
