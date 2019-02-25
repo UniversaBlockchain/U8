@@ -283,3 +283,34 @@ TEST_CASE("CreateManyNodesToOne") {
     }
     cout << "receiveCounter: " << receiveCounter << ", answerCounter: " << answerCounter << endl;
 }
+
+TEST_CASE("SendTripleMultiTimesAndReceive") {
+    std::minstd_rand  minstdRand(std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now().time_since_epoch()).count());
+    AdaptersList env(3);
+    vector<string> payloadsList({"test data set 1", "test data set 2222", "test data set 333333333333333"});
+    int attempts = 100;
+    int numSends = 5;
+    for (int i = 0; i < attempts; ++i) {
+        if (i % 100 == 0)
+            cout << "send part: " << i << "..." << i+99 << endl;
+
+        timed_mutex mtx;
+        mtx.lock();
+        atomic<long> receiveCounter1(0);
+        env.adapters[1]->setReceiveCallback([&](const byte_vector& packet, const NodeInfo& fromNode){
+            ++receiveCounter1;
+            if (receiveCounter1 >= numSends)
+                mtx.unlock();
+        });
+
+        for (int j = 0; j < numSends; ++j) {
+            string &payload = payloadsList[minstdRand() % 3];
+            env.adapters[0]->send(1, byte_vector(payload.begin(), payload.end()));
+        }
+
+        if (!mtx.try_lock_for(40s)) {
+            REQUIRE(false); //timeout
+        }
+        REQUIRE(int(receiveCounter1) == numSends);
+    }
+}
