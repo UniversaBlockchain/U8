@@ -23,7 +23,7 @@ public:
     }
 } mainInit_g;
 
-class AdaptersList {
+class AdaptersList: Noncopyable, Nonmovable {
 public:
     vector<PrivateKey> privKeys;
     NetConfig nc;
@@ -39,6 +39,10 @@ public:
             auto udpAdapter = make_shared<UDPAdapter>(privKeys[i], i, nc, [&](const byte_vector& packet, const NodeInfo& fromNode){}, true);
             adapters.push_back(udpAdapter);
         }
+    }
+    ~AdaptersList() {
+        for (size_t i = 0; i < adapters.size(); ++i)
+            adapters[i]->setReceiveCallback([](const byte_vector& packet, const NodeInfo& fromNode){});
     }
 };
 
@@ -211,10 +215,11 @@ TEST_CASE("CreateNodeToMany") {
             mtx.unlock();
     });
     for (int i = 1; i <= numNodes; ++i) {
-        env.adapters[i]->setReceiveCallback([=,&receiveCounter](const byte_vector& packet, const NodeInfo& fromNode) {
+        const int iAdapter = i;
+        env.adapters[iAdapter]->setReceiveCallback([&](const byte_vector& packet, const NodeInfo& fromNode) {
             ++receiveCounter;
             REQUIRE(messageBody == string(packet.begin(), packet.end()));
-            env.adapters[i]->send(0, byte_vector(answerBody.begin(), answerBody.end()));
+            env.adapters[iAdapter]->send(0, byte_vector(answerBody.begin(), answerBody.end()));
         });
     }
 
@@ -235,7 +240,6 @@ TEST_CASE("CreateNodeToMany") {
 }
 
 TEST_CASE("CreateManyNodesToOne") {
-    return;
     const int numNodes = 100;
     const int attempts = 5;
     const int numSends = 5;
