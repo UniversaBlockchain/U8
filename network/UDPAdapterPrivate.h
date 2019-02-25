@@ -85,6 +85,7 @@ namespace network {
     private:
         std::unordered_set<int> buffer0;
         std::unordered_set<int> buffer1;
+        friend class UDPAdapter;
     };
 
     /**

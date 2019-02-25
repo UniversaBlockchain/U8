@@ -65,6 +65,11 @@ namespace network {
          */
         void setTestMode(bool enabled) {testMode_ = enabled;}
 
+        /**
+         * for debug
+         */
+        void printInternalState();
+
     private:
         /**
          * Main listener for incoming udp packets.

@@ -582,4 +582,30 @@ namespace network {
         receiveCallback_ = callback;
     }
 
+    void UDPAdapter::printInternalState() {
+        using std::cout;
+        std::unique_lock lock(socketMutex_);
+        cout << endl << "printInternalState " << logLabel_ << endl;
+        cout << "  nextPacketId_: " << nextPacketId_ << endl;
+        for (auto& s : sessionsByRemoteId_) {
+            cout << "  session with node=" << s.first << endl;
+            cout << "    outputQueue.size():" << s.second.outputQueue.size() << endl;
+            cout << "    retransmitMap.size():" << s.second.retransmitMap.size() << endl;
+            cout << "    protectionFromDuple0.size()():" << s.second.buffer0.size() << endl;
+            cout << "    protectionFromDuple1.size()():" << s.second.buffer1.size() << endl;
+        }
+        for (auto& s : sessionReaders_) {
+            cout << "  sessionReader with node=" << s.first << endl;
+            cout << "    retransmitMap.size():" << s.second.retransmitMap.size() << endl;
+            cout << "    protectionFromDuple0.size()():" << s.second.buffer0.size() << endl;
+            cout << "    protectionFromDuple1.size()():" << s.second.buffer1.size() << endl;
+        }
+        for (auto& s : sessionReaderCandidates_) {
+            cout << "  sessionReader with node=" << s.first << endl;
+            cout << "    retransmitMap.size():" << s.second.retransmitMap.size() << endl;
+            cout << "    protectionFromDuple0.size()():" << s.second.buffer0.size() << endl;
+            cout << "    protectionFromDuple1.size()():" << s.second.buffer1.size() << endl;
+        }
+    }
+
 };
