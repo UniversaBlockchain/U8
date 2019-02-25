@@ -303,7 +303,7 @@ namespace network {
                     decrypted.resize(decrypted.size() - 2);
                     sendAck(sessionReader, packet.getPacketId());
                     if (sessionReader.protectFromDuples(packet.getPacketId()))
-                        receiveCallback_(decrypted);
+                        receiveCallback_(decrypted, sessionReader.remoteNodeInfo);
                 } else {
                     writeErr("onReceiveData error: decrypted payload too short");
                     sendNack(sessionReader, packet.getPacketId());

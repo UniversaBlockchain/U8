@@ -23,7 +23,7 @@ namespace network {
     class UDPAdapter {
 
     public:
-        typedef std::function<void(const byte_vector& packet)> TReceiveCallback;
+        typedef std::function<void(const byte_vector& packet, const NodeInfo& fromNode)> TReceiveCallback;
 
     public:
 

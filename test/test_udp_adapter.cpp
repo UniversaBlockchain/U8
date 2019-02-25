@@ -36,7 +36,7 @@ public:
             nc.addNode(nodeInfo);
         }
         for (int i = 0; i < count; ++i) {
-            auto udpAdapter = make_shared<UDPAdapter>(privKeys[i], i, nc, [&](const byte_vector& packet){}, true);
+            auto udpAdapter = make_shared<UDPAdapter>(privKeys[i], i, nc, [&](const byte_vector& packet, const NodeInfo& fromNode){}, true);
             adapters.push_back(udpAdapter);
         }
     }
@@ -60,15 +60,15 @@ TEST_CASE("HelloUdp") {
 
     atomic<long> counter0(0);
 
-    network::UDPAdapter udpAdapter0(node0key, 0, netConfig, [&counter0](const byte_vector& packet){
+    network::UDPAdapter udpAdapter0(node0key, 0, netConfig, [&counter0](const byte_vector& packet, const NodeInfo& fromNode){
         //cout << "node-0 receive data, size=" << packet.size() << ": " << string(packet.begin(), packet.end()) << endl;
         ++counter0;
     }, true);
-    network::UDPAdapter udpAdapter1(node1key, 1, netConfig, [&](const byte_vector& packet){
+    network::UDPAdapter udpAdapter1(node1key, 1, netConfig, [&](const byte_vector& packet, const NodeInfo& fromNode){
         REQUIRE(packet.size() == 18);
         REQUIRE(string(packet.begin(), packet.end()) == body0);
     }, true);
-    network::UDPAdapter udpAdapter2(node2key, 2, netConfig, [&](const byte_vector& packet){
+    network::UDPAdapter udpAdapter2(node2key, 2, netConfig, [&](const byte_vector& packet, const NodeInfo& fromNode){
         REQUIRE(packet.size() == 21);
         REQUIRE(string(packet.begin(), packet.end()) == body1);
     }, true);
@@ -97,7 +97,7 @@ TEST_CASE("SendAndReceive") {
     string receivedString("");
     timed_mutex mtx;
     mtx.lock();
-    env.adapters[1]->setReceiveCallback([&](const byte_vector& packet){
+    env.adapters[1]->setReceiveCallback([&](const byte_vector& packet, const NodeInfo& fromNode){
         receivedString = string(packet.begin(), packet.end());
         mtx.unlock();
     });
@@ -115,7 +115,7 @@ TEST_CASE("SendTripleAndReceive") {
     set<string> receivedStrings;
     timed_mutex mtx;
     mtx.lock();
-    env.adapters[1]->setReceiveCallback([&](const byte_vector& packet){
+    env.adapters[1]->setReceiveCallback([&](const byte_vector& packet, const NodeInfo& fromNode){
         receivedStrings.insert(string(packet.begin(), packet.end()));
         if (receivedStrings.size() >= 3)
             mtx.unlock();
@@ -130,20 +130,17 @@ TEST_CASE("SendTripleAndReceive") {
     REQUIRE(receivedStrings.find(body2) != receivedStrings.end());
 }
 
-TEST_CASE("SendEachOtherAndReceive") {
+void SendEachOtherAndReceive(const int attempts, const int numSends) {
     std::minstd_rand  minstdRand(std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now().time_since_epoch()).count());
     AdaptersList env(5);
     vector<string> payloadsList({"test data set 1", "test data set 2", "test data set 3"});
-
-    const int attempts = 500;
-    const int numSends = 100;
 
     atomic<long> receiveCounter(0);
     timed_mutex mtx;
     mtx.lock();
 
     for (int i = 0; i < 5; ++i) {
-        env.adapters[i]->setReceiveCallback([&](const byte_vector &packet) {
+        env.adapters[i]->setReceiveCallback([&](const byte_vector &packet, const NodeInfo& fromNode) {
             ++receiveCounter;
             if (receiveCounter >= attempts * numSends)
                 mtx.unlock();
@@ -176,4 +173,109 @@ TEST_CASE("SendEachOtherAndReceive") {
     }
     REQUIRE(receiveCounter == attempts*numSends);
     senderThread.join();
+}
+
+TEST_CASE("SendEachOtherAndReceive") {
+    const int attempts = 500;
+    const int numSends = 100;
+    SendEachOtherAndReceive(attempts, numSends);
+}
+
+TEST_CASE("SendEachOtherReceiveCloseSessionAndTryAgain") {
+    for (int i = 0; i < 6; i++) {
+        const int attempts = 100;
+        const int numSends = 10;
+        SendEachOtherAndReceive(attempts, numSends);
+    }
+}
+
+TEST_CASE("CreateNodeToMany") {
+    const int numNodes = 100;
+    const int attempts = 5;
+    const int numSends = 5;
+
+    atomic<long> receiveCounter(0);
+    atomic<long> answerCounter(0);
+
+    AdaptersList env(numNodes+1);
+
+    string messageBody("message");
+    string answerBody("answer");
+    timed_mutex mtx;
+    mtx.lock();
+
+    env.adapters[0]->setReceiveCallback([&](const byte_vector& packet, const NodeInfo& fromNode) {
+        ++answerCounter;
+        REQUIRE(answerBody == string(packet.begin(), packet.end()));
+        if (answerCounter >= attempts * numSends * numNodes)
+            mtx.unlock();
+    });
+    for (int i = 1; i <= numNodes; ++i) {
+        env.adapters[i]->setReceiveCallback([=,&receiveCounter](const byte_vector& packet, const NodeInfo& fromNode) {
+            ++receiveCounter;
+            REQUIRE(messageBody == string(packet.begin(), packet.end()));
+            env.adapters[i]->send(0, byte_vector(answerBody.begin(), answerBody.end()));
+        });
+    }
+
+    for (int i = 0; i < attempts; ++i) {
+        cout << "send part: " << i << endl;
+        for (int j = 0; j < numSends; ++j) {
+            for (int k = 1; k <= numNodes; ++k)
+                env.adapters[0]->send(k, byte_vector(messageBody.begin(), messageBody.end()));
+        }
+        this_thread::sleep_for(200ms);
+    }
+
+    if (!mtx.try_lock_for(40s)) {
+        cout << "receiveCounter: " << receiveCounter << ", answerCounter: " << answerCounter << endl;
+        REQUIRE(false); //timeout
+    }
+    cout << "receiveCounter: " << receiveCounter << ", answerCounter: " << answerCounter << endl;
+}
+
+TEST_CASE("CreateManyNodesToOne") {
+    return;
+    const int numNodes = 100;
+    const int attempts = 5;
+    const int numSends = 5;
+
+    atomic<long> receiveCounter(0);
+    atomic<long> answerCounter(0);
+
+    AdaptersList env(numNodes+1);
+
+    string messageBody("message");
+    string answerBody("answer");
+    timed_mutex mtx;
+    mtx.lock();
+
+    env.adapters[0]->setReceiveCallback([&](const byte_vector& packet, const NodeInfo& fromNode) {
+        ++receiveCounter;
+        REQUIRE(messageBody == string(packet.begin(), packet.end()));
+        env.adapters[0]->send(fromNode.getNumber(), byte_vector(answerBody.begin(), answerBody.end()));
+    });
+    for (int i = 1; i <= numNodes; ++i) {
+        env.adapters[i]->setReceiveCallback([=,&answerCounter,&mtx](const byte_vector& packet, const NodeInfo& fromNode) {
+            ++answerCounter;
+            REQUIRE(answerBody == string(packet.begin(), packet.end()));
+            if (answerCounter >= attempts * numSends * numNodes)
+                mtx.unlock();
+        });
+    }
+
+    for (int i = 0; i < attempts; ++i) {
+        cout << "send part: " << i << endl;
+        for (int j = 0; j < numSends; ++j) {
+            for (int k = 1; k <= numNodes; ++k)
+                env.adapters[k]->send(0, byte_vector(messageBody.begin(), messageBody.end()));
+        }
+        this_thread::sleep_for(200ms);
+    }
+
+    if (!mtx.try_lock_for(40s)) {
+        cout << "receiveCounter: " << receiveCounter << ", answerCounter: " << answerCounter << endl;
+        REQUIRE(false); //timeout
+    }
+    cout << "receiveCounter: " << receiveCounter << ", answerCounter: " << answerCounter << endl;
 }
