@@ -235,7 +235,7 @@ namespace network {
          * Each adapter will try to send blocks until have got special Packet with type ACK,
          * that means receiver have got block. So when we got block, but something went wrong - call this method.
          */
-        void sendNack(SessionReader& sessionReader, int packetId);
+        void sendNack(int nodeId, int packetId);
 
         template<typename ...Args>
         void writeLog(Args && ...args) {

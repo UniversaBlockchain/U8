@@ -18,4 +18,8 @@ namespace network {
         return byNumber.at(nodeId);
     }
 
+    bool NetConfig::find(int nodeId) const {
+        return byNumber.find(nodeId) != byNumber.end();
+    }
+
 };

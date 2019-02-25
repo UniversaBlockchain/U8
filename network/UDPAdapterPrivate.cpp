@@ -139,6 +139,7 @@ namespace network {
         state = SessionState::STATE_HANDSHAKE;
         handshakeStep = HandshakeState::HANDSHAKE_STEP_INIT;
         handshakeExpiresAt = getCurrentTimeMillis() - UDPAdapter::HANDSHAKE_TIMEOUT_MILLIS;
+        lastHandshakeRestartTime = getCurrentTimeMillis();
     }
 
     void Session::reconstructSessionKey(const byte_vector& key) {
@@ -170,20 +171,22 @@ namespace network {
     }
 
     void Session::startHandshake() {
-        if (lastHandshakeRestartTime + UDPAdapter::HANDSHAKE_TIMEOUT_MILLIS < getCurrentTimeMillis()) {
+        auto now = getCurrentTimeMillis();
+        if (lastHandshakeRestartTime + UDPAdapter::HANDSHAKE_TIMEOUT_MILLIS <= now) {
             for (auto& it : retransmitMap) {
                 it.second.retransmitCounter = 0;
                 it.second.packet.nullify();
-                it.second.nextRetransmitTimeMillis = getCurrentTimeMillis();
+                it.second.nextRetransmitTimeMillis = now;
             }
             removeHandshakePacketsFromRetransmitMap();
             handshakeStep = HandshakeState::HANDSHAKE_STEP_INIT;
-            handshakeExpiresAt = getCurrentTimeMillis() - UDPAdapter::HANDSHAKE_TIMEOUT_MILLIS;
+            handshakeExpiresAt = now - UDPAdapter::HANDSHAKE_TIMEOUT_MILLIS;
             state = SessionState::STATE_HANDSHAKE;
-            lastHandshakeRestartTime = getCurrentTimeMillis();
+            lastHandshakeRestartTime = now;
         } else {
             //TODO: debug, remove this printf
             printf("(startHandshake) too short time after previous startHandshake\n");
+            printf("%li\n", lastHandshakeRestartTime + UDPAdapter::HANDSHAKE_TIMEOUT_MILLIS - now);
         }
     }
 

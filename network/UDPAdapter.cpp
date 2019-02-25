@@ -294,26 +294,30 @@ namespace network {
         crc32_update(&ctx, &payload[0], payload.size()-4);
         crc32_finish(&ctx, &calculated_crc32[0], 4);
 
-        SessionReader &sessionReader = getSessionReader(packet.getSenderNodeId());
-
-        if (packet_crc32 == calculated_crc32) {
-            try {
-                byte_vector decrypted = sessionReader.sessionKey.etaDecrypt(encryptedPayload);
-                if (decrypted.size() > 2) {
-                    decrypted.resize(decrypted.size() - 2);
-                    sendAck(sessionReader, packet.getPacketId());
-                    if (sessionReader.protectFromDuples(packet.getPacketId()))
-                        receiveCallback_(decrypted, sessionReader.remoteNodeInfo);
-                } else {
-                    writeErr("onReceiveData error: decrypted payload too short");
-                    sendNack(sessionReader, packet.getPacketId());
-                }
-            } catch (const std::exception& e) {
-                writeErr("onReceiveData exception: ", e.what());
-                sendNack(sessionReader, packet.getPacketId());
-            }
+        if (sessionReaders.find(packet.getSenderNodeId()) == sessionReaders.end()) {
+            sendNack(packet.getSenderNodeId(), packet.getPacketId());
         } else {
-            writeErr("onReceiveData error: crc32 mismatch");
+            SessionReader &sessionReader = getSessionReader(packet.getSenderNodeId());
+
+            if (packet_crc32 == calculated_crc32) {
+                try {
+                    byte_vector decrypted = sessionReader.sessionKey.etaDecrypt(encryptedPayload);
+                    if (decrypted.size() > 2) {
+                        decrypted.resize(decrypted.size() - 2);
+                        sendAck(sessionReader, packet.getPacketId());
+                        if (sessionReader.protectFromDuples(packet.getPacketId()))
+                            receiveCallback_(decrypted, sessionReader.remoteNodeInfo);
+                    } else {
+                        writeErr("onReceiveData error: decrypted payload too short");
+                        sendNack(packet.getSenderNodeId(), packet.getPacketId());
+                    }
+                } catch (const std::exception &e) {
+                    writeErr("onReceiveData exception: ", e.what());
+                    sendNack(packet.getSenderNodeId(), packet.getPacketId());
+                }
+            } else {
+                writeErr("onReceiveData error: crc32 mismatch");
+            }
         }
     }
 
@@ -557,15 +561,18 @@ namespace network {
         sendPacket(sessionReader.remoteNodeInfo, packet.makeByteArray());
     }
 
-    void UDPAdapter::sendNack(SessionReader& sessionReader, int packetId) {
-        writeLog("send nack to ", sessionReader.remoteNodeInfo.getNumber());
-        byte_vector randomSeed(64);
-        sprng_read(&randomSeed[0], 64, NULL);
-        byte_vector data = bossDumpArray(UArray({UInt(packetId), UBytesFromByteVector(randomSeed)}));
-        byte_vector sign = ownPrivateKey_.sign(data, crypto::HashType::SHA512);
-        byte_vector payload = bossDumpArray(UArray({UBytesFromByteVector(data), UBytesFromByteVector(sign)}));
-        Packet packet(0, ownNodeInfo_.getNumber(), sessionReader.remoteNodeInfo.getNumber(), PacketTypes::NACK, payload);
-        sendPacket(sessionReader.remoteNodeInfo, packet.makeByteArray());
+    void UDPAdapter::sendNack(int nodeId, int packetId) {
+        if (netConfig_.find(nodeId)) {
+            const NodeInfo &dest = netConfig_.getInfo(nodeId);
+            writeLog("send nack to ", nodeId);
+            byte_vector randomSeed(64);
+            sprng_read(&randomSeed[0], 64, NULL);
+            byte_vector data = bossDumpArray(UArray({UInt(packetId), UBytesFromByteVector(randomSeed)}));
+            byte_vector sign = ownPrivateKey_.sign(data, crypto::HashType::SHA512);
+            byte_vector payload = bossDumpArray(UArray({UBytesFromByteVector(data), UBytesFromByteVector(sign)}));
+            Packet packet(0, ownNodeInfo_.getNumber(), nodeId, PacketTypes::NACK, payload);
+            sendPacket(dest, packet.makeByteArray());
+        }
     }
 
     void UDPAdapter::setReceiveCallback(const TReceiveCallback& callback) {

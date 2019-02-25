@@ -308,9 +308,78 @@ TEST_CASE("SendTripleMultiTimesAndReceive") {
             env.adapters[0]->send(1, byte_vector(payload.begin(), payload.end()));
         }
 
-        if (!mtx.try_lock_for(40s)) {
+        if (!mtx.try_lock_for(40s))
             REQUIRE(false); //timeout
-        }
         REQUIRE(int(receiveCounter1) == numSends);
     }
+}
+
+TEST_CASE("reconnect") {
+    // create pair of connected adapters
+    // ensure data are circulating between them in both directions
+    // delete one adapter (ensure the socket is closed)
+    // reopent it
+    // ensure connection is restored and data are transmitted
+    NetConfig nc;
+    PrivateKey pk0(2048);
+    PrivateKey pk1(2048);
+    NodeInfo nodeInfo0(PublicKey(pk0), 0, "node-0", "127.0.0.1", "127.0.0.1", 14000, 16000, 18000);
+    nc.addNode(nodeInfo0);
+    NodeInfo nodeInfo1(PublicKey(pk1), 1, "node-1", "127.0.0.1", "127.0.0.1", 14001, 16001, 18001);
+    nc.addNode(nodeInfo1);
+    string received0("");
+    string received1("");
+    timed_mutex mtx0;
+    timed_mutex mtx1;
+    mtx0.lock();
+    mtx1.lock();
+    auto d0 = make_shared<UDPAdapter>(pk0, 0, nc, [&](const byte_vector& packet, const NodeInfo& fromNode){
+        received0 = string(packet.begin(), packet.end());
+        mtx0.unlock();
+    }, true);
+    auto d1 = make_shared<UDPAdapter>(pk1, 1, nc, [&](const byte_vector& packet, const NodeInfo& fromNode){
+        received1 = string(packet.begin(), packet.end());
+        mtx1.unlock();
+    }, true);
+
+    string payloadA("test data set 1");
+    string payloadB("test data set 2");
+
+    d0->send(1, byte_vector(payloadA.begin(), payloadA.end()));
+    d1->send(0, byte_vector(payloadB.begin(), payloadB.end()));
+
+    if (!mtx0.try_lock_for(25s))
+        REQUIRE(false); //timeout
+    REQUIRE(payloadB == received0);
+    if (!mtx1.try_lock_for(25s))
+        REQUIRE(false); //timeout
+    REQUIRE(payloadA == received1);
+
+    cout << "close socket and reopen with new adapter" << endl;
+    d1 = nullptr;
+
+    // create new adapter with nodeInfo1 credentials
+    string received2("");
+    timed_mutex mtx2;
+    mtx2.lock();
+    auto d2 = make_shared<UDPAdapter>(pk1, 1, nc, [&](const byte_vector& packet, const NodeInfo& fromNode){
+        received2 = string(packet.begin(), packet.end());
+        mtx2.unlock();
+    }, true);
+
+//    d0->enableLog(true);
+//    d2->enableLog(true);
+
+    //reconnect becomes available  HANDSHAKE_TIMEOUT_MILLIS after previous connect, so we should sleep here
+    long sleepTime = UDPAdapter::HANDSHAKE_TIMEOUT_MILLIS;
+    this_thread::sleep_for(std::chrono::milliseconds(sleepTime));
+    long reconnectStartTime = getCurrentTimeMillis();
+    d0->send(1, byte_vector(payloadA.begin(), payloadA.end()));
+
+    if (!mtx2.try_lock_for(25s))
+        REQUIRE(false); //timeout
+    long reconnectTime = getCurrentTimeMillis() - reconnectStartTime;
+    REQUIRE(payloadA == received2);
+    cout << "reconnect time: " << reconnectTime << " ms" << endl;
+    REQUIRE(reconnectTime < 50);
 }
