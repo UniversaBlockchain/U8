@@ -12,6 +12,7 @@
 #include <atomic>
 #include <queue>
 #include <functional>
+#include <sstream>
 #include "../tools/tools.h"
 #include "NodeInfo.h"
 #include "../crypto/SymmetricKey.h"
@@ -110,14 +111,12 @@ namespace network {
         int packetId;
         int type;
         long nextRetransmitTimeMillis;
-        RetransmitItem(const Packet& newPacket, const byte_vector& newSourcePayload);
+        RetransmitItem(const Packet& newPacket, const byte_vector& newSourcePayload, int randomValue);
         RetransmitItem(const RetransmitItem&) = default;
         RetransmitItem(RetransmitItem&&) = default;
         RetransmitItem& operator=(const RetransmitItem&) = default;
         RetransmitItem& operator=(RetransmitItem &&) = default;
-        void updateNextRetransmitTime();
-    private:
-        std::minstd_rand minstdRand_;
+        void updateNextRetransmitTime(int randomValue);
     };
 
     enum class SessionState {STATE_HANDSHAKE, STATE_EXCHANGING};
@@ -141,6 +140,9 @@ namespace network {
 
     protected:
         virtual SessionState getState();
+
+    private:
+        std::minstd_rand minstdRand_;
     };
 
     /**
@@ -198,18 +200,6 @@ namespace network {
         byte_vector handshake_keyReqPart1;
         byte_vector handshake_keyReqPart2;
     };
-
-    template<typename ...Args>
-    void writeLog(bool enabled, Args && ...args) {
-        if (enabled)
-            (std::cout << ... << args) << std::endl;
-    }
-
-    template<typename ...Args>
-    void writeErr(bool enabled, Args && ...args) {
-        if (enabled)
-            (std::cerr << ... << args) << std::endl;
-    }
 
     inline
     byte_vector bossDumpArray(const UArray& arr) {

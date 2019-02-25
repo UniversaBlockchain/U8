@@ -26,7 +26,7 @@ namespace asyncio {
          */
         void addWork(function<void()> &&block) {
             try {
-                queue.put(block);
+                queue.put(std::move(block));
             } catch (const QueueClosedException &e) {
                 cerr << "AsyncLoop: execute on closed queue\n";
             }

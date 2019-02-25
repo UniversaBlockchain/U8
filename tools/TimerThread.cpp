@@ -12,6 +12,7 @@ TimerThread::TimerThread() {
             if (isStarted_ && !initialTick_ && type_ == TimerType::RATE)
                 curDelayMillis = std::max(1l, periodMillis_ - (getCurrentTimeMillis() - timeBeforePrevTick));
             if (!cv_.wait(chrono::milliseconds(curDelayMillis))) {
+                std::lock_guard guard(callbackMutex_);
                 if (isStarted_) {
                     timeBeforePrevTick = getCurrentTimeMillis();
                     if (callback_)
@@ -51,6 +52,7 @@ void TimerThread::scheduleWithFixedDelay(const std::function<void()> callback, l
 }
 
 void TimerThread::stop() {
+    std::lock_guard guard(callbackMutex_);
     isStarted_ = false;
     cv_.notifyAll();
 }

@@ -36,7 +36,7 @@ namespace network {
          * @param receiveCallback for receive incoming packets
          */
         UDPAdapter(const crypto::PrivateKey& ownPrivateKey, int ownNodeNumber, const NetConfig& netConfig,
-                   const TReceiveCallback& receiveCallback);
+                   const TReceiveCallback& receiveCallback, bool throwErrors = false);
         virtual ~UDPAdapter();
 
         /**
@@ -48,6 +48,12 @@ namespace network {
          * Switches logger on or off for this instance of UDPAdapter.
          */
         void enableLog(bool enabled) {isLogEnabled_ = enabled;}
+
+        /**
+         * Disabled by default (all udp errors goes to stderr only).
+         * Enable this in unit tests - and any udp error will be indicated by test system.
+         */
+        void throwErrors(bool enabled) {throwErrors_ = enabled;}
 
         /**
          * Change current callback for incoming packets. Useful for debug.
@@ -231,6 +237,24 @@ namespace network {
          */
         void sendNack(SessionReader& sessionReader, int packetId);
 
+        template<typename ...Args>
+        void writeLog(Args && ...args) {
+            if (isLogEnabled_) {
+                std::cout << logLabel_;
+                (std::cout << ... << args) << std::endl;
+            }
+        }
+
+        template<typename ...Args>
+        void writeErr(Args && ...args) {
+            std::stringstream buf;
+            buf << logLabel_;
+            (buf << ... << args) << std::endl;
+            std::cerr << buf.str();
+            if (throwErrors_)
+                throw std::runtime_error(std::string("UDPAdapter error: ") + buf.str());
+        }
+
     public:
         /**
          * Maximum packet size in bytes. Adapter should try to send several blocks together as long as the overall encoded
@@ -257,7 +281,7 @@ namespace network {
          * Maximum number of data blocks in the retransmit queue after which new
          * sending blocks are delayed in output queue.
          */
-        const static size_t MAX_RETRANSMIT_QUEUE_SIZE = 5000;
+        const static size_t MAX_RETRANSMIT_QUEUE_SIZE = 1500;
 
         /**
          * Maximum number of data blocks in the sending queue after which oldest
@@ -270,8 +294,16 @@ namespace network {
          */
         const static size_t HANDSHAKE_TIMEOUT_MILLIS = 10000;
 
+        /**
+         * Size of sending and receiving buffers in bytes.
+         * If it more than system max buffer size, system max buffer size will be set.
+         * Set to 0 for default buffer sizes.
+         */
+        const static size_t UDP_BUFFER_SIZE = 8*1024*1024;
+
     private:
         bool isLogEnabled_ = false;
+        bool throwErrors_ = false;
         std::string logLabel_;
         NetConfig netConfig_;
         asyncio::IOUDP socket_;

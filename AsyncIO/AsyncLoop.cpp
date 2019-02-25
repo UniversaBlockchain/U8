@@ -11,6 +11,9 @@ namespace asyncio {
         loop->data = nullptr;
 
         thread = std::thread([&]{
+            int result = 0;
+            int oldResult = 0;
+
             while (runned) {
                 bool empty = queue.empty();
                 if (!empty) {
@@ -28,10 +31,11 @@ namespace asyncio {
                     };
                 }
 
-                int result = uv_run(loop, UV_RUN_NOWAIT);
+                oldResult = result;
+                result = uv_run(loop, UV_RUN_NOWAIT);
 
-                if (!result && empty)
-                    std::this_thread::sleep_for(1ms);
+                if ((result <= oldResult) && empty)
+                    std::this_thread::sleep_for(1us);
             }
         });
     };

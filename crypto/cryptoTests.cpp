@@ -573,34 +573,47 @@ void udpAdapterHelloWorld() {
     atomic<long> counter(0);
 
     socket0.recv([&](ssize_t result, const asyncio::byte_vector& data, const char* IP, unsigned int port) {
-        if (data.size() > 0)
-            cout << "socket0 receive data, result=" << result << ", size=" << data.size() << ": " << string(data.begin(), data.end()) << endl;
     });
     socket1.recv([&](ssize_t result, const asyncio::byte_vector& data, const char* IP, unsigned int port) {
-        if (data.size() > 0) {
-//            cout << "socket1 receive data, result=" << result << ", size=" << data.size() << ": "
-//                 << string(data.begin(), data.end()) << endl;
-            checkResult("udp", body0, string(data.begin(), data.end()));
-            ++counter;
-        }
+        ++counter;
     });
 
-    for (int i = 0; i < countToSend; ++i) {
-        socket0.send(byte_vector(body0.begin(), body0.end()), "127.0.0.1", 4041, [](ssize_t result) {});
-        std::this_thread::sleep_for(100ns);
-        cout << "i: " << i << endl;
-    }
+    thread senderThread([&]() {
+        cout << "senderThread..." << endl;
+        for (int i = 0; i < countToSend; ++i) {
+            socket0.send(byte_vector(body0.begin(), body0.end()), "127.0.0.1", 4041, [](ssize_t result) {});
+            //std::this_thread::sleep_for(100us);
+            //cout << "i: " << i << endl;
+        }
+        cout << "senderThread... done!" << endl;
+    });
 
-    while (counter < countToSend) {
+    while (counter < countToSend/2) {
+        std::this_thread::sleep_for(50ms);
         cout << "counter: " << counter << endl;
-        std::this_thread::sleep_for(500ms);
     }
 
-    socket0.stopRecv();
+    cout << "stop receiver..." << endl;
+    timed_mutex mtx1;
+    mtx1.lock();
     socket1.stopRecv();
-    socket0.close([&](ssize_t result){});
-    socket1.close([&](ssize_t result){});
-    std::this_thread::sleep_for(1000ms);
+    cout << "stopRecv has called, counter=" << counter << endl;
+    socket1.close([&](ssize_t result){mtx1.unlock();});
+    if (!mtx1.try_lock_for(5s))
+        cerr << "socket1.close timeout" << endl;
+    cout << "stop receiver... done!" << endl;
+
+    senderThread.join();
+
+    cout << "stop sender..." << endl;
+    timed_mutex mtx0;
+    mtx0.lock();
+    socket0.stopRecv();
+    socket0.close([&](ssize_t result){mtx0.unlock();});
+    if (!mtx0.try_lock_for(5s))
+        cerr << "socket0.close timeout" << endl;
+    cout << "stop sender... done!" << endl;
+    cout << "counter: " << counter << endl;
 
     cout << "udpAdapterHelloWorld()... done!" << endl << endl;
 }
@@ -616,5 +629,6 @@ void testCryptoAll() {
     testKeysConcurrency();
     testGenerateNewKeys();
     testSymmetricKeys();
-    udpAdapterHelloWorld();
+    for (int i = 0; i < 10; ++i)
+        udpAdapterHelloWorld();
 }

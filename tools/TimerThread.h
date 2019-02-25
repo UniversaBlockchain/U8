@@ -49,6 +49,7 @@ private:
     std::atomic<bool> isStarted_ = false;
     std::atomic<bool> initialTick_ = true;
     std::atomic<bool> shutdown = false;
+    std::mutex callbackMutex_;
 
 };
 

@@ -55,27 +55,27 @@ namespace network {
         ,payload(newPayload) {
     }
 
-    RetransmitItem::RetransmitItem(const Packet& newPacket, const byte_vector& newSourcePayload)
+    RetransmitItem::RetransmitItem(const Packet& newPacket, const byte_vector& newSourcePayload, int randomValue)
         :packet(newPacket)
         ,retransmitCounter(0)
         ,sourcePayload(newSourcePayload)
         ,receiverNodeId(packet.getReceiverNodeId())
         ,packetId(packet.getPacketId())
-        ,type(packet.getType())
-        ,minstdRand_(std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now().time_since_epoch()).count()) {
-        updateNextRetransmitTime();
-        //TODO: move minstdRand_ to Session
+        ,type(packet.getType()) {
+        updateNextRetransmitTime(randomValue);
     }
 
-    void RetransmitItem::updateNextRetransmitTime() {
+    void RetransmitItem::updateNextRetransmitTime(int randomValue) {
         long maxRetransmitDelay = UDPAdapter::RETRANSMIT_TIME_GROW_FACTOR*retransmitCounter + UDPAdapter::RETRANSMIT_MAX_ATTEMPTS;
         maxRetransmitDelay /= UDPAdapter::RETRANSMIT_MAX_ATTEMPTS;
         maxRetransmitDelay *= UDPAdapter::RETRANSMIT_TIME;
         maxRetransmitDelay += UDPAdapter::RETRANSMIT_TIME/2;
-        nextRetransmitTimeMillis = getCurrentTimeMillis() + minstdRand_() % maxRetransmitDelay;
+        nextRetransmitTimeMillis = getCurrentTimeMillis() + randomValue % maxRetransmitDelay;
     }
 
-    Retransmitter::Retransmitter(const NodeInfo& newRemoteNodeInfo): remoteNodeInfo(newRemoteNodeInfo) {
+    Retransmitter::Retransmitter(const NodeInfo& newRemoteNodeInfo)
+        :remoteNodeInfo(newRemoteNodeInfo)
+        ,minstdRand_(std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now().time_since_epoch()).count()) {
     }
 
     void Retransmitter::removeHandshakePacketsFromRetransmitMap() {
@@ -88,7 +88,7 @@ namespace network {
     }
 
     void Retransmitter::addPacketToRetransmitMap(int packetId, const Packet& packet, const byte_vector& sourcePayload) {
-        retransmitMap.insert(make_pair(packetId, RetransmitItem(packet, sourcePayload)));
+        retransmitMap.insert(make_pair(packetId, RetransmitItem(packet, sourcePayload, minstdRand_())));
     }
 
     void Retransmitter::removePacketFromRetransmitMap(int packetId) {
@@ -100,7 +100,7 @@ namespace network {
         if (getState() == SessionState::STATE_EXCHANGING) {
             for (auto& item : retransmitMap) {
                 if (item.second.nextRetransmitTimeMillis < getCurrentTimeMillis()) {
-                    item.second.updateNextRetransmitTime();
+                    item.second.updateNextRetransmitTime(minstdRand_());
                     if (item.second.type == PacketTypes::DATA) {
                         if (item.second.packet.isEmpty()) {
                             byte_vector dataToSend = UDPAdapter::preparePayloadForSession(sessionKey, item.second.sourcePayload);
@@ -115,7 +115,7 @@ namespace network {
         } else {
             for (auto& item : retransmitMap) {
                 if (item.second.nextRetransmitTimeMillis < getCurrentTimeMillis()) {
-                    item.second.updateNextRetransmitTime();
+                    item.second.updateNextRetransmitTime(minstdRand_());
                     if (item.second.type != PacketTypes::DATA) {
                         if (!item.second.packet.isEmpty())
                             funcSendPacket(remoteNodeInfo, item.second.packet);
@@ -156,7 +156,6 @@ namespace network {
     }
 
     void Session::sendAllFromOutputQueue(std::function<void(const NodeInfo&, const byte_vector&)> funcSend) {
-        //writeLog(isLogEnabled, "sendAllFromOutputQueue");
         if (state != SessionState::STATE_HANDSHAKE) {
             int maxOutputs = UDPAdapter::MAX_RETRANSMIT_QUEUE_SIZE - retransmitMap.size();
             int i = 0;

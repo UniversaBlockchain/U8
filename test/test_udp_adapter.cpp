@@ -36,15 +36,13 @@ public:
             nc.addNode(nodeInfo);
         }
         for (int i = 0; i < count; ++i) {
-            auto udpAdapter = make_shared<UDPAdapter>(privKeys[i], i, nc, [&](const byte_vector& packet){});
+            auto udpAdapter = make_shared<UDPAdapter>(privKeys[i], i, nc, [&](const byte_vector& packet){}, true);
             adapters.push_back(udpAdapter);
         }
     }
 };
 
 TEST_CASE("HelloUdp") {
-    cout << "HelloUdp()..." << endl;
-
     string body0("packet from node-0");
     string body1("some data from node-1");
     string body2("data from node-2");
@@ -65,20 +63,20 @@ TEST_CASE("HelloUdp") {
     network::UDPAdapter udpAdapter0(node0key, 0, netConfig, [&counter0](const byte_vector& packet){
         //cout << "node-0 receive data, size=" << packet.size() << ": " << string(packet.begin(), packet.end()) << endl;
         ++counter0;
-    });
+    }, true);
     network::UDPAdapter udpAdapter1(node1key, 1, netConfig, [&](const byte_vector& packet){
         REQUIRE(packet.size() == 18);
         REQUIRE(string(packet.begin(), packet.end()) == body0);
-    });
+    }, true);
     network::UDPAdapter udpAdapter2(node2key, 2, netConfig, [&](const byte_vector& packet){
         REQUIRE(packet.size() == 21);
         REQUIRE(string(packet.begin(), packet.end()) == body1);
-    });
+    }, true);
     //udpAdapter0.enableLog(true);
     //udpAdapter1.enableLog(true);
     //udpAdapter2.enableLog(true);
 
-    long sendTo0count = 400;
+    const long sendTo0count = 400;
 
     udpAdapter0.send(1, byte_vector(body0.begin(), body0.end()));
     udpAdapter1.send(2, byte_vector(body1.begin(), body1.end()));
@@ -94,44 +92,38 @@ TEST_CASE("HelloUdp") {
 }
 
 TEST_CASE("SendAndReceive") {
-    return;
-    cout << "SendAndReceive()..." << endl;
     AdaptersList env(3);
     string body0("test data set 1");
     string receivedString("");
-    ConditionVar cv;
+    timed_mutex mtx;
+    mtx.lock();
     env.adapters[1]->setReceiveCallback([&](const byte_vector& packet){
         receivedString = string(packet.begin(), packet.end());
-        cv.notifyAll();
+        mtx.unlock();
     });
-    std::thread senderThread([&]() {
-        this_thread::sleep_for(50ms);
-        env.adapters[0]->send(1, byte_vector(body0.begin(), body0.end()));
-    });
-    if (!cv.wait(1s))
+    env.adapters[0]->send(1, byte_vector(body0.begin(), body0.end()));
+    if (!mtx.try_lock_for(15s))
         REQUIRE(false); //timeout
     REQUIRE(body0 == receivedString);
-    senderThread.join();
 }
 
 TEST_CASE("SendTripleAndReceive") {
-    return;
-    cout << "SendTripleAndReceive()..." << endl;
     AdaptersList env(3);
     string body0("test data set 1");
     string body1("test data set 2222");
     string body2("test data set 333333333333333");
     set<string> receivedStrings;
-    ConditionVar cv;
+    timed_mutex mtx;
+    mtx.lock();
     env.adapters[1]->setReceiveCallback([&](const byte_vector& packet){
         receivedStrings.insert(string(packet.begin(), packet.end()));
         if (receivedStrings.size() >= 3)
-            cv.notifyAll();
+            mtx.unlock();
     });
     env.adapters[0]->send(1, byte_vector(body0.begin(), body0.end()));
     env.adapters[0]->send(1, byte_vector(body1.begin(), body1.end()));
     env.adapters[0]->send(1, byte_vector(body2.begin(), body2.end()));
-    if (!cv.wait(5s))
+    if (!mtx.try_lock_for(15s))
         REQUIRE(false); //timeout
     REQUIRE(receivedStrings.find(body0) != receivedStrings.end());
     REQUIRE(receivedStrings.find(body1) != receivedStrings.end());
@@ -139,8 +131,6 @@ TEST_CASE("SendTripleAndReceive") {
 }
 
 TEST_CASE("SendEachOtherAndReceive") {
-    return;
-    cout << "SendEachOtherAndReceive()..." << endl;
     std::minstd_rand  minstdRand(std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now().time_since_epoch()).count());
     AdaptersList env(5);
     vector<string> payloadsList({"test data set 1", "test data set 2", "test data set 3"});
@@ -149,20 +139,21 @@ TEST_CASE("SendEachOtherAndReceive") {
     const int numSends = 100;
 
     atomic<long> receiveCounter(0);
-    ConditionVar cv;
+    timed_mutex mtx;
+    mtx.lock();
 
     for (int i = 0; i < 5; ++i) {
         env.adapters[i]->setReceiveCallback([&](const byte_vector &packet) {
             ++receiveCounter;
             if (receiveCounter >= attempts * numSends)
-                cv.notifyAll();
+                mtx.unlock();
         });
     }
 
     std::thread senderThread([&]() {
-        this_thread::sleep_for(50ms);
         for (int i = 0; i < attempts; ++i) {
-            cout << "send part: " << i << endl;
+            if (i % 100 == 0)
+                cout << "send part: " << i << "..." << i+99 << endl;
             for (int j = 0; j < numSends; ++j) {
                 int rnd1 = minstdRand() % 3;
                 int rnd2 = 0;
@@ -175,11 +166,11 @@ TEST_CASE("SendEachOtherAndReceive") {
                 const auto &sender = env.adapters[rnd2];
                 sender->send(rnd3, byte_vector(payload.begin(), payload.end()));
             }
-            this_thread::sleep_for(std::chrono::milliseconds(minstdRand() % 20));
+            this_thread::sleep_for(std::chrono::milliseconds(minstdRand() % 10));
         }
     });
 
-    if (!cv.wait(40s)) {
+    if (!mtx.try_lock_for(40s)) {
         cout << "receiveCounter: " << receiveCounter << endl;
         REQUIRE(false); //timeout
     }

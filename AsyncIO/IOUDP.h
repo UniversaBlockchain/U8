@@ -65,7 +65,6 @@ namespace asyncio {
 
     struct readUDP_data {
         read_cb callback;
-        std::shared_ptr<byte_vector> data;
         size_t maxBytesToRead;
         IOUDP* handle;
         std::string IP;
