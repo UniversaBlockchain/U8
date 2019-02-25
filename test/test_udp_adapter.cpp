@@ -314,7 +314,7 @@ TEST_CASE("SendTripleMultiTimesAndReceive") {
     }
 }
 
-TEST_CASE("reconnect") {
+TEST_CASE("Reconnect") {
     // create pair of connected adapters
     // ensure data are circulating between them in both directions
     // delete one adapter (ensure the socket is closed)
@@ -382,4 +382,50 @@ TEST_CASE("reconnect") {
     REQUIRE(payloadA == received2);
     cout << "reconnect time: " << reconnectTime << " ms" << endl;
     REQUIRE(reconnectTime < 50);
+}
+
+TEST_CASE("LostPackets") {
+    AdaptersList env(2);
+
+    env.adapters[0]->setTestMode(true);
+    env.adapters[1]->setTestMode(true);
+
+    string payloadA("test data set 1");
+    string payloadB("test data set 2");
+
+    const long countToSend = 10;
+
+    atomic<long> receiveCounter0(0);
+    atomic<long> receiveCounter1(0);
+
+    timed_mutex mtx0;
+    timed_mutex mtx1;
+    mtx0.lock();
+    mtx1.lock();
+
+    env.adapters[0]->setReceiveCallback([&](const byte_vector& packet, const NodeInfo& fromNode){
+        REQUIRE(string(packet.begin(), packet.end()) == payloadB);
+        ++receiveCounter0;
+        if (receiveCounter0 >= countToSend)
+            mtx0.unlock();
+    });
+    env.adapters[1]->setReceiveCallback([&](const byte_vector& packet, const NodeInfo& fromNode){
+        REQUIRE(string(packet.begin(), packet.end()) == payloadA);
+        ++receiveCounter1;
+        if (receiveCounter1 >= countToSend)
+            mtx1.unlock();
+    });
+
+    for (int i = 0; i < countToSend; ++i) {
+        env.adapters[0]->send(1, byte_vector(payloadA.begin(), payloadA.end()));
+        env.adapters[1]->send(0, byte_vector(payloadB.begin(), payloadB.end()));
+    }
+
+    if (!mtx0.try_lock_for(40s))
+        REQUIRE(false); //timeout
+    REQUIRE(long(receiveCounter0) == countToSend);
+    if (!mtx1.try_lock_for(40s))
+        REQUIRE(false); //timeout
+    REQUIRE(long(receiveCounter1) == countToSend);
+
 }

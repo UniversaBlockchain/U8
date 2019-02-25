@@ -17,15 +17,14 @@ namespace network {
 
     UDPAdapter::UDPAdapter(const crypto::PrivateKey& ownPrivateKey, int ownNodeNumber, const NetConfig& netConfig,
                            const TReceiveCallback& receiveCallback, bool throwErrors)
-       :netConfig_(netConfig)
+       :minstdRand_(std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now().time_since_epoch()).count())
+       ,netConfig_(netConfig)
        ,ownNodeInfo_(netConfig.getInfo(ownNodeNumber))
        ,ownPrivateKey_(ownPrivateKey)
        ,throwErrors_(throwErrors) {
         logLabel_ = std::string("UDP") + std::to_string(ownNodeNumber) + std::string(": ");
 
-        unsigned int seed = std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now().time_since_epoch()).count();
-        std::minstd_rand minstdRand(static_cast<int>(seed));
-        nextPacketId_ = minstdRand();
+        nextPacketId_ = minstdRand_();
 
         receiveCallback_ = receiveCallback;
         socket_.open(ownNodeInfo_.getNodeAddress().host.c_str(), ownNodeInfo_.getNodeAddress().port, UDP_BUFFER_SIZE);
@@ -37,7 +36,7 @@ namespace network {
         long dupleProtectionPeriod = 2 * RETRANSMIT_TIME_GROW_FACTOR * RETRANSMIT_TIME * RETRANSMIT_MAX_ATTEMPTS;
         long protectionFromDuple_prevTime = getCurrentTimeMillis();
         timer_.scheduleAtFixedRate([this, protectionFromDuple_prevTime, dupleProtectionPeriod]()mutable{
-            std::unique_lock lock(socketMutex);
+            std::unique_lock lock(socketMutex_);
             restartHandshakeIfNeeded();
             pulseRetransmit();
             if (getCurrentTimeMillis() - protectionFromDuple_prevTime >= dupleProtectionPeriod) {
@@ -60,7 +59,7 @@ namespace network {
     }
 
     void UDPAdapter::send(int destNodeNumber, const byte_vector& payload) {
-        std::unique_lock lock(socketMutex);
+        std::unique_lock lock(socketMutex_);
 
         auto dest = netConfig_.getInfo(destNodeNumber);
         Session& session = getOrCreateSession(dest);
@@ -75,7 +74,7 @@ namespace network {
     }
 
     void UDPAdapter::onReceive(const byte_vector& data) {
-        std::unique_lock lock(socketMutex);
+        std::unique_lock lock(socketMutex_);
         try {
             Packet packet(data);
             switch (packet.getType()) {
@@ -294,7 +293,7 @@ namespace network {
         crc32_update(&ctx, &payload[0], payload.size()-4);
         crc32_finish(&ctx, &calculated_crc32[0], 4);
 
-        if (sessionReaders.find(packet.getSenderNodeId()) == sessionReaders.end()) {
+        if (sessionReaders_.find(packet.getSenderNodeId()) == sessionReaders_.end()) {
             sendNack(packet.getSenderNodeId(), packet.getPacketId());
         } else {
             SessionReader &sessionReader = getSessionReader(packet.getSenderNodeId());
@@ -387,7 +386,10 @@ namespace network {
     void UDPAdapter::sendPacket(const NodeInfo& dest, const byte_vector& data) {
         if (data.size() > MAX_PACKET_SIZE)
             writeErr(std::string("datagram size too long, MAX_PACKET_SIZE is ") + std::to_string(MAX_PACKET_SIZE));
-        socket_.send(data, dest.getNodeAddress().host.c_str(), dest.getNodeAddress().port, [&](ssize_t result){});
+        if (testMode_ && (minstdRand_() % 1000 < 500))
+            writeLog("test mode, skip socket_.send");
+        else
+            socket_.send(data, dest.getNodeAddress().host.c_str(), dest.getNodeAddress().port, [&](ssize_t result){});
     }
 
     int UDPAdapter::getNextPacketId() {
@@ -401,7 +403,7 @@ namespace network {
 
     void UDPAdapter::restartHandshakeIfNeeded() {
         long now = getCurrentTimeMillis();
-        for (auto& it : sessionsByRemoteId)
+        for (auto& it : sessionsByRemoteId_)
             restartHandshakeIfNeeded(it.second, now);
     }
 
@@ -416,62 +418,62 @@ namespace network {
     }
 
     void UDPAdapter::pulseRetransmit() {
-        for (auto& s : sessionsByRemoteId)
+        for (auto& s : sessionsByRemoteId_)
             s.second.pulseRetransmit([this](const NodeInfo& dest, const Packet& packet){
                 sendPacket(dest, packet.makeByteArray());
             });
-        for (auto& s : sessionReaders)
+        for (auto& s : sessionReaders_)
             s.second.pulseRetransmit([this](const NodeInfo& dest, const Packet& packet){
                 sendPacket(dest, packet.makeByteArray());
             });
-        for (auto& s : sessionReaderCandidates)
+        for (auto& s : sessionReaderCandidates_)
             s.second.pulseRetransmit([this](const NodeInfo& dest, const Packet& packet){
                 sendPacket(dest, packet.makeByteArray());
             });
-        for (auto& s : sessionsByRemoteId)
+        for (auto& s : sessionsByRemoteId_)
             s.second.sendAllFromOutputQueue([this](const NodeInfo& dest, const byte_vector& data){
                 send(dest.getNumber(), data);
             });
     }
 
     void UDPAdapter::clearProtectionFromDupleBuffers() {
-        for (auto& s : sessionReaders)
+        for (auto& s : sessionReaders_)
             s.second.clearOldestBuffer();
-        for (auto& s : sessionReaderCandidates)
+        for (auto& s : sessionReaderCandidates_)
             s.second.clearOldestBuffer();
-        for (auto& s : sessionsByRemoteId)
+        for (auto& s : sessionsByRemoteId_)
             s.second.clearOldestBuffer();
     }
 
     Session& UDPAdapter::getOrCreateSession(const NodeInfo& destination) {
-        auto iter = sessionsByRemoteId.find(destination.getNumber());
-        if (iter == sessionsByRemoteId.end()) {
+        auto iter = sessionsByRemoteId_.find(destination.getNumber());
+        if (iter == sessionsByRemoteId_.end()) {
             Session session(destination);
-            iter = sessionsByRemoteId.insert(std::make_pair(destination.getNumber(), session)).first;
+            iter = sessionsByRemoteId_.insert(std::make_pair(destination.getNumber(), session)).first;
         }
         return iter->second;
     }
 
     SessionReader& UDPAdapter::getOrCreateSessionReaderCandidate(int remoteId) {
         const NodeInfo& destination = netConfig_.getInfo(remoteId);
-        auto iter = sessionReaderCandidates.find(destination.getNumber());
-        if (iter == sessionReaderCandidates.end()) {
+        auto iter = sessionReaderCandidates_.find(destination.getNumber());
+        if (iter == sessionReaderCandidates_.end()) {
             SessionReader sessionReader(destination);
-            iter = sessionReaderCandidates.insert(std::make_pair(destination.getNumber(), sessionReader)).first;
+            iter = sessionReaderCandidates_.insert(std::make_pair(destination.getNumber(), sessionReader)).first;
         }
         return iter->second;
     }
 
     SessionReader& UDPAdapter::getSessionReader(int remoteId) {
-        auto iter = sessionReaders.find(remoteId);
-        if (iter == sessionReaders.end())
+        auto iter = sessionReaders_.find(remoteId);
+        if (iter == sessionReaders_.end())
             throw std::runtime_error("getSessionReader: SessionReader not found");
         return iter->second;
     }
 
     void UDPAdapter::acceptSessionReaderCandidate(SessionReader& sessionReader) {
-        sessionReaders.insert(std::make_pair(sessionReader.remoteNodeInfo.getNumber(), sessionReader));
-        sessionReaderCandidates.erase(sessionReader.remoteNodeInfo.getNumber());
+        sessionReaders_.insert(std::make_pair(sessionReader.remoteNodeInfo.getNumber(), sessionReader));
+        sessionReaderCandidates_.erase(sessionReader.remoteNodeInfo.getNumber());
     }
 
     void UDPAdapter::sendHello(Session& session) {
@@ -576,7 +578,7 @@ namespace network {
     }
 
     void UDPAdapter::setReceiveCallback(const TReceiveCallback& callback) {
-        std::unique_lock lock(socketMutex);
+        std::unique_lock lock(socketMutex_);
         receiveCallback_ = callback;
     }
 

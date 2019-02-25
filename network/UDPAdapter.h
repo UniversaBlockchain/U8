@@ -60,6 +60,11 @@ namespace network {
          */
         void setReceiveCallback(const TReceiveCallback& callback);
 
+        /**
+         * Test mode emulates lost packets, for debug.
+         */
+        void setTestMode(bool enabled) {testMode_ = enabled;}
+
     private:
         /**
          * Main listener for incoming udp packets.
@@ -302,6 +307,7 @@ namespace network {
         const static size_t UDP_BUFFER_SIZE = 8*1024*1024;
 
     private:
+        std::minstd_rand minstdRand_;
         bool isLogEnabled_ = false;
         bool throwErrors_ = false;
         std::string logLabel_;
@@ -312,10 +318,12 @@ namespace network {
         TReceiveCallback receiveCallback_;
         int nextPacketId_;
         TimerThread timer_;
-        std::unordered_map<int, Session> sessionsByRemoteId;
-        std::unordered_map<int, SessionReader> sessionReaders;
-        std::unordered_map<int, SessionReader> sessionReaderCandidates;
-        std::recursive_mutex socketMutex;
+        std::unordered_map<int, Session> sessionsByRemoteId_;
+        std::unordered_map<int, SessionReader> sessionReaders_;
+        std::unordered_map<int, SessionReader> sessionReaderCandidates_;
+        std::recursive_mutex socketMutex_;
+        bool testMode_ = false;
+
         friend class Retransmitter;
     };
 

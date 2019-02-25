@@ -184,9 +184,7 @@ namespace network {
             state = SessionState::STATE_HANDSHAKE;
             lastHandshakeRestartTime = now;
         } else {
-            //TODO: debug, remove this printf
-            printf("(startHandshake) too short time after previous startHandshake\n");
-            printf("%li\n", lastHandshakeRestartTime + UDPAdapter::HANDSHAKE_TIMEOUT_MILLIS - now);
+            //checkpoint for debug output, do nothing
         }
     }
 
