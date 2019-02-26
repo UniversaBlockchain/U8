@@ -1215,6 +1215,20 @@ Contract.prototype.getReferencedItems = function() {
     return referencedItems;
 };
 
+/**
+ * Add constraint to the constraints list of the contract
+ * @param {Constraint} constr - constraint to add
+ */
+Contract.prototype.addConstraint = function(constr) {
+
+//todo !!
+
+};
+
+/**
+ * Remove constraint to the constraints list of the contract
+ * @param removed constraint to remove
+ */
 Contract.prototype.removeReferencedItem = function(removed) {
 
     for (let constr of this.constraints)
