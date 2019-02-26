@@ -1,6 +1,7 @@
 import {expect, unit, assert} from 'test'
 
 import * as cnt from 'contract'
+import * as tp from 'transactionpack'
 import * as dbm from 'defaultbimapper'
 import * as bbm from 'bossbimapper'
 import * as constr from 'constraint'
@@ -33,6 +34,45 @@ unit.test("constraint copy test", () => {
     assert(d.Delta.between(null,ds1,ds2) == null);
 });
 
+unit.test("constraint test: simple check", async () => {
+
+    let contractBase = cnt.Contract.fromPrivateKey(await crypto.PrivateKey.generate(2048));
+
+    contractBase.state.data["str_val"] = "~~~ simple string! ===";
+
+    let contractRef = cnt.Contract.fromPrivateKey(await crypto.PrivateKey.generate(2048));
+
+    contractRef.state.data["ref_str_val"] = "12345 another_string +++";
+
+    let c = new constr.Constraint(contractBase);
+    c.type = constr.Constraint.TYPE_EXISTING_STATE;
+    let conditions = {};
+    conditions[constr.Constraint.conditionsModeType.all_of] = [
+        "this.state.data.str_val == \"~~~ simple string! ===\"",
+        "ref.state.data.ref_str_val == \"12345 another_string +++\""
+    ];
+    c.setConditions(conditions);
+
+    contractBase.addConstraint(c);
+
+    await contractBase.seal();
+    contractBase.transactionPack = new tp.TransactionPack(contractBase);
+
+    let res = await contractBase.check();
+    assert(!res);
+
+    //clear errors
+    contractBase.errors = [];
+
+    //add referenced contract
+    contractBase.newItems.add(contractRef);
+    await contractBase.seal();
+    contractBase.transactionPack = new tp.TransactionPack(contractBase);
+
+    res = await contractBase.check();
+    assert(res);
+});
+
 unit.test("constraint test: refLessOrEquals", async () => {
 
     let privateKey = await crypto.PrivateKey.generate(2048);
@@ -42,21 +82,23 @@ unit.test("constraint test: refLessOrEquals", async () => {
 
     let contractB = cnt.Contract.fromPrivateKey(await crypto.PrivateKey.generate(2048));
 
-    let constr = new constr.Constraint(null);
-    constr.type = Constraint.TYPE_EXISTING_STATE;
+    let c = new constr.Constraint(null);
+    c.type = constr.Constraint.TYPE_EXISTING_STATE;
     let conditions = {};
-    conditions[constr.Constraint.conditionsModeType.all_of] = ["ref.state.data.val<10"];
-    constr.setConditions(conditions);
+    conditions[constr.Constraint.conditionsModeType.all_of] = ["ref.state.data.val<=10"];
+    c.setConditions(conditions);
 
-    contractB.addConstraint(constr);
+    contractB.addConstraint(c);
 
     let batch = cnt.Contract.fromPrivateKey(await crypto.PrivateKey.generate(2048));
 
     batch.newItems.add(contractA);
     batch.newItems.add(contractB);
-    batch.seal();
-    let res = batch.check();
+    await batch.seal();
+    batch.transactionPack = new tp.TransactionPack(batch);
 
+    let res = await batch.check();
+    assert(!res);
 });
 
 unit.test("constraint test: refMissingField", async () => {
@@ -68,24 +110,26 @@ unit.test("constraint test: refMissingField", async () => {
 
     let contractB = cnt.Contract.fromPrivateKey(await crypto.PrivateKey.generate(2048));
 
-    let constr = new constr.Constraint(null);
-    constr.type = Constraint.TYPE_EXISTING_STATE;
+    let c = new constr.Constraint(null);
+    c.type = constr.Constraint.TYPE_EXISTING_STATE;
     let conditions = {};
     conditions[constr.Constraint.conditionsModeType.all_of] = ["ref.state.data.val>-100"];
-    constr.setConditions(conditions);
+    c.setConditions(conditions);
 
-    contractB.addConstraint(constr);
+    contractB.addConstraint(c);
 
     let batch = cnt.Contract.fromPrivateKey(await crypto.PrivateKey.generate(2048));
 
     batch.newItems.add(contractA);
     batch.newItems.add(contractB);
-    batch.seal();
-    let res = batch.check();
+    await batch.seal();
+    batch.transactionPack = new tp.TransactionPack(batch);
 
+    let res = await batch.check();
+    assert(!res);
 });
 
-unit.test("constraint test: refMissingFieldConstantForEquals", async () => {
+/*unit.test("constraint test: refMissingFieldConstantForEquals", async () => {
 
     let privateKey = await crypto.PrivateKey.generate(2048);
     let contractA = cnt.Contract.fromPrivateKey(privateKey);
@@ -109,9 +153,11 @@ unit.test("constraint test: refMissingFieldConstantForEquals", async () => {
 
     batch.newItems.add(contractA);
     batch.newItems.add(contractB);
-    batch.seal();
-    let res = batch.check();
+    await batch.seal();
+    batch.transactionPack = new tp.TransactionPack(batch);
 
+    let res = await batch.check();
+    assert(!res);
 });
 
 unit.test("constraint test: refMissingFieldHashIdForEquals", async () => {
@@ -134,9 +180,11 @@ unit.test("constraint test: refMissingFieldHashIdForEquals", async () => {
 
     batch.newItems.add(contractA);
     batch.newItems.add(contractB);
-    batch.seal();
-    let res = batch.check();
+    await batch.seal();
+    batch.transactionPack = new tp.TransactionPack(batch);
 
+    let res = await batch.check();
+    assert(!res);
 });
 
 unit.test("constraint test: refMissingFieldRoleForEquals", async () => {
@@ -158,9 +206,11 @@ unit.test("constraint test: refMissingFieldRoleForEquals", async () => {
     let batch = cnt.Contract.fromPrivateKey(await crypto.PrivateKey.generate(2048));
     batch.newItems.add(contractA);
     batch.newItems.add(contractB);
-    batch.seal();
-    let res = batch.check();
+    await batch.seal();
+    batch.transactionPack = new tp.TransactionPack(batch);
 
+    let res = await batch.check();
+    assert(!res);
 });
 
 unit.test("constraint test: refMissingFieldDateTimeForEquals", async () => {
@@ -182,14 +232,16 @@ unit.test("constraint test: refMissingFieldDateTimeForEquals", async () => {
     let batch = cnt.Contract.fromPrivateKey(await crypto.PrivateKey.generate(2048));
     batch.newItems.add(contractA);
     batch.newItems.add(contractB);
-    batch.seal();
-    let res = batch.check();
+    await batch.seal();
+    batch.transactionPack = new tp.TransactionPack(batch);
 
-});
+    let res = await batch.check();
+    assert(!res);
+});*/
 
-unit.test("constraint test: checkReferences", async () => {
+/*unit.test("constraint test: checkReferences", async () => {
 
-   /* Contract contract1 = Contract.fromDslFile(ROOT_PATH + "references/ReferencedConditions_contract1.yml");
+    Contract contract1 = Contract.fromDslFile(ROOT_PATH + "references/ReferencedConditions_contract1.yml");
     Contract contract2 = Contract.fromDslFile(ROOT_PATH + "references/ReferencedConditions_contract2.yml");
 
     PrivateKey key = new PrivateKey(Do.read("./src/test_contracts/" + "_xer0yfe2nn1xthc.private.unikey"));
@@ -281,14 +333,13 @@ unit.test("constraint test: checkReferences", async () => {
     assertTrue(refContract.getReferences().get("ref_parent").matchingItems.contains(contract3));
     System.out.println("Check can_play conditions");
     assertTrue(refContract.getReferences().get("ref_can_play").matchingItems.contains(contract2));
-    */
 });
 
 unit.test("constraint test: checkReferencesContracts", async () => {
 
-    /* Contract contract1 = Contract.fromDslFile(ROOT_PATH + "Referenced_contract1.yml");
-    Contract contract2 = Contract.fromDslFile(ROOT_PATH + "Referenced_contract2.yml");
-    Contract contract3 = Contract.fromDslFile(ROOT_PATH + "Referenced_contract3.yml");
+    let contract1 = Contract.fromDslFile(ROOT_PATH + "Referenced_contract1.yml");
+    let contract2 = Contract.fromDslFile(ROOT_PATH + "Referenced_contract2.yml");
+    let contract3 = Contract.fromDslFile(ROOT_PATH + "Referenced_contract3.yml");
     contract1.seal();
     contract2.seal();
     contract3.seal();
@@ -327,5 +378,5 @@ unit.test("constraint test: checkReferencesContracts", async () => {
     assertTrue(refContract2.getReferences().get("ref_cont4").matchingItems.contains(contract1));
     assertFalse(refContract2.getReferences().get("ref_cont4").matchingItems.contains(contract2));
     assertTrue(refContract2.getReferences().get("ref_cont4").matchingItems.contains(refContract2));
-    */
-});
+
+});*/

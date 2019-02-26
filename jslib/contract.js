@@ -9,6 +9,7 @@ const QuantiserProcesses = q.QuantiserProcesses;
 const QuantiserException = q.QuantiserException;
 const Boss = require('boss.js');
 const roles = require('roles');
+const constr = require('constraint');
 const permissions = require('permissions');
 const e = require("errors");
 const Errors = e.Errors;
@@ -62,6 +63,10 @@ Transactional.prototype.deserialize = function(data,deserializer) {
 
         this.data = data.data;
     }
+};
+
+Transactional.prototype.addConstraint = function(c) {
+    this.constraints.push(c);
 };
 
 
@@ -123,12 +128,12 @@ State.prototype.getBranchRevision = function() {
         return 0;
     else
         return parseInt(this.branchId.split(":")[0])
-}
+};
 
 
 State.prototype.setBranchNumber = function (number) {
     this.branchId = this.revision + ":" + number;
-}
+};
 
 
 State.prototype.serialize = function(serializer) {
@@ -203,7 +208,9 @@ State.prototype.deserialize = function(data,deserializer) {
         this.origin = null;
 };
 
-
+State.prototype.addConstraint = function(c) {
+    this.constraints.push(c);
+};
 
 
 function Definition(contract) {
@@ -349,6 +356,10 @@ Definition.prototype.addPermission = function (permission) {
     }
     permission.role.contract = this.contract;
     this.permissions.get(permission.name).push(permission);
+};
+
+Definition.prototype.addConstraint = function(c) {
+    this.constraints.push(c);
 };
 
 
@@ -1219,10 +1230,17 @@ Contract.prototype.getReferencedItems = function() {
  * Add constraint to the constraints list of the contract
  * @param {Constraint} constr - constraint to add
  */
-Contract.prototype.addConstraint = function(constr) {
+Contract.prototype.addConstraint = function(c) {
 
-//todo !!
+    if (c.type === constr.Constraint.TYPE_TRANSACTIONAL) {
+        if (this.transactional != null)
+            this.transactional.addConstraint(c);
+    } else if (c.type === constr.Constraint.TYPE_EXISTING_DEFINITION)
+        this.definition.addConstraint(c);
+    else if(c.type === constr.Constraint.TYPE_EXISTING_STATE)
+        this.state.addConstraint(c);
 
+    this.constraints.set(c.name, c);
 };
 
 /**
@@ -1251,6 +1269,7 @@ Contract.prototype.removeReferencedItem = function(removed) {
 };
 
 Contract.prototype.checkConstraints = function(contractsTree, roleConstraintsOnly) {
+
     if (typeof roleConstraintsOnly === "undefined")
         roleConstraintsOnly = false;
 
@@ -1266,8 +1285,9 @@ Contract.prototype.checkConstraints = function(contractsTree, roleConstraintsOnl
     for (let c of this.constraints.values()) {
 
         let roleConstraint = false;
-        for (let role of this.roles)
-            if (role.containConstraint(c.name)) {
+        for (let roleName in this.roles)
+            if (this.roles.hasOwnProperty(roleName) && this.roles[roleName] instanceof roles.Role &&
+                this.roles[roleName].containConstraint(c.name)) {
                 roleConstraint = true;
                 break;
             }
@@ -1289,7 +1309,7 @@ Contract.prototype.checkConstraints = function(contractsTree, roleConstraintsOnl
 
         // use all neighbourContracts to check constraint. at least one must be ok
         let c_check = false;
-        if (c.type === Constraint.TYPE_TRANSACTIONAL) {
+        if (c.type === constr.Constraint.TYPE_TRANSACTIONAL) {
             for (let neighbour of neighbours)
                 if ((((c.transactional_id != null && neighbour.transactional != null && c.transactional_id.equals(neighbour.transactional.id)) ||
                     (c.contract_id != null && c.contract_id.equals(neighbour.id))) && this.checkOneConstraint(c, neighbour)) ||
@@ -1300,7 +1320,7 @@ Contract.prototype.checkConstraints = function(contractsTree, roleConstraintsOnl
                         break;
                     }
 
-        } else if ((c.type === Constraint.TYPE_EXISTING_DEFINITION) || (c.type === Constraint.TYPE_EXISTING_STATE)) {
+        } else if ((c.type === constr.Constraint.TYPE_EXISTING_DEFINITION) || (c.type === constr.Constraint.TYPE_EXISTING_STATE)) {
             for (let neighbour of neighbours)
                 if (c.isMatchingWith(neighbour, neighbours))
                     c.addMatchingItem(neighbour);
@@ -1311,7 +1331,7 @@ Contract.prototype.checkConstraints = function(contractsTree, roleConstraintsOnl
         if (!c_check) {
             if (!roleConstraint) {
                 allRefs_check = false;
-                this.errors.push(new ErrorRecord(Errors.FAILED_CHECK, "contract (hashId=" + this.id.base64() + ")", "checkConstraints return false"));
+                this.errors.push(new ErrorRecord(Errors.FAILED_CHECK, "contract (hashId=" + this.id.base64.substring(0, 8) + "…)", "checkConstraints return false"));
             }
         } else {
             if(roleConstraint)
@@ -1325,21 +1345,21 @@ Contract.prototype.checkConstraints = function(contractsTree, roleConstraintsOnl
 Contract.prototype.checkOneConstraint = function(c, refContract) {
     let res = true;
 
-    if (c.type === Constraint.TYPE_TRANSACTIONAL) {
+    if (c.type === constr.Constraint.TYPE_TRANSACTIONAL) {
         if ((c.transactional_id == null) ||
             (refContract.transactional == null) ||
             (refContract.transactional.id == null) ||
             (c.transactional_id === "") ||
             (refContract.transactional.id === "")) {
             res = false;
-            this.errors.push(new ErrorRecord(Errors.BAD_REF, "contract (hashId=" + this.id.base64() + ")", "transactional is missing"));
+            this.errors.push(new ErrorRecord(Errors.BAD_REF, "contract (hashId=" + this.id.base64.substring(0, 8) + "…)", "transactional is missing"));
         } else {
             if (c.transactional_id != null && refContract.transactional == null) {
                 res = false;
-                this.errors.push(new ErrorRecord(Errors.BAD_REF, "contract (hashId=" + this.id.base64() + ")", "transactional not found"));
+                this.errors.push(new ErrorRecord(Errors.BAD_REF, "contract (hashId=" + this.id.base64.substring(0, 8) + "…)", "transactional not found"));
             } else if (c.transactional_id !== refContract.transactional.id) {
                 res = false;
-                this.errors.push(new ErrorRecord(Errors.BAD_REF, "contract (hashId=" + this.id.base64() + ")", "transactional_id mismatch"));
+                this.errors.push(new ErrorRecord(Errors.BAD_REF, "contract (hashId=" + this.id.base64.substring(0, 8) + "…)", "transactional_id mismatch"));
             }
         }
     }
@@ -1347,21 +1367,21 @@ Contract.prototype.checkOneConstraint = function(c, refContract) {
     if (c.contract_id != null) {
         if (!c.contract_id.equals(refContract.id)) {
             res = false;
-            this.errors.push(new ErrorRecord(Errors.BAD_REF, "contract (hashId=" + this.id.base64() + ")", "contract_id mismatch"));
+            this.errors.push(new ErrorRecord(Errors.BAD_REF, "contract (hashId=" + this.id.base64.substring(0, 8) + "…)", "contract_id mismatch"));
         }
     }
 
     if (c.origin != null) {
         if (!c.origin.equals(refContract.getOrigin())) {
             res = false;
-            this.errors.push(new ErrorRecord(Errors.BAD_REF, "contract (hashId=" + this.id.base64() + ")", "origin mismatch"));
+            this.errors.push(new ErrorRecord(Errors.BAD_REF, "contract (hashId=" + this.id.base64.substring(0, 8) + "…)", "origin mismatch"));
         }
     }
 
     for (let refRole of c.signed_by) {
         if (!refContract.isSignedBy(refRole)) {
             res = false;
-            this.errors.push(new ErrorRecord(Errors.BAD_SIGNATURE, "contract (hashId=" + this.id.base64() + ")", "fingerprint mismatch"));
+            this.errors.push(new ErrorRecord(Errors.BAD_SIGNATURE, "contract (hashId=" + this.id.base64.substring(0, 8) + "…)", "fingerprint mismatch"));
         }
     }
 

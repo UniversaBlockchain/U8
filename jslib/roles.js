@@ -73,10 +73,7 @@ Role.prototype.equalsIgnoreName = function(to) {
 };
 
 Role.prototype.containConstraint = function(name) {
-    if (this.requiredAllConstraints.has(name) || this.requiredAnyConstraints.has(name))
-        return true;
-
-    return false;
+    return (this.requiredAllConstraints.has(name) || this.requiredAnyConstraints.has(name));
 };
 
 Role.prototype.isAllowedForKeys = function(keys) {
@@ -207,7 +204,7 @@ RoleLink.prototype.containConstraint = function(name) {
     if (Object.getPrototypeOf(RoleLink.prototype).containConstraint.call(this, name))
         return true;
 
-    if (this.contract == null || this.contract.roles[this.roleName] == null)
+    if (this.contract == null || this.contract.roles.hasOwnProperty(this.roleName))
         return false;
 
     return this.contract.roles[this.roleName].containConstraint(name);
@@ -335,7 +332,7 @@ ListRole.prototype.containConstraint = function(name) {
         return false;
 
     let contain = false;
-    for (let role of this.contract.roles)
+    for (let role of this.roles)
         if (role.containConstraint(name)) {
             contain = true;
             break;

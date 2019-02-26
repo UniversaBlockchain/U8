@@ -2,7 +2,6 @@ const bs = require("biserializable");
 const DefaultBiMapper = require("defaultbimapper").DefaultBiMapper;
 const BossBiMapper = require("bossbimapper").BossBiMapper;
 const roles = require('roles');
-const cnt = require('contract');
 const t = require("tools");
 const Boss = require('boss.js');
 const e = require("errors");
@@ -51,7 +50,7 @@ Constraint.conditionsModeType = {
  * This is a description of the constraint constructor function.
  *
  * @class
- * @param {contract} contract
+ * @param {Contract} contract
  *
  * @classdesc Constraints allow you to refer to the internal fields of the contract, constants and fields of other
  * contracts, to establish the necessary conditions.
@@ -990,39 +989,37 @@ Constraint.prototype.isMatchingWithIteration = function(contract, contracts, ite
 
     let result = true;
 
-    if (contract instanceof cnt.Contract) {
-        //check roles
-        if (result) {
-            if (this.roles.length !== 0) {
-                result = false;
-                for (let i = 0; i < this.roles.length; i++)
-                    if (contract.roles.hasOwnProperty(this.roles[i])) {
-                        result = true;
-                        break;
-                    }
-            }
+    //check roles
+    if (result) {
+        if (this.roles.length !== 0) {
+            result = false;
+            for (let i = 0; i < this.roles.length; i++)
+                if (contract.roles.hasOwnProperty(this.roles[i])) {
+                    result = true;
+                    break;
+                }
         }
-
-        //check origin
-        if (result)
-            result = (this.origin == null || !(contract.getOrigin().equals(this.origin)));
-
-        //check fields
-        if (result) {
-            if ((this.fields.length !== 0) && (contract.state != null) && (contract.state.data != null)) {
-                result = false;
-                for (let i = 0; i < this.fields.length; i++)
-                    if (contract.state.data.hasOwnProperty(this.fields[i])) {
-                        result = true;
-                        break;
-                    }
-            }
-        }
-
-        //check conditions
-        if (result)
-            result = this.checkConditions(this.conditions, contract, contracts, iteration);
     }
+
+    //check origin
+    if (result)
+        result = (this.origin == null || !(contract.getOrigin().equals(this.origin)));
+
+    //check fields
+    if (result) {
+        if ((this.fields.length !== 0) && (contract.state != null) && (contract.state.data != null)) {
+            result = false;
+            for (let i = 0; i < this.fields.length; i++)
+                if (contract.state.data.hasOwnProperty(this.fields[i])) {
+                    result = true;
+                    break;
+                }
+        }
+    }
+
+    //check conditions
+    if (result)
+        result = this.checkConditions(this.conditions, contract, contracts, iteration);
 
     return result;
 };
@@ -1137,7 +1134,7 @@ Constraint.prototype.isInheritedOperand = function (rightOperand, ref, refContra
  * Assembly condition of constraint
  *
  * @param {} condition is binder of parsed condition
- * @return {string} result with assembled condition
+ * @return {string|null} result with assembled condition
  */
 Constraint.prototype.assemblyCondition = function(condition) {
 
