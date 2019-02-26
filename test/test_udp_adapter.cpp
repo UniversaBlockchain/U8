@@ -567,3 +567,81 @@ TEST_CASE("TwoAdapters") {
     senderThread0.join();
     senderThread1.join();
 }
+
+TEST_CASE("ConcurrencySend") {
+    AdaptersList env(2);
+
+    atomic<long> sendCounter0(0);
+    atomic<long> sendCounter1(0);
+    atomic<long> receiveCounter0(0);
+    atomic<long> receiveCounter1(0);
+
+    atomic<bool> stopFlag0(false);
+    atomic<bool> stopFlag1(false);
+
+    const int sendSpeed = 4;
+
+    string payloadA("test data set 1");
+    string payloadB("test data set 2");
+
+    env.adapters[0]->setReceiveCallback([&](const byte_vector& packet, const NodeInfo& fromNode){
+        REQUIRE (payloadB == string(packet.begin(), packet.end()));
+        ++receiveCounter0;
+    });
+    env.adapters[1]->setReceiveCallback([&](const byte_vector& packet, const NodeInfo& fromNode){
+        REQUIRE (payloadA == string(packet.begin(), packet.end()));
+        ++receiveCounter1;
+    });
+
+    //initiate handshake
+    env.adapters[0]->send(1, byte_vector(payloadA.begin(), payloadA.end()));
+    env.adapters[1]->send(0, byte_vector(payloadB.begin(), payloadB.end()));
+    ++sendCounter0;
+    ++sendCounter1;
+    this_thread::sleep_for(800ms);
+
+    vector<thread> senderThreads;
+    for (int it = 0; it < 4; ++it) {
+        senderThreads.push_back(thread([&](){
+            while(true) {
+                for (int i = 0; i < sendSpeed; ++i) {
+                    env.adapters[0]->send(1, byte_vector(payloadA.begin(), payloadA.end()));
+                    ++sendCounter0;
+                }
+                this_thread::sleep_for(1ms);
+                if (stopFlag0)
+                    break;
+            }
+        }));
+        senderThreads.push_back(thread([&](){
+            while(true) {
+                for (int i = 0; i < sendSpeed; ++i) {
+                    env.adapters[1]->send(0, byte_vector(payloadB.begin(), payloadB.end()));
+                    ++sendCounter1;
+                }
+                this_thread::sleep_for(1ms);
+                if (stopFlag1)
+                    break;
+            }
+        }));
+    }
+
+    this_thread::sleep_for(1000ms);
+
+    stopFlag0 = true;
+    stopFlag1 = true;
+//    env.adapters[0]->printInternalState();
+//    env.adapters[1]->printInternalState();
+
+    this_thread::sleep_for(chrono::milliseconds(UDPAdapter::RETRANSMIT_MAX_ATTEMPTS*UDPAdapter::RETRANSMIT_TIME + 1000));
+
+//    env.adapters[0]->printInternalState();
+//    env.adapters[1]->printInternalState();
+
+    cout << "sendCounter0=" << sendCounter0 << "   ==   receiveCounter1=" << receiveCounter1 << endl;
+    cout << "sendCounter1=" << sendCounter1 << "   ==   receiveCounter0=" << receiveCounter0 << endl;
+    REQUIRE(long(sendCounter0) == long(receiveCounter1));
+    REQUIRE(long(sendCounter1) == long(receiveCounter0));
+    for (auto& t : senderThreads)
+        t.join();
+}
