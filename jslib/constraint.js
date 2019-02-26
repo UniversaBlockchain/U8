@@ -155,39 +155,81 @@ Constraint.prototype.copy = function() {
     return bbm.deserialize(bbm.serialize(this));
 };
 
+Constraint.prototype.equals = function(to) {
+    if(this === to)
+        return true;
+
+    if(Object.getPrototypeOf(this) !== Object.getPrototypeOf(to))
+        return false;
+
+    if(!t.valuesEqual(this.name, to.name))
+        return false;
+
+    if(!t.valuesEqual(this.comment, to.comment))
+        return false;
+
+    if(!t.valuesEqual(this.type, to.type))
+        return false;
+
+    if(!t.valuesEqual(this.transactional_id, to.transactional_id))
+        return false;
+
+    if(!t.valuesEqual(this.required, to.required))
+        return false;
+
+    if(!t.valuesEqual(this.signed_by, to.signed_by))
+        return false;
+
+    if(!t.valuesEqual(this.roles, to.roles))
+        return false;
+
+    if(!t.valuesEqual(this.fields, to.fields))
+        return false;
+
+    if(!t.valuesEqual(this.conditions, to.conditions))
+        return false;
+
+    if(!t.valuesEqual(this.contract_id, to.contract_id))
+        return false;
+
+    if(!t.valuesEqual(this.origin, to.origin))
+        return false;
+
+    return true;
+};
+
 Constraint.prototype.setConditions = function(conditions) {
     this.conditions = this.parseConditions(conditions);
+};
+
+Constraint.prototype.exportConditions = function() {
+    return this.assemblyConditions(this.conditions);
 };
 
 Constraint.prototype.setContract = function(contract) {
     this.baseContract = contract;
 };
 
-/*var toType = function(obj) {
-    return ({}).toString.call(obj).match(/\s([a-zA-Z]+)/)[1].toLowerCase()
-}
+Constraint.prototype.objectCastToTimeSeconds = function(obj, operand, typeOfOperand) {
+    let val;
+    if ((obj == null) && (typeOfOperand === compareOperandType.FIELD))
+        throw "Error getting operand: " + operand;
 
-private long objectCastToTimeSeconds(Object obj, String operand, compareOperandType typeOfOperand) throws Exception {
-    long val;
-
-    if ((obj == null) && (typeOfOperand == compareOperandType.FIELD))
-        throw new IllegalArgumentException("Error getting operand: " + operand);
-
-    if ((obj != null) && obj.getClass().getName().endsWith("ZonedDateTime"))
-        val = ((ZonedDateTime) obj).toEpochSecond();
-else if ((obj != null) && obj.getClass().getName().endsWith("String"))
-        val = ZonedDateTime.parse((String) obj, DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss").withZone(ZoneId.of("UTC"))).toEpochSecond();
-else if ((obj != null) && isObjectMayCastToLong(obj))
-        val = objectCastToLong(obj);
-    else if (typeOfOperand == compareOperandType.CONSTSTR)
-        val = ZonedDateTime.parse(operand, DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss").withZone(ZoneId.of("UTC"))).toEpochSecond();
-    else if (typeOfOperand == compareOperandType.CONSTOTHER)
-        val = Long.parseLong(operand);
+    if ((obj != null) && obj instanceof Date)
+        val = Math.floor(obj.getTime() / 1000);
+    else if ((obj != null) && (typeof obj === "string"))
+        val = Math.floor(Date.parse(obj) / 1000);
+    else if ((obj != null) && (typeof obj === "number"))
+        val = obj;
+    else if (typeOfOperand === compareOperandType.CONSTSTR)
+        val = Math.floor(Date.parse(operand) / 1000);
+    else if (typeOfOperand === compareOperandType.CONSTOTHER)
+        val = parseInt(operand, 10);
     else
-        throw new IllegalArgumentException("Error parsing DateTime from operand: " + operand);
+        throw "Error parsing DateTime from operand: " + operand;
 
     return val;
-};*/
+};
 
 Constraint.prototype.objectCastToBigDecimal = function(obj, operand, typeOfOperand) {
     let val;
@@ -219,12 +261,6 @@ Constraint.prototype.compareOperands = function(refContract,
     let rightOperandContract = null;
     let left = null;
     let right = null;
-    let leftVal = 0;
-    let rightVal = 0;
-    let leftBigDecimal;
-    let rightBigDecimal;
-    let isLeftDouble = false;
-    let isRightDouble = false;
     let firstPointPos;
 
     if (leftOperand != null) {
@@ -339,8 +375,8 @@ Constraint.prototype.compareOperands = function(refContract,
                         break;
 
                     if (isBigDecimalConversion) {
-                        leftBigDecimal = this.objectCastToBigDecimal(left, leftOperand, typeOfLeftOperand);
-                        rightBigDecimal = this.objectCastToBigDecimal(right, rightOperand, typeOfRightOperand);
+                        let leftBigDecimal = this.objectCastToBigDecimal(left, leftOperand, typeOfLeftOperand);
+                        let rightBigDecimal = this.objectCastToBigDecimal(right, rightOperand, typeOfRightOperand);
 
                         if (((indxOperator === LESS) && (leftBigDecimal.cmp(rightBigDecimal) === -1)) ||
                             ((indxOperator === MORE) && (leftBigDecimal.cmp(rightBigDecimal) === 1)) ||
@@ -348,161 +384,128 @@ Constraint.prototype.compareOperands = function(refContract,
                             ((indxOperator === MORE_OR_EQUAL) && (leftBigDecimal.cmp(rightBigDecimal) > -1)))
                             ret = true;
 
-                    } else if (((left != null) && left instanceof Date) ||      //todo or Object.prototype.toString.call(date) === '[object Date]'
-                        ((right != null) && right instanceof Date)) {
-                        let leftTime = objectCastToTimeSeconds(left, leftOperand, typeOfLeftOperand);
-                        let rightTime = objectCastToTimeSeconds(right, rightOperand, typeOfRightOperand);
+                    } else if (((left != null) && left instanceof Date) ||
+                               ((right != null) && right instanceof Date)) {
+                        let leftTime = this.objectCastToTimeSeconds(left, leftOperand, typeOfLeftOperand);
+                        let rightTime = this.objectCastToTimeSeconds(right, rightOperand, typeOfRightOperand);
 
                         if (((indxOperator === LESS) && (leftTime < rightTime)) ||
                             ((indxOperator === MORE) && (leftTime > rightTime)) ||
                             ((indxOperator === LESS_OR_EQUAL) && (leftTime <= rightTime)) ||
                             ((indxOperator === MORE_OR_EQUAL) && (leftTime >= rightTime)))
                             ret = true;
+
                     } else {
-                        if ((typeOfLeftOperand === compareOperandType.FIELD) && (left != null)) {
+                        let leftVal = 0;
+                        let rightVal = 0;
+
+                        if (typeOfLeftOperand === compareOperandType.FIELD)
                             leftVal = left;
-                            //if (isLeftDouble = isObjectMayCastToDouble(left))
-                            //    leftValD = objectCastToDouble(left);
-                            //else
-                            //    leftValL = objectCastToLong(left);
-                        }
+                        else if ((typeOfLeftOperand === compareOperandType.CONSTOTHER) &&
+                                 (leftOperand !== "null") && (leftOperand !== "false") && (leftOperand !== "true"))
+                            leftVal = parseFloat(leftOperand);
+                        else
+                            throw "Invalid left operator in condition for string: " + operators[indxOperator];
 
-                        if ((typeOfRightOperand === compareOperandType.FIELD) && (right != null)) {
+                        if (typeOfRightOperand === compareOperandType.FIELD)
                             rightVal = right;
-                            //if (isRightDouble = isObjectMayCastToDouble(right))
-                            //    rightValD = objectCastToDouble(right);
-                            //else
-                            //    rightValL = objectCastToLong(right);
-                        }
+                        else if ((typeOfRightOperand === compareOperandType.CONSTOTHER) &&
+                                 (rightOperand !== "null") && (rightOperand !== "false") && (rightOperand !== "true"))
+                            rightVal = parseFloat(rightOperand);
+                        else
+                            throw "Invalid right operator in condition for string: " + operators[indxOperator];
 
-                        if ((typeOfLeftOperand === compareOperandType.FIELD) && (typeOfRightOperand === compareOperandType.FIELD)) {
-                            //if (((indxOperator === LESS) && ((isLeftDouble ? leftValD : leftValL) < (isRightDouble ? rightValD : rightValL))) ||
-                            //    ((indxOperator === MORE) && ((isLeftDouble ? leftValD : leftValL) > (isRightDouble ? rightValD : rightValL))) ||
-                            //    ((indxOperator === LESS_OR_EQUAL) && ((isLeftDouble ? leftValD : leftValL) <= (isRightDouble ? rightValD : rightValL))) ||
-                            //    ((indxOperator === MORE_OR_EQUAL) && ((isLeftDouble ? leftValD : leftValL) >= (isRightDouble ? rightValD : rightValL))))
+                        if ((leftVal != null) && (rightVal != null)) {
                             if (((indxOperator === LESS) && (leftVal < rightVal)) ||
                                 ((indxOperator === MORE) && (leftVal > rightVal)) ||
                                 ((indxOperator === LESS_OR_EQUAL) && (leftVal <= rightVal)) ||
                                 ((indxOperator === MORE_OR_EQUAL) && (leftVal >= rightVal)))
                                 ret = true;
                         }
-                       /* else if ((typeOfLeftOperand === compareOperandType.FIELD) && (typeOfRightOperand === compareOperandType.CONSTOTHER)) { // rightOperand is CONSTANT (null | number | true | false)
-                            if ((rightOperand !== "null") && (rightOperand !== "false") && (rightOperand !== "true"))
-                                if ((rightOperand.indexOf(".") && // todo !!
-                                    //(((indxOperator === LESS) && ((isLeftDouble ? leftValD : leftValL) < Double.parseDouble(rightOperand))) ||
-                                    //    ((indxOperator === MORE) && ((isLeftDouble ? leftValD : leftValL) > Double.parseDouble(rightOperand))) ||
-                                    //    ((indxOperator === LESS_OR_EQUAL) && ((isLeftDouble ? leftValD : leftValL) <= Double.parseDouble(rightOperand))) ||
-                                    //    ((indxOperator === MORE_OR_EQUAL) && ((isLeftDouble ? leftValD : leftValL) >= Double.parseDouble(rightOperand))))) ||
-                                    (((indxOperator === LESS) && (leftVal) < Double.parseDouble(rightOperand))) ||
-                                        ((indxOperator === MORE) && ((isLeftDouble ? leftValD : leftValL) > Double.parseDouble(rightOperand))) ||
-                                        ((indxOperator === LESS_OR_EQUAL) && ((isLeftDouble ? leftValD : leftValL) <= Double.parseDouble(rightOperand))) ||
-                                        ((indxOperator === MORE_OR_EQUAL) && ((isLeftDouble ? leftValD : leftValL) >= Double.parseDouble(rightOperand))))) ||
-
-                                    (!rightOperand.indexOf(".") &&
-                                        (((indxOperator === LESS) && ((isLeftDouble ? leftValD : leftValL) < Long.parseLong(rightOperand))) ||
-                                            ((indxOperator === MORE) && ((isLeftDouble ? leftValD : leftValL) > Long.parseLong(rightOperand))) ||
-                                            ((indxOperator === LESS_OR_EQUAL) && ((isLeftDouble ? leftValD : leftValL) <= Long.parseLong(rightOperand))) ||
-                                            ((indxOperator === MORE_OR_EQUAL) && ((isLeftDouble ? leftValD : leftValL) >= Long.parseLong(rightOperand))))))
-                                    ret = true;
-                        } else if ((typeOfRightOperand === compareOperandType.FIELD) && (typeOfLeftOperand === compareOperandType.CONSTOTHER)) { // leftOperand is CONSTANT (null | number | true | false)
-                            if ((leftOperand !== "null") && (leftOperand !== "false") && (leftOperand !== "true"))
-                                if ((leftOperand.indexOf(".") &&
-                                    (((indxOperator === LESS) && (Double.parseDouble(leftOperand) < (isRightDouble ? rightValD : rightValL))) ||
-                                        ((indxOperator === MORE) && (Double.parseDouble(leftOperand) > (isRightDouble ? rightValD : rightValL))) ||
-                                        ((indxOperator === LESS_OR_EQUAL) && (Double.parseDouble(leftOperand) <= (isRightDouble ? rightValD : rightValL))) ||
-                                        ((indxOperator === MORE_OR_EQUAL) && (Double.parseDouble(leftOperand) >= (isRightDouble ? rightValD : rightValL))))) ||
-                                    (!leftOperand.indexOf(".") &&
-                                        (((indxOperator === LESS) && (Long.parseLong(leftOperand) < (isRightDouble ? rightValD : rightValL))) ||
-                                            ((indxOperator === MORE) && (Long.parseLong(leftOperand) > (isRightDouble ? rightValD : rightValL))) ||
-                                            ((indxOperator === LESS_OR_EQUAL) && (Long.parseLong(leftOperand) <= (isRightDouble ? rightValD : rightValL))) ||
-                                            ((indxOperator === MORE_OR_EQUAL) && (Long.parseLong(leftOperand) >= (isRightDouble ? rightValD : rightValL))))))
-                                    ret = true;
-                        } else
-                            throw "Invalid operator in condition for string: " + operators[indxOperator];*/
                     }
 
                     break;
 
                 case NOT_EQUAL:
-                /*case EQUAL:
-                    if (typeOfLeftOperand === compareOperandType.FIELD && left == null && !rightOperand.equals("null"))
+                case EQUAL:
+                    if (typeOfLeftOperand === compareOperandType.FIELD && left == null && rightOperand !== "null")
                         break;
 
-                    if (typeOfRightOperand === compareOperandType.FIELD && right == null && !leftOperand.equals("null"))
+                    if (typeOfRightOperand === compareOperandType.FIELD && right == null && leftOperand !== "null")
                         break;
 
-                    if (isBigDecimalConversion) { //todo that's another story
-                        leftBigDecimal = objectCastToBigDecimal(left, leftOperand, typeOfLeftOperand);
-                        rightBigDecimal = objectCastToBigDecimal(right, rightOperand, typeOfRightOperand);
+                    if (isBigDecimalConversion) {
+                        let leftBigDecimal = this.objectCastToBigDecimal(left, leftOperand, typeOfLeftOperand);
+                        let rightBigDecimal = this.objectCastToBigDecimal(right, rightOperand, typeOfRightOperand);
 
-                        if (((indxOperator === EQUAL) && (leftBigDecimal.compareTo(rightBigDecimal) === 0)) ||
-                            ((indxOperator === NOT_EQUAL) && (leftBigDecimal.compareTo(rightBigDecimal) !== 0)))
+                        if (((indxOperator === EQUAL) && (leftBigDecimal.cmp(rightBigDecimal) === 0)) ||
+                            ((indxOperator === NOT_EQUAL) && (leftBigDecimal.cmp(rightBigDecimal) !== 0)))
                             ret = true;
+
                     }
-                    else if (((left != null) && left.getClass().getName().endsWith("HashId")) ||
-                        ((right != null) && right.getClass().getName().endsWith("HashId"))) {
+                    else if (((left != null) && left instanceof crypto.HashId) ||
+                             ((right != null) && right instanceof crypto.HashId)) {
                         let leftID;
                         let rightID;
 
-                        if ((left != null) && left.getClass().getName().endsWith("HashId"))
+                        if ((left != null) && left instanceof crypto.HashId)
                             leftID = left;
-                        else if ((left != null) && left.getClass().getName().endsWith("String"))
-                            leftID = HashId.withDigest((String) left);
+                        else if ((left != null) && typeof left === "string")
+                            leftID = crypto.HashId.withBase64Digest(left);
                         else
-                            leftID = HashId.withDigest(leftOperand);
+                            leftID = crypto.HashId.withBase64Digest(leftOperand);
 
-                        if ((right != null) && right.getClass().getName().endsWith("HashId"))
+                        if ((right != null) && right instanceof crypto.HashId)
                             rightID = right;
-                        else if ((right != null) && right.getClass().getName().endsWith("String"))
-                            rightID = HashId.withDigest((String) right);
+                        else if ((right != null) && typeof right === "string")
+                            rightID = crypto.HashId.withBase64Digest(right);
                         else
-                            rightID = HashId.withDigest(rightOperand);
+                            rightID = crypto.HashId.withBase64Digest(rightOperand);
 
                         ret = leftID.equals(rightID);
 
                         if (indxOperator === NOT_EQUAL)
                             ret = !ret;
-                    } else if (((left != null) && (left.getClass().getName().endsWith("Role") || left.getClass().getName().endsWith("RoleLink"))) ||
-                            ((right != null) && (right.getClass().getName().endsWith("Role") || right.getClass().getName().endsWith("RoleLink")))) { // if role - compare with role, key or address
-                        if (((left != null) && (left.getClass().getName().endsWith("Role") || left.getClass().getName().endsWith("RoleLink"))) &&
-                            ((right != null) && (right.getClass().getName().endsWith("Role") || right.getClass().getName().endsWith("RoleLink")))) {
-                            if (((indxOperator === NOT_EQUAL) && !((Role)left).equalsIgnoreName((Role) right)) ||
-                                ((indxOperator === EQUAL) && ((Role)left).equalsIgnoreName((Role) right)))
+
+                    } else if (((left != null) && left instanceof roles.Role) || ((right != null) && right instanceof roles.Role)) { // if role - compare with role, key or address
+                        if (((left != null) && left instanceof roles.Role) && ((right != null) && right instanceof roles.Role)) {
+                            if (((indxOperator === NOT_EQUAL) && !left.equalsIgnoreName(right)) ||
+                                ((indxOperator === EQUAL) && left.equalsIgnoreName(right)))
                             ret = true;
 
                         } else {
                             let role;
                             let compareOperand;
-                            if ((left != null) && (left.getClass().getName().endsWith("Role") || left.getClass().getName().endsWith("RoleLink"))) {
+                            if ((left != null) && left instanceof roles.Role) {
                                 role = left;
-                                if ((right != null) && (right.getClass().getName().endsWith("String")))
+                                if ((right != null) && (typeof right === "string"))
                                     compareOperand = right;
                                 else
                                     compareOperand = rightOperand;
                             } else {
                                 role = right;
-                                if ((left != null) && (left.getClass().getName().endsWith("String")))
+                                if ((left != null) && (typeof left === "string"))
                                     compareOperand = left;
                                 else
                                     compareOperand = leftOperand;
                             }
 
-                            if(role instanceof RoleLink) {
+                            if (role instanceof roles.RoleLink) {
                                 role  = role.resolve();
                             }
 
                             try {
-                                compareOperand = compareOperand.replaceAll("\\s+", "");       // for key in quotes
+                                compareOperand = compareOperand.replace(/\s/g, "");       // for key in quotes
 
                                 if (compareOperand.length > 72) {
                                     // Key
-                                    PublicKey publicKey = new PublicKey(Base64u.decodeCompactString(compareOperand));
-                                    SimpleRole simpleRole = new SimpleRole(role.getName(), Do.listOf(publicKey));
+                                    let publicKey = new crypto.PublicKey(atob(compareOperand));
+                                    let simpleRole = new crypto.SimpleRole(role.name, [publicKey]);
                                     ret = role.equalsIgnoreName(simpleRole);
                                 } else {
                                     // Address
-                                    KeyAddress ka = new KeyAddress(compareOperand);
-                                    SimpleRole simpleRole = new SimpleRole(role.getName(), Do.listOf(ka));
+                                    let ka = new crypto.KeyAddress(compareOperand);
+                                    let simpleRole = new crypto.SimpleRole(role.name, [ka]);
                                     ret = role.equalsIgnoreName(simpleRole);
                                 }
                             }
@@ -512,48 +515,24 @@ Constraint.prototype.compareOperands = function(refContract,
 
                             if (indxOperator === NOT_EQUAL)
                                 ret = !ret;
-
                         }
+
                     } else if (((left != null) && left instanceof Date) ||
-                        ((right != null) && right instanceof Date)) {
-                        let leftTime = objectCastToTimeSeconds(left, leftOperand, typeOfLeftOperand);
-                        let rightTime = objectCastToTimeSeconds(right, rightOperand, typeOfRightOperand);
+                               ((right != null) && right instanceof Date)) {
+                        let leftTime = this.objectCastToTimeSeconds(left, leftOperand, typeOfLeftOperand);
+                        let rightTime = this.objectCastToTimeSeconds(right, rightOperand, typeOfRightOperand);
 
                         if (((indxOperator === NOT_EQUAL) && (leftTime !== rightTime)) ||
                             ((indxOperator === EQUAL) && (leftTime === rightTime)))
                             ret = true;
+
                     } else if ((typeOfLeftOperand === compareOperandType.FIELD) && (typeOfRightOperand === compareOperandType.FIELD)) {   // operands is FIELDs
                         if ((left != null) && (right != null)) {
-                            let isNumbers = true;
-
-                            //if (isLeftDouble = isObjectMayCastToDouble(left))
-                            //    leftValD = objectCastToDouble(left);
-                            //else if (isObjectMayCastToLong(left))
-                            //    leftValL = objectCastToLong(left);
-                            if (left instanceof Number)
-                                leftVal = left;
-                            else
-                                isNumbers = false;
-
-                            if (isNumbers) {
-                                //if (isRightDouble = isObjectMayCastToDouble(right))
-                                //    rightValD = objectCastToDouble(right);
-                                //else if (isObjectMayCastToLong(right))
-                                //    rightValL = objectCastToLong(right);
-                                rightVal = right;
-                                else
-                                    isNumbers = false;
-                            }
-
-                            if (isNumbers && ((isLeftDouble && !isRightDouble) || (!isLeftDouble && isRightDouble))) {
-                                if (((indxOperator === NOT_EQUAL) && ((isLeftDouble ? leftValD : leftValL) !== (isRightDouble ? rightValD : rightValL))) ||
-                                    ((indxOperator === EQUAL) && ((isLeftDouble ? leftValD : leftValL) === (isRightDouble ? rightValD : rightValL))))
-                                    ret = true;
-                            }
-                            else if (((indxOperator === NOT_EQUAL) && !left.equals(right)) ||
-                                ((indxOperator === EQUAL) && left.equals(right)))
+                            if (((indxOperator === NOT_EQUAL) && (!left.equals(right) || left !== right)) ||
+                                ((indxOperator === EQUAL) && (left.equals(right)) || left === right))
                                 ret = true;
                         }
+
                     } else {
                         let field;
                         let compareOperand;
@@ -572,95 +551,75 @@ Constraint.prototype.compareOperands = function(refContract,
                             throw "At least one operand must be a field";
 
                         if (typeCompareOperand === compareOperandType.CONSTOTHER) {         // compareOperand is CONSTANT (null|number|true|false)
-                            if (!compareOperand.equals("null") && !compareOperand.equals("false") && !compareOperand.equals("true")) {
-                                if (field != null)
+                            if (compareOperand !== "null" && compareOperand !== "false" && compareOperand !== "true") {
+                                if (field != null && (typeof field === "number"))
                                 {
-                                    if (isObjectMayCastToDouble(field)) {
-                                        leftValD = objectCastToDouble(field);
-                                        Double leftDouble = new Double(leftValD);
-
-                                        if ((compareOperand.indexOf(".") &&
-                                            (((indxOperator === NOT_EQUAL) && !leftDouble.equals(Double.parseDouble(compareOperand))) ||
-                                                ((indxOperator === EQUAL) && leftDouble.equals(Double.parseDouble(compareOperand))))) ||
-                                            (!compareOperand.indexOf(".") &&
-                                                (((indxOperator === NOT_EQUAL) && (leftValD !== Long.parseLong(compareOperand))) ||
-                                                    ((indxOperator === EQUAL) && (leftValD === Long.parseLong(compareOperand))))))
-                                            ret = true;
-                                    } else {
-                                        leftValL = objectCastToLong(field);
-                                        Long leftLong = new Long(leftValL);
-
-                                        if ((!compareOperand.indexOf(".") &&
-                                            (((indxOperator === NOT_EQUAL) && !leftLong.equals(Long.parseLong(compareOperand))) ||
-                                                ((indxOperator === EQUAL) && leftLong.equals(Long.parseLong(compareOperand))))) ||
-                                            (compareOperand.indexOf(".") &&
-                                                (((indxOperator === NOT_EQUAL) && (leftValL !== Double.parseDouble(compareOperand))) ||
-                                                    ((indxOperator === EQUAL) && (leftValL === Double.parseDouble(compareOperand))))))
-                                            ret = true;
-                                    }
+                                    ret = (field === parseFloat(compareOperand));
+                                    if (indxOperator === NOT_EQUAL)
+                                        ret = !ret;
                                 }
                             } else {          // if compareOperand : null|false|true
-                                if (((indxOperator === NOT_EQUAL) &&
-                                    ((compareOperand.equals("null") && (field != null)) ||
-                                        (compareOperand.equals("true") && ((field != null) && !(boolean) field)) ||
-                                (compareOperand.equals("false") && ((field != null) && (boolean) field))))
-                            || ((indxOperator === EQUAL) &&
-                                    ((compareOperand.equals("null") && (field == null)) ||
-                                        (compareOperand.equals("true") && ((field != null) && (boolean) field)) ||
-                                (compareOperand.equals("false") && ((field != null) && !(boolean) field)))))
+                                if ((indxOperator === NOT_EQUAL &&
+                                    ((compareOperand === "null" && field != null) ||
+                                     (compareOperand === "true" && typeof field === "boolean" && !field) ||
+                                     (compareOperand === "false" && typeof field === "boolean" && field)))
+                                    || (indxOperator === EQUAL &&
+                                    ((compareOperand === "null" && field == null) ||
+                                     (compareOperand === "true" && typeof field === "boolean" && field) ||
+                                     (compareOperand === "false" && typeof field === "boolean" && !field))))
                                 ret = true;
                             }
-                        } else if (typeCompareOperand == compareOperandType.CONSTSTR) {          // compareOperand is CONSTANT (string)
-                            if ((field != null) &&
-                                (((indxOperator === NOT_EQUAL) && !field.equals(compareOperand)) ||
-                                    ((indxOperator === EQUAL) && field.equals(compareOperand))))
+                        } else if (typeCompareOperand === compareOperandType.CONSTSTR) {          // compareOperand is CONSTANT (string)
+                            if (field != null &&
+                                ((indxOperator === NOT_EQUAL && field !== compareOperand) ||
+                                 (indxOperator === EQUAL && field === compareOperand)))
                                 ret = true;
                         }
                         else
                             throw "Invalid type of operand: " + compareOperand;
                     }
 
-                    break;*/
+                    break;
 
                 case MATCHES:
 
                     break;
-                /*case IS_INHERIT:
+                case IS_INHERIT:
                     // deprecate warning
                     console.log("WARNING: Operator 'is_inherit' was deprecated. Use operator 'is_a'.");
                 case IS_A:
-                    if ((left == null) || !left.getClass().getName().endsWith("Reference"))
+                    if (left == null || !(left instanceof Constraint))
                         throw "Expected reference in condition in left operand: " + leftOperand;
 
-                    if ((right == null) || !right.getClass().getName().endsWith("Reference"))
+                    if (right == null || !(right instanceof Constraint))
                         throw "Expected reference in condition in right operand: " + rightOperand;
 
-                    ret = ((Reference) left).isInherited((Reference) right, refContract, contracts, iteration + 1);
+                    ret = left.isInherited(right, refContract, contracts, iteration + 1);
 
                     break;
                 case INHERIT:
                     // deprecate warning
                     console.log("WARNING: Operator 'inherit' was deprecated. Use operator 'inherits'.");
                 case INHERITS:
-                    if ((right == null) || !right.getClass().getName().endsWith("Reference"))
+                    if (right == null || !(right instanceof Constraint))
                         throw"Expected reference in condition in right operand: " + rightOperand;
 
-                    ret = ((Reference) right).isMatchingWith(refContract, contracts, iteration + 1);
+                    ret = right.isMatchingWith(refContract, contracts, iteration + 1);
 
                     break;
                 case CAN_PLAY:
-                    if ((right == null) || !(right.getClass().getName().endsWith("Role") || right.getClass().getName().endsWith("RoleLink")))
+                    if (right == null || !(right instanceof roles.Role))
                         throw "Expected role in condition in right operand: " + rightOperand;
 
-                    Set<PublicKey> keys;
-                    if (leftOperand.equals("this"))
-                        keys = leftOperandContract.getEffectiveKeys();
+                    let keys;
+                    if (leftOperand === "this")
+                        keys = leftOperandContract.effectiveKeys.keys();
                     else
-                        keys = leftOperandContract.getSealedByKeys();
+                        keys = leftOperandContract.sealedByKeys.keys();
 
-                    ret = ((Role) right).isAllowedForKeys(keys);
+                    ret = right.isAllowedForKeys(keys);
 
-                    break;*/
+                    break;
                 default:
                     throw "Invalid operator in condition";
             }
@@ -873,57 +832,22 @@ Constraint.prototype.parseCondition = function(condition) {
     throw "Invalid format of condition: " + condition;
 };
 
-Constraint.prototype.checkCondition = function(condition, ref, contracts, iteration) {
+Constraint.prototype.parseConditions = function(conditions) {
 
-    let typeOfLeftOperand;
-    let typeOfRightOperand;
-
-    let leftOperand = condition.leftOperand;
-    let rightOperand = condition.rightOperand;
-    let operator = condition.operator;
-
-    let typeLeftOperand = condition.typeOfLeftOperand;
-    let typeRightOperand = condition.typeOfRightOperand;
-
-    if (typeLeftOperand === 0)
-        typeOfLeftOperand = compareOperandType.FIELD;
-    else if (typeLeftOperand === 1)
-        typeOfLeftOperand = compareOperandType.CONSTSTR;
-    else
-        typeOfLeftOperand = compareOperandType.CONSTOTHER;
-
-    if (typeRightOperand === 0)
-        typeOfRightOperand = compareOperandType.FIELD;
-    else if (typeRightOperand === 1)
-        typeOfRightOperand = compareOperandType.CONSTSTR;
-    else
-        typeOfRightOperand = compareOperandType.CONSTOTHER;
-
-    let leftConversion = condition.leftConversion; // NO_CONVERSION
-    let rightConversion = condition.rightConversion; // NO_CONVERSION
-
-    let isBigDecimalConversion = (leftConversion === CONVERSION_BIG_DECIMAL) || (rightConversion === CONVERSION_BIG_DECIMAL);
-
-    return compareOperands(ref, leftOperand, rightOperand, typeOfLeftOperand, typeOfRightOperand, isBigDecimalConversion, operator, contracts, iteration);
-};
-
-
-Constraint.prototype.parseConditions = function(conds) {
-
-    if ((conds == null) || (conds === {}))
+    if ((conditions == null) || (conditions === {}))
         return {};
 
-    if (conds.hasOwnProperty("operator"))
-        return conds;
+    if (conditions.hasOwnProperty("operator"))
+        return conditions;
 
-    let all = conds.hasOwnProperty(Constraint.conditionsModeType.all_of);
-    let any = conds.hasOwnProperty(Constraint.conditionsModeType.any_of);
+    let all = conditions.hasOwnProperty(Constraint.conditionsModeType.all_of);
+    let any = conditions.hasOwnProperty(Constraint.conditionsModeType.any_of);
 
     if (all || any) {
         let result = {};
         let keyName = all ? Constraint.conditionsModeType.all_of : Constraint.conditionsModeType.any_of;
         let parsedList = [];
-        let condList = conds[keyName];
+        let condList = conditions[keyName];
 
         if (condList == null)
             throw "Expected all_of or any_of conditions";
@@ -945,53 +869,59 @@ Constraint.prototype.parseConditions = function(conds) {
         throw "Expected all_of or any_of";
 };
 
+Constraint.prototype.checkCondition = function(condition, ref, contracts, iteration) {
+
+    if (typeof condition === "string")
+        condition = this.parseCondition(condition);
+
+    return this.compareOperands(ref, condition.leftOperand, condition.rightOperand,
+        condition.typeOfLeftOperand, condition.typeOfRightOperand,
+        (condition.leftConversion === CONVERSION_BIG_DECIMAL) ||
+        (condition.rightConversion === CONVERSION_BIG_DECIMAL),
+        condition.operator, contracts, iteration);
+};
+
 Constraint.prototype.checkConditions =  function(conditions, ref, contracts, iteration) {
 
     let result;
-
     if ((conditions == null) || (conditions === {}))
         return true;
 
-    if (conditions.hasOwnProperty(conditionsModeType.all_of))
-    {
-        let condList = conditions[conditionsModeType.all_of];
+    if (conditions.hasOwnProperty(Constraint.conditionsModeType.all_of)) {
+        let condList = conditions[Constraint.conditionsModeType.all_of];
 
         if (condList == null)
             throw "Expected all_of conditions";
 
         result = true;
-        for (let item of condList) {
-            if (item instanceof String)
-                result = result && this.checkCondition(item, ref, contracts, iteration);      // not pre-parsed (old) version
-            /*else                                                                       //todo postponed until test
-                //LinkedHashMap<String, Binder> insideHashMap = (LinkedHashMap<String, Binder>) item;
-                //Binder insideBinder = new Binder(insideHashMap);
-                result = result && this.checkConditions(item, ref, contracts, iteration);*/
-        }
-    }
-    else if (conditions.hasOwnProperty(conditionsModeType.any_of))
-    {
-        let condList = conditions[conditionsModeType.any_of];
+        for (let item of condList)
+            result = result && this.checkCondition(item, ref, contracts, iteration);
+
+    } else if (conditions.hasOwnProperty(Constraint.conditionsModeType.any_of)) {
+        let condList = conditions[Constraint.conditionsModeType.any_of];
 
         if (condList == null)
             throw "Expected any_of conditions";
 
         result = false;
-        for (let item of condList) {
-            if (item instanceof String)
-                result = result || this.checkCondition(item, ref, contracts, iteration);        // not pre-parsed (old) version
-            /*else                                                                          //todo postponed until test
-                //LinkedHashMap<String, Binder> insideHashMap = (LinkedHashMap<String, Binder>) item;
-                //Binder insideBinder = new Binder(insideHashMap);
-                result = result || this.checkConditions((Binder) item, ref, contracts, iteration);*/
-        }
-    }
-    else if (conds.hasOwnProperty("operator"))                                                    // pre-parsed version
+        for (let item of condList)
+            result = result || this.checkCondition(item, ref, contracts, iteration);
+
+    } else if (conds.hasOwnProperty("operator"))
         result = this.checkCondition(conditions, ref, contracts, iteration);
     else
         throw "Expected all_of or any_of";
 
     return result;
+};
+
+//TODO: The method allows to mark the contract as matching reference, bypassing the validation
+Constraint.prototype.addMatchingItem = function(a) {
+    this.matchingItems.add(a);
+};
+
+Constraint.prototype.isValid = function() {
+    return this.matchingItems.size() > 0;
 };
 
 Constraint.prototype.isMatchingWith = function(contract, contracts) {
@@ -1043,55 +973,52 @@ Constraint.prototype.isMatchingWithIteration = function(contract, contracts, ite
     return result;
 };
 
-Constraint.prototype.isInherited = function (conditions, ref, refContract, contracts, iteration) {
+Constraint.prototype.isInherited = function (ref, refContract, contracts, iteration) {
+    return this.isInheritedConditions(this.conditions, ref, refContract, contracts, iteration);
+};
+
+Constraint.prototype.isInheritedConditions = function (conditions, ref, refContract, contracts, iteration) {
 
     if ((conditions == null) || (conditions === {}))
         return false;
 
     let condList = null;
-
-    if (conditions.hasOwnProperty(conditionsModeType.all_of))
-    {
-        condList = conditions[conditionsModeType.all_of];
+    if (conditions.hasOwnProperty(Constraint.conditionsModeType.all_of)) {
+        condList = conditions[Constraint.conditionsModeType.all_of];
         if (condList == null)
             throw "Expected all_of conditions";
-    }
-    else if (conditions.hasOwnProperty(conditionsModeType.any_of))
-    {
-        condList = conditions[conditionsModeType.any_of];
+
+    } else if (conditions.hasOwnProperty(Constraint.conditionsModeType.any_of)) {
+        condList = conditions[Constraint.conditionsModeType.any_of];
         if (condList == null)
             throw "Expected any_of conditions";
-    }
-    else if (conditions.hasOwnProperty("operator"))
+
+    } else if (conditions.hasOwnProperty("operator"))
         return this.isInheritedParsed(conditions, ref, refContract, contracts, iteration);
     else
         throw "Expected all_of or any_of";
 
     if (condList != null)
         for (let item of condList)
-    if (item instanceof String) {
-        if (this.isInherited(item, ref, refContract, contracts, iteration))
-        return true;
-    }
-    //else if (this.isInherited((Binder) item, ref, refContract, contracts, iteration)) //todo postponed until test
-    //return true;
+            if (typeof item === "string") {
+                if (this.isInheritedCondition(item, ref, refContract, contracts, iteration))
+                    return true;
+            } else if (this.isInheritedConditions(item, ref, refContract, contracts, iteration))
+                return true;
 
     return false;
 };
 
 Constraint.prototype.isInheritedParsed = function (condition, ref, refContract, contracts, iteration) {
 
-    let operator = condition.operator; // todo !!
-    let rightOperand = condition.rightOperand;
-
-    if (((operator === INHERITS) || (operator === INHERIT)) && (rightOperand != null))
+    if (((condition.operator === INHERITS) || (condition.operator === INHERIT)) && (condition.rightOperand != null))
         return this.isInheritedOperand(rightOperand, ref, refContract, contracts, iteration);
 
     return false;
 };
 
+Constraint.prototype.isInheritedCondition = function (condition, ref, refContract, contracts, iteration) {
 
-Constraint.prototype.isInherited = function (condition, ref, refContract, contracts, iteration) {
     for (let i = INHERITS; i <= INHERIT; i++) {
         let operPos = condition.indexOf(operators[i]);
 
@@ -1100,7 +1027,7 @@ Constraint.prototype.isInherited = function (condition, ref, refContract, contra
             if (subStrR.length === 0)
                 throw "Invalid format of condition: " + condition + ". Missing right operand.";
 
-            let rightOperand = subStrR.replaceAll("\\s+", ""); // todo replaceAll
+            let rightOperand = subStrR.replace(/\s/g, "");
 
             return this.isInheritedOperand(rightOperand, ref, refContract, contracts, iteration);
         }
@@ -1108,7 +1035,6 @@ Constraint.prototype.isInherited = function (condition, ref, refContract, contra
 
     return false;
 };
-
 
 Constraint.prototype.isInheritedOperand = function (rightOperand, ref, refContract, contracts, iteration) {
 
@@ -1129,12 +1055,12 @@ Constraint.prototype.isInheritedOperand = function (rightOperand, ref, refContra
         if (this.baseContract == null)
             throw "Use right operand in condition: " + rightOperand + ". But this contract not initialized.";
 
-        let refLink = this.baseContract.findConstraintByName(rightOperand.substring(0, firstPointPos));
-        if (refLink == null)
+        let constr = this.baseContract.findConstraintByName(rightOperand.substring(0, firstPointPos));
+        if (constr == null)
             throw "Not found reference: " + rightOperand.substring(0, firstPointPos);
 
         for (let checkedContract of contracts)
-            if (refLink.isMatchingWith(checkedContract, contracts, iteration + 1))
+            if (constr.isMatchingWith(checkedContract, contracts, iteration + 1))
                 rightOperandContract = checkedContract;
 
         if (rightOperandContract == null)
@@ -1147,13 +1073,10 @@ Constraint.prototype.isInheritedOperand = function (rightOperand, ref, refContra
     if (rightOperandContract != null)
         right = rightOperandContract.get(rightOperand);
 
-    if ((right == null) || !right.getClass().getName().endsWith("Reference"))
+    if ((right == null) || !(right instanceof Constraint))
         throw "Expected reference in condition in right operand: " + rightOperand;
 
-    if (right.equals(ref))
-        return true;
-
-    return false;
+    return right.equals(ref);
 };
 
 Constraint.prototype.assemblyCondition = function(condition) {
@@ -1163,105 +1086,76 @@ Constraint.prototype.assemblyCondition = function(condition) {
 
     let result = "";
 
-    // get parsed data
-    let leftOperand = condition.leftOperand;
-    let rightOperand = condition.rightOperand;
-    let operator = condition.operator;
-
-    let leftConversion = condition.leftConversion; //NO_CONVERSION
-    let rightConversion = condition.rightConversion; //NO_CONVERSION
-
-    let typeLeftOperand = condition.typeOfLeftOperand;
-    let typeRightOperand = condition.typeOfRightOperand;
-
     // assembly condition
-    if (leftOperand != null) {
-        if (typeLeftOperand === 1)      // CONSTSTR
+    if (condition.leftOperand != null) {
+        if (condition.typeOfLeftOperand === compareOperandType.CONSTSTR)
             result += "\"";
 
-        result += leftOperand;
+        result += condition.leftOperand;
 
-        if (typeLeftOperand === 1)      // CONSTSTR
+        if (condition.typeOfLeftOperand === compareOperandType.CONSTSTR)
             result += "\"";
 
-        if (leftConversion === CONVERSION_BIG_DECIMAL)
+        if (condition.leftConversion === CONVERSION_BIG_DECIMAL)
             result += "::number";
     }
 
-    result += operators[operator];
+    result += operators[condition.operator];
 
-    if (rightOperand != null) {
-        if (typeRightOperand === 1)      // CONSTSTR
+    if (condition.rightOperand != null) {
+        if (condition.typeOfRightOperand === compareOperandType.CONSTSTR)
             result += "\"";
 
-        result += rightOperand;
+        result += condition.rightOperand;
 
-        if (typeRightOperand === 1)      // CONSTSTR
+        if (condition.typeOfRightOperand === compareOperandType.CONSTSTR)
             result += "\"";
 
-        if (rightConversion === CONVERSION_BIG_DECIMAL)
+        if (condition.rightConversion === CONVERSION_BIG_DECIMAL)
             result += "::number";
     }
 
     return result;
 };
 
-/*
-Constrain.prototype.assemblyConditions = function(conds) {
+Constraint.prototype.assemblyConditions = function(conditions) {
 
-    if ((conds == null) || (conds === {}))
+    if ((conditions == null) || (conditions === {}))
         return null;
 
-    let all = conds.hasOwnProperty(conditionsModeType.all_of.name());
-    let any = conds.hasOwnProperty(conditionsModeType.any_of.name());
+    let all = conditions.hasOwnProperty(Constraint.conditionsModeType.all_of);
+    let any = conditions.hasOwnProperty(Constraint.conditionsModeType.any_of);
 
     if (all || any) {
-
         let result = {};
-        let keyName = all ? all_of.name() : any_of.name();
-
+        let keyName = all ? Constraint.conditionsModeType.all_of : Constraint.conditionsModeType.any_of;
         let assembledList = [];
-
-        let condList = conds[keyName];
+        let condList = conditions[keyName];
 
         if (condList == null)
             throw "Expected all_of or any_of conditions";
 
         for (let item of condList) {
-            if (item instanceof String)       // already assembled condition
-                assembledList.add(item);
+            if (typeof item === "string")       // already assembled condition
+                assembledList.push(item);
             else {
-                Binder parsed = null;
-                String cond = null;
-                if (item.getClass().getName().endsWith("LinkedHashMap")) {
-                    LinkedHashMap<String, Binder> insideHashMap = (LinkedHashMap<String, Binder>) item;
-                    Binder insideBinder = new Binder(insideHashMap);
-                    parsed = this.assemblyConditions(insideBinder);
-                } else if (((Binder) item).hasOwnProperty("operator"))
-                cond = this.assemblyCondition((Binder) item);
-            else
-                parsed = this.assemblyConditions((Binder) item);
+                let assembled = null;
+                if (item.hasOwnProperty("operator"))
+                    assembled = this.assemblyCondition(item);
+                else
+                    assembled = this.assemblyConditions(item);
 
-                if (parsed != null)
-                    assembledList.add(parsed);
-
-                if (cond != null)
-                    assembledList.add(cond);
+                if (assembled != null)
+                    assembledList.push(assembled);
             }
         }
 
-        result.put(keyName, assembledList);
+        result[keyName] = assembledList;
         return result;
     }
     else
         throw "Expected all_of or any_of";
 };
-
-Constrain.prototype.equals = function(a) {
-    //let dataThis = serialize(new BiSerializer());
-    //Binder dataA = a.serialize(new BiSerializer());
-    //return dataThis.equals(dataA);
-};*/
 
 DefaultBiMapper.registerAdapter(new bs.BiAdapter("Reference", Constraint));
 DefaultBiMapper.registerAdapter(new bs.BiAdapter("Constraint", Constraint));

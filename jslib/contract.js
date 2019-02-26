@@ -790,7 +790,7 @@ Contract.prototype.getRevokingItem = function(id) {
 Contract.prototype.addSignatureToSeal = async function(x) {
     let keys;
     let proto = Object.getPrototypeOf(x);
-    if(proto === Array.prototype || proto == Set.prototype) {
+    if(proto === Array.prototype || proto === Set.prototype) {
         keys = x;
     } else if(proto === crypto.PrivateKey.prototype){
         keys = [];

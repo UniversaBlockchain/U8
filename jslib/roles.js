@@ -54,6 +54,25 @@ Role.prototype.equals = function(to) {
     return true;
 };
 
+Role.prototype.equalsIgnoreName = function(to) {
+    if(this === to)
+        return true;
+
+    if(Object.getPrototypeOf(this) !== Object.getPrototypeOf(to))
+        return false;
+
+    if(!t.valuesEqual(this.comment,to.comment))
+        return false;
+
+    if(!t.valuesEqual(this.requiredAllConstraints,to.requiredAllConstraints))
+        return false;
+
+    if(!t.valuesEqual(this.requiredAnyConstraints,to.requiredAnyConstraints))
+        return false;
+
+    return true;
+};
+
 Role.prototype.isAllowedForKeys = function(keys) {
     return this.isAllowedForConstraints(this.contract == null ? new Set() : this.contract.validRoleConstraints)
 };
@@ -162,6 +181,22 @@ RoleLink.prototype.equals = function(to) {
     return true;
 };
 
+RoleLink.prototype.equalsIgnoreName = function(to) {
+    if(this === to)
+        return true;
+
+    if(Object.getPrototypeOf(this) !== Object.getPrototypeOf(to))
+        return false;
+
+    if(!Object.getPrototypeOf(RoleLink.prototype).equalsIgnoreName.call(this,to))
+        return false;
+
+    if(!t.valuesEqual(this.roleName,to.roleName))
+        return false;
+
+    return true;
+};
+
 RoleLink.prototype.deserialize = function(data,deserializer) {
     Object.getPrototypeOf(RoleLink.prototype).deserialize.call(this,data,deserializer);
     this.roleName = data.target_name;
@@ -236,6 +271,30 @@ ListRole.prototype.equals = function(to) {
         return false;
 
     if(!Object.getPrototypeOf(ListRole.prototype).equals.call(this,to))
+        return false;
+
+    if(!t.valuesEqual(this.mode,to.mode))
+        return false;
+
+    if(this.mode === ListRoleMode.QUORUM) {
+        if(!t.valuesEqual(this.quorumSize,to.quorumSize))
+            return false;
+    }
+
+    if(!t.valuesEqual(new Set(this.roles),new Set(to.roles)))
+        return false;
+
+    return true;
+};
+
+ListRole.prototype.equalsIgnoreName = function(to) {
+    if(this === to)
+        return true;
+
+    if(Object.getPrototypeOf(this) !== Object.getPrototypeOf(to))
+        return false;
+
+    if(!Object.getPrototypeOf(ListRole.prototype).equalsIgnoreName.call(this,to))
         return false;
 
     if(!t.valuesEqual(this.mode,to.mode))
@@ -345,6 +404,25 @@ SimpleRole.prototype.equals = function(to) {
         return false;
 
     if(!Object.getPrototypeOf(SimpleRole.prototype).equals.call(this,to))
+        return false;
+
+    if(!t.valuesEqual(this.keyRecords,to.keyRecords))
+        return false;
+
+    if(!t.valuesEqual(this.keyAddresses,to.keyAddresses))
+        return false;
+
+    return true;
+};
+
+SimpleRole.prototype.equalsIgnoreName = function(to) {
+    if(this === to)
+        return true;
+
+    if(Object.getPrototypeOf(this) !== Object.getPrototypeOf(to))
+        return false;
+
+    if(!Object.getPrototypeOf(SimpleRole.prototype).equalsIgnoreName.call(this,to))
         return false;
 
     if(!t.valuesEqual(this.keyRecords,to.keyRecords))
