@@ -407,7 +407,7 @@ namespace network {
         byte_vector packetBytes = packet.makeByteArray();
         {
             std::unique_lock lock(socketMutex_);
-            sendPacket(session.remoteNodeInfo, packet.makeByteArray());
+            sendPacket(session.remoteNodeInfo, packetBytes);
             session.addPacketToRetransmitMap(packet.getPacketId(), packet, payload);
         }
     }
