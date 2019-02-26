@@ -22,7 +22,12 @@ function TransactionPack(contract) {
 }
 
 
-
+/**
+ * Method add found contracts in the new items and revoking items to {@see TransactionPack#subItems} and do it
+ * again for each new item.
+ * Also method add to {@see TransactionPack#referencedItems} referenced contracts from given.
+ * @param {contract} c - given contract to extract from.
+ */
 TransactionPack.prototype.extractAllSubItemsAndReferenced = function(contract) {
     for(let c of contract.revokingItems) {
         this.subItems.set(c.id,c);

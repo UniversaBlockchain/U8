@@ -48,10 +48,15 @@ Constraint.conditionsModeType = {
     simple_condition : "simple_condition"
 };
 
-///////////////////////////
-//Constraint
-///////////////////////////
-
+/**
+ * This is a description of the constraint constructor function.
+ *
+ * @class
+ * @param {contract} contract
+ *
+ * @classdesc Constraints allow you to refer to the internal fields of the contract, constants and fields of other
+ * contracts, to establish the necessary conditions.
+ */
 function Constraint(contract) {
     this.baseContract = contract;
     this.name = "";
@@ -246,6 +251,20 @@ Constraint.prototype.objectCastToBigDecimal = function(obj, operand, typeOfOpera
     return val;
 };
 
+/**
+ *The comparison method for finding constraint contract
+ *
+ * @param {contract} refContract contract to check for matching
+ * @param {string} leftOperand field_selector
+ * @param {string} rightOperand right operand  (constant | field_selector), constant = ("null" | number | string | true | false)
+ * @param {compareOperandType} typeOfLeftOperand type of left operand (constant | field_selector), constant = ("null" | number | string | true | false)
+ * @param {compareOperandType} typeOfRightOperand type of right operand (constant | field_selector), constant = ("null" | number | string | true | false)
+ * @param {boolean} isBigDecimalConversion
+ * @param {number} indxOperator index operator in array of operators
+ * @param {} contracts list to check for matching
+ * @param {number} iteration check inside constraints iteration number
+ * @return {boolean} true if match or false
+ */
 Constraint.prototype.compareOperands = function(refContract,
                                                 leftOperand,
                                                 rightOperand,
@@ -648,6 +667,12 @@ Constraint.prototype.compareOperands = function(refContract,
     return ret;
 };
 
+/**
+ * Parse string condition
+ *
+ * @param {string} condition string
+ * @return {}
+ */
 Constraint.prototype.parseCondition = function(condition) {
 
     let leftConversion = NO_CONVERSION;
@@ -832,6 +857,12 @@ Constraint.prototype.parseCondition = function(condition) {
     throw "Invalid format of condition: " + condition;
 };
 
+/**
+ * Pre-parsing conditions of reference
+ *
+ * @param {string} conditions is binder of not-parsed (string) conditions
+ * @return {} result with parsed conditions
+ */
 Constraint.prototype.parseConditions = function(conditions) {
 
     if ((conditions == null) || (conditions === {}))
@@ -869,6 +900,15 @@ Constraint.prototype.parseConditions = function(conditions) {
         throw "Expected all_of or any_of";
 };
 
+/**
+ * Check condition of constraint
+ *
+ * @param {} condition condition to check for matching
+ * @param {contract} ref contract to check for matching
+ * @param {} contracts contract list to check for matching
+ * @param {number} iteration check inside references iteration number
+ * @return {boolean} true if match or false
+ */
 Constraint.prototype.checkCondition = function(condition, ref, contracts, iteration) {
 
     if (typeof condition === "string")
@@ -881,6 +921,15 @@ Constraint.prototype.checkCondition = function(condition, ref, contracts, iterat
         condition.operator, contracts, iteration);
 };
 
+/**
+ * Check conditions of constraint
+ *
+ * @param {} conditions binder with conditions to check for matching
+ * @param {contract} ref contract to check for matching
+ * @param contracts contract list to check for matching
+ * @param {number} iteration check inside constraints iteration number
+ * @return {boolean} true if match or false
+ */
 Constraint.prototype.checkConditions =  function(conditions, ref, contracts, iteration) {
 
     let result;
@@ -928,6 +977,13 @@ Constraint.prototype.isMatchingWith = function(contract, contracts) {
     return this.isMatchingWithIteration(contract, contracts, 0);
 };
 
+/**
+ * Check if given item matching with current reference criteria
+ * @param {contract} contract item to check for matching
+ * @param {} contracts contract list to check for matching
+ * @param {number} iteration check inside references iteration number
+ * @return {boolean} true if match or false
+ */
 Constraint.prototype.isMatchingWithIteration = function(contract, contracts, iteration) {
     //todo: add this checking for matching with given item
 
@@ -1079,6 +1135,12 @@ Constraint.prototype.isInheritedOperand = function (rightOperand, ref, refContra
     return right.equals(ref);
 };
 
+/**
+ * Assembly condition of constraint
+ *
+ * @param {} condition is binder of parsed condition
+ * @return {string} result with assembled condition
+ */
 Constraint.prototype.assemblyCondition = function(condition) {
 
     if ((condition == null) || (condition === {}))
@@ -1118,6 +1180,11 @@ Constraint.prototype.assemblyCondition = function(condition) {
     return result;
 };
 
+/**
+ * Assembly conditions of reference
+ * @param conditions is binder of parsed conditions
+ * @return result with assembled (string) conditions
+ */
 Constraint.prototype.assemblyConditions = function(conditions) {
 
     if ((conditions == null) || (conditions === {}))

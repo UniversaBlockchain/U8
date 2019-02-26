@@ -504,6 +504,12 @@ Contract.prototype.updateContext = function() {
     }
 };
 
+/**
+ * Get contract constraint with given name in given section
+ * @param {string} name name of the reference
+ * @param {string} section section to search in
+ * @return found reference or null
+ */
 Contract.prototype.findConstraintByName = function(name, section) {
     if (section === "definition") {
         if (this.definition.constraints == null)
