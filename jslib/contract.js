@@ -506,9 +506,9 @@ Contract.prototype.updateContext = function() {
 
 /**
  * Get contract constraint with given name in given section
- * @param {string} name name of the reference
+ * @param {string} name name of the constraint
  * @param {string} section section to search in
- * @return found reference or null
+ * @return found constraint or null
  */
 Contract.prototype.findConstraintByName = function(name, section) {
     if (section === "definition") {
@@ -1191,13 +1191,180 @@ Contract.prototype.getOrigin = function() {
     } else {
         return this.state.origin;
     }
-}
+};
 
-Contract.prototype.checkConstraints = function(contractsTree,roleRefsOnly) {
-    if(typeof roleRefsOnly === "undefined")
-        roleRefsOnly = false;
+Contract.prototype.getReferencedItems = function() {
 
-    //TODO:
+    let referencedItems = new Set();
+
+    if (this.transactional != null)
+        for (let constr of this.transactional.constraints)
+            for (let matching of constr.matchingItems)
+                referencedItems.add(matching);
+
+    if (this.definition != null)
+        for (let constr of this.definition.constraints)
+            for (let matching of constr.matchingItems)
+                referencedItems.add(matching);
+
+    if (this.state != null)
+        for (let constr of this.state.constraints)
+            for (let matching of constr.matchingItems)
+                referencedItems.add(matching);
+
+    return referencedItems;
+};
+
+Contract.prototype.removeReferencedItem = function(removed) {
+
+    for (let constr of this.constraints)
+        constr.matchingItems.delete(removed);
+
+    if (this.transactional != null)
+        for (let constr of this.transactional.constraints)
+            constr.matchingItems.delete(removed);
+
+    if (this.definition != null)
+        for (let constr of this.definition.constraints)
+            constr.matchingItems.delete(removed);
+
+    if (this.state != null)
+        for (let constr of this.state.constraints)
+            constr.matchingItems.delete(removed);
+
+    this.newItems.delete(removed);
+    this.revokingItems.delete(removed);
+};
+
+Contract.prototype.checkConstraints = function(contractsTree, roleConstraintsOnly) {
+    if (typeof roleConstraintsOnly === "undefined")
+        roleConstraintsOnly = false;
+
+    this.validRoleConstraints.clear();
+
+    if (this.constraints.size === 0)
+        return true;        // if contract has no constraints -> then it's checkConstraints check is ok
+
+    let neighbours = contractsTree.values();
+
+    // check each constraint, all must be ok
+    let allRefs_check = true;
+    for (let c of this.constraints.values()) {
+
+        let roleConstraint = false;
+        for (let role of this.roles)
+            if (role.containConstraint(c.name)) {
+                roleConstraint = true;
+                break;
+            }
+
+        if (!roleConstraint)
+            for (let plist of this.definition.permissions.values()) {
+                for (let perm of plist)
+                    if (perm.role.containConstraint(c.name)) {
+                        roleConstraint = true;
+                        break;
+                    }
+
+                if (roleConstraint)
+                    break;
+            }
+
+        if (roleConstraintsOnly && !roleConstraint)
+            continue;
+
+        // use all neighbourContracts to check constraint. at least one must be ok
+        let c_check = false;
+        if (c.type === Constraint.TYPE_TRANSACTIONAL) {
+            for (let neighbour of neighbours)
+                if ((((c.transactional_id != null && neighbour.transactional != null && c.transactional_id.equals(neighbour.transactional.id)) ||
+                    (c.contract_id != null && c.contract_id.equals(neighbour.id))) && this.checkOneConstraint(c, neighbour)) ||
+                    (c.conditions.length > 0))    // new format of constraint with conditions, transactional_id - optional
+                    if (c.isMatchingWith(neighbour, neighbours)) {
+                        c.addMatchingItem(neighbour);
+                        c_check = true;
+                        break;
+                    }
+
+        } else if ((c.type === Constraint.TYPE_EXISTING_DEFINITION) || (c.type === Constraint.TYPE_EXISTING_STATE)) {
+            for (let neighbour of neighbours)
+                if (c.isMatchingWith(neighbour, neighbours))
+                    c.addMatchingItem(neighbour);
+
+            c_check = c.isValid();
+        }
+
+        if (!c_check) {
+            if (!roleConstraint) {
+                allRefs_check = false;
+                this.errors.push(new ErrorRecord(Errors.FAILED_CHECK, "contract (hashId=" + this.id.base64() + ")", "checkConstraints return false"));
+            }
+        } else {
+            if(roleConstraint)
+                this.validRoleConstraints.add(c.name);
+        }
+    }
+
+    return allRefs_check;
+};
+
+Contract.prototype.checkOneConstraint = function(c, refContract) {
+    let res = true;
+
+    if (c.type === Constraint.TYPE_TRANSACTIONAL) {
+        if ((c.transactional_id == null) ||
+            (refContract.transactional == null) ||
+            (refContract.transactional.id == null) ||
+            (c.transactional_id === "") ||
+            (refContract.transactional.id === "")) {
+            res = false;
+            this.errors.push(new ErrorRecord(Errors.BAD_REF, "contract (hashId=" + this.id.base64() + ")", "transactional is missing"));
+        } else {
+            if (c.transactional_id != null && refContract.transactional == null) {
+                res = false;
+                this.errors.push(new ErrorRecord(Errors.BAD_REF, "contract (hashId=" + this.id.base64() + ")", "transactional not found"));
+            } else if (c.transactional_id !== refContract.transactional.id) {
+                res = false;
+                this.errors.push(new ErrorRecord(Errors.BAD_REF, "contract (hashId=" + this.id.base64() + ")", "transactional_id mismatch"));
+            }
+        }
+    }
+
+    if (c.contract_id != null) {
+        if (!c.contract_id.equals(refContract.id)) {
+            res = false;
+            this.errors.push(new ErrorRecord(Errors.BAD_REF, "contract (hashId=" + this.id.base64() + ")", "contract_id mismatch"));
+        }
+    }
+
+    if (c.origin != null) {
+        if (!c.origin.equals(refContract.getOrigin())) {
+            res = false;
+            this.errors.push(new ErrorRecord(Errors.BAD_REF, "contract (hashId=" + this.id.base64() + ")", "origin mismatch"));
+        }
+    }
+
+    for (let refRole of c.signed_by) {
+        if (!refContract.isSignedBy(refRole)) {
+            res = false;
+            this.errors.push(new ErrorRecord(Errors.BAD_SIGNATURE, "contract (hashId=" + this.id.base64() + ")", "fingerprint mismatch"));
+        }
+    }
+
+    return res;
+};
+
+Contract.prototype.isSignedBy = function(role) {
+    if (role == null)
+        return false;
+
+    if (role instanceof roles.RoleLink)
+        role  = role.resolve();
+
+    if (role == null)
+        return false;
+
+    return role.isAllowedForKeys(this.effectiveKeys.keys());
 };
 
 Contract.prototype.setEffectiveKeys = function(additionalSignatures) {
@@ -1361,7 +1528,7 @@ Contract.prototype.split = function(count) {
         results.push(c);
     }
     return results;
-}
+};
 
 DefaultBiMapper.registerAdapter(new bs.BiAdapter("UniversaContract",Contract));
 

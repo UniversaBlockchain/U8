@@ -1,9 +1,8 @@
-import * as cnt from 'contract'
-
 const bs = require("biserializable");
 const DefaultBiMapper = require("defaultbimapper").DefaultBiMapper;
 const BossBiMapper = require("bossbimapper").BossBiMapper;
 const roles = require('roles');
+const cnt = require('contract');
 const t = require("tools");
 const Boss = require('boss.js');
 const e = require("errors");
@@ -68,7 +67,7 @@ function Constraint(contract) {
     this.signed_by = [];
     this.fields = [];
     this.roles = [];
-    this.matchingItems = [];
+    this.matchingItems = new Set();
     this.conditions = {};
     this.comment = null;
     bs.BiSerializable.call(this);
@@ -509,9 +508,8 @@ Constraint.prototype.compareOperands = function(refContract,
                                     compareOperand = leftOperand;
                             }
 
-                            if (role instanceof roles.RoleLink) {
+                            if (role instanceof roles.RoleLink)
                                 role  = role.resolve();
-                            }
 
                             try {
                                 compareOperand = compareOperand.replace(/\s/g, "");       // for key in quotes
@@ -970,7 +968,7 @@ Constraint.prototype.addMatchingItem = function(a) {
 };
 
 Constraint.prototype.isValid = function() {
-    return this.matchingItems.size() > 0;
+    return this.matchingItems.size > 0;
 };
 
 Constraint.prototype.isMatchingWith = function(contract, contracts) {
