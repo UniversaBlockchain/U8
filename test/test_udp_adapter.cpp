@@ -80,7 +80,7 @@ TEST_CASE("HelloUdp") {
     //udpAdapter1.enableLog(true);
     //udpAdapter2.enableLog(true);
 
-    const long sendTo0count = 400;
+    const long sendTo0count = 4000;
 
     udpAdapter0.send(1, byte_vector(body0.begin(), body0.end()));
     udpAdapter1.send(2, byte_vector(body1.begin(), body1.end()));
@@ -381,7 +381,7 @@ TEST_CASE("Reconnect") {
     long reconnectTime = getCurrentTimeMillis() - reconnectStartTime;
     REQUIRE(payloadA == received2);
     cout << "reconnect time: " << reconnectTime << " ms" << endl;
-    REQUIRE(reconnectTime < 50);
+    REQUIRE(reconnectTime < 200);
 }
 
 TEST_CASE("LostPackets") {
@@ -579,7 +579,7 @@ TEST_CASE("ConcurrencySend") {
     atomic<bool> stopFlag0(false);
     atomic<bool> stopFlag1(false);
 
-    const int sendSpeed = 4;
+    const int sendSpeed = 5;
 
     string payloadA("test data set 1");
     string payloadB("test data set 2");

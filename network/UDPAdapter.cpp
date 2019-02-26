@@ -18,6 +18,8 @@ namespace network {
     UDPAdapter::UDPAdapter(const crypto::PrivateKey& ownPrivateKey, int ownNodeNumber, const NetConfig& netConfig,
                            const TReceiveCallback& receiveCallback, bool throwErrors)
        :minstdRand_(std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now().time_since_epoch()).count())
+       ,senderPool_(2)
+       ,receiverPool_(1)
        ,netConfig_(netConfig)
        ,ownNodeInfo_(netConfig.getInfo(ownNodeNumber))
        ,ownPrivateKey_(ownPrivateKey)
@@ -30,7 +32,9 @@ namespace network {
         socket_.open(ownNodeInfo_.getNodeAddress().host.c_str(), ownNodeInfo_.getNodeAddress().port, UDP_BUFFER_SIZE);
         socket_.recv([=](ssize_t result, const asyncio::byte_vector& data, const char* IP, unsigned int port) {
             if (result > 0)
-                onReceive(data);
+                receiverPool_.execute([&,data](){
+                    onReceive(data);
+                });
         });
 
         long dupleProtectionPeriod = 2 * RETRANSMIT_TIME_GROW_FACTOR * RETRANSMIT_TIME * RETRANSMIT_MAX_ATTEMPTS;
@@ -47,8 +51,12 @@ namespace network {
     }
 
     UDPAdapter::~UDPAdapter() {
-        timer_.stop();
-        socket_.stopRecv();
+        {
+            std::unique_lock lock(socketMutex_);
+            isClosed_ = true;
+            timer_.stop();
+            socket_.stopRecv();
+        }
         timed_mutex mtx;
         mtx.lock();
         socket_.close([&](ssize_t result){
@@ -59,22 +67,39 @@ namespace network {
     }
 
     void UDPAdapter::send(int destNodeNumber, const byte_vector& payload) {
-        std::unique_lock lock(socketMutex_);
-
-        const auto& dest = netConfig_.getInfo(destNodeNumber);
-        Session& session = getOrCreateSession(dest);
-        if (session.getState() == SessionState::STATE_HANDSHAKE) {
-            session.addPayloadToOutputQueue(dest, payload);
-        } else {
-            if (session.retransmitMap.size() > MAX_RETRANSMIT_QUEUE_SIZE)
-                session.addPayloadToOutputQueue(dest, payload);
-            else
-                sendPayload(session, payload);
-        }
+        senderPool_.execute([&, destNodeNumber, payload](){
+            Session& session = getOrCreateSession(destNodeNumber);
+            SessionState state;
+            {
+                std::unique_lock lock(socketMutex_);
+                if (isClosed_)
+                    return;
+                state = session.getState();
+            }
+            if (state == SessionState::STATE_HANDSHAKE) {
+                std::unique_lock lock(socketMutex_);
+                session.addPayloadToOutputQueue(session.remoteNodeInfo, payload);
+            } else {
+                bool sendNow = false;
+                {
+                    std::unique_lock lock(socketMutex_);
+                    if (session.retransmitMapSize > MAX_RETRANSMIT_QUEUE_SIZE) {
+                        session.addPayloadToOutputQueue(session.remoteNodeInfo, payload);
+                    } else {
+                        sendNow = true;
+                        ++session.retransmitMapSize;
+                    }
+                }
+                if (sendNow)
+                    sendPayload(session, payload);
+            }
+        });
     }
 
     void UDPAdapter::onReceive(const byte_vector& data) {
         std::unique_lock lock(socketMutex_);
+        if (isClosed_)
+            return;
         try {
             Packet packet(data);
             switch (packet.getType()) {
@@ -379,8 +404,12 @@ namespace network {
     void UDPAdapter::sendPayload(Session& session, const byte_vector& payload) {
         auto dataToSend = preparePayloadForSession(session.sessionKey, payload);
         Packet packet(getNextPacketId(), ownNodeInfo_.getNumber(), session.remoteNodeInfo.getNumber(), PacketTypes::DATA, dataToSend);
-        sendPacket(session.remoteNodeInfo, packet.makeByteArray());
-        session.addPacketToRetransmitMap(packet.getPacketId(), packet, payload);
+        byte_vector packetBytes = packet.makeByteArray();
+        {
+            std::unique_lock lock(socketMutex_);
+            sendPacket(session.remoteNodeInfo, packet.makeByteArray());
+            session.addPacketToRetransmitMap(packet.getPacketId(), packet, payload);
+        }
     }
 
     void UDPAdapter::sendPacket(const NodeInfo& dest, const byte_vector& data) {
@@ -393,6 +422,7 @@ namespace network {
     }
 
     int UDPAdapter::getNextPacketId() {
+        std::unique_lock lock(socketMutex_);
         int res = nextPacketId_;
         if (nextPacketId_ >= INT32_MAX)
             nextPacketId_ = 1;
@@ -445,6 +475,12 @@ namespace network {
             s.second.clearOldestBuffer();
     }
 
+    Session& UDPAdapter::getOrCreateSession(int nodeId) {
+        std::unique_lock lock(socketMutex_);
+        const auto& dest = netConfig_.getInfo(nodeId);
+        return getOrCreateSession(dest);
+    }
+
     Session& UDPAdapter::getOrCreateSession(const NodeInfo& destination) {
         auto iter = sessionsByRemoteId_.find(destination.getNumber());
         if (iter == sessionsByRemoteId_.end()) {
@@ -484,6 +520,7 @@ namespace network {
         Packet helloPacket(getNextPacketId(), ownNodeInfo_.getNumber(), session.remoteNodeInfo.getNumber(), PacketTypes::HELLO, encryptedPayload);
         sendPacket(session.remoteNodeInfo, helloPacket.makeByteArray());
         session.addPacketToRetransmitMap(helloPacket.getPacketId(), helloPacket, helloNonce);
+        session.retransmitMapSize = session.retransmitMap.size();
     }
 
     void UDPAdapter::sendWelcome(SessionReader& sessionReader) {
@@ -499,6 +536,7 @@ namespace network {
         sendPacket(sessionReader.remoteNodeInfo, welcomePacket.makeByteArray());
         sessionReader.removeHandshakePacketsFromRetransmitMap();
         sessionReader.addPacketToRetransmitMap(welcomePacket.getPacketId(), welcomePacket, sessionReader.localNonce);
+        sessionReader.retransmitMapSize = sessionReader.retransmitMap.size();
     }
 
     void UDPAdapter::sendKeyReq(Session& session) {
@@ -523,6 +561,7 @@ namespace network {
         sendPacket(session.remoteNodeInfo, packet2.makeByteArray());
         session.addPacketToRetransmitMap(packet1.getPacketId(), packet1, encrypted);
         session.addPacketToRetransmitMap(packet2.getPacketId(), packet2, sign);
+        session.retransmitMapSize = session.retransmitMap.size();
     }
 
     void UDPAdapter::sendSessionKey(SessionReader& sessionReader) {
@@ -543,6 +582,7 @@ namespace network {
         sendPacket(sessionReader.remoteNodeInfo, packet2.makeByteArray());
         sessionReader.addPacketToRetransmitMap(packet1.getPacketId(), packet1, encrypted);
         sessionReader.addPacketToRetransmitMap(packet2.getPacketId(), packet2, sign);
+        sessionReader.retransmitMapSize = sessionReader.retransmitMap.size();
     }
 
     void UDPAdapter::sendSessionAck(Session& session) {
@@ -591,18 +631,21 @@ namespace network {
             cout << "  session with node=" << s.first << endl;
             cout << "    outputQueue.size():" << s.second.outputQueue.size() << endl;
             cout << "    retransmitMap.size():" << s.second.retransmitMap.size() << endl;
+            cout << "    retransmitMapSize:" << s.second.retransmitMapSize << endl;
             cout << "    protectionFromDuple0.size()():" << s.second.buffer0.size() << endl;
             cout << "    protectionFromDuple1.size()():" << s.second.buffer1.size() << endl;
         }
         for (auto& s : sessionReaders_) {
             cout << "  sessionReader with node=" << s.first << endl;
             cout << "    retransmitMap.size():" << s.second.retransmitMap.size() << endl;
+            cout << "    retransmitMapSize:" << s.second.retransmitMapSize << endl;
             cout << "    protectionFromDuple0.size()():" << s.second.buffer0.size() << endl;
             cout << "    protectionFromDuple1.size()():" << s.second.buffer1.size() << endl;
         }
         for (auto& s : sessionReaderCandidates_) {
             cout << "  sessionReader with node=" << s.first << endl;
             cout << "    retransmitMap.size():" << s.second.retransmitMap.size() << endl;
+            cout << "    retransmitMapSize:" << s.second.retransmitMapSize << endl;
             cout << "    protectionFromDuple0.size()():" << s.second.buffer0.size() << endl;
             cout << "    protectionFromDuple1.size()():" << s.second.buffer1.size() << endl;
         }

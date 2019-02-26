@@ -192,6 +192,13 @@ namespace network {
         Session& getOrCreateSession(const NodeInfo& destination);
 
         /**
+         * If session for remote node is already created - returns it, otherwise creates new Session
+         * <p>
+         * syncronyzed
+         */
+        Session& getOrCreateSession(int nodeId);
+
+        /**
          * If sessionReader for remote node is already created - returns it, otherwise creates new SessionReader
          */
         SessionReader& getOrCreateSessionReaderCandidate(int remoteId);
@@ -291,7 +298,7 @@ namespace network {
          * Maximum number of data blocks in the retransmit queue after which new
          * sending blocks are delayed in output queue.
          */
-        const static size_t MAX_RETRANSMIT_QUEUE_SIZE = 1500;
+        const static size_t MAX_RETRANSMIT_QUEUE_SIZE = 5000;
 
         /**
          * Maximum number of data blocks in the sending queue after which oldest
@@ -313,6 +320,8 @@ namespace network {
 
     private:
         std::minstd_rand minstdRand_;
+        ThreadPool senderPool_;
+        ThreadPool receiverPool_;
         bool isLogEnabled_ = false;
         bool throwErrors_ = false;
         std::string logLabel_;
@@ -327,6 +336,7 @@ namespace network {
         std::unordered_map<int, SessionReader> sessionReaders_;
         std::unordered_map<int, SessionReader> sessionReaderCandidates_;
         std::recursive_mutex socketMutex_;
+        bool isClosed_ = false;
         bool testMode_ = false;
 
         friend class Retransmitter;

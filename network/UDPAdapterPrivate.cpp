@@ -85,14 +85,17 @@ namespace network {
                 vec.push_back(p.first);
         for (auto& key : vec)
             retransmitMap.erase(key);
+        retransmitMapSize = retransmitMap.size();
     }
 
     void Retransmitter::addPacketToRetransmitMap(int packetId, const Packet& packet, const byte_vector& sourcePayload) {
         retransmitMap.insert(make_pair(packetId, RetransmitItem(packet, sourcePayload, minstdRand_())));
+        retransmitMapSize = retransmitMap.size();
     }
 
     void Retransmitter::removePacketFromRetransmitMap(int packetId) {
         retransmitMap.erase(packetId);
+        retransmitMapSize = retransmitMap.size();
     }
 
     void Retransmitter::pulseRetransmit(std::function<void(const NodeInfo&, const Packet&)> funcSendPacket) {
@@ -127,6 +130,7 @@ namespace network {
         }
         for (auto& key : vecToErase)
             retransmitMap.erase(key);
+        retransmitMapSize = retransmitMap.size();
     }
 
     SessionState Retransmitter::getState() {

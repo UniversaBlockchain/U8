@@ -132,6 +132,7 @@ namespace network {
         Retransmitter(const Retransmitter&) = default;
         Retransmitter(Retransmitter&&) = default;
         std::unordered_map<int, RetransmitItem> retransmitMap;
+        int retransmitMapSize = 0;
         NodeInfo remoteNodeInfo;
         crypto::SymmetricKey sessionKey;
         void removeHandshakePacketsFromRetransmitMap();
