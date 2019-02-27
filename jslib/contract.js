@@ -516,19 +516,21 @@ Contract.prototype.updateContext = function() {
 };
 
 /**
- * Get contract constraint with given name
- * @param name name of the constraint
- * @return found constraint or null
+ * Get contract constraint with given name.
+ *
+ * @param {string} name - Name of the constraint.
+ * @return {string|null} found constraint or null.
  */
 Contract.prototype.findConstraintByName = function(name) {
     return this.constraints.get(name);
 };
 
 /**
- * Get contract constraint with given name in given section
- * @param {string} name name of the constraint
- * @param {string} section section to search in
- * @return found constraint or null
+ * Get contract constraint with given name in given section.
+ *
+ * @param {string} name - Name of the constraint.
+ * @param {string} section - Section to search in.
+ * @return found constraint or null.
  */
 Contract.prototype.findConstraintByNameInSection = function(name, section) {
     if (section === "definition") {
@@ -1236,8 +1238,9 @@ Contract.prototype.getReferencedItems = function() {
 };
 
 /**
- * Add constraint to the constraints list of the contract
- * @param {Constraint} constr - constraint to add
+ * Add constraint to the constraints list of the contract.
+ *
+ * @param {Constraint} constr - Constraint to add.
  */
 Contract.prototype.addConstraint = function(c) {
 
@@ -1253,8 +1256,9 @@ Contract.prototype.addConstraint = function(c) {
 };
 
 /**
- * Remove constraint to the constraints list of the contract
- * @param removed constraint to remove
+ * Remove constraint to the constraints list of the contract.
+ *
+ * @param removed - Constraint to remove.
  */
 Contract.prototype.removeReferencedItem = function(removed) {
 
