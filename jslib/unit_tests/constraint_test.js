@@ -36,20 +36,49 @@ unit.test("constraint copy test", () => {
 
 unit.test("constraint test: simple check", async () => {
 
-    let contractBase = cnt.Contract.fromPrivateKey(await crypto.PrivateKey.generate(2048));
+    let privateKey = await crypto.PrivateKey.generate(2048);
+    let contractBase = cnt.Contract.fromPrivateKey(privateKey);
 
     contractBase.state.data["str_val"] = "~~~ simple string! ===";
+    contractBase.state.data["num_val"] = -103.5678;
 
-    let contractRef = cnt.Contract.fromPrivateKey(await crypto.PrivateKey.generate(2048));
+    let contractRef = cnt.Contract.fromPrivateKey(privateKey);
 
     contractRef.state.data["ref_str_val"] = "12345 another_string +++";
+    contractRef.state.data["ref_num_val"] = 32903103.5678;
+
+    await contractRef.seal();
+    contractBase.state.data["id_val"] = contractRef.id.base64;
 
     let c = new constr.Constraint(contractBase);
     c.type = constr.Constraint.TYPE_EXISTING_STATE;
     let conditions = {};
     conditions[constr.Constraint.conditionsModeType.all_of] = [
         "this.state.data.str_val == \"~~~ simple string! ===\"",
-        "ref.state.data.ref_str_val == \"12345 another_string +++\""
+        "ref.state.data.ref_str_val == \"12345 another_string +++\"",
+        "this.state.data.num_val >= -103.6903",
+        "ref.state.data.ref_num_val < 32903103.8093",
+        "this.creator == this.owner",
+        "ref.owner == this.creator",
+        "ref.owner == this.owner",
+        "ref.issuer == this.issuer",
+        "ref.issuer != \"26RzRJDLqze3P5Z1AzpnucF75RLi1oa6jqBaDh8MJ3XmTaUoF8R\"",
+        "this.owner == " + privateKey.longAddress,
+        "ref.issuer == " + privateKey.longAddress,
+        "ref.owner == " + btoa(privateKey.publicKey.packed),
+        "this.issuer == " + btoa(privateKey.publicKey.packed),
+        "this.state.data.id_val == ref.id",
+        "ref.id == " + contractRef.id.base64,
+        "now >= ref.definition.created_at",
+        "\"2014-03-11 15:04:07\" < now",
+        "1000000000 <= this.definition.created_at",
+        "ref.state.expires_at > \"1992-03-11 00:04:07\"",
+        "this can_play this.issuer",
+        "this can_play this.owner",
+        "this can_play this.creator",
+        "ref can_play ref.issuer",
+        "ref can_play ref.owner",
+        "ref can_play ref.creator"
     ];
     c.setConditions(conditions);
 
@@ -129,7 +158,7 @@ unit.test("constraint test: refMissingField", async () => {
     assert(!res);
 });
 
-/*unit.test("constraint test: refMissingFieldConstantForEquals", async () => {
+unit.test("constraint test: refMissingFieldConstantForEquals", async () => {
 
     let privateKey = await crypto.PrivateKey.generate(2048);
     let contractA = cnt.Contract.fromPrivateKey(privateKey);
@@ -138,16 +167,16 @@ unit.test("constraint test: refMissingField", async () => {
 
     let contractB = cnt.Contract.fromPrivateKey(await crypto.PrivateKey.generate(2048));
 
-    let constr = new constr.Constraint(null);
-    constr.type = Constraint.TYPE_EXISTING_STATE;
+    let c = new constr.Constraint(null);
+    c.type = constr.Constraint.TYPE_EXISTING_STATE;
     let conditions = {};
     conditions[constr.Constraint.conditionsModeType.all_of] = ["ref.state.data.val==false",
                                                                "ref.state.data.ival==0",
                                                                "false==ref.state.data.val",
                                                                "0==ref.state.data.ival"];
-    constr.setConditions(conditions);
+    c.setConditions(conditions);
 
-    contractB.addConstraint(constr);
+    contractB.addConstraint(c);
 
     let batch = cnt.Contract.fromPrivateKey(await crypto.PrivateKey.generate(2048));
 
@@ -168,13 +197,13 @@ unit.test("constraint test: refMissingFieldHashIdForEquals", async () => {
     contractA.state.data["another_val"] = 100;
 
     let contractB = cnt.Contract.fromPrivateKey(await crypto.PrivateKey.generate(2048));
-    let constr = new constr.Constraint(null);
-    constr.type = Constraint.TYPE_EXISTING_STATE;
+    let c = new constr.Constraint(null);
+    c.type = constr.Constraint.TYPE_EXISTING_STATE;
     let conditions = {};
     conditions[constr.Constraint.conditionsModeType.all_of] = ["ref.state.data.val!=ref.id", "this.id!=ref.state.data.val"];
-    constr.setConditions(conditions);
+    c.setConditions(conditions);
 
-    contractB.addConstraint(constr);
+    contractB.addConstraint(c);
 
     let batch = cnt.Contract.fromPrivateKey(await crypto.PrivateKey.generate(2048));
 
@@ -195,13 +224,13 @@ unit.test("constraint test: refMissingFieldRoleForEquals", async () => {
     contractA.state.data["another_val"] = 100;
 
     let contractB = cnt.Contract.fromPrivateKey(await crypto.PrivateKey.generate(2048));
-    let constr = new constr.Constraint(null);
-    constr.type = Constraint.TYPE_EXISTING_STATE;
+    let c = new constr.Constraint(null);
+    c.type = constr.Constraint.TYPE_EXISTING_STATE;
     let conditions = {};
-    conditions[constr.Constraint.conditionsModeType.all_of] = ["refMissingFieldRoleForEquals", "refMissingFieldRoleForEquals"];
-    constr.setConditions(conditions);
+    conditions[constr.Constraint.conditionsModeType.all_of] = ["ref.state.data.val!=ref.issuer", "this.issuer!=ref.state.data.val"];
+    c.setConditions(conditions);
 
-    contractB.addConstraint(constr);
+    contractB.addConstraint(c);
 
     let batch = cnt.Contract.fromPrivateKey(await crypto.PrivateKey.generate(2048));
     batch.newItems.add(contractA);
@@ -221,13 +250,13 @@ unit.test("constraint test: refMissingFieldDateTimeForEquals", async () => {
     contractA.state.data["another_val"] = 100;
 
     let contractB = cnt.Contract.fromPrivateKey(await crypto.PrivateKey.generate(2048));
-    let constr = new constr.Constraint(null);
-    constr.type = Constraint.TYPE_EXISTING_STATE;
+    let c = new constr.Constraint(null);
+    c.type = constr.Constraint.TYPE_EXISTING_STATE;
     let conditions = {};
     conditions[constr.Constraint.conditionsModeType.all_of] = ["ref.state.data.val!=ref.definition.created_at", "this.definition.created_at!=ref.state.data.val"];
-    constr.setConditions(conditions);
+    c.setConditions(conditions);
 
-    contractB.addConstraint(constr);
+    contractB.addConstraint(c);
 
     let batch = cnt.Contract.fromPrivateKey(await crypto.PrivateKey.generate(2048));
     batch.newItems.add(contractA);
@@ -237,7 +266,7 @@ unit.test("constraint test: refMissingFieldDateTimeForEquals", async () => {
 
     let res = await batch.check();
     assert(!res);
-});*/
+});
 
 /*unit.test("constraint test: checkReferences", async () => {
 

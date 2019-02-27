@@ -297,7 +297,7 @@ Constraint.prototype.compareOperands = function(refContract,
 
                 let ref = this.baseContract.findConstraintByName(leftOperand.substring(0, firstPointPos));
                 if (ref == null)
-                    throw "Not found reference: " + leftOperand.substring(0, firstPointPos);
+                    throw "Not found constraint: " + leftOperand.substring(0, firstPointPos);
 
                 for (let checkedContract of contracts)
                     if (ref.isMatchingWith(checkedContract, contracts, iteration + 1))
@@ -325,7 +325,7 @@ Constraint.prototype.compareOperands = function(refContract,
 
                     let ref = this.baseContract.findConstraintByName(leftOperand);
                     if (ref == null)
-                        throw "Not found reference: " + leftOperand;
+                        throw "Not found constraint: " + leftOperand;
 
                     for (let checkedContract of contracts)
                         if (ref.isMatchingWith(checkedContract, contracts, iteration + 1))
@@ -335,7 +335,7 @@ Constraint.prototype.compareOperands = function(refContract,
                         return false;
                 }
             } else if (leftOperand === "now")
-                left = Math.floor(Date.now() / 1000);
+                left = new Date();
         }
     }
 
@@ -356,7 +356,7 @@ Constraint.prototype.compareOperands = function(refContract,
 
                 let ref = this.baseContract.findConstraintByName(rightOperand.substring(0, firstPointPos));
                 if (ref == null)
-                    throw "Not found reference: " + rightOperand.substring(0, firstPointPos);
+                    throw "Not found constraint: " + rightOperand.substring(0, firstPointPos);
 
                 for (let checkedContract of contracts)
                     if (ref.isMatchingWith(checkedContract, contracts, iteration + 1))
@@ -371,7 +371,7 @@ Constraint.prototype.compareOperands = function(refContract,
                 throw "Invalid format of right operand in condition: " + rightOperand + ". Missing contract field.";
         } else if (typeOfRightOperand === compareOperandType.CONSTOTHER) {
             if (rightOperand === "now")
-                right = Math.floor(Date.now() / 1000);
+                right = new Date();
         }
 
         if ((leftOperandContract != null) && (indxOperator !== CAN_PLAY))
@@ -486,8 +486,8 @@ Constraint.prototype.compareOperands = function(refContract,
 
                     } else if (((left != null) && left instanceof roles.Role) || ((right != null) && right instanceof roles.Role)) { // if role - compare with role, key or address
                         if (((left != null) && left instanceof roles.Role) && ((right != null) && right instanceof roles.Role)) {
-                            if (((indxOperator === NOT_EQUAL) && !left.equalsIgnoreName(right)) ||
-                                ((indxOperator === EQUAL) && left.equalsIgnoreName(right)))
+                            if (((indxOperator === NOT_EQUAL) && !left.equalsForConstraint(right)) ||
+                                ((indxOperator === EQUAL) && left.equalsForConstraint(right)))
                             ret = true;
 
                         } else {
@@ -516,13 +516,13 @@ Constraint.prototype.compareOperands = function(refContract,
                                 if (compareOperand.length > 72) {
                                     // Key
                                     let publicKey = new crypto.PublicKey(atob(compareOperand));
-                                    let simpleRole = new crypto.SimpleRole(role.name, [publicKey]);
-                                    ret = role.equalsIgnoreName(simpleRole);
+                                    let simpleRole = new roles.SimpleRole(role.name, [publicKey]);
+                                    ret = role.equalsForConstraint(simpleRole);
                                 } else {
                                     // Address
                                     let ka = new crypto.KeyAddress(compareOperand);
-                                    let simpleRole = new crypto.SimpleRole(role.name, [ka]);
-                                    ret = role.equalsIgnoreName(simpleRole);
+                                    let simpleRole = new roles.SimpleRole(role.name, [ka]);
+                                    ret = role.equalsForConstraint(simpleRole);
                                 }
                             }
                             catch (e) {
@@ -605,10 +605,10 @@ Constraint.prototype.compareOperands = function(refContract,
                     console.log("WARNING: Operator 'is_inherit' was deprecated. Use operator 'is_a'.");
                 case IS_A:
                     if (left == null || !(left instanceof Constraint))
-                        throw "Expected reference in condition in left operand: " + leftOperand;
+                        throw "Expected constraint in condition in left operand: " + leftOperand;
 
                     if (right == null || !(right instanceof Constraint))
-                        throw "Expected reference in condition in right operand: " + rightOperand;
+                        throw "Expected constraint in condition in right operand: " + rightOperand;
 
                     ret = left.isInherited(right, refContract, contracts, iteration + 1);
 
@@ -618,7 +618,7 @@ Constraint.prototype.compareOperands = function(refContract,
                     console.log("WARNING: Operator 'inherit' was deprecated. Use operator 'inherits'.");
                 case INHERITS:
                     if (right == null || !(right instanceof Constraint))
-                        throw"Expected reference in condition in right operand: " + rightOperand;
+                        throw"Expected constraint in condition in right operand: " + rightOperand;
 
                     ret = right.isMatchingWith(refContract, contracts, iteration + 1);
 
@@ -825,7 +825,7 @@ Constraint.prototype.parseCondition = function(condition) {
 
         let leftOperand = subStrL.replace(/\s/g, "");
         if (~leftOperand.indexOf("."))
-            throw "Invalid format of condition: " + condition + ". Left operand must be a reference to a contract.";
+            throw "Invalid format of condition: " + condition + ". Left operand must be a constraint to a contract.";
 
         let subStrR = condition.substring(operPos + operators[CAN_PLAY].length);
         if (subStrR.length === 0)
@@ -855,7 +855,7 @@ Constraint.prototype.parseCondition = function(condition) {
 };
 
 /**
- * Pre-parsing conditions of reference
+ * Pre-parsing conditions of constraint
  *
  * @param {string} conditions is binder of not-parsed (string) conditions
  * @return {} result with parsed conditions
@@ -903,7 +903,7 @@ Constraint.prototype.parseConditions = function(conditions) {
  * @param {} condition condition to check for matching
  * @param {contract} ref contract to check for matching
  * @param {} contracts contract list to check for matching
- * @param {number} iteration check inside references iteration number
+ * @param {number} iteration check inside constraints iteration number
  * @return {boolean} true if match or false
  */
 Constraint.prototype.checkCondition = function(condition, ref, contracts, iteration) {
@@ -961,7 +961,7 @@ Constraint.prototype.checkConditions =  function(conditions, ref, contracts, ite
     return result;
 };
 
-//TODO: The method allows to mark the contract as matching reference, bypassing the validation
+//TODO: The method allows to mark the contract as matching constraint, bypassing the validation
 Constraint.prototype.addMatchingItem = function(a) {
     this.matchingItems.add(a);
 };
@@ -975,17 +975,17 @@ Constraint.prototype.isMatchingWith = function(contract, contracts) {
 };
 
 /**
- * Check if given item matching with current reference criteria
+ * Check if given item matching with current constraint criteria
  * @param {contract} contract item to check for matching
  * @param {} contracts contract list to check for matching
- * @param {number} iteration check inside references iteration number
+ * @param {number} iteration check inside constraints iteration number
  * @return {boolean} true if match or false
  */
 Constraint.prototype.isMatchingWithIteration = function(contract, contracts, iteration) {
     //todo: add this checking for matching with given item
 
     if (iteration > 16)
-        throw "Recursive checking references have more 16 iterations";
+        throw "Recursive checking constraints have more 16 iterations";
 
     let result = true;
 
@@ -1108,7 +1108,7 @@ Constraint.prototype.isInheritedOperand = function (rightOperand, ref, refContra
 
         let constr = this.baseContract.findConstraintByName(rightOperand.substring(0, firstPointPos));
         if (constr == null)
-            throw "Not found reference: " + rightOperand.substring(0, firstPointPos);
+            throw "Not found constraint: " + rightOperand.substring(0, firstPointPos);
 
         for (let checkedContract of contracts)
             if (constr.isMatchingWith(checkedContract, contracts, iteration + 1))
@@ -1125,7 +1125,7 @@ Constraint.prototype.isInheritedOperand = function (rightOperand, ref, refContra
         right = rightOperandContract.get(rightOperand);
 
     if ((right == null) || !(right instanceof Constraint))
-        throw "Expected reference in condition in right operand: " + rightOperand;
+        throw "Expected constraint in condition in right operand: " + rightOperand;
 
     return right.equals(ref);
 };
@@ -1176,7 +1176,7 @@ Constraint.prototype.assemblyCondition = function(condition) {
 };
 
 /**
- * Assembly conditions of reference
+ * Assembly conditions of constraint
  * @param conditions is binder of parsed conditions
  * @return result with assembled (string) conditions
  */

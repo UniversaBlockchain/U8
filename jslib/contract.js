@@ -516,12 +516,21 @@ Contract.prototype.updateContext = function() {
 };
 
 /**
+ * Get contract constraint with given name
+ * @param name name of the constraint
+ * @return found constraint or null
+ */
+Contract.prototype.findConstraintByName = function(name) {
+    return this.constraints.get(name);
+};
+
+/**
  * Get contract constraint with given name in given section
  * @param {string} name name of the constraint
  * @param {string} section section to search in
  * @return found constraint or null
  */
-Contract.prototype.findConstraintByName = function(name, section) {
+Contract.prototype.findConstraintByNameInSection = function(name, section) {
     if (section === "definition") {
         if (this.definition.constraints == null)
             return null;
@@ -575,9 +584,9 @@ Contract.prototype.get = function(name) {
                     }
 
                 if (name.startsWith("constraints."))
-                    return this.findConstraintByName(name.substring(12), this.definition);
+                    return this.findConstraintByNameInSection(name.substring(12), "definition");
                 else if (name.startsWith("references."))
-                    return this.findConstraintByName(name.substring(11), this.definition);
+                    return this.findConstraintByNameInSection(name.substring(11), "definition");
         }
     } else if (name.startsWith("state.")) {
         name = name.substring(6);
@@ -606,9 +615,9 @@ Contract.prototype.get = function(name) {
                         return null;
                     }
                 if (name.startsWith("constraints."))
-                    return this.findConstraintByName(name.substring(12), this.state);
+                    return this.findConstraintByNameInSection(name.substring(12), "state");
                 else if (name.startsWith("references."))
-                    return this.findConstraintByName(name.substring(11), this.state);
+                    return this.findConstraintByNameInSection(name.substring(11), "state");
         }
     } else if (name.startsWith("transactional.")) {
         if (this.transactional != null) {
@@ -626,9 +635,9 @@ Contract.prototype.get = function(name) {
                             return null;
                         }
                     if (name.startsWith("constraints."))
-                        return this.findConstraintByName(name.substring(12), this.transactional);
+                        return this.findConstraintByNameInSection(name.substring(12), "transactional");
                     else if (name.startsWith("references."))
-                        return this.findConstraintByName(name.substring(11), this.transactional);
+                        return this.findConstraintByNameInSection(name.substring(11), "transactional");
             }
         }
     } else switch (name) {

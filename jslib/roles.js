@@ -53,7 +53,7 @@ Role.prototype.equals = function(to) {
     return true;
 };
 
-Role.prototype.equalsIgnoreName = function(to) {
+Role.prototype.equalsForConstraint = function(to) {
     if(this === to)
         return true;
 
@@ -184,14 +184,14 @@ RoleLink.prototype.equals = function(to) {
     return true;
 };
 
-RoleLink.prototype.equalsIgnoreName = function(to) {
+RoleLink.prototype.equalsForConstraint = function(to) {
     if(this === to)
         return true;
 
     if(Object.getPrototypeOf(this) !== Object.getPrototypeOf(to))
         return false;
 
-    if(!Object.getPrototypeOf(RoleLink.prototype).equalsIgnoreName.call(this,to))
+    if(!Object.getPrototypeOf(RoleLink.prototype).equalsForConstraint.call(this,to))
         return false;
 
     if(!t.valuesEqual(this.roleName,to.roleName))
@@ -300,14 +300,14 @@ ListRole.prototype.equals = function(to) {
     return true;
 };
 
-ListRole.prototype.equalsIgnoreName = function(to) {
+ListRole.prototype.equalsForConstraint = function(to) {
     if(this === to)
         return true;
 
     if(Object.getPrototypeOf(this) !== Object.getPrototypeOf(to))
         return false;
 
-    if(!Object.getPrototypeOf(ListRole.prototype).equalsIgnoreName.call(this,to))
+    if(!Object.getPrototypeOf(ListRole.prototype).equalsForConstraint.call(this,to))
         return false;
 
     if(!t.valuesEqual(this.mode,to.mode))
@@ -445,21 +445,42 @@ SimpleRole.prototype.equals = function(to) {
     return true;
 };
 
-SimpleRole.prototype.equalsIgnoreName = function(to) {
+SimpleRole.prototype.equalsForConstraint = function(to) {
     if(this === to)
         return true;
 
     if(Object.getPrototypeOf(this) !== Object.getPrototypeOf(to))
         return false;
 
-    if(!Object.getPrototypeOf(SimpleRole.prototype).equalsIgnoreName.call(this,to))
+    if(!Object.getPrototypeOf(SimpleRole.prototype).equalsForConstraint.call(this,to))
         return false;
 
-    if(!t.valuesEqual(this.keyRecords,to.keyRecords))
+    if(!this.hasAllKeys(to))
         return false;
 
-    if(!t.valuesEqual(this.keyAddresses,to.keyAddresses))
+    if(!to.hasAllKeys(this))
         return false;
+
+    return true;
+};
+
+SimpleRole.prototype.hasAllKeys = function(to) {
+    for (let key of this.keyRecords.keys())
+        if (!(to.keyRecords.hasOwnProperty(key) || to.keyAddresses.has(key.shortAddress) || to.keyAddresses.has(key.longAddress)))
+            return false;
+
+    for (let addr of this.keyAddresses) {
+        if (to.keyAddresses.has(addr))
+            continue;
+
+        let foundKey = false;
+        for (let key of to.keyRecords.keys())
+            if (addr.equals(key.shortAddress) || addr.equals(key.longAddress))
+                foundKey = true;
+
+        if (!foundKey)
+            return false;
+    }
 
     return true;
 };
