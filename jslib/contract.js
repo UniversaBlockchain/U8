@@ -1256,7 +1256,7 @@ Contract.prototype.addConstraint = function(c) {
 };
 
 /**
- * Remove constraint to the constraints list of the contract.
+ * Remove constraint from the constraints list of the contract.
  *
  * @param removed - Constraint to remove.
  */

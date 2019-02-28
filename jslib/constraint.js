@@ -56,7 +56,7 @@ Constraint.conditionsModeType = {
  * Constraint constructor function.
  *
  * @class
- * @param {Contract} contract
+ * @param {Contract} contract containing constraint
  *
  * @classdesc Constraints allow you to refer to the internal fields of the contract, constants and fields of other
  * contracts, to establish the necessary conditions.
@@ -259,7 +259,7 @@ Constraint.prototype.objectCastToBigDecimal = function(obj, operand, typeOfOpera
  * The comparison method for finding constraint contract.
  *
  * @param {Contract} refContract - Contract to check for matching.
- * @param {string} leftOperand - Left Operand field selector.
+ * @param {string} leftOperand - Left operand field selector.
  * @param {string} rightOperand - Right operand (constant | field_selector), constant = ("null" | number | string | true | false).
  * @param {compareOperandType} typeOfLeftOperand - Type of left operand (constant | field_selector), constant = ("null" | number | string | true | false).
  * @param {compareOperandType} typeOfRightOperand - Type of right operand (constant | field_selector), constant = ("null" | number | string | true | false).
@@ -674,7 +674,7 @@ Constraint.prototype.compareOperands = function(refContract,
 /**
  * Parse string condition.
  *
- * @param {string} condition - Condition string.
+ * @param {string} condition string.
  * @return {object} - Object with condition parameters.
  * @throws Invalid format of condition.
  */
@@ -865,8 +865,8 @@ Constraint.prototype.parseCondition = function(condition) {
 /**
  * Pre-parsing conditions of constraint
  *
- * @param {object} conditions - Is binder of not-parsed (string) conditions.
- * @return {object} Binder with parsed conditions.
+ * @param {object} conditions - Is object with not-parsed (string) conditions.
+ * @return {object} Object with parsed conditions.
  * @throws Expected all_of or any_of.
  */
 Constraint.prototype.parseConditions = function(conditions) {
@@ -909,7 +909,7 @@ Constraint.prototype.parseConditions = function(conditions) {
 /**
  * Check condition of constraint.
  *
- * @param {string} condition - Condition to check for matching.
+ * @param {string|object} condition - Condition to check for matching.
  * @param {Contract} ref - Contract to check for matching.
  * @param {Set<Contract>} contracts - Contract list to check for matching.
  * @param {number} iteration - Check inside constraints iteration number.
@@ -930,7 +930,7 @@ Constraint.prototype.checkCondition = function(condition, ref, contracts, iterat
 /**
  * Check conditions of constraint.
  *
- * @param {object} conditions - Binder with conditions to check for matching.
+ * @param {object} conditions - Object with conditions to check for matching.
  * @param {Contract} ref - Contract to check for matching.
  * @param {Set<Contract>} contracts - Contract list to check for matching.
  * @param {number} iteration - Check inside constraints iteration number.
@@ -974,7 +974,7 @@ Constraint.prototype.checkConditions =  function(conditions, ref, contracts, ite
 /**
  * Add the matching item for the constraint.
  *
- * @param {Contract} a - Contract.
+ * @param {Contract} a - Contract to add to matching items.
  * @return {void}
  */
 Constraint.prototype.addMatchingItem = function(a) {
@@ -1056,9 +1056,9 @@ Constraint.prototype.isMatchingWithIteration = function(contract, contracts, ite
 /**
  * Check whether a constraint inherits a condition from the specified constraint.
  *
- * @param {Constraint} constr - Constraint.
- * @param {Contract} constrContract - Contract Contract item to check for inheritance.
- * @param {Set<Contract>} contracts - Contracts list to check for inheritance.
+ * @param {Constraint} constr - Constraint for finding in inherits condition.
+ * @param {Contract} constrContract - Contract to check for matching.
+ * @param {Set<Contract>} contracts - Contracts list to check for matching.
  * @param {number} iteration - Iteration check inside constraints iteration number.
  * @return {boolean} true if inherited or false.
  */
@@ -1069,10 +1069,10 @@ Constraint.prototype.isInherited = function (constr, constrContract, contracts, 
 /**
  * Check whether a constraint inherits a conditions from the specified constraint.
  *
- * @param {object} conditions - Binder with conditions.
- * @param {Constraint} constr - Constraint.
- * @param {Contract} constrContract - Contract Contract item to check for inheritance.
- * @param {Set<Contract>} contracts - Contracts list to check for inheritance.
+ * @param {object} conditions - Object with conditions.
+ * @param {Constraint} constr - Constraint for finding in inherits condition.
+ * @param {Contract} constrContract - Contract to check for matching.
+ * @param {Set<Contract>} contracts - Contracts list to check for matching.
  * @param {number} iteration - Iteration check inside constraints iteration number.
  * @return {boolean} true if inherited or false.
  */
@@ -1111,10 +1111,10 @@ Constraint.prototype.isInheritedConditions = function (conditions, constr, const
 /**
  * Checks whether a condition is a condition of inheritance.
  *
- * @param {object} condition - Binder with conditions.
- * @param {Constraint} constr - Constraint.
- * @param {Contract} constrContract - Contract Contract item to check for inheritance.
- * @param {Set<Contract>} contracts - Contracts list to check for inheritance.
+ * @param {object} condition - Object with conditions.
+ * @param {Constraint} constr - Constraint for finding in inherits condition.
+ * @param {Contract} constrContract - Contract to check for matching.
+ * @param {Set<Contract>} contracts - Contracts list to check for matching.
  * @param {number} iteration - Iteration check inside constraints iteration number.
  * @return {boolean} true if inherited or false.
  */
@@ -1129,10 +1129,10 @@ Constraint.prototype.isInheritedParsed = function (condition, constr, constrCont
 /**
  * Checks if a condition is a condition of inheritance if the condition is not yet parsed.
  *
- * @param {object} condition - Binder with conditions.
- * @param {Constraint} constr - Constraint.
- * @param {Contract} constrContract - Contract Contract item to check for inheritance.
- * @param {Set<Contract>} contracts - Contracts list to check for inheritance.
+ * @param {object} condition - Object with conditions.
+ * @param {Constraint} constr - Constraint for finding in inherits condition.
+ * @param {Contract} constrContract - Contract to check for matching.
+ * @param {Set<Contract>} contracts - Contracts list to check for matching.
  * @param {number} iteration - Iteration check inside constraints iteration number.
  * @return {boolean} true if inherited or false.
  * @throws Invalid format of condition
@@ -1160,9 +1160,9 @@ Constraint.prototype.isInheritedCondition = function (condition, constr, constrC
  * Checks the operand of the inheritance condition for compliance with the specified constraint.
  *
  * @param {string} rightOperand - Operand of the inheritance condition.
- * @param {Constraint} constr - Constraint.
- * @param {Contract} constrContract - Contract Contract item to check for inheritance.
- * @param {Set<Contract>} contracts - Contracts list to check for inheritance.
+ * @param {Constraint} constr - Constraint for finding in inherits condition.
+ * @param {Contract} constrContract - Contract to check for matching.
+ * @param {Set<Contract>} contracts - Contracts list to check for matching.
  * @param {number} iteration - Iteration check inside constraints iteration number.
  * @return {boolean} true if inherited or false.
  * @throws Invalid format of condition.
@@ -1213,7 +1213,7 @@ Constraint.prototype.isInheritedOperand = function (rightOperand, constr, constr
 /**
  * Assembly condition of constraint.
  *
- * @param {object} condition - binder of parsed condition.
+ * @param {object} condition - Object of parsed condition.
  * @return {string|null} result with assembled condition.
  */
 Constraint.prototype.assemblyCondition = function(condition) {
@@ -1258,7 +1258,7 @@ Constraint.prototype.assemblyCondition = function(condition) {
 /**
  * Assembly conditions of constraint.
  *
- * @param {object} conditions - Binder of parsed conditions.
+ * @param {object} conditions - Object of parsed conditions.
  * @return {object|null} result with assembled (string) conditions.
  * @throws Expected all_of or any_of conditions.
  */
