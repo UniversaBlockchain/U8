@@ -52,7 +52,6 @@ void TimerThread::scheduleWithFixedDelay(const std::function<void()> callback, l
 }
 
 void TimerThread::stop() {
-    std::lock_guard guard(callbackMutex_);
     isStarted_ = false;
     cv_.notifyAll();
 }
