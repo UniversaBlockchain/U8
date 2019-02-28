@@ -22,20 +22,29 @@ function TransactionPack(contract) {
 }
 
 
-
+/**
+ * Method add found contracts in the new items and revoking items to {@see TransactionPack#subItems} and do it
+ * again for each new item.
+ * Also method add to {@see TransactionPack#referencedItems} referenced contracts from given.
+ * @param {Contract} contract - given contract to extract from.
+ */
 TransactionPack.prototype.extractAllSubItemsAndReferenced = function(contract) {
-    for(let c of contract.revokingItems) {
-        this.subItems.set(c.id,c);
+    for (let c of contract.revokingItems) {
+        this.subItems.set(c.id, c);
         c.transactionPack = this;
+
+        for (let ref of c.getReferencedItems())
+            this.referencedItems.set(ref.id, ref);
     }
 
-    for(let c of contract.newItems) {
-        this.subItems.set(c.id,c);
+    for (let c of contract.newItems) {
+        this.subItems.set(c.id, c);
         c.transactionPack = this;
         this.extractAllSubItemsAndReferenced(c);
     }
 
-    //TODO:referenced
+    for (let ref of contract.getReferencedItems())
+        this.referencedItems.set(ref.id, ref);
 };
 
 
@@ -71,10 +80,10 @@ TransactionPack.prototype.deserialize = function(data,deserializer) {
 
     if(data.hasOwnProperty("referencedItems")) {
         for(let referencedBinary of deserializer.deserialize(data.referencedItems)) {
-            this.referencedItems.add(new Contract(referencedBinary,this));
+            let c = new Contract.fromSealedBinary(referencedBinary, this);
+            this.referencedItems.set(c.id, c);
         }
     }
-
 
     let missingIds = new Set();
     let allDeps = [];

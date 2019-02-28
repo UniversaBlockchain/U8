@@ -268,7 +268,7 @@ int Scripter::runAsMain(const string &sourceScript, const vector<string> &&args,
     if (waitExit) {
         pIsolate->Exit();
         Unlocker ul(pIsolate);
-        waitExitVar.wait();
+        waitExitVar.wait(100s);
         pIsolate->Enter();
         return exitCode;
     }

@@ -9,6 +9,7 @@ const QuantiserProcesses = q.QuantiserProcesses;
 const QuantiserException = q.QuantiserException;
 const Boss = require('boss.js');
 const roles = require('roles');
+const constr = require('constraint');
 const permissions = require('permissions');
 const e = require("errors");
 const Errors = e.Errors;
@@ -27,7 +28,7 @@ function Context(base) {
 function Transactional(contract) {
     this.contract = contract;
     this.id = null;
-    this.references = [];
+    this.constraints = [];
     this.validUntil = null;
     this.data = {};
 }
@@ -36,7 +37,7 @@ Transactional.prototype.serialize = function(serializer) {
 
     let b = {
         id: this.id,
-        references : serializer.serialize(this.references),
+        constraints : serializer.serialize(this.constraints),
         data : this.data,
     };
 
@@ -49,9 +50,11 @@ Transactional.prototype.serialize = function(serializer) {
 Transactional.prototype.deserialize = function(data,deserializer) {
     if(data != null) {
         this.id = data.id;
-        if(data.hasOwnProperty("references")) {
-            this.references = deserializer.deserialize(data.references);
-        }
+
+        if (data.hasOwnProperty("constraints"))
+            this.constraints = deserializer.deserialize(data.constraints);
+        else if (data.hasOwnProperty("references"))
+            this.constraints = deserializer.deserialize(data.references);
 
         if(data.hasOwnProperty("valid_until")) {
             this.validUntil = data.valid_until;
@@ -60,6 +63,10 @@ Transactional.prototype.deserialize = function(data,deserializer) {
 
         this.data = data.data;
     }
+};
+
+Transactional.prototype.addConstraint = function(c) {
+    this.constraints.push(c);
 };
 
 
@@ -77,7 +84,7 @@ function State(contract) {
     this.parent = null;
     this.data = {};
     this.branchId = null;
-    this.references = [];
+    this.constraints = [];
 
     //TODO:setJS
 }
@@ -121,12 +128,12 @@ State.prototype.getBranchRevision = function() {
         return 0;
     else
         return parseInt(this.branchId.split(":")[0])
-}
+};
 
 
 State.prototype.setBranchNumber = function (number) {
     this.branchId = this.revision + ":" + number;
-}
+};
 
 
 State.prototype.serialize = function(serializer) {
@@ -144,8 +151,8 @@ State.prototype.serialize = function(serializer) {
     if (this.expiresAt != null)
         of.expires_at = this.expiresAt;
 
-    if (this.references != null)
-        of.references = this.references;
+    if (this.constraints != null)
+        of.constraints = serializer.serialize(this.constraints);
 
     return serializer.serialize(of);
 };
@@ -161,11 +168,12 @@ State.prototype.deserialize = function(data,deserializer) {
     if (this.revision <= 0)
         throw "illegal revision number: " + this.revision;
 
-
-    if(data.hasOwnProperty("references"))
-        this.references = deserializer.deserialize(data.references);
+    if (data.hasOwnProperty("constraints"))
+        this.constraints = deserializer.deserialize(data.constraints);
+    else if (data.hasOwnProperty("references"))
+        this.constraints = deserializer.deserialize(data.references);
     else
-        this.references = [];
+        this.constraints = [];
 
     let r = this.contract.registerRole(deserializer.deserialize(data.owner))
     if(r.name !== "owner")
@@ -200,7 +208,9 @@ State.prototype.deserialize = function(data,deserializer) {
         this.origin = null;
 };
 
-
+State.prototype.addConstraint = function(c) {
+    this.constraints.push(c);
+};
 
 
 function Definition(contract) {
@@ -210,7 +220,7 @@ function Definition(contract) {
     this.createdAt.setMilliseconds(0);
     this.expiresAt = null;
     this.data = {};
-    this.references = [];
+    this.constraints = [];
     this.extendedType = null;
     this.permissions = new Map();
 
@@ -236,7 +246,7 @@ Definition.prototype.equals = function(to) {
     if(!t.valuesEqual(this.data,to.data))
         return false;
 
-    if(!t.valuesEqual(this.references,to.references))
+    if(!t.valuesEqual(this.constraints,to.constraints))
         return false;
 
     if(!t.valuesEqual(this.extendedType,to.extendedType))
@@ -273,8 +283,8 @@ Definition.prototype.serialize = function(serializer) {
     if (this.expiresAt != null)
         of.expires_at = this.expiresAt;
 
-    if (this.references != null)
-        of.references = this.references;
+    if (this.constraints != null)
+        of.constraints = serializer.serialize(this.constraints);
 
     if (this.extendedType != null)
         of.extended_type = this.extendedType;
@@ -300,19 +310,18 @@ Definition.prototype.deserialize = function(data,deserializer) {
         this.extendedType = null;
     }
 
-
     if(data.hasOwnProperty("data")) {
         this.data = data.data;
     } else {
         this.data = {};
     }
 
-    if(data.hasOwnProperty("references")) {
-        this.references = deserializer.deserialize(data.references);
-    } else {
-        this.references = [];
-    }
-
+    if (data.hasOwnProperty("constraints"))
+        this.constraints = deserializer.deserialize(data.constraints);
+    else if (data.hasOwnProperty("references"))
+        this.constraints = deserializer.deserialize(data.references);
+    else
+        this.constraints = [];
 
     let perms = deserializer.deserialize(data.permissions);
     for(let pid of Object.keys(perms)) {
@@ -349,6 +358,10 @@ Definition.prototype.addPermission = function (permission) {
     this.permissions.get(permission.name).push(permission);
 };
 
+Definition.prototype.addConstraint = function(c) {
+    this.constraints.push(c);
+};
+
 
 ///////////////////////////
 //Contract
@@ -372,10 +385,10 @@ function Contract() {
     this.sealedByKeys = new t.GenericMap();
     this.effectiveKeys = new Map();
     this.keysToSignWith = new Set();
-    this.references = new Map();
+    this.constraints = new Map();
     this.id = null;
     this.transactionPack = null;
-    this.validRoleReferences = new Set();
+    this.validRoleConstraints = new Set();
     this.quantiser = new Quantiser();
 }
 
@@ -502,9 +515,52 @@ Contract.prototype.updateContext = function() {
     }
 };
 
-Contract.prototype.findReferenceByName = function(name,section) {
-    //TODO: implement
-    console.log("NOT IMPLEMENTED Contract.findReferenceByName")
+/**
+ * Get contract constraint with given name.
+ *
+ * @param {string} name - Name of the constraint.
+ * @return {string|null} found constraint or null.
+ */
+Contract.prototype.findConstraintByName = function(name) {
+    return this.constraints.get(name);
+};
+
+/**
+ * Get contract constraint with given name in given section.
+ *
+ * @param {string} name - Name of the constraint.
+ * @param {string} section - Section to search in.
+ * @return found constraint or null.
+ */
+Contract.prototype.findConstraintByNameInSection = function(name, section) {
+    if (section === "definition") {
+        if (this.definition.constraints == null)
+            return null;
+
+        for (let constr of this.definition.constraints)
+            if (constr.name === name)
+                return constr;
+
+        return null;
+    } else if (section === "state") {
+        if (this.state.constraints == null)
+            return null;
+
+        for (let constr of this.state.constraints)
+            if (constr.name === name)
+                return constr;
+
+        return null;
+    } else if (section === "transactional") {
+        if ((this.transactional == null) || (this.transactional.constraints == null))
+            return null;
+
+        for (let constr of this.transactional.constraints)
+            if (constr.name === name)
+                return constr;
+
+        return null;
+    }
     return null;
 };
 
@@ -528,9 +584,11 @@ Contract.prototype.get = function(name) {
                     } else {
                         return null;
                     }
-                if (name.startsWith("references.")) {
-                    return this.findReferenceByName(name.substring(11), this.definition);
-                }
+
+                if (name.startsWith("constraints."))
+                    return this.findConstraintByNameInSection(name.substring(12), "definition");
+                else if (name.startsWith("references."))
+                    return this.findConstraintByNameInSection(name.substring(11), "definition");
         }
     } else if (name.startsWith("state.")) {
         name = name.substring(6);
@@ -558,9 +616,10 @@ Contract.prototype.get = function(name) {
                     } else {
                         return null;
                     }
-                if (name.startsWith("references.")) {
-                    return this.findReferenceByName(name.substring(11), this.state);
-                }
+                if (name.startsWith("constraints."))
+                    return this.findConstraintByNameInSection(name.substring(12), "state");
+                else if (name.startsWith("references."))
+                    return this.findConstraintByNameInSection(name.substring(11), "state");
         }
     } else if (name.startsWith("transactional.")) {
         if (this.transactional != null) {
@@ -577,9 +636,10 @@ Contract.prototype.get = function(name) {
                         } else {
                             return null;
                         }
-                    if (name.startsWith("references.")) {
-                        return this.findReferenceByName(name.substring(11), this.transactional);
-                    }
+                    if (name.startsWith("constraints."))
+                        return this.findConstraintByNameInSection(name.substring(12), "transactional");
+                    else if (name.startsWith("references."))
+                        return this.findConstraintByNameInSection(name.substring(11), "transactional");
             }
         }
     } else switch (name) {
@@ -717,24 +777,24 @@ Contract.prototype.deserialize = function(data,deserializer) {
         this.transactional = null;
     }
 
-    if (this.transactional != null && this.transactional.references != null) {
-        for(let ref of this.transactional.references) {
-            ref.setContract(this);
-            this.references.set(ref.name, ref);
+    if (this.transactional != null && this.transactional.constraints != null) {
+        for(let constr of this.transactional.constraints) {
+            constr.setContract(this);
+            this.constraints.set(constr.name, constr);
         }
     }
 
-    if (this.definition != null && this.definition.references != null) {
-        for(let ref of this.definition.references) {
-            ref.setContract(this);
-            this.references.set(ref.name, ref);
+    if (this.definition != null && this.definition.constraints != null) {
+        for(let constr of this.definition.constraints) {
+            constr.setContract(this);
+            this.constraints.set(constr.name, constr);
         }
     }
 
-    if (this.state != null && this.state.references != null) {
-        for(let ref of this.state.references) {
-            ref.setContract(this);
-            this.references.set(ref.name, ref);
+    if (this.state != null && this.state.constraints != null) {
+        for(let constr of this.state.constraints) {
+            constr.setContract(this);
+            this.constraints.set(constr.name, constr);
         }
     }
 };
@@ -758,7 +818,7 @@ Contract.prototype.getRevokingItem = function(id) {
 Contract.prototype.addSignatureToSeal = async function(x) {
     let keys;
     let proto = Object.getPrototypeOf(x);
-    if(proto === Array.prototype || proto == Set.prototype) {
+    if(proto === Array.prototype || proto === Set.prototype) {
         keys = x;
     } else if(proto === crypto.PrivateKey.prototype){
         keys = [];
@@ -829,7 +889,7 @@ Contract.prototype.equals = function(to) {
     if(!t.valuesEqual(this.sealedByKeys,to.sealedByKeys))
         return false;
 
-    if(!t.valuesEqual(this.references,to.references))
+    if(!t.valuesEqual(this.constraints,to.constraints))
         return false;
 
     return true;
@@ -863,13 +923,13 @@ Contract.prototype.check = async function(prefix,contractsTree) {
 
     this.quantiser.addWorkCost(QuantiserProcesses.PRICE_REGISTER_VERSION);
     this.quantiser.addWorkCost(QuantiserProcesses.PRICE_REVOKE_VERSION*this.revokingItems.size);
-    this.quantiser.addWorkCost(QuantiserProcesses.PRICE_CHECK_REFERENCED_VERSION*this.references.size);
+    this.quantiser.addWorkCost(QuantiserProcesses.PRICE_CHECK_CONSTRAINT*this.constraints.size);
 
-    this.checkReferencedItems(contractsTree);
+    this.checkConstraints(contractsTree);
 
     this.revokingItems.forEach(ri => {
         ri.errors = [];
-        ri.checkReferencedItems(contractsTree,true);
+        ri.checkConstraints(contractsTree,true);
         ri.errors.forEach(e => {
             this.errors.push(e);
         });
@@ -909,7 +969,7 @@ Contract.prototype.check = async function(prefix,contractsTree) {
 
     this.checkTestPaymentLimitations();
 
-    return this.errors.length == 0;
+    return this.errors.length === 0;
 };
 
 Contract.prototype.getRevisionId = function() {
@@ -1138,7 +1198,7 @@ Contract.prototype.checkChangedContract = function() {
             this.errors.push(new ErrorRecord(Errors.BAD_VALUE, "state.origin", "wrong origin, should be root"));
         }
         if (!parent.id.equals(this.state.parent))
-            this.errors.push(new ErrorRecord(Errors.BAD_VALUE, "state.parent", "illegal parent references"));
+            this.errors.push(new ErrorRecord(Errors.BAD_VALUE, "state.parent", "illegal parent reference"));
 
         let delta = new ContractDelta(parent, this);
         delta.check();
@@ -1153,13 +1213,205 @@ Contract.prototype.getOrigin = function() {
     } else {
         return this.state.origin;
     }
-}
+};
 
-Contract.prototype.checkReferencedItems = function(contractsTree,roleRefsOnly) {
-    if(typeof roleRefsOnly === "undefined")
-        roleRefsOnly = false;
+Contract.prototype.getReferencedItems = function() {
 
-    //TODO:
+    let referencedItems = new Set();
+
+    if (this.transactional != null)
+        for (let constr of this.transactional.constraints)
+            for (let matching of constr.matchingItems)
+                referencedItems.add(matching);
+
+    if (this.definition != null)
+        for (let constr of this.definition.constraints)
+            for (let matching of constr.matchingItems)
+                referencedItems.add(matching);
+
+    if (this.state != null)
+        for (let constr of this.state.constraints)
+            for (let matching of constr.matchingItems)
+                referencedItems.add(matching);
+
+    return referencedItems;
+};
+
+/**
+ * Add constraint to the constraints list of the contract.
+ *
+ * @param {Constraint} constr - Constraint to add.
+ */
+Contract.prototype.addConstraint = function(c) {
+
+    if (c.type === constr.Constraint.TYPE_TRANSACTIONAL) {
+        if (this.transactional != null)
+            this.transactional.addConstraint(c);
+    } else if (c.type === constr.Constraint.TYPE_EXISTING_DEFINITION)
+        this.definition.addConstraint(c);
+    else if(c.type === constr.Constraint.TYPE_EXISTING_STATE)
+        this.state.addConstraint(c);
+
+    this.constraints.set(c.name, c);
+};
+
+/**
+ * Remove constraint from the constraints list of the contract.
+ *
+ * @param removed - Constraint to remove.
+ */
+Contract.prototype.removeReferencedItem = function(removed) {
+
+    for (let constr of this.constraints)
+        constr.matchingItems.delete(removed);
+
+    if (this.transactional != null)
+        for (let constr of this.transactional.constraints)
+            constr.matchingItems.delete(removed);
+
+    if (this.definition != null)
+        for (let constr of this.definition.constraints)
+            constr.matchingItems.delete(removed);
+
+    if (this.state != null)
+        for (let constr of this.state.constraints)
+            constr.matchingItems.delete(removed);
+
+    this.newItems.delete(removed);
+    this.revokingItems.delete(removed);
+};
+
+Contract.prototype.checkConstraints = function(contractsTree, roleConstraintsOnly) {
+
+    if (typeof roleConstraintsOnly === "undefined")
+        roleConstraintsOnly = false;
+
+    this.validRoleConstraints.clear();
+
+    if (this.constraints.size === 0)
+        return true;        // if contract has no constraints -> then it's checkConstraints check is ok
+
+    let neighbours = new Set(contractsTree.values());
+
+    // check each constraint, all must be ok
+    let allRefs_check = true;
+    for (let c of this.constraints.values()) {
+
+        let roleConstraint = false;
+        for (let roleName in this.roles)
+            if (this.roles.hasOwnProperty(roleName) && this.roles[roleName] instanceof roles.Role &&
+                this.roles[roleName].containConstraint(c.name)) {
+                roleConstraint = true;
+                break;
+            }
+
+        if (!roleConstraint)
+            for (let plist of this.definition.permissions.values()) {
+                for (let perm of plist)
+                    if (perm.role.containConstraint(c.name)) {
+                        roleConstraint = true;
+                        break;
+                    }
+
+                if (roleConstraint)
+                    break;
+            }
+
+        if (roleConstraintsOnly && !roleConstraint)
+            continue;
+
+        // use all neighbourContracts to check constraint. at least one must be ok
+        let c_check = false;
+        if (c.type === constr.Constraint.TYPE_TRANSACTIONAL) {
+            for (let neighbour of neighbours)
+                if ((((c.transactional_id != null && neighbour.transactional != null && c.transactional_id.equals(neighbour.transactional.id)) ||
+                    (c.contract_id != null && c.contract_id.equals(neighbour.id))) && this.checkOneConstraint(c, neighbour)) ||
+                    (c.conditions.length > 0))    // new format of constraint with conditions, transactional_id - optional
+                    if (c.isMatchingWith(neighbour, neighbours)) {
+                        c.addMatchingItem(neighbour);
+                        c_check = true;
+                        break;
+                    }
+
+        } else if ((c.type === constr.Constraint.TYPE_EXISTING_DEFINITION) || (c.type === constr.Constraint.TYPE_EXISTING_STATE)) {
+            for (let neighbour of neighbours)
+                if (c.isMatchingWith(neighbour, neighbours))
+                    c.addMatchingItem(neighbour);
+
+            c_check = c.isValid();
+        }
+
+        if (!c_check) {
+            if (!roleConstraint) {
+                allRefs_check = false;
+                this.errors.push(new ErrorRecord(Errors.FAILED_CHECK, "contract (hashId=" + this.id.base64.substring(0, 8) + "…)", "checkConstraints return false"));
+            }
+        } else {
+            if(roleConstraint)
+                this.validRoleConstraints.add(c.name);
+        }
+    }
+
+    return allRefs_check;
+};
+
+Contract.prototype.checkOneConstraint = function(c, refContract) {
+    let res = true;
+
+    if (c.type === constr.Constraint.TYPE_TRANSACTIONAL) {
+        if ((c.transactional_id == null) ||
+            (refContract.transactional == null) ||
+            (refContract.transactional.id == null) ||
+            (c.transactional_id === "") ||
+            (refContract.transactional.id === "")) {
+            res = false;
+            this.errors.push(new ErrorRecord(Errors.BAD_REF, "contract (hashId=" + this.id.base64.substring(0, 8) + "…)", "transactional is missing"));
+        } else {
+            if (c.transactional_id != null && refContract.transactional == null) {
+                res = false;
+                this.errors.push(new ErrorRecord(Errors.BAD_REF, "contract (hashId=" + this.id.base64.substring(0, 8) + "…)", "transactional not found"));
+            } else if (c.transactional_id !== refContract.transactional.id) {
+                res = false;
+                this.errors.push(new ErrorRecord(Errors.BAD_REF, "contract (hashId=" + this.id.base64.substring(0, 8) + "…)", "transactional_id mismatch"));
+            }
+        }
+    }
+
+    if (c.contract_id != null) {
+        if (!c.contract_id.equals(refContract.id)) {
+            res = false;
+            this.errors.push(new ErrorRecord(Errors.BAD_REF, "contract (hashId=" + this.id.base64.substring(0, 8) + "…)", "contract_id mismatch"));
+        }
+    }
+
+    if (c.origin != null) {
+        if (!c.origin.equals(refContract.getOrigin())) {
+            res = false;
+            this.errors.push(new ErrorRecord(Errors.BAD_REF, "contract (hashId=" + this.id.base64.substring(0, 8) + "…)", "origin mismatch"));
+        }
+    }
+
+    for (let refRole of c.signed_by) {
+        if (!refContract.isSignedBy(refRole)) {
+            res = false;
+            this.errors.push(new ErrorRecord(Errors.BAD_SIGNATURE, "contract (hashId=" + this.id.base64.substring(0, 8) + "…)", "fingerprint mismatch"));
+        }
+    }
+
+    return res;
+};
+
+Contract.prototype.isSignedBy = function(role) {
+    if (role == null)
+        return false;
+
+    if (role instanceof roles.RoleLink)
+        role  = role.resolve();
+
+    if (role == null)
+        return false;
+
+    return role.isAllowedForKeys(this.effectiveKeys.keys());
 };
 
 Contract.prototype.setEffectiveKeys = function(additionalSignatures) {
@@ -1266,20 +1518,20 @@ Contract.prototype.createRevision = function(keys) {
     newRevision.state.revision = this.state.revision + 1;
     newRevision.state.createdAt = new Date();
     newRevision.state.parent = this.id;
-    newRevision.state.origin = this.state.revision == 1 ? this.id : this.state.origin;
+    newRevision.state.origin = this.state.revision === 1 ? this.id : this.state.origin;
     newRevision.revokingItems.add(this);
     newRevision.transactional = null;
 
-    if (newRevision.definition != null && newRevision.definition.references != null){
-        for(let ref of  newRevision.definition.references) {
-            ref.setContract(newRevision);
-            newRevision.references.set(ref.name, ref);
+    if (newRevision.definition != null && newRevision.definition.constraints != null) {
+        for(let constr of newRevision.definition.constraints) {
+            constr.setContract(newRevision);
+            newRevision.constraints.set(constr.name, constr);
         }
     }
-    if (newRevision.state != null && newRevision.state.references != null){
-        for(let ref of newRevision.state.references) {
-            ref.setContract(newRevision);
-            newRevision.references.set(ref.name, ref);
+    if (newRevision.state != null && newRevision.state.constraints != null) {
+        for(let constr of newRevision.state.constraints) {
+            constr.setContract(newRevision);
+            newRevision.constraints.set(constr.name, constr);
         }
     }
 
@@ -1323,7 +1575,7 @@ Contract.prototype.split = function(count) {
         results.push(c);
     }
     return results;
-}
+};
 
 DefaultBiMapper.registerAdapter(new bs.BiAdapter("UniversaContract",Contract));
 

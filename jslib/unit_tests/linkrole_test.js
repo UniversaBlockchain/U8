@@ -9,7 +9,7 @@ import * as cnt from 'contract'
 
 unit.test("link role serialization", async () => {
     let role = new roles.RoleLink("name1","name2");
-    role.requiredAnyReferences.add("ref1");
+    role.requiredAnyConstraints.add("ref1");
 
 
 
