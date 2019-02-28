@@ -265,7 +265,7 @@ Constraint.prototype.objectCastToBigDecimal = function(obj, operand, typeOfOpera
  * @param {compareOperandType} typeOfRightOperand - Type of right operand (constant | field_selector), constant = ("null" | number | string | true | false).
  * @param {boolean} isBigDecimalConversion - If true, converts strings and numbers to BigDecimal before comparison.
  * @param {number} indxOperator - Index operator in array of operators.
- * @param {IterableIterator<Contract>} contracts - Contracts list to check for matching.
+ * @param {Set<Contract>} contracts - Contracts list to check for matching.
  * @param {number} iteration - Check inside constraints iteration number
  * @return {boolean} True if match or false.
  * @throws If error compare.
@@ -307,7 +307,7 @@ Constraint.prototype.compareOperands = function(refContract,
                     throw "Not found constraint: " + leftOperand.substring(0, firstPointPos);
 
                 for (let checkedContract of contracts)
-                    if (ref.isMatchingWith(checkedContract, contracts, iteration + 1))
+                    if (ref.isMatchingWithIteration(checkedContract, contracts, iteration + 1))
                         leftOperandContract = checkedContract;
 
                 if (leftOperandContract == null)
@@ -335,7 +335,7 @@ Constraint.prototype.compareOperands = function(refContract,
                         throw "Not found constraint: " + leftOperand;
 
                     for (let checkedContract of contracts)
-                        if (ref.isMatchingWith(checkedContract, contracts, iteration + 1))
+                        if (ref.isMatchingWithIteration(checkedContract, contracts, iteration + 1))
                             leftOperandContract = checkedContract;
 
                     if (leftOperandContract == null)
@@ -366,7 +366,7 @@ Constraint.prototype.compareOperands = function(refContract,
                     throw "Not found constraint: " + rightOperand.substring(0, firstPointPos);
 
                 for (let checkedContract of contracts)
-                    if (ref.isMatchingWith(checkedContract, contracts, iteration + 1))
+                    if (ref.isMatchingWithIteration(checkedContract, contracts, iteration + 1))
                         rightOperandContract = checkedContract;
 
                 if (rightOperandContract == null)
@@ -627,7 +627,7 @@ Constraint.prototype.compareOperands = function(refContract,
                     if (right == null || !(right instanceof Constraint))
                         throw"Expected constraint in condition in right operand: " + rightOperand;
 
-                    ret = right.isMatchingWith(refContract, contracts, iteration + 1);
+                    ret = right.isMatchingWithIteration(refContract, contracts, iteration + 1);
 
                     break;
                 case CAN_PLAY:
@@ -911,7 +911,7 @@ Constraint.prototype.parseConditions = function(conditions) {
  *
  * @param {string} condition - Condition to check for matching.
  * @param {Contract} ref - Contract to check for matching.
- * @param {IterableIterator<Contract>} contracts - Contract list to check for matching.
+ * @param {Set<Contract>} contracts - Contract list to check for matching.
  * @param {number} iteration - Check inside constraints iteration number.
  * @return {boolean} true if match or false.
  */
@@ -932,7 +932,7 @@ Constraint.prototype.checkCondition = function(condition, ref, contracts, iterat
  *
  * @param {object} conditions - Binder with conditions to check for matching.
  * @param {Contract} ref - Contract to check for matching.
- * @param {IterableIterator<Contract>} contracts - Contract list to check for matching.
+ * @param {Set<Contract>} contracts - Contract list to check for matching.
  * @param {number} iteration - Check inside constraints iteration number.
  * @return {boolean} true if match or false.
  */
@@ -994,7 +994,7 @@ Constraint.prototype.isValid = function() {
  * Check if given item matching with current constraint criteria.
  *
  * @param {Contract} contract - Contract item to check for matching.
- * @param {IterableIterator<Contract>} contracts - Contract list to check for matching.
+ * @param {Set<Contract>} contracts - Contract list to check for matching.
  * @return {boolean} true if match or false.
  */
 Constraint.prototype.isMatchingWith = function(contract, contracts) {
@@ -1005,7 +1005,7 @@ Constraint.prototype.isMatchingWith = function(contract, contracts) {
  * Check if given item matching with current constraint criteria.
  *
  * @param {Contract} contract - Contract item to check for matching.
- * @param {IterableIterator<Contract>} contracts - Contracts list to check for matching.
+ * @param {Set<Contract>} contracts - Contracts list to check for matching.
  * @param {number} iteration - Iteration check inside constraints iteration number.
  * @return {boolean} true if match or false.
  * @throws Recursive checking constraint have more 16 iterations.
@@ -1058,7 +1058,7 @@ Constraint.prototype.isMatchingWithIteration = function(contract, contracts, ite
  *
  * @param {Constraint} ref - Constraint.
  * @param {Contract} refContract - Contract Contract item to check for inheritance.
- * @param {IterableIterator<Contract>} contracts - Contracts list to check for inheritance.
+ * @param {Set<Contract>} contracts - Contracts list to check for inheritance.
  * @param {number} iteration - Iteration check inside constraints iteration number.
  * @return {boolean} true if inherited or false.
  */
@@ -1072,7 +1072,7 @@ Constraint.prototype.isInherited = function (ref, refContract, contracts, iterat
  * @param {object} conditions - Binder with conditions.
  * @param {Constraint} ref - Constraint.
  * @param {Contract} refContract - Contract Contract item to check for inheritance.
- * @param {IterableIterator<Contract>} contracts - Contracts list to check for inheritance.
+ * @param {Set<Contract>} contracts - Contracts list to check for inheritance.
  * @param {number} iteration - Iteration check inside constraints iteration number.
  * @return {boolean} true if inherited or false.
  */
@@ -1114,14 +1114,14 @@ Constraint.prototype.isInheritedConditions = function (conditions, ref, refContr
  * @param {object} condition - Binder with conditions.
  * @param {Constraint} ref - Constraint.
  * @param {Contract} refContract - Contract Contract item to check for inheritance.
- * @param {IterableIterator<Contract>} contracts - Contracts list to check for inheritance.
+ * @param {Set<Contract>} contracts - Contracts list to check for inheritance.
  * @param {number} iteration - Iteration check inside constraints iteration number.
  * @return {boolean} true if inherited or false.
  */
 Constraint.prototype.isInheritedParsed = function (condition, ref, refContract, contracts, iteration) {
 
     if (((condition.operator === INHERITS) || (condition.operator === INHERIT)) && (condition.rightOperand != null))
-        return this.isInheritedOperand(rightOperand, ref, refContract, contracts, iteration);
+        return this.isInheritedOperand(condition.rightOperand, ref, refContract, contracts, iteration);
 
     return false;
 };
@@ -1132,7 +1132,7 @@ Constraint.prototype.isInheritedParsed = function (condition, ref, refContract, 
  * @param {object} condition - Binder with conditions.
  * @param {Constraint} ref - Constraint.
  * @param {Contract} refContract - Contract Contract item to check for inheritance.
- * @param {IterableIterator<Contract>} contracts - Contracts list to check for inheritance.
+ * @param {Set<Contract>} contracts - Contracts list to check for inheritance.
  * @param {number} iteration - Iteration check inside constraints iteration number.
  * @return {boolean} true if inherited or false.
  * @throws Invalid format of condition
@@ -1162,7 +1162,7 @@ Constraint.prototype.isInheritedCondition = function (condition, ref, refContrac
  * @param {string} rightOperand - .
  * @param {Constraint} ref - Constraint.
  * @param {Contract} refContract - Contract Contract item to check for inheritance.
- * @param {IterableIterator<Contract>} contracts - Contracts list to check for inheritance.
+ * @param {Set<Contract>} contracts - Contracts list to check for inheritance.
  * @param {number} iteration - Iteration check inside constraints iteration number.
  * @return {boolean} true if inherited or false.
  * @throws Invalid format of condition
@@ -1191,7 +1191,7 @@ Constraint.prototype.isInheritedOperand = function (rightOperand, ref, refContra
             throw "Not found constraint: " + rightOperand.substring(0, firstPointPos);
 
         for (let checkedContract of contracts)
-            if (constr.isMatchingWith(checkedContract, contracts, iteration + 1))
+            if (constr.isMatchingWithIteration(checkedContract, contracts, iteration + 1))
                 rightOperandContract = checkedContract;
 
         if (rightOperandContract == null)

@@ -1291,7 +1291,7 @@ Contract.prototype.checkConstraints = function(contractsTree, roleConstraintsOnl
     if (this.constraints.size === 0)
         return true;        // if contract has no constraints -> then it's checkConstraints check is ok
 
-    let neighbours = contractsTree.values();
+    let neighbours = new Set(contractsTree.values());
 
     // check each constraint, all must be ok
     let allRefs_check = true;

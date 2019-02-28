@@ -41,27 +41,41 @@ unit.test("constraint test: simple check", async () => {
 
     contractBase.state.data["str_val"] = "~~~ simple string! ===";
     contractBase.state.data["num_val"] = -103.5678;
+    contractBase.state.data["big_val"] = "4503290488913829183281920913092019320193097.7718423894839282493892109107";
 
     let contractRef = cnt.Contract.fromPrivateKey(privateKey);
 
     contractRef.state.data["ref_str_val"] = "12345 another_string +++";
     contractRef.state.data["ref_num_val"] = 32903103.5678;
+    contractRef.state.data["ref_big_val"] = "4503290488913829183281920913092019320193097.7718423894839282493892109106";
+
+    let cr = new constr.Constraint(contractRef);
+    cr.type = constr.Constraint.TYPE_EXISTING_DEFINITION;
+    cr.name = "constraintRef";
+    let conditionsRef = {};
+    conditionsRef[constr.Constraint.conditionsModeType.all_of] = ["ref.issuer == this.issuer"];
+    cr.setConditions(conditionsRef);
+    contractRef.addConstraint(cr);
 
     await contractRef.seal();
     contractBase.state.data["id_val"] = contractRef.id.base64;
 
     let c = new constr.Constraint(contractBase);
     c.type = constr.Constraint.TYPE_EXISTING_STATE;
+    c.name = "base_constraint";
     let conditions = {};
     conditions[constr.Constraint.conditionsModeType.all_of] = [
         "this.state.data.str_val == \"~~~ simple string! ===\"",
         "ref.state.data.ref_str_val == \"12345 another_string +++\"",
         "this.state.data.num_val >= -103.6903",
         "ref.state.data.ref_num_val < 32903103.8093",
+        "ref.state.data.ref_big_val <= this.state.data.big_val",
+        "ref.state.data.ref_big_val::number < this.state.data.big_val::number",
+        "ref.state.data.ref_big_val::number == 4503290488913829183281920913092019320193097.7718423894839282493892109106",
+        "this.state.data.big_val::number > 4503290488913829183281920913092019320193097.77184238948392824938921091069999",
         "this.creator == this.owner",
         "ref.owner == this.creator",
         "ref.owner == this.owner",
-        "ref.issuer == this.issuer",
         "ref.issuer != \"26RzRJDLqze3P5Z1AzpnucF75RLi1oa6jqBaDh8MJ3XmTaUoF8R\"",
         "this.owner == " + privateKey.longAddress,
         "ref.issuer == " + privateKey.longAddress,
@@ -73,6 +87,14 @@ unit.test("constraint test: simple check", async () => {
         "\"2014-03-11 15:04:07\" < now",
         "1000000000 <= this.definition.created_at",
         "ref.state.expires_at > \"1992-03-11 00:04:07\"",
+        "this.state.data.num_val defined",
+        "this.state.data.big_val defined",
+        "ref.state.data.ref_str_val defined",
+        "this.xxx.data.qwerty undefined",
+        "ref.definition.asd undefined",
+        "ref.definition.data.undef_val undefined",
+        "inherits ref.definition.constraints.constraintRef",
+        "this.state.constraints.base_constraint is_a ref.definition.constraints.constraintRef",
         "this can_play this.issuer",
         "this can_play this.owner",
         "this can_play this.creator",
