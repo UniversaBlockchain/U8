@@ -1056,27 +1056,27 @@ Constraint.prototype.isMatchingWithIteration = function(contract, contracts, ite
 /**
  * Check whether a constraint inherits a condition from the specified constraint.
  *
- * @param {Constraint} ref - Constraint.
- * @param {Contract} refContract - Contract Contract item to check for inheritance.
+ * @param {Constraint} constr - Constraint.
+ * @param {Contract} constrContract - Contract Contract item to check for inheritance.
  * @param {Set<Contract>} contracts - Contracts list to check for inheritance.
  * @param {number} iteration - Iteration check inside constraints iteration number.
  * @return {boolean} true if inherited or false.
  */
-Constraint.prototype.isInherited = function (ref, refContract, contracts, iteration) {
-    return this.isInheritedConditions(this.conditions, ref, refContract, contracts, iteration);
+Constraint.prototype.isInherited = function (constr, constrContract, contracts, iteration) {
+    return this.isInheritedConditions(this.conditions, constr, constrContract, contracts, iteration);
 };
 
 /**
- * Check whether a constraint inherits a condition from the specified constraint.
+ * Check whether a constraint inherits a conditions from the specified constraint.
  *
  * @param {object} conditions - Binder with conditions.
- * @param {Constraint} ref - Constraint.
- * @param {Contract} refContract - Contract Contract item to check for inheritance.
+ * @param {Constraint} constr - Constraint.
+ * @param {Contract} constrContract - Contract Contract item to check for inheritance.
  * @param {Set<Contract>} contracts - Contracts list to check for inheritance.
  * @param {number} iteration - Iteration check inside constraints iteration number.
  * @return {boolean} true if inherited or false.
  */
-Constraint.prototype.isInheritedConditions = function (conditions, ref, refContract, contracts, iteration) {
+Constraint.prototype.isInheritedConditions = function (conditions, constr, constrContract, contracts, iteration) {
 
     if ((conditions == null) || (conditions === {}))
         return false;
@@ -1093,51 +1093,51 @@ Constraint.prototype.isInheritedConditions = function (conditions, ref, refContr
             throw "Expected any_of conditions";
 
     } else if (conditions.hasOwnProperty("operator"))
-        return this.isInheritedParsed(conditions, ref, refContract, contracts, iteration);
+        return this.isInheritedParsed(conditions, constr, constrContract, contracts, iteration);
     else
         throw "Expected all_of or any_of";
 
     if (condList != null)
         for (let item of condList)
             if (typeof item === "string") {
-                if (this.isInheritedCondition(item, ref, refContract, contracts, iteration))
+                if (this.isInheritedCondition(item, constr, constrContract, contracts, iteration))
                     return true;
-            } else if (this.isInheritedConditions(item, ref, refContract, contracts, iteration))
+            } else if (this.isInheritedConditions(item, constr, constrContract, contracts, iteration))
                 return true;
 
     return false;
 };
 
 /**
- *
+ * Checks whether a condition is a condition of inheritance.
  *
  * @param {object} condition - Binder with conditions.
- * @param {Constraint} ref - Constraint.
- * @param {Contract} refContract - Contract Contract item to check for inheritance.
+ * @param {Constraint} constr - Constraint.
+ * @param {Contract} constrContract - Contract Contract item to check for inheritance.
  * @param {Set<Contract>} contracts - Contracts list to check for inheritance.
  * @param {number} iteration - Iteration check inside constraints iteration number.
  * @return {boolean} true if inherited or false.
  */
-Constraint.prototype.isInheritedParsed = function (condition, ref, refContract, contracts, iteration) {
+Constraint.prototype.isInheritedParsed = function (condition, constr, constrContract, contracts, iteration) {
 
     if (((condition.operator === INHERITS) || (condition.operator === INHERIT)) && (condition.rightOperand != null))
-        return this.isInheritedOperand(condition.rightOperand, ref, refContract, contracts, iteration);
+        return this.isInheritedOperand(condition.rightOperand, constr, constrContract, contracts, iteration);
 
     return false;
 };
 
 /**
- *
+ * Checks if a condition is a condition of inheritance if the condition is not yet parsed.
  *
  * @param {object} condition - Binder with conditions.
- * @param {Constraint} ref - Constraint.
- * @param {Contract} refContract - Contract Contract item to check for inheritance.
+ * @param {Constraint} constr - Constraint.
+ * @param {Contract} constrContract - Contract Contract item to check for inheritance.
  * @param {Set<Contract>} contracts - Contracts list to check for inheritance.
  * @param {number} iteration - Iteration check inside constraints iteration number.
  * @return {boolean} true if inherited or false.
  * @throws Invalid format of condition
  */
-Constraint.prototype.isInheritedCondition = function (condition, ref, refContract, contracts, iteration) {
+Constraint.prototype.isInheritedCondition = function (condition, constr, constrContract, contracts, iteration) {
 
     for (let i = INHERITS; i <= INHERIT; i++) {
         let operPos = condition.indexOf(operators[i]);
@@ -1149,7 +1149,7 @@ Constraint.prototype.isInheritedCondition = function (condition, ref, refContrac
 
             let rightOperand = subStrR.replace(/\s/g, "");
 
-            return this.isInheritedOperand(rightOperand, ref, refContract, contracts, iteration);
+            return this.isInheritedOperand(rightOperand, constr, constrContract, contracts, iteration);
         }
     }
 
@@ -1157,17 +1157,17 @@ Constraint.prototype.isInheritedCondition = function (condition, ref, refContrac
 };
 
 /**
+ * Checks the operand of the inheritance condition for compliance with the specified constraint.
  *
- *
- * @param {string} rightOperand - .
- * @param {Constraint} ref - Constraint.
- * @param {Contract} refContract - Contract Contract item to check for inheritance.
+ * @param {string} rightOperand - Operand of the inheritance condition.
+ * @param {Constraint} constr - Constraint.
+ * @param {Contract} constrContract - Contract Contract item to check for inheritance.
  * @param {Set<Contract>} contracts - Contracts list to check for inheritance.
  * @param {number} iteration - Iteration check inside constraints iteration number.
  * @return {boolean} true if inherited or false.
- * @throws Invalid format of condition
+ * @throws Invalid format of condition.
  */
-Constraint.prototype.isInheritedOperand = function (rightOperand, ref, refContract, contracts, iteration) {
+Constraint.prototype.isInheritedOperand = function (rightOperand, constr, constrContract, contracts, iteration) {
 
     let rightOperandContract = null;
     let right = null;
@@ -1175,7 +1175,7 @@ Constraint.prototype.isInheritedOperand = function (rightOperand, ref, refContra
 
     if (rightOperand.startsWith("ref.")) {
         rightOperand = rightOperand.substring(4);
-        rightOperandContract = refContract;
+        rightOperandContract = constrContract;
     } else if (rightOperand.startsWith("this.")) {
         if (this.baseContract == null)
             throw "Use right operand in condition: " + rightOperand + ". But this contract not initialized.";
@@ -1207,7 +1207,7 @@ Constraint.prototype.isInheritedOperand = function (rightOperand, ref, refContra
     if ((right == null) || !(right instanceof Constraint))
         throw "Expected constraint in condition in right operand: " + rightOperand;
 
-    return right.equals(ref);
+    return right.equals(constr);
 };
 
 /**
@@ -1256,11 +1256,11 @@ Constraint.prototype.assemblyCondition = function(condition) {
 };
 
 /**
- * Assembly conditions of Constraint.
+ * Assembly conditions of constraint.
  *
- * @param conditions - Binder of parsed conditions.
- * @return result with assembled (string) conditions.
- * @throws Expected all_of or any_of conditions
+ * @param {object} conditions - Binder of parsed conditions.
+ * @return {object|null} result with assembled (string) conditions.
+ * @throws Expected all_of or any_of conditions.
  */
 Constraint.prototype.assemblyConditions = function(conditions) {
 
