@@ -10,6 +10,7 @@
 #include <v8.h>
 #include <libplatform/libplatform.h>
 #include <cstring>
+#include <future>
 
 #include "../tools/Logging.h"
 #include "../tools/tools.h"
@@ -220,7 +221,7 @@ public:
     void exit(int code) {
         if (waitExit) {
             exitCode = code;
-            waitExitVar.notify();
+            waitExitPromise.set_value();
         } else {
             ::exit(code);
         }
@@ -258,7 +259,7 @@ private:
     // prevent double initialize() call - it is dangerous
     bool initialized = false;
 
-    ConditionVar waitExitVar;
+    std::promise<void> waitExitPromise;
     int exitCode = 0;
     bool waitExit = false;
 
