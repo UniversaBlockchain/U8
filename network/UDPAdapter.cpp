@@ -57,11 +57,11 @@ namespace network {
             timer_.stop();
             socket_.stopRecv();
         }
-        std::promise<void> mtx;
+        std::promise<void> prs;
         socket_.close([&](ssize_t result){
-            mtx.set_value();
+            prs.set_value();
         });
-        if (mtx.get_future().wait_for(9000ms) != std::future_status::ready)
+        if (prs.get_future().wait_for(9000ms) != std::future_status::ready)
             writeErr("~UDPAdapter(): timeout");
     }
 

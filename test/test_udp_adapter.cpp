@@ -99,14 +99,13 @@ TEST_CASE("SendAndReceive") {
     AdaptersList env(3);
     string body0("test data set 1");
     string receivedString("");
-    timed_mutex mtx;
-    mtx.lock();
+    promise<void> prs;
     env.adapters[1]->setReceiveCallback([&](const byte_vector& packet, const NodeInfo& fromNode){
         receivedString = string(packet.begin(), packet.end());
-        mtx.unlock();
+        prs.set_value();
     });
     env.adapters[0]->send(1, byte_vector(body0.begin(), body0.end()));
-    if (!mtx.try_lock_for(15s))
+    if (prs.get_future().wait_for(15s) != future_status::ready)
         REQUIRE(false); //timeout
     REQUIRE(body0 == receivedString);
 }
@@ -117,17 +116,16 @@ TEST_CASE("SendTripleAndReceive") {
     string body1("test data set 2222");
     string body2("test data set 333333333333333");
     set<string> receivedStrings;
-    timed_mutex mtx;
-    mtx.lock();
+    promise<void> prs;
     env.adapters[1]->setReceiveCallback([&](const byte_vector& packet, const NodeInfo& fromNode){
         receivedStrings.insert(string(packet.begin(), packet.end()));
         if (receivedStrings.size() >= 3)
-            mtx.unlock();
+            prs.set_value();
     });
     env.adapters[0]->send(1, byte_vector(body0.begin(), body0.end()));
     env.adapters[0]->send(1, byte_vector(body1.begin(), body1.end()));
     env.adapters[0]->send(1, byte_vector(body2.begin(), body2.end()));
-    if (!mtx.try_lock_for(15s))
+    if (prs.get_future().wait_for(15s) != future_status::ready)
         REQUIRE(false); //timeout
     REQUIRE(receivedStrings.find(body0) != receivedStrings.end());
     REQUIRE(receivedStrings.find(body1) != receivedStrings.end());
@@ -140,14 +138,13 @@ void SendEachOtherAndReceive(const int attempts, const int numSends) {
     vector<string> payloadsList({"test data set 1", "test data set 2", "test data set 3"});
 
     atomic<long> receiveCounter(0);
-    timed_mutex mtx;
-    mtx.lock();
+    promise<void> prs;
 
     for (int i = 0; i < 5; ++i) {
         env.adapters[i]->setReceiveCallback([&](const byte_vector &packet, const NodeInfo& fromNode) {
             ++receiveCounter;
             if (receiveCounter >= attempts * numSends)
-                mtx.unlock();
+                prs.set_value();
         });
     }
 
@@ -171,7 +168,7 @@ void SendEachOtherAndReceive(const int attempts, const int numSends) {
         }
     });
 
-    if (!mtx.try_lock_for(40s)) {
+    if (prs.get_future().wait_for(40s) != future_status::ready) {
         cout << "receiveCounter: " << receiveCounter << endl;
         REQUIRE(false); //timeout
     }
@@ -205,14 +202,13 @@ TEST_CASE("CreateNodeToMany") {
 
     string messageBody("message");
     string answerBody("answer");
-    timed_mutex mtx;
-    mtx.lock();
+    promise<void> prs;
 
     env.adapters[0]->setReceiveCallback([&](const byte_vector& packet, const NodeInfo& fromNode) {
         ++answerCounter;
         REQUIRE(answerBody == string(packet.begin(), packet.end()));
         if (answerCounter >= attempts * numSends * numNodes)
-            mtx.unlock();
+            prs.set_value();
     });
     for (int i = 1; i <= numNodes; ++i) {
         const int iAdapter = i;
@@ -232,7 +228,7 @@ TEST_CASE("CreateNodeToMany") {
         this_thread::sleep_for(200ms);
     }
 
-    if (!mtx.try_lock_for(40s)) {
+    if (prs.get_future().wait_for(40s) != future_status::ready) {
         cout << "receiveCounter: " << receiveCounter << ", answerCounter: " << answerCounter << endl;
         REQUIRE(false); //timeout
     }
@@ -251,8 +247,7 @@ TEST_CASE("CreateManyNodesToOne") {
 
     string messageBody("message");
     string answerBody("answer");
-    timed_mutex mtx;
-    mtx.lock();
+    promise<void> prs;
 
     env.adapters[0]->setReceiveCallback([&](const byte_vector& packet, const NodeInfo& fromNode) {
         ++receiveCounter;
@@ -260,11 +255,11 @@ TEST_CASE("CreateManyNodesToOne") {
         env.adapters[0]->send(fromNode.getNumber(), byte_vector(answerBody.begin(), answerBody.end()));
     });
     for (int i = 1; i <= numNodes; ++i) {
-        env.adapters[i]->setReceiveCallback([=,&answerCounter,&mtx](const byte_vector& packet, const NodeInfo& fromNode) {
+        env.adapters[i]->setReceiveCallback([=,&answerCounter,&prs](const byte_vector& packet, const NodeInfo& fromNode) {
             ++answerCounter;
             REQUIRE(answerBody == string(packet.begin(), packet.end()));
             if (answerCounter >= attempts * numSends * numNodes)
-                mtx.unlock();
+                prs.set_value();
         });
     }
 
@@ -277,7 +272,7 @@ TEST_CASE("CreateManyNodesToOne") {
         this_thread::sleep_for(200ms);
     }
 
-    if (!mtx.try_lock_for(40s)) {
+    if (prs.get_future().wait_for(40s) != future_status::ready) {
         cout << "receiveCounter: " << receiveCounter << ", answerCounter: " << answerCounter << endl;
         REQUIRE(false); //timeout
     }
@@ -294,13 +289,12 @@ TEST_CASE("SendTripleMultiTimesAndReceive") {
         if (i % 100 == 0)
             cout << "send part: " << i << "..." << i+99 << endl;
 
-        timed_mutex mtx;
-        mtx.lock();
+        promise<void> prs;
         atomic<long> receiveCounter1(0);
         env.adapters[1]->setReceiveCallback([&](const byte_vector& packet, const NodeInfo& fromNode){
             ++receiveCounter1;
             if (receiveCounter1 >= numSends)
-                mtx.unlock();
+                prs.set_value();
         });
 
         for (int j = 0; j < numSends; ++j) {
@@ -308,7 +302,7 @@ TEST_CASE("SendTripleMultiTimesAndReceive") {
             env.adapters[0]->send(1, byte_vector(payload.begin(), payload.end()));
         }
 
-        if (!mtx.try_lock_for(40s))
+        if (prs.get_future().wait_for(40s) != future_status::ready)
             REQUIRE(false); //timeout
         REQUIRE(int(receiveCounter1) == numSends);
     }
@@ -329,17 +323,15 @@ TEST_CASE("Reconnect") {
     nc.addNode(nodeInfo1);
     string received0("");
     string received1("");
-    timed_mutex mtx0;
-    timed_mutex mtx1;
-    mtx0.lock();
-    mtx1.lock();
+    promise<void> prs0;
+    promise<void> prs1;
     auto d0 = make_shared<UDPAdapter>(pk0, 0, nc, [&](const byte_vector& packet, const NodeInfo& fromNode){
         received0 = string(packet.begin(), packet.end());
-        mtx0.unlock();
+        prs0.set_value();
     }, true);
     auto d1 = make_shared<UDPAdapter>(pk1, 1, nc, [&](const byte_vector& packet, const NodeInfo& fromNode){
         received1 = string(packet.begin(), packet.end());
-        mtx1.unlock();
+        prs1.set_value();
     }, true);
 
     string payloadA("test data set 1");
@@ -348,10 +340,10 @@ TEST_CASE("Reconnect") {
     d0->send(1, byte_vector(payloadA.begin(), payloadA.end()));
     d1->send(0, byte_vector(payloadB.begin(), payloadB.end()));
 
-    if (!mtx0.try_lock_for(25s))
+    if (prs0.get_future().wait_for(25s) != future_status::ready)
         REQUIRE(false); //timeout
     REQUIRE(payloadB == received0);
-    if (!mtx1.try_lock_for(25s))
+    if (prs1.get_future().wait_for(25s) != future_status::ready)
         REQUIRE(false); //timeout
     REQUIRE(payloadA == received1);
 
@@ -360,11 +352,10 @@ TEST_CASE("Reconnect") {
 
     // create new adapter with nodeInfo1 credentials
     string received2("");
-    timed_mutex mtx2;
-    mtx2.lock();
+    promise<void> prs2;
     auto d2 = make_shared<UDPAdapter>(pk1, 1, nc, [&](const byte_vector& packet, const NodeInfo& fromNode){
         received2 = string(packet.begin(), packet.end());
-        mtx2.unlock();
+        prs2.set_value();
     }, true);
 
 //    d0->enableLog(true);
@@ -376,7 +367,7 @@ TEST_CASE("Reconnect") {
     long reconnectStartTime = getCurrentTimeMillis();
     d0->send(1, byte_vector(payloadA.begin(), payloadA.end()));
 
-    if (!mtx2.try_lock_for(25s))
+    if (prs2.get_future().wait_for(25s) != future_status::ready)
         REQUIRE(false); //timeout
     long reconnectTime = getCurrentTimeMillis() - reconnectStartTime;
     REQUIRE(payloadA == received2);
@@ -398,22 +389,20 @@ TEST_CASE("LostPackets") {
     atomic<long> receiveCounter0(0);
     atomic<long> receiveCounter1(0);
 
-    timed_mutex mtx0;
-    timed_mutex mtx1;
-    mtx0.lock();
-    mtx1.lock();
+    promise<void> prs0;
+    promise<void> prs1;
 
     env.adapters[0]->setReceiveCallback([&](const byte_vector& packet, const NodeInfo& fromNode){
         REQUIRE(string(packet.begin(), packet.end()) == payloadB);
         ++receiveCounter0;
         if (receiveCounter0 >= countToSend)
-            mtx0.unlock();
+            prs0.set_value();
     });
     env.adapters[1]->setReceiveCallback([&](const byte_vector& packet, const NodeInfo& fromNode){
         REQUIRE(string(packet.begin(), packet.end()) == payloadA);
         ++receiveCounter1;
         if (receiveCounter1 >= countToSend)
-            mtx1.unlock();
+            prs1.set_value();
     });
 
     for (int i = 0; i < countToSend; ++i) {
@@ -421,10 +410,10 @@ TEST_CASE("LostPackets") {
         env.adapters[1]->send(0, byte_vector(payloadB.begin(), payloadB.end()));
     }
 
-    if (!mtx0.try_lock_for(40s))
+    if (prs0.get_future().wait_for(40s) != future_status::ready)
         REQUIRE(false); //timeout
     REQUIRE(long(receiveCounter0) == countToSend);
-    if (!mtx1.try_lock_for(40s))
+    if (prs1.get_future().wait_for(40s) != future_status::ready)
         REQUIRE(false); //timeout
     REQUIRE(long(receiveCounter1) == countToSend);
 
@@ -449,23 +438,21 @@ TEST_CASE("SendBadNetConfig") {
     const long countToSend = 3;
 
     atomic<long> receiveCounter1(0);
-    timed_mutex mtx1;
-    mtx1.lock();
+    promise<void> prs1;
     atomic<long> receiveCounter3(0);
-    timed_mutex mtx3;
-    mtx3.lock();
+    promise<void> prs3;
 
     UDPAdapter d0 = UDPAdapter(pk0, 0, nc, [&](const byte_vector& packet, const NodeInfo& fromNode){}, true);
     UDPAdapter d1 = UDPAdapter(pk1, 1, nc, [&](const byte_vector& packet, const NodeInfo& fromNode){
         ++receiveCounter1;
         if (receiveCounter1 >= 3)
-            mtx1.unlock();
+            prs1.set_value();
     }, true);
     //UDPAdapter d2 is missing;
     UDPAdapter d3 = UDPAdapter(pk3bad, 3, nc, [&](const byte_vector& packet, const NodeInfo& fromNode){
         ++receiveCounter3;
         if (receiveCounter3 >= 3)
-            mtx3.unlock();
+            prs3.set_value();
     }, true);
 
     string payloadA("test data set 1");
@@ -482,10 +469,10 @@ TEST_CASE("SendBadNetConfig") {
     for (long i = 0; i < countToSend; ++i)
         d0.send(1, byte_vector(payloadA.begin(), payloadA.end()));
 
-    if (!mtx1.try_lock_for(15s))
+    if (prs1.get_future().wait_for(15s) != future_status::ready)
         REQUIRE(false); //timeout
     REQUIRE(long(receiveCounter1) == countToSend);
-    if (mtx3.try_lock_for(5s))
+    if (prs3.get_future().wait_for(5s) == future_status::ready)
         REQUIRE(false); //packets has delivered, but it should not
     REQUIRE(long(receiveCounter3) == 0);
 }
