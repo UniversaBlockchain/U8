@@ -35,7 +35,7 @@ public:
      * @param max_duration
      * @return true if notification is received, false if timeout expired but no notification occured.
      */
-    bool wait(chrono::milliseconds max_duration = chrono::milliseconds::max()) {
+    bool wait(chrono::milliseconds max_duration = getMaxDurationMillis()) {
         unique_lock lock(mx);
         return cv.wait_for(lock, max_duration) == std::cv_status::no_timeout;
     }
@@ -43,6 +43,17 @@ public:
 protected:
     mutex mx;
     condition_variable cv;
+
+private:
+    inline static chrono::milliseconds getMaxDurationMillis() {
+#ifdef __PLATFORM_DARWIN
+        return chrono::milliseconds::max();
+#else
+        return std::chrono::duration_cast<std::chrono::milliseconds>(
+                chrono::system_clock::time_point::max() - chrono::system_clock::now());
+#endif
+    }
+
 };
 
 #endif //U8_CONDITIONVAR_H

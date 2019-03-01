@@ -12,6 +12,7 @@ set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -std=c++17 -g -Wno-register"
 
 if (${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
     set(MACOSX true)
+    add_compile_definitions(__PLATFORM_DARWIN)
 endif ()
 
 if (MACOSX)
