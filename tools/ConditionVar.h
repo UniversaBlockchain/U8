@@ -37,7 +37,7 @@ public:
      */
     bool wait(chrono::milliseconds max_duration = getMaxDurationMillis()) {
         unique_lock lock(mx);
-        return cv.wait_for(lock, max_duration) == std::cv_status::no_timeout;
+        return cv.wait_until(lock, (max_duration > chrono::hours(1000000)) ? chrono::system_clock::time_point::max() : chrono::system_clock::now() + max_duration) == std::cv_status::no_timeout;
     }
 
 protected:
