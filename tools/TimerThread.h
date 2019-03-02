@@ -9,7 +9,7 @@
 #include <thread>
 #include <atomic>
 #include "tools.h"
-#include "ConditionVar.h"
+#include "Semaphore.h"
 
 class TimerThread : Noncopyable, Nonmovable {
 
@@ -42,7 +42,7 @@ private:
 private:
     std::function<void()> callback_;
     std::thread worker_;
-    ConditionVar cv_;
+    Semaphore sem_;
     long initialDelayMillis_ = 0;
     long periodMillis_ = 9000;
     TimerType type_ = TimerType::RATE;

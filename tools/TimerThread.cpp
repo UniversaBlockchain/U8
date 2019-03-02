@@ -11,7 +11,7 @@ TimerThread::TimerThread() {
             long curDelayMillis = isStarted_ ? ( initialTick_ ? initialDelayMillis_ : periodMillis_ ) : 9000;
             if (isStarted_ && !initialTick_ && type_ == TimerType::RATE)
                 curDelayMillis = std::max(1l, periodMillis_ - (getCurrentTimeMillis() - timeBeforePrevTick));
-            if (!cv_.wait(chrono::milliseconds(curDelayMillis))) {
+            if (!sem_.wait(std::chrono::milliseconds(curDelayMillis))) {
                 std::lock_guard guard(callbackMutex_);
                 if (isStarted_) {
                     timeBeforePrevTick = getCurrentTimeMillis();
@@ -27,7 +27,7 @@ TimerThread::TimerThread() {
 TimerThread::~TimerThread() {
     isStarted_ = false;
     shutdown = true;
-    cv_.notifyAll();
+    sem_.notify();
     worker_.join();
 }
 
@@ -38,7 +38,7 @@ void TimerThread::scheduleAtFixedRate(const std::function<void()> callback, long
     type_ = TimerType::RATE;
     isStarted_ = true;
     initialTick_ = true;
-    cv_.notifyAll();
+    sem_.notify();
 }
 
 void TimerThread::scheduleWithFixedDelay(const std::function<void()> callback, long initialDelayMillis, long periodMillis) {
@@ -48,10 +48,10 @@ void TimerThread::scheduleWithFixedDelay(const std::function<void()> callback, l
     type_ = TimerType::DELAY;
     isStarted_ = true;
     initialTick_ = true;
-    cv_.notifyAll();
+    sem_.notify();
 }
 
 void TimerThread::stop() {
     isStarted_ = false;
-    cv_.notifyAll();
+    sem_.notify();
 }
