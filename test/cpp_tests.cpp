@@ -10,6 +10,8 @@
 #include "../tools/tools.h"
 #include "../tools/Queue.h"
 #include "../tools/vprintf.h"
+#include "../tools/ThreadPool.h"
+#include "../tools/Semaphore.h"
 
 TEST_CASE("Queue") {
     SECTION("blocking operations: unlimited capacity") {
@@ -104,4 +106,33 @@ TEST_CASE("Queue") {
     }
 }
 
+TEST_CASE("Semaphore") {
+    ThreadPool writerPool(2);
+    ThreadPool readerPool(2);
 
+    const int WEIGHT = 100000;
+
+    Semaphore sem;
+    atomic<long> counter(0);
+
+    for (int i = 0; i < 10; ++i) {
+        writerPool.execute([&sem]() {
+            for (int c = 0; c < WEIGHT; ++c)
+                sem.notify();
+        });
+        readerPool.execute([&sem, &counter]() {
+            do {
+                if (sem.wait(10ms))
+                    ++counter;
+            } while (counter < WEIGHT * 10);
+        });
+    }
+
+    do {
+        this_thread::sleep_for(100ms);
+        //printf("counter: %li, count_=%i\n", long(counter), sem.count());
+    } while (counter < WEIGHT * 10);
+
+    REQUIRE(long(counter) == WEIGHT*10);
+    REQUIRE(sem.count() == 0);
+}
