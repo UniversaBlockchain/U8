@@ -3,6 +3,7 @@
 //
 
 #include "AsyncIO.h"
+#include "TLS/uv_tls.h"
 #include <thread>
 
 namespace asyncio {
@@ -68,7 +69,16 @@ namespace asyncio {
     }
 
     const char* getError(ssize_t code) {
-        return uv_strerror(code);
+        if (code == ERR_TLS_INIT_CONTEXT)
+            return "Error initialization TLS context";
+        else if (code == ERR_TLS_GET_TLS_SESSION)
+            return "Error initialization new TLS session from context";
+        else if (code == ERR_TLS_CONNECT_TIMEOUT)
+            return "Failed to establish TLS handshake when connecting";
+        else if (code == ERR_TLS_ACCEPT_TIMEOUT)
+            return "Failed to establish TLS handshake when accepting";
+        else
+            return uv_strerror((int) code);
     }
 
     bool isFile(const ioDirEntry& entry) {

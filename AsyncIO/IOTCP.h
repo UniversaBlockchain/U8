@@ -62,7 +62,6 @@ namespace asyncio {
 
     struct writeTCP_data {
         write_cb callback;
-        uv_write_t* req;
         uv_buf_t uvBuff;
         std::shared_ptr<byte_vector> data;
         bool connReset;
