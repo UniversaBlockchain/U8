@@ -52,6 +52,7 @@ void allAsyncIOTests() {
     testUnifyFileAndTCPread();
     testClientWriteWithouthRead();
     testAsyncTLS();
+    stressTestTCP();
 
     asyncio::deinitLoop();
 }
@@ -1775,4 +1776,130 @@ void testAsyncTLS() {
     clients.clear();
 
     printf("testAsyncTLS()...done\n\n");
+}
+
+void stressTestTCP() {
+    printf("\nstressTestTCP...\n");
+
+    int blocks = 100;
+    int packages = 10000; //packages in block
+    const int length_package = 50;
+
+    int counter = 0;
+    uv_sem_t sem;
+
+    asyncio::IOTCP srv;
+    asyncio::IOTCP acc;
+
+    uv_sem_init(&sem, 0);
+
+    srv.open("127.0.0.1", PORT, [&](ssize_t result){
+        ASSERT(!asyncio::isError(result));
+
+        printf("New connection\n");
+
+        int res = acc.acceptFromListeningSocket(&srv);
+        ASSERT(!asyncio::isError(res));
+
+        for (int i = 0; i < blocks; i++) {
+            printf("Send block %i of %i packages\n", i, packages);
+
+            for (int j = 0; j < packages; j++) {
+                //printf("repeats package : %i \n", j);
+
+                auto send_buf = (unsigned char*) malloc(length_package);
+                for (int x = 0; x < length_package; x++) {
+                    send_buf[x] = (unsigned char)(i & 0xFF);
+                    //printf("send_buf[x] data =  %i \n", send_buf[x]);
+                }
+
+                acc.write(send_buf, length_package, [=](ssize_t result) {
+                    ASSERT(!asyncio::isError(result));
+
+                    free(send_buf);
+                });
+            }
+        }
+        //printf("Completed sending %i packets, repeats %i \n", count_package, repeats_package);
+    });
+
+    unsigned char recv_buf[length_package];
+
+    asyncio::IOTCP cli;
+
+    cli.connect("127.0.0.1", PORT + 1, "127.0.0.1", PORT, [&](ssize_t result){
+        ASSERT(!asyncio::isError(result));
+
+        printf("Connected to server\n");
+
+        for (int i = 0; i < blocks; ++i) {
+            for (int j = 0; j < packages; j++) {
+                cli.read(recv_buf, length_package, [&, i, j](ssize_t result) {
+                    ++counter;
+                    //printf("Recv package : %i length_package %i \n", counter, length_package);
+                    ASSERT(result == length_package);
+
+                    for (int x = 0; x < length_package; x++) {
+                        //printf("i= %i  i&0xFF= %i  recv_buf[x]= %i  j= %i counter= %i\n", i, i & 0xFF, recv_buf[x] & 0xFF, j, counter);
+                        ASSERT((unsigned char)(i & 0xFF) == recv_buf[x]);
+                    }
+
+                    if (j == packages - 1)
+                        printf("Received block %i of %i packages\n", i, packages);
+
+                    if (counter >= blocks * packages) {
+                        uv_sem_post(&sem);
+                        printf("Client finished, %i blocks of %i packets, total received %i \n", blocks, packages, counter);
+                    }
+                });
+
+            }
+            //printf("recv pack\n");
+        }
+    });
+
+    uv_sem_wait(&sem);
+    uv_sem_destroy(&sem);
+
+    uv_sem_init(&sem, 0);
+
+    printf("Close accepted socket\n");
+
+    acc.close([&](ssize_t result){
+        ASSERT(!asyncio::isError(result));
+
+        uv_sem_post(&sem);
+    });
+
+    uv_sem_wait(&sem);
+    uv_sem_destroy(&sem);
+
+    uv_sem_init(&sem, 0);
+
+    printf("Close client socket\n");
+
+    cli.close([&](ssize_t result){
+        ASSERT(!asyncio::isError(result));
+
+        uv_sem_post(&sem);
+    });
+
+    uv_sem_wait(&sem);
+    uv_sem_destroy(&sem);
+
+    //close TCP server
+    uv_sem_init(&sem, 0);
+
+    printf("Close server\n");
+
+    srv.close([&](ssize_t result){
+        ASSERT(!asyncio::isError(result));
+
+        uv_sem_post(&sem);
+    });
+
+    uv_sem_wait(&sem);
+    uv_sem_destroy(&sem);
+
+    printf("stressTestTCP done\n\n");
 }
