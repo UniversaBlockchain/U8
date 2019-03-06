@@ -37,6 +37,7 @@ endif()
 file(GLOB LIBRARY_SRC
     AsyncIO/*.h AsyncIO/*.cpp
     AsyncIO/TLS/*.h AsyncIO/TLS/*.c
+    db/*.h db/*.cpp
     crypto/*.h crypto/*.cpp
     js_bindings/*.h js_bindings/*.cpp
     network/*.h network/*.cpp
@@ -85,8 +86,8 @@ elseif (${platform} STREQUAL linux)
         target_include_directories(u8_lib PUBLIC ext/${platform}/${l}/include)
         target_link_directories(u8_lib PUBLIC ext/${platform}/${l}/lib)
     endforeach (l)
-    target_link_libraries(u8 PUBLIC v8 v8_libplatform v8_libbase tomcrypt gmp uv pthread ssl crypto)
-    target_link_libraries(u8_tests PUBLIC tomcrypt gmp uv pthread)
+    target_link_libraries(u8 PUBLIC v8 v8_libplatform v8_libbase tomcrypt gmp uv pq pthread ssl crypto)
+    target_link_libraries(u8_tests PUBLIC tomcrypt gmp uv pq pthread ssl crypto)
 else ()
     message(FATAL_ERROR "unknown platform ${platform}")
 endif ()

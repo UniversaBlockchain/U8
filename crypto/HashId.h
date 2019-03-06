@@ -69,11 +69,16 @@ namespace crypto {
          */
         static HashId withDigest(void *digestData, size_t digestDataSize);
 
+        /**
+         * Create random new hashId. Mainly for testing purposes.
+         */
+        static HashId createRandom();
+
         HashId(const HashId &copyFrom);
 
         HashId(HashId &&moveFrom);
 
-        std::string toBase64();
+        std::string toBase64() const;
 
         std::vector<unsigned char> getDigest();
 
