@@ -58,12 +58,16 @@ namespace db {
         /**
          * Only one sql command in query string allowed here.
          * Query parameters passes through vector<any>. Useful for big queries, e.g. multi insert.
+         * <p>
+         * Valid params types: byte_vector, string, const char*, int, long, bool, double.
          */
         void execParamsArr(const std::string &query, QueryCallback callback, std::vector<std::any>& params);
 
         /**
          * Only one sql command in query string allowed here.
          * Query parameters passes through variadic arguments.
+         * <p>
+         * Valid params types: byte_vector, string, const char*, int, long, bool, double.
          */
         template<typename... Args>
         void execParams(const std::string &query, QueryCallback callback, Args ...args) {
