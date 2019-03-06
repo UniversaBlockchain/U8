@@ -3,6 +3,7 @@
 //
 
 #include "IOTLS.h"
+#include <cstring>
 
 namespace asyncio {
 
