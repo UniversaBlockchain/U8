@@ -103,18 +103,19 @@ TEST_CASE("PGPool") {
         } while (readyCounter < TEST_QUERIES_COUNT * 3);
         REQUIRE(readyCounter == TEST_QUERIES_COUNT * 3);
 
+        Semaphore sem2;
         pgPool.execParams("SELECT id, state FROM table1 WHERE id>$1 ORDER BY id ASC LIMIT 3;",
-                          [&sem](db::QueryResultsArr &qra) {
+                          [&sem2](db::QueryResultsArr &qra) {
                               if (qra[0].isError())
                                   throw std::runtime_error("error: " + string(qra[0].getErrorText()));
                               REQUIRE(qra[0].getRowsCount() == 3);
                               REQUIRE(bytesToString(qra[0].getValueByIndex(0, 0)) == to_string(8));
                               REQUIRE(bytesToString(qra[0].getValueByIndex(1, 0)) == to_string(9));
                               REQUIRE(bytesToString(qra[0].getValueByIndex(2, 0)) == to_string(10));
-                              sem.notify();
+                              sem2.notify();
                           }, "7");
 
-        sem.wait();
+        sem2.wait();
     }
 
     SECTION("insert and get new id") {
