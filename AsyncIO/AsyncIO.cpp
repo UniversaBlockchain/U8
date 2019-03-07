@@ -22,7 +22,8 @@ namespace asyncio {
         umask(000);
 
         if (!asyncLoop) {
-            asyncLoop = uv_loop_new();
+            asyncLoop = (uv_loop_t*) malloc(sizeof(uv_loop_t));
+            uv_loop_init(asyncLoop);
 
             //Opened async handle will keep the loop alive
             uv_async_init(asyncLoop, &exitHandle, [](uv_async_t* asyncHandle){
@@ -43,6 +44,7 @@ namespace asyncio {
                 uv_run(loop, UV_RUN_DEFAULT);
                 uv_loop_close(loop);
 
+                free(asyncLoop);
                 asyncLoop = nullptr;
             }, nullptr);
 

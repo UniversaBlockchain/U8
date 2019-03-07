@@ -90,6 +90,20 @@ namespace asyncio {
 
         if (readQueue.empty() && !tlsReading) {
             tlsReading = true;
+
+            if (!dataQueue.empty()) {
+                byte_vector data;
+
+                while (!dataQueue.empty() && data.size() < maxBytesToRead)
+                    data.push_back((uint8_t) dataQueue.get());
+
+                read_data->callback(data, data.size());
+
+                delete read_data;
+                checkReadQueue();
+                return;
+            }
+
             bufferized = false;
 
             freeReadData();
@@ -106,6 +120,7 @@ namespace asyncio {
                         read_data->callback(byte_vector(), result);
 
                         delete read_data;
+                        checkReadQueue();
                     }
                 });
             else
@@ -133,6 +148,22 @@ namespace asyncio {
 
         if (readQueue.empty() && !tlsReading) {
             tlsReading = true;
+
+            if (!dataQueue.empty()) {
+                int len = 0;
+
+                while (!dataQueue.empty() && len < maxBytesToRead) {
+                    ((char*) read_data->buffer)[len] = dataQueue.get();
+                    len++;
+                }
+
+                read_data->callback(len);
+
+                delete read_data;
+                checkReadQueue();
+                return;
+            }
+
             bufferized = true;
 
             freeReadData();
@@ -149,6 +180,7 @@ namespace asyncio {
                         read_data->callback(result);
 
                         delete read_data;
+                        checkReadQueue();
                     }
                 });
             else
@@ -172,6 +204,21 @@ namespace asyncio {
         if (bufferized) {
             auto read_data = (readBufferTLS_data*) tls_read_data.data;
 
+            if (!dataQueue.empty()) {
+                int len = 0;
+
+                while (!dataQueue.empty() && len < read_data->maxBytesToRead) {
+                    ((char*) read_data->buffer)[len] = dataQueue.get();
+                    len++;
+                }
+
+                read_data->callback(len);
+
+                delete read_data;
+                checkReadQueue();
+                return;
+            }
+
             tls_data.tls->read_data = read_data;
 
             if (aloop)
@@ -184,12 +231,26 @@ namespace asyncio {
                         read_data->callback(result);
 
                         delete read_data;
+                        checkReadQueue();
                     }
                 });
             else
                 throw std::logic_error("Async loop not initialized.");
         } else {
             auto read_data = (readTLS_data*) tls_read_data.data;
+
+            if (!dataQueue.empty()) {
+                byte_vector data;
+
+                while (!dataQueue.empty() && data.size() < read_data->maxBytesToRead)
+                    data.push_back((uint8_t) dataQueue.get());
+
+                read_data->callback(data, data.size());
+
+                delete read_data;
+                checkReadQueue();
+                return;
+            }
 
             tls_data.tls->read_data = read_data;
 
@@ -203,6 +264,7 @@ namespace asyncio {
                         read_data->callback(byte_vector(), result);
 
                         delete read_data;
+                        checkReadQueue();
                     }
                 });
             else
@@ -531,8 +593,11 @@ namespace asyncio {
 
         if (nread > 0) {
             ssize_t vector_size = nread;
-            if (rcv_data->maxBytesToRead && (vector_size > rcv_data->maxBytesToRead))
+            if (rcv_data->maxBytesToRead && (vector_size > rcv_data->maxBytesToRead)) {
                 vector_size = rcv_data->maxBytesToRead;
+
+                TLSHandle->addDataToQueue(buf->base + vector_size, (size_t)nread - vector_size);
+            }
 
             byte_vector data((unsigned long) vector_size);
             data.assign(buf->base, buf->base + vector_size);
@@ -564,10 +629,13 @@ namespace asyncio {
 
         if (nread > 0) {
             ssize_t vector_size = nread;
-            if (rcv_data->maxBytesToRead && (vector_size > rcv_data->maxBytesToRead))
+            if (rcv_data->maxBytesToRead && (vector_size > rcv_data->maxBytesToRead)) {
                 vector_size = rcv_data->maxBytesToRead;
 
-            memcpy(rcv_data->buffer, buf->base, vector_size);
+                TLSHandle->addDataToQueue(buf->base + vector_size, (size_t)nread - vector_size);
+            }
+
+            memcpy(rcv_data->buffer, buf->base, (size_t) vector_size);
 
             rcv_data->callback(vector_size);
         } else
@@ -807,6 +875,9 @@ namespace asyncio {
 
         int res = client->acceptFromListeningSocket(this, std::move(callback), timeout);
 
+        if (res < 0)
+            delete client;
+
         return (res >= 0) ? client : nullptr;
     }
 
@@ -959,5 +1030,10 @@ namespace asyncio {
 
     void IOTLS::setConnectionReset() {
         connReset = true;
+    }
+
+    void IOTLS::addDataToQueue(char* buff, size_t len) {
+        for (size_t i = 0; i < len; i++)
+            dataQueue.put(buff[i]);
     }
 }

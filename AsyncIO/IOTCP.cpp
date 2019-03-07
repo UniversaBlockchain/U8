@@ -106,6 +106,7 @@ namespace asyncio {
                         read_data->callback(byte_vector(), result);
 
                         delete read_data;
+                        checkReadQueue();
                     }
                 });
             else
@@ -152,6 +153,7 @@ namespace asyncio {
                         read_data->callback(result);
 
                         delete read_data;
+                        checkReadQueue();
                     }
                 });
             else
@@ -187,6 +189,7 @@ namespace asyncio {
                         read_data->callback(result);
 
                         delete read_data;
+                        checkReadQueue();
                     }
                 });
             else
@@ -206,6 +209,7 @@ namespace asyncio {
                         read_data->callback(byte_vector(), result);
 
                         delete read_data;
+                        checkReadQueue();
                     }
                 });
             else
@@ -603,6 +607,9 @@ namespace asyncio {
         auto client = new IOTCP(aloop);
 
         int res = client->acceptFromListeningSocket(this);
+
+        if (res < 0)
+            delete client;
 
         if (result)
             *result = res;

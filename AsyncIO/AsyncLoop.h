@@ -48,12 +48,12 @@ namespace asyncio {
          * Get a handle of asynchronous loop
          * @return handle of asynchronous loop.
          */
-        uv_loop_t* getLoop() { return loop; }
+        uv_loop_t* getLoop() { return &loop; }
 
     private:
         Queue<function<void()>> queue;
         std::thread thread;
-        uv_loop_t* loop = nullptr;
+        uv_loop_t loop;
         atomic<bool> runned = true;
     };
 }

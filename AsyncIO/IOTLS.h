@@ -142,19 +142,19 @@ namespace asyncio {
          * @param keyFilePath is path to PEM file with key.
          * @param callback is made when the connection has been established and a successful TLS handshake is made.
          * @param timeout (in milliseconds) waiting for a TLS handshake before calling a callback with an error
-         *        (optional, default 5000 ms). Set to 0 for endless waiting.
+         *        and auto close socket (optional, default 5000 ms). Set to 0 for endless waiting.
          */
         void connect(const char* bindIP, unsigned int bindPort, const char* IP, unsigned int port,
                         const char* certFilePath, const char* keyFilePath, connect_cb callback, unsigned int timeout = 5000);
 
         /**
         * Accept TLS connection from remote TCP socket and return pointer to his handle.
-        * Delete returning IOHandle after his closing.
+        * Delete returning handle IOTLS after his closing.
         *
         * @param callback is made when the connection has been accepted and a successful TLS handshake is made
         * or when a accept error.
         * @param timeout (in milliseconds) waiting for a TLS handshake before calling a callback with an error
-        *        (optional, default 5000 ms). Set to 0 for endless waiting.
+        *        and auto close socket (optional, default 5000 ms). Set to 0 for endless waiting.
         * @return pointer to handle of accepted connection (@see IOTLS).
         */
         IOTLS* accept(accept_cb callback, unsigned int timeout = 5000);
@@ -223,6 +223,15 @@ namespace asyncio {
          */
         void setConnectionReset();
 
+        /**
+         * Add data to queue.
+         * For internal usage.
+         *
+         * @param buff is data buffer.
+         * @param len is data length.
+         */
+        void addDataToQueue(char* buff, size_t len);
+
     private:
         ioLoop* loop;
         uv_tcp_t* ioTCPSoc;
@@ -237,6 +246,7 @@ namespace asyncio {
         ioHandle_t type;
 
         Queue<socketRead_data> readQueue;
+        Queue<char> dataQueue;
 
         AsyncLoop* aloop = nullptr;
         bool ownLoop;

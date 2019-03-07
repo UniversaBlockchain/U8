@@ -429,6 +429,11 @@ namespace asyncio {
 
     void IOFile::readFilePart_onTimeout(uv_timer_t* handle) {
         //TODO: possible interrupt current request
+        uv_timer_stop(handle);
+
+        uv_close((uv_handle_t*) handle, [](uv_handle_t* handle){
+            delete handle;
+        });
     }
 
     void IOFile::stat_onStat(asyncio::ioHandle *req) {

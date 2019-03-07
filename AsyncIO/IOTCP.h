@@ -139,6 +139,7 @@ namespace asyncio {
 
         /**
          * Accept connection from remote TCP socket and return his handle.
+         * Delete returning handle IOTCP after his closing.
          *
          * @param result is pointer to accepting result (optional, ignored if nullptr).
          * If isError(*result) returns true - use getError(*result) to determine the error.
