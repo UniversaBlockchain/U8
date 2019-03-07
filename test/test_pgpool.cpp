@@ -109,9 +109,9 @@ TEST_CASE("PGPool") {
                               if (qra[0].isError())
                                   throw std::runtime_error("error: " + string(qra[0].getErrorText()));
                               REQUIRE(qra[0].getRowsCount() == 3);
-                              REQUIRE(bytesToString(qra[0].getValueByIndex(0, 0)) == to_string(8));
-                              REQUIRE(bytesToString(qra[0].getValueByIndex(1, 0)) == to_string(9));
-                              REQUIRE(bytesToString(qra[0].getValueByIndex(2, 0)) == to_string(10));
+                              REQUIRE(db::getIntValue(qra[0].getValueByIndex(0, 0)) == 8);
+                              REQUIRE(db::getIntValue(qra[0].getValueByIndex(1, 0)) == 9);
+                              REQUIRE(db::getIntValue(qra[0].getValueByIndex(2, 0)) == 10);
                               sem2.notify();
                           }, "7");
 
@@ -126,7 +126,7 @@ TEST_CASE("PGPool") {
                     [&sem,i](db::QueryResultsArr &qra) {
                         if (qra[0].isError())
                             throw std::runtime_error("error: " + string(qra[0].getErrorText()));
-                        int newId = stoi(bytesToString(qra[0].getValueByIndex(0, 0)));
+                        int newId = db::getIntValue(qra[0].getValueByIndex(0, 0));
                         REQUIRE(newId == i+1);
                         sem.notify();
                     }, HashId::createRandom().getDigest(), "4", getCurrentTimeMillis() / 1000,
@@ -147,7 +147,7 @@ TEST_CASE("PGPool") {
                 [&sem,&rowId](db::QueryResultsArr &qra) {
                     if (qra[0].isError())
                         throw std::runtime_error("error: " + string(qra[0].getErrorText()));
-                    int newId = stoi(bytesToString(qra[0].getValueByIndex(0, 0)));
+                    int newId = db::getIntValue(qra[0].getValueByIndex(0, 0));
                     rowId = newId;
                     REQUIRE(rowId == 1);
                     sem.notify();
@@ -157,12 +157,12 @@ TEST_CASE("PGPool") {
 
         // select it and check
         pgPool.execParams(
-                "SELECT encode(hash,'base64') FROM table1 WHERE id=$1 LIMIT 1;",
+                "SELECT hash FROM table1 WHERE id=$1 LIMIT 1;",
                 [&sem,rowId,hashId1](db::QueryResultsArr &qra) {
                     if (qra[0].isError())
                         throw std::runtime_error("error: " + string(qra[0].getErrorText()));
                     REQUIRE(qra[0].getRowsCount() == 1);
-                    auto hashId1FromDb = HashId::withDigest(base64_decodeToBytes(db::bytesToStringLine(qra[0].getValueByIndex(0, 0))));
+                    auto hashId1FromDb = HashId::withDigest(qra[0].getValueByIndex(0, 0));
                     REQUIRE(hashId1 == hashId1FromDb);
                     sem.notify();
                 }, rowId);
@@ -181,12 +181,12 @@ TEST_CASE("PGPool") {
 
         // select it and check, now database should store hashId2
         pgPool.execParams(
-                "SELECT encode(hash,'base64') FROM table1 WHERE id=$1 LIMIT 1;",
+                "SELECT hash FROM table1 WHERE id=$1 LIMIT 1;",
                 [&sem,rowId,hashId2](db::QueryResultsArr &qra) {
                     if (qra[0].isError())
                         throw std::runtime_error("error: " + string(qra[0].getErrorText()));
                     REQUIRE(qra[0].getRowsCount() == 1);
-                    auto hashId2FromDb = HashId::withDigest(base64_decodeToBytes(db::bytesToStringLine(qra[0].getValueByIndex(0, 0))));
+                    auto hashId2FromDb = HashId::withDigest(qra[0].getValueByIndex(0, 0));
                     REQUIRE(hashId2 == hashId2FromDb);
                     sem.notify();
                 }, rowId);
@@ -196,9 +196,9 @@ TEST_CASE("PGPool") {
     SECTION("insert, select and update integer and bigint") {
         Semaphore sem;
         int created_at_1 = getCurrentTimeMillis()/1000;
-        long expires_at_1 = long(created_at_1) + 9000000000000l;
+        long long expires_at_1 = (long long)(created_at_1) + 9000000000000l;
         int created_at_2 = created_at_1 + 1000;
-        long expires_at_2 = long(created_at_2) + 9100000000000l;
+        long long expires_at_2 = (long long)(created_at_2) + 9100000000000l;
         int rowId = 0;
 
         // insert created_at_1 and expires_at_1
@@ -207,7 +207,7 @@ TEST_CASE("PGPool") {
                 [&sem,&rowId](db::QueryResultsArr &qra) {
                     if (qra[0].isError())
                         throw std::runtime_error("error: " + string(qra[0].getErrorText()));
-                    int newId = stoi(bytesToString(qra[0].getValueByIndex(0, 0)));
+                    int newId = db::getIntValue(qra[0].getValueByIndex(0, 0));
                     rowId = newId;
                     REQUIRE(rowId == 1);
                     sem.notify();
@@ -221,8 +221,8 @@ TEST_CASE("PGPool") {
                     if (qra[0].isError())
                         throw std::runtime_error("error: " + string(qra[0].getErrorText()));
                     REQUIRE(qra[0].getRowsCount() == 1);
-                    auto field1 = stoi(bytesToString(qra[0].getValueByName(0, "field1")));
-                    auto field2 = stol(bytesToString(qra[0].getValueByName(0, "field2")));
+                    auto field1 = db::getIntValue(qra[0].getValueByName(0, "field1"));
+                    auto field2 = db::getLongValue(qra[0].getValueByName(0, "field2"));
                     REQUIRE(field1 == created_at_1);
                     REQUIRE(field2 == expires_at_1);
                     sem.notify();
@@ -247,8 +247,8 @@ TEST_CASE("PGPool") {
                     if (qra[0].isError())
                         throw std::runtime_error("error: " + string(qra[0].getErrorText()));
                     REQUIRE(qra[0].getRowsCount() == 1);
-                    auto field1 = stoi(bytesToString(qra[0].getValueByName(0, "field1")));
-                    auto field2 = stol(bytesToString(qra[0].getValueByName(0, "field2")));
+                    auto field1 = db::getIntValue(qra[0].getValueByName(0, "field1"));
+                    auto field2 = db::getLongValue(qra[0].getValueByName(0, "field2"));
                     REQUIRE(field1 == created_at_2);
                     REQUIRE(field2 == expires_at_2);
                     sem.notify();
@@ -272,7 +272,7 @@ TEST_CASE("PGPool") {
                 [&sem,&rowId](db::QueryResultsArr &qra) {
                     if (qra[0].isError())
                         throw std::runtime_error("error: " + string(qra[0].getErrorText()));
-                    int newId = stoi(bytesToString(qra[0].getValueByIndex(0, 0)));
+                    int newId = db::getIntValue(qra[0].getValueByIndex(0, 0));
                     rowId = newId;
                     REQUIRE(rowId == 1);
                     sem.notify();
@@ -287,8 +287,8 @@ TEST_CASE("PGPool") {
                         throw std::runtime_error("error: " + string(qra[0].getErrorText()));
                     REQUIRE(qra[0].getRowsCount() == 1);
                     auto db_text_val = bytesToString(qra[0].getValueByIndex(0, 0));
-                    auto db_boolean_val = bytesToString(qra[0].getValueByIndex(0, 1))=="t" ? true : false;
-                    auto db_double_val = atof(bytesToString(qra[0].getValueByIndex(0, 2)).c_str());
+                    auto db_boolean_val = db::getBoolValue(qra[0].getValueByIndex(0, 1));;
+                    auto db_double_val = db::getDoubleValue(qra[0].getValueByIndex(0, 2));
                     REQUIRE(db_text_val == text1);
                     REQUIRE(db_boolean_val == bool1);
                     REQUIRE(db_double_val == double1);
@@ -315,8 +315,8 @@ TEST_CASE("PGPool") {
                         throw std::runtime_error("error: " + string(qra[0].getErrorText()));
                     REQUIRE(qra[0].getRowsCount() == 1);
                     auto db_text_val = bytesToString(qra[0].getValueByIndex(0, 0));
-                    auto db_boolean_val = bytesToString(qra[0].getValueByIndex(0, 1))=="t" ? true : false;
-                    auto db_double_val = atof(bytesToString(qra[0].getValueByIndex(0, 2)).c_str());
+                    auto db_boolean_val = db::getBoolValue(qra[0].getValueByIndex(0, 1));
+                    auto db_double_val = db::getDoubleValue(qra[0].getValueByIndex(0, 2));
                     REQUIRE(db_text_val == text2);
                     REQUIRE(db_boolean_val == bool2);
                     REQUIRE(db_double_val == double2);
@@ -330,7 +330,7 @@ TEST_CASE("PGPool") {
         const int BUF_SIZE = 20;
         Semaphore sem;
         atomic<int> readyCounter(0);
-        long t0 = getCurrentTimeMillis();
+        long long t0 = getCurrentTimeMillis();
         for (int i = 0; i < ROWS_COUNT; ++i) {
             pgPool.execParams(
                     "INSERT INTO table1(hash,state,locked_by_id,created_at,expires_at) VALUES ($1, $2, 0, $3, $4)",
@@ -352,7 +352,7 @@ TEST_CASE("PGPool") {
         recreateTestTable();
         readyCounter = 0;
 
-        long t1 = getCurrentTimeMillis();
+        long long t1 = getCurrentTimeMillis();
         for (int i = 0; i < ROWS_COUNT/BUF_SIZE; ++i) {
             string query = "INSERT INTO table1(hash,state,locked_by_id,created_at,expires_at) VALUES ";
             vector<any> params;
@@ -374,7 +374,7 @@ TEST_CASE("PGPool") {
                         if (qra[0].isError())
                             throw std::runtime_error("error: " + string(qra[0].getErrorText()));
                         for (int k = 0; k < qra[0].getRowsCount(); ++k) {
-                            int id = stoi(bytesToString(qra[0].getValueByIndex(k,0)));
+                            int id = db::getIntValue(qra[0].getValueByIndex(k,0));
                             //cout << "inserted id: " << id << endl;
                             ++readyCounter;
                         }

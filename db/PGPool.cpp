@@ -42,6 +42,36 @@ namespace db {
         return getValueByIndex(rowNum, colIndex);
     }
 
+    int getIntValue(const byte_vector& val) {
+        if (val.size() < sizeof(int))
+            throw std::invalid_argument(
+                    "QueryResult::getIntValue: data too small: " + std::to_string(val.size()) + " bytes");
+        return be32toh(*(int *) &val[0]);
+    }
+
+    long long getLongValue(const byte_vector& val) {
+        if (val.size() < sizeof(long long))
+            throw std::invalid_argument(
+                    "QueryResult::getLongValue: data too small: " + std::to_string(val.size()) + " bytes");
+        return be64toh(*(long long*)&val[0]);
+    }
+
+    bool getBoolValue(const byte_vector& val) {
+        return *(bool*)&val[0];
+    }
+
+    double getDoubleValue(const byte_vector& val) {
+        if (val.size() < sizeof(double))
+            throw std::invalid_argument(
+                    "QueryResult::getDoubleValue: data too small: " + std::to_string(val.size()) + " bytes");
+        long long hval = be64toh(*((long long*)&val[0]));
+        return *((double*)&hval);
+    }
+
+    std::string getStringValue(const byte_vector& val) {
+        return bytesToString(val);
+    }
+
     PGPool::PGPool(int poolSize, const std::string& connectString) : threadPool_(poolSize) {
         for (int i = 0; i < poolSize; ++i) {
             std::shared_ptr<PGconn> con;
@@ -116,6 +146,10 @@ namespace db {
                     auto ps = make_shared<string>(std::to_string(std::any_cast<long>(val)));
                     addString(i, ps);
                     stringHolder.push_back(ps);
+                } else if (val.type() == typeid(long long)) {
+                    auto ps = make_shared<string>(std::to_string(std::any_cast<long long>(val)));
+                    addString(i, ps);
+                    stringHolder.push_back(ps);
                 } else if (val.type() == typeid(bool)) {
                     auto ps = make_shared<string>(std::to_string(std::any_cast<bool>(val)));
                     addString(i, ps);
@@ -128,7 +162,7 @@ namespace db {
                     std::cerr << "PGPool.execParams error: wrong type: " << val.type().name() << std::endl;
                 }
             }
-            PQsendQueryParams(bc.con.get(), query.c_str(), params.size(), nullptr, values, lengths, binaryFlags, 0);
+            PQsendQueryParams(bc.con.get(), query.c_str(), params.size(), nullptr, values, lengths, binaryFlags, 1);
             PQflush(bc.con.get());
             QueryResultsArr results;
             while (true) {

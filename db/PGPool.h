@@ -33,6 +33,12 @@ namespace db {
         std::shared_ptr<pg_result> pgRes_;
     };
 
+    int getIntValue(const byte_vector& val);
+    long long getLongValue(const byte_vector& val);
+    bool getBoolValue(const byte_vector& val);
+    double getDoubleValue(const byte_vector& val);
+    std::string getStringValue(const byte_vector& val);
+
     typedef std::vector<QueryResult> QueryResultsArr;
     typedef const std::function<void(QueryResultsArr&)>& QueryCallback;
 
