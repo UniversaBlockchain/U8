@@ -114,50 +114,47 @@ namespace db {
             const char *values[params.size()];
             int lengths[params.size()];
             int binaryFlags[params.size()];
-            vector<shared_ptr<string>> stringHolder;
             vector<shared_ptr<byte_vector>> bytesHolder;
-            auto addString = [&stringHolder,&values,&lengths,&binaryFlags](int i, std::shared_ptr<std::string> ps){
-                stringHolder.push_back(ps);
-                string &s = *ps;
-                values[i] = &s[0];
-                lengths[i] = s.length();
-                binaryFlags[i] = 0;
+            auto addByteVector = [&bytesHolder,&values,&lengths,&binaryFlags](int i, std::shared_ptr<byte_vector> ps) {
+                bytesHolder.push_back(ps);
+                byte_vector &bv = *ps;
+                values[i] = (char *) &bv[0];
+                lengths[i] = bv.size();
+                binaryFlags[i] = 1;
             };
             for (int i = 0; i < params.size(); ++i) {
                 auto &val = params[i];
                 if (val.type() == typeid(byte_vector)) {
                     auto ps = make_shared<byte_vector>(std::any_cast<byte_vector>(val));
-                    bytesHolder.push_back(ps);
-                    byte_vector &bv = *ps;
-                    values[i] = (char *) &bv[0];
-                    lengths[i] = bv.size();
-                    binaryFlags[i] = 1;
+                    addByteVector(i, ps);
                 } else if (val.type() == typeid(const char *)) {
-                    auto ps = make_shared<string>(std::any_cast<const char *>(val));
-                    addString(i, ps);
+                    auto v = std::any_cast<const char *>(val);
+                    auto ps = make_shared<byte_vector>(v, v+strlen(v));
+                    addByteVector(i, ps);
                 } else if (val.type() == typeid(std::string)) {
-                    auto ps = make_shared<string>(std::any_cast<std::string>(val));
-                    addString(i, ps);
+                    auto v = std::any_cast<std::string>(val);
+                    auto ps = make_shared<byte_vector>(v.begin(), v.end());
+                    addByteVector(i, ps);
                 } else if (val.type() == typeid(int)) {
-                    auto ps = make_shared<string>(std::to_string(std::any_cast<int>(val)));
-                    addString(i, ps);
-                    stringHolder.push_back(ps);
+                    auto v = std::any_cast<int>(val);
+                    v = htobe32(v);
+                    addByteVector(i, make_shared<byte_vector>((char*)&v, ((char*)&v)+sizeof(int)));
                 } else if (val.type() == typeid(long)) {
-                    auto ps = make_shared<string>(std::to_string(std::any_cast<long>(val)));
-                    addString(i, ps);
-                    stringHolder.push_back(ps);
+                    auto v = std::any_cast<long>(val);
+                    v = htobe64(v);
+                    addByteVector(i, make_shared<byte_vector>((char*)&v, ((char*)&v)+sizeof(long)));
                 } else if (val.type() == typeid(long long)) {
-                    auto ps = make_shared<string>(std::to_string(std::any_cast<long long>(val)));
-                    addString(i, ps);
-                    stringHolder.push_back(ps);
+                    auto v = std::any_cast<long long>(val);
+                    v = htobe64(v);
+                    addByteVector(i, make_shared<byte_vector>((char*)&v, ((char*)&v)+sizeof(long long)));
                 } else if (val.type() == typeid(bool)) {
-                    auto ps = make_shared<string>(std::to_string(std::any_cast<bool>(val)));
-                    addString(i, ps);
-                    stringHolder.push_back(ps);
+                    auto v = std::any_cast<bool>(val);
+                    addByteVector(i, make_shared<byte_vector>((char*)&v, ((char*)&v)+sizeof(bool)));
                 } else if (val.type() == typeid(double)) {
-                    auto ps = make_shared<string>(std::to_string(std::any_cast<double>(val)));
-                    addString(i, ps);
-                    stringHolder.push_back(ps);
+                    auto v = std::any_cast<double>(val);
+                    long long lv = htobe64(*(long long*)&v);
+                    v = *(double*)&lv;
+                    addByteVector(i, make_shared<byte_vector>((char*)&v, ((char*)&v)+sizeof(double)));
                 } else {
                     std::cerr << "PGPool.execParams error: wrong type: " << val.type().name() << std::endl;
                 }

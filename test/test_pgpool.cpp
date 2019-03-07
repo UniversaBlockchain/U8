@@ -78,13 +78,13 @@ TEST_CASE("PGPool") {
                             throw std::runtime_error("error: " + string(qra[0].getErrorText()));
                         ++readyCounter;
                         sem.notify();
-                    }, HashId::createRandom().getDigest(), "4", getCurrentTimeMillis() / 1000,
-                    getCurrentTimeMillis() / 1000 + 31536000);
+                    }, HashId::createRandom().getDigest(), 4, (int)getCurrentTimeMillis() / 1000,
+                    getCurrentTimeMillis() / 1000l + 31536000l);
 
             // insert with pgPool.execParamsArr()
             vector<any> params(
-                    {HashId::createRandom().getDigest(), "4", getCurrentTimeMillis() / 1000,
-                     getCurrentTimeMillis() / 1000 + 31536000});
+                    {HashId::createRandom().getDigest(), 4, (int)getCurrentTimeMillis() / 1000,
+                     getCurrentTimeMillis() / 1000l + 31536000l});
             pgPool.execParamsArr(
                     "INSERT INTO table1(hash,state,locked_by_id,created_at,expires_at) VALUES ($1, $2, 0, $3, $4)",
                     [&sem, &readyCounter](db::QueryResultsArr &qra) {
@@ -113,7 +113,7 @@ TEST_CASE("PGPool") {
                               REQUIRE(db::getIntValue(qra[0].getValueByIndex(1, 0)) == 9);
                               REQUIRE(db::getIntValue(qra[0].getValueByIndex(2, 0)) == 10);
                               sem2.notify();
-                          }, "7");
+                          }, 7);
 
         sem2.wait();
     }
@@ -129,8 +129,8 @@ TEST_CASE("PGPool") {
                         int newId = db::getIntValue(qra[0].getValueByIndex(0, 0));
                         REQUIRE(newId == i+1);
                         sem.notify();
-                    }, HashId::createRandom().getDigest(), "4", getCurrentTimeMillis() / 1000,
-                    getCurrentTimeMillis() / 1000 + 31536000);
+                    }, HashId::createRandom().getDigest(), 4, (int)getCurrentTimeMillis() / 1000,
+                    getCurrentTimeMillis() / 1000l + 31536000l);
             sem.wait();
         }
     }
@@ -151,8 +151,8 @@ TEST_CASE("PGPool") {
                     rowId = newId;
                     REQUIRE(rowId == 1);
                     sem.notify();
-                }, hashId1.getDigest(), "4", getCurrentTimeMillis() / 1000,
-                getCurrentTimeMillis() / 1000 + 31536000);
+                }, hashId1.getDigest(), 4, (int)getCurrentTimeMillis() / 1000,
+                getCurrentTimeMillis() / 1000l + 31536000l);
         sem.wait();
 
         // select it and check
@@ -211,7 +211,7 @@ TEST_CASE("PGPool") {
                     rowId = newId;
                     REQUIRE(rowId == 1);
                     sem.notify();
-                }, HashId::createRandom().getDigest(), "4", created_at_1, expires_at_1);
+                }, HashId::createRandom().getDigest(), 4, created_at_1, expires_at_1);
         sem.wait();
 
         // select and check
@@ -286,7 +286,7 @@ TEST_CASE("PGPool") {
                     if (qra[0].isError())
                         throw std::runtime_error("error: " + string(qra[0].getErrorText()));
                     REQUIRE(qra[0].getRowsCount() == 1);
-                    auto db_text_val = bytesToString(qra[0].getValueByIndex(0, 0));
+                    auto db_text_val = db::getStringValue(qra[0].getValueByIndex(0, 0));
                     auto db_boolean_val = db::getBoolValue(qra[0].getValueByIndex(0, 1));;
                     auto db_double_val = db::getDoubleValue(qra[0].getValueByIndex(0, 2));
                     REQUIRE(db_text_val == text1);
@@ -314,7 +314,7 @@ TEST_CASE("PGPool") {
                     if (qra[0].isError())
                         throw std::runtime_error("error: " + string(qra[0].getErrorText()));
                     REQUIRE(qra[0].getRowsCount() == 1);
-                    auto db_text_val = bytesToString(qra[0].getValueByIndex(0, 0));
+                    auto db_text_val = db::getStringValue(qra[0].getValueByIndex(0, 0));
                     auto db_boolean_val = db::getBoolValue(qra[0].getValueByIndex(0, 1));
                     auto db_double_val = db::getDoubleValue(qra[0].getValueByIndex(0, 2));
                     REQUIRE(db_text_val == text2);
@@ -339,8 +339,8 @@ TEST_CASE("PGPool") {
                             throw std::runtime_error("error: " + string(qra[0].getErrorText()));
                         ++readyCounter;
                         sem.notify();
-                    }, HashId::createRandom().getDigest(), "4", getCurrentTimeMillis() / 1000,
-                    getCurrentTimeMillis() / 1000 + 31536000);
+                    }, HashId::createRandom().getDigest(), 4, (int)getCurrentTimeMillis() / 1000,
+                    getCurrentTimeMillis() / 1000l + 31536000l);
         }
         do {
             sem.wait();
@@ -360,9 +360,9 @@ TEST_CASE("PGPool") {
                 char buf[64];
                 snprintf(buf, sizeof(buf), "($%i,$%i,0,$%i,$%i)", j*4+1, j*4+2, j*4+3, j*4+4);
                 params.push_back(HashId::createRandom().getDigest());
-                params.push_back("4");
-                params.push_back(getCurrentTimeMillis() / 1000);
-                params.push_back(getCurrentTimeMillis() / 1000 + 31536000);
+                params.push_back(4);
+                params.push_back((int)getCurrentTimeMillis() / 1000);
+                params.push_back(getCurrentTimeMillis() / 1000l + 31536000l);
                 if (j > 0)
                     query += ",";
                 query += buf;
