@@ -39,9 +39,10 @@ const chunkSize = 2048;
 
 const file_proto = IOFile.prototype;
 const tcp_proto = IOTCP.prototype;
+const tls_proto = IOTLS.prototype;
 const udp_proto = IOUDP.prototype;
 
-file_proto.read = tcp_proto.read = function (size) {
+file_proto.read = tcp_proto.read = tls_proto.read =function (size) {
     if (size <= 0)
         throw Error("size must > 0");
     let ap = new AsyncProcessor();
@@ -54,7 +55,7 @@ file_proto.read = tcp_proto.read = function (size) {
     return ap.promise;
 };
 
-file_proto.write = tcp_proto.write = function (data) {
+file_proto.write = tcp_proto.write = tls_proto.write =function (data) {
     if (!(data instanceof Uint8Array)) {
         data = Uint8Array.from(data);
     }
@@ -63,7 +64,7 @@ file_proto.write = tcp_proto.write = function (data) {
     return ap.promise;
 };
 
-file_proto.close = tcp_proto.close = udp_proto.close = function() {
+file_proto.close = tcp_proto.close = tls_proto.close = udp_proto.close = function() {
     let ap = new AsyncProcessor();
     this._close_raw(code => ap.process(code));
     return ap.promise;

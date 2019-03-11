@@ -1,5 +1,5 @@
 import {expect, assert, unit} from 'test'
-import {tcp, udp} from 'network'
+import {tcp, tls, udp} from 'network'
 
 async function reportErrors(block) {
     try {
@@ -27,6 +27,31 @@ unit.test("simple tcp", async () => {
     });
 
     let conn = await tcp.connect({host: "127.0.0.1", port: 23102});
+    await conn.output.write("foobar\n");
+    let ss = chomp(await conn.input.allAsString());
+    expect.equal(ss, "hello!");
+    expect.equal(serverReads, "foobar");
+    server.close();
+});
+
+unit.test("simple tls", async () => {
+
+    let server = tls.listen({port: 23102, certFilePath: "../test/server-cert.pem", keyFilePath: "../test/server-key.pem"});
+    let serverReads;
+
+    let connectionProcessor = async (connection) => {
+        await reportErrors(async () => {
+            serverReads = await connection.input.readLine();
+            await connection.output.write("hello!\n");
+            connection.close();
+        });
+    };
+
+    server.accept(connectionProcessor, (error) => {
+        unit.fail("accept failed: " + error);
+    });
+
+    let conn = await tls.connect({host: "127.0.0.1", port: 23102, certFilePath: "../test/server-cert.pem", keyFilePath: "../test/server-key.pem"});
     await conn.output.write("foobar\n");
     let ss = chomp(await conn.input.allAsString());
     expect.equal(ss, "hello!");
