@@ -11,5 +11,7 @@ void testAsyncUDP();
 void testAsyncTCP();
 void testUnifyFileAndTCPread();
 void testClientWriteWithouthRead();
+void testAsyncTLS();
+void stressTestTCP();
 
 #endif //U8_ASYNCIOTESTS_H

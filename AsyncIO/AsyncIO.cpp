@@ -3,6 +3,7 @@
 //
 
 #include "AsyncIO.h"
+#include "TLS/uv_tls.h"
 #include <thread>
 
 namespace asyncio {
@@ -21,7 +22,8 @@ namespace asyncio {
         umask(000);
 
         if (!asyncLoop) {
-            asyncLoop = uv_loop_new();
+            asyncLoop = (uv_loop_t*) malloc(sizeof(uv_loop_t));
+            uv_loop_init(asyncLoop);
 
             //Opened async handle will keep the loop alive
             uv_async_init(asyncLoop, &exitHandle, [](uv_async_t* asyncHandle){
@@ -42,6 +44,7 @@ namespace asyncio {
                 uv_run(loop, UV_RUN_DEFAULT);
                 uv_loop_close(loop);
 
+                free(asyncLoop);
                 asyncLoop = nullptr;
             }, nullptr);
 
@@ -68,7 +71,16 @@ namespace asyncio {
     }
 
     const char* getError(ssize_t code) {
-        return uv_strerror(code);
+        if (code == ERR_TLS_INIT_CONTEXT)
+            return "Error initialization TLS context";
+        else if (code == ERR_TLS_GET_TLS_SESSION)
+            return "Error initialization new TLS session from context";
+        else if (code == ERR_TLS_CONNECT_TIMEOUT)
+            return "Failed to establish TLS handshake when connecting";
+        else if (code == ERR_TLS_ACCEPT_TIMEOUT)
+            return "Failed to establish TLS handshake when accepting";
+        else
+            return uv_strerror((int) code);
     }
 
     bool isFile(const ioDirEntry& entry) {

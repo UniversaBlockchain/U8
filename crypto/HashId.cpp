@@ -6,6 +6,7 @@
 #include "HashId.h"
 #include "gost3411-2012.h"
 #include "base64.h"
+#include "../tools/tools.h"
 
 namespace crypto {
 
@@ -43,6 +44,12 @@ namespace crypto {
         return res;
     }
 
+    HashId HashId::createRandom() {
+        byte_vector body(64);
+        sprng_read(&body[0], 64, NULL);
+        return HashId::of(body);
+    }
+
     void HashId::initWith(void *data, size_t size) {
         if (digest.size() == 0) {
             const unsigned long gostSize = 256;
@@ -66,7 +73,7 @@ namespace crypto {
         }
     }
 
-    std::string HashId::toBase64() {
+    std::string HashId::toBase64() const {
         return base64_encode(&digest[0], digest.size());
     }
 

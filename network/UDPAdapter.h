@@ -23,7 +23,7 @@ namespace network {
     class UDPAdapter {
 
     public:
-        typedef std::function<void(const byte_vector& packet)> TReceiveCallback;
+        typedef std::function<void(const byte_vector& packet, const NodeInfo& fromNode)> TReceiveCallback;
 
     public:
 
@@ -59,6 +59,16 @@ namespace network {
          * Change current callback for incoming packets. Useful for debug.
          */
         void setReceiveCallback(const TReceiveCallback& callback);
+
+        /**
+         * Test mode emulates lost packets, for debug.
+         */
+        void setTestMode(bool enabled) {testMode_ = enabled;}
+
+        /**
+         * for debug
+         */
+        void printInternalState();
 
     private:
         /**
@@ -182,6 +192,13 @@ namespace network {
         Session& getOrCreateSession(const NodeInfo& destination);
 
         /**
+         * If session for remote node is already created - returns it, otherwise creates new Session
+         * <p>
+         * syncronyzed
+         */
+        Session& getOrCreateSession(int nodeId);
+
+        /**
          * If sessionReader for remote node is already created - returns it, otherwise creates new SessionReader
          */
         SessionReader& getOrCreateSessionReaderCandidate(int remoteId);
@@ -235,7 +252,7 @@ namespace network {
          * Each adapter will try to send blocks until have got special Packet with type ACK,
          * that means receiver have got block. So when we got block, but something went wrong - call this method.
          */
-        void sendNack(SessionReader& sessionReader, int packetId);
+        void sendNack(int nodeId, int packetId);
 
         template<typename ...Args>
         void writeLog(Args && ...args) {
@@ -281,7 +298,7 @@ namespace network {
          * Maximum number of data blocks in the retransmit queue after which new
          * sending blocks are delayed in output queue.
          */
-        const static size_t MAX_RETRANSMIT_QUEUE_SIZE = 1500;
+        const static size_t MAX_RETRANSMIT_QUEUE_SIZE = 5000;
 
         /**
          * Maximum number of data blocks in the sending queue after which oldest
@@ -302,6 +319,9 @@ namespace network {
         const static size_t UDP_BUFFER_SIZE = 8*1024*1024;
 
     private:
+        std::minstd_rand minstdRand_;
+        ThreadPool senderPool_;
+        ThreadPool receiverPool_;
         bool isLogEnabled_ = false;
         bool throwErrors_ = false;
         std::string logLabel_;
@@ -312,10 +332,13 @@ namespace network {
         TReceiveCallback receiveCallback_;
         int nextPacketId_;
         TimerThread timer_;
-        std::unordered_map<int, Session> sessionsByRemoteId;
-        std::unordered_map<int, SessionReader> sessionReaders;
-        std::unordered_map<int, SessionReader> sessionReaderCandidates;
-        std::recursive_mutex socketMutex;
+        std::unordered_map<int, Session> sessionsByRemoteId_;
+        std::unordered_map<int, SessionReader> sessionReaders_;
+        std::unordered_map<int, SessionReader> sessionReaderCandidates_;
+        std::recursive_mutex socketMutex_;
+        bool isClosed_ = false;
+        bool testMode_ = false;
+
         friend class Retransmitter;
     };
 

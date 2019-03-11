@@ -7,8 +7,8 @@
 namespace asyncio {
 
     AsyncLoop::AsyncLoop() {
-        loop = uv_loop_new();
-        loop->data = nullptr;
+        uv_loop_init(&loop);
+        loop.data = nullptr;
 
         thread = std::thread([&]{
             int result = 0;
@@ -32,7 +32,7 @@ namespace asyncio {
                 }
 
                 oldResult = result;
-                result = uv_run(loop, UV_RUN_NOWAIT);
+                result = uv_run(&loop, UV_RUN_NOWAIT);
 
                 if ((result <= oldResult) && empty)
                     std::this_thread::sleep_for(1us);
@@ -42,7 +42,7 @@ namespace asyncio {
 
     AsyncLoop::~AsyncLoop() {
         runned = false;
-        uv_loop_close(loop);
+        uv_loop_close(&loop);
         thread.join();
     };
 }

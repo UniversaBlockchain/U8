@@ -13,7 +13,7 @@ unit.test("list role serialization", async () => {
     role.quorumSize = 3;
     role.roles.push(new roles.SimpleRole("name1",k.publicKey));
     role.roles.push(new roles.SimpleRole("name2",k.publicKey.longAddress));
-    role.requiredAnyReferences.add("ref1");
+    role.requiredAnyConstraints.add("ref1");
 
 
 

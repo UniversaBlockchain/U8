@@ -12,6 +12,7 @@ set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -std=c++17 -g -Wno-register"
 
 if (${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
     set(MACOSX true)
+    add_compile_definitions(__PLATFORM_DARWIN)
 endif ()
 
 if (MACOSX)
@@ -35,6 +36,8 @@ endif()
 
 file(GLOB LIBRARY_SRC
     AsyncIO/*.h AsyncIO/*.cpp
+    AsyncIO/TLS/*.h AsyncIO/TLS/*.c
+    db/*.h db/*.cpp
     crypto/*.h crypto/*.cpp
     js_bindings/*.h js_bindings/*.cpp
     network/*.h network/*.cpp
@@ -62,13 +65,14 @@ if (${platform} STREQUAL macos)
     add_custom_target(u8libs ALL DEPENDS download_libs.stamp)
     add_dependencies(u8 u8libs)
     set(libtype .dylib)
-    foreach (l libv8 libtomcrypt libuv)
+    foreach (l libv8 libtomcrypt libuv libpq libssl)
         message( ext/${platform}/${l}/include)
         message( ext/${platform}/${l}/include)
         target_include_directories(u8_lib PUBLIC ext/${platform}/${l}/include)
         target_link_directories(u8_lib PUBLIC ext/${platform}/${l}/lib)
     endforeach (l)
-    target_link_libraries(u8 PUBLIC v8 v8_libplatform v8_libbase tomcrypt gmp uv)
+    target_link_libraries(u8 PUBLIC v8 v8_libplatform v8_libbase tomcrypt gmp uv pq ssl crypto)
+    target_link_libraries(u8_tests PUBLIC tomcrypt gmp uv pq ssl crypto)
 elseif (${platform} STREQUAL macos_v8_monolith)
     foreach (l v8 tomcrypt gmp)
         target_include_directories(u8_lib PUBLIC ext/macosx/${l}/include)
@@ -79,12 +83,12 @@ elseif (${platform} STREQUAL linux)
     add_custom_command(OUTPUT ../download_libs.stamp WORKING_DIRECTORY .. COMMAND sh download_libs.sh ${platform} > download_libs.stamp)
     add_custom_target(u8libs ALL DEPENDS download_libs.stamp)
     add_dependencies(u8 u8libs)
-    foreach (l libv8 libtomcrypt libuv)
+    foreach (l libv8 libtomcrypt libuv libpq libssl)
         target_include_directories(u8_lib PUBLIC ext/${platform}/${l}/include)
         target_link_directories(u8_lib PUBLIC ext/${platform}/${l}/lib)
     endforeach (l)
-    target_link_libraries(u8 PUBLIC v8 v8_libplatform v8_libbase tomcrypt gmp uv pthread)
-    target_link_libraries(u8_tests PUBLIC tomcrypt gmp uv pthread)
+    target_link_libraries(u8 PUBLIC v8 v8_libplatform v8_libbase tomcrypt gmp uv pq pthread ssl crypto)
+    target_link_libraries(u8_tests PUBLIC tomcrypt gmp uv pq pthread ssl crypto)
 else ()
     message(FATAL_ERROR "unknown platform ${platform}")
 endif ()

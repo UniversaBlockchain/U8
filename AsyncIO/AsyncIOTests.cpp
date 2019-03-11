@@ -10,6 +10,7 @@
 #include "IODir.h"
 #include "IOUDP.h"
 #include "IOTCP.h"
+#include "IOTLS.h"
 #include "AsyncIOTests.h"
 
 using namespace std;
@@ -50,6 +51,8 @@ void allAsyncIOTests() {
     testAsyncTCP();
     testUnifyFileAndTCPread();
     testClientWriteWithouthRead();
+    testAsyncTLS();
+    stressTestTCP();
 
     asyncio::deinitLoop();
 }
@@ -1105,7 +1108,7 @@ void testAsyncTCP() {
 
                 asyncio::IOTCP cli;
 
-                cli.connect("127.0.0.1", PORT + (unsigned int) t * NUM_ITERATIONS + i, "127.0.0.1", PORT, [&](ssize_t result){
+                cli.connect("127.0.0.1", PORT + (unsigned int) t * NUM_ITERATIONS + i + 1, "127.0.0.1", PORT, [&](ssize_t result){
                     ASSERT(!asyncio::isError(result));
 
                     printf("Connected to server\n");
@@ -1196,6 +1199,8 @@ void testAsyncTCP() {
 
             printf("Server received: PING\n");
 
+            free(buffs[b]);
+
             clients[n]->write((void*) "PONG", 5, [n, &sem_tcp_srv, &clients](ssize_t result){
                 ASSERT(result == 5);
 
@@ -1218,7 +1223,7 @@ void testAsyncTCP() {
 
                 char buff_cli[5];
 
-                cli.connect("127.0.0.1", PORT + (unsigned int) t * NUM_ITERATIONS + i, "127.0.0.1", PORT, [&](ssize_t result){
+                cli.connect("127.0.0.1", PORT + (unsigned int) t * NUM_ITERATIONS + i + 1, "127.0.0.1", PORT, [&](ssize_t result){
                     ASSERT(!asyncio::isError(result));
 
                     printf("Connected to server\n");
@@ -1374,9 +1379,10 @@ void testAsyncTCP() {
     uv_sem_wait(&sem_tcp_srv);
     uv_sem_destroy(&sem_tcp_srv);
 
-    printf("partial read test successful\n");
-
+    delete clients[0];
     clients.clear();
+
+    printf("partial read test successful\n");
 
     printf("testAsyncTCP()...done\n\n");
 }
@@ -1651,4 +1657,625 @@ void testClientWriteWithouthRead() {
     printf("client write without read test successful\n");
 
     printf("testClientWriteWithouthRead()...done\n\n");
+}
+
+void testAsyncTLS() {
+    printf("testAsyncTLS()...\n");
+
+    uv_sem_t sem_tls_srv;
+    uv_sem_init(&sem_tls_srv, 0);
+
+    //init TLS server
+    asyncio::IOTLS srv;
+    vector<asyncio::IOTLS*> clients;
+
+    srv.open("127.0.0.1", PORT, "../test/server-cert.pem", "../test/server-key.pem", [&](ssize_t result){
+        ASSERT(!asyncio::isError(result));
+
+        printf("New connection\n");
+
+        clients.push_back(srv.accept([&](asyncio::IOTLS* handle, ssize_t result){
+            printf("Connection accepted\n");
+
+            handle->enableKeepAlive(60);
+
+            handle->read(4096, [handle, &sem_tls_srv](const asyncio::byte_vector& data, ssize_t result){
+                ASSERT(result == 5);
+                ASSERT(!memcmp("PING", data.data(), 4));
+
+                printf("Server received: PING\n");
+
+                asyncio::byte_vector pong(5);
+                memcpy(pong.data(), "PONG", 4);
+
+                handle->write(pong, [handle, &sem_tls_srv](ssize_t result){
+                    ASSERT(result == 5);
+
+                    handle->close([&](ssize_t result){
+                        ASSERT(!asyncio::isError(result));
+
+                        uv_sem_post(&sem_tls_srv);
+                    });
+                });
+            });
+        }));
+    });
+
+    //TLS client threads
+    vector<thread> clientThreads;
+
+    for (long t = 0; t < NUM_THREADS; t++) {
+        clientThreads.emplace_back([t](){
+            for (int i = 0; i < NUM_ITERATIONS; i++) {
+                uv_sem_init(&stop[t], 0);
+
+                asyncio::IOTLS cli;
+                printf("Connecting to server\n");
+
+                cli.connect("127.0.0.1", PORT + (unsigned int) t * NUM_ITERATIONS + i + 1, "127.0.0.1", PORT,
+                        "../test/server-cert.pem", "../test/server-key.pem", [&](ssize_t result){
+
+                    ASSERT(!asyncio::isError(result));
+
+                    printf("Connected to server\n");
+
+                    cli.enableKeepAlive(60);
+
+                    asyncio::byte_vector ping(5);
+                    memcpy(ping.data(), "PING", 4);
+
+                    cli.write(ping, [&](ssize_t result){
+                        ASSERT(result == 5);
+
+                        cli.read(4096, [&](const asyncio::byte_vector& data, ssize_t result){
+                            ASSERT(result == 5);
+                            ASSERT(!memcmp("PONG", data.data(), 4));
+
+                            printf("Client received: PONG\n");
+
+                            cli.close([&](ssize_t result){
+                                ASSERT(!asyncio::isError(result));
+                                uv_sem_post(&stop[t]);
+                            });
+                        });
+                    });
+                });
+
+                uv_sem_wait(&stop[t]);
+                uv_sem_destroy(&stop[t]);
+
+                printf("Thread %ld iteration %i\n", t, i);
+            }
+        });
+    }
+
+    for (long t = 0; t < NUM_THREADS; t++)
+        clientThreads[t].join();
+
+    for (int i = 0; i < NUM_THREADS * NUM_ITERATIONS; i++)
+        uv_sem_wait(&sem_tls_srv);
+    uv_sem_destroy(&sem_tls_srv);
+
+    for (asyncio::IOTLS* handle : clients)
+        delete handle;
+
+    //close TLS server
+    uv_sem_init(&sem_tls_srv, 0);
+
+    printf("Close server\n");
+
+    srv.close([&](ssize_t result){
+        ASSERT(!asyncio::isError(result));
+
+        uv_sem_post(&sem_tls_srv);
+    });
+
+    uv_sem_wait(&sem_tls_srv);
+    uv_sem_destroy(&sem_tls_srv);
+
+    clientThreads.clear();
+    clients.clear();
+
+    printf("test with byte-vectors successful\n");
+
+    uv_sem_init(&sem_tls_srv, 0);
+
+    //init TLS server
+    asyncio::IOTLS srv_buff;
+
+    srv_buff.open("127.0.0.1", PORT, "../test/server-cert.pem", "../test/server-key.pem", [&](ssize_t result){
+        ASSERT(!asyncio::isError(result));
+
+        printf("New connection\n");
+
+        clients.push_back(srv_buff.accept([&](asyncio::IOTLS* handle, ssize_t result) {
+            printf("Connection accepted\n");
+
+            char* buff = (char*) malloc(5);
+
+            handle->read(buff, 5, [&, buff, handle](ssize_t result){
+                ASSERT(result == 5);
+                ASSERT(!memcmp("PING", buff, 4));
+
+                printf("Server received: PING\n");
+
+                free(buff);
+
+                handle->write((void*) "PONG", 5, [&, handle](ssize_t result){
+                    ASSERT(result == 5);
+
+                    handle->close([&](ssize_t result){
+                        ASSERT(!asyncio::isError(result));
+
+                        uv_sem_post(&sem_tls_srv);
+                    });
+                });
+            });
+        }));
+    });
+
+    //TLS client threads
+    for (long t = 0; t < NUM_THREADS; t++) {
+        clientThreads.emplace_back([t](){
+            for (int i = 0; i < NUM_ITERATIONS; i++) {
+                uv_sem_init(&stop[t], 0);
+
+                asyncio::IOTLS cli;
+
+                char buff_cli[5];
+
+                cli.connect("127.0.0.1", PORT + (unsigned int) t * NUM_ITERATIONS + i + 1, "127.0.0.1", PORT,
+                        "../test/server-cert.pem", "../test/server-key.pem", [&](ssize_t result){
+                    ASSERT(!asyncio::isError(result));
+
+                    printf("Connected to server\n");
+
+                    cli.write((void*) "PING", 5, [&](ssize_t result){
+                        ASSERT(result == 5);
+
+                        cli.read(buff_cli, 5, [&](ssize_t result){
+                            ASSERT(result == 5);
+                            ASSERT(!memcmp("PONG", buff_cli, 4));
+
+                            printf("Client received: PONG\n");
+
+                            cli.close([&](ssize_t result){
+                                ASSERT(!asyncio::isError(result));
+                                uv_sem_post(&stop[t]);
+                            });
+                        });
+                    });
+                });
+
+                uv_sem_wait(&stop[t]);
+                uv_sem_destroy(&stop[t]);
+
+                printf("Thread %ld iteration %i\n", t, i);
+            }
+        });
+    }
+
+    for (long t = 0; t < NUM_THREADS; t++)
+        clientThreads[t].join();
+
+    for (int i = 0; i < NUM_THREADS * NUM_ITERATIONS; i++)
+        uv_sem_wait(&sem_tls_srv);
+    uv_sem_destroy(&sem_tls_srv);
+
+    for (asyncio::IOTLS* handle : clients)
+        delete handle;
+
+    //close TLS server
+    uv_sem_init(&sem_tls_srv, 0);
+
+    printf("Close server\n");
+
+    srv_buff.close([&](ssize_t result){
+        ASSERT(!asyncio::isError(result));
+
+        uv_sem_post(&sem_tls_srv);
+    });
+
+    uv_sem_wait(&sem_tls_srv);
+    uv_sem_destroy(&sem_tls_srv);
+
+    clientThreads.clear();
+    clients.clear();
+
+    printf("test with memory buffers successful\n");
+
+    //init TLS server
+    asyncio::IOTLS srv_part;
+
+    uv_sem_init(&sem_tls_srv, 0);
+
+    srv_part.open("127.0.0.1", PORT, "../test/server-cert.pem", "../test/server-key.pem", [&](ssize_t result){
+        ASSERT(!asyncio::isError(result));
+
+        printf("New connection\n");
+
+        clients.push_back(srv_part.accept([&](asyncio::IOTLS* handle, ssize_t result) {
+            printf("Connection accepted\n");
+
+            handle->read(3, [&, handle](const asyncio::byte_vector& data, ssize_t result){
+                ASSERT(result == 3);
+                ASSERT(!memcmp("ABC", data.data(), 3));
+
+                printf("Server received: ABC\n");
+
+                handle->read(3, [&, handle](const asyncio::byte_vector& data, ssize_t result){
+                    ASSERT(result == 3);
+                    ASSERT(!memcmp("DEF", data.data(), 3));
+
+                    printf("Server received: DEF\n");
+
+                    handle->read(3, [&, handle](const asyncio::byte_vector& data, ssize_t result){
+                        ASSERT(result == 3);
+                        ASSERT(!memcmp("GHI", data.data(), 3));
+
+                        printf("Server received: GHI\n");
+
+                        handle->read(3, [&, handle](const asyncio::byte_vector& data, ssize_t result){
+                            ASSERT(result == 1);
+
+                            ASSERT(!memcmp("J", data.data(), 1));
+                            printf("Server received: J\n");
+
+                            handle->close([&](ssize_t result){
+                                ASSERT(!asyncio::isError(result));
+
+                                uv_sem_post(&sem_tls_srv);
+                            });
+                        });
+                    });
+                });
+            });
+        }));
+    });
+
+    //init TLS client
+    asyncio::IOTLS cli;
+
+    cli.connect("127.0.0.1", PORT + 1, "127.0.0.1", PORT, "../test/server-cert.pem", "../test/server-key.pem", [&](ssize_t result){
+        ASSERT(!asyncio::isError(result));
+
+        printf("Connected to server\n");
+
+        cli.write((void*) "ABCDEFGHIJ", 10, [&](ssize_t result){
+            ASSERT(result == 10);
+
+            cli.close([&](ssize_t result){
+                ASSERT(!asyncio::isError(result));
+                uv_sem_post(&sem_tls_srv);
+            });
+        });
+    });
+
+    uv_sem_wait(&sem_tls_srv);
+    uv_sem_wait(&sem_tls_srv);
+    uv_sem_destroy(&sem_tls_srv);
+
+    //close TLS server
+    uv_sem_init(&sem_tls_srv, 0);
+
+    printf("Close server\n");
+
+    srv_part.close([&](ssize_t result){
+        ASSERT(!asyncio::isError(result));
+
+        uv_sem_post(&sem_tls_srv);
+    });
+
+    uv_sem_wait(&sem_tls_srv);
+    uv_sem_destroy(&sem_tls_srv);
+
+    delete clients[0];
+    clients.clear();
+
+    printf("partial read test successful\n");
+
+    uv_sem_init(&sem_tls_srv, 0);
+
+    //init TLS server
+    asyncio::IOTLS srv_tls;
+
+    srv_tls.open("127.0.0.1", PORT, "../test/server-cert.pem", "../test/server-key.pem", [&](ssize_t result){
+        ASSERT(!asyncio::isError(result));
+
+        printf("New connection\n");
+
+        clients.push_back(srv_tls.accept([&](asyncio::IOTLS* handle, ssize_t result){
+            ASSERT(result == ERR_TLS_ACCEPT_TIMEOUT);
+            ASSERT(handle == nullptr);
+
+            printf("No handshake, connection not accepted\n");
+
+            uv_sem_post(&sem_tls_srv);
+        }, 50));
+    });
+
+    //TCP client threads (TCP not establish TLS handshake)
+    for (long t = 0; t < NUM_THREADS; t++) {
+        clientThreads.emplace_back([t](){
+            for (int i = 0; i < NUM_ITERATIONS; i++) {
+                uv_sem_init(&stop[t], 0);
+
+                asyncio::IOTCP cli;
+
+                char buff_cli[5];
+
+                cli.connect("127.0.0.1", PORT + (unsigned int) t * NUM_ITERATIONS + i + 1, "127.0.0.1", PORT, [&](ssize_t result){
+                    ASSERT(!asyncio::isError(result));
+
+                    printf("Connected to server\n");
+
+                    cli.write((void*) "PING", 5, [&](ssize_t result){
+                        ASSERT(result == 5);
+
+                        cli.read(buff_cli, 5, [&](ssize_t result){
+                            ASSERT(result <= 0);
+
+                            cli.close([&](ssize_t result){
+                                ASSERT(!asyncio::isError(result));
+                                uv_sem_post(&stop[t]);
+                            });
+                        });
+                    });
+                });
+
+                uv_sem_wait(&stop[t]);
+                uv_sem_destroy(&stop[t]);
+
+                printf("Thread %ld iteration %i\n", t, i);
+            }
+        });
+    }
+
+    for (long t = 0; t < NUM_THREADS; t++)
+        clientThreads[t].join();
+
+    for (int i = 0; i < NUM_THREADS * NUM_ITERATIONS; i++)
+        uv_sem_wait(&sem_tls_srv);
+    uv_sem_destroy(&sem_tls_srv);
+
+    for (asyncio::IOTLS* handle : clients)
+        delete handle;
+
+    //close TLS server
+    uv_sem_init(&sem_tls_srv, 0);
+
+    printf("Close server\n");
+
+    srv_tls.close([&](ssize_t result){
+        ASSERT(!asyncio::isError(result));
+
+        uv_sem_post(&sem_tls_srv);
+    });
+
+    uv_sem_wait(&sem_tls_srv);
+    uv_sem_destroy(&sem_tls_srv);
+
+    clientThreads.clear();
+    clients.clear();
+
+    printf("test closing accepting sockets without TLS handshake successful\n");
+
+    uv_sem_init(&sem_tls_srv, 0);
+
+    //init TCP server (TCP not establish TLS handshake)
+    asyncio::IOTCP srv_tcp;
+    vector<asyncio::IOTCP*> clients_tcp;
+
+    uv_mutex_t clients_mutex;
+    uv_mutex_init(&clients_mutex);
+
+    srv_tcp.open("127.0.0.1", PORT, [&](ssize_t result){
+        ASSERT(!asyncio::isError(result));
+
+        printf("New connection\n");
+
+        uv_mutex_lock(&clients_mutex);
+
+        unsigned long n = clients_tcp.size();
+        clients_tcp.push_back(srv_tcp.accept());
+
+        uv_mutex_unlock(&clients_mutex);
+
+        clients_tcp[n]->enableKeepAlive(60);
+
+        clients_tcp[n]->read(4096, [&, n](const asyncio::byte_vector& data, ssize_t result){
+            asyncio::byte_vector answer(7);
+            memcpy(answer.data(), "ANSWER", 6);
+
+            clients_tcp[n]->write(answer, [&, n](ssize_t result){
+                ASSERT(result == 7);
+
+                clients_tcp[n]->close([&](ssize_t result){
+                    ASSERT(!asyncio::isError(result));
+
+                    uv_sem_post(&sem_tls_srv);
+                });
+            });
+        });
+    });
+
+    //TLS client threads
+    for (long t = 0; t < NUM_THREADS; t++) {
+        clientThreads.emplace_back([t](){
+            for (int i = 0; i < NUM_ITERATIONS; i++) {
+                uv_sem_init(&stop[t], 0);
+
+                asyncio::IOTLS cli;
+
+                cli.connect("127.0.0.1", PORT + (unsigned int) t * NUM_ITERATIONS + i + 1, "127.0.0.1", PORT,
+                            "../test/server-cert.pem", "../test/server-key.pem", [&](ssize_t result){
+                    ASSERT(result == ERR_TLS_CONNECT_TIMEOUT);
+
+                    uv_sem_post(&stop[t]);
+                }, 50);
+
+                uv_sem_wait(&stop[t]);
+                uv_sem_destroy(&stop[t]);
+
+                printf("Thread %ld iteration %i\n", t, i);
+            }
+        });
+    }
+
+    for (long t = 0; t < NUM_THREADS; t++)
+        clientThreads[t].join();
+
+    for (int i = 0; i < NUM_THREADS * NUM_ITERATIONS; i++)
+        uv_sem_wait(&sem_tls_srv);
+    uv_sem_destroy(&sem_tls_srv);
+
+    for (asyncio::IOTCP* handle : clients_tcp)
+        delete handle;
+
+    //close TCP server
+    uv_sem_init(&sem_tls_srv, 0);
+
+    printf("Close server\n");
+
+    srv_tcp.close([&](ssize_t result){
+        ASSERT(!asyncio::isError(result));
+
+        uv_sem_post(&sem_tls_srv);
+    });
+
+    uv_sem_wait(&sem_tls_srv);
+    uv_sem_destroy(&sem_tls_srv);
+    uv_mutex_destroy(&clients_mutex);
+
+    clientThreads.clear();
+    clients_tcp.clear();
+
+    printf("test closing connecting sockets without TLS handshake successful\n");
+
+    printf("testAsyncTLS()...done\n\n");
+}
+
+void stressTestTCP() {
+    printf("\nstressTestTCP...\n");
+
+    int blocks = 100;
+    int packages = 10000; //packages in block
+    const int length_package = 50;
+
+    int counter = 0;
+    uv_sem_t sem;
+
+    asyncio::IOTCP srv;
+    asyncio::IOTCP acc;
+
+    uv_sem_init(&sem, 0);
+
+    srv.open("127.0.0.1", PORT, [&](ssize_t result){
+        ASSERT(!asyncio::isError(result));
+
+        printf("New connection\n");
+
+        int res = acc.acceptFromListeningSocket(&srv);
+        ASSERT(!asyncio::isError(res));
+
+        for (int i = 0; i < blocks; i++) {
+            printf("Send block %i of %i packages\n", i, packages);
+
+            for (int j = 0; j < packages; j++) {
+                //printf("repeats package : %i \n", j);
+
+                auto send_buf = (unsigned char*) malloc(length_package);
+                for (int x = 0; x < length_package; x++) {
+                    send_buf[x] = (unsigned char)(i & 0xFF);
+                    //printf("send_buf[x] data =  %i \n", send_buf[x]);
+                }
+
+                acc.write(send_buf, length_package, [=](ssize_t result) {
+                    ASSERT(!asyncio::isError(result));
+
+                    free(send_buf);
+                });
+            }
+        }
+        //printf("Completed sending %i packets, repeats %i \n", count_package, repeats_package);
+    });
+
+    unsigned char recv_buf[length_package];
+
+    asyncio::IOTCP cli;
+
+    cli.connect("127.0.0.1", PORT + 1, "127.0.0.1", PORT, [&](ssize_t result){
+        ASSERT(!asyncio::isError(result));
+
+        printf("Connected to server\n");
+
+        for (int i = 0; i < blocks; ++i) {
+            for (int j = 0; j < packages; j++) {
+                cli.read(recv_buf, length_package, [&, i, j](ssize_t result) {
+                    ++counter;
+                    //printf("Recv package : %i length_package %i \n", counter, length_package);
+                    ASSERT(result == length_package);
+
+                    for (int x = 0; x < length_package; x++) {
+                        //printf("i= %i  i&0xFF= %i  recv_buf[x]= %i  j= %i counter= %i\n", i, i & 0xFF, recv_buf[x] & 0xFF, j, counter);
+                        ASSERT((unsigned char)(i & 0xFF) == recv_buf[x]);
+                    }
+
+                    if (j == packages - 1)
+                        printf("Received block %i of %i packages\n", i, packages);
+
+                    if (counter >= blocks * packages) {
+                        uv_sem_post(&sem);
+                        printf("Client finished, %i blocks of %i packets, total received %i \n", blocks, packages, counter);
+                    }
+                });
+
+            }
+        }
+    });
+
+    uv_sem_wait(&sem);
+    uv_sem_destroy(&sem);
+
+    uv_sem_init(&sem, 0);
+
+    printf("Close accepted socket\n");
+
+    acc.close([&](ssize_t result){
+        ASSERT(!asyncio::isError(result));
+
+        uv_sem_post(&sem);
+    });
+
+    uv_sem_wait(&sem);
+    uv_sem_destroy(&sem);
+
+    uv_sem_init(&sem, 0);
+
+    printf("Close client socket\n");
+
+    cli.close([&](ssize_t result){
+        ASSERT(!asyncio::isError(result));
+
+        uv_sem_post(&sem);
+    });
+
+    uv_sem_wait(&sem);
+    uv_sem_destroy(&sem);
+
+    //close TCP server
+    uv_sem_init(&sem, 0);
+
+    printf("Close server\n");
+
+    srv.close([&](ssize_t result){
+        ASSERT(!asyncio::isError(result));
+
+        uv_sem_post(&sem);
+    });
+
+    uv_sem_wait(&sem);
+    uv_sem_destroy(&sem);
+
+    printf("stressTestTCP done\n\n");
 }

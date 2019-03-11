@@ -11,7 +11,7 @@ unit.test("simple role serialization", async () => {
     let role = new roles.SimpleRole("name",k.publicKey);
     role.keyAddresses.add(k.publicKey.shortAddress);
 
-    role.requiredAnyReferences.add("ref1");
+    role.requiredAnyConstraints.add("ref1");
 
 
 

@@ -44,9 +44,9 @@ namespace asyncio {
 
                 if (sockData->read) {
                     if (bufferized)
-                        delete (readUDPBuffer_data*) sockData->read;
+                        delete (readBufferTCP_data*) sockData->read;
                     else
-                        delete (readUDP_data *) sockData->read;
+                        delete (readTCP_data*) sockData->read;
                 }
 
                 delete sockData;
@@ -106,6 +106,7 @@ namespace asyncio {
                         read_data->callback(byte_vector(), result);
 
                         delete read_data;
+                        checkReadQueue();
                     }
                 });
             else
@@ -152,6 +153,7 @@ namespace asyncio {
                         read_data->callback(result);
 
                         delete read_data;
+                        checkReadQueue();
                     }
                 });
             else
@@ -187,6 +189,7 @@ namespace asyncio {
                         read_data->callback(result);
 
                         delete read_data;
+                        checkReadQueue();
                     }
                 });
             else
@@ -206,6 +209,7 @@ namespace asyncio {
                         read_data->callback(byte_vector(), result);
 
                         delete read_data;
+                        checkReadQueue();
                     }
                 });
             else
@@ -233,7 +237,6 @@ namespace asyncio {
         auto write_data = new writeTCP_data();
 
         write_data->callback = std::move(callback);
-        write_data->req = req;
         write_data->data = std::make_shared<byte_vector>(data);
         write_data->uvBuff = uv_buf_init((char*) write_data->data->data(), (unsigned int) write_data->data->size());
         write_data->connReset = connReset;
@@ -271,7 +274,6 @@ namespace asyncio {
         auto write_data = new writeTCP_data();
 
         write_data->callback = std::move(callback);
-        write_data->req = req;
         write_data->uvBuff = uv_buf_init((char*) buffer, (unsigned int) size);
         write_data->data = nullptr;
         write_data->connReset = connReset;
@@ -388,7 +390,7 @@ namespace asyncio {
         auto read_data = (readTCP_data*) ((TCPSocket_data*) handle->data)->read;
 
         size_t size = suggested_size;
-        if (size > read_data->maxBytesToRead)
+        if (read_data->maxBytesToRead && (size > read_data->maxBytesToRead))
             size = read_data->maxBytesToRead;
 
         *buf = uv_buf_init((char*) malloc(size), (unsigned int) size);
@@ -418,7 +420,7 @@ namespace asyncio {
 
         if (nread > 0) {
             ssize_t vector_size = nread;
-            if (vector_size > read_data->maxBytesToRead)
+            if (read_data->maxBytesToRead && (vector_size > read_data->maxBytesToRead))
                 vector_size = read_data->maxBytesToRead;
 
             byte_vector data((unsigned long) vector_size);
@@ -605,6 +607,9 @@ namespace asyncio {
         auto client = new IOTCP(aloop);
 
         int res = client->acceptFromListeningSocket(this);
+
+        if (res < 0)
+            delete client;
 
         if (result)
             *result = res;

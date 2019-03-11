@@ -85,6 +85,7 @@ namespace network {
     private:
         std::unordered_set<int> buffer0;
         std::unordered_set<int> buffer1;
+        friend class UDPAdapter;
     };
 
     /**
@@ -131,6 +132,7 @@ namespace network {
         Retransmitter(const Retransmitter&) = default;
         Retransmitter(Retransmitter&&) = default;
         std::unordered_map<int, RetransmitItem> retransmitMap;
+        int retransmitMapSize = 0;
         NodeInfo remoteNodeInfo;
         crypto::SymmetricKey sessionKey;
         void removeHandshakePacketsFromRetransmitMap();

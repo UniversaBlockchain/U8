@@ -594,23 +594,21 @@ void udpAdapterHelloWorld() {
     }
 
     cout << "stop receiver..." << endl;
-    timed_mutex mtx1;
-    mtx1.lock();
+    promise<void> prs1;
     socket1.stopRecv();
     cout << "stopRecv has called, counter=" << counter << endl;
-    socket1.close([&](ssize_t result){mtx1.unlock();});
-    if (!mtx1.try_lock_for(5s))
+    socket1.close([&](ssize_t result){prs1.set_value();});
+    if (prs1.get_future().wait_for(5s) != future_status::ready)
         cerr << "socket1.close timeout" << endl;
     cout << "stop receiver... done!" << endl;
 
     senderThread.join();
 
     cout << "stop sender..." << endl;
-    timed_mutex mtx0;
-    mtx0.lock();
+    promise<void> prs0;
     socket0.stopRecv();
-    socket0.close([&](ssize_t result){mtx0.unlock();});
-    if (!mtx0.try_lock_for(5s))
+    socket0.close([&](ssize_t result){prs0.set_value();});
+    if (prs0.get_future().wait_for(5s) != future_status::ready)
         cerr << "socket0.close timeout" << endl;
     cout << "stop sender... done!" << endl;
     cout << "counter: " << counter << endl;

@@ -12,7 +12,7 @@ const QuantiserProcesses = {
     PRICE_SPLITJOIN_PERM : 2,
     PRICE_REGISTER_VERSION: 20,
     PRICE_REVOKE_VERSION: 20,
-    PRICE_CHECK_REFERENCED_VERSION : 1
+    PRICE_CHECK_CONSTRAINT : 1
 };
 
 function QuantiserException() {

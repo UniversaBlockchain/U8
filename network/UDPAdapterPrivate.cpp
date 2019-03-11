@@ -85,14 +85,17 @@ namespace network {
                 vec.push_back(p.first);
         for (auto& key : vec)
             retransmitMap.erase(key);
+        retransmitMapSize = retransmitMap.size();
     }
 
     void Retransmitter::addPacketToRetransmitMap(int packetId, const Packet& packet, const byte_vector& sourcePayload) {
         retransmitMap.insert(make_pair(packetId, RetransmitItem(packet, sourcePayload, minstdRand_())));
+        retransmitMapSize = retransmitMap.size();
     }
 
     void Retransmitter::removePacketFromRetransmitMap(int packetId) {
         retransmitMap.erase(packetId);
+        retransmitMapSize = retransmitMap.size();
     }
 
     void Retransmitter::pulseRetransmit(std::function<void(const NodeInfo&, const Packet&)> funcSendPacket) {
@@ -127,6 +130,7 @@ namespace network {
         }
         for (auto& key : vecToErase)
             retransmitMap.erase(key);
+        retransmitMapSize = retransmitMap.size();
     }
 
     SessionState Retransmitter::getState() {
@@ -139,6 +143,7 @@ namespace network {
         state = SessionState::STATE_HANDSHAKE;
         handshakeStep = HandshakeState::HANDSHAKE_STEP_INIT;
         handshakeExpiresAt = getCurrentTimeMillis() - UDPAdapter::HANDSHAKE_TIMEOUT_MILLIS;
+        lastHandshakeRestartTime = getCurrentTimeMillis();
     }
 
     void Session::reconstructSessionKey(const byte_vector& key) {
@@ -170,20 +175,20 @@ namespace network {
     }
 
     void Session::startHandshake() {
-        if (lastHandshakeRestartTime + UDPAdapter::HANDSHAKE_TIMEOUT_MILLIS < getCurrentTimeMillis()) {
+        auto now = getCurrentTimeMillis();
+        if (lastHandshakeRestartTime + UDPAdapter::HANDSHAKE_TIMEOUT_MILLIS <= now) {
             for (auto& it : retransmitMap) {
                 it.second.retransmitCounter = 0;
                 it.second.packet.nullify();
-                it.second.nextRetransmitTimeMillis = getCurrentTimeMillis();
+                it.second.nextRetransmitTimeMillis = now;
             }
             removeHandshakePacketsFromRetransmitMap();
             handshakeStep = HandshakeState::HANDSHAKE_STEP_INIT;
-            handshakeExpiresAt = getCurrentTimeMillis() - UDPAdapter::HANDSHAKE_TIMEOUT_MILLIS;
+            handshakeExpiresAt = now - UDPAdapter::HANDSHAKE_TIMEOUT_MILLIS;
             state = SessionState::STATE_HANDSHAKE;
-            lastHandshakeRestartTime = getCurrentTimeMillis();
+            lastHandshakeRestartTime = now;
         } else {
-            //TODO: debug, remove this printf
-            printf("(startHandshake) too short time after previous startHandshake\n");
+            //checkpoint for debug output, do nothing
         }
     }
 

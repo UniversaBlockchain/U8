@@ -9,27 +9,27 @@ unit.test("role refs", () => {
 
     assert(role.isAllowedForKeys([]));
 
-    role.requiredAnyReferences.add("ref1");
+    role.requiredAnyConstraints.add("ref1");
 
     assert(!role.isAllowedForKeys([]));
 
-    assert(role.isAllowedForReferences(new Set(["ref1"])));
+    assert(role.isAllowedForConstraints(new Set(["ref1"])));
 
-    role.requiredAllReferences.add("ref2");
-    role.requiredAllReferences.add("ref3");
+    role.requiredAllConstraints.add("ref2");
+    role.requiredAllConstraints.add("ref3");
 
-    assert(!role.isAllowedForReferences(new Set(["ref1","ref2"])));
-    assert(role.isAllowedForReferences(new Set(["ref1","ref2","ref3"])));
+    assert(!role.isAllowedForConstraints(new Set(["ref1","ref2"])));
+    assert(role.isAllowedForConstraints(new Set(["ref1","ref2","ref3"])));
 });
 
 
 unit.test("role serialization", () => {
     let role = new roles.Role("name");
 
-    role.requiredAnyReferences.add("ref1");
+    role.requiredAnyConstraints.add("ref1");
 
-    role.requiredAllReferences.add("ref2");
-    role.requiredAllReferences.add("ref3");
+    role.requiredAllConstraints.add("ref2");
+    role.requiredAllConstraints.add("ref3");
 
 
     let s = role.serialize(dbm.DefaultBiMapper.getInstance());

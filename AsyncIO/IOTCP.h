@@ -62,7 +62,6 @@ namespace asyncio {
 
     struct writeTCP_data {
         write_cb callback;
-        uv_write_t* req;
         uv_buf_t uvBuff;
         std::shared_ptr<byte_vector> data;
         bool connReset;
@@ -140,6 +139,7 @@ namespace asyncio {
 
         /**
          * Accept connection from remote TCP socket and return his handle.
+         * Delete returning handle IOTCP after his closing.
          *
          * @param result is pointer to accepting result (optional, ignored if nullptr).
          * If isError(*result) returns true - use getError(*result) to determine the error.
