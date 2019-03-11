@@ -16,7 +16,7 @@ const ErrorRecord = e.ErrorRecord;
 const Config = require("config").Config;
 const ContractDelta = require("contractdelta").ContractDelta;
 const ExtendedSignature = require("extendedsignature").ExtendedSignature;
-
+const ex = require("exceptions");
 const MAX_API_LEVEL = 3;
 
 function Context(base) {
@@ -159,7 +159,7 @@ State.prototype.deserialize = function(data,deserializer) {
 
     this.revision = data.revision;
     if (this.revision <= 0)
-        throw "illegal revision number: " + this.revision;
+        throw new ex.IllegalArgumentException("illegal revision number: " + this.revision);
 
 
     if(data.hasOwnProperty("references"))
@@ -169,11 +169,11 @@ State.prototype.deserialize = function(data,deserializer) {
 
     let r = this.contract.registerRole(deserializer.deserialize(data.owner))
     if(r.name !== "owner")
-        throw "bad owner role name";
+        throw new ex.IllegalArgumentException("bad owner role name");
 
     r = this.contract.registerRole(deserializer.deserialize(data.created_by))
     if(r.name !== "creator")
-        throw "bad creator role name";
+        throw new ex.IllegalArgumentException("bad creator role name");
 
     if(data.hasOwnProperty("data"))
         this.data = data.data;
@@ -256,9 +256,9 @@ Definition.prototype.serialize = function(serializer) {
     for (let plist of this.permissions.values()) {
         for (let perm of plist) {
             if (perm.id == null)
-                throw "permission without id: " + perm;
+                throw new ex.IllegalArgumentException("permission without id: " + perm);
             if (pb.hasOwnProperty(perm.id))
-                throw "permission: duplicate permission id found: " + perm;
+                throw new ex.IllegalArgumentException("permission: duplicate permission id found: " + perm);
             pb[perm.id] = serializer.serialize(perm);
         }
     }
@@ -285,7 +285,7 @@ Definition.prototype.serialize = function(serializer) {
 Definition.prototype.deserialize = function(data,deserializer) {
     let r = this.contract.registerRole(deserializer.deserialize(data.issuer));
     if(r.name !== "issuer")
-        throw "issuer creator role name";
+        throw new ex.IllegalArgumentException("issuer creator role name");
 
     this.createdAt = deserializer.deserialize(data.created_at);
     if(data.hasOwnProperty("expires_at")) {
@@ -439,7 +439,7 @@ Contract.fromSealedBinary = function(sealed,transactionPack) {
     result.isNeedVerifySealedKeys = true;
     let data = Boss.load(sealed);
     if(data.type !== "unicapsule") {
-        throw "wrong object type, unicapsule required";
+        throw new ex.IllegalArgumentException("wrong object type, unicapsule required");
     }
 
     result.apiLevel = data.version;
@@ -594,7 +594,7 @@ Contract.prototype.get = function(name) {
         case "creator":
             return this.roles.creator;
     }
-    throw "bad root: " + originalName;
+    throw new ex.IllegalArgumentException("bad root: " + originalName);
 
 };
 
@@ -699,7 +699,7 @@ Contract.prototype.deserialize = function(data,deserializer) {
 
     let l = data.api_level;
     if (l > MAX_API_LEVEL)
-        throw "contract api level conflict: found " + l + " my level " + this.apiLevel;
+        throw new ex.IllegalArgumentException("contract api level conflict: found " + l + " my level " + this.apiLevel);
 
     if (this.definition == null)
         this.definition = new Definition(this);
@@ -764,11 +764,11 @@ Contract.prototype.addSignatureToSeal = async function(x) {
         keys = [];
         keys.push(x);
     } else {
-        throw "Invalid param " + x + ". Should be either PrivateKey or Array of PrivateKey";
+        throw new ex.IllegalArgumentException("Invalid param " + x + ". Should be either PrivateKey or Array of PrivateKey");
     }
 
     if(this.sealedBinary == null)
-        throw "failed to add signature: sealed binary does not exist";
+        throw new ex.IllegalStateException("failed to add signature: sealed binary does not exist");
 
     keys.forEach(k => this.keysToSignWith.add(k));
 
@@ -782,7 +782,7 @@ Contract.prototype.addSignatureToSeal = async function(x) {
 
 Contract.prototype.addSignatureBytesToSeal = async function(signature,publicKey) {
     if(this.sealedBinary == null)
-        throw "failed to add signature: sealed binary does not exist";
+        throw new ex.IllegalArgumentException("failed to add signature: sealed binary does not exist");
 
     let data = Boss.load(this.sealedBinary);
     //console.log(Object.getPrototypeOf(data.signatures).constructor.name);
@@ -1210,7 +1210,7 @@ Contract.prototype.verifySealedKeys = async function(isQuantise) {
 
     let data = Boss.load(this.sealedBinary);
     if (data.type !== "unicapsule")
-        throw "wrong object type, unicapsule required";
+        throw new ex.IllegalArgumentException("wrong object type, unicapsule required");
 
 
     let contractBytes = data.data;
@@ -1300,9 +1300,9 @@ Contract.prototype.createRevision = function(keys) {
 Contract.prototype.split = function(count) {
     // we can split only the new revision and only once this time
     if (this.state.getBranchRevision() === this.state.revision)
-        throw "this revision is already split";
+        throw new ex.IllegalStateException("this revision is already split");
     if (count < 1)
-        throw "split: count should be > 0";
+        throw new ex.IllegalArgumentException("split: count should be > 0");
 
     // initialize context if not yet
     this.updateContext();

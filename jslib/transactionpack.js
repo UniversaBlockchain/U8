@@ -3,6 +3,7 @@ const DefaultBiMapper = require("defaultbimapper").DefaultBiMapper;
 const BossBiMapper = require("bossbimapper").BossBiMapper;
 const t = require("tools");
 const Boss = require("boss");
+const ex = require("exceptions");
 //const Contract = require("contract").Contract;
 
 ///////////////////////////
@@ -108,7 +109,7 @@ TransactionPack.prototype.deserialize = function(data,deserializer) {
         }
 
         if(!removed)
-            throw "circle deps in contracts tree";
+            throw new ex.IllegalStateException("circle deps in contracts tree");
     }
 
     this.contract = Contract.fromSealedBinary(deserializer.deserialize(data.contract),this);

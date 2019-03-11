@@ -1,6 +1,6 @@
 const Tools = require("tools");
 const Config = require("config").Config;
-
+const Exception = require("exceptions").Exception;
 ///////////////////////////
 //TransactionPack
 ///////////////////////////
@@ -16,8 +16,10 @@ const QuantiserProcesses = {
 };
 
 function QuantiserException() {
-
+    Exception.call("");
 }
+
+QuantiserException.prototype = Object.create(Exception.prototype);
 
 function Quantiser() {
     this.quantaSum_ = 0;

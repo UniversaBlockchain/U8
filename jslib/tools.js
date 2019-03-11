@@ -130,7 +130,7 @@ Object.prototype.equals = function(to) {
     }
 
     console.log("Error: equals is not redefined for custom object " + JSON.stringify(this));
-    throw "Error: equals is not redefined for custom object "; //+ JSON.stringify(this);
+    throw new ex.IllegalArgumentException("Error: equals is not redefined for custom object "); //+ JSON.stringify(this);
 };
 
 
