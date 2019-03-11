@@ -18,6 +18,8 @@ const Config = require("config").Config;
 const ContractDelta = require("contractdelta").ContractDelta;
 const ExtendedSignature = require("extendedsignature").ExtendedSignature;
 const ex = require("exceptions");
+const yaml = require('yaml');
+
 const MAX_API_LEVEL = 3;
 
 function Context(base) {
@@ -212,6 +214,53 @@ State.prototype.addConstraint = function(c) {
     this.constraints.push(c);
 };
 
+State.prototype.initializeWithDsl = function(root) {
+    this.createdAt = t.convertToDate(root.created_at);
+    this.expiresAt = t.convertToDate(root.expires_at);
+
+    if (root.hasOwnProperty("revision"))
+        this.revision = root.revision;
+    else
+        throw new ex.IllegalArgumentException("state.revision not found");
+
+    if (root.hasOwnProperty("data"))
+        this.data = root.data;
+    else
+        this.data = {};
+
+    if (this.createdAt == null) {
+        if (this.revision !== 1)
+            throw new ex.IllegalArgumentException("state.created_at must be set for revisions > 1");
+
+        this.createdAt = this.contract.definition.createdAt;
+    }
+
+    this.contract.createRole("owner", root.owner);
+    this.contract.createRole("creator", root.created_by);
+
+    let constrs;
+    if (root.hasOwnProperty("constraints"))
+        constrs = root.constraints;
+    if (root.hasOwnProperty("references"))
+        constrs = root.references;
+
+    if (constrs != null)
+        constrs.forEach(item => {
+            let constraint;
+            if (item.hasOwnProperty("constraint"))
+                constraint = item.constraint;
+            if (item.hasOwnProperty("reference"))
+                constraint = item.reference;
+
+            if (constraint != null)
+                this.constraints.push(constr.Constraint.fromDsl(constraint, this.contract));
+            else
+                throw new ex.IllegalArgumentException("Expected constraint section");
+        });
+
+    return this;
+};
+
 
 function Definition(contract) {
     bs.BiSerializable.call(this);
@@ -360,6 +409,98 @@ Definition.prototype.addPermission = function (permission) {
 
 Definition.prototype.addConstraint = function(c) {
     this.constraints.push(c);
+};
+
+Definition.prototype.initializeWithDsl = function(root) {
+    this.contract.createRole("issuer", root.issuer);
+
+    this.createdAt = t.convertToDate(root.created_at);
+    this.expiresAt = t.convertToDate(root.expires_at);
+
+    if (root.hasOwnProperty("data"))
+        this.data = root.data;
+    else
+        this.data = {};
+
+    if (root.hasOwnProperty("extended_type"))
+        this.extendedType = root.extended_type;
+
+    let constrs;
+    if (root.hasOwnProperty("constraints"))
+        constrs = root.constraints;
+    if (root.hasOwnProperty("references"))
+        constrs = root.references;
+
+    if (constrs != null)
+        constrs.forEach(item => {
+            let constraint;
+            if (item.hasOwnProperty("constraint"))
+                constraint = item.constraint;
+            if (item.hasOwnProperty("reference"))
+                constraint = item.reference;
+
+            if (constraint != null)
+                this.constraints.push(constr.Constraint.fromDsl(constraint, this.contract));
+            else
+                throw new ex.IllegalArgumentException("Expected constraint section");
+        });
+
+    return this;
+};
+
+/**
+ * Collect all permissions and create links to roles or new roles as appropriate
+ */
+Definition.prototype.scanDslPermissions = function(root) {
+    if (root.hasOwnProperty("permissions"))
+        for (let [name, params] of Object.entries(root.permissions)) {
+            // this complex logic is needed to process both yaml-imported structures
+            // and regular serialized data in the same place
+            let proto = Object.getPrototypeOf(params);
+            if (proto === Array.prototype || proto === Set.prototype)
+                for (let param of params)
+                    this.loadDslPermission(name, param);
+            else if (params instanceof permissions.Permission)
+                this.addPermission(params);
+            else
+                this.loadDslPermission(name, params);
+        }
+};
+
+Definition.prototype.loadDslPermission = function(name, params) {
+    let roleName = null;
+    let role = null;
+
+    let stringParams = (typeof params === "string");
+    if (stringParams)
+    // yaml style: permission: role
+        roleName = params;
+    else {
+        // extended yaml style or serialized object
+        if (!params.hasOwnProperty("role"))
+            throw new ex.IllegalArgumentException("Expected role of permission");
+
+        let x = params.role;
+        if (x instanceof roles.Role)
+        // serialized, role object
+            role = this.contract.registerRole(x);
+        else if (Object.getPrototypeOf(x) === Object.prototype)
+        // if Object - create role from Object
+            role = this.contract.createRole("@" + name, x);
+        else
+        // yaml, extended form: permission: { role: name, ... }
+            roleName = x;
+    }
+
+    if (role == null && roleName != null)
+    // we need to create alias to existing role
+        role = this.contract.createRole("@" + name, roleName);
+
+    if (role == null)
+        throw new ex.IllegalArgumentException("permission " + name + " refers to missing role: " + roleName);
+
+    // now we have ready role and probably parameter for custom rights creation
+    this.addPermission(permissions.Permission.forName(name, role, stringParams ? null : params));
 };
 
 
@@ -1575,6 +1716,72 @@ Contract.prototype.split = function(count) {
         results.push(c);
     }
     return results;
+};
+
+/**
+ * Create contract importing its parameters with passed .yaml file. No signatures are added automatically.
+ * It is required to add signatures before check.
+ *
+ * @param fileName path to file containing Yaml representation of contract.
+ * @return initialized contract
+ */
+Contract.fromDslFile = async function(fileName) {
+    let input = await io.openRead(fileName);
+    let data = await input.allAsString();
+
+    let root = DefaultBiMapper.getInstance().deserialize(yaml.load(data));
+
+    return new Contract().initializeWithDsl(root);
+};
+
+Contract.prototype.initializeWithDsl = function(root) {
+    this.apiLevel = root.api_level;
+    this.definition = new Definition(this).initializeWithDsl(root.definition);
+    this.state = new State(this).initializeWithDsl(root.state);
+
+    // fill constraints list
+    if (this.definition != null && this.definition.constraints != null) {
+        for (let constr of this.definition.constraints) {
+            constr.setContract(this);
+            this.constraints.set(constr.name, constr);
+        }
+    }
+
+    if (this.state != null && this.state.constraints != null) {
+        for (let constr of this.state.constraints) {
+            constr.setContract(this);
+            this.constraints.set(constr.name, constr);
+        }
+    }
+
+    // now we have all roles, we can build permissions:
+    this.definition.scanDslPermissions(root.definition);
+    return this;
+};
+
+/**
+ * Resolve object describing role and create either: - new role object - symlink to named role instance, ensure it
+ * is register and return it, if it is a Map, tries to construct and register {@see Role} then return it.
+ *
+ * @param roleName is name of the role
+ * @param roleObject is object for role creating
+ *
+ * @return Role
+ */
+Contract.prototype.createRole = function(roleName, roleObject) {
+    if (typeof roleObject === "string")
+        return this.registerRole(new roles.RoleLink(roleName, roleObject));
+
+    if (roleObject instanceof roles.Role)
+        if (roleObject.name != null && (roleObject.name === roleName))
+            return this.registerRole(roleObject);
+        else
+            return this.registerRole(roleObject.linkAs(roleName));
+
+    if (Object.getPrototypeOf(roleObject) === Object.prototype)
+        return this.registerRole(roles.Role.fromDsl(roleName, roleObject));
+
+    throw new ex.IllegalArgumentException("cant make role from " + JSON.stringify(roleObject));
 };
 
 DefaultBiMapper.registerAdapter(new bs.BiAdapter("UniversaContract",Contract));

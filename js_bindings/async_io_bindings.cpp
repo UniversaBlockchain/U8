@@ -50,7 +50,11 @@ void JsAsyncFileOpen(const FunctionCallbackInfo<Value> &args) {
                     if (fn->IsNull()) {
                         se->throwError("null callback in IOFile::open");
                     } else {
-                        Local<Value> res = BigInt::New(isolate, result);
+                        Local<Value> res;
+                        if (result < 0)
+                            res = Integer::New(isolate, result);
+                        else
+                            res = BigInt::New(isolate, result);
                         fn->Call(fn, 1, &res);
                     }
                     delete pcb;

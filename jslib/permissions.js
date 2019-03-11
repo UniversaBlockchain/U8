@@ -5,6 +5,7 @@ let dlt = require("deltas");
 let err = require("errors");
 let roles = require("roles")
 let BigDecimal  = require("big").Big;
+const ex = require("exceptions");
 
 ///////////////////////////
 //Permission
@@ -16,6 +17,30 @@ function Permission(name,role,params) {
     this.params = params;
     bs.BiSerializable.call(this);
 }
+
+/**
+ * Create new permission of a specific type by type name
+ *
+ * @param name is specific type name
+ * @param role allows to permission
+ * @param params is parameters of permission, set of parameters depends on the type of permission
+ *
+ * @return Permission
+ */
+Permission.forName = function(name, role, params) {
+    switch (name) {
+        case "revoke":
+            return new RevokePermission(role);
+        case "change_owner":
+            return new ChangeOwnerPermission(role);
+        case "modify_data":
+            return new ModifyDataPermission(role, params);
+        case "decrement_permission":
+            return new ChangeNumberPermission(role, params);
+        default:
+            throw new ex.IllegalArgumentException("can't construct permission: " + name);
+    }
+};
 
 Permission.prototype = Object.create(bs.BiSerializable.prototype);
 

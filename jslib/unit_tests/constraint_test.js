@@ -7,6 +7,9 @@ import * as bbm from 'bossbimapper'
 import * as constr from 'constraint'
 import * as t from 'tools'
 import * as d from 'deltas'
+import * as io from 'io'
+
+const ROOT_PATH = "../test/constraints/";
 
 unit.test("constraint copy test", () => {
 
@@ -290,23 +293,24 @@ unit.test("constraint test: refMissingFieldDateTimeForEquals", async () => {
     assert(!res);
 });
 
-/*unit.test("constraint test: checkReferences", async () => {
+unit.test("constraint test: checkConstraints", async () => {
 
-    Contract contract1 = Contract.fromDslFile(ROOT_PATH + "references/ReferencedConditions_contract1.yml");
-    Contract contract2 = Contract.fromDslFile(ROOT_PATH + "references/ReferencedConditions_contract2.yml");
+    let contract1 = await cnt.Contract.fromDslFile(ROOT_PATH + "ReferencedConditions_contract1.yml");
+    let contract2 = await cnt.Contract.fromDslFile(ROOT_PATH + "ReferencedConditions_contract2.yml");
 
-    PrivateKey key = new PrivateKey(Do.read("./src/test_contracts/" + "_xer0yfe2nn1xthc.private.unikey"));
+    let privateBytes = await (await io.openRead("../test/_xer0yfe2nn1xthc.private.unikey")).allBytes();
+    let key = new crypto.PrivateKey(privateBytes);
 
-    Binder conditions = contract1.getReferences().get("ref_string").getConditions();
-    List<Object> condList = conditions.getList(all_of.name(), null);
+    let conditions = contract1.constraints.get("ref_string").conditions;
+    let condList = conditions["all_of"];
 
     // Mirroring conditions with strings
-    condList.add("\"string\"!=ref.state.data.string3");
-    condList.add("\"==INFORMATION==\"==ref.definition.data.string2");
-    condList.add("\"26RzRJDLqze3P5Z1AzpnucF75RLi1oa6jqBaDh8MJ3XmTaUoF8R\"==ref.definition.issuer");
-    condList.add("\"mqIooBcuyMBRLHZGJGQ7osf6TnoWkkVVBGNG0LDuPiZeXahnDxM+PoPMgEuqzOvsfoWNISyqYaCYyR9" +
+    condList.push("\"string\"!=ref.state.data.string3");
+    condList.push("\"==INFORMATION==\"==ref.definition.data.string2");
+    condList.push("\"26RzRJDLqze3P5Z1AzpnucF75RLi1oa6jqBaDh8MJ3XmTaUoF8R\"==ref.definition.issuer");
+    condList.push("\"mqIooBcuyMBRLHZGJGQ7osf6TnoWkkVVBGNG0LDuPiZeXahnDxM+PoPMgEuqzOvsfoWNISyqYaCYyR9" +
         "zCfpZCF6pjZ+HvjsD73pZ6uaXlUY0e72nBPNbAtFhk2pEXyxt\"!= this.id");
-    condList.add("\"HggcAQABxAACzHE9ibWlnK4RzpgFIB4jIg3WcXZSKXNAqOTYUtGXY03xJSwpqE+y/HbqqE0WsmcAt5\n" +
+    condList.push("\"HggcAQABxAACzHE9ibWlnK4RzpgFIB4jIg3WcXZSKXNAqOTYUtGXY03xJSwpqE+y/HbqqE0WsmcAt5\n" +
         "           a0F5H7bz87Uy8Me1UdIDcOJgP8HMF2M0I/kkT6d59ZhYH/TlpDcpLvnJWElZAfOytaICE01bkOkf6M\n" +
         "           z5egpToDEEPZH/RXigj9wkSXkk43WZSxVY5f2zaVmibUZ9VLoJlmjNTZ+utJUZi66iu9e0SXupOr/+\n" +
         "           BJL1Gm595w32Fd0141kBvAHYDHz2K3x4m1oFAcElJ83ahSl1u85/naIaf2yuxiQNz3uFMTn0IpULCM\n" +
@@ -315,78 +319,78 @@ unit.test("constraint test: refMissingFieldDateTimeForEquals", async () => {
         "           hxe/FwWIXOr0C0yA3NFgxKLiKZjkd5eJ84GLy+iD00Rzjom+GG4FDQKr2HxYZDdDuLE4PEpYSzEB/8\n" +
         "           LyIqeM7dSyaHFTBII/sLuFru6ffoKxBNk/cwAGZqOwD3fkJjNq1R3h6QylWXI/cSO9yRnRMmMBJwal\n" +
         "           MexOc3/kPEEdfjH/GcJU0Mw6DgoY8QgfaNwXcFbBUvf3TwZ5Mysf21OLHH13g8gzREm+h8c=\"==ref.definition.issuer");
-    condList.add("\"1:25\"==this.state.branchId");
-    contract1.getReferences().get("ref_string").setConditions(conditions);
+    condList.push("\"1:25\"==this.state.branchId");
+    contract1.constraints.get("ref_string").setConditions(conditions);
 
-    conditions = contract1.getReferences().get("ref_time").getConditions();
-    condList = conditions.getList(all_of.name(), null);
+    conditions = contract1.constraints.get("ref_time").conditions;
+    condList = conditions["all_of"];
 
     // Mirroring conditions with time string
-    condList.add("\"1977-06-14 16:03:10\"<ref.definition.created_at");
-    condList.add("\"2958-04-18 00:58:00\">this.definition.expires_at");
-    condList.add("\"1968-04-18 23:58:01\" < now");
-    condList.add("\"2086-03-22 11:35:37\"!=now");
+    condList.push("\"1977-06-14 16:03:10\"<ref.definition.created_at");
+    condList.push("\"2958-04-18 00:58:00\">this.definition.expires_at");
+    condList.push("\"1968-04-18 23:58:01\" < now");
+    condList.push("\"2086-03-22 11:35:37\"!=now");
 
-    contract1.getReferences().get("ref_time").setConditions(conditions);
+    contract1.constraints.get("ref_time").setConditions(conditions);
 
-    contract2.seal();
+    await contract2.seal();
 
-    Contract contract3 = contract2.createRevision(key);
-    contract3.seal();
-
-    // signature to check can_play operator
-    contract2.addSignatureToSeal(key);
-
-    contract1.getStateData().set("contract2_origin", contract2.getOrigin().toBase64String());
-    contract1.getStateData().set("contract2_id", contract2.getId().toBase64String());
-    contract1.getStateData().set("contract3_parent", contract3.getParent().toBase64String());
-
-    contract1.getState().setBranchNumber(25);
-    System.out.println("branchId: " + contract1.getState().getBranchId());
-    contract1.seal();
+    let contract3 = contract2.createRevision([key]);
+    await contract3.seal();
 
     // signature to check can_play operator
-    contract1.addSignatureToSeal(key);
+    await contract2.addSignatureToSeal(key);
 
-    System.out.println("Contract3_parent: " + contract3.getParent().toBase64String());
-    System.out.println("contract2_origin:  " + contract1.getStateData().get("contract2_origin"));
-    System.out.println("contract2_id:  " + contract1.getStateData().get("contract2_id"));
+    contract1.state.data["contract2_origin"] = contract2.getOrigin().base64;
+    contract1.state.data["contract2_id"] = contract2.id.base64;
+    contract1.state.data["contract3_parent"] = contract3.state.parent.base64;
 
-    TransactionPack tp = new TransactionPack();
-    tp.setContract(contract1);
-    tp.addSubItem(contract2);
-    tp.addReferencedItem(contract2);
-    tp.addSubItem(contract3);
-    tp.addReferencedItem(contract3);
+    contract1.state.setBranchNumber(25);
 
-    Contract refContract = new Contract(contract1.seal(), tp);
-    refContract.check();
+    let t0 = Date.now();
+    await contract1.seal();
+    let t1 = Date.now();
+    console.log("contract1 sealed by " + (t1 - t0) + " milliseconds.");
 
-    System.out.println("Check roles conditions");
-    assertTrue(refContract.getReferences().get("ref_roles").matchingItems.contains(contract2));
-    System.out.println("Check integer conditions");
-    assertTrue(refContract.getReferences().get("ref_integer").matchingItems.contains(contract2));
-    System.out.println("Check float conditions");
-    assertTrue(refContract.getReferences().get("ref_float").matchingItems.contains(contract2));
-    System.out.println("Check string conditions");
-    assertTrue(refContract.getReferences().get("ref_string").matchingItems.contains(contract2));
-    System.out.println("Check boolean conditions");
-    assertTrue(refContract.getReferences().get("ref_boolean").matchingItems.contains(contract2));
-    System.out.println("Check inherited conditions");
-    assertTrue(refContract.getReferences().get("ref_inherited").matchingItems.contains(contract2));
-    System.out.println("Check time conditions");
-    assertTrue(refContract.getReferences().get("ref_time").matchingItems.contains(contract2));
-    System.out.println("Check ref_hashes conditions");
-    assertTrue(refContract.getReferences().get("ref_hashes").matchingItems.contains(contract2));
-    System.out.println("Check ref_bigdecimal conditions");
-    assertTrue(refContract.getReferences().get("ref_bigdecimal").matchingItems.contains(contract2));
-    System.out.println("Check parent conditions");
-    assertTrue(refContract.getReferences().get("ref_parent").matchingItems.contains(contract3));
-    System.out.println("Check can_play conditions");
-    assertTrue(refContract.getReferences().get("ref_can_play").matchingItems.contains(contract2));
+    // signature to check can_play operator
+    await contract1.addSignatureToSeal(key);
+
+    let tpack = new tp.TransactionPack(contract1);
+    tpack.subItems.set(contract2.id, contract2);
+    tpack.referencedItems.set(contract2.id, contract2);
+    tpack.subItems.set(contract3.id, contract3);
+    tpack.referencedItems.set(contract3.id, contract3);
+
+    let constrContract = new cnt.Contract.fromSealedBinary(contract1.sealedBinary, tpack);
+
+    //console.log(JSON.stringify(refContract, null, 2));
+    /*await constrContract.check();
+
+    console.log("Check roles conditions");
+    assert(constrContract.constraints.get("ref_roles").matchingItems.has(contract2));
+    console.log("Check integer conditions");
+    assert(constrContract.constraints.get("ref_integer").matchingItems.has(contract2));
+    console.log("Check float conditions");
+    assert(constrContract.constraints.get("ref_float").matchingItems.has(contract2));
+    console.log("Check string conditions");
+    assert(constrContract.constraints.get("ref_string").matchingItems.has(contract2));
+    console.log("Check boolean conditions");
+    assert(constrContract.constraints.get("ref_boolean").matchingItems.has(contract2));
+    console.log("Check inherited conditions");
+    assert(constrContract.constraints.get("ref_inherited").matchingItems.has(contract2));
+    console.log("Check time conditions");
+    assert(constrContract.constraints.get("ref_time").matchingItems.has(contract2));
+    console.log("Check ref_hashes conditions");
+    assert(constrContract.constraints.get("ref_hashes").matchingItems.has(contract2));
+    console.log("Check ref_bigdecimal conditions");
+    assert(constrContract.constraints.get("ref_bigdecimal").matchingItems.has(contract2));
+    console.log("Check parent conditions");
+    assert(constrContract.constraints.get("ref_parent").matchingItems.has(contract3));
+    console.log("Check can_play conditions");
+    assert(constrContract.constraints.get("ref_can_play").matchingItems.has(contract2));*/
 });
 
-unit.test("constraint test: checkReferencesContracts", async () => {
+/*unit.test("constraint test: checkReferencesContracts", async () => {
 
     let contract1 = Contract.fromDslFile(ROOT_PATH + "Referenced_contract1.yml");
     let contract2 = Contract.fromDslFile(ROOT_PATH + "Referenced_contract2.yml");

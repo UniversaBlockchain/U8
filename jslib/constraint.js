@@ -80,6 +80,31 @@ function Constraint(contract) {
     bs.BiSerializable.call(this);
 }
 
+Constraint.fromDsl = function(c, contract) {
+    let result = new Constraint(contract);
+
+    if(c.hasOwnProperty("name"))
+        result.name = c.name;
+    else
+        throw "Expected reference name";
+
+    if(c.hasOwnProperty("comment"))
+        result.comment = c.comment;
+
+    if(c.hasOwnProperty("where")) {
+        let where = {};
+        let proto = Object.getPrototypeOf(c.where);
+        if (proto === Array.prototype || proto === Set.prototype)
+            where[Constraint.conditionsModeType.all_of] = c.where;
+        else
+            where = c.where;
+
+        result.setConditions(where);
+    }
+
+    return result;
+};
+
 Constraint.prototype = Object.create(bs.BiSerializable.prototype);
 
 Constraint.prototype.deserialize = function(data, deserializer) {
@@ -466,8 +491,7 @@ Constraint.prototype.compareOperands = function(refContract,
                             ((indxOperator === NOT_EQUAL) && (leftBigDecimal.cmp(rightBigDecimal) !== 0)))
                             ret = true;
 
-                    }
-                    else if (((left != null) && left instanceof crypto.HashId) ||
+                    } else if (((left != null) && left instanceof crypto.HashId) ||
                              ((right != null) && right instanceof crypto.HashId)) {
                         let leftID;
                         let rightID;
@@ -551,8 +575,8 @@ Constraint.prototype.compareOperands = function(refContract,
 
                     } else if ((typeOfLeftOperand === compareOperandType.FIELD) && (typeOfRightOperand === compareOperandType.FIELD)) {   // operands is FIELDs
                         if ((left != null) && (right != null)) {
-                            if (((indxOperator === NOT_EQUAL) && (!left.equals(right) || left !== right)) ||
-                                ((indxOperator === EQUAL) && (left.equals(right)) || left === right))
+                            if ((indxOperator === NOT_EQUAL && left !== right) ||
+                                (indxOperator === EQUAL && left === right))
                                 ret = true;
                         }
 

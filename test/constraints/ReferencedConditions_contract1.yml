@@ -1467,7 +1467,7 @@ definition:
      seconds: 1200000000
    time6:
      __type: unixtime
-     seconds: 82000000000000
+     seconds: 8200000000000
 
 # required section. Data that represent current contract state, could be modified in accordance with
 # 'permissions' section above
@@ -1630,4 +1630,4 @@ state:
      seconds: 1200000000
    time6:
      __type: unixtime
-     seconds: 82000000000000
+     seconds: 8200000000000

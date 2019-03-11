@@ -56,11 +56,11 @@ Object.prototype.equals = function(to) {
         return true;
     }
 
-    if(this instanceof String) {
+    if(typeof this === "string") {
         return this === to;
     }
 
-    if(this instanceof Number) {
+    if(typeof this === "number") {
         return this === to;
     }
 
@@ -230,5 +230,26 @@ const DigestEqMixin = {
 
 const THROW_EXCEPTIONS = true;
 
+function convertToDate(data) {
+    if (data == null)
+        return null;
+    else if (data instanceof Date)
+        return data;
+    else if (typeof data === "number") {
+        let res = new Date();
+        res.setTime(data * 1000);
+        return res;
+    } else if ((data.hasOwnProperty("__type") ||
+        data.hasOwnProperty("__t")) &&
+        data.hasOwnProperty("seconds")) {
+        let res = new Date();
+        res.setTime(data.seconds * 1000);
+        return res;
+    } else if (data === "now()")
+        return new Date();
+    else
+        throw "can't convert " + JSON.stringify(data) + "to Date";
+}
 
-module.exports = {arraysEqual,valuesEqual,randomString, MemoiseMixin, PackedEqMixin,DigestEqMixin,GenericMap,THROW_EXCEPTIONS};
+module.exports = {arraysEqual,valuesEqual,randomString, MemoiseMixin, PackedEqMixin,DigestEqMixin,GenericMap,THROW_EXCEPTIONS,
+    convertToDate};

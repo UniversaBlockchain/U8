@@ -2,7 +2,7 @@ const bs = require("biserializable");
 const dbm = require("defaultbimapper");
 const t = require("tools");
 const KeyRecord = require("keyrecord").KeyRecord;
-
+const ex = require("exceptions");
 
 ///////////////////////////
 //Role
@@ -23,6 +23,38 @@ function Role(name) {
 
     this.contract = null;
 }
+
+Role.fromDsl = function (name, serializedRole) {
+    if (name == null)
+        name = serializedRole.name;
+    let result;
+
+    let type;
+    if (serializedRole.hasOwnProperty("type"))
+        type = serializedRole.type;
+
+    if (type == null || type.toLowerCase() === "simple")
+        result = new SimpleRole(name);
+    else if (type.toLowerCase() === "link")
+        result = new RoleLink(name);
+    else if (type.toLowerCase() === "list")
+        result = new ListRole(name);
+    else
+        throw new ex.IllegalArgumentException("Unknown role type: " + type);
+
+    if (serializedRole.hasOwnProperty("requires")) {
+        if(serializedRole.requires.hasOwnProperty("all_of"))
+            serializedRole.requires.all_of.forEach(item => result.requiredAllConstraints.add(item));
+
+        if(serializedRole.requires.hasOwnProperty("any_of"))
+            serializedRole.requires.any_of.forEach(item => result.requiredAnyConstraints.add(item));
+    }
+
+    if (serializedRole.hasOwnProperty("comment"))
+        result.comment = serializedRole.comment;
+
+    return result;
+};
 
 Role.prototype = Object.create(bs.BiSerializable.prototype);
 

@@ -48,12 +48,16 @@ BiMapper.prototype.deserialize = function (data) {
         return null;
 
     if(Object.getPrototypeOf(data) === Object.prototype) {
-        if(data.hasOwnProperty("__type")) {
-            if(this.adapters.has(data.__type)) {
-//                console.log(JSON.stringify(data));
-                let adapter = this.adapters.get(data.__type);
-                return adapter.deserialize(data,this);
-            }
+        let type;
+        if (data.hasOwnProperty("__type") && this.adapters.has(data.__type))
+            type = data.__type;
+        if (data.hasOwnProperty("__t") && this.adapters.has(data.__t))
+            type = data.__t;
+
+        if (type !== undefined) {
+//          console.log(JSON.stringify(data));
+            let adapter = this.adapters.get(type);
+            return adapter.deserialize(data, this);
         }
 
         let result = {};
