@@ -971,7 +971,10 @@ Constraint.prototype.checkConditions =  function(conditions, ref, contracts, ite
 
         result = true;
         for (let item of condList)
-            result = result && this.checkCondition(item, ref, contracts, iteration);
+            if (typeof item === "string")
+                result = result && this.checkCondition(item, ref, contracts, iteration);
+            else
+                result = result && this.checkConditions(item, ref, contracts, iteration);
 
     } else if (conditions.hasOwnProperty(Constraint.conditionsModeType.any_of)) {
         let condList = conditions[Constraint.conditionsModeType.any_of];
@@ -981,9 +984,12 @@ Constraint.prototype.checkConditions =  function(conditions, ref, contracts, ite
 
         result = false;
         for (let item of condList)
-            result = result || this.checkCondition(item, ref, contracts, iteration);
+            if (typeof item === "string")
+                result = result || this.checkCondition(item, ref, contracts, iteration);
+            else
+                result = result || this.checkConditions(item, ref, contracts, iteration);
 
-    } else if (conds.hasOwnProperty("operator"))
+    } else if (conditions.hasOwnProperty("operator"))
         result = this.checkCondition(conditions, ref, contracts, iteration);
     else
         throw new ex.IllegalArgumentException("Expected all_of or any_of");

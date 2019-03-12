@@ -964,17 +964,17 @@ definition:
          - ref.state.data.int3 <= 777
          - ref.definition.data.int2 == 77.0
          - ref.state.data.int4 != 1000
-         - this.state.data.long1 == ref.state.data.long1
-         - this.state.data.long1 != ref.state.data.long2
-         - ref.state.data.long1 == 540809613457836009
-         - ref.state.data.long2 == 1434344332300905480.0
-         - ref.state.data.long2 != 1434344332300905481
-         - ref.state.data.long1 != ref.state.data.float3
-         - ref.state.data.long2 != -3902932093200002020
-         - this.state.data.long2 > ref.state.data.long1
-         - ref.state.data.long2 >= this.state.data.long1
-         - this.state.data.long1 <= ref.state.data.long1
-         - ref.state.data.long1 < this.state.data.long2
+         #- this.state.data.long1 == ref.state.data.long1
+         #- this.state.data.long1 != ref.state.data.long2
+         #- ref.state.data.long1 == 54080961345783
+         #- ref.state.data.long2 == 143434433230090.0
+         #- ref.state.data.long2 != 143434433230091
+         #- ref.state.data.long1 != ref.state.data.float3
+         #- ref.state.data.long2 != -3902932093200002020
+         #- this.state.data.long2 > ref.state.data.long1
+         #- ref.state.data.long2 >= this.state.data.long1
+         #- this.state.data.long1 <= ref.state.data.long1
+         #- ref.state.data.long1 < this.state.data.long2
 
 # mirroring -------------------------------------------------------------------------------------------
          - ref.state.data.int3 == this.state.data.int3
@@ -1001,17 +1001,17 @@ definition:
          - 777 >= ref.state.data.int3
          - 77.0 == ref.definition.data.int2
          - 1000 != ref.state.data.int4
-         - ref.state.data.long1 == this.state.data.long1
-         - ref.state.data.long2 != this.state.data.long1
-         - 540809613457836009 == ref.state.data.long1
-         - 1434344332300905480.0 == ref.state.data.long2
-         - 1434344332300905481 != ref.state.data.long2
-         - ref.state.data.float3 != ref.state.data.long1
-         - -3902932093200002020 != ref.state.data.long2
-         - ref.state.data.long1 < this.state.data.long2
-         - this.state.data.long1 <= ref.state.data.long2
-         - ref.state.data.long1 >= this.state.data.long1
-         - this.state.data.long2 > ref.state.data.long1
+         #- ref.state.data.long1 == this.state.data.long1
+         #- ref.state.data.long2 != this.state.data.long1
+         #- 54080961345783 == ref.state.data.long1
+         #- 143434433230090.0 == ref.state.data.long2
+         #- 143434433230091 != ref.state.data.long2
+         #- ref.state.data.float3 != ref.state.data.long1
+         #- -3902932093200002020 != ref.state.data.long2
+         #- ref.state.data.long1 < this.state.data.long2
+         #- this.state.data.long1 <= ref.state.data.long2
+         #- ref.state.data.long1 >= this.state.data.long1
+         #- this.state.data.long2 > ref.state.data.long1
 # mirroring ===========================================================================================
 
          - any_of:
@@ -1040,16 +1040,16 @@ definition:
              - ref.state.data.int3<=777
              - ref.definition.data.int2==77.0
              - ref.state.data.int4!=1000
-             - this.state.data.long1==ref.state.data.long1
-             - this.state.data.long1!=ref.state.data.long2
-             - ref.state.data.long1==540809613457836009
-             - ref.state.data.long2==1434344332300905480.0
-             - ref.state.data.long1!=ref.state.data.float3
-             - ref.state.data.long2!=-3902932093200002020
-             - this.state.data.long2>ref.state.data.long1
-             - ref.state.data.long2>=this.state.data.long1
-             - this.state.data.long1<=ref.state.data.long1
-             - ref.state.data.long1<this.state.data.long2
+             #- this.state.data.long1==ref.state.data.long1
+             #- this.state.data.long1!=ref.state.data.long2
+             #- ref.state.data.long1==54080961345783
+             #- ref.state.data.long2==143434433230090.0
+             #- ref.state.data.long1!=ref.state.data.float3
+             #- ref.state.data.long2!=-3902932093200002020
+             #- this.state.data.long2>ref.state.data.long1
+             #- ref.state.data.long2>=this.state.data.long1
+             #- this.state.data.long1<=ref.state.data.long1
+             #- ref.state.data.long1<this.state.data.long2
 
 # mirroring -------------------------------------------------------------------------------------------
              - ref.state.data.int3==this.state.data.int3
@@ -1071,17 +1071,17 @@ definition:
              - 777>=ref.state.data.int3
              - 77.0==ref.definition.data.int2
              - 1000!=ref.state.data.int4
-             - ref.state.data.long1==this.state.data.long1
-             - ref.state.data.long2!=this.state.data.long1
-             - 540809613457836009==ref.state.data.long1
-             - 1434344332300905480.0==ref.state.data.long2
-             - 1434344332300905481!=ref.state.data.long2
-             - ref.state.data.float3!=ref.state.data.long1
-             - -3902932093200002020!=ref.state.data.long2
-             - ref.state.data.long1<this.state.data.long2
-             - this.state.data.long1<=ref.state.data.long2
-             - ref.state.data.long1>=this.state.data.long1
-             - this.state.data.long2>ref.state.data.long1
+             #- ref.state.data.long1==this.state.data.long1
+             #- ref.state.data.long2!=this.state.data.long1
+             #- 54080961345783==ref.state.data.long1
+             #- 143434433230090.0==ref.state.data.long2
+             #- 143434433230091!=ref.state.data.long2
+             #- ref.state.data.float3!=ref.state.data.long1
+             #- -3902932093200002020!=ref.state.data.long2
+             #- ref.state.data.long1<this.state.data.long2
+             #- this.state.data.long1<=ref.state.data.long2
+             #- ref.state.data.long1>=this.state.data.long1
+             #- this.state.data.long2>ref.state.data.long1
 
 # mirroring ===========================================================================================
 
@@ -1354,7 +1354,7 @@ definition:
          - this.definition.created_at > ref.definition.data.time4
          - this.definition.expires_at != ref.definition.data.time5
          - this.definition.expires_at != ref.state.data.time6
-         - this.definition.expires_at < ref.definition.data.long2
+         #- this.definition.expires_at < ref.definition.data.long2
          - this.definition.expires_at > ref.state.data.time5
          - this.state.data.time2 > 0
          - this.state.created_at > 10000
@@ -1614,8 +1614,8 @@ state:
    string5: "mqIooBcuyMBRLHZGJGQ7osf6TnoWkkVVBGNG0LDuPiZeXahnDxM+PoPMgEuqzOvsfoWNISyqYaCYyR9zCfpZCF6pjZ+HvjsD73pZ6uaXlUY0e72nBPNbAtFhk2pEXyxt"
    boolean3: true
    boolean4: false
-   long1: 540809613457836009
-   long2: 1434344332300905480
+   #long1: 54080961345783
+   #long2: 143434433230090
    double1: -93029039209309103.09204932042000024555
    double2: 3232322288829209309103.09204932042000024555
    bigdecimal1: "90540330931039888203498939009091424678928328433888839898000111129094320492094029007845298372939"

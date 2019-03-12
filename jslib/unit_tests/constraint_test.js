@@ -301,7 +301,7 @@ unit.test("constraint test: checkConstraints", async () => {
     let privateBytes = await (await io.openRead("../test/_xer0yfe2nn1xthc.private.unikey")).allBytes();
     let key = new crypto.PrivateKey(privateBytes);
 
-    let conditions = contract1.constraints.get("ref_string").conditions;
+    let conditions = contract1.constraints.get("ref_roles").conditions;
     let condList = conditions["all_of"];
 
     // Mirroring conditions with strings
@@ -320,7 +320,7 @@ unit.test("constraint test: checkConstraints", async () => {
         "           LyIqeM7dSyaHFTBII/sLuFru6ffoKxBNk/cwAGZqOwD3fkJjNq1R3h6QylWXI/cSO9yRnRMmMBJwal\n" +
         "           MexOc3/kPEEdfjH/GcJU0Mw6DgoY8QgfaNwXcFbBUvf3TwZ5Mysf21OLHH13g8gzREm+h8c=\"==ref.definition.issuer");
     condList.push("\"1:25\"==this.state.branchId");
-    contract1.constraints.get("ref_string").setConditions(conditions);
+    contract1.constraints.get("ref_roles").setConditions(conditions);
 
     conditions = contract1.constraints.get("ref_time").conditions;
     condList = conditions["all_of"];
@@ -347,10 +347,7 @@ unit.test("constraint test: checkConstraints", async () => {
 
     contract1.state.setBranchNumber(25);
 
-    let t0 = Date.now();
     await contract1.seal();
-    let t1 = Date.now();
-    console.log("contract1 sealed by " + (t1 - t0) + " milliseconds.");
 
     // signature to check can_play operator
     await contract1.addSignatureToSeal(key);
@@ -361,33 +358,21 @@ unit.test("constraint test: checkConstraints", async () => {
     tpack.subItems.set(contract3.id, contract3);
     tpack.referencedItems.set(contract3.id, contract3);
 
-    let constrContract = new cnt.Contract.fromSealedBinary(contract1.sealedBinary, tpack);
+    //contract1 = new cnt.Contract.fromSealedBinary(contract1.sealedBinary, tpack);
 
-    //console.log(JSON.stringify(refContract, null, 2));
-    /*await constrContract.check();
+    await contract1.check();
 
-    console.log("Check roles conditions");
-    assert(constrContract.constraints.get("ref_roles").matchingItems.has(contract2));
-    console.log("Check integer conditions");
-    assert(constrContract.constraints.get("ref_integer").matchingItems.has(contract2));
-    console.log("Check float conditions");
-    assert(constrContract.constraints.get("ref_float").matchingItems.has(contract2));
-    console.log("Check string conditions");
-    assert(constrContract.constraints.get("ref_string").matchingItems.has(contract2));
-    console.log("Check boolean conditions");
-    assert(constrContract.constraints.get("ref_boolean").matchingItems.has(contract2));
-    console.log("Check inherited conditions");
-    assert(constrContract.constraints.get("ref_inherited").matchingItems.has(contract2));
-    console.log("Check time conditions");
-    assert(constrContract.constraints.get("ref_time").matchingItems.has(contract2));
-    console.log("Check ref_hashes conditions");
-    assert(constrContract.constraints.get("ref_hashes").matchingItems.has(contract2));
-    console.log("Check ref_bigdecimal conditions");
-    assert(constrContract.constraints.get("ref_bigdecimal").matchingItems.has(contract2));
-    console.log("Check parent conditions");
-    assert(constrContract.constraints.get("ref_parent").matchingItems.has(contract3));
-    console.log("Check can_play conditions");
-    assert(constrContract.constraints.get("ref_can_play").matchingItems.has(contract2));*/
+    //assert(contract1.constraints.get("ref_roles").matchingItems.has(contract2));
+    assert(contract1.constraints.get("ref_integer").matchingItems.has(contract2));
+    assert(contract1.constraints.get("ref_float").matchingItems.has(contract2));
+    assert(contract1.constraints.get("ref_string").matchingItems.has(contract2));
+    assert(contract1.constraints.get("ref_boolean").matchingItems.has(contract2));
+    //assert(contract1.constraints.get("ref_inherited").matchingItems.has(contract2));
+    assert(contract1.constraints.get("ref_time").matchingItems.has(contract2));
+    assert(contract1.constraints.get("ref_hashes").matchingItems.has(contract2));
+    assert(contract1.constraints.get("ref_bigdecimal").matchingItems.has(contract2));
+    assert(contract1.constraints.get("ref_parent").matchingItems.has(contract3));
+    assert(contract1.constraints.get("ref_can_play").matchingItems.has(contract2));
 });
 
 /*unit.test("constraint test: checkReferencesContracts", async () => {

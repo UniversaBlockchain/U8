@@ -735,7 +735,7 @@ Contract.prototype.get = function(name) {
         name = name.substring(6);
         switch (name) {
             case "origin":
-                return this.state.origin;
+                return this.getOrigin();
             case "created_at":
                 return this.state.createdAt;
             case "expires_at":
@@ -787,7 +787,7 @@ Contract.prototype.get = function(name) {
         case "id":
             return this.id;
         case "origin":
-            return this.state.origin;
+            return this.getOrigin();
         case "issuer":
             return this.roles.issuer;
         case "owner":

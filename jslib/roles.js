@@ -42,6 +42,8 @@ Role.fromDsl = function (name, serializedRole) {
     else
         throw new ex.IllegalArgumentException("Unknown role type: " + type);
 
+    //result.initWithDsl(serializedRole);
+
     if (serializedRole.hasOwnProperty("requires")) {
         if(serializedRole.requires.hasOwnProperty("all_of"))
             serializedRole.requires.all_of.forEach(item => result.requiredAllConstraints.add(item));

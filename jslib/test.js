@@ -78,6 +78,7 @@ const unit = {
                 console.log("ok");
             } catch (e) {
                 console.log("FAILED!");
+                console.error(e.message);
                 console.error(e.stack);
                 failedTestsCount++;
             }
