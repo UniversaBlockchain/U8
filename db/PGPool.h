@@ -29,8 +29,17 @@ namespace db {
         int getRowsCount();
         byte_vector getValueByIndex(int rowNum, int colIndex);
         byte_vector getValueByName(int rowNum, const std::string& colName);
+        void cacheResults();
+        byte_vector getCachedValueByIndex(int rowNum, int colIndex);
+        byte_vector getCachedValueByName(int rowNum, const std::string& colName);
+        int getCachedColsCount();
+        int getCachedRowsCount();
     private:
         std::shared_ptr<pg_result> pgRes_;
+        std::vector<byte_vector> cache_;
+        int cacheColsCount_ = 0;
+        int cacheRowsCount_ = 0;
+        std::unordered_map<string, int> cacheColNames_;
     };
 
     int getIntValue(const byte_vector& val);

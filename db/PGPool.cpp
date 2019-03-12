@@ -66,17 +66,57 @@ namespace db {
         return getValueByIndex(rowNum, colIndex);
     }
 
+    void QueryResult::cacheResults() {
+        int nRows = PQntuples(pgRes_.get());
+        int nCols = PQnfields(pgRes_.get());
+        cacheRowsCount_ = nRows;
+        cacheColsCount_ = nCols;
+        cache_.resize(nCols*nRows);
+        for (int iRow = 0; iRow < nRows; ++iRow)
+            for (int iCol = 0; iCol < nCols; ++iCol)
+                cache_[iRow*nCols+iCol] = getValueByIndex(iRow, iCol);
+        for (int iCol = 0; iCol < nCols; ++iCol) {
+            std::string name(PQfname(pgRes_.get(), iCol));
+            cacheColNames_[name] = iCol;
+        }
+    }
+
+    byte_vector QueryResult::getCachedValueByIndex(int rowNum, int colIndex) {
+        if (cache_.size() == 0)
+            throw std::invalid_argument("QueryResult::getCachedValueByIndex error: cache is empty, call cacheResults() first");
+        return cache_.at(rowNum * cacheColsCount_ + colIndex);
+    }
+
+    byte_vector QueryResult::getCachedValueByName(int rowNum, const std::string& colName) {
+        if (cache_.size() == 0)
+            throw std::invalid_argument("QueryResult::getCachedValueByName error: cache is empty, call cacheResults() first");
+        if (cacheColNames_.find(colName) == cacheColNames_.end())
+            throw std::invalid_argument("QueryResult::getCachedValueByName error: column not found: " + colName);
+        int colIndex = cacheColNames_[colName];
+        return cache_.at(rowNum * cacheColsCount_ + colIndex);
+    }
+
+    int QueryResult::getCachedColsCount() {
+        return cacheColsCount_;
+    }
+
+    int QueryResult::getCachedRowsCount() {
+        return cacheRowsCount_;
+    }
+
     int getIntValue(const byte_vector& val) {
-        if (val.size() < sizeof(int))
+        auto sz = sizeof(int);
+        if (val.size() != sz)
             throw std::invalid_argument(
-                    "QueryResult::getIntValue: data too small: " + std::to_string(val.size()) + " bytes");
+                    "QueryResult::getIntValue: wrong data size: " + std::to_string(val.size()) + " bytes received, required " + std::to_string(sz));
         return be32toh(*(int *) &val[0]);
     }
 
     long long getLongValue(const byte_vector& val) {
-        if (val.size() < sizeof(long long))
+        auto sz = sizeof(long long);
+        if (val.size() < sz)
             throw std::invalid_argument(
-                    "QueryResult::getLongValue: data too small: " + std::to_string(val.size()) + " bytes");
+                    "QueryResult::getLongValue: wrong data size: " + std::to_string(val.size()) + " bytes received, required " + std::to_string(sz));
         return be64toh(*(long long*)&val[0]);
     }
 
@@ -85,9 +125,10 @@ namespace db {
     }
 
     double getDoubleValue(const byte_vector& val) {
-        if (val.size() < sizeof(double))
+        auto sz = sizeof(double);
+        if (val.size() < sz)
             throw std::invalid_argument(
-                    "QueryResult::getDoubleValue: data too small: " + std::to_string(val.size()) + " bytes");
+                    "QueryResult::getDoubleValue: wrong data size: " + std::to_string(val.size()) + " bytes received, required " + std::to_string(sz));
         long long hval = be64toh(*((long long*)&val[0]));
         return *((double*)&hval);
     }

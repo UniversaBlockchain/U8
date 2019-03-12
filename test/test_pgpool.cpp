@@ -325,6 +325,54 @@ TEST_CASE("PGPool") {
         sem.wait();
     }
 
+    SECTION("cache results") {
+        const int TEST_QUERIES_COUNT = 100;
+        Semaphore sem;
+        atomic<int> readyCounter(0);
+        vector<HashId> hashes;
+        for (int i = 0; i < TEST_QUERIES_COUNT; ++i) {
+            // insert with pgPool.execParams()
+            hashes.push_back(HashId::createRandom());
+            pgPool.execParams(
+                    "INSERT INTO table1(hash,state,locked_by_id,created_at,expires_at) VALUES ($1, $2, 0, $3, $4)",
+                    [&sem, &readyCounter](db::QueryResultsArr &qra) {
+                        if (qra[0].isError())
+                            throw std::runtime_error("error: " + string(qra[0].getErrorText()));
+                        ++readyCounter;
+                        sem.notify();
+                    }, hashes.at(i).getDigest(), i*2, i*3,
+                    long(i)*10l);
+        }
+
+        do {
+            sem.wait();
+            int counterState = int(readyCounter);
+            if (counterState % 100 == 0)
+                cout << "readyCounter: " << counterState << endl;
+        } while (readyCounter < TEST_QUERIES_COUNT);
+        REQUIRE(readyCounter == TEST_QUERIES_COUNT);
+
+        Semaphore sem2;
+        pgPool.execParams("SELECT * FROM table1 WHERE state>$1 ORDER BY state ASC LIMIT 10", [&sem2,&hashes](db::QueryResultsArr& qra){
+            auto& qr = qra[0];
+            if (qr.isError())
+                throw std::runtime_error("error: " + string(qra[0].getErrorText()));
+            qr.cacheResults();
+            for (int iRow = 0; iRow < qr.getCachedRowsCount(); ++iRow) {
+                REQUIRE(qr.getCachedValueByIndex(iRow, 1) == hashes.at(iRow+14).getDigest());
+                REQUIRE(qr.getCachedValueByName(iRow, "hash") == hashes.at(iRow+14).getDigest());
+                REQUIRE(db::getIntValue(qr.getCachedValueByIndex(iRow, 2)) == (iRow+14)*2);
+                REQUIRE(db::getIntValue(qr.getCachedValueByName(iRow, "state")) == (iRow+14)*2);
+                REQUIRE(db::getIntValue(qr.getCachedValueByIndex(iRow, 4)) == (iRow+14)*3);
+                REQUIRE(db::getIntValue(qr.getCachedValueByName(iRow, "created_at")) == (iRow+14)*3);
+                REQUIRE(db::getLongValue(qr.getCachedValueByIndex(iRow, 5)) == (iRow+14)*10);
+                REQUIRE(db::getLongValue(qr.getCachedValueByName(iRow, "expires_at")) == ((long)iRow+14l)*10l);
+            }
+            sem2.notify();
+        }, 13*2);
+        sem2.wait();
+    }
+
     SECTION("performance: insert line-by-line vs multi insert") {
         const int ROWS_COUNT = 10000;
         const int BUF_SIZE = 20;
