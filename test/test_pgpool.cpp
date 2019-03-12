@@ -6,6 +6,7 @@
 #include <postgresql/libpq-fe.h>
 #include <atomic>
 #include <tomcrypt.h>
+#include <random>
 #include "catch2.h"
 #include "../db/PGPool.h"
 #include "../tools/Semaphore.h"
@@ -374,21 +375,22 @@ TEST_CASE("PGPool") {
     }
 
     SECTION("performance: insert line-by-line vs multi insert") {
-        const int ROWS_COUNT = 10000;
+        const int ROWS_COUNT = 1000;
         const int BUF_SIZE = 20;
         Semaphore sem;
         atomic<int> readyCounter(0);
         long long t0 = getCurrentTimeMillis();
         for (int i = 0; i < ROWS_COUNT; ++i) {
-            pgPool.execParams(
+            vector<any> params({HashId::createRandom().getDigest(), 4, (int)getCurrentTimeMillis() / 1000,
+                                getCurrentTimeMillis() / 1000l + 31536000l});
+            pgPool.execParamsArr(
                     "INSERT INTO table1(hash,state,locked_by_id,created_at,expires_at) VALUES ($1, $2, 0, $3, $4)",
                     [&sem, &readyCounter](db::QueryResultsArr &qra) {
                         if (qra[0].isError())
                             throw std::runtime_error("error: " + string(qra[0].getErrorText()));
                         ++readyCounter;
                         sem.notify();
-                    }, HashId::createRandom().getDigest(), 4, (int)getCurrentTimeMillis() / 1000,
-                    getCurrentTimeMillis() / 1000l + 31536000l);
+                    }, params);
         }
         do {
             sem.wait();
@@ -436,4 +438,86 @@ TEST_CASE("PGPool") {
         REQUIRE(readyCounter == ROWS_COUNT);
         cout << "multi insert: " << getCurrentTimeMillis()-t1 << " ms" << endl;
     }
+
+    SECTION("performance: select line-by-line vs array in 'where'") {
+        const int ROWS_COUNT = 50000;
+        const int INSERT_BUF_SIZE = 20;
+        const int SELECTS_COUNT = ROWS_COUNT/10;
+        const int SELECTS_BUF_SIZE = 20;
+        Semaphore sem;
+        atomic<int> readyCounter(0);
+        std::minstd_rand  minstdRand(std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now().time_since_epoch()).count());
+
+        vector<HashId> hashes;
+        for (int i = 0; i < ROWS_COUNT/INSERT_BUF_SIZE; ++i) {
+            string query = "INSERT INTO table1(hash,state,locked_by_id,created_at,expires_at) VALUES ";
+            vector<any> params;
+            for (int j = 0; j < INSERT_BUF_SIZE; ++j) {
+                char buf[64];
+                snprintf(buf, sizeof(buf), "($%i,$%i,0,$%i,$%i)", j*4+1, j*4+2, j*4+3, j*4+4);
+                hashes.push_back(HashId::createRandom());
+                params.push_back(hashes.at(i*INSERT_BUF_SIZE+j).getDigest());
+                params.push_back(i*INSERT_BUF_SIZE+j);
+                params.push_back((int)getCurrentTimeMillis() / 1000);
+                params.push_back(getCurrentTimeMillis() / 1000l + 31536000l);
+                if (j > 0)
+                    query += ",";
+                query += buf;
+            }
+            query += " RETURNING id;";
+            pgPool.execParamsArr(
+                    query,
+                    [&sem, &readyCounter, i](db::QueryResultsArr &qra) {
+                        if (qra[0].isError())
+                            throw std::runtime_error("error: " + string(qra[0].getErrorText()));
+                        for (int k = 0; k < qra[0].getRowsCount(); ++k) {
+                            ++readyCounter;
+                        }
+                        sem.notify();
+                    }, params);
+        }
+        do {
+            sem.wait();
+            int counterState = int(readyCounter);
+        } while (readyCounter < ROWS_COUNT);
+        REQUIRE(readyCounter == ROWS_COUNT);
+
+        long long t0 = getCurrentTimeMillis();
+        Semaphore sem2;
+        for (int i = 0; i < SELECTS_COUNT; ++i) {
+            vector<any> params({hashes[minstdRand()%ROWS_COUNT].getDigest()});
+            pgPool.execParamsArr("SELECT state FROM table1 WHERE hash=$1 LIMIT 1", [&sem2](db::QueryResultsArr &qra) {
+                if (qra[0].isError())
+                    throw std::runtime_error("error: " + string(qra[0].getErrorText()));
+                sem2.notify();
+            }, params);
+        }
+        for (int i = 0; i < SELECTS_COUNT; ++i)
+            sem2.wait();
+        cout << "many single selects: " << getCurrentTimeMillis()-t0 << " ms" << endl;
+
+        long long t1 = getCurrentTimeMillis();
+        for (int i = 0; i < SELECTS_COUNT/SELECTS_BUF_SIZE; ++i) {
+            string queryArray = "(";
+            vector<any> params;
+            for (int j = 1; j <= SELECTS_BUF_SIZE; ++j) {
+                params.push_back(hashes[minstdRand()%ROWS_COUNT].getDigest());
+                queryArray += "$" + to_string(j);
+                if (j != SELECTS_BUF_SIZE)
+                    queryArray += ",";
+            }
+            queryArray += ")";
+            pgPool.execParamsArr("SELECT state FROM table1 WHERE hash IN "+queryArray+" LIMIT "+to_string(SELECTS_BUF_SIZE), [&sem2](db::QueryResultsArr &qra) {
+                if (qra[0].isError())
+                    throw std::runtime_error("error: " + string(qra[0].getErrorText()));
+                qra[0].cacheResults();
+                for (int j = 0; j < SELECTS_BUF_SIZE; ++j)
+                    sem2.notify();
+            }, params);
+        }
+        for (int i = 0; i < SELECTS_COUNT; ++i)
+            sem2.wait();
+        cout << "batch selects: " << getCurrentTimeMillis()-t1 << " ms" << endl;
+    }
+
 }
