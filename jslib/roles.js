@@ -42,7 +42,7 @@ Role.fromDsl = function (name, serializedRole) {
     else
         throw new ex.IllegalArgumentException("Unknown role type: " + type);
 
-    //result.initWithDsl(serializedRole);
+    result.initWithDsl(serializedRole);
 
     if (serializedRole.hasOwnProperty("requires")) {
         if(serializedRole.requires.hasOwnProperty("all_of"))
@@ -283,6 +283,17 @@ RoleLink.prototype.isAllowedForKeys = function(keys) {
         return false;
 };
 
+RoleLink.prototype.initWithDsl = function(serializedRole) {
+    if (serializedRole.hasOwnProperty("target"))
+        this.roleName = serializedRole.target;
+    else
+        throw new ex.IllegalArgumentException("Unknown target of RoleLink");
+
+    if (this.name === this.roleName)
+        throw new ex.IllegalArgumentException("RoleLink: name and target name are equals: " + this.roleName);
+
+};
+
 
 
 ///////////////////////////
@@ -427,6 +438,27 @@ ListRole.prototype.isAllowedForKeys = function(keys) {
     return false;
 };
 
+ListRole.prototype.initWithDsl = function(serializedRole) {
+    if (!serializedRole.hasOwnProperty("roles"))
+        throw new ex.IllegalArgumentException("Unknown roles of ListRole");
+
+    if (!serializedRole.hasOwnProperty("mode"))
+        throw new ex.IllegalArgumentException("Unknown mode of ListRole");
+
+    let roleObjects = serializedRole.roles;
+    this.mode = serializedRole.mode.toUpperCase();
+
+    if(this.mode === ListRoleMode.QUORUM)
+        this.quorumSize = serializedRole.quorumSize;
+
+    roleObjects.forEach(x => {
+        if (typeof x === "string")
+            this.roles.push(new RoleLink(x + "link" + Date.now(), x));
+        else
+            this.roles.push(Role.fromDsl(null, x));
+    });
+};
+
 
 
 ///////////////////////////
@@ -500,7 +532,7 @@ SimpleRole.prototype.equalsForConstraint = function(to) {
 
 SimpleRole.prototype.hasAllKeys = function(to) {
     for (let key of this.keyRecords.keys())
-        if (!(to.keyRecords.hasOwnProperty(key) || to.keyAddresses.has(key.shortAddress) || to.keyAddresses.has(key.longAddress)))
+        if (!(to.keyRecords.get(key) || to.keyAddresses.has(key.shortAddress) || to.keyAddresses.has(key.longAddress)))
             return false;
 
     for (let addr of this.keyAddresses) {
@@ -535,8 +567,8 @@ SimpleRole.prototype.deserialize = function(data,deserializer) {
 SimpleRole.prototype.serialize = function(serializer) {
     let data = Object.getPrototypeOf(SimpleRole.prototype).serialize.call(this,serializer);
 
-    let array = [];;
-    for(let [k,v] of this.keyRecords) {
+    let array = [];
+    for (let [k,v] of this.keyRecords) {
         array.push(v);
     }
     data.keys = serializer.serialize(array);
@@ -544,8 +576,6 @@ SimpleRole.prototype.serialize = function(serializer) {
 
     return data;
 };
-
-
 
 SimpleRole.prototype.isAllowedForKeys = function(keys) {
     if(!Object.getPrototypeOf(SimpleRole.prototype).isAllowedForKeys.call(this,keys))
@@ -578,6 +608,26 @@ SimpleRole.prototype.isAllowedForKeys = function(keys) {
     }
 
     return true;
+};
+
+SimpleRole.prototype.addKeyRecord = function(keyRecord) {
+    this.keyRecords.set(keyRecord.key, keyRecord);
+};
+
+SimpleRole.prototype.initWithDsl = function(serializedRole) {
+    if (serializedRole.hasOwnProperty("keys")) {
+        let list = serializedRole.keys;
+        for (let k of list)
+            this.addKeyRecord(KeyRecord.fromDsl(k));
+    } else if (serializedRole.hasOwnProperty("key"))
+        this.addKeyRecord(KeyRecord.fromDsl(serializedRole));
+
+    if (serializedRole.hasOwnProperty("addresses")) {
+        let list = serializedRole.addresses;
+        for (let a of list)
+            this.keyAddresses.add(new crypto.KeyAddress(a.uaddress));
+    } else if (serializedRole.hasOwnProperty("uaddress"))
+        this.keyAddresses.add(new crypto.KeyAddress(serializedRole.uaddress));
 };
 
 

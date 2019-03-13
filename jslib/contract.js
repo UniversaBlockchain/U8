@@ -718,6 +718,8 @@ Contract.prototype.get = function(name) {
                 return this.definition.extendedType;
             case "issuer":
                 return this.roles.issuer;
+            case "origin":
+                return this.getOrigin();
             default:
                 if (name.startsWith("data."))
                     if(this.definition.data.hasOwnProperty(name.substring(5))) {
