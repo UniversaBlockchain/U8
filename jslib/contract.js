@@ -1719,11 +1719,11 @@ Contract.prototype.split = function(count) {
 };
 
 /**
- * Create contract importing its parameters with passed .yaml file. No signatures are added automatically.
+ * Create a contract by importing its parameters of the transferred .yaml file. Signatures are not automatically added.
  * It is required to add signatures before check.
  *
- * @param fileName path to file containing Yaml representation of contract.
- * @return initialized contract
+ * @param {string} fileName - Path to file containing YAML representation of a contract.
+ * @return {Contract} initialized contract.
  */
 Contract.fromDslFile = async function(fileName) {
     let input = await io.openRead(fileName);
@@ -1763,10 +1763,11 @@ Contract.prototype.initializeWithDsl = function(root) {
  * Resolve object describing role and create either: - new role object - symlink to named role instance, ensure it
  * is register and return it, if it is a Map, tries to construct and register {@see Role} then return it.
  *
- * @param roleName is name of the role
- * @param roleObject is object for role creating
+ * @param {string} roleName - Name of the role.
+ * @param {object} roleObject - Is object for role creating.
  *
- * @return Role
+ * @return {Role} role.
+ * @throws If can't make role.
  */
 Contract.prototype.createRole = function(roleName, roleObject) {
     if (typeof roleObject === "string")

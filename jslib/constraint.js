@@ -697,7 +697,7 @@ Constraint.prototype.compareOperands = function(refContract,
 /**
  * Parse string condition.
  *
- * @param {string} condition string.
+ * @param {string} condition - Condition string.
  * @return {object} - Object with condition parameters.
  * @throws Invalid format of condition.
  */

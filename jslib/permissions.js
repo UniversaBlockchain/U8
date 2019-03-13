@@ -19,13 +19,13 @@ function Permission(name,role,params) {
 }
 
 /**
- * Create new permission of a specific type by type name
+ * Create new permission of a specific type by type name.
  *
- * @param name is specific type name
- * @param role allows to permission
- * @param params is parameters of permission, set of parameters depends on the type of permission
+ * @param {string} name - Specific type name.
+ * @param {Role} role - Role allows to permission.
+ * @param {object} params - Parameters of permission, set of parameters depends on the type of permission.
  *
- * @return Permission
+ * @return {Permission} permission
  */
 Permission.forName = function(name, role, params) {
     switch (name) {
