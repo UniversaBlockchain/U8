@@ -80,8 +80,12 @@ void on_tcp_read(uv_stream_t *stream, ssize_t nrd, const uv_buf_t *data)
     uv_tls_t *parent = getTLSFromData(stream->data);
 
     assert( parent != NULL);
-    if ( nrd <= 0 ) {
-        if( nrd == UV_EOF) {
+    if ( nrd > 0 )
+        evt_tls_feed_data(parent->tls, data->base, nrd);
+    else if (parent->tls->read_cb)
+            parent->tls->read_cb(parent->tls, NULL, nrd);
+
+        /*if( nrd == UV_EOF) {
             if ( evt_tls_is_handshake_over(parent->tls) ) {
                 uv_tls_close(parent, (uv_tls_close_cb)free);
             }
@@ -89,11 +93,8 @@ void on_tcp_read(uv_stream_t *stream, ssize_t nrd, const uv_buf_t *data)
                 //if handshake is not over, simply tear down without close_notify
                 uv_close((uv_handle_t*)stream, on_tcp_eof);
             }
-        }
-        free(data->base);
-        return;
-    }
-    evt_tls_feed_data(parent->tls, data->base, nrd);
+        }*/
+
     free(data->base);
 }
 

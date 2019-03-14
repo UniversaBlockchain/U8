@@ -18,7 +18,7 @@ unit.test("simple tcp", async () => {
         await reportErrors(async () => {
             serverReads = await connection.input.readLine();
             await connection.output.write("hello!\n");
-            connection.close();
+            await connection.close();
         });
     };
 
@@ -31,7 +31,7 @@ unit.test("simple tcp", async () => {
     let ss = chomp(await conn.input.allAsString());
     expect.equal(ss, "hello!");
     expect.equal(serverReads, "foobar");
-    server.close();
+    await server.close();
 });
 
 unit.test("simple tls", async () => {
@@ -43,7 +43,7 @@ unit.test("simple tls", async () => {
         await reportErrors(async () => {
             serverReads = await connection.input.readLine();
             await connection.output.write("hello!\n");
-            connection.close();
+            await connection.close();
         });
     };
 
@@ -54,10 +54,10 @@ unit.test("simple tls", async () => {
     let conn = await tls.connect({host: "127.0.0.1", port: 23103, certFilePath: "../test/server-cert.pem", keyFilePath: "../test/server-key.pem"});
 
     await conn.output.write("foobar\n");
-    let ss = chomp(await conn.input.readLine());
+    let ss = chomp(await conn.input.allAsString());
     expect.equal(ss, "hello!");
     expect.equal(serverReads, "foobar");
-    server.close();
+    await server.close();
 });
 
 unit.test("simple udp", async () => {
@@ -76,7 +76,7 @@ unit.test("simple udp", async () => {
             assert(((IP === "127.0.0.1") || (IP === "0.0.0.0")), "check ip");
             assert(port === 18158, "check port");
 
-            sock1.close();
+            await sock1.close();
         });
     }, (error) => {
         unit.fail("recv failed: " + error);
@@ -90,7 +90,7 @@ unit.test("simple udp", async () => {
 
             await sock2.send("qwerty", {port: 18157});
 
-            sock2.close();
+            await sock2.close();
         });
     }, (error) => {
         unit.fail("recv failed: " + error);
@@ -119,7 +119,7 @@ unit.test("multi udp", async () => {
 
             packets++;
             if (packets === 2)
-                sock1.close();
+                await sock1.close();
         });
     }, (error) => {
         unit.fail("recv failed: " + error);
@@ -128,5 +128,5 @@ unit.test("multi udp", async () => {
     await sock2.send("qwerty", {port: 18107});
     await sock2.send("1234567", {port: 18107});
 
-    sock2.close();
+    await sock2.close();
 });
