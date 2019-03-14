@@ -1,4 +1,4 @@
-import {expect, assert, unit} from 'test'
+import {expect, assert, assertSilent, unit} from 'test'
 import {tcp, udp} from 'network'
 import {now} from 'timers'
 
@@ -46,26 +46,26 @@ unit.test("simple udp", async () => {
     });
 
     sock1.recv(100, async (data, IP, port) => {
-        await report(async () => {
+        await reportErrors(async () => {
             expect.equal(data, "qwerty");
             assert(((IP === "127.0.0.1") || (IP === "0.0.0.0")), "check ip");
             assert(port === 18158, "check port");
 
-            sock1.close();
+            await sock1.close();
         });
     }, (error) => {
         unit.fail("recv failed: " + error);
     });
 
     sock2.recv(100, async (data, IP, port) => {
-        await report(async () => {
+        await reportErrors(async () => {
             expect.equal(data, "123");
             assert(((IP === "127.0.0.1") || (IP === "0.0.0.0")), "check ip");
             assert(port === 18157, "check port");
 
             await sock2.send("qwerty", {port: 18157});
 
-            sock2.close();
+            await sock2.close();
         });
     }, (error) => {
         unit.fail("recv failed: " + error);
@@ -87,15 +87,15 @@ unit.test("multi udp", async () => {
     let packets = 0;
 
     sock1.recv(100, async (data, IP, port) => {
-        //await report(async () => {
+        await reportErrors(async () => {
             assert(((data === "qwerty") || (data === "1234567")), "check data");
             assert(((IP === "127.0.0.1") || (IP === "0.0.0.0")), "check ip");
             assert(port === 18108, "check port");
 
             packets++;
             if (packets === 2)
-                sock1.close();
-        //});
+                await sock1.close();
+        });
     }, (error) => {
         unit.fail("recv failed: " + error);
     });
@@ -113,5 +113,49 @@ unit.test("multi udp", async () => {
     }
     assert(packets===2, "check received packets count");
 
-    sock2.close();
+    await sock2.close();
+});
+
+unit.test("multi udp 1000", async () => {
+
+    let sock1 = udp.open({port: 18107}, (error) => {
+        unit.fail("open failed: " + error);
+    });
+
+    let sock2 = udp.open({port: 18108}, (error) => {
+        unit.fail("open failed: " + error);
+    });
+
+    let packets = 0;
+    let promises = [];
+
+    sock1.recv(100, async (data, IP, port) => {
+        let p = new Promise(resolve => {
+            packets++;
+            assertSilent(((data === "qwerty") || (data === "1234567")), "check data");
+            assertSilent(((IP === "127.0.0.1") || (IP === "0.0.0.0")), "check ip "+packets+": "+IP);
+            assertSilent(port === 18108, "check port");
+            resolve();
+        });
+        promises.push(p);
+    }, (error) => {
+        unit.fail("recv failed: " + error);
+    });
+
+    let t0 = now();
+    let count_to_send = 1000;
+    for (var i = 0; i < count_to_send; ++i) {
+        await sock2.send("qwerty", {port: 18107});
+    }
+
+    while (promises.length < count_to_send)
+        await sleep(10);
+    await Promise.all(promises);
+
+    let dt = now() - t0;
+    //console.log("rate: " + (packets/dt*1000).toFixed(2) + " packets per second");
+    assert(packets===count_to_send, "check received packets count");
+
+    await sock1.close();
+    await sock2.close();
 });

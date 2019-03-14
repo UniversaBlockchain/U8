@@ -13,6 +13,10 @@ function checkPassed() {
     console.logPut('.');
 }
 
+function checkPassedSilent() {
+    passedChecksCount++;
+}
+
 function checkFailed(message) {
     failedCheckssCount++;
     throw new unit.TestFailed("failed: " + message);
@@ -59,6 +63,12 @@ const expect = {
             checkFailed(message || "condition failed");
         else
             checkPassed();
+    },
+    silentThat(condition, message) {
+        if (!condition)
+            checkFailed(message || "condition failed");
+        else
+            checkPassedSilent();
     }
 };
 
@@ -101,5 +111,6 @@ expect.eq = expect.equal;
 expect.ne = expect.notEqual;
 
 let assert = expect.that;
+let assertSilent = expect.silentThat;
 
-module.exports = {unit, expect, assert}
+module.exports = {unit, expect, assert, assertSilent}
