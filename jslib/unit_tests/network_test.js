@@ -36,7 +36,7 @@ unit.test("simple tcp", async () => {
 
 unit.test("simple tls", async () => {
 
-    let server = tls.listen({port: 23102, certFilePath: "../test/server-cert.pem", keyFilePath: "../test/server-key.pem"});
+    let server = tls.listen({port: 23103, certFilePath: "../test/server-cert.pem", keyFilePath: "../test/server-key.pem"});
     let serverReads;
 
     let connectionProcessor = async (connection) => {
@@ -51,9 +51,10 @@ unit.test("simple tls", async () => {
         unit.fail("accept failed: " + error);
     });
 
-    let conn = await tls.connect({host: "127.0.0.1", port: 23102, certFilePath: "../test/server-cert.pem", keyFilePath: "../test/server-key.pem"});
+    let conn = await tls.connect({host: "127.0.0.1", port: 23103, certFilePath: "../test/server-cert.pem", keyFilePath: "../test/server-key.pem"});
+
     await conn.output.write("foobar\n");
-    let ss = chomp(await conn.input.allAsString());
+    let ss = chomp(await conn.input.readLine());
     expect.equal(ss, "hello!");
     expect.equal(serverReads, "foobar");
     server.close();

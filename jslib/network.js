@@ -46,11 +46,11 @@ class TcpServer {
      * @param bufferLength the biffering parameter for the TcpConnection streams.
      */
     constructor({port, bindIp = "0.0.0.0", maxConnections = 0, bufferLength = chunkSize}) {
-        [this.port, this.bindIp, this.bufferLength, this.maxConnections] = [port, bindIp, maxConnections, bufferLength];
+        [this.port, this.bindIp, this.maxConnections, this.bufferLength] = [port, bindIp, maxConnections, bufferLength];
     }
 
     /**
-     * Accept incomint connection. Calls resolve(TcpConnection) on each incoming connection or
+     * Accept incoming connection. Calls resolve(TcpConnection) on each incoming connection or
      * reject(error) if it is not possible.
      *
      * @param resolve callback to process incoming connection passed as a single argument of type {TcpConnection}
@@ -164,16 +164,16 @@ class TLSServer {
      * @param certFilePath certFilePath is path to PEM file with certificate.
      * @param keyFilePath is path to PEM file with key.
      */
-    constructor({port, bindIp = "0.0.0.0", certFilePath, keyFilePath, maxConnections = 0, bufferLength = chunkSize}) {
-        [this.port, this.bindIp, this.certFilePath, this.keyFilePath, this.bufferLength, this.maxConnections] =
-            [port, bindIp, certFilePath, keyFilePath, maxConnections, bufferLength];
+    constructor({port, bindIp = "0.0.0.0", certFilePath, keyFilePath, maxConnections = 0, bufferLength = chunkSize, timeout = 5000}) {
+        [this.port, this.bindIp, this.certFilePath, this.keyFilePath, this.maxConnections, this.bufferLength, this.timeout] =
+            [port, bindIp, certFilePath, keyFilePath, maxConnections, bufferLength, timeout];
     }
 
     /**
-     * Accept incomint connection. Calls resolve(TcpConnection) on each incoming connection or
+     * Accept incoming connection. Calls resolve(TLSConnection) on each incoming connection or
      * reject(error) if it is not possible.
      *
-     * @param resolve callback to process incoming connection passed as a single argument of type {TcpConnection}
+     * @param resolve callback to process incoming connection passed as a single argument of type {TLSConnection}
      * @param reject callback to process errors. After it is called, the server may stop processing incoming connections.
      */
     accept(resolve, reject) {
@@ -185,11 +185,9 @@ class TLSServer {
                 try {
                     let connectionHandle = new IOTLS();
                     let ap = new AsyncProcessor();
-                    let result = connectionHandle._accept(this.handle, code => ap.process(code, new TLSConnection(connectionHandle, this.bufferLength)), this.timeout);
-                    if (result < 0)
-                        reject(new IoError(result));
-                    else
-                        resolve(new TLSConnection(connectionHandle, this.bufferLength));
+                    ap.resolve = resolve;
+                    ap.reject = reject;
+                    connectionHandle._accept(this.handle, code => ap.process(code, new TLSConnection(connectionHandle, this.bufferLength)), this.timeout);
                 } catch (e) {
                     reject(e);
                 }

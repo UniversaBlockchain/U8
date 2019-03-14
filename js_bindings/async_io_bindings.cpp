@@ -319,26 +319,32 @@ void JsAsyncTLSAccept(const FunctionCallbackInfo<Value> &args) {
     Scripter::unwrapArgs(args, [&](ArgsContext &ac) {
         auto scripter = ac.scripter;
         if (args.Length() == 3) {
+            if (!ac.args[1]->IsFunction()) {
+                scripter->throwError("invalid callback");
+                return;
+            }
+
             auto obj = ac.as<Object>(0);
             auto tpl = TLSTemplate.Get(ac.isolate);
             if (!obj->IsObject() || !tpl->HasInstance(obj)) {
                 ac.throwError("required IOTLS argument");
-            } else {
-                auto serverHandle = unwrap<asyncio::IOTLS>(args.This());
-                auto isolate = ac.isolate;
-                Persistent<Function> *onReady = new Persistent<Function>(ac.isolate, ac.as<Function>(1));
-                auto connectionHandle = unwrap<asyncio::IOTLS>(obj);
-                auto timeout = ac.asInt(2);
-                int code = serverHandle->acceptFromListeningSocket(connectionHandle, [=](asyncio::IOTLS* handle, ssize_t result) {
-                    scripter->lockedContext([=](auto context) {
-                        auto fn = onReady->Get(isolate);
-                        delete onReady;
-                        Local<Value> jsResult = Integer::New(isolate, result);
-                        fn->Call(fn, 1, &jsResult);
-                    });
-                }, timeout);
-                ac.setReturnValue(code);
-            };
+                return;
+            }
+
+            auto serverHandle = unwrap<asyncio::IOTLS>(args.This());
+            auto isolate = ac.isolate;
+            Persistent<Function> *onReady = new Persistent<Function>(ac.isolate, ac.as<Function>(1));
+            auto connectionHandle = unwrap<asyncio::IOTLS>(obj);
+            auto timeout = ac.asInt(2);
+            int code = serverHandle->acceptFromListeningSocket(connectionHandle, [=](asyncio::IOTLS* handle, ssize_t result) {
+                scripter->lockedContext([=](auto context) {
+                    auto fn = onReady->Get(isolate);
+                    delete onReady;
+                    Local<Value> jsResult = Integer::New(isolate, result);
+                    fn->Call(fn, 1, &jsResult);
+                });
+            }, timeout);
+            ac.setReturnValue(code);
         } else {
             scripter->throwError("invalid number of arguments");
         }
