@@ -280,6 +280,7 @@ void JsAsyncUDPRecv(const FunctionCallbackInfo<Value> &args) {
         args.This()->Set(String::NewFromUtf8(ac.isolate, "_pcb"), BigInt::NewFromUnsigned(ac.isolate, (uint64_t) pcb));
 
         handle->recv([=](ssize_t result, const byte_vector& data, const char* IP, unsigned int port) {
+            std::string strIP = IP;
             // here we are in the async dispatcher thread we should not lock:
             scripter->inPool([=](auto context) {
                 Isolate *isolate = context->GetIsolate();
@@ -298,7 +299,7 @@ void JsAsyncUDPRecv(const FunctionCallbackInfo<Value> &args) {
                         auto pBuffer = new Persistent<ArrayBuffer>(isolate, ab);
 
                         Local<Value> res[4]{pResult->Get(isolate), Integer::New(isolate, result),
-                                            String::NewFromUtf8(isolate, IP), Integer::New(isolate, port)};
+                                            String::NewFromUtf8(isolate, strIP.data()), Integer::New(isolate, port)};
                         fn->Call(fn, 4, res);
 
                         delete pResult;
