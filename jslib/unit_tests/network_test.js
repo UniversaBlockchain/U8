@@ -1,5 +1,6 @@
 import {expect, assert, unit} from 'test'
 import {tcp, udp} from 'network'
+import {now} from 'timers'
 
 async function reportErrors(block) {
     try {
@@ -86,7 +87,7 @@ unit.test("multi udp", async () => {
     let packets = 0;
 
     sock1.recv(100, async (data, IP, port) => {
-        await report(async () => {
+        //await report(async () => {
             assert(((data === "qwerty") || (data === "1234567")), "check data");
             assert(((IP === "127.0.0.1") || (IP === "0.0.0.0")), "check ip");
             assert(port === 18108, "check port");
@@ -94,13 +95,23 @@ unit.test("multi udp", async () => {
             packets++;
             if (packets === 2)
                 sock1.close();
-        });
+        //});
     }, (error) => {
         unit.fail("recv failed: " + error);
     });
 
     await sock2.send("qwerty", {port: 18107});
     await sock2.send("1234567", {port: 18107});
+
+    let t0 = now();
+    while(true) {
+        await sleep(40);
+        if (packets >= 2)
+            break;
+        if (now() - t0 > 1000)
+            assert(false, "timeout");
+    }
+    assert(packets===2, "check received packets count");
 
     sock2.close();
 });
