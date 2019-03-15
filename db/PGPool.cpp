@@ -15,7 +15,7 @@
 
 #define htobe32(x) OSSwapHostToBigInt32(x)
 #define htole32(x) OSSwapHostToLittleInt32(x)
-#define be32toh(x) OSSwapBigToHostInt32(x):
+#define be32toh(x) OSSwapBigToHostInt32(x)
 #define le32toh(x) OSSwapLittleToHostInt32(x)
 
 #define htobe64(x) OSSwapHostToBigInt64(x)
