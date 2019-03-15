@@ -185,3 +185,12 @@ unit.test("multi udp 1000", async () => {
     await sock1.close();
     await sock2.close();
 });
+
+unit.test("udp reopen", async () => {
+    for (var i = 0; i < 100; ++i) {
+        let sock1 = udp.open({port: 18107}, (error) => {
+            unit.fail("open failed (i="+i+"): " + error);
+        });
+        await sock1.close();
+    }
+});
