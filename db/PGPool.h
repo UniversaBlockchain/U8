@@ -14,6 +14,7 @@
 #include "../crypto/base64.h"
 #include "../tools/tools.h"
 #include "../tools/ThreadPool.h"
+#include <unordered_map>
 
 namespace db {
 
