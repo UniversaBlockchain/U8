@@ -24,7 +24,7 @@ class TcpConnection {
      * @returns {Promise<void>}
      */
     async close() {
-        this._handle.close();
+        return this._handle.close();
     }
 
 }
@@ -143,7 +143,7 @@ class TLSConnection {
      * @returns {Promise<void>}
      */
     async close() {
-        this._handle.close();
+        return this._handle.close();
     }
 
 }
@@ -295,7 +295,7 @@ class UdpSocket {
      * @returns {Promise<void>}
      */
     async close() {
-        this._handle.close();
+        return this._handle.close();
     }
 }
 
