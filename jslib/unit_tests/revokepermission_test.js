@@ -6,10 +6,11 @@ import  * as perm from 'permissions'
 import  * as cnt from 'contract'
 import  * as tp from 'transactionpack'
 import * as t from 'tools'
+import * as tk from 'unit_tests/test_keys'
 
 
 unit.test("revoke permission serialization", async () => {
-    let k = await crypto.PrivateKey.generate(2048);
+    let k = tk.TestKeys.getKey();
     let role = new roles.SimpleRole("name",k.publicKey);
     role.keyAddresses.add(k.publicKey.shortAddress);
 
@@ -25,8 +26,8 @@ unit.test("revoke permission serialization", async () => {
 
 
 unit.test("revoke permission check", async () => {
-    let k = await crypto.PrivateKey.generate(2048);
-    let k2 = await crypto.PrivateKey.generate(2048);
+    let k = tk.TestKeys.getKey();
+    let k2 = tk.TestKeys.getKey();
 
     let c1 = cnt.Contract.fromPrivateKey(k);
     let role = new roles.SimpleRole("name",k2.publicKey.longAddress);

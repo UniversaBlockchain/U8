@@ -251,5 +251,14 @@ function convertToDate(data) {
         throw "can't convert " + JSON.stringify(data) + "to Date";
 }
 
+function randomBytes(count) {
+    var result  = new Uint8Array(count);
+    for(var i = 0;  i < count; ++i) {
+        result[i] = Math.floor(Math.random() * 256);
+    }
+
+}
+
+
 module.exports = {arraysEqual,valuesEqual,randomString, MemoiseMixin, PackedEqMixin,DigestEqMixin,GenericMap,THROW_EXCEPTIONS,
-    convertToDate};
+    convertToDate,randomBytes};

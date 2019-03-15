@@ -4,6 +4,7 @@ import  * as dbm from 'defaultbimapper'
 import  * as roles from 'roles'
 import * as t from 'tools'
 import * as cnt from 'contract'
+import * as tk from 'unit_tests/test_keys'
 
 
 
@@ -22,8 +23,8 @@ unit.test("link role serialization", async () => {
 
 
 unit.test("link role 1", async () => {
-    let k1 = await crypto.PrivateKey.generate(2048);
-    let k2 = await crypto.PrivateKey.generate(2048);
+    let k1 = tk.TestKeys.getKey();
+    let k2 = tk.TestKeys.getKey();
     let c = new cnt.Contract.fromPrivateKey(k1);
     let  rl = new roles.RoleLink("owner","issuer");
     c.registerRole(rl);
@@ -34,8 +35,8 @@ unit.test("link role 1", async () => {
 });
 
 unit.test("link role many", async () => {
-    let k1 = await crypto.PrivateKey.generate(2048);
-    let k2 = await crypto.PrivateKey.generate(2048);
+    let k1 = tk.TestKeys.getKey();
+    let k2 = tk.TestKeys.getKey();
     let c = new cnt.Contract.fromPrivateKey(k1);
     let  rl = new roles.RoleLink("owner","issuer");
     c.registerRole(rl);

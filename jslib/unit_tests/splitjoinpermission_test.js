@@ -6,11 +6,12 @@ import  * as perm from 'permissions'
 import  * as cnt from 'contract'
 import  * as tp from 'transactionpack'
 import * as t from 'tools'
+import * as tk from 'unit_tests/test_keys'
 
 
 
 unit.test("split join permission serialization", async () => {
-    let k = await crypto.PrivateKey.generate(2048);
+    let k = tk.TestKeys.getKey();
     let role = new roles.SimpleRole("name",k.publicKey);
     role.keyAddresses.add(k.publicKey.shortAddress);
 
@@ -26,8 +27,8 @@ unit.test("split join permission serialization", async () => {
 
 
 unit.test("split join permission split", async () => {
-    let k = await crypto.PrivateKey.generate(2048);
-    let k2 = await crypto.PrivateKey.generate(2048);
+    let k = tk.TestKeys.getKey();
+    let k2 = tk.TestKeys.getKey();
     let role = new roles.SimpleRole("name",k.publicKey.shortAddress);
     let sjp = new perm.SplitJoinPermission(role,{field_name:"amount",min_value:"0.0001",min_unit: "0.0001",join_match_fields: ["definition.data.key1"]});
 
@@ -60,8 +61,8 @@ unit.test("split join permission split", async () => {
 });
 
 unit.test("split join permission split no permission", async () => {
-    let k = await crypto.PrivateKey.generate(2048);
-    let k2 = await crypto.PrivateKey.generate(2048);
+    let k = tk.TestKeys.getKey();
+    let k2 = tk.TestKeys.getKey();
 
     let c = cnt.Contract.fromPrivateKey(k2);
     c.state.data.amount = "1000";
@@ -82,8 +83,8 @@ unit.test("split join permission split no permission", async () => {
 
 
 unit.test("split join permission join", async () => {
-    let k = await crypto.PrivateKey.generate(2048);
-    let k2 = await crypto.PrivateKey.generate(2048);
+    let k = tk.TestKeys.getKey();
+    let k2 = tk.TestKeys.getKey();
     let role = new roles.SimpleRole("name",k.publicKey.shortAddress);
     let sjp1 = new perm.SplitJoinPermission(role,{field_name:"amount",min_value:"0.0001",min_unit: "0.0001",join_match_fields: ["definition.data.key1"]});
     let sjp2 = new perm.SplitJoinPermission(role,{field_name:"amount",min_value:"0.0001",min_unit: "0.0001",join_match_fields: ["definition.data.key1"]});
@@ -124,8 +125,8 @@ unit.test("split join permission join", async () => {
 });
 
 unit.test("split join permission join no permission", async () => {
-    let k = await crypto.PrivateKey.generate(2048);
-    let k2 = await crypto.PrivateKey.generate(2048);
+    let k = tk.TestKeys.getKey();
+    let k2 = tk.TestKeys.getKey();
     let role = new roles.SimpleRole("name",k.publicKey.shortAddress);
     let sjp1 = new perm.SplitJoinPermission(role,{field_name:"amount",min_value:"0.0001",min_unit: "0.0001",join_match_fields: ["definition.data.key1"]});
 
@@ -155,8 +156,8 @@ unit.test("split join permission join no permission", async () => {
 
 
 unit.test("split join permission join no matching", async () => {
-    let k = await crypto.PrivateKey.generate(2048);
-    let k2 = await crypto.PrivateKey.generate(2048);
+    let k = tk.TestKeys.getKey();
+    let k2 = tk.TestKeys.getKey();
     let role = new roles.SimpleRole("name",k.publicKey.shortAddress);
     let sjp1 = new perm.SplitJoinPermission(role,{field_name:"amount",min_value:"0.0001",min_unit: "0.0001",join_match_fields: ["definition.data.key1"]});
 
@@ -215,8 +216,8 @@ unit.test("split join permission join no matching", async () => {
 
 
 unit.test("split join permission split/join", async () => {
-    let k = await crypto.PrivateKey.generate(2048);
-    let k2 = await crypto.PrivateKey.generate(2048);
+    let k = tk.TestKeys.getKey();
+    let k2 = tk.TestKeys.getKey();
     let role = new roles.SimpleRole("name",k.publicKey.shortAddress);
     let role2 = new roles.SimpleRole("name",k2.publicKey.shortAddress);
     let sjp1 = new perm.SplitJoinPermission(role,{field_name:"amount",min_value:"0.0001",min_unit: "0.0001",join_match_fields: ["definition.data.key1"]});

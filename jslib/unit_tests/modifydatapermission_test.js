@@ -6,9 +6,11 @@ import  * as perm from 'permissions'
 import  * as cnt from 'contract'
 import  * as tp from 'transactionpack'
 import * as t from 'tools'
+import * as tk from 'unit_tests/test_keys'
+
 
 unit.test("modify data permission serialization", async () => {
-    let k = await crypto.PrivateKey.generate(2048);
+    let k = tk.TestKeys.getKey();
     let role = new roles.SimpleRole("name",k.publicKey);
     role.keyAddresses.add(k.publicKey.shortAddress);
 
@@ -22,8 +24,8 @@ unit.test("modify data permission serialization", async () => {
 
 
 unit.test("modify data permission check whitelist", async () => {
-    let k = await crypto.PrivateKey.generate(2048);
-    let k2 = await crypto.PrivateKey.generate(2048);
+    let k = tk.TestKeys.getKey();
+    let k2 = tk.TestKeys.getKey();
     let role = new roles.SimpleRole("r123",k.publicKey.shortAddress);
 
     let mdp = new perm.ModifyDataPermission(role,{fields:{f1:null,f2:["123","asd123"]}});
@@ -56,8 +58,8 @@ unit.test("modify data permission check whitelist", async () => {
 
 
 unit.test("modify data permission check listed", async () => {
-    let k = await crypto.PrivateKey.generate(2048);
-    let k2 = await crypto.PrivateKey.generate(2048);
+    let k = tk.TestKeys.getKey();
+    let k2 = tk.TestKeys.getKey();
     let role = new roles.SimpleRole("r123",k.publicKey.shortAddress);
 
     let mdp = new perm.ModifyDataPermission(role,{fields:{f1:null,f2:["123","asd123"]}});

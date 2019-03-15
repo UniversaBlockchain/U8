@@ -27,6 +27,13 @@ function Context(base) {
     this.siblings = new Set();
 }
 
+/**
+ * Transactional is one of contract sections. It can be changed or even skipped freely across contract revisions
+ *
+ * @param contract {Contract} transactional is created for
+ * @constructor
+ */
+
 function Transactional(contract) {
     this.contract = contract;
     this.id = null;
@@ -72,6 +79,13 @@ Transactional.prototype.addConstraint = function(c) {
 };
 
 
+/**
+ * State is one of contract sections. It can be changed across contract revisions however changes
+ * are made strictly according to either global or permission-controlled rules
+ *
+ * @param contract {Contract} state is created for
+ * @constructor
+ */
 function State(contract) {
     bs.BiSerializable.call(this);
     this.contract = contract;
@@ -261,6 +275,12 @@ State.prototype.initializeWithDsl = function(root) {
     return this;
 };
 
+/**
+ * Definition is one of contract sections. It is immutable and can not be changed across contract revisions
+ *
+ * @param contract {Contract} definition is created for
+ * @constructor
+ */
 
 function Definition(contract) {
     bs.BiSerializable.call(this);
@@ -504,9 +524,10 @@ Definition.prototype.loadDslPermission = function(name, params) {
 };
 
 
-///////////////////////////
-//Contract
-///////////////////////////
+/**
+ * Universa contract
+ * @constructor
+ */
 
 function Contract() {
     this.revokingItems = new Set();
@@ -537,6 +558,19 @@ Contract.prototype = Object.create(bs.BiSerializable.prototype);
 Contract.testQuantaLimit = -1;
 Contract.JSAPI_SCRIPT_FIELD = "scripts";
 
+/**
+ * Creates a default empty new contract using a provided key as issuer and owner and sealer. Default expiration is
+ * set to 90 days.
+ * <p>
+ * This constructor adds key as sealing signature so it is ready to {@link #seal()} just after construction, thought
+ * it is necessary to put real data to it first. It is allowed to change owner, expiration and data fields after
+ * creation (but before sealing).
+ * <p>
+ * Change owner permission is added by default
+ * @param key for creating roles "issuer", "owner", "creator" and signing the contract
+ * @returns {Contract} created
+ */
+
 Contract.fromPrivateKey = function(key) {
     let c = new Contract();
     let now = new Date();
@@ -566,7 +600,7 @@ Contract.prototype.setOwnBinary = function(result) {
     }
 
     if(result.signatures.length === 0) {
-        result.salt = null; //TODO: 12 random bytes
+        result.salt = t.randomBytes(12);
     } else {
         delete  result.salt;
     }
@@ -580,8 +614,18 @@ Contract.prototype.setOwnBinary = function(result) {
             this.transactionPack.referencedItems.set(k,v);
         }
     }
-}
+};
 
+/**
+ * Extract contract from v2 or v3 sealed form, getting revoking and new items from sealed unicapsule and referenced items from
+ * the transaction pack supplied.
+ * <p>
+ * It is recommended to call {@link #check()} after construction to see the errors.
+ *
+ * @param sealed binary sealed contract.
+ * @param transactionPack   the transaction pack to resolve dependencies against.
+ * @returns {Contract} extracted contract
+ */
 Contract.fromSealedBinary = function(sealed,transactionPack) {
     let result = new Contract();
     if(!transactionPack)
@@ -705,6 +749,14 @@ Contract.prototype.findConstraintByNameInSection = function(name, section) {
     return null;
 };
 
+/**
+ * Get the named field in 'dotted' notation, e.g. 'state.data.name', or 'state.origin', 'definition.issuer' and so
+ * on.
+ *
+ * @param name of field to got value from
+ * @returns found value
+ */
+
 Contract.prototype.get = function(name) {
     let originalName = name;
     if (name.startsWith("definition.")) {
@@ -801,8 +853,16 @@ Contract.prototype.get = function(name) {
 
 };
 
+/**
+ * Seal contract to binary.
+ * This call adds signatures from {@link #Contract.keysToSignWith}
+ *
+ * @param isTransactionRoot indicates if contract is transaction root and  transaction pack should be created
+ * @return contract's sealed unicapsule
+ */
 
 Contract.prototype.seal = async function(isTransactionRoot) {
+
     let revokingIds = [];
     for(let ri of this.revokingItems) {
         revokingIds.push(ri.id);
@@ -942,6 +1002,14 @@ Contract.prototype.deserialize = function(data,deserializer) {
     }
 };
 
+
+/**
+ * Register new role for contract. If role with the same name already exists it will be replaced with new one
+ *
+ *
+ * @param role {Role} to register
+ * @returns {Role}
+ */
 Contract.prototype.registerRole = function(role) {
     this.roles[role.name] = role;
     role.contract = this;
@@ -957,6 +1025,15 @@ Contract.prototype.getRevokingItem = function(id) {
 
     return null;
 };
+
+/**
+ * Asynchronously adds signature to sealed binary of contract. Keeps contract data as it is it however changes its id.
+ *
+ * Useful if you got contracts from third-party and need to sign it.
+ * F.e. contracts that should be sign with two persons.
+ *
+ * @param x - is either key or {Array}/{Set} of keys to sign contract with
+ */
 
 Contract.prototype.addSignatureToSeal = async function(x) {
     let keys;
@@ -982,6 +1059,16 @@ Contract.prototype.addSignatureToSeal = async function(x) {
         await this.addSignatureBytesToSeal(signature,key.publicKey);
     }
 };
+
+
+/**
+ * Asynchronously adds pre-constructed signature to sealed binary of contract. Keeps contract data as it is it however changes its id.
+ *
+ * Useful if signature was constructed by third-party and needs to be added to contract.
+ *
+ * @param signature - pre-constructed signature bytes
+ * @param publicKey - key that corresponds to signature
+ */
 
 Contract.prototype.addSignatureBytesToSeal = async function(signature,publicKey) {
     if(this.sealedBinary == null)
@@ -1038,6 +1125,14 @@ Contract.prototype.equals = function(to) {
     return true;
 };
 
+
+/**
+ * Asynchronously checks contract filling the {@link Contract.errors}. Call it without params on root contract of transaction
+ *
+ * @param prefix - used for subsequent checks of children contracts
+ * @param contractsTree - used for subsequent checks of children contracts
+ * @returns {Promise<boolean>} indicating if check was successful
+ */
 
 Contract.prototype.check = async function(prefix,contractsTree) {
     if(typeof prefix === "undefined")
@@ -1193,10 +1288,21 @@ Contract.prototype.checkTestPaymentLimitations = function() {
     return res;
 };
 
+
+/**
+ * Calculates transaction processing cost in U
+ * @returns {number} - transaction processing const in U
+ */
+
 Contract.prototype.getProcessedCostU = function() {
     return Math.ceil( this.quantiser.quantaSum_ / Quantiser.quantaPerU);
 };
 
+
+/**
+ * Get contract expiration time
+ * @returns {Date} contract expiration time
+ */
 
 Contract.prototype.getExpiresAt = function() {
     return this.state.expiresAt != null ? this.state.expiresAt : this.definition.expiresAt;
@@ -1350,6 +1456,12 @@ Contract.prototype.checkChangedContract = function() {
     }
 };
 
+
+/**
+ * Get contract origin
+ * @returns {crypto.HashId} contract origin
+ */
+
 Contract.prototype.getOrigin = function() {
     if(this.state.origin == null) {
         return this.id;
@@ -1357,6 +1469,13 @@ Contract.prototype.getOrigin = function() {
         return this.state.origin;
     }
 };
+
+
+
+/**
+ * Collects references items across the contract
+ * @returns {Set<Contract>} references items
+ */
 
 Contract.prototype.getReferencedItems = function() {
 
@@ -1649,12 +1768,21 @@ Contract.prototype.verifySealedKeys = async function(isQuantise) {
     this.isNeedVerifySealedKeys = false;
 };
 
+
+
 Contract.prototype.copy = function() {
     let bbm = BossBiMapper.getInstance();
 
     return bbm.deserialize(bbm.serialize(this));
 
 };
+
+/**
+ *
+ * @param keys {Array<crypto.PrivateKey>} or {Set<crypto.PrivateKey>} of creator keys for new revision
+ * @returns {Contract} new revision of a contract
+ */
+
 Contract.prototype.createRevision = function(keys) {
     let newRevision = this.copy();
 
@@ -1691,6 +1819,12 @@ Contract.prototype.createRevision = function(keys) {
     return newRevision;
 };
 
+/**
+ * Split contract into several branches
+ *
+ * @param count {number} of contracts to split from current.
+ * @returns {Array<Contract>} of contracts split
+ */
 
 Contract.prototype.split = function(count) {
     // we can split only the new revision and only once this time

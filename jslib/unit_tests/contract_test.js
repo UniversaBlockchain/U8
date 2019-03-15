@@ -8,11 +8,12 @@ import  * as cnt from 'contract'
 import  * as tp from 'transactionpack'
 import * as t from 'tools'
 import * as d from 'deltas'
+import * as tk from 'unit_tests/test_keys'
 
 
 
 unit.test("contract copy test", async () => {
-    let k = await crypto.PrivateKey.generate(2048);
+    let k = tk.TestKeys.getKey();
     let c1 = cnt.Contract.fromPrivateKey(k);
 
 

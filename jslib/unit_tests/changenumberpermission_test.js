@@ -6,10 +6,10 @@ import  * as perm from 'permissions'
 import  * as cnt from 'contract'
 import  * as tp from 'transactionpack'
 import * as t from 'tools'
-
+import * as tk from 'unit_tests/test_keys'
 
 unit.test("change number permission serialization", async () => {
-    let k = await crypto.PrivateKey.generate(2048);
+    let k = tk.TestKeys.getKey();
     let role = new roles.SimpleRole("name",k.publicKey);
     role.keyAddresses.add(k.publicKey.shortAddress);
     let cnp = new perm.ChangeNumberPermission(role,{field_name:"field1",min_step: -1, max_step: 2, min_value:500, max_value: 1000});
@@ -22,7 +22,7 @@ unit.test("change number permission serialization", async () => {
 });
 
 unit.test("change number permission step", async () => {
-    let k = await crypto.PrivateKey.generate(2048);
+    let k = tk.TestKeys.getKey();
     let role = new roles.SimpleRole("name",k.publicKey);
     role.keyAddresses.add(k.publicKey.shortAddress);
 
@@ -69,7 +69,7 @@ unit.test("change number permission step", async () => {
 
 
 unit.test("change number permission value", async () => {
-    let k = await crypto.PrivateKey.generate(2048);
+    let k = tk.TestKeys.getKey();
     let role = new roles.SimpleRole("name",k.publicKey);
     role.keyAddresses.add(k.publicKey.shortAddress);
 

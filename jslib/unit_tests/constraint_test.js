@@ -8,6 +8,7 @@ import * as constr from 'constraint'
 import * as t from 'tools'
 import * as d from 'deltas'
 import * as io from 'io'
+import * as tk from 'unit_tests/test_keys'
 
 const ROOT_PATH = "../test/constraints/";
 
@@ -39,7 +40,7 @@ unit.test("constraint copy test", () => {
 
 unit.test("constraint test: simple check", async () => {
 
-    let privateKey = await crypto.PrivateKey.generate(2048);
+    let privateKey = tk.TestKeys.getKey();
     let contractBase = Contract.fromPrivateKey(privateKey);
 
     contractBase.state.data["str_val"] = "~~~ simple string! ===";
@@ -129,12 +130,12 @@ unit.test("constraint test: simple check", async () => {
 
 unit.test("constraint test: refLessOrEquals", async () => {
 
-    let privateKey = await crypto.PrivateKey.generate(2048);
+    let privateKey = tk.TestKeys.getKey();
     let contractA = Contract.fromPrivateKey(privateKey);
 
     contractA.state.data["val"] = 100;
 
-    let contractB = Contract.fromPrivateKey(await crypto.PrivateKey.generate(2048));
+    let contractB = Contract.fromPrivateKey(tk.TestKeys.getKey());
 
     let c = new constr.Constraint(null);
     c.type = constr.Constraint.TYPE_EXISTING_STATE;
@@ -144,7 +145,7 @@ unit.test("constraint test: refLessOrEquals", async () => {
 
     contractB.addConstraint(c);
 
-    let batch = Contract.fromPrivateKey(await crypto.PrivateKey.generate(2048));
+    let batch = Contract.fromPrivateKey(tk.TestKeys.getKey());
 
     batch.newItems.add(contractA);
     batch.newItems.add(contractB);
@@ -157,12 +158,12 @@ unit.test("constraint test: refLessOrEquals", async () => {
 
 unit.test("constraint test: refMissingField", async () => {
 
-    let privateKey = await crypto.PrivateKey.generate(2048);
+    let privateKey = tk.TestKeys.getKey();
     let contractA = Contract.fromPrivateKey(privateKey);
 
     contractA.state.data["another_val"] = 100;
 
-    let contractB = Contract.fromPrivateKey(await crypto.PrivateKey.generate(2048));
+    let contractB = Contract.fromPrivateKey(tk.TestKeys.getKey());
 
     let c = new constr.Constraint(null);
     c.type = constr.Constraint.TYPE_EXISTING_STATE;
@@ -172,7 +173,7 @@ unit.test("constraint test: refMissingField", async () => {
 
     contractB.addConstraint(c);
 
-    let batch = Contract.fromPrivateKey(await crypto.PrivateKey.generate(2048));
+    let batch = Contract.fromPrivateKey(tk.TestKeys.getKey());
 
     batch.newItems.add(contractA);
     batch.newItems.add(contractB);
@@ -185,12 +186,12 @@ unit.test("constraint test: refMissingField", async () => {
 
 unit.test("constraint test: refMissingFieldConstantForEquals", async () => {
 
-    let privateKey = await crypto.PrivateKey.generate(2048);
+    let privateKey = tk.TestKeys.getKey();
     let contractA = Contract.fromPrivateKey(privateKey);
 
     contractA.state.data["another_val"] = 100;
 
-    let contractB = Contract.fromPrivateKey(await crypto.PrivateKey.generate(2048));
+    let contractB = Contract.fromPrivateKey(tk.TestKeys.getKey());
 
     let c = new constr.Constraint(null);
     c.type = constr.Constraint.TYPE_EXISTING_STATE;
@@ -203,7 +204,7 @@ unit.test("constraint test: refMissingFieldConstantForEquals", async () => {
 
     contractB.addConstraint(c);
 
-    let batch = Contract.fromPrivateKey(await crypto.PrivateKey.generate(2048));
+    let batch = Contract.fromPrivateKey(tk.TestKeys.getKey());
 
     batch.newItems.add(contractA);
     batch.newItems.add(contractB);
@@ -216,12 +217,12 @@ unit.test("constraint test: refMissingFieldConstantForEquals", async () => {
 
 unit.test("constraint test: refMissingFieldHashIdForEquals", async () => {
 
-    let privateKey = await crypto.PrivateKey.generate(2048);
+    let privateKey = tk.TestKeys.getKey();
     let contractA = Contract.fromPrivateKey(privateKey);
 
     contractA.state.data["another_val"] = 100;
 
-    let contractB = Contract.fromPrivateKey(await crypto.PrivateKey.generate(2048));
+    let contractB = Contract.fromPrivateKey(tk.TestKeys.getKey());
     let c = new constr.Constraint(null);
     c.type = constr.Constraint.TYPE_EXISTING_STATE;
     let conditions = {};
@@ -230,7 +231,7 @@ unit.test("constraint test: refMissingFieldHashIdForEquals", async () => {
 
     contractB.addConstraint(c);
 
-    let batch = Contract.fromPrivateKey(await crypto.PrivateKey.generate(2048));
+    let batch = Contract.fromPrivateKey(tk.TestKeys.getKey());
 
     batch.newItems.add(contractA);
     batch.newItems.add(contractB);
@@ -243,12 +244,12 @@ unit.test("constraint test: refMissingFieldHashIdForEquals", async () => {
 
 unit.test("constraint test: refMissingFieldRoleForEquals", async () => {
 
-    let privateKey = await crypto.PrivateKey.generate(2048);
+    let privateKey = tk.TestKeys.getKey();
     let contractA = Contract.fromPrivateKey(privateKey);
 
     contractA.state.data["another_val"] = 100;
 
-    let contractB = Contract.fromPrivateKey(await crypto.PrivateKey.generate(2048));
+    let contractB = Contract.fromPrivateKey(tk.TestKeys.getKey());
     let c = new constr.Constraint(null);
     c.type = constr.Constraint.TYPE_EXISTING_STATE;
     let conditions = {};
@@ -257,7 +258,7 @@ unit.test("constraint test: refMissingFieldRoleForEquals", async () => {
 
     contractB.addConstraint(c);
 
-    let batch = Contract.fromPrivateKey(await crypto.PrivateKey.generate(2048));
+    let batch = Contract.fromPrivateKey(tk.TestKeys.getKey());
     batch.newItems.add(contractA);
     batch.newItems.add(contractB);
     await batch.seal();
@@ -269,12 +270,12 @@ unit.test("constraint test: refMissingFieldRoleForEquals", async () => {
 
 unit.test("constraint test: refMissingFieldDateTimeForEquals", async () => {
 
-    let privateKey = await crypto.PrivateKey.generate(2048);
+    let privateKey = tk.TestKeys.getKey();
     let contractA = Contract.fromPrivateKey(privateKey);
 
     contractA.state.data["another_val"] = 100;
 
-    let contractB = Contract.fromPrivateKey(await crypto.PrivateKey.generate(2048));
+    let contractB = Contract.fromPrivateKey(tk.TestKeys.getKey());
     let c = new constr.Constraint(null);
     c.type = constr.Constraint.TYPE_EXISTING_STATE;
     let conditions = {};
@@ -283,7 +284,7 @@ unit.test("constraint test: refMissingFieldDateTimeForEquals", async () => {
 
     contractB.addConstraint(c);
 
-    let batch = Contract.fromPrivateKey(await crypto.PrivateKey.generate(2048));
+    let batch = Contract.fromPrivateKey(tk.TestKeys.getKey());
     batch.newItems.add(contractA);
     batch.newItems.add(contractB);
     await batch.seal();
