@@ -9,10 +9,13 @@
 #include "../tools/tools.h"
 #include "../AsyncIO/IOFile.h"
 #include "../AsyncIO/IOTCP.h"
+#include "../AsyncIO/IOTLS.h"
 
 static Persistent<FunctionTemplate> FileTemplate;
 static Persistent<FunctionTemplate> TCPTemplate;
+static Persistent<FunctionTemplate> TLSTemplate;
 static Persistent<FunctionTemplate> UDPTemplate;
+
 
 void JsAsyncGetErrorText(const FunctionCallbackInfo<Value> &args) {
     Scripter::unwrap(args, [&](const shared_ptr<Scripter> &se, auto isolate, auto context) {
@@ -252,6 +255,106 @@ void JsAsyncTCPAccept(const FunctionCallbackInfo<Value> &args) {
     });
 }
 
+//void open(const char* IP, unsigned int port, const char* certFilePath, const char* keyFilePath,
+//          openTCP_cb callback, int maxConnections = SOMAXCONN);
+void JsAsyncTLSListen(const FunctionCallbackInfo<Value> &args) {
+    Scripter::unwrapArgs(args, [&](ArgsContext &ac) {
+        auto scripter = ac.scripter;
+        if (args.Length() == 6) {
+            if (!ac.args[4]->IsFunction()) {
+                scripter->throwError("invalid callback");
+                return;
+            }
+            auto handle = unwrap<asyncio::IOTLS>(args.This());
+            auto isolate = ac.isolate;
+            Persistent<Function> *onReady = new Persistent<Function>(ac.isolate, ac.as<Function>(4));
+            int maxConnections = ac.asInt(5);
+            if (maxConnections <= 0) maxConnections = SOMAXCONN;
+            handle->open(ac.asString(0).data(), ac.asInt(1),ac.asString(2).data(),ac.asString(3).data(), [=](ssize_t result) {
+                scripter->lockedContext([=](auto context) {
+                    auto fn = onReady->Get(isolate);
+                    delete onReady;
+                    Local<Value> jsResult = Integer::New(isolate, result);
+                    fn->Call(fn, 1, &jsResult);
+                });
+            }, maxConnections);
+        } else {
+            scripter->throwError("invalid number of arguments");
+        }
+    });
+}
+
+//void connect(const char* bindIP, unsigned int bindPort, const char* IP, unsigned int port,
+//             const char* certFilePath, const char* keyFilePath, connect_cb callback, unsigned int timeout = 5000);
+void JsAsyncTLSConnect(const FunctionCallbackInfo<Value> &args) {
+    Scripter::unwrapArgs(args, [&](ArgsContext &ac) {
+        auto scripter = ac.scripter;
+        if (args.Length() == 8) {
+            if (!ac.args[6]->IsFunction()) {
+                scripter->throwError("invalid callback");
+                return;
+            }
+            auto handle = unwrap<asyncio::IOTLS>(args.This());
+            auto isolate = ac.isolate;
+            Persistent<Function> *onReady = new Persistent<Function>(ac.isolate, ac.as<Function>(6));
+            auto bindIp = ac.asString(0);
+            auto bindPort = ac.asInt(1);
+            auto connectToHost = ac.asString(2);
+            auto connectToPort = ac.asInt(3);
+            auto timeout = ac.asInt(7);
+
+            handle->connect(bindIp.data(), bindPort, connectToHost.data(), connectToPort, ac.asString(4).data(), ac.asString(5).data(), [=](ssize_t result) {
+                scripter->lockedContext([=](auto context) {
+                    auto fn = onReady->Get(isolate);
+                    delete onReady;
+                    Local<Value> jsResult = Integer::New(isolate, result);
+                    fn->Call(fn, 1, &jsResult);
+                });
+            }, timeout);
+        } else {
+            scripter->throwError("invalid number of arguments");
+        }
+    });
+}
+
+//int acceptFromListeningSocket(IOTLS* listenSocket, accept_cb callback, unsigned int timeout);
+//typedef std::function<void(IOTLS* handle, ssize_t result)> accept_cb;
+void JsAsyncTLSAccept(const FunctionCallbackInfo<Value> &args) {
+    Scripter::unwrapArgs(args, [&](ArgsContext &ac) {
+        auto scripter = ac.scripter;
+        if (args.Length() == 3) {
+            if (!ac.args[1]->IsFunction()) {
+                scripter->throwError("invalid callback");
+                return;
+            }
+
+            auto obj = ac.as<Object>(0);
+            auto tpl = TLSTemplate.Get(ac.isolate);
+            if (!obj->IsObject() || !tpl->HasInstance(obj)) {
+                ac.throwError("required IOTLS argument");
+                return;
+            }
+
+            auto serverHandle = unwrap<asyncio::IOTLS>(args.This());
+            auto isolate = ac.isolate;
+            Persistent<Function> *onReady = new Persistent<Function>(ac.isolate, ac.as<Function>(1));
+            auto connectionHandle = unwrap<asyncio::IOTLS>(obj);
+            auto timeout = ac.asInt(2);
+            int code = serverHandle->acceptFromListeningSocket(connectionHandle, [=](asyncio::IOTLS* handle, ssize_t result) {
+                scripter->lockedContext([=](auto context) {
+                    auto fn = onReady->Get(isolate);
+                    delete onReady;
+                    Local<Value> jsResult = Integer::New(isolate, result);
+                    fn->Call(fn, 1, &jsResult);
+                });
+            }, timeout);
+            ac.setReturnValue(code);
+        } else {
+            scripter->throwError("invalid number of arguments");
+        }
+    });
+}
+
 // UDP open         0                1
 // void open(const char* IP, unsigned int port)
 void JsAsyncUDPOpen(const FunctionCallbackInfo<Value> &args) {
@@ -446,6 +549,28 @@ void JsInitIOTCP(Isolate *isolate, const Local<ObjectTemplate> &global) {
     // register it into global namespace
     TCPTemplate.Reset(isolate, tpl);
     global->Set(isolate, "IOTCP", tpl);
+}
+
+void JsInitIOTLS(Isolate *isolate, const Local<ObjectTemplate> &global) {
+    // Bind object with default constructor
+    Local<FunctionTemplate> tpl = bindCppClass<asyncio::IOTLS>(isolate, "IOTLS");
+
+    // instance methods
+    auto prototype = tpl->PrototypeTemplate();
+    prototype->Set(isolate, "version", String::NewFromUtf8(isolate, "0.0.1"));
+    prototype->Set(isolate, "_read_raw", FunctionTemplate::New(isolate, JsAsyncHandleRead));
+    prototype->Set(isolate, "_write_raw", FunctionTemplate::New(isolate, JsAsyncHandleWrite));
+    prototype->Set(isolate, "_close_raw", FunctionTemplate::New(isolate, JsAsyncHandleClose));
+    prototype->Set(isolate, "_listen", FunctionTemplate::New(isolate, JsAsyncTLSListen));
+    prototype->Set(isolate, "_connect", FunctionTemplate::New(isolate, JsAsyncTLSConnect));
+    prototype->Set(isolate, "_accept", FunctionTemplate::New(isolate, JsAsyncTLSAccept));
+
+    // class methods
+    tpl->Set(isolate, "getErrorText", FunctionTemplate::New(isolate, JsAsyncGetErrorText));
+
+    // register it into global namespace
+    TLSTemplate.Reset(isolate, tpl);
+    global->Set(isolate, "IOTLS", tpl);
 }
 
 void JsInitIOUDP(Isolate *isolate, const Local<ObjectTemplate> &global) {

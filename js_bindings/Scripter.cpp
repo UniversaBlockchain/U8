@@ -135,6 +135,7 @@ void Scripter::initialize() {
 
     JsInitIOFile(pIsolate, global);
     JsInitIOTCP(pIsolate, global);
+    JsInitIOTLS(pIsolate, global);
     JsInitIOUDP(pIsolate, global);
     JsInitCrypto(pIsolate,global);
 

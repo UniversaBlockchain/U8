@@ -1,5 +1,5 @@
 import {expect, assert, assertSilent, unit} from 'test'
-import {tcp, udp} from 'network'
+import {tcp, tls, udp} from 'network'
 import {now} from 'timers'
 
 async function reportErrors(block) {
@@ -19,7 +19,7 @@ unit.test("simple tcp", async () => {
         await reportErrors(async () => {
             serverReads = await connection.input.readLine();
             await connection.output.write("hello!\n");
-            connection.close();
+            await connection.close();
         });
     };
 
@@ -32,7 +32,33 @@ unit.test("simple tcp", async () => {
     let ss = chomp(await conn.input.allAsString());
     expect.equal(ss, "hello!");
     expect.equal(serverReads, "foobar");
-    server.close();
+    await server.close();
+});
+
+unit.test("simple tls", async () => {
+
+    let server = tls.listen({port: 23103, certFilePath: "../test/server-cert.pem", keyFilePath: "../test/server-key.pem"});
+    let serverReads;
+
+    let connectionProcessor = async (connection) => {
+        await reportErrors(async () => {
+            serverReads = await connection.input.readLine();
+            await connection.output.write("hello!\n");
+            await connection.close();
+        });
+    };
+
+    server.accept(connectionProcessor, (error) => {
+        unit.fail("accept failed: " + error);
+    });
+
+    let conn = await tls.connect({host: "127.0.0.1", port: 23103, certFilePath: "../test/server-cert.pem", keyFilePath: "../test/server-key.pem"});
+
+    await conn.output.write("foobar\n");
+    let ss = chomp(await conn.input.allAsString());
+    expect.equal(ss, "hello!");
+    expect.equal(serverReads, "foobar");
+    await server.close();
 });
 
 unit.test("simple udp", async () => {
