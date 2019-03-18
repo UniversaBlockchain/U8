@@ -10,55 +10,63 @@ async function reportErrors(block) {
     }
 }
 
-unit.test("simple tcp", async () => {
+unit.test("multi tcp", async () => {
 
-    let server = tcp.listen({port: 23102});
-    let serverReads;
+    for (let i = 0; i < 10; i++)
+    {
+        let server = tcp.listen({port: 23102});
+        let serverReads;
 
-    let connectionProcessor = async (connection) => {
-        await reportErrors(async () => {
-            serverReads = await connection.input.readLine();
-            await connection.output.write("hello!\n");
-            await connection.close();
+        let connectionProcessor = async (connection) => {
+            await reportErrors(async () => {
+                serverReads = await connection.input.readLine();
+                await connection.output.write("hello!\n");
+                await connection.close();
+            });
+        };
+
+        server.accept(connectionProcessor, (error) => {
+            unit.fail("accept failed: " + error);
         });
-    };
 
-    server.accept(connectionProcessor, (error) => {
-        unit.fail("accept failed: " + error);
-    });
-
-    let conn = await tcp.connect({host: "127.0.0.1", port: 23102});
-    await conn.output.write("foobar\n");
-    let ss = chomp(await conn.input.allAsString());
-    expect.equal(ss, "hello!");
-    expect.equal(serverReads, "foobar");
-    await server.close();
+        let conn = await tcp.connect({host: "127.0.0.1", port: 23102});
+        await conn.output.write("foobar\n");
+        let ss = chomp(await conn.input.allAsString());
+        expect.equal(ss, "hello!");
+        expect.equal(serverReads, "foobar");
+        await conn.close();
+        await server.close();
+    }
 });
 
-unit.test("simple tls", async () => {
+unit.test("multi tls", async () => {
 
-    let server = tls.listen({port: 23103, certFilePath: "../test/server-cert.pem", keyFilePath: "../test/server-key.pem"});
-    let serverReads;
+    for (let i = 0; i < 10; i++)
+    {
+        let server = tls.listen({port: 24103, certFilePath: "../test/server-cert.pem", keyFilePath: "../test/server-key.pem"});
+        let serverReads;
 
-    let connectionProcessor = async (connection) => {
-        await reportErrors(async () => {
-            serverReads = await connection.input.readLine();
-            await connection.output.write("hello!\n");
-            await connection.close();
+        let connectionProcessor = async (connection) => {
+            await reportErrors(async () => {
+                serverReads = await connection.input.readLine();
+                await connection.output.write("hello!\n");
+                await connection.close();
+            });
+        };
+
+        server.accept(connectionProcessor, (error) => {
+            unit.fail("accept failed: " + error);
         });
-    };
 
-    server.accept(connectionProcessor, (error) => {
-        unit.fail("accept failed: " + error);
-    });
+        let conn = await tls.connect({host: "127.0.0.1", port: 24103, certFilePath: "../test/server-cert.pem", keyFilePath: "../test/server-key.pem"});
 
-    let conn = await tls.connect({host: "127.0.0.1", port: 23103, certFilePath: "../test/server-cert.pem", keyFilePath: "../test/server-key.pem"});
-
-    await conn.output.write("foobar\n");
-    let ss = chomp(await conn.input.allAsString());
-    expect.equal(ss, "hello!");
-    expect.equal(serverReads, "foobar");
-    await server.close();
+        await conn.output.write("foobar\n");
+        let ss = chomp(await conn.input.allAsString());
+        expect.equal(ss, "hello!");
+        expect.equal(serverReads, "foobar");
+        await conn.close();
+        await server.close();
+    }
 });
 
 unit.test("simple udp", async () => {

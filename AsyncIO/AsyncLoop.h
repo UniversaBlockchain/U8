@@ -21,6 +21,11 @@ namespace asyncio {
         ~AsyncLoop();
 
         /**
+         * stop asynchronous loop
+         */
+        void stop();
+
+        /**
          * schedule a task: execute a block in async loop thread
          * @param block lambda to execute.
          */

@@ -37,6 +37,11 @@ namespace asyncio {
         }
     }
 
+    void IOTCP::stopOwnLoop() {
+        if (ownLoop)
+            aloop->stop();
+    }
+
     void IOTCP::freeRequest() {
         if (ioTCPSoc) {
             if (ioTCPSoc->data) {
@@ -310,6 +315,7 @@ namespace asyncio {
 
         socket_data->callback = std::move(callback);
         socket_data->connReset = connReset;
+        socket_data->handle = this;
 
         auto handle = (uv_handle_t*) ioTCPSoc;
 
@@ -466,6 +472,9 @@ namespace asyncio {
         ((TCPSocket_data*) handle->data)->close = nullptr;
 
         socket_data->callback(socket_data->connReset ? UV_ECONNRESET : 0);
+
+        if (socket_data->handle)
+            ((IOTCP*) socket_data->handle)->stopOwnLoop();
 
         delete socket_data;
     }
