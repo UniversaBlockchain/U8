@@ -541,7 +541,7 @@ TEST_CASE("PGPool") {
         cout << "multi insert: " << getCurrentTimeMillis()-t1 << " ms" << endl;
     }
 
-    /*SECTION("performance: select line-by-line vs array in 'where'") {
+    SECTION("performance: select line-by-line vs array in 'where'") {
         const int ROWS_COUNT = 50000;
         const int INSERT_BUF_SIZE = 20;
         const int SELECTS_COUNT = ROWS_COUNT/10;
@@ -551,6 +551,8 @@ TEST_CASE("PGPool") {
         std::minstd_rand  minstdRand(std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now().time_since_epoch()).count());
 
         vector<HashId> hashes;
+        for (int i = 0; i < ROWS_COUNT; ++i)
+            hashes.push_back(HashId::createRandom());
         for (int i = 0; i < ROWS_COUNT/INSERT_BUF_SIZE; ++i) {
             pgPool.withConnection([&hashes,i,&sem,&readyCounter](db::BusyConnection&& con){
                 string query = "INSERT INTO table1(hash,state,locked_by_id,created_at,expires_at) VALUES ";
@@ -558,7 +560,6 @@ TEST_CASE("PGPool") {
                 for (int j = 0; j < INSERT_BUF_SIZE; ++j) {
                     char buf[64];
                     snprintf(buf, sizeof(buf), "($%i,$%i,0,$%i,$%i)", j*4+1, j*4+2, j*4+3, j*4+4);
-                    hashes.push_back(HashId::createRandom());
                     params.push_back(hashes.at(i*INSERT_BUF_SIZE+j).getDigest());
                     params.push_back(i*INSERT_BUF_SIZE+j);
                     params.push_back((int)getCurrentTimeMillis() / 1000);
@@ -639,7 +640,7 @@ TEST_CASE("PGPool") {
         for (int i = 0; i < SELECTS_COUNT; ++i)
             sem2.wait();
         cout << "batch selects: " << getCurrentTimeMillis()-t1 << " ms" << endl;
-    }*/
+    }
 
     SECTION("withConnection") {
         Semaphore sem;
