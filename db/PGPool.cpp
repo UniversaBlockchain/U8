@@ -51,6 +51,10 @@ namespace db {
         return PQntuples(pgRes_.get());
     }
 
+    int QueryResult::getAffectedRows() {
+        return std::stoi(PQcmdTuples(pgRes_.get()));
+    }
+
     byte_vector QueryResult::getValueByIndex(int rowNum, int colIndex) {
         char* p = PQgetvalue(pgRes_.get(), rowNum, colIndex);
         int len = PQgetlength(pgRes_.get(), rowNum, colIndex);
@@ -137,7 +141,93 @@ namespace db {
         return bytesToString(val);
     }
 
-    PGPool::PGPool(int poolSize, const std::string& connectString) : threadPool_(poolSize) {
+    BusyConnection::~BusyConnection() {
+        parent_.releaseConnection(con_);
+    }
+
+    void BusyConnection::executeQueryArr(ExecuteSuccessCallback onSuccess, ExecuteErrorCallback onError, const std::string& queryString, std::vector<std::any>& params) {
+        const char *values[params.size()];
+        int lengths[params.size()];
+        int binaryFlags[params.size()];
+        vector<shared_ptr<byte_vector>> bytesHolder;
+        auto addByteVector = [&bytesHolder,&values,&lengths,&binaryFlags](int i, std::shared_ptr<byte_vector> ps) {
+            bytesHolder.push_back(ps);
+            byte_vector &bv = *ps;
+            values[i] = (char *) &bv[0];
+            lengths[i] = bv.size();
+            binaryFlags[i] = 1;
+        };
+        for (int i = 0; i < params.size(); ++i) {
+            auto &val = params[i];
+            if (val.type() == typeid(byte_vector)) {
+                auto ps = make_shared<byte_vector>(std::any_cast<byte_vector>(val));
+                addByteVector(i, ps);
+            } else if (val.type() == typeid(const char *)) {
+                auto v = std::any_cast<const char *>(val);
+                auto ps = make_shared<byte_vector>(v, v+strlen(v));
+                addByteVector(i, ps);
+            } else if (val.type() == typeid(std::string)) {
+                auto v = std::any_cast<std::string>(val);
+                auto ps = make_shared<byte_vector>(v.begin(), v.end());
+                addByteVector(i, ps);
+            } else if (val.type() == typeid(int)) {
+                auto v = std::any_cast<int>(val);
+                v = htobe32(v);
+                addByteVector(i, make_shared<byte_vector>((char*)&v, ((char*)&v)+sizeof(int)));
+            } else if (val.type() == typeid(long)) {
+                auto v = std::any_cast<long>(val);
+                v = htobe64(v);
+                addByteVector(i, make_shared<byte_vector>((char*)&v, ((char*)&v)+sizeof(long)));
+            } else if (val.type() == typeid(long long)) {
+                auto v = std::any_cast<long long>(val);
+                v = htobe64(v);
+                addByteVector(i, make_shared<byte_vector>((char*)&v, ((char*)&v)+sizeof(long long)));
+            } else if (val.type() == typeid(bool)) {
+                auto v = std::any_cast<bool>(val);
+                addByteVector(i, make_shared<byte_vector>((char*)&v, ((char*)&v)+sizeof(bool)));
+            } else if (val.type() == typeid(double)) {
+                auto v = std::any_cast<double>(val);
+                long long lv = htobe64(*(long long*)&v);
+                v = *(double*)&lv;
+                addByteVector(i, make_shared<byte_vector>((char*)&v, ((char*)&v)+sizeof(double)));
+            } else {
+                std::cerr << "PGPool.execParams error: wrong type: " << val.type().name() << std::endl;
+            }
+        }
+        PQsendQueryParams(conPtr(), queryString.c_str(), params.size(), nullptr, values, lengths, binaryFlags, 1);
+        PQflush(conPtr());
+        QueryResultsArr results;
+        while (true) {
+            pg_result *r = PQgetResult(conPtr());
+            if (r == nullptr)
+                break;
+            results.push_back(QueryResult(r));
+        }
+        if (results.size() == 0) {
+            onError("PGPool.executeQuery error: your sql query returns no result, use updateQuery instead.");
+            return;
+        }
+        if (results.size() > 1) {
+            onError("PGPool.executeQuery error: your sql query returns "+std::to_string(results.size())+" results, bun only 1 is supported.");
+            return;
+        }
+        if (results[0].isError()) {
+            onError("PGPool.executeQuery error: postgres error: " + std::string(results[0].getErrorText()));
+            return;
+        }
+        onSuccess(std::move(results[0]));
+    }
+
+    void BusyConnection::updateQueryArr(UpdateSuccessCallback onSuccess, UpdateErrorCallback onError, const std::string& queryString, std::vector<std::any>& params) {
+        executeQueryArr(
+            [&onSuccess](QueryResult&& qr){onSuccess(qr.getAffectedRows());},
+            [&onError](const string& errText){onError(errText);},
+            queryString,
+            params
+        );
+    }
+
+    PGPool::PGPool(int poolSize, const std::string& connectString) : threadPool_(poolSize), usedConnectionsCount_(0) {
         for (int i = 0; i < poolSize; ++i) {
             std::shared_ptr<PGconn> con;
             con.reset(PQconnectdb(connectString.c_str()), &PQfinish);
@@ -157,78 +247,28 @@ namespace db {
         }
     }
 
-    void PGPool::exec(const std::string &query, QueryCallback callback) {
-        threadPool_.execute([callback, query, this]() {
-            BusyConnection bc(*this, getUnusedConnection());
-            PQsendQuery(bc.con.get(), query.c_str());
-            PQflush(bc.con.get());
-            QueryResultsArr results;
-            while (true) {
-                pg_result *r = PQgetResult(bc.con.get());
-                if (r == nullptr)
-                    break;
-                results.push_back(QueryResult(r));
-            }
-            callback(results);
+    void PGPool::withConnection(WithConnectionCallback callback) {
+        threadPool_.execute([callback, this]() {
+            callback(BusyConnection(*this, getUnusedConnection()));
         });
     }
 
-    void PGPool::execParamsArr(const std::string &query, QueryCallback callback, std::vector<std::any>& params) {
-        threadPool_.execute([params,query,callback,this](){
+    size_t PGPool::totalConnections() {
+        return threadPool_.countThreads();
+    }
+
+    size_t PGPool::availableConnections() {
+        return totalConnections() - usedConnectionsCount_;
+    }
+
+    void PGPool::exec(const std::string &query, QueryCallback callback) {
+        threadPool_.execute([callback, query, this]() {
             BusyConnection bc(*this, getUnusedConnection());
-            const char *values[params.size()];
-            int lengths[params.size()];
-            int binaryFlags[params.size()];
-            vector<shared_ptr<byte_vector>> bytesHolder;
-            auto addByteVector = [&bytesHolder,&values,&lengths,&binaryFlags](int i, std::shared_ptr<byte_vector> ps) {
-                bytesHolder.push_back(ps);
-                byte_vector &bv = *ps;
-                values[i] = (char *) &bv[0];
-                lengths[i] = bv.size();
-                binaryFlags[i] = 1;
-            };
-            for (int i = 0; i < params.size(); ++i) {
-                auto &val = params[i];
-                if (val.type() == typeid(byte_vector)) {
-                    auto ps = make_shared<byte_vector>(std::any_cast<byte_vector>(val));
-                    addByteVector(i, ps);
-                } else if (val.type() == typeid(const char *)) {
-                    auto v = std::any_cast<const char *>(val);
-                    auto ps = make_shared<byte_vector>(v, v+strlen(v));
-                    addByteVector(i, ps);
-                } else if (val.type() == typeid(std::string)) {
-                    auto v = std::any_cast<std::string>(val);
-                    auto ps = make_shared<byte_vector>(v.begin(), v.end());
-                    addByteVector(i, ps);
-                } else if (val.type() == typeid(int)) {
-                    auto v = std::any_cast<int>(val);
-                    v = htobe32(v);
-                    addByteVector(i, make_shared<byte_vector>((char*)&v, ((char*)&v)+sizeof(int)));
-                } else if (val.type() == typeid(long)) {
-                    auto v = std::any_cast<long>(val);
-                    v = htobe64(v);
-                    addByteVector(i, make_shared<byte_vector>((char*)&v, ((char*)&v)+sizeof(long)));
-                } else if (val.type() == typeid(long long)) {
-                    auto v = std::any_cast<long long>(val);
-                    v = htobe64(v);
-                    addByteVector(i, make_shared<byte_vector>((char*)&v, ((char*)&v)+sizeof(long long)));
-                } else if (val.type() == typeid(bool)) {
-                    auto v = std::any_cast<bool>(val);
-                    addByteVector(i, make_shared<byte_vector>((char*)&v, ((char*)&v)+sizeof(bool)));
-                } else if (val.type() == typeid(double)) {
-                    auto v = std::any_cast<double>(val);
-                    long long lv = htobe64(*(long long*)&v);
-                    v = *(double*)&lv;
-                    addByteVector(i, make_shared<byte_vector>((char*)&v, ((char*)&v)+sizeof(double)));
-                } else {
-                    std::cerr << "PGPool.execParams error: wrong type: " << val.type().name() << std::endl;
-                }
-            }
-            PQsendQueryParams(bc.con.get(), query.c_str(), params.size(), nullptr, values, lengths, binaryFlags, 1);
-            PQflush(bc.con.get());
+            PQsendQuery(bc.conPtr(), query.c_str());
+            PQflush(bc.conPtr());
             QueryResultsArr results;
             while (true) {
-                pg_result *r = PQgetResult(bc.con.get());
+                pg_result *r = PQgetResult(bc.conPtr());
                 if (r == nullptr)
                     break;
                 results.push_back(QueryResult(r));
@@ -245,6 +285,7 @@ namespace db {
         }
         {
             std::unique_lock lock(poolMutex_);
+            ++usedConnectionsCount_;
             std::shared_ptr<PGconn> con = connPool_.front();
             connPool_.pop();
             return con;
@@ -255,6 +296,7 @@ namespace db {
         std::lock_guard guard(poolMutex_);
         connPool_.push(con);
         poolCV_.notify_one();
+        --usedConnectionsCount_;
     }
 
 }
