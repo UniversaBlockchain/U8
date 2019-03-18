@@ -3,3 +3,6 @@ cmake-build-debug/
 ext/
 download_libs.stamp
 download_libs/
+Test*.bin
+.DS_Store
+**/.DS_Store
