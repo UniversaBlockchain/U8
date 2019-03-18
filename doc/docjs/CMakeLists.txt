@@ -3,6 +3,7 @@ set(TARGET_NAME docjs)
 add_custom_target(${TARGET_NAME})
 
 find_npm()
+
 set(JSDOC_WORKING_DIR ${CMAKE_SOURCE_DIR}/doc/docjs)
 
 file(TO_NATIVE_PATH ${JSDOC_WORKING_DIR}/node_modules/.bin/jsdoc JSDOC_PATH)
@@ -14,5 +15,5 @@ file(TO_NATIVE_PATH ../../jslib NATIVE_JSDOC_WORKING_DIR)
 add_custom_command(TARGET ${TARGET_NAME}
   COMMAND ${NPM_EXECUTABLE} --no-progress install &&  ${JSDOC_PATH} ${NATIVE_JSDOC_WORKING_DIR} -c ${JSDOC_CONFIG_PATH} -d ${OUTPUT_DIR} -R ${README_DIR}
   WORKING_DIRECTORY ${JSDOC_WORKING_DIR}
-  COMMENT "generate the JSDoc JSON"
+  COMMENT "generate the JSDoc"
 )

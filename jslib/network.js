@@ -108,10 +108,10 @@ let tcp = {
     /**
      * Start listening for incoming TCP/IP connections. Same as creating the {TcpServer} instance.
      *
-     * @param port
-     * @param bindIp
-     * @param maxConnections
-     * @param bufferLength
+     * @param port to listen
+     * @param bindIp interface to use
+     * @param maxConnections allowed in the queue
+     * @param bufferLength of the stream
      * @return {TcpServer}
      */
     listen({port, bindIp = "0.0.0.0", maxConnections = 0, bufferLength = chunkSize}) {
@@ -163,6 +163,7 @@ class TLSServer {
      * @param bufferLength the biffering parameter for the TLSConnection streams.
      * @param certFilePath certFilePath is path to PEM file with certificate.
      * @param keyFilePath is path to PEM file with key.
+     * @param timeout
      */
     constructor({port, bindIp = "0.0.0.0", certFilePath, keyFilePath, maxConnections = 0, bufferLength = chunkSize, timeout = 5000}) {
         [this.port, this.bindIp, this.certFilePath, this.keyFilePath, this.maxConnections, this.bufferLength, this.timeout] =
@@ -233,7 +234,7 @@ let tls = {
     /**
      * Start listening for incoming TLS connections. Same as creating the {TLSServer} instance.
      *
-     * @param port
+     * @param port to listen
      * @param bindIp
      * @param certFilePath certFilePath is path to PEM file with certificate.
      * @param keyFilePath is path to PEM file with key.
