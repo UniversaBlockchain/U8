@@ -120,7 +120,23 @@ TEST_CASE("PGPool") {
                         REQUIRE(db::getIntValue(qr.getValueByIndex(0, 0)) == 8);
                         REQUIRE(db::getIntValue(qr.getValueByIndex(1, 0)) == 9);
                         REQUIRE(db::getIntValue(qr.getValueByIndex(2, 0)) == 10);
+                        int i = 0;
+                        while(true) {
+                            auto row = qr.getRows(1);
+                            if (row.size() == 0)
+                                break;
+                            REQUIRE(db::getIntValue(row[0][0]) == 8+i);
+                            ++i;
+                        }
+                        auto allRows = qr.getRows();
+                        REQUIRE(db::getIntValue(allRows[0][0]) == 8);
+                        REQUIRE(db::getIntValue(allRows[1][0]) == 9);
+                        REQUIRE(db::getIntValue(allRows[2][0]) == 10);
                         sem2.notify();
+                        auto colNames = qr.getColNames();
+                        REQUIRE(colNames.size() == 2);
+                        REQUIRE(colNames[0] == "id");
+                        REQUIRE(colNames[1] == "state");
                     },
                     [](const string &errText) {
                         throw std::runtime_error(errText);

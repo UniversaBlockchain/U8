@@ -108,6 +108,40 @@ namespace db {
         return cacheRowsCount_;
     }
 
+    std::vector<std::vector<byte_vector>> QueryResult::getRows(int maxRows) {
+        int nRows = PQntuples(pgRes_.get());
+        int nCols = PQnfields(pgRes_.get());
+        if (maxRows == 0) {
+            std::vector<std::vector<byte_vector>> res(nRows);
+            for (int iRow = 0; iRow < nRows; ++iRow) {
+                res[iRow].resize(nCols);
+                for (int iCol = 0; iCol < nCols; ++iCol)
+                    res[iRow][iCol] = getValueByIndex(iRow, iCol);
+            }
+            return res;
+        } else {
+            int rowsToFetch = min(nRows-nextRowIndex_, maxRows);
+            if (rowsToFetch == 0)
+                return std::vector<std::vector<byte_vector>>();
+            std::vector<std::vector<byte_vector>> res(rowsToFetch);
+            for (int iRow = nextRowIndex_; iRow < nextRowIndex_+rowsToFetch; ++iRow) {
+                res[iRow-nextRowIndex_].resize(nCols);
+                for (int iCol = 0; iCol < nCols; ++iCol)
+                    res[iRow-nextRowIndex_][iCol] = getValueByIndex(iRow, iCol);
+            }
+            nextRowIndex_ += rowsToFetch;
+            return res;
+        }
+    }
+
+    std::vector<std::string> QueryResult::getColNames() {
+        int nCols = PQnfields(pgRes_.get());
+        std::vector<std::string> res(nCols);
+        for (int iCol = 0; iCol < nCols; ++iCol)
+            res[iCol] = std::string(PQfname(pgRes_.get(), iCol));
+        return res;
+    }
+
     int getIntValue(const byte_vector& val) {
         auto sz = sizeof(int);
         if (val.size() != sz)

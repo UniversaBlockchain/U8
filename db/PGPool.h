@@ -27,8 +27,6 @@ namespace db {
         bool isError();
         char* getErrorText();
         int getErrorCode();
-        int getRowsCount();
-        int getAffectedRows();
         byte_vector getValueByIndex(int rowNum, int colIndex);
         byte_vector getValueByName(int rowNum, const std::string& colName);
         void cacheResults();
@@ -36,12 +34,36 @@ namespace db {
         byte_vector getCachedValueByName(int rowNum, const std::string& colName);
         int getCachedColsCount();
         int getCachedRowsCount();
+
+        /**
+         * Get vector of rows. Each row is a vector of byte_vector with binary representation of resulting value.
+         * If there are less rows than requested, returns all remaining rows. Return empty array when there are
+         * no more rows. If maxRows is 0, returns all resulting data anyway.
+         */
+        std::vector<std::vector<byte_vector>> getRows(int maxRows = 0);
+
+        /**
+         * Return total number of rows in the set (does not change when {#getRows} calls)
+         */
+        int getRowsCount();
+
+        /**
+         * Useful for UPDATE queries.
+         */
+        int getAffectedRows();
+
+        /**
+         * Return vector of column names, in the same order as in resulting rows.
+         */
+        std::vector<std::string> getColNames();
+
     private:
         std::shared_ptr<pg_result> pgRes_;
         std::vector<byte_vector> cache_;
         int cacheColsCount_ = 0;
         int cacheRowsCount_ = 0;
         std::unordered_map<string, int> cacheColNames_;
+        int nextRowIndex_ = 0;
     };
 
     int getIntValue(const byte_vector& val);
@@ -177,7 +199,6 @@ namespace db {
 
     private:
         std::shared_ptr<PGconn> getUnusedConnection();
-        friend BusyConnection;
 
     private:
         std::queue<std::shared_ptr<PGconn>> connPool_;
