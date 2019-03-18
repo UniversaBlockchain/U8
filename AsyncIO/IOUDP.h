@@ -91,6 +91,7 @@ namespace asyncio {
     struct closeSocket_data {
         close_cb callback;
         bool connReset;
+        IOHandle* handle;
     };
 
     struct socketRead_data {
@@ -216,6 +217,12 @@ namespace asyncio {
          * For internal usage.
          */
         void checkReadQueue();
+
+        /**
+         * Stop own asynchronous loop (if initialized).
+         * For internal usage.
+         */
+        void stopOwnLoop();
 
         /**
          * Set default remote IP address and port for read/write data from UDP socket for read mode.

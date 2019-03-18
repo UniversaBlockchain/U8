@@ -41,6 +41,11 @@ namespace asyncio {
         }
     }
 
+    void IOTLS::stopOwnLoop() {
+        if (ownLoop)
+            aloop->stop();
+    }
+
     void IOTLS::freeRequest() {
         if (ioTCPSoc) {
             delete ioTCPSoc;
@@ -379,6 +384,7 @@ namespace asyncio {
                     socket_data->callback = std::move(callback);
                     socket_data->tls_data = &tls_data;
                     socket_data->connReset = connReset;
+                    socket_data->handle = this;
 
                     tls_data.tls->close_data = socket_data;
 
@@ -404,12 +410,16 @@ namespace asyncio {
 
                         close_data->callback(close_data->connReset ? UV_ECONNRESET : 0);
 
+                        if (close_data->handle)
+                            close_data->handle->stopOwnLoop();
+
                         delete close_data;
                     });
                 } else {
                     auto sock_data = (connect_accept_TLS_data*) handle->data;
                     sock_data->close_callback = std::move(callback);
                     sock_data->connReset = connReset;
+                    sock_data->handle = this;
 
                     uv_close((uv_handle_t*) ioTCPSoc, [](uv_handle_t* handle){
                         auto socket_data = (connect_accept_TLS_data*) handle->data;
@@ -430,6 +440,9 @@ namespace asyncio {
 
                         socket_data->close_callback(socket_data->connReset ? UV_ECONNRESET : 0);
 
+                        if (socket_data->handle)
+                            socket_data->handle->stopOwnLoop();
+
                         delete socket_data;
                     });
                 }
@@ -448,6 +461,7 @@ namespace asyncio {
 
             socket_data->callback = std::move(callback);
             socket_data->connReset = connReset;
+            socket_data->handle = this;
 
             handle->data = socket_data;
 
@@ -652,6 +666,9 @@ namespace asyncio {
         handle->data = nullptr;
 
         socket_data->callback(socket_data->connReset ? UV_ECONNRESET : 0);
+
+        if (socket_data->handle)
+            ((IOTLS*) socket_data->handle)->stopOwnLoop();
 
         delete socket_data;
     }

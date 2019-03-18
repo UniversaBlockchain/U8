@@ -41,8 +41,14 @@ namespace asyncio {
     };
 
     AsyncLoop::~AsyncLoop() {
-        runned = false;
+        if (runned)
+            runned = false;
+
         uv_loop_close(&loop);
         thread.join();
+    };
+
+    void AsyncLoop::stop() {
+        runned = false;
     };
 }

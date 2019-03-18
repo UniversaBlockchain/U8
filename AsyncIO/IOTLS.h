@@ -52,6 +52,7 @@ namespace asyncio {
         TLS_data* tls_data;
         close_cb callback;
         bool connReset;
+        IOTLS* handle;
     };
 
     struct readTLS_data {
@@ -222,6 +223,12 @@ namespace asyncio {
          * For internal usage.
          */
         void setConnectionReset();
+
+        /**
+         * Stop own asynchronous loop (if initialized).
+         * For internal usage.
+         */
+        void stopOwnLoop();
 
         /**
          * Add data to queue.

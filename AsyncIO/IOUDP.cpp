@@ -37,6 +37,11 @@ namespace asyncio {
         }
     }
 
+    void IOUDP::stopOwnLoop() {
+        if (ownLoop)
+            aloop->stop();
+    }
+
     void IOUDP::freeRequest() {
         if (ioUDPSoc) {
             if (ioUDPSoc->data) {
@@ -280,6 +285,7 @@ namespace asyncio {
 
         socket_data->callback = std::move(callback);
         socket_data->connReset = false;
+        socket_data->handle = this;
 
         auto handle = (uv_handle_t*) ioUDPSoc;
 
@@ -495,6 +501,9 @@ namespace asyncio {
         ((UDPSocket_data*) handle->data)->close = nullptr;
 
         socket_data->callback(socket_data->connReset ? UV_ECONNRESET : 0);
+
+        if (socket_data->handle)
+            ((IOUDP*) socket_data->handle)->stopOwnLoop();
 
         delete socket_data;
     }

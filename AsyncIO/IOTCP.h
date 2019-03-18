@@ -202,6 +202,12 @@ namespace asyncio {
          */
         void setConnectionReset();
 
+        /**
+         * Stop own asynchronous loop (if initialized).
+         * For internal usage.
+         */
+        void stopOwnLoop();
+
     private:
         ioLoop* loop;
         uv_tcp_t* ioTCPSoc;
