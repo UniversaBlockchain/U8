@@ -1,19 +1,16 @@
-function Exception(message) {
-    this.message = message;
-    this.stack = new Error().stack;
+
+class IllegalStateError extends Error {
+    constructor(message = undefined) {
+        super()
+    }
 }
 
-function IllegalStateException(message) {
-    Exception.call(this, message)
+class IllegalArgumentError extends Error {
+    constructor(message = undefined) {
+        super()
+    }
 }
-IllegalStateException.prototype = Object.create(Exception.prototype);
-
-
-function IllegalArgumentException(message) {
-    Exception.call(this, message)
-}
-IllegalArgumentException.prototype = Object.create(Exception.prototype);
 
 
 
-module.exports = {Exception,IllegalStateException,IllegalArgumentException}
+module.exports = {IllegalStateError,IllegalArgumentError}

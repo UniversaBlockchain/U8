@@ -118,7 +118,7 @@ TransactionPack.prototype.deserialize = function(data,deserializer) {
         }
 
         if(!removed)
-            throw new ex.IllegalStateException("circle deps in contracts tree");
+            throw new ex.IllegalStateError("circle deps in contracts tree");
     }
 
     this.contract = Contract.fromSealedBinary(deserializer.deserialize(data.contract),this);

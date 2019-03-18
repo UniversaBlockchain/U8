@@ -182,7 +182,7 @@ State.prototype.deserialize = function(data,deserializer) {
 
     this.revision = data.revision;
     if (this.revision <= 0)
-        throw new ex.IllegalArgumentException("illegal revision number: " + this.revision);
+        throw new ex.IllegalArgumentError("illegal revision number: " + this.revision);
 
     if (data.hasOwnProperty("constraints"))
         this.constraints = deserializer.deserialize(data.constraints);
@@ -193,11 +193,11 @@ State.prototype.deserialize = function(data,deserializer) {
 
     let r = this.contract.registerRole(deserializer.deserialize(data.owner))
     if(r.name !== "owner")
-        throw new ex.IllegalArgumentException("bad owner role name");
+        throw new ex.IllegalArgumentError("bad owner role name");
 
     r = this.contract.registerRole(deserializer.deserialize(data.created_by))
     if(r.name !== "creator")
-        throw new ex.IllegalArgumentException("bad creator role name");
+        throw new ex.IllegalArgumentError("bad creator role name");
 
     if(data.hasOwnProperty("data"))
         this.data = data.data;
@@ -235,7 +235,7 @@ State.prototype.initializeWithDsl = function(root) {
     if (root.hasOwnProperty("revision"))
         this.revision = root.revision;
     else
-        throw new ex.IllegalArgumentException("state.revision not found");
+        throw new ex.IllegalArgumentError("state.revision not found");
 
     if (root.hasOwnProperty("data"))
         this.data = root.data;
@@ -244,7 +244,7 @@ State.prototype.initializeWithDsl = function(root) {
 
     if (this.createdAt == null) {
         if (this.revision !== 1)
-            throw new ex.IllegalArgumentException("state.created_at must be set for revisions > 1");
+            throw new ex.IllegalArgumentError("state.created_at must be set for revisions > 1");
 
         this.createdAt = this.contract.definition.createdAt;
     }
@@ -269,7 +269,7 @@ State.prototype.initializeWithDsl = function(root) {
             if (constraint != null)
                 this.constraints.push(constr.Constraint.fromDsl(constraint, this.contract));
             else
-                throw new ex.IllegalArgumentException("Expected constraint section");
+                throw new ex.IllegalArgumentError("Expected constraint section");
         });
 
     return this;
@@ -335,9 +335,9 @@ Definition.prototype.serialize = function(serializer) {
     for (let plist of this.permissions.values()) {
         for (let perm of plist) {
             if (perm.id == null)
-                throw new ex.IllegalArgumentException("permission without id: " + perm);
+                throw new ex.IllegalArgumentError("permission without id: " + perm);
             if (pb.hasOwnProperty(perm.id))
-                throw new ex.IllegalArgumentException("permission: duplicate permission id found: " + perm);
+                throw new ex.IllegalArgumentError("permission: duplicate permission id found: " + perm);
             pb[perm.id] = serializer.serialize(perm);
         }
     }
@@ -364,7 +364,7 @@ Definition.prototype.serialize = function(serializer) {
 Definition.prototype.deserialize = function(data,deserializer) {
     let r = this.contract.registerRole(deserializer.deserialize(data.issuer));
     if(r.name !== "issuer")
-        throw new ex.IllegalArgumentException("issuer creator role name");
+        throw new ex.IllegalArgumentError("issuer creator role name");
 
     this.createdAt = deserializer.deserialize(data.created_at);
     if(data.hasOwnProperty("expires_at")) {
@@ -462,7 +462,7 @@ Definition.prototype.initializeWithDsl = function(root) {
             if (constraint != null)
                 this.constraints.push(constr.Constraint.fromDsl(constraint, this.contract));
             else
-                throw new ex.IllegalArgumentException("Expected constraint section");
+                throw new ex.IllegalArgumentError("Expected constraint section");
         });
 
     return this;
@@ -498,7 +498,7 @@ Definition.prototype.loadDslPermission = function(name, params) {
     else {
         // extended yaml style or serialized object
         if (!params.hasOwnProperty("role"))
-            throw new ex.IllegalArgumentException("Expected role of permission");
+            throw new ex.IllegalArgumentError("Expected role of permission");
 
         let x = params.role;
         if (x instanceof roles.Role)
@@ -517,7 +517,7 @@ Definition.prototype.loadDslPermission = function(name, params) {
         role = this.contract.createRole("@" + name, roleName);
 
     if (role == null)
-        throw new ex.IllegalArgumentException("permission " + name + " refers to missing role: " + roleName);
+        throw new ex.IllegalArgumentError("permission " + name + " refers to missing role: " + roleName);
 
     // now we have ready role and probably parameter for custom rights creation
     this.addPermission(permissions.Permission.forName(name, role, stringParams ? null : params));
@@ -637,7 +637,7 @@ Contract.fromSealedBinary = function(sealed,transactionPack) {
     result.isNeedVerifySealedKeys = true;
     let data = Boss.load(sealed);
     if(data.type !== "unicapsule") {
-        throw new ex.IllegalArgumentException("wrong object type, unicapsule required");
+        throw new ex.IllegalArgumentError("wrong object type, unicapsule required");
     }
 
     result.apiLevel = data.version;
@@ -849,7 +849,7 @@ Contract.prototype.get = function(name) {
         case "creator":
             return this.roles.creator;
     }
-    throw new ex.IllegalArgumentException("bad root: " + originalName);
+    throw new ex.IllegalArgumentError("bad root: " + originalName);
 
 };
 
@@ -962,7 +962,7 @@ Contract.prototype.deserialize = function(data,deserializer) {
 
     let l = data.api_level;
     if (l > MAX_API_LEVEL)
-        throw new ex.IllegalArgumentException("contract api level conflict: found " + l + " my level " + this.apiLevel);
+        throw new ex.IllegalArgumentError("contract api level conflict: found " + l + " my level " + this.apiLevel);
 
     if (this.definition == null)
         this.definition = new Definition(this);
@@ -1044,11 +1044,11 @@ Contract.prototype.addSignatureToSeal = async function(x) {
         keys = [];
         keys.push(x);
     } else {
-        throw new ex.IllegalArgumentException("Invalid param " + x + ". Should be either PrivateKey or Array of PrivateKey");
+        throw new ex.IllegalArgumentError("Invalid param " + x + ". Should be either PrivateKey or Array of PrivateKey");
     }
 
     if(this.sealedBinary == null)
-        throw new ex.IllegalStateException("failed to add signature: sealed binary does not exist");
+        throw new ex.IllegalStateError("failed to add signature: sealed binary does not exist");
 
     keys.forEach(k => this.keysToSignWith.add(k));
 
@@ -1072,7 +1072,7 @@ Contract.prototype.addSignatureToSeal = async function(x) {
 
 Contract.prototype.addSignatureBytesToSeal = async function(signature,publicKey) {
     if(this.sealedBinary == null)
-        throw new ex.IllegalArgumentException("failed to add signature: sealed binary does not exist");
+        throw new ex.IllegalArgumentError("failed to add signature: sealed binary does not exist");
 
     let data = Boss.load(this.sealedBinary);
     //console.log(Object.getPrototypeOf(data.signatures).constructor.name);
@@ -1724,7 +1724,7 @@ Contract.prototype.verifySealedKeys = async function(isQuantise) {
 
     let data = Boss.load(this.sealedBinary);
     if (data.type !== "unicapsule")
-        throw new ex.IllegalArgumentException("wrong object type, unicapsule required");
+        throw new ex.IllegalArgumentError("wrong object type, unicapsule required");
 
 
     let contractBytes = data.data;
@@ -1829,9 +1829,9 @@ Contract.prototype.createRevision = function(keys) {
 Contract.prototype.split = function(count) {
     // we can split only the new revision and only once this time
     if (this.state.getBranchRevision() === this.state.revision)
-        throw new ex.IllegalStateException("this revision is already split");
+        throw new ex.IllegalStateError("this revision is already split");
     if (count < 1)
-        throw new ex.IllegalArgumentException("split: count should be > 0");
+        throw new ex.IllegalArgumentError("split: count should be > 0");
 
     // initialize context if not yet
     this.updateContext();
@@ -1918,7 +1918,7 @@ Contract.prototype.createRole = function(roleName, roleObject) {
     if (Object.getPrototypeOf(roleObject) === Object.prototype)
         return this.registerRole(roles.Role.fromDsl(roleName, roleObject));
 
-    throw new ex.IllegalArgumentException("cant make role from " + JSON.stringify(roleObject));
+    throw new ex.IllegalArgumentError("cant make role from " + JSON.stringify(roleObject));
 };
 
 DefaultBiMapper.registerAdapter(new bs.BiAdapter("UniversaContract",Contract));

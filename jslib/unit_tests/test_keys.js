@@ -250,7 +250,7 @@ function TestKeys() {
 
 TestKeys.prototype.getKey = function() {
     if(this.keys.length === 0 ) {
-        throw new ex.IllegalStateException("test set is out of keys");
+        throw new ex.IllegalStateError("test set is out of keys");
     }
 
     var pos = Math.floor(Math.random()*this.keys.length);

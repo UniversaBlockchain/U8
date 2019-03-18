@@ -15,11 +15,12 @@ const QuantiserProcesses = {
     PRICE_CHECK_CONSTRAINT : 1
 };
 
-function QuantiserException() {
-    Exception.call("");
-}
 
-QuantiserException.prototype = Object.create(Exception.prototype);
+class QuantiserException extends Error {
+    constructor(message = undefined) {
+        super()
+    }
+}
 
 function Quantiser() {
     this.quantaSum_ = 0;

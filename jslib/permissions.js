@@ -43,7 +43,7 @@ Permission.forName = function(name, role, params) {
         case "decrement_permission":
             return new ChangeNumberPermission(role, params);
         default:
-            throw new ex.IllegalArgumentException("can't construct permission: " + name);
+            throw new ex.IllegalArgumentError("can't construct permission: " + name);
     }
 };
 

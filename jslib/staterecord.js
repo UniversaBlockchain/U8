@@ -21,7 +21,7 @@ StateRecord.prototype.toString = function () {
 
 StateRecord.prototype.lockToRevoke = function (idToRevoke) {
     if(state !== ItemState.PENDING) {
-        throw new ex.IllegalStateException("only pending records are allowed to lock others");
+        throw new ex.IllegalStateError("only pending records are allowed to lock others");
     }
 
     let lockedRecord = this.ledger.getRecord(idToRevoke);
@@ -98,7 +98,7 @@ StateRecord.prototype.revoke = function () {
         this.state = ItemState.REVOKED;
         this.save();
     } else {
-        throw new ex.IllegalStateException("can't archive record that is not in the locked state");
+        throw new ex.IllegalStateError("can't archive record that is not in the locked state");
     }
 
 };
@@ -108,14 +108,14 @@ StateRecord.prototype.approve = function () {
         this.state = ItemState.APPROVED;
         this.save();
     } else
-        throw new ex.IllegalStateException("attempt to approve record that is not pending: " + state);
+        throw new ex.IllegalStateError("attempt to approve record that is not pending: " + state);
 
 };
 
 
 StateRecord.prototype.createOutputLockRecord = function (id) {
     if (state !== ItemState.PENDING)
-        throw new ex.IllegalStateException("wrong state to createOutputLockRecord: " + state);
+        throw new ex.IllegalStateError("wrong state to createOutputLockRecord: " + state);
 
     let newRecord = this.ledger.getRecord(id);
     if (newRecord != null) {
@@ -137,7 +137,7 @@ StateRecord.prototype.markTestRecord = function () {
 
 StateRecord.prototype.reload = function () {
     if (this.recordId === 0)
-        throw new ex.IllegalStateException("can't reload record without recordId (new?)");
+        throw new ex.IllegalStateError("can't reload record without recordId (new?)");
     this.ledger.reload(this);
     return this;
 

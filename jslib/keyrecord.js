@@ -13,7 +13,7 @@ function KeyRecord(key) {
 
 KeyRecord.fromDsl = function (serializedKeyRecord) {
     if(!serializedKeyRecord.hasOwnProperty("key"))
-        throw new ex.IllegalArgumentException("Undefined key required for init KeyRecord");
+        throw new ex.IllegalArgumentError("Undefined key required for init KeyRecord");
 
     let result = new KeyRecord(serializedKeyRecord.key);
 
@@ -40,10 +40,10 @@ KeyRecord.prototype.setupKey = function() {
             if (this.key instanceof Array)
                 this.key = new crypto.PublicKey(this.key);
             else
-                throw new ex.IllegalArgumentException("unsupported key object: " + JSON.stringify(this.key));
+                throw new ex.IllegalArgumentError("unsupported key object: " + JSON.stringify(this.key));
         }
     } catch (e) {
-        throw new ex.IllegalArgumentException("unsupported key, failed to construct", e);
+        throw new ex.IllegalArgumentError("unsupported key, failed to construct", e);
     }
 };
 

@@ -46,7 +46,7 @@ Role.fromDsl = function (name, serializedRole) {
     else if (type.toLowerCase() === "list")
         result = new ListRole(name);
     else
-        throw new ex.IllegalArgumentException("Unknown role type: " + type);
+        throw new ex.IllegalArgumentError("Unknown role type: " + type);
 
     result.initWithDsl(serializedRole);
 
@@ -334,10 +334,10 @@ RoleLink.prototype.initWithDsl = function(serializedRole) {
     if (serializedRole.hasOwnProperty("target"))
         this.roleName = serializedRole.target;
     else
-        throw new ex.IllegalArgumentException("Unknown target of RoleLink");
+        throw new ex.IllegalArgumentError("Unknown target of RoleLink");
 
     if (this.name === this.roleName)
-        throw new ex.IllegalArgumentException("RoleLink: name and target name are equals: " + this.roleName);
+        throw new ex.IllegalArgumentError("RoleLink: name and target name are equals: " + this.roleName);
 
 };
 
@@ -494,10 +494,10 @@ ListRole.prototype.isAllowedForKeys = function(keys) {
 
 ListRole.prototype.initWithDsl = function(serializedRole) {
     if (!serializedRole.hasOwnProperty("roles"))
-        throw new ex.IllegalArgumentException("Unknown roles of ListRole");
+        throw new ex.IllegalArgumentError("Unknown roles of ListRole");
 
     if (!serializedRole.hasOwnProperty("mode"))
-        throw new ex.IllegalArgumentException("Unknown mode of ListRole");
+        throw new ex.IllegalArgumentError("Unknown mode of ListRole");
 
     let roleObjects = serializedRole.roles;
     this.mode = serializedRole.mode.toUpperCase();
@@ -546,7 +546,7 @@ function SimpleRole(name,param) {
             } else if(p instanceof crypto.PublicKey) {
                 this.keyRecords.set(p,new KeyRecord(p));
             } else {
-                throw new ex.IllegalArgumentException("invalid param type")
+                throw new ex.IllegalArgumentError("invalid param type")
             }
         }
     }

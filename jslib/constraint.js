@@ -249,7 +249,7 @@ Constraint.prototype.setContract = function(contract) {
 Constraint.prototype.objectCastToTimeSeconds = function(obj, operand, typeOfOperand) {
     let val;
     if ((obj == null) && (typeOfOperand === compareOperandType.FIELD))
-        throw new ex.IllegalArgumentException("Error getting operand: " + operand);
+        throw new ex.IllegalArgumentError("Error getting operand: " + operand);
     if ((obj != null) && obj instanceof Date)
         val = Math.floor(obj.getTime() / 1000);
     else if ((obj != null) && (typeof obj === "string"))
@@ -261,7 +261,7 @@ Constraint.prototype.objectCastToTimeSeconds = function(obj, operand, typeOfOper
     else if (typeOfOperand === compareOperandType.CONSTOTHER)
         val = parseInt(operand, 10);
     else
-        throw new ex.IllegalArgumentException("Error parsing DateTime from operand: " + operand);
+        throw new ex.IllegalArgumentError("Error parsing DateTime from operand: " + operand);
 
     return val;
 };
@@ -269,14 +269,14 @@ Constraint.prototype.objectCastToTimeSeconds = function(obj, operand, typeOfOper
 Constraint.prototype.objectCastToBigDecimal = function(obj, operand, typeOfOperand) {
     let val;
     if ((obj == null) && (typeOfOperand === compareOperandType.FIELD))
-        throw new ex.IllegalArgumentException("Error getting operand: " + operand);
+        throw new ex.IllegalArgumentError("Error getting operand: " + operand);
 
     if ((obj != null) && ((typeof obj === "string") || (typeof obj === "number")))
         val = new BigDecimal(obj);
     else if ((typeOfOperand === compareOperandType.CONSTSTR) || (typeOfOperand === compareOperandType.CONSTOTHER))
         val = new BigDecimal(operand);
     else
-        throw new ex.IllegalArgumentException("Error parsing BigDecimal from operand: " + operand);
+        throw new ex.IllegalArgumentError("Error parsing BigDecimal from operand: " + operand);
 
     return val;
 };
@@ -320,17 +320,17 @@ Constraint.prototype.compareOperands = function(refContract,
                 leftOperandContract = refContract;
             } else if (leftOperand.startsWith("this.")) {
                 if (this.baseContract == null)
-                     throw new ex.IllegalArgumentException("Use left operand in condition: " + leftOperand + ". But this contract not initialized.");
+                     throw new ex.IllegalArgumentError("Use left operand in condition: " + leftOperand + ". But this contract not initialized.");
 
                 leftOperand = leftOperand.substring(5);
                 leftOperandContract = this.baseContract;
             } else if ((firstPointPos = leftOperand.indexOf(".")) > 0) {
                 if (this.baseContract == null)
-                    throw new ex.IllegalArgumentException("Use left operand in condition: " + leftOperand + ". But this contract not initialized.");
+                    throw new ex.IllegalArgumentError("Use left operand in condition: " + leftOperand + ". But this contract not initialized.");
 
                 let ref = this.baseContract.findConstraintByName(leftOperand.substring(0, firstPointPos));
                 if (ref == null)
-                    throw new ex.IllegalArgumentException("Not found constraint: " + leftOperand.substring(0, firstPointPos));
+                    throw new ex.IllegalArgumentError("Not found constraint: " + leftOperand.substring(0, firstPointPos));
                 for (let checkedContract of contracts)
                     if (ref.isMatchingWithIteration(checkedContract, contracts, iteration + 1))
                         leftOperandContract = checkedContract;
@@ -340,7 +340,7 @@ Constraint.prototype.compareOperands = function(refContract,
 
                 leftOperand = leftOperand.substring(firstPointPos + 1);
             } else
-                throw new ex.IllegalArgumentException("Invalid format of left operand in condition: " + leftOperand + ". Missing contract field.");
+                throw new ex.IllegalArgumentError("Invalid format of left operand in condition: " + leftOperand + ". Missing contract field.");
 
         } else if (typeOfLeftOperand === compareOperandType.CONSTOTHER) {
             if (indxOperator === CAN_PLAY) {
@@ -348,16 +348,16 @@ Constraint.prototype.compareOperands = function(refContract,
                     leftOperandContract = refContract;
                 } else if (leftOperand === "this") {
                     if (this.baseContract == null)
-                        throw new ex.IllegalArgumentException("Use left operand in condition: " + leftOperand + ". But this contract not initialized.");
+                        throw new ex.IllegalArgumentError("Use left operand in condition: " + leftOperand + ". But this contract not initialized.");
 
                     leftOperandContract = this.baseContract;
                 } else {
                     if (this.baseContract == null)
-                        throw new ex.IllegalArgumentException("Use left operand in condition: " + leftOperand + ". But this contract not initialized.");
+                        throw new ex.IllegalArgumentError("Use left operand in condition: " + leftOperand + ". But this contract not initialized.");
 
                     let ref = this.baseContract.findConstraintByName(leftOperand);
                     if (ref == null)
-                        throw new ex.IllegalArgumentException("Not found constraint: " + leftOperand);
+                        throw new ex.IllegalArgumentError("Not found constraint: " + leftOperand);
 
                     for (let checkedContract of contracts)
                         if (ref.isMatchingWithIteration(checkedContract, contracts, iteration + 1))
@@ -378,17 +378,17 @@ Constraint.prototype.compareOperands = function(refContract,
                 rightOperandContract = refContract;
             } else if (rightOperand.startsWith("this.")) {
                 if (this.baseContract == null)
-                    throw new ex.IllegalArgumentException("Use right operand in condition: " + rightOperand + ". But this contract not initialized.");
+                    throw new ex.IllegalArgumentError("Use right operand in condition: " + rightOperand + ". But this contract not initialized.");
 
                 rightOperand = rightOperand.substring(5);
                 rightOperandContract = this.baseContract;
             } else if ((firstPointPos = rightOperand.indexOf(".")) > 0) {
                 if (this.baseContract == null)
-                    throw new ex.IllegalArgumentException("Use right operand in condition: " + rightOperand + ". But this contract not initialized.");
+                    throw new ex.IllegalArgumentError("Use right operand in condition: " + rightOperand + ". But this contract not initialized.");
 
                 let ref = this.baseContract.findConstraintByName(rightOperand.substring(0, firstPointPos));
                 if (ref == null)
-                    throw new ex.IllegalArgumentException("Not found constraint: " + rightOperand.substring(0, firstPointPos));
+                    throw new ex.IllegalArgumentError("Not found constraint: " + rightOperand.substring(0, firstPointPos));
 
                 for (let checkedContract of contracts)
                     if (ref.isMatchingWithIteration(checkedContract, contracts, iteration + 1))
@@ -400,7 +400,7 @@ Constraint.prototype.compareOperands = function(refContract,
                 rightOperand = rightOperand.substring(firstPointPos + 1);
             }
             else
-                throw new ex.IllegalArgumentException("Invalid format of right operand in condition: " + rightOperand + ". Missing contract field.");
+                throw new ex.IllegalArgumentError("Invalid format of right operand in condition: " + rightOperand + ". Missing contract field.");
         } else if (typeOfRightOperand === compareOperandType.CONSTOTHER) {
             if (rightOperand === "now")
                 right = new Date();
@@ -454,7 +454,7 @@ Constraint.prototype.compareOperands = function(refContract,
                                  (leftOperand !== "null") && (leftOperand !== "false") && (leftOperand !== "true"))
                             leftVal = parseFloat(leftOperand);
                         else
-                            throw new ex.IllegalArgumentException("Invalid left operator in condition for string: " + operators[indxOperator]);
+                            throw new ex.IllegalArgumentError("Invalid left operator in condition for string: " + operators[indxOperator]);
 
                         if (typeOfRightOperand === compareOperandType.FIELD)
                             rightVal = right;
@@ -462,7 +462,7 @@ Constraint.prototype.compareOperands = function(refContract,
                                  (rightOperand !== "null") && (rightOperand !== "false") && (rightOperand !== "true"))
                             rightVal = parseFloat(rightOperand);
                         else
-                            throw new ex.IllegalArgumentException("Invalid right operator in condition for string: " + operators[indxOperator]);
+                            throw new ex.IllegalArgumentError("Invalid right operator in condition for string: " + operators[indxOperator]);
 
                         if ((leftVal != null) && (rightVal != null)) {
                             if (((indxOperator === LESS) && (leftVal < rightVal)) ||
@@ -557,7 +557,7 @@ Constraint.prototype.compareOperands = function(refContract,
                                 }
                             }
                             catch (e) {
-                                throw new ex.IllegalArgumentException("Key or address compare error in condition: " + e.toString());
+                                throw new ex.IllegalArgumentError("Key or address compare error in condition: " + e.toString());
                             }
 
                             if (indxOperator === NOT_EQUAL)
@@ -595,7 +595,7 @@ Constraint.prototype.compareOperands = function(refContract,
                             typeCompareOperand = typeOfLeftOperand;
                         }
                         else
-                            throw new ex.IllegalArgumentException("At least one operand must be a field");
+                            throw new ex.IllegalArgumentError("At least one operand must be a field");
 
                         if (typeCompareOperand === compareOperandType.CONSTOTHER) {         // compareOperand is CONSTANT (null|number|true|false)
                             if (compareOperand !== "null" && compareOperand !== "false" && compareOperand !== "true") {
@@ -623,7 +623,7 @@ Constraint.prototype.compareOperands = function(refContract,
                                 ret = true;
                         }
                         else
-                            throw new ex.IllegalArgumentException("Invalid type of operand: " + compareOperand);
+                            throw new ex.IllegalArgumentError("Invalid type of operand: " + compareOperand);
                     }
 
                     break;
@@ -636,10 +636,10 @@ Constraint.prototype.compareOperands = function(refContract,
                     console.log("WARNING: Operator 'is_inherit' was deprecated. Use operator 'is_a'.");
                 case IS_A:
                     if (left == null || !(left instanceof Constraint))
-                        throw new ex.IllegalArgumentException("Expected constraint in condition in left operand: " + leftOperand);
+                        throw new ex.IllegalArgumentError("Expected constraint in condition in left operand: " + leftOperand);
 
                     if (right == null || !(right instanceof Constraint))
-                        throw new ex.IllegalArgumentException("Expected constraint in condition in right operand: " + rightOperand);
+                        throw new ex.IllegalArgumentError("Expected constraint in condition in right operand: " + rightOperand);
 
                     ret = left.isInherited(right, refContract, contracts, iteration + 1);
 
@@ -649,13 +649,13 @@ Constraint.prototype.compareOperands = function(refContract,
                     console.log("WARNING: Operator 'inherit' was deprecated. Use operator 'inherits'.");
                 case INHERITS:
                     if (right == null || !(right instanceof Constraint))
-                        throw new ex.IllegalArgumentException("Expected constraint in condition in right operand: " + rightOperand);
+                        throw new ex.IllegalArgumentError("Expected constraint in condition in right operand: " + rightOperand);
                     ret = right.isMatchingWithIteration(refContract, contracts, iteration + 1);
 
                     break;
                 case CAN_PLAY:
                     if (right == null || !(right instanceof roles.Role))
-                        throw new ex.IllegalArgumentException("Expected role in condition in right operand: " + rightOperand);
+                        throw new ex.IllegalArgumentError("Expected role in condition in right operand: " + rightOperand);
 
                     let keys;
                     if (leftOperand === "this")
@@ -667,11 +667,11 @@ Constraint.prototype.compareOperands = function(refContract,
 
                     break;
                 default:
-                     throw new ex.IllegalArgumentException("Invalid operator in condition");
+                     throw new ex.IllegalArgumentError("Invalid operator in condition");
             }
         }
         catch (e) {
-            throw new ex.IllegalArgumentException("Error compare operands in condition: " + e.toString());
+            throw new ex.IllegalArgumentError("Error compare operands in condition: " + e.toString());
         }
     } else {       // if rightOperand == null, then operation: defined / undefined
         if (indxOperator === DEFINED) {
@@ -688,7 +688,7 @@ Constraint.prototype.compareOperands = function(refContract,
             }
         }
         else
-            throw new ex.IllegalArgumentException("Invalid operator in condition");
+            throw new ex.IllegalArgumentError("Invalid operator in condition");
     }
 
     return ret;
@@ -746,12 +746,12 @@ Constraint.prototype.parseCondition = function(condition) {
         // Parsing left operand
         let subStrL = condition.substring(0, operPos);
         if (subStrL.length === 0)
-            throw new ex.IllegalArgumentException("Invalid format of condition: " + condition + ". Missing left operand.");
+            throw new ex.IllegalArgumentError("Invalid format of condition: " + condition + ". Missing left operand.");
         let lmarkPos1 = subStrL.indexOf("\"");
         let lmarkPos2 = subStrL.lastIndexOf("\"");
 
         if ((lmarkPos1 >= 0) && (lmarkPos1 === lmarkPos2))
-            throw new ex.IllegalArgumentException("Invalid format of condition: " + condition + ". Only one quote is found for left operand.");
+            throw new ex.IllegalArgumentError("Invalid format of condition: " + condition + ". Only one quote is found for left operand.");
 
         let leftOperand;
         let typeLeftOperand = compareOperandType.CONSTOTHER;
@@ -773,13 +773,13 @@ Constraint.prototype.parseCondition = function(condition) {
         // Parsing right operand
         let subStrR = condition.substring(operPos + operators[i].length);
         if (subStrR.length === 0)
-            throw new ex.IllegalArgumentException("Invalid format of condition: " + condition + ". Missing right operand.");
+            throw new ex.IllegalArgumentError("Invalid format of condition: " + condition + ". Missing right operand.");
 
         let rmarkPos1 = subStrR.indexOf("\"");
         let rmarkPos2 = subStrR.lastIndexOf("\"");
 
         if ((rmarkPos1 >= 0) && (rmarkPos1 === rmarkPos2))
-            throw new ex.IllegalArgumentException("Invalid format of condition: " + condition + ". Only one quote is found for rigth operand.");
+            throw new ex.IllegalArgumentError("Invalid format of condition: " + condition + ". Only one quote is found for rigth operand.");
 
         let rightOperand;
         let typeRightOperand = compareOperandType.CONSTOTHER;
@@ -825,7 +825,7 @@ Constraint.prototype.parseCondition = function(condition) {
         if ((operPos === 0) || ((operPos > 0) && (condition.charAt(operPos - 1) !== '_'))) {
             let subStrR = condition.substring(operPos + operators[i].length);
             if (subStrR.length === 0)
-                throw new ex.IllegalArgumentException("Invalid format of condition: " + condition + ". Missing right operand.");
+                throw new ex.IllegalArgumentError("Invalid format of condition: " + condition + ". Missing right operand.");
 
             let rightOperand = subStrR.replace(/\s/g, "");
 
@@ -851,15 +851,15 @@ Constraint.prototype.parseCondition = function(condition) {
         // Parsing left operand
         let subStrL = condition.substring(0, operPos);
         if (subStrL.length === 0)
-            throw new ex.IllegalArgumentException("Invalid format of condition: " + condition + ". Missing left operand.");
+            throw new ex.IllegalArgumentError("Invalid format of condition: " + condition + ". Missing left operand.");
 
         let leftOperand = subStrL.replace(/\s/g, "");
         if (~leftOperand.indexOf("."))
-            throw new ex.IllegalArgumentException("Invalid format of condition: " + condition + ". Left operand must be a constraint to a contract.");
+            throw new ex.IllegalArgumentError("Invalid format of condition: " + condition + ". Left operand must be a constraint to a contract.");
 
         let subStrR = condition.substring(operPos + operators[CAN_PLAY].length);
         if (subStrR.length === 0)
-            throw new ex.IllegalArgumentException("Invalid format of condition: " + condition + ". Missing right operand.");
+            throw new ex.IllegalArgumentError("Invalid format of condition: " + condition + ". Missing right operand.");
 
         // Parsing right operand
         let rightOperand = subStrR.replace(/\s/g, "");
@@ -868,7 +868,7 @@ Constraint.prototype.parseCondition = function(condition) {
             (rightOperand.length > firstPointPos + 1) &&
             ((rightOperand.charAt(firstPointPos + 1) < '0') ||
              (rightOperand.charAt(firstPointPos + 1) > '9'))))
-            throw new ex.IllegalArgumentException("Invalid format of condition: " + condition + ". Right operand must be a role field.");
+            throw new ex.IllegalArgumentError("Invalid format of condition: " + condition + ". Right operand must be a role field.");
 
         return {
             operator: CAN_PLAY,
@@ -881,7 +881,7 @@ Constraint.prototype.parseCondition = function(condition) {
         };
     }
 
-    throw new ex.IllegalArgumentException("Invalid format of condition: " + condition);
+    throw new ex.IllegalArgumentError("Invalid format of condition: " + condition);
 };
 
 /**
@@ -909,7 +909,7 @@ Constraint.prototype.parseConditions = function(conditions) {
         let condList = conditions[keyName];
 
         if (condList == null)
-            throw new ex.IllegalArgumentException("Expected all_of or any_of conditions");
+            throw new ex.IllegalArgumentError("Expected all_of or any_of conditions");
         for (let item of condList) {
             if (typeof item === "string")
                 parsedList.push(this.parseCondition(item));
@@ -924,7 +924,7 @@ Constraint.prototype.parseConditions = function(conditions) {
         return result;
     }
     else
-        throw new ex.IllegalArgumentException("Expected all_of or any_of");
+        throw new ex.IllegalArgumentError("Expected all_of or any_of");
 };
 
 /**
@@ -967,7 +967,7 @@ Constraint.prototype.checkConditions =  function(conditions, ref, contracts, ite
         let condList = conditions[Constraint.conditionsModeType.all_of];
 
         if (condList == null)
-            throw new ex.IllegalArgumentException("Expected all_of conditions");
+            throw new ex.IllegalArgumentError("Expected all_of conditions");
 
         result = true;
         for (let item of condList)
@@ -980,7 +980,7 @@ Constraint.prototype.checkConditions =  function(conditions, ref, contracts, ite
         let condList = conditions[Constraint.conditionsModeType.any_of];
 
         if (condList == null)
-            throw new ex.IllegalArgumentException("Expected any_of conditions");
+            throw new ex.IllegalArgumentError("Expected any_of conditions");
 
         result = false;
         for (let item of condList)
@@ -992,7 +992,7 @@ Constraint.prototype.checkConditions =  function(conditions, ref, contracts, ite
     } else if (conditions.hasOwnProperty("operator"))
         result = this.checkCondition(conditions, ref, contracts, iteration);
     else
-        throw new ex.IllegalArgumentException("Expected all_of or any_of");
+        throw new ex.IllegalArgumentError("Expected all_of or any_of");
 
     return result;
 };
@@ -1041,7 +1041,7 @@ Constraint.prototype.isMatchingWithIteration = function(contract, contracts, ite
     //todo: add this checking for matching with given item
 
     if (iteration > 16)
-        throw new ex.IllegalArgumentException("Recursive checking constraints have more 16 iterations");
+        throw new ex.IllegalArgumentError("Recursive checking constraints have more 16 iterations");
 
     let result = true;
 
@@ -1112,17 +1112,17 @@ Constraint.prototype.isInheritedConditions = function (conditions, constr, const
     if (conditions.hasOwnProperty(Constraint.conditionsModeType.all_of)) {
         condList = conditions[Constraint.conditionsModeType.all_of];
         if (condList == null)
-            throw new ex.IllegalArgumentException("Expected all_of conditions");
+            throw new ex.IllegalArgumentError("Expected all_of conditions");
 
     } else if (conditions.hasOwnProperty(Constraint.conditionsModeType.any_of)) {
         condList = conditions[Constraint.conditionsModeType.any_of];
         if (condList == null)
-            throw new ex.IllegalArgumentException("Expected any_of conditions");
+            throw new ex.IllegalArgumentError("Expected any_of conditions");
 
     } else if (conditions.hasOwnProperty("operator"))
         return this.isInheritedParsed(conditions, constr, constrContract, contracts, iteration);
     else
-        throw new ex.IllegalArgumentException("Expected all_of or any_of");
+        throw new ex.IllegalArgumentError("Expected all_of or any_of");
 
     if (condList != null)
         for (let item of condList)
@@ -1172,7 +1172,7 @@ Constraint.prototype.isInheritedCondition = function (condition, constr, constrC
         if ((operPos === 0) || ((operPos > 0) && (condition.charAt(operPos - 1) !== '_'))) {
             let subStrR = condition.substring(operPos + operators[i].length);
             if (subStrR.length === 0)
-                throw new ex.IllegalArgumentException("Invalid format of condition: " + condition + ". Missing right operand.");
+                throw new ex.IllegalArgumentError("Invalid format of condition: " + condition + ". Missing right operand.");
 
             let rightOperand = subStrR.replace(/\s/g, "");
 
@@ -1205,17 +1205,17 @@ Constraint.prototype.isInheritedOperand = function (rightOperand, constr, constr
         rightOperandContract = constrContract;
     } else if (rightOperand.startsWith("this.")) {
         if (this.baseContract == null)
-            throw new ex.IllegalArgumentException("Use right operand in condition: " + rightOperand + ". But this contract not initialized.");
+            throw new ex.IllegalArgumentError("Use right operand in condition: " + rightOperand + ". But this contract not initialized.");
 
         rightOperand = rightOperand.substring(5);
         rightOperandContract = this.baseContract;
     } else if ((firstPointPos = rightOperand.indexOf(".")) > 0) {
         if (this.baseContract == null)
-            throw new ex.IllegalArgumentException("Use right operand in condition: " + rightOperand + ". But this contract not initialized.");
+            throw new ex.IllegalArgumentError("Use right operand in condition: " + rightOperand + ". But this contract not initialized.");
 
         let constr = this.baseContract.findConstraintByName(rightOperand.substring(0, firstPointPos));
         if (constr == null)
-            throw new ex.IllegalArgumentException("Not found constraint: " + rightOperand.substring(0, firstPointPos));
+            throw new ex.IllegalArgumentError("Not found constraint: " + rightOperand.substring(0, firstPointPos));
 
         for (let checkedContract of contracts)
             if (constr.isMatchingWithIteration(checkedContract, contracts, iteration + 1))
@@ -1227,13 +1227,13 @@ Constraint.prototype.isInheritedOperand = function (rightOperand, constr, constr
         rightOperand = rightOperand.substring(firstPointPos + 1);
     } else
         //throw "Invalid format of right operand in condition: " + rightOperand + ". Missing contract field.";
-        throw new ex.IllegalArgumentException("Invalid format of right operand in condition: " + rightOperand + ". Missing contract field.");
+        throw new ex.IllegalArgumentError("Invalid format of right operand in condition: " + rightOperand + ". Missing contract field.");
 
     if (rightOperandContract != null)
         right = rightOperandContract.get(rightOperand);
 
     if ((right == null) || !(right instanceof Constraint))
-        throw new ex.IllegalArgumentException("Expected constraint in condition in right operand: " + rightOperand);
+        throw new ex.IllegalArgumentError("Expected constraint in condition in right operand: " + rightOperand);
 
     return right.equals(constr);
 };
@@ -1305,7 +1305,7 @@ Constraint.prototype.assemblyConditions = function(conditions) {
         let condList = conditions[keyName];
 
         if (condList == null)
-            throw new ex.IllegalArgumentException("Expected all_of or any_of conditions");
+            throw new ex.IllegalArgumentError("Expected all_of or any_of conditions");
 
         for (let item of condList) {
             if (typeof item === "string")       // already assembled condition
@@ -1326,7 +1326,7 @@ Constraint.prototype.assemblyConditions = function(conditions) {
         return result;
     }
     else
-        throw new ex.IllegalArgumentException("Expected all_of or any_of");
+        throw new ex.IllegalArgumentError("Expected all_of or any_of");
 };
 
 DefaultBiMapper.registerAdapter(new bs.BiAdapter("Reference", Constraint));
