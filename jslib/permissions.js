@@ -11,6 +11,11 @@ const ex = require("exceptions");
 //Permission
 ///////////////////////////
 
+/**
+ * Abstract permission for the Universa contract. The permission implements the right of a {Role} player (e.g. Universa party, set of keys used in signing the contract) to
+ * perform some change over the contract state. The real permissions are all superclasses of it.
+ */
+
 function Permission(name,role,params) {
     this.name = name;
     this.role = role;
@@ -44,6 +49,11 @@ Permission.forName = function(name, role, params) {
 
 Permission.prototype = Object.create(bs.BiSerializable.prototype);
 
+/**
+ * Check if permission-associated role is allowed for set of keys.
+ * @param keys {iterable<crypto.PrivateKey>} keys to check allowance for
+ * @returns {boolean} indicates if permission is allowed for keys
+ */
 Permission.prototype.isAllowedForKeys = function (keys) {
     return this.role.isAllowedForKeys(keys);
 };
@@ -94,7 +104,7 @@ Permission.prototype.equals = function(to) {
 };
 
 Permission.prototype.checkChanges = function(contract, changed, stateChanges, revokingItems, keys) {
-
+    throw new ex.Exception("not implemented")
 }
 
 
@@ -102,6 +112,14 @@ Permission.prototype.checkChanges = function(contract, changed, stateChanges, re
 //ChangeNumberPermission
 ///////////////////////////
 
+/**
+ * Permission allows to change some numeric (as for now, integer) field, controlling it's range
+ * and delta. This permission could be used more than once allowing for different roles to
+ * change in different range and directions.
+ * @param role {Role} role need to be played to allow permission
+ * @param params {Object} containing fields: min_value, max_value, min_step, max_step
+ * @constructor
+ */
 function ChangeNumberPermission(role,params) {
     Permission.call(this,"decrement_permission",role,params);
     if(params)
@@ -189,6 +207,12 @@ ChangeNumberPermission.prototype.checkChanges = function(contract, changed, stat
 //ChangeOwnerPermission
 ///////////////////////////
 
+/**
+ * Permission allows to change and remove owner role of contract.
+ * @param role {Role} role need to be played to allow permission
+ * @constructor
+ */
+
 function ChangeOwnerPermission(role) {
     Permission.call(this,"change_owner",role,{});
 }
@@ -206,6 +230,13 @@ ChangeOwnerPermission.prototype.checkChanges = function(contract, changed, state
 ///////////////////////////
 //ModifyDataPermission
 ///////////////////////////
+
+/**
+ * Permission allows to change some set of fields. Field values can be limited to a list of values.
+ * @param role {Role} role need to be played to allow permission
+ * @param params {Object} with the only property "fields" containing Object:  fieldName -> inteable<Value> (null for whitelist)
+ * @constructor
+ */
 
 function ModifyDataPermission(role,params) {
     Permission.call(this,"modify_data",role,params);
@@ -277,6 +308,12 @@ ModifyDataPermission.prototype.checkChanges = function(contract, changed, stateC
 //RevokePermission
 ///////////////////////////
 
+/**
+ * Permission allows to revoke contract.
+ * @param role {Role} role need to be played to allow permission
+ * @constructor
+ */
+
 function RevokePermission(role) {
     Permission.call(this,"revoke",role,{});
 }
@@ -288,6 +325,27 @@ RevokePermission.prototype = Object.create(Permission.prototype);
 ///////////////////////////
 //SplitJoinPermission
 ///////////////////////////
+
+/**
+ * Permission to split and join contracts with the split and join of the value of a certain numeric field of contracts.
+ *
+ * For contracts with a certain number field ("amount") the following is allowed:
+ *
+ * - several multiple revisions can be legitimately derived (“split”) from any revision only if their total "amount"
+ * is the same as the "amount" of the base revision;
+ *
+ * - several multiple revisions can be legitimately “joined”  if the result "amount' is the same as the sum of "amounts"
+ * in the base revisions.
+ *
+ * @param role {Role} role need to be played to allow permission
+ * @param params {Object} containing fields: <p>
+ * field_name (field name in {State} data containing value being split/joined), <p>
+ * min_value (bigdecimal represents minimal value), <p>
+ * min_unit (bigdecimal represents minimal unit), <p>
+ * join_match_fields (array of comma-separated pathes to fields that should match for joinable contracts)
+ *
+ * @constructor
+ */
 
 function SplitJoinPermission(role,params) {
     Permission.call(this,"split_join",role,params);

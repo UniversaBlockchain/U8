@@ -1032,7 +1032,7 @@ Contract.prototype.getRevokingItem = function(id) {
  * Useful if you got contracts from third-party and need to sign it.
  * F.e. contracts that should be sign with two persons.
  *
- * @param x - is either key or {Array}/{Set} of keys to sign contract with
+ * @param x -  {(Array<crypto.PrivateKey>|Set<crypto.PrivateKey>|crypto.PrivateKey)} keys to sign contract with
  */
 
 Contract.prototype.addSignatureToSeal = async function(x) {

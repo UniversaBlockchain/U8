@@ -14,6 +14,12 @@ const RequiredMode = {
 };
 
 
+/**
+ * Base class for every role. Defines role name and constraints
+ * @param name {string} name of the role
+ * @constructor
+ */
+
 function Role(name) {
     this.name = name;
     this.comment = null;
@@ -59,6 +65,11 @@ Role.fromDsl = function (name, serializedRole) {
 };
 
 Role.prototype = Object.create(bs.BiSerializable.prototype);
+
+/**
+ * Check if role is valid
+ * @returns {boolean} indicating if role is valid
+ */
 
 Role.prototype.isValid = function() {
     return false;
@@ -109,6 +120,14 @@ Role.prototype.equalsForConstraint = function(to) {
 Role.prototype.containConstraint = function(name) {
     return (this.requiredAllConstraints.has(name) || this.requiredAnyConstraints.has(name));
 };
+
+
+/**
+ * Check if role allowed for a set of keys.
+ * Note that role constraints are also checked (in context of contract role is attached to)
+ * @param keys {iterable<crypto.PrivateKey>} keys to check allowance for
+ * @returns {boolean} if role is allowed for a set of keys
+ */
 
 Role.prototype.isAllowedForKeys = function(keys) {
     return this.isAllowedForConstraints(this.contract == null ? new Set() : this.contract.validRoleConstraints)
@@ -175,6 +194,12 @@ Role.prototype.serialize = function(serializer) {
     return res;
 };
 
+/**
+ * Creates {RoleLink} that points to current role
+ * @param linkName {string} name of the {RoleLink}
+ * @returns {RoleLink} created link
+ */
+
 Role.prototype.linkAs = function (linkName) {
     let newRole = new RoleLink(linkName, name);
     if (this.contract != null)
@@ -187,6 +212,17 @@ Role.prototype.linkAs = function (linkName) {
 ///////////////////////////
 //RoleLink
 ///////////////////////////
+
+/**
+ * A symlink-like role delegate. It uses a named role in the context of a bound {@link Contract},
+ * it delegates all actual work to the target role from the contract roles.
+ * <p>
+ * This is used to assign roles to roles, and to create special roles for permissions, etc.
+ *
+ * @param name name of the link
+ * @param roleName name of the linked role
+ * @constructor
+ */
 
 function RoleLink(name,roleName) {
     Role.call(this,name);
@@ -255,9 +291,20 @@ RoleLink.prototype.serialize = function(serializer) {
     return data;
 };
 
+
+/**
+ * Get role it is linked to
+ * @returns {Role} linked role
+ */
+
 RoleLink.prototype.getRole = function() {
     return this.contract.roles[this.roleName];
 };
+
+/**
+ * Follows the links until real (not link) role is found. It is then returned.
+ * @returns {Role} first non-link role in chain if found. Otherwise {null}
+ */
 
 RoleLink.prototype.resolve = function() {
     let maxDepth = 40;
@@ -306,6 +353,13 @@ const ListRoleMode = {
     QUORUM : "QUORUM"
 };
 
+
+/**
+ * Role combining other roles (sub-roles) in the "and", "or" and "any N of" principle.
+ * @param name name of the link
+ * @param roleName name of the linked role
+ * @constructor
+ */
 
 function ListRole(name) {
     Role.call(this,name);
@@ -465,6 +519,17 @@ ListRole.prototype.initWithDsl = function(serializedRole) {
 //SimpleRole
 ///////////////////////////
 
+/**
+ *  * Base class for any role combination, e.g. single key, any key from a set, all keys from a set, minimum number of key
+ * from a set and so on.
+ * <p>
+ * IMPORTANT, This class express "all_of" logic, e.g. if all of the presented keys are listed, then the role is allowed.
+
+ * @param name {string} name of the role
+ * @param param {(crypto.PrivateKey|crypto.KeyAddress|iterable<crypto.PrivateKey>|iterable<crypto.KeyAddress>)}
+ *
+ * @constructor
+ */
 function SimpleRole(name,param) {
     Role.call(this,name);
     this.keyAddresses = new Set();
@@ -480,6 +545,8 @@ function SimpleRole(name,param) {
                 this.keyAddresses.add(p);
             } else if(p instanceof crypto.PublicKey) {
                 this.keyRecords.set(p,new KeyRecord(p));
+            } else {
+                throw new ex.IllegalArgumentException("invalid param type")
             }
         }
     }
@@ -634,6 +701,7 @@ SimpleRole.prototype.initWithDsl = function(serializedRole) {
 dbm.DefaultBiMapper.registerAdapter(new bs.BiAdapter("RoleLink",RoleLink));
 dbm.DefaultBiMapper.registerAdapter(new bs.BiAdapter("ListRole",ListRole));
 dbm.DefaultBiMapper.registerAdapter(new bs.BiAdapter("SimpleRole",SimpleRole));
+
 
 const RoleExtractor = {
     extractKeys : function (role) {
