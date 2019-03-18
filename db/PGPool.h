@@ -66,8 +66,6 @@ namespace db {
      */
     class BusyConnection {
     public:
-
-        BusyConnection(PGPool& new_parent, std::shared_ptr<PGconn> new_con): parent_(new_parent), con_(new_con) {}
         ~BusyConnection();
 
         /**
@@ -114,6 +112,12 @@ namespace db {
         void updateQueryArr(UpdateSuccessCallback onSuccess, UpdateErrorCallback onError, const std::string& queryString, std::vector<std::any>& params);
 
     private:
+        /**
+         * BusyConnection can be constructed from PGPool implementation only.
+         */
+        BusyConnection(PGPool& new_parent, std::shared_ptr<PGconn> new_con): parent_(new_parent), con_(new_con) {}
+        friend PGPool;
+
         template<typename T>
         void prepareParams(std::vector<std::any>& params, T t) {
             params.push_back(t);
@@ -173,6 +177,7 @@ namespace db {
 
     private:
         std::shared_ptr<PGconn> getUnusedConnection();
+        friend BusyConnection;
 
     private:
         std::queue<std::shared_ptr<PGconn>> connPool_;
