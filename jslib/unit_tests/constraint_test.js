@@ -393,8 +393,8 @@ unit.test("constraint test: checkConstraintsBetweenContracts", async () => {
     tpack.subItems.set(contract3.id, contract3);
     tpack.referencedItems.set(contract3.id, contract3);
 
-    let refContract1 = new Contract.fromSealedBinary(contract1.sealedBinary, tpack);
-    let refContract2 = new Contract.fromSealedBinary(contract3.sealedBinary, tpack);
+    let refContract1 = Contract.fromSealedBinary(contract1.sealedBinary, tpack);
+    let refContract2 = Contract.fromSealedBinary(contract3.sealedBinary, tpack);
 
     await refContract1.check();
     await refContract2.check();

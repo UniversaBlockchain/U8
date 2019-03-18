@@ -22,38 +22,41 @@ class QuantiserException extends Error {
     }
 }
 
-function Quantiser() {
-    this.quantaSum_ = 0;
-    this.quantaLimit_ = -1;
+class Quantiser {
+    constructor() {
+        this.quantaSum_ = 0;
+        this.quantaLimit_ = -1;
 
+    }
+
+    reset(limit) {
+        this.quantaSum_ = 0;
+        this.quantaLimit_ = limit;
+    }
+
+    addWorkCost(cost) {
+        this.quantaSum_ += cost;
+        if (this.quantaLimit_ >= 0)
+            if (this.quantaSum_ > this.quantaLimit_){
+                throw new QuantiserException();
+            }
+    }
+
+    addWorkCostFrom(quantiser) {
+        this.addWorkCost(quantiser.quantaSum_);
+    }
+
+    quantasLeft() {
+        if (this.quantaLimit_ >= 0) {
+            return this.quantaLimit_ - this.quantiser.quantaSum_;
+        }
+        return -1;
+    }
+
+    static quantaPerU = Config.quantiser_quantaPerU;
 }
 
-Quantiser.quantaPerU = Config.quantiser_quantaPerU;
 
-Quantiser.prototype.reset = function(limit) {
-    this.quantaSum_ = 0;
-    this.quantaLimit_ = limit;
-};
-
-Quantiser.prototype.addWorkCost = function(cost){
-    this.quantaSum_ += cost;
-    if (this.quantaLimit_ >= 0)
-        if (this.quantaSum_ > this.quantaLimit_){
-            throw new QuantiserException();
-        }
-};
-
-Quantiser.prototype.addWorkCostFrom = function(quantiser){
-    this.addWorkCost(quantiser.quantaSum_);
-};
-
-
-Quantiser.prototype.quantasLeft = function() {
-    if (this.quantaLimit_ >= 0) {
-        return this.quantaLimit_ - this.quantiser.quantaSum_;
-    }
-    return -1;
-};
 
 ///////////////////////////
 //EXPORTS

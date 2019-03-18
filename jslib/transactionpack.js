@@ -10,43 +10,151 @@ const ex = require("exceptions");
 //TransactionPack
 ///////////////////////////
 
-function TransactionPack(contract) {
-    this.subItems = new t.GenericMap();
-    this.referencedItems = new t.GenericMap();
-    this.keysForPack = new Set();
-    this.contract = contract;
-    if(contract) {
-        this.extractAllSubItemsAndReferenced(contract);
-        this.contract.transactionPack = this;
+class TransactionPack {
+    constructor(contract) {
+        this.subItems = new t.GenericMap();
+        this.referencedItems = new t.GenericMap();
+        this.keysForPack = new Set();
+        this.contract = contract;
+        if(contract) {
+            this.extractAllSubItemsAndReferenced(contract);
+            this.contract.transactionPack = this;
+        }
+        this.packedBinary = null;
     }
-    this.packedBinary = null;
-}
 
+    /**
+     * Method add found contracts in the new items and revoking items to {@see TransactionPack#subItems} and do it
+     * again for each new item.
+     * Also method add to {@see TransactionPack#referencedItems} referenced contracts from given.
+     * @param {Contract} contract - given contract to extract from.
+     */
+    extractAllSubItemsAndReferenced(contract) {
+        for (let c of contract.revokingItems) {
+            this.subItems.set(c.id, c);
+            c.transactionPack = this;
 
-/**
- * Method add found contracts in the new items and revoking items to {@see TransactionPack#subItems} and do it
- * again for each new item.
- * Also method add to {@see TransactionPack#referencedItems} referenced contracts from given.
- * @param {Contract} contract - given contract to extract from.
- */
-TransactionPack.prototype.extractAllSubItemsAndReferenced = function(contract) {
-    for (let c of contract.revokingItems) {
-        this.subItems.set(c.id, c);
-        c.transactionPack = this;
+            for (let ref of c.getReferencedItems())
+                this.referencedItems.set(ref.id, ref);
+        }
 
-        for (let ref of c.getReferencedItems())
+        for (let c of contract.newItems) {
+            this.subItems.set(c.id, c);
+            c.transactionPack = this;
+            this.extractAllSubItemsAndReferenced(c);
+        }
+
+        for (let ref of contract.getReferencedItems())
             this.referencedItems.set(ref.id, ref);
     }
 
-    for (let c of contract.newItems) {
-        this.subItems.set(c.id, c);
-        c.transactionPack = this;
-        this.extractAllSubItemsAndReferenced(c);
+    deserialize(data, deserializer) {
+        if(data.hasOwnProperty("keys")) {
+            for(let keyBinary of deserializer.deserialize(data.keys)) {
+                this.keysForPack.add(new crypto.PublicKey(keyBinary));
+            }
+        }
+
+        if(data.hasOwnProperty("referencedItems")) {
+            for(let referencedBinary of deserializer.deserialize(data.referencedItems)) {
+                let c = new Contract.fromSealedBinary(referencedBinary, this);
+                this.referencedItems.set(c.id, c);
+            }
+        }
+
+        let missingIds = new Set();
+        let allDeps = [];
+        for(let subitemBinary of deserializer.deserialize(data.subItems)) {
+            let deps = new ContractDependencies(subitemBinary);
+            allDeps.push(deps);
+            missingIds.add(deps.id);
+        }
+
+        while (allDeps.length > 0) {
+            let removed = false;
+            for(let i = 0; i < allDeps.length;i++) {
+
+                let found = false;
+                for(let id of allDeps[i].dependencies) {
+                    if(missingIds.has(id)) {
+                        found = true;
+                        break;
+                    }
+                }
+
+                if(!found) {
+                    removed = true;
+                    //TODO: NContracts
+                    let c = new Contract.fromSealedBinary(allDeps[i].binary,this);
+                    this.subItems.set(c.id,c);
+                    missingIds.delete(c.id);
+                    allDeps.splice(i,1);
+                    i--;
+                }
+            }
+
+            if(!removed)
+                throw new ex.IllegalStateError("circle deps in contracts tree");
+        }
+
+        this.contract = Contract.fromSealedBinary(deserializer.deserialize(data.contract),this);
+
     }
 
-    for (let ref of contract.getReferencedItems())
-        this.referencedItems.set(ref.id, ref);
-};
+    serialize(serializer) {
+
+        let subItemBinaries = [];
+        for(let si of this.subItems.values()) {
+            subItemBinaries.push(si.sealedBinary);
+        }
+
+        let res = {
+            contract : this.contract.sealedBinary,
+            subItems : subItemBinaries
+        };
+
+        if(this.referencedItems.size > 0) {
+            let referencesItemBinaries = [];
+            for(let ri of this.referencedItems.values()) {
+                referencesItemBinaries.push(ri.sealedBinary);
+            }
+            res.referencedItems = referencesItemBinaries;
+        }
+
+        if(this.keysForPack.size > 0) {
+            let keyBinaries = [];
+            for(let key of this.keysForPack) {
+                keyBinaries.push(key.packed);
+            }
+            res.keys = keyBinaries;
+        }
+
+        if(this.contract.definition.extendedType) {
+            res.extended_type = this.contract.definition.extendedType;
+        }
+
+        return serializer.serialize(res);
+    }
+
+    pack() {
+        if(this.packedBinary === null) {
+            this.packedBinary = Boss.dump(BossBiMapper.getInstance().serialize(this));
+        }
+        return this.packedBinary;
+    }
+
+    static unpack(bytes) {
+        let x = Boss.load(bytes);
+
+        let res = BossBiMapper.getInstance().deserialize(x);
+        if(res instanceof TransactionPack) {
+            return res;
+        }
+
+        let c = new Contract(bytes);
+        return c.transactionPack;
+    }
+}
 
 
 function ContractDependencies(binary) {
@@ -69,115 +177,6 @@ function ContractDependencies(binary) {
         }
     }
 }
-
-
-
-TransactionPack.prototype.deserialize = function(data,deserializer) {
-    if(data.hasOwnProperty("keys")) {
-        for(let keyBinary of deserializer.deserialize(data.keys)) {
-            this.keysForPack.add(new crypto.PublicKey(keyBinary));
-        }
-    }
-
-    if(data.hasOwnProperty("referencedItems")) {
-        for(let referencedBinary of deserializer.deserialize(data.referencedItems)) {
-            let c = new Contract.fromSealedBinary(referencedBinary, this);
-            this.referencedItems.set(c.id, c);
-        }
-    }
-
-    let missingIds = new Set();
-    let allDeps = [];
-    for(let subitemBinary of deserializer.deserialize(data.subItems)) {
-        let deps = new ContractDependencies(subitemBinary);
-        allDeps.push(deps);
-        missingIds.add(deps.id);
-    }
-
-    while (allDeps.length > 0) {
-        let removed = false;
-        for(let i = 0; i < allDeps.length;i++) {
-
-            let found = false;
-            for(let id of allDeps[i].dependencies) {
-                if(missingIds.has(id)) {
-                    found = true;
-                    break;
-                }
-            }
-
-            if(!found) {
-                removed = true;
-                //TODO: NContracts
-                let c = new Contract.fromSealedBinary(allDeps[i].binary,this);
-                this.subItems.set(c.id,c);
-                missingIds.delete(c.id);
-                allDeps.splice(i,1);
-                i--;
-            }
-        }
-
-        if(!removed)
-            throw new ex.IllegalStateError("circle deps in contracts tree");
-    }
-
-    this.contract = Contract.fromSealedBinary(deserializer.deserialize(data.contract),this);
-
-};
-
-TransactionPack.prototype.serialize = function(serializer) {
-
-    let subItemBinaries = [];
-    for(let si of this.subItems.values()) {
-        subItemBinaries.push(si.sealedBinary);
-    }
-
-    let res = {
-        contract : this.contract.sealedBinary,
-        subItems : subItemBinaries
-    };
-
-    if(this.referencedItems.size > 0) {
-        let referencesItemBinaries = [];
-        for(let ri of this.referencedItems.values()) {
-            referencesItemBinaries.push(ri.sealedBinary);
-        }
-        res.referencedItems = referencesItemBinaries;
-    }
-
-    if(this.keysForPack.size > 0) {
-        let keyBinaries = [];
-        for(let key of this.keysForPack) {
-            keyBinaries.push(key.packed);
-        }
-        res.keys = keyBinaries;
-    }
-
-    if(this.contract.definition.extendedType) {
-        res.extended_type = this.contract.definition.extendedType;
-    }
-
-    return serializer.serialize(res);
-};
-
-TransactionPack.prototype.pack = function() {
-    if(this.packedBinary === null) {
-        this.packedBinary = Boss.dump(BossBiMapper.getInstance().serialize(this));
-    }
-    return this.packedBinary;
-};
-
-TransactionPack.unpack = function(bytes) {
-    let x = Boss.load(bytes);
-
-    let res = BossBiMapper.getInstance().deserialize(x);
-    if(res instanceof TransactionPack) {
-        return res;
-    }
-
-    let c = new Contract(bytes);
-    return c.transactionPack;
-};
 
 
 DefaultBiMapper.registerAdapter(new BiAdapter("TransactionPack",TransactionPack));

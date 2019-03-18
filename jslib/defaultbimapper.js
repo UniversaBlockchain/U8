@@ -1,33 +1,33 @@
 let bs = require("biserializable");
 
 
-function DefaultBiMapper() {
-    bs.BiMapper.call(this);
+class DefaultBiMapper extends bs.BiMapper {
+    constructor() {
+        super();
+    }
+
+    static getInstance() {
+        if(!DefaultBiMapper.instance)
+            DefaultBiMapper.instance = new DefaultBiMapper();
+        return DefaultBiMapper.instance;
+    }
+
+    static registerAdapter(adapter) {
+        this.getInstance().registerAdapter(adapter);
+    }
+
+    static removeAdapter(adapter) {
+        this.getInstance().removeAdapter(adapter);
+    }
+
+    static removeAdapterForType(type) {
+        this.getInstance().removeAdapterForType(type);
+    }
+
+    static removeAdapterForTag(tag) {
+        this.getInstance().removeAdapterForTag(tag);
+    }
 }
-
-DefaultBiMapper.prototype = Object.create(bs.BiMapper.prototype);
-
-DefaultBiMapper.getInstance = function () {
-    if(!DefaultBiMapper.instance)
-        DefaultBiMapper.instance = new DefaultBiMapper();
-    return DefaultBiMapper.instance;
-};
-
-DefaultBiMapper.registerAdapter = function (adapter) {
-    this.getInstance().registerAdapter(adapter);
-};
-
-DefaultBiMapper.removeAdapter = function (adapter) {
-    this.getInstance().removeAdapter(adapter);
-};
-
-DefaultBiMapper.removeAdapterForType = function (type) {
-    this.getInstance().removeAdapterForType(type);
-};
-
-DefaultBiMapper.removeAdapterForTag = function (tag) {
-    this.getInstance().removeAdapterForTag(tag);
-};
 
 
 let binaryAdapter = new bs.BiAdapter("binary",Uint8Array);

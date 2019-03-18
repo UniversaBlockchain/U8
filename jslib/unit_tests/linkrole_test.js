@@ -25,7 +25,7 @@ unit.test("link role serialization", async () => {
 unit.test("link role 1", async () => {
     let k1 = tk.TestKeys.getKey();
     let k2 = tk.TestKeys.getKey();
-    let c = new cnt.Contract.fromPrivateKey(k1);
+    let c = cnt.Contract.fromPrivateKey(k1);
     let  rl = new roles.RoleLink("owner","issuer");
     c.registerRole(rl);
 
@@ -37,7 +37,7 @@ unit.test("link role 1", async () => {
 unit.test("link role many", async () => {
     let k1 = tk.TestKeys.getKey();
     let k2 = tk.TestKeys.getKey();
-    let c = new cnt.Contract.fromPrivateKey(k1);
+    let c = cnt.Contract.fromPrivateKey(k1);
     let  rl = new roles.RoleLink("owner","issuer");
     c.registerRole(rl);
 
