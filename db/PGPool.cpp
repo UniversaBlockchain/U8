@@ -70,44 +70,6 @@ namespace db {
         return getValueByIndex(rowNum, colIndex);
     }
 
-    void QueryResult::cacheResults() {
-        int nRows = PQntuples(pgRes_.get());
-        int nCols = PQnfields(pgRes_.get());
-        cacheRowsCount_ = nRows;
-        cacheColsCount_ = nCols;
-        cache_.resize(nCols*nRows);
-        for (int iRow = 0; iRow < nRows; ++iRow)
-            for (int iCol = 0; iCol < nCols; ++iCol)
-                cache_[iRow*nCols+iCol] = getValueByIndex(iRow, iCol);
-        for (int iCol = 0; iCol < nCols; ++iCol) {
-            std::string name(PQfname(pgRes_.get(), iCol));
-            cacheColNames_[name] = iCol;
-        }
-    }
-
-    byte_vector QueryResult::getCachedValueByIndex(int rowNum, int colIndex) {
-        if (cache_.size() == 0)
-            throw std::invalid_argument("QueryResult::getCachedValueByIndex error: cache is empty, call cacheResults() first");
-        return cache_.at(rowNum * cacheColsCount_ + colIndex);
-    }
-
-    byte_vector QueryResult::getCachedValueByName(int rowNum, const std::string& colName) {
-        if (cache_.size() == 0)
-            throw std::invalid_argument("QueryResult::getCachedValueByName error: cache is empty, call cacheResults() first");
-        if (cacheColNames_.find(colName) == cacheColNames_.end())
-            throw std::invalid_argument("QueryResult::getCachedValueByName error: column not found: " + colName);
-        int colIndex = cacheColNames_[colName];
-        return cache_.at(rowNum * cacheColsCount_ + colIndex);
-    }
-
-    int QueryResult::getCachedColsCount() {
-        return cacheColsCount_;
-    }
-
-    int QueryResult::getCachedRowsCount() {
-        return cacheRowsCount_;
-    }
-
     std::vector<std::vector<byte_vector>> QueryResult::getRows(int maxRows) {
         int nRows = PQntuples(pgRes_.get());
         int nCols = PQnfields(pgRes_.get());

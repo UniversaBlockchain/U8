@@ -428,65 +428,6 @@ TEST_CASE("PGPool") {
         sem.wait();
     }
 
-    SECTION("cache results") {
-        const int TEST_QUERIES_COUNT = 100;
-        Semaphore sem;
-        atomic<int> readyCounter(0);
-        vector<HashId> hashes;
-        for (int i = 0; i < TEST_QUERIES_COUNT; ++i) {
-            // insert with pgPool.execParams()
-            hashes.push_back(HashId::createRandom());
-            pgPool.withConnection([&sem,&readyCounter,&hashes,i](db::BusyConnection&& con){
-                con.updateQuery(
-                        [&sem,&readyCounter](int affectedRows) {
-                            ++readyCounter;
-                            sem.notify();
-                        },
-                        [](const string &errText) {
-                            throw std::runtime_error(errText);
-                        },
-                        "INSERT INTO table1(hash,state,locked_by_id,created_at,expires_at) VALUES ($1, $2, 0, $3, $4)",
-                        hashes.at(i).getDigest(), i*2, i*3,
-                        long(i)*10l
-                );
-            });
-        }
-
-        do {
-            sem.wait();
-            int counterState = int(readyCounter);
-            if (counterState % 100 == 0)
-                cout << "readyCounter: " << counterState << endl;
-        } while (readyCounter < TEST_QUERIES_COUNT);
-        REQUIRE(readyCounter == TEST_QUERIES_COUNT);
-
-        Semaphore sem2;
-        pgPool.withConnection([&sem2,&hashes](db::BusyConnection&& con){
-            con.executeQuery(
-                    [&sem2,&hashes](db::QueryResult &&qr) {
-                        qr.cacheResults();
-                        for (int iRow = 0; iRow < qr.getCachedRowsCount(); ++iRow) {
-                            REQUIRE(qr.getCachedValueByIndex(iRow, 1) == hashes.at(iRow+14).getDigest());
-                            REQUIRE(qr.getCachedValueByName(iRow, "hash") == hashes.at(iRow+14).getDigest());
-                            REQUIRE(db::getIntValue(qr.getCachedValueByIndex(iRow, 2)) == (iRow+14)*2);
-                            REQUIRE(db::getIntValue(qr.getCachedValueByName(iRow, "state")) == (iRow+14)*2);
-                            REQUIRE(db::getIntValue(qr.getCachedValueByIndex(iRow, 4)) == (iRow+14)*3);
-                            REQUIRE(db::getIntValue(qr.getCachedValueByName(iRow, "created_at")) == (iRow+14)*3);
-                            REQUIRE(db::getLongValue(qr.getCachedValueByIndex(iRow, 5)) == (iRow+14)*10);
-                            REQUIRE(db::getLongValue(qr.getCachedValueByName(iRow, "expires_at")) == ((long)iRow+14l)*10l);
-                        }
-                        sem2.notify();
-                    },
-                    [](const string &errText) {
-                        throw std::runtime_error(errText);
-                    },
-                    "SELECT * FROM table1 WHERE state>$1 ORDER BY state ASC LIMIT 10",
-                    13*2
-            );
-        });
-        sem2.wait();
-    }
-
     SECTION("performance: insert line-by-line vs multi insert") {
         const int ROWS_COUNT = 1000;
         const int BUF_SIZE = 20;
@@ -652,7 +593,6 @@ TEST_CASE("PGPool") {
                 queryArray += ")";
                 con.executeQueryArr(
                         [&sem2](db::QueryResult&& qr) {
-                            qr.cacheResults();
                             for (int j = 0; j < SELECTS_BUF_SIZE; ++j)
                                 sem2.notify();
                         },
