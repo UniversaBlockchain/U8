@@ -27,7 +27,7 @@ namespace asyncio {
      * @param handle is pointer to handle of accepted connection (@see IOTLS).
      * @param result is accept TCP connection and TLS handshake result.
      * If isError(result) returns true - use getError(result) to determine the error.
-     * If isError(result) returns false - TCP connection successfully accepted.
+     * If isError(result) returns false - TLS connection successfully accepted.
      */
     typedef std::function<void(IOTLS* handle, ssize_t result)> accept_cb;
 
@@ -132,7 +132,7 @@ namespace asyncio {
                 openTCP_cb callback, int maxConnections = SOMAXCONN);
 
         /**
-         * Asynchronous init, bind and establish an IPv4 or IPv6 TCP connection.
+         * Asynchronous init, bind and establish an IPv4 or IPv6 TLS connection.
          * Use SSL/TLS for decrypt connection.
          *
          * @param IP address for bind socket (IPv4 or IPv6).
