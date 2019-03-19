@@ -9,28 +9,21 @@
 static Persistent<FunctionTemplate> PGPoolTemplate;
 static Persistent<FunctionTemplate> BusyConnectionTemplate;
 
-// PGPool(int poolSize, const std::string& connectString);
-db::PGPool* JsPGPool(const FunctionCallbackInfo<Value> &args) {
-    int poolSize = 0;
-    std::string connectString = "";
+// PGPool methods
 
+void JsPGPoolConnect(const FunctionCallbackInfo<Value> &args) {
     Scripter::unwrapArgs(args, [&](ArgsContext &ac) {
 
         auto scripter = ac.scripter;
         if (args.Length() != 2)
             scripter->throwError("invalid number of arguments");
 
-        poolSize = ac.asInt(0);
-        connectString = ac.asString(1);
+        auto pool = unwrap<db::PGPool>(args.This());
+
+        pair<bool, string> result = pool->connect(ac.asInt(0), ac.asString(1));
+        //ac.setReturnValue(result.second);
     });
-
-    if (poolSize && !connectString.empty())
-        return new db::PGPool(poolSize, connectString);
-    else
-        return nullptr;
 }
-
-// PGPool methods
 
 void JsPGPoolWithConnection(const FunctionCallbackInfo<Value> &args) {
     Scripter::unwrapArgs(args, [&](ArgsContext &ac) {
@@ -49,13 +42,14 @@ void JsPGPoolWithConnection(const FunctionCallbackInfo<Value> &args) {
         Persistent<Function> *pcb = new Persistent<Function>(ac.isolate, fn);
 
         pool->withConnection([=](db::BusyConnection&& conn) {
-            db::BusyConnection connection = std::move(conn);
+            db::BusyConnection* connection = new db::BusyConnection();
+            connection->moveFrom(std::move(conn));
 
             // here we are in another thread
             scripter->inPool([=](auto context) {
                 Isolate *isolate = context->GetIsolate();
                 auto fn = pcb->Get(isolate);
-                Local<Value> res[1] {wrap(BusyConnectionTemplate, isolate, (db::BusyConnection*) &connection)};
+                Local<Value> res[1] {wrap(BusyConnectionTemplate, isolate, connection)};
                 fn->Call(fn, 1, res);
                 delete pcb;
             });
@@ -102,12 +96,13 @@ void JsBusyConnectionExecuteQuery(const FunctionCallbackInfo<Value> &args) {
 // Classes bindings
 
 void JsInitPGPool(Isolate *isolate, const Local<ObjectTemplate> &global) {
-    // Bind object with constructor PGPool(int poolSize, const std::string& connectString);
-    Local<FunctionTemplate> tpl = bindCppClass<db::PGPool>(isolate, "PGPool", JsPGPool);
+    // Bind object with default constructor
+    Local<FunctionTemplate> tpl = bindCppClass<db::PGPool>(isolate, "PGPool");
 
     // instance methods
     auto prototype = tpl->PrototypeTemplate();
     prototype->Set(isolate, "version", String::NewFromUtf8(isolate, "0.0.1"));
+    prototype->Set(isolate, "_connect", FunctionTemplate::New(isolate, JsPGPoolConnect));
     prototype->Set(isolate, "_withConnection", FunctionTemplate::New(isolate, JsPGPoolWithConnection));
     prototype->Set(isolate, "_totalConnections", FunctionTemplate::New(isolate, JsPGPoolTotalConnections));
     prototype->Set(isolate, "_availableConnections", FunctionTemplate::New(isolate, JsPGPoolAvailableConnections));
@@ -118,8 +113,8 @@ void JsInitPGPool(Isolate *isolate, const Local<ObjectTemplate> &global) {
 }
 
 void JsInitBusyConnection(Isolate *isolate, const Local<ObjectTemplate> &global) {
-    // Bind object with constructor
-    /*Local<FunctionTemplate> tpl = bindCppClass<db::BusyConnection>(isolate, "BusyConnection");
+    // Bind object with default constructor
+    Local<FunctionTemplate> tpl = bindCppClass<db::BusyConnection>(isolate, "BusyConnection");
 
     // instance methods
     auto prototype = tpl->PrototypeTemplate();
@@ -128,5 +123,5 @@ void JsInitBusyConnection(Isolate *isolate, const Local<ObjectTemplate> &global)
 
     // register it into global namespace
     BusyConnectionTemplate.Reset(isolate, tpl);
-    global->Set(isolate, "BusyConnection", tpl);*/
+    global->Set(isolate, "BusyConnection", tpl);
 }
