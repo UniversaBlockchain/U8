@@ -176,7 +176,14 @@ namespace db {
     }
 
     BusyConnection::~BusyConnection() {
-        parent_.releaseConnection(con_);
+        if (parent_ != nullptr)
+            parent_->releaseConnection(con_);
+    }
+
+    void BusyConnection::moveFrom(BusyConnection&& other) {
+        parent_ = std::move(other.parent_);
+        con_ = other.con_;
+        other.parent_ = nullptr;
     }
 
     void BusyConnection::executeQueryArr(ExecuteSuccessCallback onSuccess, ExecuteErrorCallback onError, const std::string& queryString, std::vector<std::any>& params) {
@@ -303,7 +310,7 @@ namespace db {
 
     void PGPool::withConnection(WithConnectionCallback callback) {
         threadPool_.execute([callback, this]() {
-            callback(BusyConnection(*this, getUnusedConnection()));
+            callback(BusyConnection(this, getUnusedConnection()));
         });
     }
 
@@ -317,7 +324,7 @@ namespace db {
 
     void PGPool::exec(const std::string &query, QueryCallback callback) {
         threadPool_.execute([callback, query, this]() {
-            BusyConnection bc(*this, getUnusedConnection());
+            BusyConnection bc(this, getUnusedConnection());
             PQsendQuery(bc.conPtr(), query.c_str());
             PQflush(bc.conPtr());
             QueryResultsArr results;

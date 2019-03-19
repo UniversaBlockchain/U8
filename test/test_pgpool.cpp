@@ -75,7 +75,9 @@ TEST_CASE("PGPool") {
                     });
 
             // insert with pgPool.execParams()
-            pgPool.withConnection([&sem,&readyCounter](db::BusyConnection&& con) {
+            pgPool.withConnection([&sem,&readyCounter](db::BusyConnection&& con1) {
+                db::BusyConnection con;
+                con.moveFrom(move(con1));
                 con.executeQuery(
                         [&sem, &readyCounter](db::QueryResult &&qr) {
                             ++readyCounter;
@@ -573,7 +575,9 @@ TEST_CASE("PGPool") {
         for (int i = 0; i < ROWS_COUNT; ++i)
             hashes.push_back(HashId::createRandom());
         for (int i = 0; i < ROWS_COUNT/INSERT_BUF_SIZE; ++i) {
-            pgPool.withConnection([&hashes,i,&sem,&readyCounter](db::BusyConnection&& con){
+            pgPool.withConnection([&hashes,i,&sem,&readyCounter](db::BusyConnection&& con1){
+                db::BusyConnection con;
+                con.moveFrom(move(con1));
                 string query = "INSERT INTO table1(hash,state,locked_by_id,created_at,expires_at) VALUES ";
                 vector<any> params;
                 for (int j = 0; j < INSERT_BUF_SIZE; ++j) {
@@ -612,7 +616,9 @@ TEST_CASE("PGPool") {
         long long t0 = getCurrentTimeMillis();
         Semaphore sem2;
         for (int i = 0; i < SELECTS_COUNT; ++i) {
-            pgPool.withConnection([&hashes,&minstdRand,&sem2](db::BusyConnection&& con){
+            pgPool.withConnection([&hashes,&minstdRand,&sem2](db::BusyConnection&& con1){
+                db::BusyConnection con;
+                con.moveFrom(move(con1));
                 vector<any> params({hashes[minstdRand()%ROWS_COUNT].getDigest()});
                 con.executeQueryArr(
                         [&sem2](db::QueryResult&& qr) {
@@ -632,7 +638,9 @@ TEST_CASE("PGPool") {
 
         long long t1 = getCurrentTimeMillis();
         for (int i = 0; i < SELECTS_COUNT/SELECTS_BUF_SIZE; ++i) {
-            pgPool.withConnection([&hashes,&minstdRand,&sem2](db::BusyConnection&& con){
+            pgPool.withConnection([&hashes,&minstdRand,&sem2](db::BusyConnection&& con1){
+                db::BusyConnection con;
+                con.moveFrom(move(con1));
                 string queryArray = "(";
                 vector<any> params;
                 for (int j = 1; j <= SELECTS_BUF_SIZE; ++j) {

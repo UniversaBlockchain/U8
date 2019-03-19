@@ -88,6 +88,21 @@ namespace db {
      */
     class BusyConnection {
     public:
+
+        /**
+         * For js bindings.
+         */
+        BusyConnection(): parent_(nullptr) {}
+
+        /**
+         * For js bindings.
+         */
+        void moveFrom(BusyConnection&& other);
+
+        /**
+         * By design it should be used from PGPool only.
+         */
+        BusyConnection(PGPool* new_parent, std::shared_ptr<PGconn> new_con): parent_(new_parent), con_(new_con) {}
         ~BusyConnection();
 
         /**
@@ -134,11 +149,6 @@ namespace db {
         void updateQueryArr(UpdateSuccessCallback onSuccess, UpdateErrorCallback onError, const std::string& queryString, std::vector<std::any>& params);
 
     private:
-        /**
-         * BusyConnection can be constructed from PGPool implementation only.
-         */
-        BusyConnection(PGPool& new_parent, std::shared_ptr<PGconn> new_con): parent_(new_parent), con_(new_con) {}
-        friend PGPool;
 
         template<typename T>
         void prepareParams(std::vector<std::any>& params, T t) {
@@ -153,7 +163,7 @@ namespace db {
 
     private:
         std::shared_ptr<PGconn> con_;
-        PGPool& parent_;
+        PGPool* parent_;
     };
 
     /**
@@ -170,6 +180,10 @@ namespace db {
         PGPool(int poolSize, const std::string &host, int port, const std::string &dbname, const std::string &user,
                const std::string &pswd);
 
+        /**
+         * For js bindings.
+         * @return pair with error status and error text. If res.first is true, then db connected correctly. Else see res.second for error text.
+         */
         std::pair<bool,std::string> connect(int poolSize, const std::string& connectString);
 
         /**
