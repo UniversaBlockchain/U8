@@ -261,11 +261,13 @@ namespace db {
         );
     }
 
+    PGPool::PGPool(): threadPool_(1), usedConnectionsCount_(0) {
+    }
+
     PGPool::PGPool(int poolSize, const std::string& connectString) : threadPool_(poolSize), usedConnectionsCount_(0) {
         for (int i = 0; i < poolSize; ++i) {
             std::shared_ptr<PGconn> con;
             con.reset(PQconnectdb(connectString.c_str()), &PQfinish);
-            PQsetnonblocking(con.get(), 1);
             connPool_.push(con);
         }
     }
@@ -276,9 +278,27 @@ namespace db {
             std::shared_ptr<PGconn> con;
             con.reset(PQsetdbLogin(host.c_str(), std::to_string(port).c_str(), nullptr, nullptr, dbname.c_str(),
                                    user.c_str(), pswd.c_str()), &PQfinish);
-            PQsetnonblocking(con.get(), 1);
             connPool_.push(con);
         }
+    }
+
+    std::pair<bool,std::string> PGPool::connect(int poolSize, const std::string& connectString) {
+        if (poolSize < 1l)
+            return make_pair(false, "poolSize must be at least 1");
+        if (connPool_.size() > 0)
+            return make_pair(false, "pgPool is already connected");
+        threadPool_.addWorkers(poolSize-threadPool_.countThreads());
+        for (int i = 0; i < poolSize; ++i) {
+            std::shared_ptr<PGconn> con;
+            pg_conn* pCon = PQconnectdb(connectString.c_str());
+            if (PQstatus(pCon) == CONNECTION_OK) {
+                con.reset(pCon, &PQfinish);
+                connPool_.push(con);
+            } else {
+                return make_pair(false, "unable to connect db");
+            }
+        }
+        return make_pair(true, "");
     }
 
     void PGPool::withConnection(WithConnectionCallback callback) {

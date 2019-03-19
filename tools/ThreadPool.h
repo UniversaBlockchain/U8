@@ -59,6 +59,11 @@ public:
     ~ThreadPool();
 
     /**
+     * Sometimes we need to create ThreadPool not from constructor, but somewhere else in code. This method helps.
+     */
+    void addWorkers(size_t count);
+
+    /**
      * schedule a taks: execute a block in first available thread of the pool
      * @param block labmda to execute.
      */

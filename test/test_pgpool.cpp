@@ -51,7 +51,10 @@ void recreateTestTable() {
 
 TEST_CASE("PGPool") {
     recreateTestTable();
-    db::PGPool pgPool(4, "host=localhost port=5432 dbname=unit_tests");
+    db::PGPool pgPool;
+    auto res = pgPool.connect(4, "host=localhost port=5432 dbname=unit_tests");
+    if (!res.first)
+        throw std::runtime_error(res.second);
 
     SECTION("hello world") {
         const int TEST_QUERIES_COUNT = 100;

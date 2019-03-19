@@ -163,10 +163,14 @@ namespace db {
 
     public:
 
+        PGPool();
+
         PGPool(int poolSize, const std::string& connectString);
 
         PGPool(int poolSize, const std::string &host, int port, const std::string &dbname, const std::string &user,
                const std::string &pswd);
+
+        std::pair<bool,std::string> connect(int poolSize, const std::string& connectString);
 
         /**
          * Get connection from the pool, pass it to the callback and return it to the pool.

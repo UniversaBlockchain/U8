@@ -39,3 +39,9 @@ ThreadPool::~ThreadPool() {
         delete t;
     }
 }
+
+void ThreadPool::addWorkers(size_t count) {
+    maxThreads += count;
+    for (size_t i = 0; i < count; i++)
+        addWorker();
+}
