@@ -11,6 +11,7 @@
 #include "../tools/tools.h"
 #include "basic_builtins.h"
 #include "async_io_bindings.h"
+#include "pg_bindings.h"
 
 static const char *ARGV0 = nullptr;
 
@@ -138,6 +139,8 @@ void Scripter::initialize() {
     JsInitIOTLS(pIsolate, global);
     JsInitIOUDP(pIsolate, global);
     JsInitCrypto(pIsolate,global);
+    JsInitBusyConnection(pIsolate, global);
+    JsInitPGPool(pIsolate, global);
 
     // Save context and wrap weak self:
     context.Reset(pIsolate, v8::Context::New(pIsolate, nullptr, global));

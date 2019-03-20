@@ -21,7 +21,10 @@ void JsPGPoolConnect(const FunctionCallbackInfo<Value> &args) {
         auto pool = unwrap<db::PGPool>(args.This());
 
         pair<bool, string> result = pool->connect(ac.asInt(0), ac.asString(1));
-        //ac.setReturnValue(result.second);
+        string s("");
+        if (!result.first)
+            s = result.second;
+        ac.setReturnValue(ac.v8String(s.c_str()));
     });
 }
 
@@ -52,6 +55,7 @@ void JsPGPoolWithConnection(const FunctionCallbackInfo<Value> &args) {
                 Local<Value> res[1] {wrap(BusyConnectionTemplate, isolate, connection)};
                 fn->Call(fn, 1, res);
                 delete pcb;
+                delete connection;
             });
         });
     });

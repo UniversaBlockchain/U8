@@ -16,7 +16,8 @@
  */
 class DatabaseError extends Error {
     constructor(message = undefined) {
-        super()
+        super();
+        this.message = message;
     }
 }
 
@@ -160,3 +161,4 @@ class SqlDriverResultSet {
 }
 
 
+module.exports = {DatabaseError,SqlStatementError,InvalidParameterError,SqlDriverPool};
