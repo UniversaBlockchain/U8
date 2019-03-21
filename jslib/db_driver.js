@@ -152,6 +152,13 @@ class SqlDriverResultSet {
     }
 
     /**
+     * Return total number of columns in the set.
+     */
+    getColsCount() {
+        throw new DatabaseError("not implemented");
+    }
+
+    /**
      * Return count of rows updated by UPDATE sql query
      */
     getAffectedRows() {

@@ -1,4 +1,5 @@
 import * as db from 'db_driver'
+import {MemoiseMixin} from 'tools'
 
 function connect(connectionString, onConnected, onError, maxConnection = 100) {
     let pool = new PGPool();
@@ -57,6 +58,10 @@ class PgDriverResultSet extends db.SqlDriverResultSet {
         return this.qr._getRowsCount();
     }
 
+    getColsCount() {
+        return this.memoise('__qr_getColsCount', () => this.qr._getColsCount());
+    }
+
     getAffectedRows() {
         return this.qr._getAffectedRows();
     }
@@ -65,9 +70,25 @@ class PgDriverResultSet extends db.SqlDriverResultSet {
         return this.qr._getColNames();
     }
 
+    getRows(maxRows=1024) {
+        let rowsData = this.qr._getRows(maxRows);
+        let colsCount = this.getColsCount();
+        let rowsCount = rowsData.length / colsCount;
+        let res = [];
+        for (let iRow = 0; iRow < rowsCount; ++iRow) {
+            let row = [];
+            for (let iCol = 0; iCol < colsCount; ++iCol)
+                row.push(rowsData[iRow*colsCount+iCol]);
+            res.push(row);
+        }
+        return res;
+    }
+
     close() {
         throw new db.DatabaseError("PgDriverResultSet closes automatically. Don't call close() manually.");
     }
 }
+
+Object.assign(PgDriverResultSet.prototype, MemoiseMixin);
 
 module.exports = {connect};

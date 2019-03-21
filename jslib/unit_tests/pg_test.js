@@ -26,13 +26,17 @@ unit.test("pg_test: hello", async () => {
             pool.withConnection((con) => {
                 console.log("withConnection.callback: con=" + con.constructor.name + ", availableConnections=" + pool.availableConnections());
                 con.executeQuery((r) => {
-                    console.log("con.executeQuery.onSuccess: rowsCount=" + r.getRowsCount() + ", affectedRows="+r.getAffectedRows());
-                    console.log("getColNames: " + r.getColNames());
+                    console.log("con.executeQuery.onSuccess:");
+                    console.log("  getRowsCount: " + r.getRowsCount());
+                    console.log("  getColsCount: " + r.getColsCount());
+                    console.log("  getAffectedRows: " + r.getAffectedRows());
+                    console.log("  getColNames: " + r.getColNames());
+                    console.log("  getRows: " + JSON.stringify(r.getRows(0)));
                     resolver();
                 }, (e) => {
                     console.error("con.executeQuery.onError: " + e);
                     resolver();
-                }, "SELECT 1 AS one, 2 AS two, 3 AS three;");
+                }, "SELECT 1 AS one, 2 AS two, 3 AS three, 'some text' AS text;");
             });
             await promise;
         }

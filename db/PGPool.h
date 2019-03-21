@@ -45,6 +45,11 @@ namespace db {
         int getRowsCount();
 
         /**
+         * Return total number of columns in the set.
+         */
+        int getColsCount();
+
+        /**
          * Useful for UPDATE queries.
          */
         int getAffectedRows();

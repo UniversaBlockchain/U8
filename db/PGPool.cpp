@@ -59,6 +59,10 @@ namespace db {
         return PQntuples(pgRes_.get());
     }
 
+    int QueryResult::getColsCount() {
+        return PQnfields(pgRes_.get());
+    }
+
     int QueryResult::getAffectedRows() {
         return std::stoi(PQcmdTuples(pgRes_.get()));
     }
@@ -309,18 +313,13 @@ namespace db {
     }
 
     std::shared_ptr<PGconn> PGPool::getUnusedConnection() {
-        {
-            std::unique_lock lock(poolMutex_);
-            while (connPool_.empty())
-                poolCV_.wait(lock);
-        }
-        {
-            std::unique_lock lock(poolMutex_);
-            ++usedConnectionsCount_;
-            std::shared_ptr<PGconn> con = connPool_.front();
-            connPool_.pop();
-            return con;
-        }
+        std::unique_lock lock(poolMutex_);
+        while (connPool_.empty())
+            poolCV_.wait(lock);
+        ++usedConnectionsCount_;
+        std::shared_ptr<PGconn> con = connPool_.front();
+        connPool_.pop();
+        return con;
     }
 
     void PGPool::releaseConnection(std::shared_ptr<PGconn> con) {

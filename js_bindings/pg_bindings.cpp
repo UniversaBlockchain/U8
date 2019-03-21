@@ -190,6 +190,20 @@ void JsQueryResultGetRowsCount(const FunctionCallbackInfo<Value> &args) {
     });
 }
 
+void JsQueryResultGetColsCount(const FunctionCallbackInfo<Value> &args) {
+    Scripter::unwrapArgs(args, [&](ArgsContext &ac) {
+
+        auto scripter = ac.scripter;
+        if (args.Length() != 0)
+            scripter->throwError("invalid number of arguments");
+
+        auto pqr = unwrap<db::QueryResult>(args.This());
+
+        unsigned int result = pqr->getColsCount();
+        ac.setReturnValue(result);
+    });
+}
+
 void JsQueryResultGetAffectedRows(const FunctionCallbackInfo<Value> &args) {
     Scripter::unwrapArgs(args, [&](ArgsContext &ac) {
 
@@ -221,6 +235,36 @@ void JsQueryResultGetColNames(const FunctionCallbackInfo<Value> &args) {
     });
 }
 
+void JsQueryResultGetRows(const FunctionCallbackInfo<Value> &args) {
+    Scripter::unwrapArgs(args, [&](ArgsContext &ac) {
+        auto scripter = ac.scripter;
+        if (args.Length() != 1)
+            scripter->throwError("invalid number of arguments");
+
+        auto maxRows = ac.asInt(0);
+
+        auto pqr = unwrap<db::QueryResult>(args.This());
+        auto rows = pqr->getRows(maxRows);
+
+        if (rows.size() == 0) {
+            Local<Value> res[0];
+            Local<Array> result = Array::New(args.GetIsolate(), res, rows.size());
+            ac.setReturnValue(result);
+        } else {
+            auto colsCount = rows[0].size();
+            Local<Value> res[rows.size() * colsCount];
+            for (int iRow = 0; iRow < rows.size(); ++iRow) {
+                for (int iCol = 0; iCol < colsCount; ++iCol) {
+                    res[iRow*colsCount+iCol] = ac.toBinary(rows[iRow][iCol]);
+                }
+            }
+            Local<Array> result = Array::New(args.GetIsolate(), res, rows.size()*colsCount);
+            ac.setReturnValue(result);
+
+        }
+    });
+}
+
 void JsInitQueryResult(Isolate *isolate, const Local<ObjectTemplate> &global) {
     // Bind object with default constructor
     Local<FunctionTemplate> tpl = bindCppClass<db::QueryResult>(isolate, "QueryResult");
@@ -229,8 +273,10 @@ void JsInitQueryResult(Isolate *isolate, const Local<ObjectTemplate> &global) {
     auto prototype = tpl->PrototypeTemplate();
     prototype->Set(isolate, "version", String::NewFromUtf8(isolate, "0.0.1"));
     prototype->Set(isolate, "_getRowsCount", FunctionTemplate::New(isolate, JsQueryResultGetRowsCount));
+    prototype->Set(isolate, "_getColsCount", FunctionTemplate::New(isolate, JsQueryResultGetColsCount));
     prototype->Set(isolate, "_getAffectedRows", FunctionTemplate::New(isolate, JsQueryResultGetAffectedRows));
     prototype->Set(isolate, "_getColNames", FunctionTemplate::New(isolate, JsQueryResultGetColNames));
+    prototype->Set(isolate, "_getRows", FunctionTemplate::New(isolate, JsQueryResultGetRows));
 
     // register it into global namespace
     QueryResultTemplate.Reset(isolate, tpl);
