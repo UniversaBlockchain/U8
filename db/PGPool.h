@@ -23,6 +23,8 @@ namespace db {
      */
     class QueryResult {
     public:
+        QueryResult();
+        void moveFrom(QueryResult&& other);
         QueryResult(pg_result *pgRes);
         bool isError();
         char* getErrorText();

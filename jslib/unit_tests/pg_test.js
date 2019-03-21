@@ -18,14 +18,21 @@ unit.test("pg_test: hello", async () => {
             throw Error("db.connect.onError: " + e);
         }, 8);
 
-        for (let i = 0; i < 1000; ++i) {
+        for (let i = 0; i < 1; ++i) {
             let resolver;
             let promise = new Promise((resolve, reject) => {
                 resolver = resolve;
             });
             pool.withConnection((con) => {
-                //console.log("withConnection.callback: con=" + con + ", availableConnections=" + pool.availableConnections());
-                resolver();
+                console.log("withConnection.callback: con=" + con.constructor.name + ", availableConnections=" + pool.availableConnections());
+                con.executeQuery((r) => {
+                    console.log("con.executeQuery.onSuccess: rowsCount=" + r.getRowsCount() + ", affectedRows="+r.getAffectedRows());
+                    console.log("getColNames: " + r.getColNames());
+                    resolver();
+                }, (e) => {
+                    console.error("con.executeQuery.onError: " + e);
+                    resolver();
+                }, "SELECT 1 AS one, 2 AS two, 3 AS three;");
             });
             await promise;
         }

@@ -18,7 +18,7 @@ class PgDriverPool extends db.SqlDriverPool {
 
     withConnection(callback) {
         this.pool._withConnection((con)=>{
-            callback(con);
+            callback(new PgDriverConnection(con));
         });
         //throw new db.DatabaseError("pg not implemented");
     }
@@ -29,6 +29,44 @@ class PgDriverPool extends db.SqlDriverPool {
 
     availableConnections() {
         return this.pool._availableConnections();
+    }
+}
+
+class PgDriverConnection extends db.SqlDriverConnection {
+    constructor(con) {
+        super();
+        this.con = con;
+    }
+
+    executeQuery(onSuccess, onError, queryString, ...params) {
+        this.con._executeQuery((qr)=>{
+            onSuccess(new PgDriverResultSet(qr));
+        }, (errText)=>{
+            onError(new db.DatabaseError(errText));
+        }, queryString, []);
+    }
+}
+
+class PgDriverResultSet extends db.SqlDriverResultSet {
+    constructor(qr) {
+        super();
+        this.qr = qr;
+    }
+
+    getRowsCount() {
+        return this.qr._getRowsCount();
+    }
+
+    getAffectedRows() {
+        return this.qr._getAffectedRows();
+    }
+
+    getColNames() {
+        return this.qr._getColNames();
+    }
+
+    close() {
+        throw new db.DatabaseError("PgDriverResultSet closes automatically. Don't call close() manually.");
     }
 }
 

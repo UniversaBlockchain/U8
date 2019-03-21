@@ -31,6 +31,14 @@
 
 namespace db {
 
+    QueryResult::QueryResult() {
+    }
+
+    void QueryResult::moveFrom(QueryResult&& other) {
+        pgRes_ = std::move(other.pgRes_);
+        nextRowIndex_ = other.nextRowIndex_;
+    }
+
     QueryResult::QueryResult(pg_result *pgRes) {
         pgRes_.reset(pgRes, &PQclear);
     }

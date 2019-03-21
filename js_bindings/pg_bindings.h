@@ -12,5 +12,6 @@ using namespace std;
 
 void JsInitPGPool(Isolate *isolate, const Local<ObjectTemplate> &global);
 void JsInitBusyConnection(Isolate *isolate, const Local<ObjectTemplate> &global);
+void JsInitQueryResult(Isolate *isolate, const Local<ObjectTemplate> &global);
 
 #endif //U8_PG_BINDINGS_H

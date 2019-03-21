@@ -138,7 +138,8 @@ void Scripter::initialize() {
     JsInitIOTCP(pIsolate, global);
     JsInitIOTLS(pIsolate, global);
     JsInitIOUDP(pIsolate, global);
-    JsInitCrypto(pIsolate,global);
+    JsInitCrypto(pIsolate, global);
+    JsInitQueryResult(pIsolate, global);
     JsInitBusyConnection(pIsolate, global);
     JsInitPGPool(pIsolate, global);
 

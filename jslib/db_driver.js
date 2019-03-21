@@ -152,6 +152,20 @@ class SqlDriverResultSet {
     }
 
     /**
+     * Return count of rows updated by UPDATE sql query
+     */
+    getAffectedRows() {
+        throw new DatabaseError("not implemented");
+    }
+
+    /**
+     * Return {Array} of strings with names of selected columns.
+     */
+    getColNames() {
+        throw new DatabaseError("not implemented");
+    }
+
+    /**
      * Optinally close the resultset. If not called explicitly, driver
      */
     close() {
@@ -161,4 +175,4 @@ class SqlDriverResultSet {
 }
 
 
-module.exports = {DatabaseError,SqlStatementError,InvalidParameterError,SqlDriverPool};
+module.exports = {DatabaseError,SqlStatementError,InvalidParameterError,SqlDriverPool,SqlDriverConnection,SqlDriverResultSet};
