@@ -70,6 +70,10 @@ class PgDriverResultSet extends db.SqlDriverResultSet {
         return this.qr._getColNames();
     }
 
+    getColTypes() {
+        return this.qr._getColTypes();
+    }
+
     getRows(maxRows=1024) {
         let rowsData = this.qr._getRows(maxRows);
         let colsCount = this.getColsCount();

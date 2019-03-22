@@ -26,21 +26,23 @@
 #endif
 
 #include "PGPool.h"
-
+#include "../tools/Semaphore.h"
 
 
 namespace db {
 
-    QueryResult::QueryResult() {
+    QueryResult::QueryResult(): parent_(nullptr) {
+    }
+
+    QueryResult::QueryResult(PGPool* new_parent, pg_result *pgRes): parent_(new_parent) {
+        pgRes_.reset(pgRes, &PQclear);
     }
 
     void QueryResult::moveFrom(QueryResult&& other) {
         pgRes_ = std::move(other.pgRes_);
         nextRowIndex_ = other.nextRowIndex_;
-    }
-
-    QueryResult::QueryResult(pg_result *pgRes) {
-        pgRes_.reset(pgRes, &PQclear);
+        parent_ = other.parent_;
+        other.parent_ = nullptr;
     }
 
     bool QueryResult::isError() {
@@ -116,11 +118,27 @@ namespace db {
         return res;
     }
 
+    std::vector<string> QueryResult::getColTypes() {
+        int nCols = PQnfields(pgRes_.get());
+        std::vector<string> res(nCols);
+        for (int iCol = 0; iCol < nCols; ++iCol)
+            res[iCol] = parent_->getType(PQftype(pgRes_.get(), iCol));
+        return res;
+    }
+
+    short getInt16Value(const byte_vector& val) {
+        auto sz = sizeof(short);
+        if (val.size() != sz)
+            throw std::invalid_argument(
+                    "getInt16Value: wrong data size: " + std::to_string(val.size()) + " bytes received, required " + std::to_string(sz));
+        return be16toh(*(int *) &val[0]);
+    }
+
     int getIntValue(const byte_vector& val) {
         auto sz = sizeof(int);
         if (val.size() != sz)
             throw std::invalid_argument(
-                    "QueryResult::getIntValue: wrong data size: " + std::to_string(val.size()) + " bytes received, required " + std::to_string(sz));
+                    "getIntValue: wrong data size: " + std::to_string(val.size()) + " bytes received, required " + std::to_string(sz));
         return be32toh(*(int *) &val[0]);
     }
 
@@ -128,7 +146,7 @@ namespace db {
         auto sz = sizeof(long long);
         if (val.size() < sz)
             throw std::invalid_argument(
-                    "QueryResult::getLongValue: wrong data size: " + std::to_string(val.size()) + " bytes received, required " + std::to_string(sz));
+                    "getLongValue: wrong data size: " + std::to_string(val.size()) + " bytes received, required " + std::to_string(sz));
         return be64toh(*(long long*)&val[0]);
     }
 
@@ -140,7 +158,7 @@ namespace db {
         auto sz = sizeof(double);
         if (val.size() < sz)
             throw std::invalid_argument(
-                    "QueryResult::getDoubleValue: wrong data size: " + std::to_string(val.size()) + " bytes received, required " + std::to_string(sz));
+                    "getDoubleValue: wrong data size: " + std::to_string(val.size()) + " bytes received, required " + std::to_string(sz));
         long long hval = be64toh(*((long long*)&val[0]));
         return *((double*)&hval);
     }
@@ -216,7 +234,7 @@ namespace db {
             pg_result *r = PQgetResult(conPtr());
             if (r == nullptr)
                 break;
-            results.push_back(QueryResult(r));
+            results.push_back(QueryResult(this->parent_, r));
         }
         if (results.size() == 0) {
             onError("PGPool.executeQuery error: your sql query returns no result, use updateQuery instead.");
@@ -251,6 +269,7 @@ namespace db {
             con.reset(PQconnectdb(connectString.c_str()), &PQfinish);
             connPool_.push(con);
         }
+        loadOids();
     }
 
     PGPool::PGPool(int poolSize, const std::string &host, int port, const std::string &dbname, const std::string &user,
@@ -261,6 +280,7 @@ namespace db {
                                    user.c_str(), pswd.c_str()), &PQfinish);
             connPool_.push(con);
         }
+        loadOids();
     }
 
     std::pair<bool,std::string> PGPool::connect(int poolSize, const std::string& connectString) {
@@ -279,6 +299,9 @@ namespace db {
                 return make_pair(false, "unable to connect db");
             }
         }
+        std::string err = loadOids();
+        if (err.length() > 0l)
+            return make_pair(false, err);
         return make_pair(true, "");
     }
 
@@ -306,7 +329,7 @@ namespace db {
                 pg_result *r = PQgetResult(bc.conPtr());
                 if (r == nullptr)
                     break;
-                results.push_back(QueryResult(r));
+                results.push_back(QueryResult(this, r));
             }
             callback(results);
         });
@@ -320,6 +343,27 @@ namespace db {
         std::shared_ptr<PGconn> con = connPool_.front();
         connPool_.pop();
         return con;
+    }
+
+    string PGPool::loadOids() {
+        Semaphore sem;
+        std::string err("");
+        withConnection([&sem,&err,this](BusyConnection&& con){
+            con.executeQuery([&sem,this](QueryResult&& qr){
+                pgTypes_.clear();
+                for (int i = 0, rowsCount = qr.getRowsCount(); i < rowsCount; ++i) {
+                    int oid = getIntValue(qr.getValueByIndex(i, 0));
+                    pgTypes_[oid] = getStringValue(qr.getValueByIndex(i, 1));
+                }
+                sem.notify();
+            }, [&sem,&err](const std::string& errText){
+                err = "PGPool::loadOids error: unable to load types table, " + errText;
+                sem.notify();
+            },
+            "SELECT oid, typname from pg_type;");
+        });
+        sem.wait();
+        return err;
     }
 
     void PGPool::releaseConnection(std::shared_ptr<PGconn> con) {

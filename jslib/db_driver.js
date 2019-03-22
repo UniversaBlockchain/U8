@@ -135,7 +135,7 @@ class SqlDriverResultSet {
     /**
      * Get {Array} of rows. each row is a plain 0-based javascript array of converted javascript values.
      * If there are less rows than requested, returns all remaining rows. Return empty array when there are
-     * no more rows.
+     * no more rows. If maxRows is 0, returns all resulting data anyway.
      *
      * @param maxRows max number of rows to return
      * @return [Array(Array())] results, could be empty array.
@@ -169,6 +169,13 @@ class SqlDriverResultSet {
      * Return {Array} of strings with names of selected columns.
      */
     getColNames() {
+        throw new DatabaseError("not implemented");
+    }
+
+    /**
+     * Return {Array} with info about types of selected columns. For pg it is an array of Oid.
+     */
+    getColTypes() {
         throw new DatabaseError("not implemented");
     }
 

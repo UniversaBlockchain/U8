@@ -31,12 +31,13 @@ unit.test("pg_test: hello", async () => {
                     console.log("  getColsCount: " + r.getColsCount());
                     console.log("  getAffectedRows: " + r.getAffectedRows());
                     console.log("  getColNames: " + r.getColNames());
+                    console.log("  getColTypes: " + r.getColTypes());
                     console.log("  getRows: " + JSON.stringify(r.getRows(0)));
                     resolver();
                 }, (e) => {
                     console.error("con.executeQuery.onError: " + e);
                     resolver();
-                }, "SELECT 1 AS one, 2 AS two, 3 AS three, 'some text' AS text;");
+                }, "SELECT 1 AS one, 2::bigint AS two, 3 AS three, 'some text' AS text;");
             });
             await promise;
         }

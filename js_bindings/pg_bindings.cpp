@@ -235,6 +235,43 @@ void JsQueryResultGetColNames(const FunctionCallbackInfo<Value> &args) {
     });
 }
 
+void JsQueryResultGetColTypes(const FunctionCallbackInfo<Value> &args) {
+    Scripter::unwrapArgs(args, [&](ArgsContext &ac) {
+        auto scripter = ac.scripter;
+        if (args.Length() != 0)
+            scripter->throwError("invalid number of arguments");
+
+        auto pqr = unwrap<db::QueryResult>(args.This());
+        auto colTypes = pqr->getColTypes();
+
+        Local<Value> res[colTypes.size()];
+        for (int i = 0; i < colTypes.size(); ++i)
+            res[i] = ac.v8String(colTypes[i]);
+            //res[i] = Integer::New(scripter->isolate(), colTypes[i]);
+        Local<Array> result = Array::New(args.GetIsolate(), res, colTypes.size());
+        ac.setReturnValue(result);
+    });
+}
+
+static unordered_map<string, std::function<Local<Value>(ArgsContext &ac, const byte_vector&)>> Converter
+{
+    {"int4", [](ArgsContext &ac, const byte_vector& bv){
+        return Number::New(ac.isolate, db::getIntValue(bv));
+    }},
+    {"int8", [](ArgsContext &ac, const byte_vector& bv){
+        return Number::New(ac.isolate, db::getLongValue(bv));
+    }},
+    {"text", [](ArgsContext &ac, const byte_vector& bv){
+        return ac.v8String(db::getStringValue(bv));
+    }},
+};
+
+Local<Value> getJsValueFromPgResult(ArgsContext &ac, const byte_vector& data, const string& pgType) {
+    if (Converter.find(pgType) != Converter.end())
+        return Converter[pgType](ac, data);
+    return ac.v8String("pg type: " + pgType + " is not bound");
+}
+
 void JsQueryResultGetRows(const FunctionCallbackInfo<Value> &args) {
     Scripter::unwrapArgs(args, [&](ArgsContext &ac) {
         auto scripter = ac.scripter;
@@ -251,11 +288,14 @@ void JsQueryResultGetRows(const FunctionCallbackInfo<Value> &args) {
             Local<Array> result = Array::New(args.GetIsolate(), res, rows.size());
             ac.setReturnValue(result);
         } else {
+            auto colTypes = pqr->getColTypes();
             auto colsCount = rows[0].size();
             Local<Value> res[rows.size() * colsCount];
             for (int iRow = 0; iRow < rows.size(); ++iRow) {
                 for (int iCol = 0; iCol < colsCount; ++iCol) {
-                    res[iRow*colsCount+iCol] = ac.toBinary(rows[iRow][iCol]);
+                    //res[iRow*colsCount+iCol] = ac.toBinary(rows[iRow][iCol]);
+                    //res[iRow*colsCount+iCol] = Number::New(scripter->isolate(), db::getIntValue(rows[iRow][iCol]));
+                    res[iRow*colsCount+iCol] = getJsValueFromPgResult(ac, rows[iRow][iCol], colTypes[iCol]);
                 }
             }
             Local<Array> result = Array::New(args.GetIsolate(), res, rows.size()*colsCount);
@@ -276,6 +316,7 @@ void JsInitQueryResult(Isolate *isolate, const Local<ObjectTemplate> &global) {
     prototype->Set(isolate, "_getColsCount", FunctionTemplate::New(isolate, JsQueryResultGetColsCount));
     prototype->Set(isolate, "_getAffectedRows", FunctionTemplate::New(isolate, JsQueryResultGetAffectedRows));
     prototype->Set(isolate, "_getColNames", FunctionTemplate::New(isolate, JsQueryResultGetColNames));
+    prototype->Set(isolate, "_getColTypes", FunctionTemplate::New(isolate, JsQueryResultGetColTypes));
     prototype->Set(isolate, "_getRows", FunctionTemplate::New(isolate, JsQueryResultGetRows));
 
     // register it into global namespace

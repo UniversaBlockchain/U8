@@ -18,14 +18,16 @@
 
 namespace db {
 
+    class PGPool;
+
     /**
      * Resulting object for sql queries, uses in callback functions.
      */
     class QueryResult {
     public:
         QueryResult();
+        QueryResult(PGPool* new_parent, pg_result *pgRes);
         void moveFrom(QueryResult&& other);
-        QueryResult(pg_result *pgRes);
         bool isError();
         char* getErrorText();
         int getErrorCode();
@@ -59,18 +61,24 @@ namespace db {
          */
         std::vector<std::string> getColNames();
 
+        /**
+         * Return vector of column types as OIDs.
+         */
+        std::vector<string> getColTypes();
+
     private:
         std::shared_ptr<pg_result> pgRes_;
         int nextRowIndex_ = 0;
+        PGPool* parent_;
     };
 
+    short getInt16Value(const byte_vector& val);
     int getIntValue(const byte_vector& val);
     long long getLongValue(const byte_vector& val);
     bool getBoolValue(const byte_vector& val);
     double getDoubleValue(const byte_vector& val);
     std::string getStringValue(const byte_vector& val);
 
-    class PGPool;
     class BusyConnection;
 
     typedef std::vector<QueryResult> QueryResultsArr;
@@ -148,6 +156,9 @@ namespace db {
 
     private:
 
+        void prepareParams(std::vector<std::any>& params) {
+        }
+
         template<typename T>
         void prepareParams(std::vector<std::any>& params, T t) {
             params.push_back(t);
@@ -213,8 +224,14 @@ namespace db {
          */
         void releaseConnection(std::shared_ptr<PGconn> con);
 
+        /**
+         * Returns pg type name by its oid. Oids list are loaded on connection step.
+         */
+        string getType(int oid) {return pgTypes_[oid];};
+
     private:
         std::shared_ptr<PGconn> getUnusedConnection();
+        std::string loadOids();
 
     private:
         std::queue<std::shared_ptr<PGconn>> connPool_;
@@ -222,6 +239,7 @@ namespace db {
         std::condition_variable poolCV_;
         ThreadPool threadPool_;
         std::atomic<size_t> usedConnectionsCount_;
+        std::unordered_map<int, string> pgTypes_;
 
     };
 
