@@ -267,8 +267,12 @@ static unordered_map<string, std::function<Local<Value>(ArgsContext &ac, const b
 };
 
 Local<Value> getJsValueFromPgResult(ArgsContext &ac, const byte_vector& data, const string& pgType) {
-    if (Converter.find(pgType) != Converter.end())
-        return Converter[pgType](ac, data);
+    try {
+        if (Converter.find(pgType) != Converter.end())
+            return Converter[pgType](ac, data);
+    } catch (const std::exception& e) {
+        return ac.v8String(std::string("conversion error: ") + e.what());
+    }
     return ac.v8String("pg type: " + pgType + " is not bound");
 }
 
