@@ -178,7 +178,8 @@ namespace db {
         other.parent_ = nullptr;
     }
 
-    void BusyConnection::executeQueryArr(ExecuteSuccessCallback onSuccess, ExecuteErrorCallback onError, const std::string& queryString, std::vector<std::any>& params) {
+    void BusyConnection::executeQueryArr(ExecuteSuccessCallback onSuccess, ExecuteErrorCallback onError, const std::string& queryString0, std::vector<std::any>& params) {
+        std::string queryString = replacePlaceholders(queryString0);
         const char *values[params.size()];
         int lengths[params.size()];
         int binaryFlags[params.size()];
@@ -251,7 +252,8 @@ namespace db {
         onSuccess(std::move(results[0]));
     }
 
-    void BusyConnection::executeQueryArrStr(ExecuteSuccessCallback onSuccess, ExecuteErrorCallback onError, const std::string& queryString, std::vector<std::any>& params) {
+    void BusyConnection::executeQueryArrStr(ExecuteSuccessCallback onSuccess, ExecuteErrorCallback onError, const std::string& queryString0, std::vector<std::any>& params) {
+        std::string queryString = replacePlaceholders(queryString0);
         const char *values[params.size()];
         int lengths[params.size()];
         int binaryFlags[params.size()];
@@ -441,6 +443,23 @@ namespace db {
         connPool_.push(con);
         poolCV_.notify_one();
         --usedConnectionsCount_;
+    }
+
+    std::string replacePlaceholders(const std::string& s) {
+        std::string res;
+        int copyFrom = 0;
+        int iPlaceholder = 1;
+        for (int i = 0; i < s.length(); ++i) {
+            if (s[i] == '?') {
+                res += std::string(&s[copyFrom], i - copyFrom);
+                res += "$" + std::to_string(iPlaceholder);
+                ++iPlaceholder;
+                copyFrom = i+1;
+            }
+        }
+        if (copyFrom <= s.length())
+            res += std::string(&s[copyFrom], s.length() - copyFrom);
+        return res;
     }
 
 }

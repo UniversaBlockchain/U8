@@ -165,7 +165,7 @@ unit.test("performance: insert line-by-line vs multi insert", async () => {
                     resolver();
             }, e => {
                 throw Error(e);
-            }, "INSERT INTO table1(hash,state,locked_by_id,created_at,expires_at) VALUES ($1, $2, 0, $3, $4)",
+            }, "INSERT INTO table1(hash,state,locked_by_id,created_at,expires_at) VALUES (?, ?, 0, ?, ?)",
             crypto.HashId.of(randomBytes(16)).digest, 4, (new Date().getTime()/1000).toFixed(0),
             (new Date().getTime()/1000 + 31536000).toFixed(0));
         });
@@ -186,7 +186,7 @@ unit.test("performance: insert line-by-line vs multi insert", async () => {
             let query = "INSERT INTO table1(hash,state,locked_by_id,created_at,expires_at) VALUES ";
             let params = [];
             for (let j = 0; j < BUF_SIZE; ++j) {
-                let buf = "($" + (j*4+1) + ",$" + (j*4+2) + ",0,$" + (j*4+3) + ",$" + (j*4+4) + ")";
+                let buf = "(?,?,0,?,?)";
                 params.push(crypto.HashId.of(randomBytes(16)).digest);
                 params.push(4);
                 params.push((new Date().getTime()/1000).toFixed(0));

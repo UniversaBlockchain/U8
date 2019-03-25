@@ -623,3 +623,26 @@ TEST_CASE("PGPool") {
     }
 
 }
+
+TEST_CASE("PGPool_replacePlaceholders") {
+    string s = db::replacePlaceholders("INSERT INTO table1(hash,state,locked_by_id,created_at,expires_at) VALUES (?,?,0,?,?),(?,?,0,?,?)");
+    REQUIRE(s == "INSERT INTO table1(hash,state,locked_by_id,created_at,expires_at) VALUES ($1,$2,0,$3,$4),($5,$6,0,$7,$8)");
+    s = db::replacePlaceholders("?");
+    REQUIRE(s == "$1");
+    s = db::replacePlaceholders("??");
+    REQUIRE(s == "$1$2");
+    s = db::replacePlaceholders("???");
+    REQUIRE(s == "$1$2$3");
+    s = db::replacePlaceholders("???");
+    REQUIRE(s == "$1$2$3");
+    s = db::replacePlaceholders("-?-?-?-");
+    REQUIRE(s == "-$1-$2-$3-");
+    s = db::replacePlaceholders("----");
+    REQUIRE(s == "----");
+    s = db::replacePlaceholders("1");
+    REQUIRE(s == "1");
+    s = db::replacePlaceholders("");
+    REQUIRE(s == "");
+    s = db::replacePlaceholders("-$1-$2-$3-");
+    REQUIRE(s == "-$1-$2-$3-");
+}

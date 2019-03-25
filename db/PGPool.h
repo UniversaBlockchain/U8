@@ -264,6 +264,8 @@ namespace db {
         return s;
     }
 
+    std::string replacePlaceholders(const std::string& s);
+
 }
 
 #endif //U8_PGPOOL_H
