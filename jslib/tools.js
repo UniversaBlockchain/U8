@@ -256,7 +256,7 @@ function randomBytes(count) {
     for(var i = 0;  i < count; ++i) {
         result[i] = Math.floor(Math.random() * 256);
     }
-
+    return result;
 }
 
 

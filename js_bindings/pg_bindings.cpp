@@ -143,7 +143,7 @@ void JsBusyConnectionExecuteQuery(const FunctionCallbackInfo<Value> &args) {
         }, [=](const string& err){
             scripter->inPool([=](auto context) {
                 Isolate *isolate = context->GetIsolate();
-                auto fn = onSuccessPcb->Get(isolate);
+                auto fn = onErrorPcb->Get(isolate);
                 Local<Value> result = scripter->v8String(err);
                 fn->Call(fn, 1, &result);
                 delete onSuccessPcb;
@@ -203,7 +203,7 @@ void JsBusyConnectionUpdateQuery(const FunctionCallbackInfo<Value> &args) {
         }, [=](const string& err){
             scripter->inPool([=](auto context) {
                 Isolate *isolate = context->GetIsolate();
-                auto fn = onSuccessPcb->Get(isolate);
+                auto fn = onErrorPcb->Get(isolate);
                 Local<Value> result = scripter->v8String(err);
                 fn->Call(fn, 1, &result);
                 delete onSuccessPcb;

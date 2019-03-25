@@ -1,6 +1,7 @@
-import {expect, unit, assert} from 'test'
+import {expect, unit, assert, assertSilent} from 'test'
 import * as db from 'pg_driver'
 import {HashId} from 'crypto'
+import {randomBytes} from 'tools'
 
 unit.test("pg_test: hello", async () => {
     try {
@@ -112,23 +113,34 @@ unit.test("pg_test: tables", async () => {
         pool = dbPool;
     }, (e) => {
         throw Error(e);
-    }, 8);
+    }, 80);
 
     let resolver;
     let promise = new Promise((resolve, reject) => {
         resolver = resolve;
     });
+    let counter = 0;
+    let counter_max = 100;
 
-    pool.withConnection(con => {
-        con.executeUpdate(affectedRows => {
-                assert(affectedRows === 1);
-                resolver();
-            }, e => {
-            throw Error(e);
-            }, "INSERT INTO table1(hash,state,locked_by_id,created_at,expires_at) VALUES ($1, $2, 0, $3, $4)",
-            crypto.HashId.of("hello, world").digest, 4, 5, 6,
-        );
-    });
+    let t0 = new Date().getTime();
+    for (let i = 0; i < counter_max; ++i) {
+        pool.withConnection(con => {
+            con.executeUpdate(affectedRows => {
+                    assertSilent(affectedRows === 1);
+                    ++counter;
+                    if (counter % 1000 == 0)
+                        console.log("counter=" + counter);
+                    if (counter >= counter_max)
+                        resolver();
+                }, e => {
+                    throw Error(e);
+                }, "INSERT INTO table1(hash,state,locked_by_id,created_at,expires_at) VALUES ($1, $2, 0, $3, $4)",
+                crypto.HashId.of(randomBytes(16)).digest, 4, 5, 6,
+            );
+        });
+    }
 
     await promise;
+    let dt = new Date().getTime() - t0;
+    //console.log("dt = " + dt + " ms");
 });
