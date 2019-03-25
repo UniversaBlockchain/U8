@@ -433,10 +433,15 @@ TEST_CASE("PGPool") {
         const int BUF_SIZE = 20;
         Semaphore sem;
         atomic<int> readyCounter(0);
+
+        vector<HashId> hashes;
+        for (int i = 0; i < ROWS_COUNT; ++i)
+            hashes.push_back(HashId::createRandom());
+
         long long t0 = getCurrentTimeMillis();
         for (int i = 0; i < ROWS_COUNT; ++i) {
-            pgPool.withConnection([&sem,&readyCounter](db::BusyConnection&& con){
-                vector<any> params({HashId::createRandom().getDigest(), 4, (int)getCurrentTimeMillis() / 1000,
+            pgPool.withConnection([&sem,&readyCounter,&hashes,i](db::BusyConnection&& con){
+                vector<any> params({hashes[i].getDigest(), 4, (int)getCurrentTimeMillis() / 1000,
                                     getCurrentTimeMillis() / 1000l + 31536000l});
                 con.executeUpdateArr(
                         [&sem,&readyCounter](int affectedRows) {
@@ -463,13 +468,13 @@ TEST_CASE("PGPool") {
 
         long long t1 = getCurrentTimeMillis();
         for (int i = 0; i < ROWS_COUNT/BUF_SIZE; ++i) {
-            pgPool.withConnection([&readyCounter,&sem](db::BusyConnection&& con){
+            pgPool.withConnection([&readyCounter,&sem,&hashes,i](db::BusyConnection&& con){
                 string query = "INSERT INTO table1(hash,state,locked_by_id,created_at,expires_at) VALUES ";
                 vector<any> params;
                 for (int j = 0; j < BUF_SIZE; ++j) {
                     char buf[64];
                     snprintf(buf, sizeof(buf), "($%i,$%i,0,$%i,$%i)", j*4+1, j*4+2, j*4+3, j*4+4);
-                    params.push_back(HashId::createRandom().getDigest());
+                    params.push_back(hashes[i*BUF_SIZE+j].getDigest());
                     params.push_back(4);
                     params.push_back((int)getCurrentTimeMillis() / 1000);
                     params.push_back(getCurrentTimeMillis() / 1000l + 31536000l);

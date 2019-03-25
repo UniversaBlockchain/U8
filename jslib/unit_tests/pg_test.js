@@ -145,8 +145,8 @@ unit.test("pg_test: tables", async () => {
 });
 
 unit.test("performance: insert line-by-line vs multi insert", async () => {
-    let ROWS_COUNT = 1000;
-    let BUF_SIZE = 20;
+    let ROWS_COUNT = 10000;
+    let BUF_SIZE = 200;
     let testResult = "";
     let pool = createPool(4);
     let readyCounter = 0;
@@ -154,6 +154,10 @@ unit.test("performance: insert line-by-line vs multi insert", async () => {
     let promise = new Promise((resolve, reject) => {
         resolver = resolve;
     });
+
+    let hashes = [];
+    for (let i = 0; i < ROWS_COUNT; ++i)
+        hashes.push(crypto.HashId.of(randomBytes(16)).digest);
 
     await recreateTestTable()
     let t0 = new Date().getTime();
@@ -166,7 +170,7 @@ unit.test("performance: insert line-by-line vs multi insert", async () => {
             }, e => {
                 throw Error(e);
             }, "INSERT INTO table1(hash,state,locked_by_id,created_at,expires_at) VALUES (?, ?, 0, ?, ?)",
-            crypto.HashId.of(randomBytes(16)).digest, 4, (new Date().getTime()/1000).toFixed(0),
+            hashes[i], 4, (new Date().getTime()/1000).toFixed(0),
             (new Date().getTime()/1000 + 31536000).toFixed(0));
         });
     }
@@ -187,7 +191,7 @@ unit.test("performance: insert line-by-line vs multi insert", async () => {
             let params = [];
             for (let j = 0; j < BUF_SIZE; ++j) {
                 let buf = "(?,?,0,?,?)";
-                params.push(crypto.HashId.of(randomBytes(16)).digest);
+                params.push(hashes[i*BUF_SIZE+j]);
                 params.push(4);
                 params.push((new Date().getTime()/1000).toFixed(0));
                 params.push((new Date().getTime()/1000 + 31536000).toFixed(0));

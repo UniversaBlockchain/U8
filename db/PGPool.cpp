@@ -238,7 +238,7 @@ namespace db {
             results.push_back(QueryResult(this->parent_, r));
         }
         if (results.size() == 0) {
-            onError("PGPool.executeQuery error: your sql query returns no result, use updateQuery instead.");
+            onError("PGPool.executeQuery error: your sql query returns no result, use executeUpdate instead.");
             return;
         }
         if (results.size() > 1) {
@@ -300,7 +300,7 @@ namespace db {
             results.push_back(QueryResult(this->parent_, r));
         }
         if (results.size() == 0) {
-            onError("PGPool.executeQuery error: your sql query returns no result, use updateQuery instead.");
+            onError("PGPool.executeQuery error: your sql query returns no result, use executeUpdate instead.");
             return;
         }
         if (results.size() > 1) {

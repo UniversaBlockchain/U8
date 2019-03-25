@@ -155,7 +155,7 @@ void JsBusyConnectionExecuteQuery(const FunctionCallbackInfo<Value> &args) {
     });
 }
 
-void JsBusyConnectionUpdateQuery(const FunctionCallbackInfo<Value> &args) {
+void JsBusyConnectionExecuteUpdate(const FunctionCallbackInfo<Value> &args) {
     Scripter::unwrapArgs(args, [&](ArgsContext &ac) {
 
         auto scripter = ac.scripter;
@@ -242,7 +242,7 @@ void JsInitBusyConnection(Isolate *isolate, const Local<ObjectTemplate> &global)
     auto prototype = tpl->PrototypeTemplate();
     prototype->Set(isolate, "version", String::NewFromUtf8(isolate, "0.0.1"));
     prototype->Set(isolate, "_executeQuery", FunctionTemplate::New(isolate, JsBusyConnectionExecuteQuery));
-    prototype->Set(isolate, "_updateQuery", FunctionTemplate::New(isolate, JsBusyConnectionUpdateQuery));
+    prototype->Set(isolate, "_executeUpdate", FunctionTemplate::New(isolate, JsBusyConnectionExecuteUpdate));
 
     // register it into global namespace
     BusyConnectionTemplate.Reset(isolate, tpl);
