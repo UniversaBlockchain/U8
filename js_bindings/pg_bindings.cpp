@@ -191,7 +191,7 @@ void JsBusyConnectionUpdateQuery(const FunctionCallbackInfo<Value> &args) {
 
         auto con = unwrap<db::BusyConnection>(args.This());
 
-        con->updateQueryArrStr([=](int affectedRows){
+        con->executeUpdateArrStr([=](int affectedRows){
             scripter->inPool([=](auto context) {
                 Isolate *isolate = context->GetIsolate();
                 auto fn = onSuccessPcb->Get(isolate);

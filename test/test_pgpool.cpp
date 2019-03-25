@@ -223,7 +223,7 @@ TEST_CASE("PGPool") {
 
         // update to hashId2
         pgPool.withConnection([&sem,&hashId2,rowId](db::BusyConnection&& con) {
-            con.updateQuery(
+            con.executeUpdate(
                     [&sem](int affectedRows) {
                         REQUIRE(affectedRows == 1);
                         sem.notify();
@@ -304,7 +304,7 @@ TEST_CASE("PGPool") {
 
         // update to created_at_2 and expires_at_2
         pgPool.withConnection([&sem,created_at_2,expires_at_2,rowId](db::BusyConnection&& con) {
-            con.updateQuery(
+            con.executeUpdate(
                     [&sem](int affectedRows) {
                         REQUIRE(affectedRows == 1);
                         sem.notify();
@@ -391,7 +391,7 @@ TEST_CASE("PGPool") {
 
         // update to text2, bool2, double2
         pgPool.withConnection([&sem,&rowId,text2,bool2,double2](db::BusyConnection&& con) {
-            con.updateQuery(
+            con.executeUpdate(
                     [&sem](int affectedRows) {
                         REQUIRE(affectedRows == 1);
                         sem.notify();
@@ -438,7 +438,7 @@ TEST_CASE("PGPool") {
             pgPool.withConnection([&sem,&readyCounter](db::BusyConnection&& con){
                 vector<any> params({HashId::createRandom().getDigest(), 4, (int)getCurrentTimeMillis() / 1000,
                                     getCurrentTimeMillis() / 1000l + 31536000l});
-                con.updateQueryArr(
+                con.executeUpdateArr(
                         [&sem,&readyCounter](int affectedRows) {
                             ++readyCounter;
                             sem.notify();

@@ -148,21 +148,21 @@ namespace db {
          * @param args optional parameters. If any, the prepared statement should be used.
          */
         template<typename... Args>
-        void updateQuery(UpdateSuccessCallback onSuccess, UpdateErrorCallback onError, const std::string& queryString, Args ...args) {
+        void executeUpdate(UpdateSuccessCallback onSuccess, UpdateErrorCallback onError, const std::string& queryString, Args ...args) {
             std::vector<std::any> params;
             prepareParams(params, args...);
-            updateQueryArr(onSuccess, onError, queryString, params);
+            executeUpdateArr(onSuccess, onError, queryString, params);
         }
 
         /**
-         * Query parameters passes through vector<any>. Useful for big queries, e.g. multi insert; /see {updateQuery}
+         * Query parameters passes through vector<any>. Useful for big queries, e.g. multi insert; /see {executeUpdate}
          */
-        void updateQueryArr(UpdateSuccessCallback onSuccess, UpdateErrorCallback onError, const std::string& queryString, std::vector<std::any>& params);
+        void executeUpdateArr(UpdateSuccessCallback onSuccess, UpdateErrorCallback onError, const std::string& queryString, std::vector<std::any>& params);
 
         /**
          * Query parameters passes through vector<any>; byte_vector in binary mode, all other types as text
          */
-        void updateQueryArrStr(UpdateSuccessCallback onSuccess, UpdateErrorCallback onError, const std::string& queryString, std::vector<std::any>& params);
+        void executeUpdateArrStr(UpdateSuccessCallback onSuccess, UpdateErrorCallback onError, const std::string& queryString, std::vector<std::any>& params);
 
     private:
 

@@ -312,7 +312,7 @@ namespace db {
         onSuccess(std::move(results[0]));
     }
 
-    void BusyConnection::updateQueryArr(UpdateSuccessCallback onSuccess, UpdateErrorCallback onError, const std::string& queryString, std::vector<std::any>& params) {
+    void BusyConnection::executeUpdateArr(UpdateSuccessCallback onSuccess, UpdateErrorCallback onError, const std::string& queryString, std::vector<std::any>& params) {
         executeQueryArr(
             [&onSuccess](QueryResult&& qr){onSuccess(qr.getAffectedRows());},
             [&onError](const string& errText){onError(errText);},
@@ -321,7 +321,7 @@ namespace db {
         );
     }
 
-    void BusyConnection::updateQueryArrStr(UpdateSuccessCallback onSuccess, UpdateErrorCallback onError, const std::string& queryString, std::vector<std::any>& params) {
+    void BusyConnection::executeUpdateArrStr(UpdateSuccessCallback onSuccess, UpdateErrorCallback onError, const std::string& queryString, std::vector<std::any>& params) {
         executeQueryArrStr(
                 [&onSuccess](QueryResult&& qr){onSuccess(qr.getAffectedRows());},
                 [&onError](const string& errText){onError(errText);},
