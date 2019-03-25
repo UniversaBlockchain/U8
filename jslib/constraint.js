@@ -266,6 +266,149 @@ class Constraint extends bs.BiSerializable {
         return val;
     }
 
+    evaluateOperand(operand, typeOfOperand, conversion, refContract, contracts, iteration) {
+        /*Contract operandContract = null;
+        int firstPointPos;
+
+        if (operand == null)
+        throw new IllegalArgumentException("Error evaluate null operand");
+
+        if (typeOfOperand == compareOperandType.FIELD) {
+            if (operand.startsWith("ref.")) {
+            operand = operand.substring(4);
+            operandContract = refContract;
+        } else if (operand.startsWith("this.")) {
+            if (baseContract == null)
+                throw new IllegalArgumentException("Use left operand in expression: " + operand + ". But this contract not initialized.");
+
+            operand = operand.substring(5);
+            operandContract = baseContract;
+        } else if ((firstPointPos = operand.indexOf(".")) > 0) {
+            if (baseContract == null)
+                throw new IllegalArgumentException("Use left operand in expression: " + operand + ". But this contract not initialized.");
+
+            Reference ref = baseContract.findReferenceByName(operand.substring(0, firstPointPos));
+            if (ref == null)
+                throw new IllegalArgumentException("Not found reference: " + operand.substring(0, firstPointPos));
+
+            for (Contract checkedContract : contracts)
+            if (ref.isMatchingWith(checkedContract, contracts, iteration + 1))
+                operandContract = checkedContract;
+
+            if (operandContract == null)
+                throw new IllegalArgumentException("Not found referenced contract for reference: " + operand.substring(0, firstPointPos));
+
+            operand = operand.substring(firstPointPos + 1);
+        } else
+            throw new IllegalArgumentException("Invalid format of left operand in expression: " + operand + ". Missing contract field.");
+
+            return operandContract.get(operand);
+        } else {
+            if (conversion == CONVERSION_BIG_DECIMAL || operand.length() > 9)   // 10 symbols > int32 => operand * operand > int64(long). Use BigDecimal.
+                return new BigDecimal(operand);
+            else if (operand.contains("."))
+                return Double.parseDouble(operand);
+            else
+                return Long.parseLong(operand);
+        }*/
+    }
+
+    evaluateExpression(expression, refContract, contracts, iteration) {
+        /*Object left;
+        Object right;
+        Object result;
+        compareOperandType typeOfLeftOperand;
+        compareOperandType typeOfRightOperand;
+
+        // unpack expression
+        String leftOperand = expression.getString("leftOperand", null);
+        String rightOperand = expression.getString("rightOperand", null);
+
+        Binder leftExpression = expression.getBinder("left", null);
+        Binder rightExpression = expression.getBinder("right", null);
+
+        int operation = expression.getIntOrThrow("operation");
+
+        int typeLeftOperand = expression.getIntOrThrow("typeOfLeftOperand");
+        int typeRightOperand = expression.getIntOrThrow("typeOfRightOperand");
+
+        typeOfLeftOperand = compareOperandType.values()[typeLeftOperand];
+        typeOfRightOperand = compareOperandType.values()[typeRightOperand];
+
+        int leftConversion = expression.getInt("leftConversion", NO_CONVERSION);
+        int rightConversion = expression.getInt("rightConversion", NO_CONVERSION);
+
+        try {
+            // evaluate operands
+            if (typeOfLeftOperand == compareOperandType.EXPRESSION)
+                left = evaluateExpression(leftExpression, refContract, contracts, iteration);
+            else
+                left = evaluateOperand(leftOperand, typeOfLeftOperand, leftConversion, refContract, contracts, iteration);
+
+            if (typeOfRightOperand == compareOperandType.EXPRESSION)
+                right = evaluateExpression(rightExpression, refContract, contracts, iteration);
+            else
+                right = evaluateOperand(rightOperand, typeOfRightOperand, rightConversion, refContract, contracts, iteration);
+
+            if (left == null || right == null)
+                return null;
+
+            // evaluate expression
+            if ((leftConversion == CONVERSION_BIG_DECIMAL) || (rightConversion == CONVERSION_BIG_DECIMAL) ||
+                left.getClass().getName().endsWith("BigDecimal") || right.getClass().getName().endsWith("BigDecimal")) {
+                // BigDecimals
+                if (operation == PLUS)
+                    result = objectCastToBigDecimal(left, null, compareOperandType.FIELD).add(
+                        objectCastToBigDecimal(right, null, compareOperandType.FIELD));
+                else if (operation == MINUS)
+                    result = objectCastToBigDecimal(left, null, compareOperandType.FIELD).subtract(
+                        objectCastToBigDecimal(right, null, compareOperandType.FIELD));
+                else if (operation == MULT)
+                    result = objectCastToBigDecimal(left, null, compareOperandType.FIELD).multiply(
+                        objectCastToBigDecimal(right, null, compareOperandType.FIELD));
+                else if (operation == DIV)
+                    result = objectCastToBigDecimal(left, null, compareOperandType.FIELD).divide(
+                        objectCastToBigDecimal(right, null, compareOperandType.FIELD), RoundingMode.HALF_UP);
+                else
+                    throw new IllegalArgumentException("Unknown operation: " + operation);
+
+            } else if (isObjectMayCastToDouble(left) || isObjectMayCastToDouble(right)) {
+                // Doubles
+                if (operation == PLUS)
+                    result = objectCastToDouble(left) + objectCastToDouble(right);
+                else if (operation == MINUS)
+                    result = objectCastToDouble(left) - objectCastToDouble(right);
+                else if (operation == MULT)
+                    result = objectCastToDouble(left) * objectCastToDouble(right);
+                else if (operation == DIV)
+                    result = objectCastToDouble(left) / objectCastToDouble(right);
+                else
+                    throw new IllegalArgumentException("Unknown operation: " + operation);
+
+            } else if (isObjectMayCastToLong(left) || isObjectMayCastToLong(right)) {
+                // Long integers
+                if (operation == PLUS)
+                    result = objectCastToLong(left) + objectCastToLong(right);
+                else if (operation == MINUS)
+                    result = objectCastToLong(left) - objectCastToLong(right);
+                else if (operation == MULT)
+                    result = objectCastToLong(left) * objectCastToLong(right);
+                else if (operation == DIV)
+                    result = objectCastToLong(left) / objectCastToLong(right);
+                else
+                    throw new IllegalArgumentException("Unknown operation: " + operation);
+
+            } else
+                throw new IllegalArgumentException("Incompatible operand types. Left: " + left.getClass().getName() +
+                    ". Right: " + right.getClass().getName());
+        } catch (Exception e) {
+            e.printStackTrace();
+            throw new IllegalArgumentException("Error evaluate expression: " + e.getMessage());
+        }
+
+        return result;*/
+    }
+
     /**
      * The comparison method for finding constraint contract.
      *
@@ -296,8 +439,20 @@ class Constraint extends bs.BiSerializable {
         let rightOperandContract = null;
         let left = null;
         let right = null;
+        let leftExpression = null;
+        let rightExpression = null;
         let firstPointPos;
 
+        if (leftOperand != null && typeof leftOperand === "object") {
+            leftExpression = leftOperand;
+            leftOperand = undefined;
+        }
+        if (rightOperand != null && typeof rightOperand === "object") {
+            rightExpression = rightOperand;
+            rightOperand = undefined;
+        }
+
+        // get operands
         if (leftOperand != null) {
             if (typeOfLeftOperand === compareOperandType.FIELD) {
                 if (leftOperand.startsWith("ref.")) {
@@ -321,7 +476,7 @@ class Constraint extends bs.BiSerializable {
                             leftOperandContract = checkedContract;
 
                     if (leftOperandContract == null)
-                        return false;
+                        throw new ex.IllegalArgumentError("Not found referenced contract for constraint: " + leftOperand.substring(0, firstPointPos));
 
                     leftOperand = leftOperand.substring(firstPointPos + 1);
                 } else
@@ -349,7 +504,7 @@ class Constraint extends bs.BiSerializable {
                                 leftOperandContract = checkedContract;
 
                         if (leftOperandContract == null)
-                            return false;
+                            throw new ex.IllegalArgumentError("Not found referenced contract for constraint: " + leftOperand);
                     }
                 } else if (leftOperand === "now")
                     left = new Date();
@@ -389,11 +544,27 @@ class Constraint extends bs.BiSerializable {
                 if (rightOperand === "now")
                     right = new Date();
             }
+        }
 
+        // check operator
+        if (rightOperand != null || rightExpression != null) {
             if ((leftOperandContract != null) && (indxOperator !== CAN_PLAY))
                 left = leftOperandContract.get(leftOperand);
             if (rightOperandContract != null)
                 right = rightOperandContract.get(rightOperand);
+
+            if (leftExpression != null) {
+                left = this.evaluateExpression(leftExpression, refContract, contracts, iteration);
+                typeOfLeftOperand = compareOperandType.FIELD;
+                if (left instanceof BigDecimal)
+                    isBigDecimalConversion = true;
+            }
+            if (rightExpression != null) {
+                right = this.evaluateExpression(rightExpression, refContract, contracts, iteration);
+                typeOfRightOperand = compareOperandType.FIELD;
+                if (right instanceof BigDecimal)
+                    isBigDecimalConversion = true;
+            }
 
             try {
                 switch (indxOperator) {
@@ -461,10 +632,10 @@ class Constraint extends bs.BiSerializable {
 
                     case NOT_EQUAL:
                     case EQUAL:
-                        if (typeOfLeftOperand === compareOperandType.FIELD && left == null && rightOperand !== "null")
+                        if (typeOfLeftOperand === compareOperandType.FIELD && left == null && (rightOperand == null || rightOperand !== "null"))
                             break;
 
-                        if (typeOfRightOperand === compareOperandType.FIELD && right == null && leftOperand !== "null")
+                        if (typeOfRightOperand === compareOperandType.FIELD && right == null && (leftOperand == null || leftOperand !== "null"))
                             break;
 
                         if (isBigDecimalConversion) {
@@ -651,7 +822,7 @@ class Constraint extends bs.BiSerializable {
             } catch (e) {
                 throw new ex.IllegalArgumentError("Error compare operands in condition: " + e.toString());
             }
-        } else {       // if rightOperand == null, then operation: defined / undefined
+        } else {       // if rightOperand == null && rightExpression == null, then operation: defined / undefined
             if (indxOperator === DEFINED) {
                 try {
                     if (leftOperandContract.get(leftOperand) != null)
@@ -748,81 +919,86 @@ class Constraint extends bs.BiSerializable {
         throw new ex.IllegalArgumentError("Internal parsing error in expression: " + expression + ". opPos not reached.");
     }
 
-    static parseExpression(expression, topLevel) {
-        /*if (topLevel) {
+    parseExpression(expression, topLevel) {
+        if (topLevel) {
             // remove top-level parentheses
-            int countParentheses = Constraint.countCommonParentheses(expression);
+            let countParentheses = Constraint.countCommonParentheses(expression);
             if (countParentheses > 0)
-                expression = expression.substring(countParentheses, expression.length() - countParentheses);
+                expression = expression.substring(countParentheses, expression.length - countParentheses);
         }
 
-        int opPos = -1;
-        int i = -1;
+        let opPos = -1;
+        let i = -1;
         do {
             i++;
             while ((opPos = expression.indexOf(operations[i], opPos + 1)) > 0 && !Constraint.isTopLevelOperation(expression, opPos));
         } while (opPos <= 0 && i < DIV);
 
         if (opPos <= 0)
-            throw new IllegalArgumentException("Invalid format of expression: " + expression + ". Not found top-level operation.");
+            throw new ex.IllegalArgumentError("Invalid format of expression: " + expression + ". Not found top-level operation.");
 
-        String leftOperand = expression.substring(0, opPos);
-        if (leftOperand.length() == 0)
-            throw new IllegalArgumentException("Invalid format of expression: " + expression + ". Missing left operand.");
+        let leftOperand = expression.substring(0, opPos);
+        if (leftOperand.length === 0)
+            throw new ex.IllegalArgumentError("Invalid format of expression: " + expression + ". Missing left operand.");
 
-        compareOperandType typeLeftOperand = compareOperandType.CONSTOTHER;
-        Binder left = null;
-        boolean leftParentheses = false;
+        let typeLeftOperand = compareOperandType.CONSTOTHER;
+        let leftParentheses = false;
 
-        int countParentheses = Constraint.countCommonParentheses(leftOperand);
+        let countParentheses = Constraint.countCommonParentheses(leftOperand);
         if (countParentheses > 0) {
-            leftOperand = leftOperand.substring(countParentheses, leftOperand.length() - countParentheses);
+            leftOperand = leftOperand.substring(countParentheses, leftOperand.length - countParentheses);
             leftParentheses = true;
         }
 
-        if (isExpression(leftOperand)) {
-            left = Constraint.parseExpression(leftOperand, false);
+        if (this.isExpression(leftOperand)) {
+            leftOperand = this.parseExpression(leftOperand, false);
             typeLeftOperand = compareOperandType.EXPRESSION;
-        } else {
-            if (isFieldOperand(leftOperand))
-                typeLeftOperand = compareOperandType.FIELD;
-        }
+        } else if (Constraint.isFieldOperand(leftOperand))
+            typeLeftOperand = compareOperandType.FIELD;
 
-        String rightOperand = expression.substring(opPos + operations[i].length());
-        if (rightOperand.length() == 0)
-            throw new IllegalArgumentException("Invalid format of expression: " + expression + ". Missing right operand.");
+        let rightOperand = expression.substring(opPos + operations[i].length);
+        if (rightOperand.length === 0)
+            throw new ex.IllegalArgumentError("Invalid format of expression: " + expression + ". Missing right operand.");
 
-        compareOperandType typeRightOperand = compareOperandType.CONSTOTHER;
-        Binder right = null;
-        boolean rightParentheses = false;
+        let typeRightOperand = compareOperandType.CONSTOTHER;
+        let rightParentheses = false;
 
         countParentheses = Constraint.countCommonParentheses(rightOperand);
         if (countParentheses > 0) {
-            rightOperand = rightOperand.substring(countParentheses, rightOperand.length() - countParentheses);
+            rightOperand = rightOperand.substring(countParentheses, rightOperand.length - countParentheses);
             rightParentheses = true;
         }
 
-        if (isExpression(rightOperand)) {
-            right = Constraint.parseExpression(rightOperand, false);
+        if (this.isExpression(rightOperand)) {
+            rightOperand = this.parseExpression(rightOperand, false);
             typeRightOperand = compareOperandType.EXPRESSION;
-        } else if (isFieldOperand(rightOperand))
+        } else if (Constraint.isFieldOperand(rightOperand))
             typeRightOperand = compareOperandType.FIELD;
 
-        int leftConversion = NO_CONVERSION;
-        int rightConversion = NO_CONVERSION;
+        let leftConversion = NO_CONVERSION;
+        let rightConversion = NO_CONVERSION;
 
-        if ((typeLeftOperand == compareOperandType.FIELD) && (leftOperand.endsWith("::number"))) {
+        if ((typeLeftOperand === compareOperandType.FIELD) && (leftOperand.endsWith("::number"))) {
             leftConversion = CONVERSION_BIG_DECIMAL;
-            leftOperand = leftOperand.substring(0, leftOperand.length() - 8);
+            leftOperand = leftOperand.substring(0, leftOperand.length - 8);
         }
 
-        if ((typeRightOperand == compareOperandType.FIELD) && (rightOperand.endsWith("::number"))) {
+        if ((typeRightOperand === compareOperandType.FIELD) && (rightOperand.endsWith("::number"))) {
             rightConversion = CONVERSION_BIG_DECIMAL;
-            rightOperand = rightOperand.substring(0, rightOperand.length() - 8);
+            rightOperand = rightOperand.substring(0, rightOperand.length - 8);
         }
 
-        return packExpression(i, leftOperand, rightOperand, left, right, typeLeftOperand, typeRightOperand,
-            leftConversion, rightConversion, leftParentheses, rightParentheses);*/
+        return {
+            operation: i,
+            leftOperand: leftOperand,
+            rightOperand: rightOperand,
+            typeOfLeftOperand: typeLeftOperand,
+            typeOfRightOperand: typeRightOperand,
+            leftConversion: leftConversion,
+            rightConversion: rightConversion,
+            leftParentheses: leftParentheses,
+            rightParentheses: rightParentheses
+        };
     }
 
     /**
@@ -897,7 +1073,7 @@ class Constraint extends bs.BiSerializable {
                     if (i > EQUAL)
                         throw new ex.IllegalArgumentError("Invalid format of condition: " + condition + ". Operator incompatible with expression in left operand.");
 
-                    leftOperand = Constraint.parseExpression(leftOperand, true);
+                    leftOperand = this.parseExpression(leftOperand, true);
                     typeLeftOperand = compareOperandType.EXPRESSION;
                 } else if (Constraint.isFieldOperand(leftOperand))
                     typeLeftOperand = compareOperandType.FIELD;
@@ -912,7 +1088,7 @@ class Constraint extends bs.BiSerializable {
             let rmarkPos2 = subStrR.lastIndexOf("\"");
 
             if ((rmarkPos1 >= 0) && (rmarkPos1 === rmarkPos2))
-                throw new ex.IllegalArgumentError("Invalid format of condition: " + condition + ". Only one quote is found for rigth operand.");
+                throw new ex.IllegalArgumentError("Invalid format of condition: " + condition + ". Only one quote is found for right operand.");
 
             let rightOperand;
             let typeRightOperand = compareOperandType.CONSTOTHER;
@@ -927,7 +1103,7 @@ class Constraint extends bs.BiSerializable {
                     if (i > EQUAL)
                         throw new ex.IllegalArgumentError("Invalid format of condition: " + condition + ". Operator incompatible with expression in right operand.");
 
-                    rightOperand = Constraint.parseExpression(rightOperand, true);
+                    rightOperand = this.parseExpression(rightOperand, true);
                     typeRightOperand = compareOperandType.EXPRESSION;
                 } else if (Constraint.isFieldOperand(rightOperand))
                     typeRightOperand = compareOperandType.FIELD;
