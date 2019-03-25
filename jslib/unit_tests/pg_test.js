@@ -63,15 +63,20 @@ async function execSync(pool, queryStr) {
     await promise;
 }
 
-async function recreateTestTable() {
-    //alter database unit_tests SET client_min_messages TO WARNING;
-
+function createPool(poolSize) {
     let pool;
     db.connect("host=localhost port=5432 dbname=unit_tests", (dbPool) => {
         pool = dbPool;
     }, (e) => {
         throw Error(e);
-    }, 1);
+    }, poolSize);
+    return pool;
+}
+
+async function recreateTestTable() {
+    //alter database unit_tests SET client_min_messages TO WARNING;
+
+    let pool = createPool(1);
 
     await execSync(pool, `
         drop table if exists table1;
@@ -107,13 +112,7 @@ async function recreateTestTable() {
 
 unit.test("pg_test: tables", async () => {
     await recreateTestTable();
-
-    let pool;
-    db.connect("host=localhost port=5432 dbname=unit_tests", (dbPool) => {
-        pool = dbPool;
-    }, (e) => {
-        throw Error(e);
-    }, 80);
+    let pool = createPool(4);
 
     let resolver;
     let promise = new Promise((resolve, reject) => {
@@ -143,4 +142,72 @@ unit.test("pg_test: tables", async () => {
     await promise;
     let dt = new Date().getTime() - t0;
     //console.log("dt = " + dt + " ms");
+});
+
+unit.test("performance: insert line-by-line vs multi insert", async () => {
+    let ROWS_COUNT = 1000;
+    let BUF_SIZE = 20;
+    let testResult = "";
+    let pool = createPool(4);
+    let readyCounter = 0;
+    let resolver;
+    let promise = new Promise((resolve, reject) => {
+        resolver = resolve;
+    });
+
+    await recreateTestTable()
+    let t0 = new Date().getTime();
+    for (let i = 0; i < ROWS_COUNT; ++i) {
+        pool.withConnection(con => {
+            con.executeUpdate(affectedRows => {
+                readyCounter += 1;
+                if (readyCounter >= ROWS_COUNT)
+                    resolver();
+            }, e => {
+                throw Error(e);
+            }, "INSERT INTO table1(hash,state,locked_by_id,created_at,expires_at) VALUES ($1, $2, 0, $3, $4)",
+            crypto.HashId.of(randomBytes(16)).digest, 4, (new Date().getTime()/1000).toFixed(0),
+            (new Date().getTime()/1000 + 31536000).toFixed(0));
+        });
+    }
+    await promise;
+    let dt = new Date().getTime() - t0;
+    testResult += "line by line: " + dt + " ms";
+
+    await recreateTestTable();
+    readyCounter = 0;
+    promise = new Promise((resolve, reject) => {
+        resolver = resolve;
+    });
+
+    let t1 = new Date().getTime();
+    for (let i = 0; i < ROWS_COUNT/BUF_SIZE; ++i) {
+        pool.withConnection(con => {
+            let query = "INSERT INTO table1(hash,state,locked_by_id,created_at,expires_at) VALUES ";
+            let params = [];
+            for (let j = 0; j < BUF_SIZE; ++j) {
+                let buf = "($" + (j*4+1) + ",$" + (j*4+2) + ",0,$" + (j*4+3) + ",$" + (j*4+4) + ")";
+                params.push(crypto.HashId.of(randomBytes(16)).digest);
+                params.push(4);
+                params.push((new Date().getTime()/1000).toFixed(0));
+                params.push((new Date().getTime()/1000 + 31536000).toFixed(0));
+                if (j > 0)
+                    query += ",";
+                query += buf;
+            }
+            query += " RETURNING id;";
+            con.executeUpdate(affectedRows => {
+                readyCounter += affectedRows;
+                if (readyCounter >= ROWS_COUNT)
+                    resolver();
+            }, e => {
+                throw Error(e);
+            }, query, ...params);
+        });
+    }
+    await promise;
+    dt = new Date().getTime() - t1;
+    testResult += ", multi insert: " + dt + " ms ...";
+
+    console.logPut(testResult);
 });
