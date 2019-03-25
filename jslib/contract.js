@@ -20,7 +20,7 @@ const ExtendedSignature = require("extendedsignature").ExtendedSignature;
 const ex = require("exceptions");
 const yaml = require('yaml');
 
-const MAX_API_LEVEL = 3;
+const MAX_API_LEVEL = 4;
 
 function Context(base) {
     this.base = base;

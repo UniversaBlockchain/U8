@@ -27,6 +27,13 @@ const INHERITS = 11;
 const INHERIT = 12;
 const CAN_PLAY = 13;
 
+//Operations
+const operations = ["+", "-", "*", "/"];
+const PLUS = 0;
+const MINUS = 1;
+const MULT = 2;
+const DIV = 3;
+
 //Conversions
 const NO_CONVERSION = 0;
 const CONVERSION_BIG_DECIMAL = 1;
@@ -40,7 +47,8 @@ const CONVERSION_BIG_DECIMAL = 1;
 const compareOperandType = {
     FIELD : 0,
     CONSTSTR  : 1,
-    CONSTOTHER : 2
+    CONSTOTHER : 2,
+    EXPRESSION : 3
 };
 
 
@@ -220,7 +228,7 @@ class Constraint extends bs.BiSerializable {
         this.baseContract = contract;
     }
 
-    objectCastToTimeSeconds(obj, operand, typeOfOperand) {
+    static objectCastToTimeSeconds(obj, operand, typeOfOperand) {
         let val;
         if ((obj == null) && (typeOfOperand === compareOperandType.FIELD))
             throw new ex.IllegalArgumentError("Error getting operand: " + operand);
@@ -240,10 +248,13 @@ class Constraint extends bs.BiSerializable {
         return val;
     }
 
-    objectCastToBigDecimal(obj, operand, typeOfOperand) {
+    static objectCastToBigDecimal(obj, operand, typeOfOperand) {
         let val;
         if ((obj == null) && (typeOfOperand === compareOperandType.FIELD))
             throw new ex.IllegalArgumentError("Error getting operand: " + operand);
+
+        if ((obj != null) && obj instanceof BigDecimal)
+            return obj;
 
         if ((obj != null) && ((typeof obj === "string") || (typeof obj === "number")))
             val = new BigDecimal(obj);
@@ -397,8 +408,8 @@ class Constraint extends bs.BiSerializable {
                             break;
 
                         if (isBigDecimalConversion) {
-                            let leftBigDecimal = this.objectCastToBigDecimal(left, leftOperand, typeOfLeftOperand);
-                            let rightBigDecimal = this.objectCastToBigDecimal(right, rightOperand, typeOfRightOperand);
+                            let leftBigDecimal = Constraint.objectCastToBigDecimal(left, leftOperand, typeOfLeftOperand);
+                            let rightBigDecimal = Constraint.objectCastToBigDecimal(right, rightOperand, typeOfRightOperand);
 
                             if (((indxOperator === LESS) && (leftBigDecimal.cmp(rightBigDecimal) === -1)) ||
                                 ((indxOperator === MORE) && (leftBigDecimal.cmp(rightBigDecimal) === 1)) ||
@@ -408,8 +419,8 @@ class Constraint extends bs.BiSerializable {
 
                         } else if (((left != null) && left instanceof Date) ||
                             ((right != null) && right instanceof Date)) {
-                            let leftTime = this.objectCastToTimeSeconds(left, leftOperand, typeOfLeftOperand);
-                            let rightTime = this.objectCastToTimeSeconds(right, rightOperand, typeOfRightOperand);
+                            let leftTime = Constraint.objectCastToTimeSeconds(left, leftOperand, typeOfLeftOperand);
+                            let rightTime = Constraint.objectCastToTimeSeconds(right, rightOperand, typeOfRightOperand);
 
                             if (((indxOperator === LESS) && (leftTime < rightTime)) ||
                                 ((indxOperator === MORE) && (leftTime > rightTime)) ||
@@ -457,8 +468,8 @@ class Constraint extends bs.BiSerializable {
                             break;
 
                         if (isBigDecimalConversion) {
-                            let leftBigDecimal = this.objectCastToBigDecimal(left, leftOperand, typeOfLeftOperand);
-                            let rightBigDecimal = this.objectCastToBigDecimal(right, rightOperand, typeOfRightOperand);
+                            let leftBigDecimal = Constraint.objectCastToBigDecimal(left, leftOperand, typeOfLeftOperand);
+                            let rightBigDecimal = Constraint.objectCastToBigDecimal(right, rightOperand, typeOfRightOperand);
 
                             if (((indxOperator === EQUAL) && (leftBigDecimal.cmp(rightBigDecimal) === 0)) ||
                                 ((indxOperator === NOT_EQUAL) && (leftBigDecimal.cmp(rightBigDecimal) !== 0)))
@@ -538,8 +549,8 @@ class Constraint extends bs.BiSerializable {
 
                         } else if (((left != null) && left instanceof Date) ||
                             ((right != null) && right instanceof Date)) {
-                            let leftTime = this.objectCastToTimeSeconds(left, leftOperand, typeOfLeftOperand);
-                            let rightTime = this.objectCastToTimeSeconds(right, rightOperand, typeOfRightOperand);
+                            let leftTime = Constraint.objectCastToTimeSeconds(left, leftOperand, typeOfLeftOperand);
+                            let rightTime = Constraint.objectCastToTimeSeconds(right, rightOperand, typeOfRightOperand);
 
                             if (((indxOperator === NOT_EQUAL) && (leftTime !== rightTime)) ||
                                 ((indxOperator === EQUAL) && (leftTime === rightTime)))
@@ -659,6 +670,161 @@ class Constraint extends bs.BiSerializable {
         return ret;
     }
 
+    static isFieldOperand(operand) {
+        let firstPointPos;
+        return ((firstPointPos = operand.indexOf(".")) > 0) &&
+            (operand.length > firstPointPos + 1) &&
+            ((operand.charAt(firstPointPos + 1) < '0') ||
+             (operand.charAt(firstPointPos + 1) > '9'));
+    }
+
+    isExpression(operand) {
+        if (this.baseContract == null)
+            console.log("WARNING: Need base contract to check API level. Capabilities API level 4 and above disabled.");
+
+        return this.baseContract != null && this.baseContract.apiLevel >= 4 &&
+            operations.some((op, i) => operand.includes(op) && (i !== MINUS || operand.lastIndexOf(op) > 0));
+    }
+
+    static countCommonParentheses(expression) {
+        let commonLevel = 0;
+        while (expression.charAt(commonLevel) === '(')
+            commonLevel++;
+
+        if (commonLevel === 0)
+            return 0;
+
+        let pos = commonLevel;
+        let level = commonLevel;
+        while (pos < expression.length - commonLevel) {
+            if (expression.charAt(pos) === '(')
+                level++;
+
+            if (expression.charAt(pos) === ')') {
+                level--;
+                if (level === 0)
+                    return 0;
+
+                if (level < commonLevel)
+                    commonLevel = level;
+            }
+
+            pos++;
+        }
+
+        if (commonLevel > 0) {
+            if (commonLevel !== level)
+                throw new ex.IllegalArgumentError("Invalid format of expression: " + expression + ". Expected ')'.");
+
+            while (pos < expression.length) {
+                if (expression.charAt(pos) !== ')')
+                    throw new ex.IllegalArgumentError("Invalid format of expression: " + expression + ". Expected ')'.");
+                pos++;
+            }
+        }
+
+        return commonLevel;
+    }
+
+    static isTopLevelOperation(expression, opPos) {
+        let pos = 0;
+        let level = 0;
+        while (pos < expression.length) {
+            if (pos === opPos)
+                return level === 0;
+
+            if (expression.charAt(pos) === '(')
+                level++;
+
+            if (expression.charAt(pos) === ')') {
+                level--;
+                if (level < 0)
+                    throw new ex.IllegalArgumentError("Invalid format of expression: " + expression + ". Not expected ')'.");
+            }
+
+            pos++;
+        }
+
+        throw new ex.IllegalArgumentError("Internal parsing error in expression: " + expression + ". opPos not reached.");
+    }
+
+    static parseExpression(expression, topLevel) {
+        /*if (topLevel) {
+            // remove top-level parentheses
+            int countParentheses = Constraint.countCommonParentheses(expression);
+            if (countParentheses > 0)
+                expression = expression.substring(countParentheses, expression.length() - countParentheses);
+        }
+
+        int opPos = -1;
+        int i = -1;
+        do {
+            i++;
+            while ((opPos = expression.indexOf(operations[i], opPos + 1)) > 0 && !Constraint.isTopLevelOperation(expression, opPos));
+        } while (opPos <= 0 && i < DIV);
+
+        if (opPos <= 0)
+            throw new IllegalArgumentException("Invalid format of expression: " + expression + ". Not found top-level operation.");
+
+        String leftOperand = expression.substring(0, opPos);
+        if (leftOperand.length() == 0)
+            throw new IllegalArgumentException("Invalid format of expression: " + expression + ". Missing left operand.");
+
+        compareOperandType typeLeftOperand = compareOperandType.CONSTOTHER;
+        Binder left = null;
+        boolean leftParentheses = false;
+
+        int countParentheses = Constraint.countCommonParentheses(leftOperand);
+        if (countParentheses > 0) {
+            leftOperand = leftOperand.substring(countParentheses, leftOperand.length() - countParentheses);
+            leftParentheses = true;
+        }
+
+        if (isExpression(leftOperand)) {
+            left = Constraint.parseExpression(leftOperand, false);
+            typeLeftOperand = compareOperandType.EXPRESSION;
+        } else {
+            if (isFieldOperand(leftOperand))
+                typeLeftOperand = compareOperandType.FIELD;
+        }
+
+        String rightOperand = expression.substring(opPos + operations[i].length());
+        if (rightOperand.length() == 0)
+            throw new IllegalArgumentException("Invalid format of expression: " + expression + ". Missing right operand.");
+
+        compareOperandType typeRightOperand = compareOperandType.CONSTOTHER;
+        Binder right = null;
+        boolean rightParentheses = false;
+
+        countParentheses = Constraint.countCommonParentheses(rightOperand);
+        if (countParentheses > 0) {
+            rightOperand = rightOperand.substring(countParentheses, rightOperand.length() - countParentheses);
+            rightParentheses = true;
+        }
+
+        if (isExpression(rightOperand)) {
+            right = Constraint.parseExpression(rightOperand, false);
+            typeRightOperand = compareOperandType.EXPRESSION;
+        } else if (isFieldOperand(rightOperand))
+            typeRightOperand = compareOperandType.FIELD;
+
+        int leftConversion = NO_CONVERSION;
+        int rightConversion = NO_CONVERSION;
+
+        if ((typeLeftOperand == compareOperandType.FIELD) && (leftOperand.endsWith("::number"))) {
+            leftConversion = CONVERSION_BIG_DECIMAL;
+            leftOperand = leftOperand.substring(0, leftOperand.length() - 8);
+        }
+
+        if ((typeRightOperand == compareOperandType.FIELD) && (rightOperand.endsWith("::number"))) {
+            rightConversion = CONVERSION_BIG_DECIMAL;
+            rightOperand = rightOperand.substring(0, rightOperand.length() - 8);
+        }
+
+        return packExpression(i, leftOperand, rightOperand, left, right, typeLeftOperand, typeRightOperand,
+            leftConversion, rightConversion, leftParentheses, rightParentheses);*/
+    }
+
     /**
      * Parse string condition.
      *
@@ -701,7 +867,7 @@ class Constraint extends bs.BiSerializable {
             let lastMarkPos = condition.lastIndexOf("\"");
 
             // Normal situation - operator without quotes
-            while ((operPos >= 0) && ((firstMarkPos >= 0) && (operPos > firstMarkPos) && (operPos < lastMarkPos)))
+            while ((operPos > firstMarkPos) && (firstMarkPos >= 0) && (operPos < lastMarkPos))
                 operPos = condition.indexOf(operators[i], operPos + 1);
 
             // Operator not found
@@ -726,11 +892,14 @@ class Constraint extends bs.BiSerializable {
                 typeLeftOperand = compareOperandType.CONSTSTR;
             } else {
                 leftOperand = subStrL.replace(/\s/g, "");
-                let firstPointPos;
-                if (((firstPointPos = leftOperand.indexOf(".")) > 0) &&
-                    (leftOperand.length > firstPointPos + 1) &&
-                    ((leftOperand.charAt(firstPointPos + 1) < '0') ||
-                        (leftOperand.charAt(firstPointPos + 1) > '9')))
+
+                if (this.isExpression(leftOperand)) {
+                    if (i > EQUAL)
+                        throw new ex.IllegalArgumentError("Invalid format of condition: " + condition + ". Operator incompatible with expression in left operand.");
+
+                    leftOperand = Constraint.parseExpression(leftOperand, true);
+                    typeLeftOperand = compareOperandType.EXPRESSION;
+                } else if (Constraint.isFieldOperand(leftOperand))
                     typeLeftOperand = compareOperandType.FIELD;
             }
 
@@ -753,11 +922,14 @@ class Constraint extends bs.BiSerializable {
                 typeRightOperand = compareOperandType.CONSTSTR;
             } else {
                 rightOperand = subStrR.replace(/\s/g, "");
-                let firstPointPos;
-                if (((firstPointPos = rightOperand.indexOf(".")) > 0) &&
-                    (rightOperand.length > firstPointPos + 1) &&
-                    ((rightOperand.charAt(firstPointPos + 1) < '0') ||
-                        (rightOperand.charAt(firstPointPos + 1) > '9')))
+
+                if (this.isExpression(rightOperand)) {
+                    if (i > EQUAL)
+                        throw new ex.IllegalArgumentError("Invalid format of condition: " + condition + ". Operator incompatible with expression in right operand.");
+
+                    rightOperand = Constraint.parseExpression(rightOperand, true);
+                    typeRightOperand = compareOperandType.EXPRESSION;
+                } else if (Constraint.isFieldOperand(rightOperand))
                     typeRightOperand = compareOperandType.FIELD;
             }
 
@@ -1205,7 +1377,7 @@ class Constraint extends bs.BiSerializable {
      * @param {object} condition - Object of parsed condition.
      * @return {string|null} result with assembled condition.
      */
-    assemblyCondition(condition) {
+    static assemblyCondition(condition) {
 
         if ((condition == null) || (condition === {}))
             return null;
@@ -1274,7 +1446,7 @@ class Constraint extends bs.BiSerializable {
                 else {
                     let assembled = null;
                     if (item.hasOwnProperty("operator"))
-                        assembled = this.assemblyCondition(item);
+                        assembled = Constraint.assemblyCondition(item);
                     else
                         assembled = this.assemblyConditions(item);
 

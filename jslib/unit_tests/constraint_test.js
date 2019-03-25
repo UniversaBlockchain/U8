@@ -14,7 +14,7 @@ const ROOT_PATH = "../test/constraints/";
 
 unit.test("constraint copy test", () => {
 
-    let c1 = new constr.Constraint(null);
+    let c1 = new constr.Constraint(Contract.fromPrivateKey(tk.TestKeys.getKey()));
     c1.name = "c1";
     c1.comment = "c1_comment";
     let conds = {};
@@ -81,12 +81,12 @@ unit.test("constraint test: simple check", async () => {
         "ref.owner == this.creator",
         "ref.owner == this.owner",
         "ref.issuer != \"26RzRJDLqze3P5Z1AzpnucF75RLi1oa6jqBaDh8MJ3XmTaUoF8R\"",
-        "this.owner == " + privateKey.longAddress,
-        "ref.issuer == " + privateKey.longAddress,
-        "ref.owner == " + btoa(privateKey.publicKey.packed),
-        "this.issuer == " + btoa(privateKey.publicKey.packed),
+        "this.owner == \"" + privateKey.longAddress + "\"",
+        "ref.issuer == \"" + privateKey.longAddress + "\"",
+        "ref.owner == \"" + btoa(privateKey.publicKey.packed) + "\"",
+        "this.issuer == \"" + btoa(privateKey.publicKey.packed) + "\"",
         "this.state.data.id_val == ref.id",
-        "ref.id == " + contractRef.id.base64,
+        "ref.id == \"" + contractRef.id.base64 + "\"",
         "now >= ref.definition.created_at",
         "\"2014-03-11 15:04:07\" < now",
         "1000000000 <= this.definition.created_at",
@@ -137,7 +137,7 @@ unit.test("constraint test: refLessOrEquals", async () => {
 
     let contractB = Contract.fromPrivateKey(tk.TestKeys.getKey());
 
-    let c = new constr.Constraint(null);
+    let c = new constr.Constraint(contractB);
     c.type = constr.Constraint.TYPE_EXISTING_STATE;
     let conditions = {};
     conditions[constr.Constraint.conditionsModeType.all_of] = ["ref.state.data.val<=10"];
@@ -165,7 +165,7 @@ unit.test("constraint test: refMissingField", async () => {
 
     let contractB = Contract.fromPrivateKey(tk.TestKeys.getKey());
 
-    let c = new constr.Constraint(null);
+    let c = new constr.Constraint(contractB);
     c.type = constr.Constraint.TYPE_EXISTING_STATE;
     let conditions = {};
     conditions[constr.Constraint.conditionsModeType.all_of] = ["ref.state.data.val>-100"];
@@ -193,7 +193,7 @@ unit.test("constraint test: refMissingFieldConstantForEquals", async () => {
 
     let contractB = Contract.fromPrivateKey(tk.TestKeys.getKey());
 
-    let c = new constr.Constraint(null);
+    let c = new constr.Constraint(contractB);
     c.type = constr.Constraint.TYPE_EXISTING_STATE;
     let conditions = {};
     conditions[constr.Constraint.conditionsModeType.all_of] = ["ref.state.data.val==false",
@@ -223,7 +223,7 @@ unit.test("constraint test: refMissingFieldHashIdForEquals", async () => {
     contractA.state.data["another_val"] = 100;
 
     let contractB = Contract.fromPrivateKey(tk.TestKeys.getKey());
-    let c = new constr.Constraint(null);
+    let c = new constr.Constraint(contractB);
     c.type = constr.Constraint.TYPE_EXISTING_STATE;
     let conditions = {};
     conditions[constr.Constraint.conditionsModeType.all_of] = ["ref.state.data.val!=ref.id", "this.id!=ref.state.data.val"];
@@ -250,7 +250,7 @@ unit.test("constraint test: refMissingFieldRoleForEquals", async () => {
     contractA.state.data["another_val"] = 100;
 
     let contractB = Contract.fromPrivateKey(tk.TestKeys.getKey());
-    let c = new constr.Constraint(null);
+    let c = new constr.Constraint(contractB);
     c.type = constr.Constraint.TYPE_EXISTING_STATE;
     let conditions = {};
     conditions[constr.Constraint.conditionsModeType.all_of] = ["ref.state.data.val!=ref.issuer", "this.issuer!=ref.state.data.val"];
@@ -276,7 +276,7 @@ unit.test("constraint test: refMissingFieldDateTimeForEquals", async () => {
     contractA.state.data["another_val"] = 100;
 
     let contractB = Contract.fromPrivateKey(tk.TestKeys.getKey());
-    let c = new constr.Constraint(null);
+    let c = new constr.Constraint(contractB);
     c.type = constr.Constraint.TYPE_EXISTING_STATE;
     let conditions = {};
     conditions[constr.Constraint.conditionsModeType.all_of] = ["ref.state.data.val!=ref.definition.created_at", "this.definition.created_at!=ref.state.data.val"];
