@@ -376,9 +376,136 @@ unit.test("constraint test: checkConstraints", async () => {
     assert(contract1.constraints.get("ref_can_play").matchingItems.has(contract2));
 });
 
+unit.test("constraint test: checkConstraintsAPILevel4", async () => {
+
+    let contract1 = await Contract.fromDslFile(ROOT_PATH + "ReferencedConditions_contract1_v4.yml");
+    let contract2 = await Contract.fromDslFile(ROOT_PATH + "ReferencedConditions_contract2.yml");
+
+    let privateBytes = await (await io.openRead("../test/_xer0yfe2nn1xthc.private.unikey")).allBytes();
+    let key = new crypto.PrivateKey(privateBytes);
+
+    let conditions = contract1.constraints.get("ref_roles").conditions;
+    let condList = conditions["all_of"];
+
+    // Mirroring conditions with strings
+    condList.push("\"string\"!=ref.state.data.string3");
+    condList.push("\"==INFORMATION==\"==ref.definition.data.string2");
+    condList.push("\"26RzRJDLqze3P5Z1AzpnucF75RLi1oa6jqBaDh8MJ3XmTaUoF8R\"==ref.definition.issuer");
+    condList.push("\"mqIooBcuyMBRLHZGJGQ7osf6TnoWkkVVBGNG0LDuPiZeXahnDxM+PoPMgEuqzOvsfoWNISyqYaCYyR9" +
+        "zCfpZCF6pjZ+HvjsD73pZ6uaXlUY0e72nBPNbAtFhk2pEXyxt\"!= this.id");
+    condList.push("\"HggcAQABxAACzHE9ibWlnK4RzpgFIB4jIg3WcXZSKXNAqOTYUtGXY03xJSwpqE+y/HbqqE0WsmcAt5\n" +
+        "           a0F5H7bz87Uy8Me1UdIDcOJgP8HMF2M0I/kkT6d59ZhYH/TlpDcpLvnJWElZAfOytaICE01bkOkf6M\n" +
+        "           z5egpToDEEPZH/RXigj9wkSXkk43WZSxVY5f2zaVmibUZ9VLoJlmjNTZ+utJUZi66iu9e0SXupOr/+\n" +
+        "           BJL1Gm595w32Fd0141kBvAHYDHz2K3x4m1oFAcElJ83ahSl1u85/naIaf2yuxiQNz3uFMTn0IpULCM\n" +
+        "           vLMvmE+L9io7+KWXld2usujMXI1ycDRw85h6IJlPcKHVQKnJ/4wNBUveBDLFLlOcMpCzWlO/D7M2Iy\n" +
+        "           Na8XEvwPaFJlN1UN/9eVpaRUBEfDq6zi+RC8MaVWzFbNi913suY0Q8F7ejKR6aQvQPuNN6bK6iRYZc\n" +
+        "           hxe/FwWIXOr0C0yA3NFgxKLiKZjkd5eJ84GLy+iD00Rzjom+GG4FDQKr2HxYZDdDuLE4PEpYSzEB/8\n" +
+        "           LyIqeM7dSyaHFTBII/sLuFru6ffoKxBNk/cwAGZqOwD3fkJjNq1R3h6QylWXI/cSO9yRnRMmMBJwal\n" +
+        "           MexOc3/kPEEdfjH/GcJU0Mw6DgoY8QgfaNwXcFbBUvf3TwZ5Mysf21OLHH13g8gzREm+h8c=\"==ref.definition.issuer");
+    condList.push("\"1:25\"==this.state.branchId");
+    contract1.constraints.get("ref_roles").setConditions(conditions);
+
+    conditions = contract1.constraints.get("ref_time").conditions;
+    condList = conditions["all_of"];
+
+    // Mirroring conditions with time string
+    condList.push("\"1977-06-14 16:03:10\"<ref.definition.created_at");
+    condList.push("\"2958-04-18 00:58:00\">this.definition.expires_at");
+    condList.push("\"1968-04-18 23:58:01\" < now");
+    condList.push("\"2086-03-22 11:35:37\"!=now");
+
+    contract1.constraints.get("ref_time").setConditions(conditions);
+
+    await contract2.seal();
+
+    let contract3 = contract2.createRevision([key]);
+    await contract3.seal();
+
+    // signature to check can_play operator
+    await contract2.addSignatureToSeal(key);
+
+    contract1.state.data["contract2_origin"] = contract2.getOrigin().base64;
+    contract1.state.data["contract2_id"] = contract2.id.base64;
+    contract1.state.data["contract3_parent"] = contract3.state.parent.base64;
+
+    contract1.state.setBranchNumber(25);
+
+    await contract1.seal();
+
+    // signature to check can_play operator
+    await contract1.addSignatureToSeal(key);
+
+    let tpack = new tp.TransactionPack(contract1);
+    tpack.subItems.set(contract2.id, contract2);
+    tpack.referencedItems.set(contract2.id, contract2);
+    tpack.subItems.set(contract3.id, contract3);
+    tpack.referencedItems.set(contract3.id, contract3);
+
+    //contract1 = new Contract.fromSealedBinary(contract1.sealedBinary, tpack);
+
+    await contract1.check();
+
+    assert(contract1.constraints.get("ref_roles").matchingItems.has(contract2));
+    assert(contract1.constraints.get("ref_integer").matchingItems.has(contract2));
+    assert(contract1.constraints.get("ref_float").matchingItems.has(contract2));
+    assert(contract1.constraints.get("ref_string").matchingItems.has(contract2));
+    assert(contract1.constraints.get("ref_boolean").matchingItems.has(contract2));
+    assert(contract1.constraints.get("ref_inherited").matchingItems.has(contract2));
+    assert(contract1.constraints.get("ref_time").matchingItems.has(contract2));
+    assert(contract1.constraints.get("ref_hashes").matchingItems.has(contract2));
+    assert(contract1.constraints.get("ref_bigdecimal").matchingItems.has(contract2));
+    assert(contract1.constraints.get("ref_parent").matchingItems.has(contract3));
+    assert(contract1.constraints.get("ref_can_play").matchingItems.has(contract2));
+    assert(contract1.constraints.get("ref_arithmetic").matchingItems.has(contract2));
+});
+
 unit.test("constraint test: checkConstraintsBetweenContracts", async () => {
 
     let contract1 = await Contract.fromDslFile(ROOT_PATH + "Referenced_contract1.yml");
+    let contract2 = await Contract.fromDslFile(ROOT_PATH + "Referenced_contract2.yml");
+    let contract3 = await Contract.fromDslFile(ROOT_PATH + "Referenced_contract3.yml");
+    await contract1.seal();
+    await contract2.seal();
+    await contract3.seal();
+
+    let tpack = new tp.TransactionPack(contract1);
+    tpack.subItems.set(contract1.id, contract1);
+    tpack.referencedItems.set(contract1.id, contract1);
+    tpack.subItems.set(contract2.id, contract2);
+    tpack.referencedItems.set(contract2.id, contract2);
+    tpack.subItems.set(contract3.id, contract3);
+    tpack.referencedItems.set(contract3.id, contract3);
+
+    let refContract1 = Contract.fromSealedBinary(contract1.sealedBinary, tpack);
+    let refContract2 = Contract.fromSealedBinary(contract3.sealedBinary, tpack);
+
+    await refContract1.check();
+    await refContract2.check();
+
+    assert(refContract1.constraints.get("ref_cont").matchingItems.has(refContract1));
+    assert(refContract1.constraints.get("ref_cont").matchingItems.has(contract2));
+    assert(!refContract1.constraints.get("ref_cont").matchingItems.has(contract3));
+
+    assert(!refContract1.constraints.get("ref_cont2").matchingItems.has(refContract1));
+    assert(!refContract1.constraints.get("ref_cont2").matchingItems.has(contract2));
+    assert(refContract1.constraints.get("ref_cont2").matchingItems.has(contract3));
+
+    assert(refContract1.constraints.get("ref_cont_inherit").matchingItems.has(refContract1));
+    assert(!refContract1.constraints.get("ref_cont_inherit").matchingItems.has(contract2));
+    assert(!refContract1.constraints.get("ref_cont_inherit").matchingItems.has(contract3));
+
+    assert(refContract2.constraints.get("ref_cont3").matchingItems.has(contract1));
+    assert(refContract2.constraints.get("ref_cont3").matchingItems.has(contract2));
+    assert(refContract2.constraints.get("ref_cont3").matchingItems.has(refContract2));
+
+    assert(refContract2.constraints.get("ref_cont4").matchingItems.has(contract1));
+    assert(!refContract2.constraints.get("ref_cont4").matchingItems.has(contract2));
+    assert(refContract2.constraints.get("ref_cont4").matchingItems.has(refContract2));
+});
+
+unit.test("constraint test: checkConstraintsBetweenContractsAPILevel4", async () => {
+
+    let contract1 = await Contract.fromDslFile(ROOT_PATH + "Referenced_contract1_v4.yml");
     let contract2 = await Contract.fromDslFile(ROOT_PATH + "Referenced_contract2.yml");
     let contract3 = await Contract.fromDslFile(ROOT_PATH + "Referenced_contract3.yml");
     await contract1.seal();
