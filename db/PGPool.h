@@ -136,6 +136,11 @@ namespace db {
         void executeQueryArr(ExecuteSuccessCallback onSuccess, ExecuteErrorCallback onError, const std::string& queryString, std::vector<std::any>& params);
 
         /**
+         * Query parameters passes through vector<any>; byte_vector in binary mode, all other types as text
+         */
+        void executeQueryArrStr(ExecuteSuccessCallback onSuccess, ExecuteErrorCallback onError, const std::string& queryString, std::vector<std::any>& params);
+
+        /**
          * Execute non-query statement, e.g. data modification or table structure modification statement.
          * @param onSuccess callback that is called when statement is executed with an integer parameter containing number of affected strings.
          * @param onError callback that is called

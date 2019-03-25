@@ -251,6 +251,67 @@ namespace db {
         onSuccess(std::move(results[0]));
     }
 
+    void BusyConnection::executeQueryArrStr(ExecuteSuccessCallback onSuccess, ExecuteErrorCallback onError, const std::string& queryString, std::vector<std::any>& params) {
+        const char *values[params.size()];
+        int lengths[params.size()];
+        int binaryFlags[params.size()];
+        vector<shared_ptr<byte_vector>> bytesHolder;
+        vector<shared_ptr<string>> stringHolder;
+        auto addByteVector = [&bytesHolder,&values,&lengths,&binaryFlags](int i, std::shared_ptr<byte_vector> ps) {
+            bytesHolder.push_back(ps);
+            byte_vector &bv = *ps;
+            values[i] = (char *) &bv[0];
+            lengths[i] = bv.size();
+            binaryFlags[i] = 1;
+        };
+        auto addString = [&stringHolder,&values,&lengths,&binaryFlags](int i, std::shared_ptr<string> ps) {
+            stringHolder.push_back(ps);
+            string &s = *ps;
+            values[i] = (char *) s.c_str();
+            lengths[i] = s.length();
+            binaryFlags[i] = 0;
+        };
+        for (int i = 0; i < params.size(); ++i) {
+            auto &val = params[i];
+            if (val.type() == typeid(byte_vector)) {
+                auto ps = make_shared<byte_vector>(std::any_cast<byte_vector>(val));
+                addByteVector(i, ps);
+            } else if (val.type() == typeid(const char *)) {
+                auto v = std::any_cast<const char *>(val);
+                auto ps = make_shared<string>(v, strlen(v));
+                addString(i, ps);
+            } else if (val.type() == typeid(std::string)) {
+                auto v = std::any_cast<std::string>(val);
+                auto ps = make_shared<string>(v);
+                addString(i, ps);
+            } else {
+                std::cerr << "PGPool.execParams error: wrong type: " << val.type().name() << std::endl;
+            }
+        }
+        PQsendQueryParams(conPtr(), queryString.c_str(), params.size(), nullptr, values, lengths, binaryFlags, 1);
+        PQflush(conPtr());
+        QueryResultsArr results;
+        while (true) {
+            pg_result *r = PQgetResult(conPtr());
+            if (r == nullptr)
+                break;
+            results.push_back(QueryResult(this->parent_, r));
+        }
+        if (results.size() == 0) {
+            onError("PGPool.executeQuery error: your sql query returns no result, use updateQuery instead.");
+            return;
+        }
+        if (results.size() > 1) {
+            onError("PGPool.executeQuery error: your sql query returns "+std::to_string(results.size())+" results, bun only 1 is supported.");
+            return;
+        }
+        if (results[0].isError()) {
+            onError("PGPool.executeQuery error: postgres error: " + std::string(results[0].getErrorText()));
+            return;
+        }
+        onSuccess(std::move(results[0]));
+    }
+
     void BusyConnection::updateQueryArr(UpdateSuccessCallback onSuccess, UpdateErrorCallback onError, const std::string& queryString, std::vector<std::any>& params) {
         executeQueryArr(
             [&onSuccess](QueryResult&& qr){onSuccess(qr.getAffectedRows());},

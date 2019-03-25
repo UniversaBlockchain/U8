@@ -113,10 +113,22 @@ void JsBusyConnectionExecuteQuery(const FunctionCallbackInfo<Value> &args) {
         Persistent<Function> *onErrorPcb = new Persistent<Function>(ac.isolate, onError);
         auto queryString = ac.asString(2);
 
+        vector<any> params;
+        auto arr = v8::Handle<v8::Array>::Cast(args[3]);
+        for (size_t i = 0, count = arr->Length(); i < count; ++i) {
+            if (arr->Get(i)->IsTypedArray()) {
+                auto contents = v8::Handle<v8::Uint8Array>::Cast(arr->Get(i))->Buffer()->GetContents();
+                byte_vector bv(contents.ByteLength());
+                memcpy(&bv[0], contents.Data(), contents.ByteLength());
+                params.push_back(bv);
+            } else {
+                params.push_back(scripter->getString(arr->Get(i)));
+            }
+        }
+
         auto con = unwrap<db::BusyConnection>(args.This());
 
-        vector<any> params;
-        con->executeQueryArr([=](db::QueryResult&& qr){
+        con->executeQueryArrStr([=](db::QueryResult&& qr){
             db::QueryResult* pqr = new db::QueryResult();
             pqr->moveFrom(std::move(qr));
             scripter->inPool([=](auto context) {
@@ -247,7 +259,6 @@ void JsQueryResultGetColTypes(const FunctionCallbackInfo<Value> &args) {
         Local<Value> res[colTypes.size()];
         for (int i = 0; i < colTypes.size(); ++i)
             res[i] = ac.v8String(colTypes[i]);
-            //res[i] = Integer::New(scripter->isolate(), colTypes[i]);
         Local<Array> result = Array::New(args.GetIsolate(), res, colTypes.size());
         ac.setReturnValue(result);
     });
@@ -259,7 +270,7 @@ static unordered_map<string, std::function<Local<Value>(ArgsContext &ac, const b
         return Number::New(ac.isolate, db::getIntValue(bv));
     }},
     {"int8", [](ArgsContext &ac, const byte_vector& bv){
-        return Number::New(ac.isolate, db::getLongValue(bv));
+        return BigInt::New(ac.isolate, db::getLongValue(bv));
     }},
     {"text", [](ArgsContext &ac, const byte_vector& bv){
         return ac.v8String(db::getStringValue(bv));
@@ -297,8 +308,6 @@ void JsQueryResultGetRows(const FunctionCallbackInfo<Value> &args) {
             Local<Value> res[rows.size() * colsCount];
             for (int iRow = 0; iRow < rows.size(); ++iRow) {
                 for (int iCol = 0; iCol < colsCount; ++iCol) {
-                    //res[iRow*colsCount+iCol] = ac.toBinary(rows[iRow][iCol]);
-                    //res[iRow*colsCount+iCol] = Number::New(scripter->isolate(), db::getIntValue(rows[iRow][iCol]));
                     res[iRow*colsCount+iCol] = getJsValueFromPgResult(ac, rows[iRow][iCol], colTypes[iCol]);
                 }
             }

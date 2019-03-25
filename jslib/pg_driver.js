@@ -44,7 +44,7 @@ class PgDriverConnection extends db.SqlDriverConnection {
             onSuccess(new PgDriverResultSet(qr));
         }, (errText)=>{
             onError(new db.DatabaseError(errText));
-        }, queryString, []);
+        }, queryString, params);
     }
 }
 
