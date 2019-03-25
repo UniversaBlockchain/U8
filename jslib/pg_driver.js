@@ -46,6 +46,14 @@ class PgDriverConnection extends db.SqlDriverConnection {
             onError(new db.DatabaseError(errText));
         }, queryString, params);
     }
+
+    executeUpdate(onSuccess, onError, queryString, ...params) {
+        this.con._updateQuery((affectedRows)=>{
+            onSuccess(affectedRows);
+        }, (errText)=>{
+            onError(new db.DatabaseError(errText));
+        }, queryString, params);
+    }
 }
 
 class PgDriverResultSet extends db.SqlDriverResultSet {

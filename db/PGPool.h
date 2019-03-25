@@ -159,6 +159,11 @@ namespace db {
          */
         void updateQueryArr(UpdateSuccessCallback onSuccess, UpdateErrorCallback onError, const std::string& queryString, std::vector<std::any>& params);
 
+        /**
+         * Query parameters passes through vector<any>; byte_vector in binary mode, all other types as text
+         */
+        void updateQueryArrStr(UpdateSuccessCallback onSuccess, UpdateErrorCallback onError, const std::string& queryString, std::vector<std::any>& params);
+
     private:
 
         void prepareParams(std::vector<std::any>& params) {

@@ -4,11 +4,6 @@ import {HashId} from 'crypto'
 
 unit.test("pg_test: hello", async () => {
     try {
-        let a = 1;
-        let b = 2;
-        let c = a + b;
-        assert(c == 3);
-
         let pool;
 
         db.connect("host=localhost port=5432 dbname=unit_tests", (dbPool) => {
@@ -125,12 +120,13 @@ unit.test("pg_test: tables", async () => {
     });
 
     pool.withConnection(con => {
-        con.executeQuery(r => {
+        con.executeUpdate(affectedRows => {
+                assert(affectedRows === 1);
                 resolver();
             }, e => {
             throw Error(e);
             }, "INSERT INTO table1(hash,state,locked_by_id,created_at,expires_at) VALUES ($1, $2, 0, $3, $4)",
-            crypto.HashId.of("hello, world").digest, 4, 5, 6
+            crypto.HashId.of("hello, world").digest, 4, 5, 6,
         );
     });
 

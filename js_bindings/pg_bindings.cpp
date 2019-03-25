@@ -155,6 +155,66 @@ void JsBusyConnectionExecuteQuery(const FunctionCallbackInfo<Value> &args) {
     });
 }
 
+void JsBusyConnectionUpdateQuery(const FunctionCallbackInfo<Value> &args) {
+    Scripter::unwrapArgs(args, [&](ArgsContext &ac) {
+
+        auto scripter = ac.scripter;
+        if (args.Length() != 4)
+            scripter->throwError("invalid number of arguments");
+
+        auto onSuccess = ac.as<Function>(0);
+        if (onSuccess->IsNull() || onSuccess->IsUndefined()) {
+            scripter->throwError("null onSuccess in JsBusyConnectionExecuteQuery");
+            return;
+        }
+        Persistent<Function> *onSuccessPcb = new Persistent<Function>(ac.isolate, onSuccess);
+        auto onError = ac.as<Function>(1);
+        if (onError->IsNull() || onError->IsUndefined()) {
+            scripter->throwError("null onError in JsBusyConnectionExecuteQuery");
+            return;
+        }
+        Persistent<Function> *onErrorPcb = new Persistent<Function>(ac.isolate, onError);
+        auto queryString = ac.asString(2);
+
+        vector<any> params;
+        auto arr = v8::Handle<v8::Array>::Cast(args[3]);
+        for (size_t i = 0, count = arr->Length(); i < count; ++i) {
+            if (arr->Get(i)->IsTypedArray()) {
+                auto contents = v8::Handle<v8::Uint8Array>::Cast(arr->Get(i))->Buffer()->GetContents();
+                byte_vector bv(contents.ByteLength());
+                memcpy(&bv[0], contents.Data(), contents.ByteLength());
+                params.push_back(bv);
+            } else {
+                params.push_back(scripter->getString(arr->Get(i)));
+            }
+        }
+
+        auto con = unwrap<db::BusyConnection>(args.This());
+
+        con->updateQueryArrStr([=](int affectedRows){
+            scripter->inPool([=](auto context) {
+                Isolate *isolate = context->GetIsolate();
+                auto fn = onSuccessPcb->Get(isolate);
+                Local<v8::Value> prm = Number::New(ac.isolate, affectedRows);
+                fn->Call(fn, 1, &prm);
+                delete onSuccessPcb;
+                delete onErrorPcb;
+            });
+        }, [=](const string& err){
+            scripter->inPool([=](auto context) {
+                Isolate *isolate = context->GetIsolate();
+                auto fn = onSuccessPcb->Get(isolate);
+                Local<Value> result = scripter->v8String(err);
+                fn->Call(fn, 1, &result);
+                delete onSuccessPcb;
+                delete onErrorPcb;
+            });
+        }, queryString, params);
+
+
+    });
+}
+
 // Classes bindings
 
 void JsInitPGPool(Isolate *isolate, const Local<ObjectTemplate> &global) {
@@ -182,6 +242,7 @@ void JsInitBusyConnection(Isolate *isolate, const Local<ObjectTemplate> &global)
     auto prototype = tpl->PrototypeTemplate();
     prototype->Set(isolate, "version", String::NewFromUtf8(isolate, "0.0.1"));
     prototype->Set(isolate, "_executeQuery", FunctionTemplate::New(isolate, JsBusyConnectionExecuteQuery));
+    prototype->Set(isolate, "_updateQuery", FunctionTemplate::New(isolate, JsBusyConnectionUpdateQuery));
 
     // register it into global namespace
     BusyConnectionTemplate.Reset(isolate, tpl);

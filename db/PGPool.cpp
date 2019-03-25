@@ -321,6 +321,15 @@ namespace db {
         );
     }
 
+    void BusyConnection::updateQueryArrStr(UpdateSuccessCallback onSuccess, UpdateErrorCallback onError, const std::string& queryString, std::vector<std::any>& params) {
+        executeQueryArrStr(
+                [&onSuccess](QueryResult&& qr){onSuccess(qr.getAffectedRows());},
+                [&onError](const string& errText){onError(errText);},
+                queryString,
+                params
+        );
+    }
+
     PGPool::PGPool(): threadPool_(1), usedConnectionsCount_(0) {
     }
 
