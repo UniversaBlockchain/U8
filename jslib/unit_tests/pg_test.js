@@ -145,8 +145,8 @@ unit.test("pg_test: tables", async () => {
 });
 
 unit.test("performance: insert line-by-line vs multi insert", async () => {
-    let ROWS_COUNT = 10000;
-    let BUF_SIZE = 200;
+    let ROWS_COUNT = 1000;
+    let BUF_SIZE = 20;
     let testResult = "";
     let pool = createPool(4);
     let readyCounter = 0;
