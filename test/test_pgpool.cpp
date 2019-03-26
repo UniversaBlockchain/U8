@@ -65,14 +65,14 @@ TEST_CASE("PGPool") {
             vector<unsigned char> rndBytes(16);
             sprng_read(&rndBytes[0], 16, NULL);
             auto b64 = base64_encode(rndBytes);
-//            pgPool.exec(
-//                    string("INSERT INTO table1(hash,state,locked_by_id,created_at,expires_at) VALUES (decode('") + b64 +
-//                    string("', 'base64'), 4, 0, 33, 44) RETURNING id;"), [&sem, &readyCounter](db::QueryResultsArr &qra) {
-//                        if (qra[0].isError())
-//                            throw std::runtime_error("error: " + string(qra[0].getErrorText()));
-//                        ++readyCounter;
-//                        sem.notify();
-//                    });
+            pgPool.exec(
+                    string("INSERT INTO table1(hash,state,locked_by_id,created_at,expires_at) VALUES (decode('") + b64 +
+                    string("', 'base64'), 4, 0, 33, 44) RETURNING id;"), [&sem, &readyCounter](db::QueryResultsArr &qra) {
+                        if (qra[0].isError())
+                            throw std::runtime_error("error: " + string(qra[0].getErrorText()));
+                        ++readyCounter;
+                        sem.notify();
+                    });
 
             // insert with pgPool.execParams()
             pgPool.withConnection([&sem,&readyCounter](db::BusyConnection& con) {
@@ -112,8 +112,8 @@ TEST_CASE("PGPool") {
             int counterState = int(readyCounter);
             if (counterState % 100 == 0)
                 cout << "readyCounter: " << counterState << endl;
-        } while (readyCounter < TEST_QUERIES_COUNT * 2);
-        REQUIRE(readyCounter == TEST_QUERIES_COUNT * 2);
+        } while (readyCounter < TEST_QUERIES_COUNT * 3);
+        REQUIRE(readyCounter == TEST_QUERIES_COUNT * 3);
 
         Semaphore sem2;
         pgPool.withConnection([&sem2](db::BusyConnection& con){

@@ -397,19 +397,20 @@ namespace db {
     }
 
     void PGPool::exec(const std::string &query, QueryCallback callback) {
-        poolControlThread_.execute([callback, query, this]() {
-            auto bc = getUnusedConnection();
-            PQsendQuery(bc.get()->conPtr(), query.c_str());
-            PQflush(bc.get()->conPtr());
-            QueryResultsArr results;
-            while (true) {
-                pg_result *r = PQgetResult(bc.get()->conPtr());
-                if (r == nullptr)
-                    break;
-                results.push_back(QueryResult(this, r));
-            }
-            callback(results);
-            releaseConnection(bc);
+        withConnection([=](shared_ptr<BusyConnection> bc){
+            bc->exec([bc, callback, query, this](){
+                PQsendQuery(bc.get()->conPtr(), query.c_str());
+                PQflush(bc.get()->conPtr());
+                QueryResultsArr results;
+                while (true) {
+                    pg_result *r = PQgetResult(bc.get()->conPtr());
+                    if (r == nullptr)
+                        break;
+                    results.push_back(QueryResult(this, r));
+                }
+                callback(results);
+                releaseConnection(bc);
+            });
         });
     }
 

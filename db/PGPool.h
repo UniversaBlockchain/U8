@@ -161,6 +161,8 @@ namespace db {
 
         int getId() {return conId_;}
 
+        void exec(std::function<void()> f) {worker_(f);}
+
     private:
 
         void prepareParams(std::vector<std::any>& params) {
