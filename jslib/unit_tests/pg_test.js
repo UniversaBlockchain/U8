@@ -363,6 +363,105 @@ unit.test("insert, select and update integer and bigint", async () => {
     await promise;
 });
 
+unit.test("insert, select and update text, boolean, double", async () => {
+    await recreateTestTable();
+    let pool = createPool(4);
+    let text1 = "text value 1";
+    let text2 = "text value 222";
+    let bool1 = true;
+    let bool2 = false;
+    let double1 = 1.23456789e+100;
+    let double2 = 1.23456789e+120;
+    let rowId = 0;
+
+    // insert text1, bool1, double1
+    let resolver;
+    let promise = new Promise((resolve, reject) => {resolver = resolve;});
+    pool.withConnection(con => {
+        con.executeQuery(r => {
+                rowId = parseInt(r.getRows(1)[0]);
+                assert(rowId === 1);
+                resolver();
+                pool.releaseConnection(con);
+            },
+            e => {
+                pool.releaseConnection(con);
+                throw Error(e);
+            },
+            "INSERT INTO table2(text_val, boolean_val, double_val) VALUES (?,?,?) RETURNING id;",
+            text1, bool1, double1
+        );
+    });
+    await promise;
+
+    // select and check
+    promise = new Promise((resolve, reject) => {resolver = resolve;});
+    pool.withConnection(con => {
+        con.executeQuery(r => {
+                assert(r.getRowsCount() === 1);
+                let row = r.getRows(1)[0];
+                assert(row[0] === text1);
+                assert(row[1] === bool1);
+                assert(row[2] === double1);
+                let types = r.getColTypes();
+                assert(types[0] === "text");
+                assert(types[1] === "bool");
+                assert(types[2] === "float8");
+                resolver();
+                pool.releaseConnection(con);
+            },
+            e => {
+                pool.releaseConnection(con);
+                throw Error(e);
+            },
+            "SELECT text_val, boolean_val, double_val FROM table2 WHERE id=? LIMIT 1;",
+            rowId);
+    });
+    await promise;
+
+    // update to text2, bool2, double2
+    promise = new Promise((resolve, reject) => {resolver = resolve;});
+    pool.withConnection(con => {
+        con.executeUpdate(affectedRows => {
+                assert(affectedRows === 1);
+                resolver();
+                pool.releaseConnection(con);
+            }, e => {
+                pool.releaseConnection(con);
+                throw Error(e);
+            },
+            "UPDATE table2 SET text_val=?, boolean_val=?, double_val=? WHERE id=?;",
+            text2, bool2, double2, rowId
+        );
+    });
+    await promise;
+
+    // select and check
+    promise = new Promise((resolve, reject) => {resolver = resolve;});
+    pool.withConnection(con => {
+        con.executeQuery(r => {
+                assert(r.getRowsCount() === 1);
+                let row = r.getRows(1)[0];
+                assert(row[0] === text2);
+                assert(row[1] === bool2);
+                assert(row[2] === double2);
+                let types = r.getColTypes();
+                assert(types[0] === "text");
+                assert(types[1] === "bool");
+                assert(types[2] === "float8");
+                resolver();
+                pool.releaseConnection(con);
+            },
+            e => {
+                pool.releaseConnection(con);
+                throw Error(e);
+            },
+            "SELECT text_val, boolean_val, double_val FROM table2 WHERE id=? LIMIT 1;",
+            rowId);
+    });
+    await promise;
+});
+
 unit.test("performance: insert line-by-line vs multi insert", async () => {
     let ROWS_COUNT = 400;
     let BUF_SIZE = 20;

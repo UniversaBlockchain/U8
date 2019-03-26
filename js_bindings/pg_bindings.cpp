@@ -358,6 +358,12 @@ static unordered_map<string, std::function<Local<Value>(ArgsContext &ac, const b
     {"bytea", [](ArgsContext &ac, const byte_vector& bv){
         return ac.toBinary(bv);
     }},
+    {"float8", [](ArgsContext &ac, const byte_vector& bv){
+        return Number::New(ac.isolate, db::getDoubleValue(bv));
+    }},
+    {"bool", [](ArgsContext &ac, const byte_vector& bv){
+        return v8::Boolean::New(ac.isolate, db::getBoolValue(bv));
+    }},
 };
 
 Local<Value> getJsValueFromPgResult(ArgsContext &ac, const byte_vector& data, const string& pgType) {
