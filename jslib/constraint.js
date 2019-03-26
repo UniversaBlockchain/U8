@@ -1548,6 +1548,36 @@ class Constraint extends bs.BiSerializable {
     }
 
     /**
+     * Assembly expression of reference condition.
+     *
+     * @param {object} expression - Object of parsed expression.
+     * @return {string|null} result with assembled expression.
+     */
+    static assemblyExpression(expression) {
+
+        let result = "";
+
+        // assembly expression
+        if (expression.leftOperand != null) {
+            result += expression.leftOperand;
+            if (expression.leftConversion === CONVERSION_BIG_DECIMAL)
+                result += "::number";
+        } else if (expression.left != null)
+            result += Constraint.assemblyExpression(expression.left);
+
+        result += operations[expression.operation];
+
+        if (expression.rightOperand != null) {
+            result += expression.rightOperand;
+            if (expression.rightConversion === CONVERSION_BIG_DECIMAL)
+                result += "::number";
+        } else if (expression.right != null)
+            result += Constraint.assemblyExpression(expression.right);
+
+        return result;
+    }
+
+    /**
      * Assembly condition of constraint.
      *
      * @param {object} condition - Object of parsed condition.
@@ -1572,7 +1602,8 @@ class Constraint extends bs.BiSerializable {
 
             if (condition.leftConversion === CONVERSION_BIG_DECIMAL)
                 result += "::number";
-        }
+        } else if (condition.left != null)
+            result += Constraint.assemblyExpression(left);
 
         result += operators[condition.operator];
 
@@ -1587,7 +1618,8 @@ class Constraint extends bs.BiSerializable {
 
             if (condition.rightConversion === CONVERSION_BIG_DECIMAL)
                 result += "::number";
-        }
+        } else if (condition.right != null)
+            result += Constraint.assemblyExpression(right);
 
         return result;
     }
