@@ -267,146 +267,113 @@ class Constraint extends bs.BiSerializable {
     }
 
     evaluateOperand(operand, typeOfOperand, conversion, refContract, contracts, iteration) {
-        /*Contract operandContract = null;
-        int firstPointPos;
+        let operandContract = null;
+        let firstPointPos;
 
         if (operand == null)
-        throw new IllegalArgumentException("Error evaluate null operand");
+            throw new ex.IllegalArgumentError("Error evaluate null operand");
 
-        if (typeOfOperand == compareOperandType.FIELD) {
+        if (typeOfOperand === compareOperandType.FIELD) {
             if (operand.startsWith("ref.")) {
-            operand = operand.substring(4);
-            operandContract = refContract;
-        } else if (operand.startsWith("this.")) {
-            if (baseContract == null)
-                throw new IllegalArgumentException("Use left operand in expression: " + operand + ". But this contract not initialized.");
+                operand = operand.substring(4);
+                operandContract = refContract;
+            } else if (operand.startsWith("this.")) {
+                if (this.baseContract == null)
+                    throw new ex.IllegalArgumentError("Use left operand in expression: " + operand + ". But this contract not initialized.");
 
-            operand = operand.substring(5);
-            operandContract = baseContract;
-        } else if ((firstPointPos = operand.indexOf(".")) > 0) {
-            if (baseContract == null)
-                throw new IllegalArgumentException("Use left operand in expression: " + operand + ". But this contract not initialized.");
+                operand = operand.substring(5);
+                operandContract = this.baseContract;
+            } else if ((firstPointPos = operand.indexOf(".")) > 0) {
+                if (this.baseContract == null)
+                    throw new ex.IllegalArgumentError("Use left operand in expression: " + operand + ". But this contract not initialized.");
 
-            Reference ref = baseContract.findReferenceByName(operand.substring(0, firstPointPos));
-            if (ref == null)
-                throw new IllegalArgumentException("Not found reference: " + operand.substring(0, firstPointPos));
+                let ref = this.baseContract.findConstraintByName(operand.substring(0, firstPointPos));
+                if (ref == null)
+                    throw new ex.IllegalArgumentError("Not found reference: " + operand.substring(0, firstPointPos));
 
-            for (Contract checkedContract : contracts)
-            if (ref.isMatchingWith(checkedContract, contracts, iteration + 1))
-                operandContract = checkedContract;
+                for (let checkedContract of contracts)
+                    if (ref.isMatchingWithIteration(checkedContract, contracts, iteration + 1))
+                        operandContract = checkedContract;
 
-            if (operandContract == null)
-                throw new IllegalArgumentException("Not found referenced contract for reference: " + operand.substring(0, firstPointPos));
+                if (operandContract == null)
+                    throw new ex.IllegalArgumentError("Not found referenced contract for constraint: " + operand.substring(0, firstPointPos));
 
-            operand = operand.substring(firstPointPos + 1);
-        } else
-            throw new IllegalArgumentException("Invalid format of left operand in expression: " + operand + ". Missing contract field.");
+                operand = operand.substring(firstPointPos + 1);
+            } else
+                throw new ex.IllegalArgumentError("Invalid format of left operand in expression: " + operand + ". Missing contract field.");
 
-            return operandContract.get(operand);
+                return operandContract.get(operand);
         } else {
-            if (conversion == CONVERSION_BIG_DECIMAL || operand.length() > 9)   // 10 symbols > int32 => operand * operand > int64(long). Use BigDecimal.
+            if (conversion === CONVERSION_BIG_DECIMAL || operand.length > 7)   // > 7 symbols => operand * operand > number precision. Use BigDecimal.
                 return new BigDecimal(operand);
-            else if (operand.contains("."))
-                return Double.parseDouble(operand);
+            else if (operand.includes("."))
+                return parseFloat(operand);
             else
-                return Long.parseLong(operand);
-        }*/
+                return parseInt(operand);
+        }
     }
 
     evaluateExpression(expression, refContract, contracts, iteration) {
-        /*Object left;
-        Object right;
-        Object result;
-        compareOperandType typeOfLeftOperand;
-        compareOperandType typeOfRightOperand;
-
-        // unpack expression
-        String leftOperand = expression.getString("leftOperand", null);
-        String rightOperand = expression.getString("rightOperand", null);
-
-        Binder leftExpression = expression.getBinder("left", null);
-        Binder rightExpression = expression.getBinder("right", null);
-
-        int operation = expression.getIntOrThrow("operation");
-
-        int typeLeftOperand = expression.getIntOrThrow("typeOfLeftOperand");
-        int typeRightOperand = expression.getIntOrThrow("typeOfRightOperand");
-
-        typeOfLeftOperand = compareOperandType.values()[typeLeftOperand];
-        typeOfRightOperand = compareOperandType.values()[typeRightOperand];
-
-        int leftConversion = expression.getInt("leftConversion", NO_CONVERSION);
-        int rightConversion = expression.getInt("rightConversion", NO_CONVERSION);
+        let left;
+        let right;
+        let result;
 
         try {
             // evaluate operands
-            if (typeOfLeftOperand == compareOperandType.EXPRESSION)
-                left = evaluateExpression(leftExpression, refContract, contracts, iteration);
+            if (expression.typeOfLeftOperand === compareOperandType.EXPRESSION)
+                left = this.evaluateExpression(expression.leftOperand, refContract, contracts, iteration);
             else
-                left = evaluateOperand(leftOperand, typeOfLeftOperand, leftConversion, refContract, contracts, iteration);
+                left = this.evaluateOperand(expression.leftOperand, expression.typeOfLeftOperand,
+                    expression.leftConversion, refContract, contracts, iteration);
 
-            if (typeOfRightOperand == compareOperandType.EXPRESSION)
-                right = evaluateExpression(rightExpression, refContract, contracts, iteration);
+            if (expression.typeOfRightOperand === compareOperandType.EXPRESSION)
+                right = this.evaluateExpression(expression.rightOperand, refContract, contracts, iteration);
             else
-                right = evaluateOperand(rightOperand, typeOfRightOperand, rightConversion, refContract, contracts, iteration);
+                right = this.evaluateOperand(expression.rightOperand, expression.typeOfRightOperand,
+                    expression.rightConversion, refContract, contracts, iteration);
 
             if (left == null || right == null)
                 return null;
 
             // evaluate expression
-            if ((leftConversion == CONVERSION_BIG_DECIMAL) || (rightConversion == CONVERSION_BIG_DECIMAL) ||
-                left.getClass().getName().endsWith("BigDecimal") || right.getClass().getName().endsWith("BigDecimal")) {
+            if (expression.leftConversion === CONVERSION_BIG_DECIMAL || expression.rightConversion === CONVERSION_BIG_DECIMAL ||
+                left instanceof BigDecimal || right instanceof BigDecimal) {
                 // BigDecimals
-                if (operation == PLUS)
-                    result = objectCastToBigDecimal(left, null, compareOperandType.FIELD).add(
-                        objectCastToBigDecimal(right, null, compareOperandType.FIELD));
-                else if (operation == MINUS)
-                    result = objectCastToBigDecimal(left, null, compareOperandType.FIELD).subtract(
-                        objectCastToBigDecimal(right, null, compareOperandType.FIELD));
-                else if (operation == MULT)
-                    result = objectCastToBigDecimal(left, null, compareOperandType.FIELD).multiply(
-                        objectCastToBigDecimal(right, null, compareOperandType.FIELD));
-                else if (operation == DIV)
-                    result = objectCastToBigDecimal(left, null, compareOperandType.FIELD).divide(
-                        objectCastToBigDecimal(right, null, compareOperandType.FIELD), RoundingMode.HALF_UP);
+                if (expression.operation === PLUS)
+                    result = Constraint.objectCastToBigDecimal(left, null, compareOperandType.FIELD).add(
+                        Constraint.objectCastToBigDecimal(right, null, compareOperandType.FIELD));
+                else if (expression.operation === MINUS)
+                    result = Constraint.objectCastToBigDecimal(left, null, compareOperandType.FIELD).sub(
+                        Constraint.objectCastToBigDecimal(right, null, compareOperandType.FIELD));
+                else if (expression.operation === MULT)
+                    result = Constraint.objectCastToBigDecimal(left, null, compareOperandType.FIELD).mul(
+                        Constraint.objectCastToBigDecimal(right, null, compareOperandType.FIELD));
+                else if (expression.operation === DIV)
+                    result = Constraint.objectCastToBigDecimal(left, null, compareOperandType.FIELD).div(
+                        Constraint.objectCastToBigDecimal(right, null, compareOperandType.FIELD));
                 else
-                    throw new IllegalArgumentException("Unknown operation: " + operation);
+                    throw new ex.IllegalArgumentError("Unknown operation: " + expression.operation);
 
-            } else if (isObjectMayCastToDouble(left) || isObjectMayCastToDouble(right)) {
-                // Doubles
-                if (operation == PLUS)
-                    result = objectCastToDouble(left) + objectCastToDouble(right);
-                else if (operation == MINUS)
-                    result = objectCastToDouble(left) - objectCastToDouble(right);
-                else if (operation == MULT)
-                    result = objectCastToDouble(left) * objectCastToDouble(right);
-                else if (operation == DIV)
-                    result = objectCastToDouble(left) / objectCastToDouble(right);
+            } else if (typeof left === "number" && typeof right === "number") {
+                // Numbers
+                if (expression.operation === PLUS)
+                    result = left + right;
+                else if (expression.operation === MINUS)
+                    result = left - right;
+                else if (expression.operation === MULT)
+                    result = left * right;
+                else if (expression.operation === DIV)
+                    result = left / right;
                 else
-                    throw new IllegalArgumentException("Unknown operation: " + operation);
-
-            } else if (isObjectMayCastToLong(left) || isObjectMayCastToLong(right)) {
-                // Long integers
-                if (operation == PLUS)
-                    result = objectCastToLong(left) + objectCastToLong(right);
-                else if (operation == MINUS)
-                    result = objectCastToLong(left) - objectCastToLong(right);
-                else if (operation == MULT)
-                    result = objectCastToLong(left) * objectCastToLong(right);
-                else if (operation == DIV)
-                    result = objectCastToLong(left) / objectCastToLong(right);
-                else
-                    throw new IllegalArgumentException("Unknown operation: " + operation);
+                    throw new ex.IllegalArgumentError("Unknown operation: " + expression.operation);
 
             } else
-                throw new IllegalArgumentException("Incompatible operand types. Left: " + left.getClass().getName() +
-                    ". Right: " + right.getClass().getName());
-        } catch (Exception e) {
-            e.printStackTrace();
-            throw new IllegalArgumentException("Error evaluate expression: " + e.getMessage());
+                throw new ex.IllegalArgumentError("Incompatible operand types. Left: " + typeof left + ". Right: " + typeof right);
+        } catch (e) {
+            throw new ex.IllegalArgumentError("Error evaluate expression: " + e.toString());
         }
 
-        return result;*/
+        return result;
     }
 
     /**

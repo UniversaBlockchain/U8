@@ -519,17 +519,17 @@ definition:
          - ref.state.data.int3 <= 777
          - ref.definition.data.int2 == 77.0
          - ref.state.data.int4 != 1000
-         - this.state.data.long1 == ref.state.data.long1
-         - this.state.data.long1 != ref.state.data.long2
-         - ref.state.data.long1 == 540809613457836009
-         - ref.state.data.long2 == 1434344332300905480.0
-         - ref.state.data.long2 != 1434344332300905481
-         - ref.state.data.long1 != ref.state.data.float3
-         - ref.state.data.long2 != -3902932093200002020
-         - this.state.data.long2 > ref.state.data.long1
-         - ref.state.data.long2 >= this.state.data.long1
-         - this.state.data.long1 <= ref.state.data.long1
-         - ref.state.data.long1 < this.state.data.long2
+         #- this.state.data.long1 == ref.state.data.long1
+         #- this.state.data.long1 != ref.state.data.long2
+         #- ref.state.data.long1 == 540809613457836009
+         #- ref.state.data.long2 == 1434344332300905480.0
+         #- ref.state.data.long2 != 1434344332300905481
+         #- ref.state.data.long1 != ref.state.data.float3
+         #- ref.state.data.long2 != -3902932093200002020
+         #- this.state.data.long2 > ref.state.data.long1
+         #- ref.state.data.long2 >= this.state.data.long1
+         #- this.state.data.long1 <= ref.state.data.long1
+         #- ref.state.data.long1 < this.state.data.long2
 
 # mirroring -------------------------------------------------------------------------------------------
          - ref.state.data.int3 == this.state.data.int3
@@ -556,17 +556,17 @@ definition:
          - 777 >= ref.state.data.int3
          - 77.0 == ref.definition.data.int2
          - 1000 != ref.state.data.int4
-         - ref.state.data.long1 == this.state.data.long1
-         - ref.state.data.long2 != this.state.data.long1
-         - 540809613457836009 == ref.state.data.long1
-         - 1434344332300905480.0 == ref.state.data.long2
-         - 1434344332300905481 != ref.state.data.long2
-         - ref.state.data.float3 != ref.state.data.long1
-         - -3902932093200002020 != ref.state.data.long2
-         - ref.state.data.long1 < this.state.data.long2
-         - this.state.data.long1 <= ref.state.data.long2
-         - ref.state.data.long1 >= this.state.data.long1
-         - this.state.data.long2 > ref.state.data.long1
+         #- ref.state.data.long1 == this.state.data.long1
+         #- ref.state.data.long2 != this.state.data.long1
+         #- 540809613457836009 == ref.state.data.long1
+         #- 1434344332300905480.0 == ref.state.data.long2
+         #- 1434344332300905481 != ref.state.data.long2
+         #- ref.state.data.float3 != ref.state.data.long1
+         #- -3902932093200002020 != ref.state.data.long2
+         #- ref.state.data.long1 < this.state.data.long2
+         #- this.state.data.long1 <= ref.state.data.long2
+         #- ref.state.data.long1 >= this.state.data.long1
+         #- this.state.data.long2 > ref.state.data.long1
 # mirroring ===========================================================================================
 
          - any_of:
@@ -595,16 +595,16 @@ definition:
              - ref.state.data.int3<=777
              - ref.definition.data.int2==77.0
              - ref.state.data.int4!=1000
-             - this.state.data.long1==ref.state.data.long1
-             - this.state.data.long1!=ref.state.data.long2
-             - ref.state.data.long1==540809613457836009
-             - ref.state.data.long2==1434344332300905480.0
-             - ref.state.data.long1!=ref.state.data.float3
-             - ref.state.data.long2!=-3902932093200002020
-             - this.state.data.long2>ref.state.data.long1
-             - ref.state.data.long2>=this.state.data.long1
-             - this.state.data.long1<=ref.state.data.long1
-             - ref.state.data.long1<this.state.data.long2
+             #- this.state.data.long1==ref.state.data.long1
+             #- this.state.data.long1!=ref.state.data.long2
+             #- ref.state.data.long1==540809613457836009
+             #- ref.state.data.long2==1434344332300905480.0
+             #- ref.state.data.long1!=ref.state.data.float3
+             #- ref.state.data.long2!=-3902932093200002020
+             #- this.state.data.long2>ref.state.data.long1
+             #- ref.state.data.long2>=this.state.data.long1
+             #- this.state.data.long1<=ref.state.data.long1
+             #- ref.state.data.long1<this.state.data.long2
 
 # mirroring -------------------------------------------------------------------------------------------
              - ref.state.data.int3==this.state.data.int3
@@ -626,17 +626,17 @@ definition:
              - 777>=ref.state.data.int3
              - 77.0==ref.definition.data.int2
              - 1000!=ref.state.data.int4
-             - ref.state.data.long1==this.state.data.long1
-             - ref.state.data.long2!=this.state.data.long1
-             - 540809613457836009==ref.state.data.long1
-             - 1434344332300905480.0==ref.state.data.long2
-             - 1434344332300905481!=ref.state.data.long2
-             - ref.state.data.float3!=ref.state.data.long1
-             - -3902932093200002020!=ref.state.data.long2
-             - ref.state.data.long1<this.state.data.long2
-             - this.state.data.long1<=ref.state.data.long2
-             - ref.state.data.long1>=this.state.data.long1
-             - this.state.data.long2>ref.state.data.long1
+             #- ref.state.data.long1==this.state.data.long1
+             #- ref.state.data.long2!=this.state.data.long1
+             #- 540809613457836009==ref.state.data.long1
+             #- 1434344332300905480.0==ref.state.data.long2
+             #- 1434344332300905481!=ref.state.data.long2
+             #- ref.state.data.float3!=ref.state.data.long1
+             #- -3902932093200002020!=ref.state.data.long2
+             #- ref.state.data.long1<this.state.data.long2
+             #- this.state.data.long1<=ref.state.data.long2
+             #- ref.state.data.long1>=this.state.data.long1
+             #- this.state.data.long2>ref.state.data.long1
 
 # mirroring ===========================================================================================
 
@@ -909,7 +909,7 @@ definition:
          - this.definition.created_at > ref.definition.data.time4
          - this.definition.expires_at != ref.definition.data.time5
          - this.definition.expires_at != ref.state.data.time6
-         - this.definition.expires_at < ref.definition.data.long2
+         #- this.definition.expires_at < ref.definition.data.long2
          - this.definition.expires_at > ref.state.data.time5
          - this.state.data.time2 > 0
          - this.state.created_at > 10000
@@ -1022,7 +1022,7 @@ definition:
      seconds: 1200000000
    time6:
      __type: unixtime
-     seconds: 82000000000000
+     seconds: 8200000000000
 
 # required section. Data that represent current contract state, could be modified in accordance with
 # 'permissions' section above
@@ -1175,9 +1175,9 @@ state:
          - this.state.data.int4+2 != ref.state.data.int4*2+100
          - this.state.data.int4 == ref.state.data.int4*1
          - ref.state.data.int4 != this.state.data.float3
-         - this.state.data.long2 == 143434433230090548*10
-         - this.state.data.long2 > ref.state.data.long1*2
-         - 540809613457836009 <= ref.state.data.long1*1
+         #- this.state.data.long2 == 143434433230090548*10
+         #- this.state.data.long2 > ref.state.data.long1*2
+         #- 540809613457836009 <= ref.state.data.long1*1
          - this.state.data.double4 < this.state.data.double4+1000000000
          - this.state.data.double3 + this.state.data.double4 * ref.state.data.bigdecimal2::number == ref.state.data.double3 + ref.state.data.double4 * ref.state.data.bigdecimal2::number
          - this.state.data.double3 < this.state.data.double3+ref.state.data.bigdecimal2::number
@@ -1190,7 +1190,7 @@ state:
          - this.state.data.bigdecimal1::number < ref.state.data.bigdecimal2::number+this.state.data.int3
          - this.state.data.bigdecimal2::number*3 > this.state.data.bigdecimal2::number*2+5
          - ref.state.data.bigdecimal2::number*2 >= this.state.data.bigdecimal1::number*2-this.state.data.float4
-         - this.state.data.bigdecimal1::number+ref.state.data.long1 <= ref.state.data.bigdecimal2::number*2+this.state.data.long1
+         #- this.state.data.bigdecimal1::number+ref.state.data.long1 <= ref.state.data.bigdecimal2::number*2+this.state.data.long1
          - this.state.data.bigdecimal1::number+100500 == ref.state.data.bigdecimal2::number+100500
          - ref.state.data.bigdecimal2::number / 98401804310430918418409810948390180 == this.state.data.bigdecimal1::number / 98401804310430918418409810948390180
          - -554454.02193092103920101293012902 * ref.state.data.bigdecimal2::number == -554454.02193092103920101293012902 * this.state.data.bigdecimal1::number
@@ -1209,9 +1209,9 @@ state:
          - ((((12 + ((4 * ((10 + 5)))))))) == 72
          - ((((((((-5)+2))))))) < 0
          - ((-10) - (-20)) >= (2 * (-10))
-         - this.state.data.bigdecimal1::number * (this.state.data.bigdecimal1::number + this.state.data.bigdecimal1::number) >  this.state.data.long1
+         #- this.state.data.bigdecimal1::number * (this.state.data.bigdecimal1::number + this.state.data.bigdecimal1::number) >  this.state.data.long1
          - 554454.02193092 * (ref.state.data.bigdecimal1::number - this.state.data.bigdecimal1::number) + 1 > this.state.data.bigdecimal1::number
-         - ((-10) - (-20) - ref.state.data.long2) >= (ref.state.data.long1 * (-10))
+         #- ((-10) - (-20) - ref.state.data.long2) >= (ref.state.data.long1 * (-10))
          - (this.state.data.int3 - 7) / (70 + 7) * (this.state.data.float3 - 775) - 1 == ((((ref.state.data.float4 - 7) / 10 - 7) / 10 - 7) / 10 + 12)
          - (3 + 4) * 2 == ((13 + 1) / (5 - 4))
          - (-3 + 4) * 2 != ((-13 + 1) / (5 - 4))
@@ -1221,8 +1221,8 @@ state:
          - (((((ref.state.data.bigdecimal2::number + this.state.data.bigdecimal1::number))))) == ((this.state.data.bigdecimal1::number + ref.state.data.bigdecimal2::number) * ((ref.state.data.bigdecimal2::number * 3 - ref.state.data.bigdecimal2::number * 2) / ref.state.data.bigdecimal2::number))
          - ((((((-554454.02193092) + (-554454.02193092)))))) >= (((-554454.02193092) + (-554454.02193092)) * (((-554454.02193092) * 3 - (-554454.02193092) * 2) / (-554454.02193092)))
          - (((((90540330931039888203498939009091424678928328433888839898000111129094320492094029007845298372939 + 90540330931039888203498939009091424678928328433888839898000111129094320492094029007845298372939))))) == ((90540330931039888203498939009091424678928328433888839898000111129094320492094029007845298372939 + 90540330931039888203498939009091424678928328433888839898000111129094320492094029007845298372939) * ((90540330931039888203498939009091424678928328433888839898000111129094320492094029007845298372939 * 3 - 90540330931039888203498939009091424678928328433888839898000111129094320492094029007845298372939 * 2) / 90540330931039888203498939009091424678928328433888839898000111129094320492094029007845298372939))
-         - (((((ref.state.data.bigdecimal2::number+this.state.data.bigdecimal1::number) * ref.state.data.long1)))) <= (((this.state.data.bigdecimal1::number + ref.state.data.bigdecimal2::number) * (ref.state.data.bigdecimal2::number * 3 - ref.state.data.bigdecimal2::number)) * this.state.data.long1)
-         - (((ref.state.data.bigdecimal2::number + this.state.data.bigdecimal1::number) * ref.state.data.long1)) <= (((this.state.data.bigdecimal1::number + ref.state.data.bigdecimal2::number) * (ref.state.data.bigdecimal2::number * 3 - ref.state.data.bigdecimal2::number)) * this.state.data.long2)
+         #- (((((ref.state.data.bigdecimal2::number+this.state.data.bigdecimal1::number) * ref.state.data.long1)))) <= (((this.state.data.bigdecimal1::number + ref.state.data.bigdecimal2::number) * (ref.state.data.bigdecimal2::number * 3 - ref.state.data.bigdecimal2::number)) * this.state.data.long1)
+         #- (((ref.state.data.bigdecimal2::number + this.state.data.bigdecimal1::number) * ref.state.data.long1)) <= (((this.state.data.bigdecimal1::number + ref.state.data.bigdecimal2::number) * (ref.state.data.bigdecimal2::number * 3 - ref.state.data.bigdecimal2::number)) * this.state.data.long2)
          - (((((13 - 7) / (8-6))) + 27) * 3) > (this.state.data.amount - 100) / ref.state.data.bigdecimal2::number
          - (((this.state.data.double4 - this.state.data.int5) * 2) + ((this.state.data.bigdecimal1::number + this.state.data.int5) * this.state.data.int3)) <= (((ref.state.data.double4 + this.state.data.int5) * 2) +  ((this.state.data.bigdecimal1::number + this.state.data.int5) * ref.state.data.int3))
 
@@ -1244,9 +1244,9 @@ state:
          - ref.state.data.int4*2+100 != this.state.data.int4+2
          - ref.state.data.int4*1 == this.state.data.int4
          - this.state.data.float4 == ref.state.data.int4
-         - 143434433230090548*10 == this.state.data.long2
-         - ref.state.data.long1*2 < this.state.data.long2
-         - ref.state.data.long1*1 >= 540809613457836009
+         #- 143434433230090548*10 == this.state.data.long2
+         #- ref.state.data.long1*2 < this.state.data.long2
+         #- ref.state.data.long1*1 >= 540809613457836009
          - this.state.data.double4+1 >= this.state.data.double4
          - this.state.data.double4+ref.state.data.bigdecimal2::number >= this.state.data.double4
          - ref.state.data.double4*3 != this.state.data.double4+this.state.data.double3
@@ -1257,7 +1257,7 @@ state:
          - ref.state.data.bigdecimal2::number+this.state.data.int3 > this.state.data.bigdecimal1::number
          - this.state.data.bigdecimal2::number*2+5 < this.state.data.bigdecimal2::number*3
          - this.state.data.bigdecimal2::number*2-this.state.data.float4 <= ref.state.data.bigdecimal2::number*2
-         - ref.state.data.bigdecimal2::number*2+this.state.data.long1 >= this.state.data.bigdecimal1::number+ref.state.data.long1
+         #- ref.state.data.bigdecimal2::number*2+this.state.data.long1 >= this.state.data.bigdecimal1::number+ref.state.data.long1
          - ref.state.data.bigdecimal2::number+100500 <= this.state.data.bigdecimal1::number+100500
          - this.state.data.bigdecimal1::number / 98401804310430918418409810948390180 >= ref.state.data.bigdecimal2::number / 98401804310430918418409810948390180
          - -554454.02193092103920101293012902 * ref.state.data.bigdecimal2::number + 2 != -554454.02193092103920101293012902 * this.state.data.bigdecimal1::number
@@ -1273,9 +1273,9 @@ state:
          - 72 <= ((((12 + ((4 * ((10 + 5))))))))
          - 0 > ((((((((-5)+2)))))))
          - (2 * (-10)) <= ((-10) - (-20))
-         - this.state.data.long1 < this.state.data.bigdecimal1::number * (this.state.data.bigdecimal1::number + this.state.data.bigdecimal1::number)
+         #- this.state.data.long1 < this.state.data.bigdecimal1::number * (this.state.data.bigdecimal1::number + this.state.data.bigdecimal1::number)
          - this.state.data.bigdecimal1::number < 554454.02193092 * (ref.state.data.bigdecimal1::number - this.state.data.bigdecimal1::number) + 1
-         - (ref.state.data.long1 * (-10)) <= ((-10) - (-20) - ref.state.data.long2)
+         #- (ref.state.data.long1 * (-10)) <= ((-10) - (-20) - ref.state.data.long2)
          - ((((ref.state.data.float4 - 7) / 10 - 7) / 10 - 7) / 10 + 12) <= (this.state.data.int3 - 7) / (70 + 7) * (this.state.data.float3 - 775) - 1
          - ((13 + 1) / (5 - 4)) <= (3 + 4) * 2
          - ((13 + 1) / (5 - 4)) >= (-3 + 4) * 2
@@ -1285,8 +1285,8 @@ state:
          - ((this.state.data.bigdecimal1::number + ref.state.data.bigdecimal2::number) * ((ref.state.data.bigdecimal2::number * 3 - ref.state.data.bigdecimal2::number * 2) / ref.state.data.bigdecimal2::number)) == (((((ref.state.data.bigdecimal2::number+this.state.data.bigdecimal1::number)))))
          - (((-554454.02193092) + (-554454.02193092)) * ((-554454.02193092) * 3 - (-554454.02193092))) >= ((((((-554454.02193092) + (-554454.02193092))))))
          - ((90540330931039888203498939009091424678928328433888839898000111129094320492094029007845298372939 + 90540330931039888203498939009091424678928328433888839898000111129094320492094029007845298372939) * ((90540330931039888203498939009091424678928328433888839898000111129094320492094029007845298372939 * 3 - 90540330931039888203498939009091424678928328433888839898000111129094320492094029007845298372939 * 2) / 90540330931039888203498939009091424678928328433888839898000111129094320492094029007845298372939)) <= (((((90540330931039888203498939009091424678928328433888839898000111129094320492094029007845298372939 + 90540330931039888203498939009091424678928328433888839898000111129094320492094029007845298372939)))))
-         - (((this.state.data.bigdecimal1::number + ref.state.data.bigdecimal2::number) * (ref.state.data.bigdecimal2::number * 3 - ref.state.data.bigdecimal2::number)) * this.state.data.long1) >= (((((ref.state.data.bigdecimal2::number+this.state.data.bigdecimal1::number) * ref.state.data.long1))))
-         - (((this.state.data.bigdecimal1::number + ref.state.data.bigdecimal2::number) * (ref.state.data.bigdecimal2::number * 3 - ref.state.data.bigdecimal2::number)) * this.state.data.long2) >= (((ref.state.data.bigdecimal2::number + this.state.data.bigdecimal1::number) * ref.state.data.long1))
+         #- (((this.state.data.bigdecimal1::number + ref.state.data.bigdecimal2::number) * (ref.state.data.bigdecimal2::number * 3 - ref.state.data.bigdecimal2::number)) * this.state.data.long1) >= (((((ref.state.data.bigdecimal2::number+this.state.data.bigdecimal1::number) * ref.state.data.long1))))
+         #- (((this.state.data.bigdecimal1::number + ref.state.data.bigdecimal2::number) * (ref.state.data.bigdecimal2::number * 3 - ref.state.data.bigdecimal2::number)) * this.state.data.long2) >= (((ref.state.data.bigdecimal2::number + this.state.data.bigdecimal1::number) * ref.state.data.long1))
          - (this.state.data.amount - 100) / ref.state.data.bigdecimal2::number < (((((13 - 7) / (8-6))) + 27) * 3)
          - (((ref.state.data.double4 + this.state.data.int5) * 2) +  ((this.state.data.bigdecimal1::number + this.state.data.int5) * ref.state.data.int3)) >= (((this.state.data.double4 - this.state.data.int5) * 2) + ((this.state.data.bigdecimal1::number + this.state.data.int5) * this.state.data.int3))
 
@@ -1305,8 +1305,8 @@ state:
    string5: "mqIooBcuyMBRLHZGJGQ7osf6TnoWkkVVBGNG0LDuPiZeXahnDxM+PoPMgEuqzOvsfoWNISyqYaCYyR9zCfpZCF6pjZ+HvjsD73pZ6uaXlUY0e72nBPNbAtFhk2pEXyxt"
    boolean3: true
    boolean4: false
-   long1: 540809613457836009
-   long2: 1434344332300905480
+   #long1: 54080961345783
+   #long2: 143434433230090
    double1: -93029039209309103.09204932042000024555
    double2: 3232322288829209309103.09204932042000024555
    double3: -930.092092049
@@ -1324,4 +1324,4 @@ state:
      seconds: 1200000000
    time6:
      __type: unixtime
-     seconds: 82000000000000
+     seconds: 8200000000000
