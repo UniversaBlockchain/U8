@@ -1525,21 +1525,44 @@ class Constraint extends bs.BiSerializable {
         let result = "";
 
         // assembly expression
+
+        if (expression.leftParentheses)
+            result += "(";
+
         if (expression.leftOperand != null) {
-            result += expression.leftOperand;
-            if (expression.leftConversion === CONVERSION_BIG_DECIMAL)
-                result += "::number";
-        } else if (expression.left != null)
-            result += Constraint.assemblyExpression(expression.left);
+            if (typeof expression.leftOperand === "object")
+                result += Constraint.assemblyExpression(expression.leftOperand);
+
+            else {
+                result += expression.leftOperand;
+
+                if (expression.leftConversion === CONVERSION_BIG_DECIMAL)
+                    result += "::number";
+            }
+        }
+
+        if (expression.leftParentheses)
+            result += ")";
 
         result += operations[expression.operation];
 
+        if (expression.rightParentheses)
+            result += "(";
+
         if (expression.rightOperand != null) {
-            result += expression.rightOperand;
-            if (expression.rightConversion === CONVERSION_BIG_DECIMAL)
-                result += "::number";
-        } else if (expression.right != null)
-            result += Constraint.assemblyExpression(expression.right);
+            if (typeof expression.rightOperand === "object")
+                result += Constraint.assemblyExpression(expression.rightOperand);
+
+            else {
+                result += expression.rightOperand;
+
+                if (expression.rightConversion === CONVERSION_BIG_DECIMAL)
+                    result += "::number";
+            }
+        }
+
+        if (expression.rightParentheses)
+            result += ")";
 
         return result;
     }
@@ -1558,35 +1581,43 @@ class Constraint extends bs.BiSerializable {
         let result = "";
 
         // assembly condition
+
         if (condition.leftOperand != null) {
-            if (condition.typeOfLeftOperand === compareOperandType.CONSTSTR)
-                result += "\"";
+            if (typeof condition.leftOperand === "object")
+                result += Constraint.assemblyExpression(condition.leftOperand);
+            else {
+                if (condition.typeOfLeftOperand === compareOperandType.CONSTSTR)
+                    result += "\"";
 
-            result += condition.leftOperand;
+                result += condition.leftOperand;
 
-            if (condition.typeOfLeftOperand === compareOperandType.CONSTSTR)
-                result += "\"";
+                if (condition.typeOfLeftOperand === compareOperandType.CONSTSTR)
+                    result += "\"";
 
-            if (condition.leftConversion === CONVERSION_BIG_DECIMAL)
-                result += "::number";
-        } else if (condition.left != null)
-            result += Constraint.assemblyExpression(left);
+                if (condition.leftConversion === CONVERSION_BIG_DECIMAL)
+                    result += "::number";
+            }
+        }
 
         result += operators[condition.operator];
 
         if (condition.rightOperand != null) {
-            if (condition.typeOfRightOperand === compareOperandType.CONSTSTR)
-                result += "\"";
+            if (typeof condition.rightOperand ==="object")
+                result += Constraint.assemblyExpression(condition.rightOperand);
+            else {
+                if (condition.typeOfRightOperand === compareOperandType.CONSTSTR)
+                    result += "\"";
 
-            result += condition.rightOperand;
+                result += condition.rightOperand;
 
-            if (condition.typeOfRightOperand === compareOperandType.CONSTSTR)
-                result += "\"";
+                if (condition.typeOfRightOperand === compareOperandType.CONSTSTR)
+                    result += "\"";
 
-            if (condition.rightConversion === CONVERSION_BIG_DECIMAL)
-                result += "::number";
-        } else if (condition.right != null)
-            result += Constraint.assemblyExpression(right);
+                if (condition.rightConversion === CONVERSION_BIG_DECIMAL)
+                    result += "::number";
+            }
+        }
+
 
         return result;
     }
