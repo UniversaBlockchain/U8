@@ -150,6 +150,123 @@ unit.test("pg_test: tables", async () => {
     //console.log("dt = " + dt + " ms");
 });
 
+unit.test("insert and get new id", async () => {
+    await recreateTestTable();
+    let pool = createPool(4);
+
+    for (let i = 0; i < 10; ++i) {
+        let resolver;
+        let promise = new Promise((resolve, reject) => {
+            resolver = resolve;
+        });
+
+        pool.withConnection(con => {
+            con.executeQuery(r => {
+                    assert(r.getRows(1)[0] == i+1);
+                    resolver();
+                    pool.releaseConnection(con);
+                },
+                e => {
+                    pool.releaseConnection(con);
+                    throw Error(e);
+                }, "INSERT INTO table1(hash,state,locked_by_id,created_at,expires_at) VALUES ($1, $2, 0, $3, $4) RETURNING id;",
+                crypto.HashId.of(randomBytes(16)).digest, 4, (new Date().getTime()/1000).toFixed(0),
+                (new Date().getTime()/1000 + 31536000).toFixed(0));
+        });
+        await promise;
+    }
+});
+
+unit.test("insert, select and update bytea", async () => {
+    await recreateTestTable();
+    let pool = createPool(4);
+    let hashId1 = crypto.HashId.of(randomBytes(16));
+    let hashId2 = crypto.HashId.of(randomBytes(16));
+    let rowId = 0;
+
+    // insert hashId1
+    let resolver;
+    let promise = new Promise((resolve, reject) => {resolver = resolve;});
+    pool.withConnection(con => {
+        con.executeQuery(r => {
+                rowId = parseInt(r.getRows(1)[0]);
+                assert(rowId === 1);
+                resolver();
+                pool.releaseConnection(con);
+            },
+            e => {
+                pool.releaseConnection(con);
+                throw Error(e);
+            },
+            "INSERT INTO table1(hash,state,locked_by_id,created_at,expires_at) VALUES (?,?,0,?,?) RETURNING id;",
+            hashId1.digest,
+            4,
+            (new Date().getTime()/1000).toFixed(0),
+            (new Date().getTime()/1000 + 31536000).toFixed(0));
+    });
+    await promise;
+
+    // select it and check
+    promise = new Promise((resolve, reject) => {resolver = resolve;});
+    pool.withConnection(con => {
+        con.executeQuery(r => {
+            assert(r.getRowsCount() === 1);
+            let hashId1FromDb = crypto.HashId.withDigest(r.getRows(1)[0][0]);
+            // console.log();
+            // console.log(hashId1.base64);
+            // console.log(hashId1FromDb.base64);
+            assert(hashId1FromDb.equals(hashId1));
+            resolver();
+            pool.releaseConnection(con);
+        },
+        e => {
+            pool.releaseConnection(con);
+            throw Error(e);
+        },
+        "SELECT hash FROM table1 WHERE id=? LIMIT 1;",
+        rowId);
+    });
+    await promise;
+
+    // update to hashId2
+    promise = new Promise((resolve, reject) => {resolver = resolve;});
+    pool.withConnection(con => {
+        con.executeUpdate(affectedRows => {
+            assert(affectedRows === 1);
+            resolver();
+            pool.releaseConnection(con);
+        }, e => {
+            pool.releaseConnection(con);
+            throw Error(e);
+        },
+        "UPDATE table1 SET hash=? WHERE id=?;",
+        hashId2.digest, rowId);
+    });
+    await promise;
+
+    // select it and check, now database should store hashId2
+    promise = new Promise((resolve, reject) => {resolver = resolve;});
+    pool.withConnection(con => {
+        con.executeQuery(r => {
+                assert(r.getRowsCount() === 1);
+                let hashId2FromDb = crypto.HashId.withDigest(r.getRows(1)[0][0]);
+                // console.log();
+                // console.log(hashId2.base64);
+                // console.log(hashId2FromDb.base64);
+                assert(hashId2FromDb.equals(hashId2));
+                resolver();
+                pool.releaseConnection(con);
+            },
+            e => {
+                pool.releaseConnection(con);
+                throw Error(e);
+            },
+            "SELECT hash FROM table1 WHERE id=? LIMIT 1;",
+            rowId);
+    });
+    await promise;
+});
+
 unit.test("performance: insert line-by-line vs multi insert", async () => {
     let ROWS_COUNT = 400;
     let BUF_SIZE = 20;

@@ -355,6 +355,9 @@ static unordered_map<string, std::function<Local<Value>(ArgsContext &ac, const b
     {"text", [](ArgsContext &ac, const byte_vector& bv){
         return ac.v8String(db::getStringValue(bv));
     }},
+    {"bytea", [](ArgsContext &ac, const byte_vector& bv){
+        return ac.toBinary(bv);
+    }},
 };
 
 Local<Value> getJsValueFromPgResult(ArgsContext &ac, const byte_vector& data, const string& pgType) {
@@ -364,7 +367,7 @@ Local<Value> getJsValueFromPgResult(ArgsContext &ac, const byte_vector& data, co
     } catch (const std::exception& e) {
         return ac.v8String(std::string("conversion error: ") + e.what());
     }
-    return ac.v8String("pg type: " + pgType + " is not bound");
+    return ac.v8String("pg type error: " + pgType + " is not bound");
 }
 
 void JsQueryResultGetRows(const FunctionCallbackInfo<Value> &args) {
