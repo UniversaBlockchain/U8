@@ -267,6 +267,102 @@ unit.test("insert, select and update bytea", async () => {
     await promise;
 });
 
+unit.test("insert, select and update integer and bigint", async () => {
+    await recreateTestTable();
+    let pool = createPool(4);
+    let created_at_1 = Number((new Date().getTime()/1000).toFixed(0));
+    let expires_at_1 = BigInt(created_at_1) + BigInt(Number.MAX_SAFE_INTEGER)*2n;
+    let created_at_2 = created_at_1 + 1000;
+    let expires_at_2 = BigInt(created_at_2) + BigInt(Number.MAX_SAFE_INTEGER)*2n + 9100000000000n;
+    let rowId = 0;
+    assert(typeof created_at_1 === "number");
+    assert(typeof expires_at_1 === "bigint");
+
+    // insert created_at_1 and expires_at_1
+    let resolver;
+    let promise = new Promise((resolve, reject) => {resolver = resolve;});
+    pool.withConnection(con => {
+        con.executeQuery(r => {
+                rowId = parseInt(r.getRows(1)[0]);
+                assert(rowId === 1);
+                resolver();
+                pool.releaseConnection(con);
+            },
+            e => {
+                pool.releaseConnection(con);
+                throw Error(e);
+            },
+            "INSERT INTO table1(hash,state,locked_by_id,created_at,expires_at) VALUES (?, ?, 0, ?, ?) RETURNING id;",
+            crypto.HashId.of(randomBytes(16)).digest,
+            4,
+            created_at_1,
+            expires_at_1);
+    });
+    await promise;
+
+    // select and check
+    promise = new Promise((resolve, reject) => {resolver = resolve;});
+    pool.withConnection(con => {
+        con.executeQuery(r => {
+                assert(r.getRowsCount() === 1);
+                let row = r.getRows(1)[0];
+                assert(row[0] === created_at_1);
+                assert(row[1] === expires_at_1);
+                let names = r.getColNames();
+                assert(names[0] === "field1");
+                assert(names[1] === "field2");
+                let types = r.getColTypes();
+                assert(types[0] === "int4");
+                assert(types[1] === "int8");
+                resolver();
+                pool.releaseConnection(con);
+            },
+            e => {
+                pool.releaseConnection(con);
+                throw Error(e);
+            },
+            "SELECT created_at AS field1, expires_at AS field2 FROM table1 WHERE id=? LIMIT 1;",
+            rowId);
+    });
+    await promise;
+
+    // update to created_at_2 and expires_at_2
+    promise = new Promise((resolve, reject) => {resolver = resolve;});
+    pool.withConnection(con => {
+        con.executeUpdate(affectedRows => {
+                assert(affectedRows === 1);
+                resolver();
+                pool.releaseConnection(con);
+            }, e => {
+                pool.releaseConnection(con);
+                throw Error(e);
+            },
+            "UPDATE table1 SET created_at=?, expires_at=? WHERE id=?;",
+            created_at_2, expires_at_2, rowId);
+    });
+    await promise;
+
+    // select and check
+    promise = new Promise((resolve, reject) => {resolver = resolve;});
+    pool.withConnection(con => {
+        con.executeQuery(r => {
+                assert(r.getRowsCount() === 1);
+                let row = r.getRows(1)[0];
+                assert(row[0] === created_at_2);
+                assert(row[1] === expires_at_2);
+                resolver();
+                pool.releaseConnection(con);
+            },
+            e => {
+                pool.releaseConnection(con);
+                throw Error(e);
+            },
+            "SELECT created_at AS field1, expires_at AS field2 FROM table1 WHERE id=? LIMIT 1;",
+            rowId);
+    });
+    await promise;
+});
+
 unit.test("performance: insert line-by-line vs multi insert", async () => {
     let ROWS_COUNT = 400;
     let BUF_SIZE = 20;
