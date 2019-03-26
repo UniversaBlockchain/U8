@@ -83,7 +83,8 @@ namespace db {
 
     typedef std::vector<QueryResult> QueryResultsArr;
     typedef const std::function<void(QueryResultsArr&)>& QueryCallback;
-    typedef const std::function<void(db::BusyConnection&&)>& WithConnectionCallback;
+    typedef const std::function<void(shared_ptr<db::BusyConnection>)>& WithConnectionCallbackJs;
+    typedef const std::function<void(db::BusyConnection&)>& WithConnectionCallback;
     typedef const std::function<void(QueryResult&&)>& ExecuteSuccessCallback;
     typedef const std::function<void(const std::string& errText)>& ExecuteErrorCallback;
     typedef const std::function<void(int affectedRows)>& UpdateSuccessCallback;
@@ -92,24 +93,18 @@ namespace db {
     /**
      * Automatically release connection back to the pool.
      */
-    class BusyConnection {
+    class BusyConnection: Nonmovable, Noncopyable {
     public:
 
         /**
          * For js bindings.
          */
-        BusyConnection(): parent_(nullptr) {}
-
-        /**
-         * For js bindings.
-         */
-        void moveFrom(BusyConnection&& other);
+        BusyConnection(): parent_(nullptr), worker_(1) {}
 
         /**
          * By design it should be used from PGPool only.
          */
-        BusyConnection(PGPool* new_parent, std::shared_ptr<PGconn> new_con): parent_(new_parent), con_(new_con) {}
-        ~BusyConnection();
+        BusyConnection(PGPool* new_parent, std::shared_ptr<PGconn> new_con, int newId): parent_(new_parent), con_(new_con), worker_(1), conId_(newId) {}
 
         /**
          * Accessor for libpq PGconn*
@@ -164,6 +159,8 @@ namespace db {
          */
         void executeUpdateArrStr(UpdateSuccessCallback onSuccess, UpdateErrorCallback onError, const std::string& queryString, std::vector<std::any>& params);
 
+        int getId() {return conId_;}
+
     private:
 
         void prepareParams(std::vector<std::any>& params) {
@@ -183,6 +180,8 @@ namespace db {
     private:
         std::shared_ptr<PGconn> con_;
         PGPool* parent_;
+        ThreadPool worker_;
+        int conId_;
     };
 
     /**
@@ -208,9 +207,17 @@ namespace db {
         /**
          * Get connection from the pool, pass it to the callback and return it to the pool.
          * The call itself never blocks while the callback could be called in some moment in future.
-         * @param callback db::PGPool::BusyConnection
+         * <p>
+         * Releases automatically.
+         * @param callback shared_ptr<db::PGPool::BusyConnection>
          */
         void withConnection(WithConnectionCallback callback);
+
+        /**
+         * Need to be released by pgPool.releaseConnection()
+         * @param callback db::PGPool::BusyConnection
+         */
+        void withConnection(WithConnectionCallbackJs callback);
 
         /**
          * Return number of connections in the pool.
@@ -223,6 +230,8 @@ namespace db {
         size_t availableConnections();
 
         /**
+         * deprecated
+         * <p>
          * Executes string sql command. All query parameters should be inside string.
          * You can concatenate several sql commands in one string. Callback receives vecror<QueryResult> parameter,
          * one result for each sql command.
@@ -232,7 +241,12 @@ namespace db {
         /**
          * Uses from class BusyConnection.
          */
-        void releaseConnection(std::shared_ptr<PGconn> con);
+        void releaseConnection(std::shared_ptr<BusyConnection> con);
+
+        /**
+         * Uses from JS bindings.
+         */
+        void releaseConnection(int conId);
 
         /**
          * Returns pg type name by its oid. Oids list are loaded on connection step.
@@ -240,15 +254,16 @@ namespace db {
         string getType(int oid) {return pgTypes_[oid];};
 
     private:
-        std::shared_ptr<PGconn> getUnusedConnection();
+        std::shared_ptr<BusyConnection> getUnusedConnection();
         std::string loadOids();
 
     private:
-        std::queue<std::shared_ptr<PGconn>> connPool_;
+        std::queue<std::shared_ptr<BusyConnection>> connPool_;
         std::mutex poolMutex_;
         std::condition_variable poolCV_;
-        ThreadPool threadPool_;
-        std::atomic<size_t> usedConnectionsCount_;
+        ThreadPool poolControlThread_;
+        //std::atomic<size_t> usedConnectionsCount_;
+        std::unordered_map<int, std::shared_ptr<BusyConnection>> usedConnections_;
         std::unordered_map<int, string> pgTypes_;
 
     };

@@ -45,18 +45,15 @@ void JsPGPoolWithConnection(const FunctionCallbackInfo<Value> &args) {
         }
         Persistent<Function> *pcb = new Persistent<Function>(ac.isolate, fn);
 
-        pool->withConnection([=](db::BusyConnection&& conn) {
-            db::BusyConnection* connection = new db::BusyConnection();
-            connection->moveFrom(std::move(conn));
-
+        pool->withConnection([=](shared_ptr<db::BusyConnection> conn) {
             // here we are in another thread
             scripter->inPool([=](auto context) {
                 Isolate *isolate = context->GetIsolate();
                 auto fn = pcb->Get(isolate);
-                Local<Value> res[1] {wrap(BusyConnectionTemplate, isolate, connection)};
+                Local<Value> res[1] {wrap(BusyConnectionTemplate, isolate, conn.get())};
                 fn->Call(fn, 1, res);
                 delete pcb;
-                delete connection;
+                //pool->releaseConnection(conn);
             });
         });
     });
@@ -87,6 +84,27 @@ void JsPGPoolAvailableConnections(const FunctionCallbackInfo<Value> &args) {
 
         unsigned int result = pool->availableConnections();
         ac.setReturnValue(result);
+    });
+}
+
+void JsPGPoolReleaseConnection(const FunctionCallbackInfo<Value> &args) {
+    Scripter::unwrapArgs(args, [&](ArgsContext &ac) {
+
+        auto scripter = ac.scripter;
+        if (args.Length() != 1)
+            scripter->throwError("invalid number of arguments");
+
+        auto obj = ac.as<Object>(0);
+        auto tpl = BusyConnectionTemplate.Get(ac.isolate);
+        if (!obj->IsObject() || !tpl->HasInstance(obj)) {
+            ac.throwError("required BusyConnection argument");
+            return;
+        }
+
+        auto con = unwrap<db::BusyConnection>(obj);
+
+        auto pool = unwrap<db::PGPool>(args.This());
+        pool->releaseConnection(con->getId());
     });
 }
 
@@ -228,6 +246,7 @@ void JsInitPGPool(Isolate *isolate, const Local<ObjectTemplate> &global) {
     prototype->Set(isolate, "_withConnection", FunctionTemplate::New(isolate, JsPGPoolWithConnection));
     prototype->Set(isolate, "_totalConnections", FunctionTemplate::New(isolate, JsPGPoolTotalConnections));
     prototype->Set(isolate, "_availableConnections", FunctionTemplate::New(isolate, JsPGPoolAvailableConnections));
+    prototype->Set(isolate, "_releaseConnection", FunctionTemplate::New(isolate, JsPGPoolReleaseConnection));
 
     // register it into global namespace
     PGPoolTemplate.Reset(isolate, tpl);

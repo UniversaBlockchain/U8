@@ -72,6 +72,10 @@ class SqlDriverPool {
     availableConnections() {
         return 0;
     }
+
+    releaseConnection(con) {
+        throw new DatabaseError("not implemented");
+    }
 }
 
 /**

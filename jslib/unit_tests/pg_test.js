@@ -30,9 +30,11 @@ unit.test("pg_test: hello", async () => {
                     // console.log("  getColNames: " + r.getColNames());
                     // console.log("  getColTypes: " + r.getColTypes());
                     // console.log("  getRows: " + JSON.stringify(r.getRows(0), function(k,v){return (typeof v==='bigint')?v.toString()+"n":v;}));
+                    pool.releaseConnection(con);
                     resolver();
                 }, (e) => {
                     console.error("con.executeQuery.onError: " + e);
+                    pool.releaseConnection(con);
                     resolver();
                 }, "SELECT 1 AS one, 2::bigint AS two, 3 AS three, 'some text' AS text, $1, $2, $3, $4, $5;", 1, 2.333e+170, 3, 4.34, "ololo");
             });
@@ -52,10 +54,12 @@ async function execSync(pool, queryStr) {
     pool.withConnection(con => {
         con.executeQuery(
             r => {
+                pool.releaseConnection(con);
                 resolver();
             },
             e => {
                 console.error(e);
+                pool.releaseConnection(con);
                 resolver();
             },
             queryStr);
@@ -129,9 +133,11 @@ unit.test("pg_test: tables", async () => {
                     ++counter;
                     if (counter % 1000 == 0)
                         console.log("counter=" + counter);
+                    pool.releaseConnection(con);
                     if (counter >= counter_max)
                         resolver();
                 }, e => {
+                    pool.releaseConnection(con);
                     throw Error(e);
                 }, "INSERT INTO table1(hash,state,locked_by_id,created_at,expires_at) VALUES ($1, $2, 0, $3, $4)",
                 crypto.HashId.of(randomBytes(16)).digest, 4, 5, 6,
@@ -165,9 +171,11 @@ unit.test("performance: insert line-by-line vs multi insert", async () => {
         pool.withConnection(con => {
             con.executeUpdate(affectedRows => {
                 readyCounter += 1;
+                    pool.releaseConnection(con);
                 if (readyCounter >= ROWS_COUNT)
                     resolver();
             }, e => {
+                    pool.releaseConnection(con);
                 throw Error(e);
             }, "INSERT INTO table1(hash,state,locked_by_id,created_at,expires_at) VALUES (?, ?, 0, ?, ?)",
             hashes[i], 4, (new Date().getTime()/1000).toFixed(0),
@@ -202,9 +210,11 @@ unit.test("performance: insert line-by-line vs multi insert", async () => {
             query += " RETURNING id;";
             con.executeUpdate(affectedRows => {
                 readyCounter += affectedRows;
+                pool.releaseConnection(con);
                 if (readyCounter >= ROWS_COUNT)
                     resolver();
             }, e => {
+                pool.releaseConnection(con);
                 throw Error(e);
             }, query, ...params);
         });
@@ -249,9 +259,11 @@ unit.test("performance: select line-by-line vs array in 'where'", async () => {
             query += " RETURNING id;";
             con.executeUpdate(affectedRows => {
                 readyCounter += affectedRows;
+                pool.releaseConnection(con);
                 if (readyCounter >= ROWS_COUNT)
                     resolver();
             }, e => {
+                pool.releaseConnection(con);
                 throw Error(e);
             }, query, ...params);
         });
@@ -266,9 +278,11 @@ unit.test("performance: select line-by-line vs array in 'where'", async () => {
         pool.withConnection(con => {
             con.executeQuery(r => {
                 readyCounter += 1;
+                pool.releaseConnection(con);
                 if (readyCounter >= SELECTS_COUNT)
                     resolver();
             }, e => {
+                pool.releaseConnection(con);
                 throw Error(e);
             }, "SELECT state FROM table1 WHERE hash=$1 LIMIT 1", hashes[Math.floor(Math.random() * ROWS_COUNT)]);
         });
@@ -293,9 +307,11 @@ unit.test("performance: select line-by-line vs array in 'where'", async () => {
             queryArray += ")";
             con.executeQuery(r => {
                 readyCounter += SELECTS_BUF_SIZE;
+                pool.releaseConnection(con);
                 if (readyCounter >= SELECTS_COUNT)
                     resolver();
             }, e => {
+                pool.releaseConnection(con);
                 throw Error(e);
             }, "SELECT state FROM table1 WHERE hash IN "+queryArray+" LIMIT "+SELECTS_BUF_SIZE, ...params);
         });
@@ -303,6 +319,84 @@ unit.test("performance: select line-by-line vs array in 'where'", async () => {
     await promise;
     dt = new Date().getTime() - t1;
     testResult += ", batch selects: " + dt + " ms ...";
+
+    console.logPut(testResult);
+});
+
+unit.test("performance: multithreading", async () => {
+    let ROWS_COUNT = 10000;
+    let INSERT_BUF_SIZE = 1000;
+    let SELECTS_COUNT = ROWS_COUNT/10;
+    let SELECTS_BUF_SIZE = 50;
+    let testResult = "";
+    let pool = createPool(20);
+    let readyCounter = 0;
+    let resolver;
+    let promise = new Promise((resolve, reject) => {
+        resolver = resolve;
+    });
+
+    let hashes = [];
+    for (let i = 0; i < ROWS_COUNT; ++i)
+        hashes.push(crypto.HashId.of(randomBytes(16)).digest);
+    for (let i = 0; i < ROWS_COUNT/INSERT_BUF_SIZE; ++i) {
+        pool.withConnection(con => {
+            let query = "INSERT INTO table1(hash,state,locked_by_id,created_at,expires_at) VALUES ";
+            let params = [];
+            for (let j = 0; j < INSERT_BUF_SIZE; ++j) {
+                let buf = "(?,?,0,?,?)";
+                params.push(hashes[i*INSERT_BUF_SIZE+j]);
+                params.push(4);
+                params.push((new Date().getTime()/1000).toFixed(0));
+                params.push((new Date().getTime()/1000 + 31536000).toFixed(0));
+                if (j > 0)
+                    query += ",";
+                query += buf;
+            }
+            query += " RETURNING id;";
+            con.executeUpdate(affectedRows => {
+                readyCounter += affectedRows;
+                pool.releaseConnection(con);
+                if (readyCounter >= ROWS_COUNT)
+                    resolver();
+            }, e => {
+                pool.releaseConnection(con);
+                throw Error(e);
+            }, query, ...params);
+        });
+    }
+    await promise;
+
+    readyCounter = 0;
+    promise = new Promise((resolve, reject) => {resolver = resolve;});
+    let t1 = new Date().getTime();
+    for (let i = 0; i < SELECTS_COUNT/SELECTS_BUF_SIZE; ++i) {
+        pool.withConnection(con => {
+            let queryArray = "(";
+            let params = [];
+            for (let j = 1; j <= SELECTS_BUF_SIZE; ++j) {
+                params.push(hashes[Math.floor(Math.random() * ROWS_COUNT)]);
+                queryArray += "?";
+                if (j != SELECTS_BUF_SIZE)
+                    queryArray += ",";
+            }
+            queryArray += ")";
+            con.executeQuery(r => {
+                readyCounter += SELECTS_BUF_SIZE;
+                pool.releaseConnection(con);
+                if (readyCounter >= SELECTS_COUNT)
+                    resolver();
+            }, e => {
+                pool.releaseConnection(con);
+                throw Error(e);
+            }, "SELECT state FROM table1, pg_sleep(1) WHERE hash IN "+queryArray+" LIMIT "+SELECTS_BUF_SIZE, ...params);
+        });
+    }
+    await promise;
+    let dt = new Date().getTime() - t1;
+    testResult += ", total time: " + dt + " ms ...";
+    assert(dt > 1000*0.9);
+    assert(dt < 1000*1.1);
 
     console.logPut(testResult);
 });

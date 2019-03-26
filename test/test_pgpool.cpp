@@ -65,19 +65,17 @@ TEST_CASE("PGPool") {
             vector<unsigned char> rndBytes(16);
             sprng_read(&rndBytes[0], 16, NULL);
             auto b64 = base64_encode(rndBytes);
-            pgPool.exec(
-                    string("INSERT INTO table1(hash,state,locked_by_id,created_at,expires_at) VALUES (decode('") + b64 +
-                    string("', 'base64'), 4, 0, 33, 44);"), [&sem, &readyCounter](db::QueryResultsArr &qra) {
-                        if (qra[0].isError())
-                            throw std::runtime_error("error: " + string(qra[0].getErrorText()));
-                        ++readyCounter;
-                        sem.notify();
-                    });
+//            pgPool.exec(
+//                    string("INSERT INTO table1(hash,state,locked_by_id,created_at,expires_at) VALUES (decode('") + b64 +
+//                    string("', 'base64'), 4, 0, 33, 44) RETURNING id;"), [&sem, &readyCounter](db::QueryResultsArr &qra) {
+//                        if (qra[0].isError())
+//                            throw std::runtime_error("error: " + string(qra[0].getErrorText()));
+//                        ++readyCounter;
+//                        sem.notify();
+//                    });
 
             // insert with pgPool.execParams()
-            pgPool.withConnection([&sem,&readyCounter](db::BusyConnection&& con1) {
-                db::BusyConnection con;
-                con.moveFrom(move(con1));
+            pgPool.withConnection([&sem,&readyCounter](db::BusyConnection& con) {
                 con.executeQuery(
                         [&sem, &readyCounter](db::QueryResult &&qr) {
                             ++readyCounter;
@@ -92,7 +90,7 @@ TEST_CASE("PGPool") {
             });
 
             // insert with pgPool.execParamsArr()
-            pgPool.withConnection([&sem,&readyCounter](db::BusyConnection&& con) {
+            pgPool.withConnection([&sem,&readyCounter](db::BusyConnection& con) {
                 vector<any> params(
                         {HashId::createRandom().getDigest(), 4, (int)getCurrentTimeMillis() / 1000,
                          getCurrentTimeMillis() / 1000l + 31536000l});
@@ -114,11 +112,11 @@ TEST_CASE("PGPool") {
             int counterState = int(readyCounter);
             if (counterState % 100 == 0)
                 cout << "readyCounter: " << counterState << endl;
-        } while (readyCounter < TEST_QUERIES_COUNT * 3);
-        REQUIRE(readyCounter == TEST_QUERIES_COUNT * 3);
+        } while (readyCounter < TEST_QUERIES_COUNT * 2);
+        REQUIRE(readyCounter == TEST_QUERIES_COUNT * 2);
 
         Semaphore sem2;
-        pgPool.withConnection([&sem2](db::BusyConnection&& con){
+        pgPool.withConnection([&sem2](db::BusyConnection& con){
             con.executeQuery(
                     [&sem2](db::QueryResult &&qr) {
                         REQUIRE(qr.getRowsCount() == 3);
@@ -155,7 +153,7 @@ TEST_CASE("PGPool") {
     SECTION("insert and get new id") {
         Semaphore sem;
         for (int i = 0; i < 10; ++i) {
-            pgPool.withConnection([&sem,i](db::BusyConnection&& con){
+            pgPool.withConnection([&sem,i](db::BusyConnection& con){
                con.executeQuery(
                        [&sem,i](db::QueryResult &&qr) {
                            int newId = db::getIntValue(qr.getValueByIndex(0, 0));
@@ -183,7 +181,7 @@ TEST_CASE("PGPool") {
         int rowId = 0;
 
         // insert hashId1
-        pgPool.withConnection([&sem,&rowId,&hashId1](db::BusyConnection&& con){
+        pgPool.withConnection([&sem,&rowId,&hashId1](db::BusyConnection& con){
            con.executeQuery(
                [&sem,&rowId](db::QueryResult &&qr) {
                    int newId = db::getIntValue(qr.getValueByIndex(0, 0));
@@ -204,7 +202,7 @@ TEST_CASE("PGPool") {
         sem.wait();
 
         // select it and check
-        pgPool.withConnection([&sem,&hashId1,rowId](db::BusyConnection&& con) {
+        pgPool.withConnection([&sem,&hashId1,rowId](db::BusyConnection& con) {
             con.executeQuery(
                     [&sem,&hashId1](db::QueryResult &&qr) {
                         REQUIRE(qr.getRowsCount() == 1);
@@ -222,7 +220,7 @@ TEST_CASE("PGPool") {
         sem.wait();
 
         // update to hashId2
-        pgPool.withConnection([&sem,&hashId2,rowId](db::BusyConnection&& con) {
+        pgPool.withConnection([&sem,&hashId2,rowId](db::BusyConnection& con) {
             con.executeUpdate(
                     [&sem](int affectedRows) {
                         REQUIRE(affectedRows == 1);
@@ -238,7 +236,7 @@ TEST_CASE("PGPool") {
         sem.wait();
 
         // select it and check, now database should store hashId2
-        pgPool.withConnection([&sem,&hashId2,rowId](db::BusyConnection&& con) {
+        pgPool.withConnection([&sem,&hashId2,rowId](db::BusyConnection& con) {
             con.executeQuery(
                     [&sem,&hashId2](db::QueryResult &&qr) {
                         REQUIRE(qr.getRowsCount() == 1);
@@ -265,7 +263,7 @@ TEST_CASE("PGPool") {
         int rowId = 0;
 
         // insert created_at_1 and expires_at_1
-        pgPool.withConnection([&sem,&rowId,created_at_1,expires_at_1](db::BusyConnection&& con){
+        pgPool.withConnection([&sem,&rowId,created_at_1,expires_at_1](db::BusyConnection& con){
             con.executeQuery(
                     [&sem,&rowId](db::QueryResult &&qr) {
                         int newId = db::getIntValue(qr.getValueByIndex(0, 0));
@@ -283,7 +281,7 @@ TEST_CASE("PGPool") {
         sem.wait();
 
         // select and check
-        pgPool.withConnection([&sem,created_at_1,expires_at_1,rowId](db::BusyConnection&& con) {
+        pgPool.withConnection([&sem,created_at_1,expires_at_1,rowId](db::BusyConnection& con) {
             con.executeQuery(
                     [&sem,created_at_1,expires_at_1](db::QueryResult &&qr) {
                         REQUIRE(qr.getRowsCount() == 1);
@@ -303,7 +301,7 @@ TEST_CASE("PGPool") {
         sem.wait();
 
         // update to created_at_2 and expires_at_2
-        pgPool.withConnection([&sem,created_at_2,expires_at_2,rowId](db::BusyConnection&& con) {
+        pgPool.withConnection([&sem,created_at_2,expires_at_2,rowId](db::BusyConnection& con) {
             con.executeUpdate(
                     [&sem](int affectedRows) {
                         REQUIRE(affectedRows == 1);
@@ -319,7 +317,7 @@ TEST_CASE("PGPool") {
         sem.wait();
 
         // select and check
-        pgPool.withConnection([&sem,created_at_2,expires_at_2,rowId](db::BusyConnection&& con) {
+        pgPool.withConnection([&sem,created_at_2,expires_at_2,rowId](db::BusyConnection& con) {
             con.executeQuery(
                     [&sem,created_at_2,expires_at_2](db::QueryResult &&qr) {
                         REQUIRE(qr.getRowsCount() == 1);
@@ -350,7 +348,7 @@ TEST_CASE("PGPool") {
         int rowId = 0;
 
         // insert text1, bool1, double1
-        pgPool.withConnection([&sem,&rowId,text1,bool1,double1](db::BusyConnection&& con) {
+        pgPool.withConnection([&sem,&rowId,text1,bool1,double1](db::BusyConnection& con) {
             con.executeQuery(
                     [&sem,&rowId](db::QueryResult &&qr) {
                         int newId = db::getIntValue(qr.getValueByIndex(0, 0));
@@ -368,7 +366,7 @@ TEST_CASE("PGPool") {
         sem.wait();
 
         // select and check
-        pgPool.withConnection([&sem,&rowId,text1,bool1,double1](db::BusyConnection&& con) {
+        pgPool.withConnection([&sem,&rowId,text1,bool1,double1](db::BusyConnection& con) {
             con.executeQuery(
                     [&sem,&rowId,text1,bool1,double1](db::QueryResult &&qr) {
                         REQUIRE(qr.getRowsCount() == 1);
@@ -390,7 +388,7 @@ TEST_CASE("PGPool") {
         sem.wait();
 
         // update to text2, bool2, double2
-        pgPool.withConnection([&sem,&rowId,text2,bool2,double2](db::BusyConnection&& con) {
+        pgPool.withConnection([&sem,&rowId,text2,bool2,double2](db::BusyConnection& con) {
             con.executeUpdate(
                     [&sem](int affectedRows) {
                         REQUIRE(affectedRows == 1);
@@ -406,7 +404,7 @@ TEST_CASE("PGPool") {
         sem.wait();
 
         // select and check
-        pgPool.withConnection([&sem,&rowId,text2,bool2,double2](db::BusyConnection&& con) {
+        pgPool.withConnection([&sem,&rowId,text2,bool2,double2](db::BusyConnection& con) {
             con.executeQuery(
                     [&sem,&rowId,text2,bool2,double2](db::QueryResult &&qr) {
                         REQUIRE(qr.getRowsCount() == 1);
@@ -440,7 +438,7 @@ TEST_CASE("PGPool") {
 
         long long t0 = getCurrentTimeMillis();
         for (int i = 0; i < ROWS_COUNT; ++i) {
-            pgPool.withConnection([&sem,&readyCounter,&hashes,i](db::BusyConnection&& con){
+            pgPool.withConnection([&sem,&readyCounter,&hashes,i](db::BusyConnection& con){
                 vector<any> params({hashes[i].getDigest(), 4, (int)getCurrentTimeMillis() / 1000,
                                     getCurrentTimeMillis() / 1000l + 31536000l});
                 con.executeUpdateArr(
@@ -468,7 +466,7 @@ TEST_CASE("PGPool") {
 
         long long t1 = getCurrentTimeMillis();
         for (int i = 0; i < ROWS_COUNT/BUF_SIZE; ++i) {
-            pgPool.withConnection([&readyCounter,&sem,&hashes,i](db::BusyConnection&& con){
+            pgPool.withConnection([&readyCounter,&sem,&hashes,i](db::BusyConnection& con){
                 string query = "INSERT INTO table1(hash,state,locked_by_id,created_at,expires_at) VALUES ";
                 vector<any> params;
                 for (int j = 0; j < BUF_SIZE; ++j) {
@@ -521,9 +519,7 @@ TEST_CASE("PGPool") {
         for (int i = 0; i < ROWS_COUNT; ++i)
             hashes.push_back(HashId::createRandom());
         for (int i = 0; i < ROWS_COUNT/INSERT_BUF_SIZE; ++i) {
-            pgPool.withConnection([&hashes,i,&sem,&readyCounter](db::BusyConnection&& con1){
-                db::BusyConnection con;
-                con.moveFrom(move(con1));
+            pgPool.withConnection([&hashes,i,&sem,&readyCounter](db::BusyConnection& con){
                 string query = "INSERT INTO table1(hash,state,locked_by_id,created_at,expires_at) VALUES ";
                 vector<any> params;
                 for (int j = 0; j < INSERT_BUF_SIZE; ++j) {
@@ -562,9 +558,7 @@ TEST_CASE("PGPool") {
         long long t0 = getCurrentTimeMillis();
         Semaphore sem2;
         for (int i = 0; i < SELECTS_COUNT; ++i) {
-            pgPool.withConnection([&hashes,&minstdRand,&sem2](db::BusyConnection&& con1){
-                db::BusyConnection con;
-                con.moveFrom(move(con1));
+            pgPool.withConnection([&hashes,&minstdRand,&sem2](db::BusyConnection& con){
                 vector<any> params({hashes[minstdRand()%ROWS_COUNT].getDigest()});
                 con.executeQueryArr(
                         [&sem2](db::QueryResult&& qr) {
@@ -584,9 +578,7 @@ TEST_CASE("PGPool") {
 
         long long t1 = getCurrentTimeMillis();
         for (int i = 0; i < SELECTS_COUNT/SELECTS_BUF_SIZE; ++i) {
-            pgPool.withConnection([&hashes,&minstdRand,&sem2](db::BusyConnection&& con1){
-                db::BusyConnection con;
-                con.moveFrom(move(con1));
+            pgPool.withConnection([&hashes,&minstdRand,&sem2](db::BusyConnection& con){
                 string queryArray = "(";
                 vector<any> params;
                 for (int j = 1; j <= SELECTS_BUF_SIZE; ++j) {
@@ -618,7 +610,7 @@ TEST_CASE("PGPool") {
         Semaphore sem;
         const int count = 100;
         for (int i = 0; i < count; ++i) {
-            pgPool.withConnection([i,&pgPool,&sem](db::BusyConnection &&con) {
+            pgPool.withConnection([i,&pgPool,&sem](db::BusyConnection &con) {
                 this_thread::sleep_for(10ms);
                 sem.notify();
             });

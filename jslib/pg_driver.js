@@ -21,7 +21,6 @@ class PgDriverPool extends db.SqlDriverPool {
         this.pool._withConnection((con)=>{
             callback(new PgDriverConnection(con));
         });
-        //throw new db.DatabaseError("pg not implemented");
     }
 
     totalConnections() {
@@ -30,6 +29,10 @@ class PgDriverPool extends db.SqlDriverPool {
 
     availableConnections() {
         return this.pool._availableConnections();
+    }
+
+    releaseConnection(con) {
+        this.pool._releaseConnection(con.con);
     }
 }
 
