@@ -30,11 +30,11 @@ unit.test("pg_test: hello", async () => {
                     // console.log("  getColNames: " + r.getColNames());
                     // console.log("  getColTypes: " + r.getColTypes());
                     // console.log("  getRows: " + JSON.stringify(r.getRows(0), function(k,v){return (typeof v==='bigint')?v.toString()+"n":v;}));
-                    pool.releaseConnection(con);
+                    con.release();
                     resolver();
                 }, (e) => {
                     console.error("con.executeQuery.onError: " + e);
-                    pool.releaseConnection(con);
+                    con.release();
                     resolver();
                 }, "SELECT 1 AS one, 2::bigint AS two, 3 AS three, 'some text' AS text, $1, $2, $3, $4, $5;", 1, 2.333e+170, 3, 4.34, "ololo");
             });
@@ -54,12 +54,12 @@ async function execSync(pool, queryStr) {
     pool.withConnection(con => {
         con.executeQuery(
             r => {
-                pool.releaseConnection(con);
+                con.release();
                 resolver();
             },
             e => {
                 console.error(e);
-                pool.releaseConnection(con);
+                con.release();
                 resolver();
             },
             queryStr);
@@ -133,11 +133,11 @@ unit.test("pg_test: tables", async () => {
                     ++counter;
                     if (counter % 1000 == 0)
                         console.log("counter=" + counter);
-                    pool.releaseConnection(con);
+                    con.release();
                     if (counter >= counter_max)
                         resolver();
                 }, e => {
-                    pool.releaseConnection(con);
+                    con.release();
                     throw Error(e);
                 }, "INSERT INTO table1(hash,state,locked_by_id,created_at,expires_at) VALUES ($1, $2, 0, $3, $4)",
                 crypto.HashId.of(randomBytes(16)).digest, 4, 5, 6,
@@ -164,10 +164,10 @@ unit.test("insert and get new id", async () => {
             con.executeQuery(r => {
                     assert(r.getRows(1)[0] == i+1);
                     resolver();
-                    pool.releaseConnection(con);
+                    con.release();
                 },
                 e => {
-                    pool.releaseConnection(con);
+                    con.release();
                     throw Error(e);
                 }, "INSERT INTO table1(hash,state,locked_by_id,created_at,expires_at) VALUES ($1, $2, 0, $3, $4) RETURNING id;",
                 crypto.HashId.of(randomBytes(16)).digest, 4, (new Date().getTime()/1000).toFixed(0),
@@ -192,10 +192,10 @@ unit.test("insert, select and update bytea", async () => {
                 rowId = parseInt(r.getRows(1)[0]);
                 assert(rowId === 1);
                 resolver();
-                pool.releaseConnection(con);
+                con.release();
             },
             e => {
-                pool.releaseConnection(con);
+                con.release();
                 throw Error(e);
             },
             "INSERT INTO table1(hash,state,locked_by_id,created_at,expires_at) VALUES (?,?,0,?,?) RETURNING id;",
@@ -217,10 +217,10 @@ unit.test("insert, select and update bytea", async () => {
             // console.log(hashId1FromDb.base64);
             assert(hashId1FromDb.equals(hashId1));
             resolver();
-            pool.releaseConnection(con);
+            con.release();
         },
         e => {
-            pool.releaseConnection(con);
+            con.release();
             throw Error(e);
         },
         "SELECT hash FROM table1 WHERE id=? LIMIT 1;",
@@ -234,9 +234,9 @@ unit.test("insert, select and update bytea", async () => {
         con.executeUpdate(affectedRows => {
             assert(affectedRows === 1);
             resolver();
-            pool.releaseConnection(con);
+            con.release();
         }, e => {
-            pool.releaseConnection(con);
+            con.release();
             throw Error(e);
         },
         "UPDATE table1 SET hash=? WHERE id=?;",
@@ -255,10 +255,10 @@ unit.test("insert, select and update bytea", async () => {
                 // console.log(hashId2FromDb.base64);
                 assert(hashId2FromDb.equals(hashId2));
                 resolver();
-                pool.releaseConnection(con);
+                con.release();
             },
             e => {
-                pool.releaseConnection(con);
+                con.release();
                 throw Error(e);
             },
             "SELECT hash FROM table1 WHERE id=? LIMIT 1;",
@@ -286,10 +286,10 @@ unit.test("insert, select and update integer and bigint", async () => {
                 rowId = parseInt(r.getRows(1)[0]);
                 assert(rowId === 1);
                 resolver();
-                pool.releaseConnection(con);
+                con.release();
             },
             e => {
-                pool.releaseConnection(con);
+                con.release();
                 throw Error(e);
             },
             "INSERT INTO table1(hash,state,locked_by_id,created_at,expires_at) VALUES (?, ?, 0, ?, ?) RETURNING id;",
@@ -315,10 +315,10 @@ unit.test("insert, select and update integer and bigint", async () => {
                 assert(types[0] === "int4");
                 assert(types[1] === "int8");
                 resolver();
-                pool.releaseConnection(con);
+                con.release();
             },
             e => {
-                pool.releaseConnection(con);
+                con.release();
                 throw Error(e);
             },
             "SELECT created_at AS field1, expires_at AS field2 FROM table1 WHERE id=? LIMIT 1;",
@@ -332,9 +332,9 @@ unit.test("insert, select and update integer and bigint", async () => {
         con.executeUpdate(affectedRows => {
                 assert(affectedRows === 1);
                 resolver();
-                pool.releaseConnection(con);
+                con.release();
             }, e => {
-                pool.releaseConnection(con);
+                con.release();
                 throw Error(e);
             },
             "UPDATE table1 SET created_at=?, expires_at=? WHERE id=?;",
@@ -351,10 +351,10 @@ unit.test("insert, select and update integer and bigint", async () => {
                 assert(row[0] === created_at_2);
                 assert(row[1] === expires_at_2);
                 resolver();
-                pool.releaseConnection(con);
+                con.release();
             },
             e => {
-                pool.releaseConnection(con);
+                con.release();
                 throw Error(e);
             },
             "SELECT created_at AS field1, expires_at AS field2 FROM table1 WHERE id=? LIMIT 1;",
@@ -382,10 +382,10 @@ unit.test("insert, select and update text, boolean, double", async () => {
                 rowId = parseInt(r.getRows(1)[0]);
                 assert(rowId === 1);
                 resolver();
-                pool.releaseConnection(con);
+                con.release();
             },
             e => {
-                pool.releaseConnection(con);
+                con.release();
                 throw Error(e);
             },
             "INSERT INTO table2(text_val, boolean_val, double_val) VALUES (?,?,?) RETURNING id;",
@@ -408,10 +408,10 @@ unit.test("insert, select and update text, boolean, double", async () => {
                 assert(types[1] === "bool");
                 assert(types[2] === "float8");
                 resolver();
-                pool.releaseConnection(con);
+                con.release();
             },
             e => {
-                pool.releaseConnection(con);
+                con.release();
                 throw Error(e);
             },
             "SELECT text_val, boolean_val, double_val FROM table2 WHERE id=? LIMIT 1;",
@@ -425,9 +425,9 @@ unit.test("insert, select and update text, boolean, double", async () => {
         con.executeUpdate(affectedRows => {
                 assert(affectedRows === 1);
                 resolver();
-                pool.releaseConnection(con);
+                con.release();
             }, e => {
-                pool.releaseConnection(con);
+                con.release();
                 throw Error(e);
             },
             "UPDATE table2 SET text_val=?, boolean_val=?, double_val=? WHERE id=?;",
@@ -450,10 +450,10 @@ unit.test("insert, select and update text, boolean, double", async () => {
                 assert(types[1] === "bool");
                 assert(types[2] === "float8");
                 resolver();
-                pool.releaseConnection(con);
+                con.release();
             },
             e => {
-                pool.releaseConnection(con);
+                con.release();
                 throw Error(e);
             },
             "SELECT text_val, boolean_val, double_val FROM table2 WHERE id=? LIMIT 1;",
@@ -483,11 +483,11 @@ unit.test("performance: insert line-by-line vs multi insert", async () => {
         pool.withConnection(con => {
             con.executeUpdate(affectedRows => {
                 readyCounter += 1;
-                    pool.releaseConnection(con);
+                    con.release();
                 if (readyCounter >= ROWS_COUNT)
                     resolver();
             }, e => {
-                    pool.releaseConnection(con);
+                    con.release();
                 throw Error(e);
             }, "INSERT INTO table1(hash,state,locked_by_id,created_at,expires_at) VALUES (?, ?, 0, ?, ?)",
             hashes[i], 4, (new Date().getTime()/1000).toFixed(0),
@@ -522,11 +522,11 @@ unit.test("performance: insert line-by-line vs multi insert", async () => {
             query += " RETURNING id;";
             con.executeUpdate(affectedRows => {
                 readyCounter += affectedRows;
-                pool.releaseConnection(con);
+                con.release();
                 if (readyCounter >= ROWS_COUNT)
                     resolver();
             }, e => {
-                pool.releaseConnection(con);
+                con.release();
                 throw Error(e);
             }, query, ...params);
         });
@@ -571,11 +571,11 @@ unit.test("performance: select line-by-line vs array in 'where'", async () => {
             query += " RETURNING id;";
             con.executeUpdate(affectedRows => {
                 readyCounter += affectedRows;
-                pool.releaseConnection(con);
+                con.release();
                 if (readyCounter >= ROWS_COUNT)
                     resolver();
             }, e => {
-                pool.releaseConnection(con);
+                con.release();
                 throw Error(e);
             }, query, ...params);
         });
@@ -590,11 +590,11 @@ unit.test("performance: select line-by-line vs array in 'where'", async () => {
         pool.withConnection(con => {
             con.executeQuery(r => {
                 readyCounter += 1;
-                pool.releaseConnection(con);
+                con.release();
                 if (readyCounter >= SELECTS_COUNT)
                     resolver();
             }, e => {
-                pool.releaseConnection(con);
+                con.release();
                 throw Error(e);
             }, "SELECT state FROM table1 WHERE hash=$1 LIMIT 1", hashes[Math.floor(Math.random() * ROWS_COUNT)]);
         });
@@ -619,11 +619,11 @@ unit.test("performance: select line-by-line vs array in 'where'", async () => {
             queryArray += ")";
             con.executeQuery(r => {
                 readyCounter += SELECTS_BUF_SIZE;
-                pool.releaseConnection(con);
+                con.release();
                 if (readyCounter >= SELECTS_COUNT)
                     resolver();
             }, e => {
-                pool.releaseConnection(con);
+                con.release();
                 throw Error(e);
             }, "SELECT state FROM table1 WHERE hash IN "+queryArray+" LIMIT "+SELECTS_BUF_SIZE, ...params);
         });
@@ -668,11 +668,11 @@ unit.test("performance: multithreading", async () => {
             query += " RETURNING id;";
             con.executeUpdate(affectedRows => {
                 readyCounter += affectedRows;
-                pool.releaseConnection(con);
+                con.release();
                 if (readyCounter >= ROWS_COUNT)
                     resolver();
             }, e => {
-                pool.releaseConnection(con);
+                con.release();
                 throw Error(e);
             }, query, ...params);
         });
@@ -695,11 +695,11 @@ unit.test("performance: multithreading", async () => {
             queryArray += ")";
             con.executeQuery(r => {
                 readyCounter += SELECTS_BUF_SIZE;
-                pool.releaseConnection(con);
+                con.release();
                 if (readyCounter >= SELECTS_COUNT)
                     resolver();
             }, e => {
-                pool.releaseConnection(con);
+                con.release();
                 throw Error(e);
             }, "SELECT state FROM table1, pg_sleep(0.3) WHERE hash IN "+queryArray+" LIMIT "+SELECTS_BUF_SIZE, ...params);
         });
@@ -717,7 +717,7 @@ unit.test("performance: multithreading", async () => {
     // If all requests completed, the test should finish.
     // If some request have lost - the test will hangs.
     console.log();
-    let ROWS_COUNT = 500;
+    let ROWS_COUNT = 400;
     let INSERT_BUF_SIZE = 20;
     let SELECTS_COUNT = ROWS_COUNT;
     let testResult = "";
@@ -748,11 +748,11 @@ unit.test("performance: multithreading", async () => {
             query += " RETURNING id;";
             con.executeUpdate(affectedRows => {
                 readyCounter += affectedRows;
-                pool.releaseConnection(con);
+                con.release();
                 if (readyCounter >= ROWS_COUNT)
                     resolver();
             }, async e => {
-                pool.releaseConnection(con);
+                con.release();
                 throw Error(e);
             }, query, ...params);
         });
@@ -766,14 +766,14 @@ unit.test("performance: multithreading", async () => {
         pool.withConnection(async con => {
             con.executeQuery(r => {
                 readyCounter += 1;
-                pool.releaseConnection(con);
-                console.log("readyCounter="+readyCounter);
+                con.release();
+                console.log("readyCounter="+readyCounter+"/"+SELECTS_COUNT);
                 if (readyCounter >= SELECTS_COUNT)
                     resolver();
             }, async e => {
-                pool.releaseConnection(con);
+                con.release();
                 await sleep(2000);
-                console.error("repeat select...")
+                console.log("repeat select...")
                 funcSelect(rowId);
             }, "SELECT state FROM table1, pg_sleep(1) WHERE hash=? LIMIT 1", rowId);
         });

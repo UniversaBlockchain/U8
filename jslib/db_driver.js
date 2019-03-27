@@ -72,10 +72,6 @@ class SqlDriverPool {
     availableConnections() {
         return 0;
     }
-
-    releaseConnection(con) {
-        throw new DatabaseError("not implemented");
-    }
 }
 
 /**
@@ -128,6 +124,13 @@ class SqlDriverConnection {
      * @return {number} number of rows affected (as database reports}
      */
     executeUpdate(onSuccess, onError, queryString, ...params) {
+        throw new DatabaseError("not implemented");
+    }
+
+    /**
+     * Each connection received with withConnection() pool method, should be released.
+     */
+    release() {
         throw new DatabaseError("not implemented");
     }
 }

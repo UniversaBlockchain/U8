@@ -351,6 +351,11 @@ namespace db {
         );
     }
 
+    void BusyConnection::release() {
+        if (parent_ != nullptr)
+            parent_->releaseConnection(getId());
+    }
+
     void BusyConnection::goResetCon() {
         worker_([=]() {
             bool isConOk = true;
@@ -435,7 +440,7 @@ namespace db {
         poolControlThread_.execute([callback, this]() {
             auto con = getUnusedConnection();
             callback(*con);
-            releaseConnection(con);
+            con->release();
         });
     }
 
@@ -462,7 +467,7 @@ namespace db {
                     results.push_back(QueryResult(this, r));
                 }
                 callback(results);
-                releaseConnection(bc);
+                bc->release();
             });
         });
     }
@@ -488,11 +493,11 @@ namespace db {
                     pgTypes_[oid] = getStringValue(qr.getValueByIndex(i, 1));
                 }
                 sem.notify();
-                releaseConnection(con);
+                con->release();
             }, [&sem,&err,con,this](const std::string& errText){
                 err = "PGPool::loadOids error: unable to load types table, " + errText;
                 sem.notify();
-                releaseConnection(con);
+                con->release();
             },
             "SELECT oid, typname from pg_type;");
         });

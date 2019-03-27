@@ -30,10 +30,6 @@ class PgDriverPool extends db.SqlDriverPool {
     availableConnections() {
         return this.pool._availableConnections();
     }
-
-    releaseConnection(con) {
-        this.pool._releaseConnection(con.con);
-    }
 }
 
 class PgDriverConnection extends db.SqlDriverConnection {
@@ -56,6 +52,10 @@ class PgDriverConnection extends db.SqlDriverConnection {
         }, (errText)=>{
             onError(new db.DatabaseError(errText));
         }, queryString, params);
+    }
+
+    release() {
+        this.con._release();
     }
 }
 

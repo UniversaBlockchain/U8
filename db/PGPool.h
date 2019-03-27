@@ -164,6 +164,14 @@ namespace db {
          */
         void executeUpdateArrStr(UpdateSuccessCallback onSuccess, UpdateErrorCallback onError, const std::string& queryString, std::vector<std::any>& params);
 
+        /**
+         * Release the connection. Call it after pgPool.withConnection().
+         */
+        void release();
+
+    public:
+        // internal, but should be public
+
         int getId() {return conId_;}
 
         void exec(std::function<void()> f) {worker_(f);}

@@ -87,27 +87,6 @@ void JsPGPoolAvailableConnections(const FunctionCallbackInfo<Value> &args) {
     });
 }
 
-void JsPGPoolReleaseConnection(const FunctionCallbackInfo<Value> &args) {
-    Scripter::unwrapArgs(args, [&](ArgsContext &ac) {
-
-        auto scripter = ac.scripter;
-        if (args.Length() != 1)
-            scripter->throwError("invalid number of arguments");
-
-        auto obj = ac.as<Object>(0);
-        auto tpl = BusyConnectionTemplate.Get(ac.isolate);
-        if (!obj->IsObject() || !tpl->HasInstance(obj)) {
-            ac.throwError("required BusyConnection argument");
-            return;
-        }
-
-        auto con = unwrap<db::BusyConnection>(obj);
-
-        auto pool = unwrap<db::PGPool>(args.This());
-        pool->releaseConnection(con->getId());
-    });
-}
-
 // BusyConnection methods
 
 void JsBusyConnectionExecuteQuery(const FunctionCallbackInfo<Value> &args) {
@@ -233,6 +212,18 @@ void JsBusyConnectionExecuteUpdate(const FunctionCallbackInfo<Value> &args) {
     });
 }
 
+void JsBusyConnectionRelease(const FunctionCallbackInfo<Value> &args) {
+    Scripter::unwrapArgs(args, [&](ArgsContext &ac) {
+
+        auto scripter = ac.scripter;
+        if (args.Length() != 0)
+            scripter->throwError("invalid number of arguments");
+
+        auto con = unwrap<db::BusyConnection>(args.This());
+        con->release();
+    });
+}
+
 // Classes bindings
 
 void JsInitPGPool(Isolate *isolate, const Local<ObjectTemplate> &global) {
@@ -246,7 +237,6 @@ void JsInitPGPool(Isolate *isolate, const Local<ObjectTemplate> &global) {
     prototype->Set(isolate, "_withConnection", FunctionTemplate::New(isolate, JsPGPoolWithConnection));
     prototype->Set(isolate, "_totalConnections", FunctionTemplate::New(isolate, JsPGPoolTotalConnections));
     prototype->Set(isolate, "_availableConnections", FunctionTemplate::New(isolate, JsPGPoolAvailableConnections));
-    prototype->Set(isolate, "_releaseConnection", FunctionTemplate::New(isolate, JsPGPoolReleaseConnection));
 
     // register it into global namespace
     PGPoolTemplate.Reset(isolate, tpl);
@@ -262,6 +252,7 @@ void JsInitBusyConnection(Isolate *isolate, const Local<ObjectTemplate> &global)
     prototype->Set(isolate, "version", String::NewFromUtf8(isolate, "0.0.1"));
     prototype->Set(isolate, "_executeQuery", FunctionTemplate::New(isolate, JsBusyConnectionExecuteQuery));
     prototype->Set(isolate, "_executeUpdate", FunctionTemplate::New(isolate, JsBusyConnectionExecuteUpdate));
+    prototype->Set(isolate, "_release", FunctionTemplate::New(isolate, JsBusyConnectionRelease));
 
     // register it into global namespace
     BusyConnectionTemplate.Reset(isolate, tpl);
