@@ -546,3 +546,55 @@ unit.test("constraint test: checkConstraintsBetweenContractsAPILevel4", async ()
     assert(!refContract2.constraints.get("ref_cont4").matchingItems.has(contract2));
     assert(refContract2.constraints.get("ref_cont4").matchingItems.has(refContract2));
 });
+
+unit.test("constraint test: checkConstraintsAssembly", async () => {
+
+    let contract1 = await Contract.fromDslFile(ROOT_PATH + "ReferencedConditions_contract1_v4.yml");
+
+    let ref_roles = contract1.constraints.get("ref_roles").exportConditions();
+    assert(~ref_roles["all_of"].indexOf("this.definition.issuer==ref.definition.issuer"));
+    assert(~ref_roles["all_of"].indexOf("ref.owner defined"));
+    assert(~ref_roles["all_of"].indexOf("ref.owner!=\"26RzRJDLqze3P5Z1AzpnucF75RLi1oa6jqBaDh8MJ3XmTaUoF8R\""));
+    assert(~ref_roles["all_of"].indexOf("ref.definition.issuer==\"HggcAQABxAACzHE9ibWlnK4RzpgFIB4jIg3WcXZSKXNAqOTYUtGXY03xJSwpqE+y/HbqqE0WsmcAt5a0F5H7bz87Uy8Me1UdIDcOJgP8HMF2M0I/kkT6d59ZhYH/TlpDcpLvnJWElZAfOytaICE01bkOkf6Mz5egpToDEEPZH/RXigj9wkSXkk43WZSxVY5f2zaVmibUZ9VLoJlmjNTZ+utJUZi66iu9e0SXupOr/+BJL1Gm595w32Fd0141kBvAHYDHz2K3x4m1oFAcElJ83ahSl1u85/naIaf2yuxiQNz3uFMTn0IpULCMvLMvmE+L9io7+KWXld2usujMXI1ycDRw85h6IJlPcKHVQKnJ/4wNBUveBDLFLlOcMpCzWlO/D7M2IyNa8XEvwPaFJlN1UN/9eVpaRUBEfDq6zi+RC8MaVWzFbNi913suY0Q8F7ejKR6aQvQPuNN6bK6iRYZchxe/FwWIXOr0C0yA3NFgxKLiKZjkd5eJ84GLy+iD00Rzjom+GG4FDQKr2HxYZDdDuLE4PEpYSzEB/8LyIqeM7dSyaHFTBII/sLuFru6ffoKxBNk/cwAGZqOwD3fkJjNq1R3h6QylWXI/cSO9yRnRMmMBJwalMexOc3/kPEEdfjH/GcJU0Mw6DgoY8QgfaNwXcFbBUvf3TwZ5Mysf21OLHH13g8gzREm+h8c=\""));
+
+    let ref_integer = contract1.constraints.get("ref_integer").exportConditions();
+    let ref_float = contract1.constraints.get("ref_float").exportConditions();
+    let ref_string = contract1.constraints.get("ref_string").exportConditions();
+    let ref_boolean = contract1.constraints.get("ref_boolean").exportConditions();
+    let ref_inherited = contract1.constraints.get("ref_inherited").exportConditions();
+    let ref_time = contract1.constraints.get("ref_time").exportConditions();
+    let ref_hashes = contract1.constraints.get("ref_hashes").exportConditions();
+    let ref_bigdecimal = contract1.constraints.get("ref_bigdecimal").exportConditions();
+    let ref_parent = contract1.constraints.get("ref_parent").exportConditions();
+    let ref_can_play = contract1.constraints.get("ref_can_play").exportConditions();
+
+    let ref_arithmetic = contract1.constraints.get("ref_arithmetic").exportConditions();
+    assert(~ref_arithmetic["all_of"].indexOf("11>2*3+4"));
+    assert(~ref_arithmetic["all_of"].indexOf("this.state.data.int3<this.state.data.double4*1000"));
+    assert(~ref_arithmetic["all_of"].indexOf("this.state.data.int3*this.state.data.double3<=ref.state.data.int3*ref.state.data.double3"));
+    assert(~ref_arithmetic["all_of"].indexOf("this.state.data.amount*ref.state.data.bigdecimal2::number>=ref.state.data.bigdecimal2::number+this.state.data.int4"));
+    assert(~ref_arithmetic["all_of"].indexOf("this.state.data.int4+2!=ref.state.data.int4*2+100"));
+    assert(~ref_arithmetic["all_of"].indexOf("this.state.data.double3+this.state.data.double4*ref.state.data.bigdecimal2::number==ref.state.data.double3+ref.state.data.double4*ref.state.data.bigdecimal2::number"));
+    assert(~ref_arithmetic["all_of"].indexOf("905403309310398882034989390090914246789283284338888398980001111290943204920940290078452983729*73<=ref.state.data.bigdecimal1::number"));
+    assert(~ref_arithmetic["all_of"].indexOf("ref.state.data.bigdecimal2::number/98401804310430918418409810948390180==this.state.data.bigdecimal1::number/98401804310430918418409810948390180"));
+    assert(~ref_arithmetic["all_of"].indexOf("-554454.02193092103920101293012902*ref.state.data.bigdecimal2::number!=-554454.02193092103920101293012902*this.state.data.bigdecimal2::number"));
+    assert(~ref_arithmetic["all_of"].indexOf("this.state.data.bigdecimal1::number*ref.state.data.bigdecimal2::number+this.state.data.int3*ref.state.data.bigdecimal1::number>ref.state.data.bigdecimal2::number*this.state.data.bigdecimal1::number-this.state.data.int3"));
+    assert(~ref_arithmetic["all_of"].indexOf("this.state.data.bigdecimal1::number*ref.state.data.bigdecimal2::number+ref.state.data.bigdecimal1::number*ref.state.data.bigdecimal2::number>ref.state.data.bigdecimal2::number*this.state.data.bigdecimal1::number-this.state.data.int3"));
+    assert(~ref_arithmetic["all_of"].indexOf("this.state.data.bigdecimal1::number+ref.state.data.bigdecimal2::number*this.state.data.int3!=ref.state.data.bigdecimal2::number+this.state.data.bigdecimal1::number/this.state.data.int3"));
+    assert(~ref_arithmetic["all_of"].indexOf("12+4*(10+5)==72"));
+    assert(~ref_arithmetic["all_of"].indexOf("12+(4*(10+5))==72"));
+    assert(~ref_arithmetic["all_of"].indexOf("(-5)+2<0"));
+    assert(~ref_arithmetic["all_of"].indexOf("(-10)-(-20)>=2*(-10)"));
+    assert(~ref_arithmetic["all_of"].indexOf("554454.02193092*(ref.state.data.bigdecimal1::number-this.state.data.bigdecimal1::number)+1>this.state.data.bigdecimal1::number"));
+    assert(~ref_arithmetic["all_of"].indexOf("(this.state.data.int3-7)/(70+7)*(this.state.data.float3-775)-1==(((ref.state.data.float4-7)/10-7)/10-7)/10+12"));
+    assert(~ref_arithmetic["all_of"].indexOf("(-3+4)*2!=(-13+1)/(5-4)"));
+    assert(~ref_arithmetic["all_of"].indexOf("((((3+4)*2)/(2*10))+15)*this.state.data.bigdecimal1::number>=(13-1)/(5-4)"));
+    assert(~ref_arithmetic["all_of"].indexOf("(((13-7)/(8-6))+27)*3>(this.state.data.amount-100)/ref.state.data.bigdecimal2::number"));
+    assert(~ref_arithmetic["all_of"].indexOf("ref.state.data.bigdecimal2::number+this.state.data.bigdecimal1::number==(this.state.data.bigdecimal1::number+ref.state.data.bigdecimal2::number)*((ref.state.data.bigdecimal2::number*3-ref.state.data.bigdecimal2::number*2)/ref.state.data.bigdecimal2::number)"));
+    assert(~ref_arithmetic["all_of"].indexOf("(-554454.02193092)+(-554454.02193092)>=((-554454.02193092)+(-554454.02193092))*(((-554454.02193092)*3-(-554454.02193092)*2)/(-554454.02193092))"));
+    assert(~ref_arithmetic["all_of"].indexOf("90540330931039888203498939009091424678928328433888839898000111129094320492094029007845298372939+90540330931039888203498939009091424678928328433888839898000111129094320492094029007845298372939==(90540330931039888203498939009091424678928328433888839898000111129094320492094029007845298372939+90540330931039888203498939009091424678928328433888839898000111129094320492094029007845298372939)*((90540330931039888203498939009091424678928328433888839898000111129094320492094029007845298372939*3-90540330931039888203498939009091424678928328433888839898000111129094320492094029007845298372939*2)/90540330931039888203498939009091424678928328433888839898000111129094320492094029007845298372939)"));
+    assert(~ref_arithmetic["all_of"].indexOf("(((13-7)/(8-6))+27)*3>(this.state.data.amount-100)/ref.state.data.bigdecimal2::number"));
+    assert(~ref_arithmetic["all_of"].indexOf("((this.state.data.double4-this.state.data.int5)*2)+((this.state.data.bigdecimal1::number+this.state.data.int5)*this.state.data.int3)<=((ref.state.data.double4+this.state.data.int5)*2)+((this.state.data.bigdecimal1::number+this.state.data.int5)*ref.state.data.int3)"));
+
+    //console.log(JSON.stringify(ref_arithmetic, null, 2));
+});

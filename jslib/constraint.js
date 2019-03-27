@@ -1502,7 +1502,6 @@ class Constraint extends bs.BiSerializable {
 
             rightOperand = rightOperand.substring(firstPointPos + 1);
         } else
-            //throw "Invalid format of right operand in condition: " + rightOperand + ". Missing contract field.";
             throw new ex.IllegalArgumentError("Invalid format of right operand in condition: " + rightOperand + ". Missing contract field.");
 
         if (rightOperandContract != null)
@@ -1525,7 +1524,6 @@ class Constraint extends bs.BiSerializable {
         let result = "";
 
         // assembly expression
-
         if (expression.leftParentheses)
             result += "(";
 
@@ -1581,7 +1579,6 @@ class Constraint extends bs.BiSerializable {
         let result = "";
 
         // assembly condition
-
         if (condition.leftOperand != null) {
             if (typeof condition.leftOperand === "object")
                 result += Constraint.assemblyExpression(condition.leftOperand);
