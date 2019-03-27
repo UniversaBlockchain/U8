@@ -258,6 +258,8 @@ class Constraint extends bs.BiSerializable {
 
         if ((obj != null) && ((typeof obj === "string") || (typeof obj === "number")))
             val = new BigDecimal(obj);
+        else if ((obj != null) && obj instanceof Date)
+            val = new BigDecimal(Math.floor(obj.getTime() / 1000));
         else if ((typeOfOperand === compareOperandType.CONSTSTR) || (typeOfOperand === compareOperandType.CONSTOTHER))
             val = new BigDecimal(operand);
         else

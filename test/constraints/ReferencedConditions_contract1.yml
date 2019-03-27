@@ -1406,7 +1406,7 @@ definition:
          - this.definition.expires_at != ref.definition.data.time5
          - this.definition.expires_at != ref.state.data.time6
 
-         #- this.definition.expires_at < ref.definition.data.bigdecimal4::number TODO
+         - this.definition.expires_at < ref.definition.data.bigdecimal4::number
 
          #- this.definition.expires_at < ref.definition.data.long2
          - this.definition.expires_at > ref.state.data.time5
