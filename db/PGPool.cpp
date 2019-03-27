@@ -218,14 +218,27 @@ namespace db {
                     std::cerr << "PGPool.execParams error: wrong type: " << val.type().name() << std::endl;
                 }
             }
-            PQsendQueryParams(conPtr(), queryString.c_str(), params.size(), nullptr, values, lengths, binaryFlags, 1);
-            PQflush(conPtr());
+            if (0 == PQsendQueryParams(conPtr(), queryString.c_str(), params.size(), nullptr, values, lengths, binaryFlags, 1)) {
+                parent_->checkAndResetAllConnections();
+                onError("PGPool connection is broken (PQsendQueryParams)");
+                return;
+            }
+            if (0 != PQflush(conPtr())) {
+                parent_->checkAndResetAllConnections();
+                onError("PGPool connection is broken (PQflush)");
+                return;
+            }
             QueryResultsArr results;
             while (true) {
                 pg_result *r = PQgetResult(conPtr());
                 if (r == nullptr)
                     break;
                 results.push_back(QueryResult(this->parent_, r));
+            }
+            if (PQstatus(conPtr()) == CONNECTION_BAD) {
+                parent_->checkAndResetAllConnections();
+                onError("PGPool connection is broken (PQgetResult)");
+                return;
             }
             if (results.size() == 0) {
                 onError("PGPool.executeQuery error: your sql query returns no result, use executeUpdate instead.");
@@ -282,14 +295,27 @@ namespace db {
                     std::cerr << "PGPool.execParams error: wrong type: " << val.type().name() << std::endl;
                 }
             }
-            PQsendQueryParams(conPtr(), queryString.c_str(), params.size(), nullptr, values, lengths, binaryFlags, 1);
-            PQflush(conPtr());
+            if (0 == PQsendQueryParams(conPtr(), queryString.c_str(), params.size(), nullptr, values, lengths, binaryFlags, 1)) {
+                parent_->checkAndResetAllConnections();
+                onError("PGPool connection is broken (PQsendQueryParams)");
+                return;
+            }
+            if (0 != PQflush(conPtr())) {
+                parent_->checkAndResetAllConnections();
+                onError("PGPool connection is broken (PQflush)");
+                return;
+            }
             QueryResultsArr results;
             while (true) {
                 pg_result *r = PQgetResult(conPtr());
                 if (r == nullptr)
                     break;
                 results.push_back(QueryResult(this->parent_, r));
+            }
+            if (PQstatus(conPtr()) == CONNECTION_BAD) {
+                parent_->checkAndResetAllConnections();
+                onError("PGPool connection is broken (PQgetResult)");
+                return;
             }
             if (results.size() == 0) {
                 onError("PGPool.executeQuery error: your sql query returns no result, use executeUpdate instead.");
@@ -323,6 +349,33 @@ namespace db {
                 queryString,
                 params
         );
+    }
+
+    void BusyConnection::goResetCon() {
+        worker_([=]() {
+            bool isConOk = true;
+            if (0 == PQsendQuery(conPtr(), "SELECT 1;"))
+                isConOk = false;
+            if (isConOk) {
+                if (0 != PQflush(conPtr()))
+                    isConOk = false;
+            }
+            QueryResultsArr results;
+            if (isConOk) {
+                while (true) {
+                    pg_result *r = PQgetResult(conPtr());
+                    if (r == nullptr)
+                        break;
+                    results.push_back(QueryResult(this->parent_, r));
+                }
+            }
+            if (PQstatus(conPtr()) == CONNECTION_BAD)
+                isConOk = false;
+            if (!isConOk) {
+                this_thread::sleep_for(chrono::milliseconds(BROKEN_CONNECTION_RESET_DELAY_MILLIS));
+                PQreset(conPtr());
+            }
+        });
     }
 
     PGPool::PGPool(): poolControlThread_(1) {
@@ -459,6 +512,23 @@ namespace db {
         connPool_.push(usedConnections_[conId]);
         usedConnections_.erase(conId);
         poolCV_.notify_one();
+    }
+
+    void PGPool::checkAndResetAllConnections() {
+        std::vector<int> idsVec;
+        {
+            std::lock_guard guard(poolMutex_);
+            while (!connPool_.empty()) {
+                auto con = connPool_.front();
+                connPool_.pop();
+                usedConnections_[con->getId()] = con;
+                idsVec.push_back(con->getId());
+            }
+            for (auto& con: usedConnections_)
+                con.second->goResetCon();
+        }
+        for (auto it = idsVec.begin(); it != idsVec.end(); ++it)
+            releaseConnection(*it);
     }
 
     std::string replacePlaceholders(const std::string& s) {

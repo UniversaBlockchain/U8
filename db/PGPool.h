@@ -18,6 +18,11 @@
 
 namespace db {
 
+    /**
+     * Each broken connection tries to reconnect to db server after this delay time.
+     */
+    const int BROKEN_CONNECTION_RESET_DELAY_MILLIS = 5000;
+
     class PGPool;
 
     /**
@@ -163,6 +168,8 @@ namespace db {
 
         void exec(std::function<void()> f) {worker_(f);}
 
+        void goResetCon();
+
     private:
 
         void prepareParams(std::vector<std::any>& params) {
@@ -254,6 +261,11 @@ namespace db {
          * Returns pg type name by its oid. Oids list are loaded on connection step.
          */
         string getType(int oid) {return pgTypes_[oid];};
+
+        /**
+         * Calls automatically from BusyConnection in error cases.
+         */
+        void checkAndResetAllConnections();
 
     private:
         std::shared_ptr<BusyConnection> getUnusedConnection();

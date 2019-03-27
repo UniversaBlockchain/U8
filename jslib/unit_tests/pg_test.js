@@ -636,12 +636,12 @@ unit.test("performance: select line-by-line vs array in 'where'", async () => {
 });
 
 unit.test("performance: multithreading", async () => {
-    let ROWS_COUNT = 10000;
-    let INSERT_BUF_SIZE = 1000;
-    let SELECTS_COUNT = ROWS_COUNT/10;
-    let SELECTS_BUF_SIZE = 50;
+    let ROWS_COUNT = 1000;
+    let INSERT_BUF_SIZE = 100;
+    let SELECTS_COUNT = ROWS_COUNT/50;
+    let SELECTS_BUF_SIZE = 2;
     let testResult = "";
-    let pool = createPool(20);
+    let pool = createPool(10);
     let readyCounter = 0;
     let resolver;
     let promise = new Promise((resolve, reject) => {
@@ -701,14 +701,99 @@ unit.test("performance: multithreading", async () => {
             }, e => {
                 pool.releaseConnection(con);
                 throw Error(e);
-            }, "SELECT state FROM table1, pg_sleep(1) WHERE hash IN "+queryArray+" LIMIT "+SELECTS_BUF_SIZE, ...params);
+            }, "SELECT state FROM table1, pg_sleep(0.3) WHERE hash IN "+queryArray+" LIMIT "+SELECTS_BUF_SIZE, ...params);
         });
     }
     await promise;
     let dt = new Date().getTime() - t1;
     testResult += ", total time: " + dt + " ms ...";
-    assert(dt > 1000*0.9);
-    assert(dt < 1000*1.1);
+    console.logPut(testResult);
+    assert(dt > 300*0.8);
+    assert(dt < 300*1.2);
+});
+
+/*unit.test("check pg connections restore, needs to run it manually", async () => {
+    // For success testing, restart pg daemon manually several times during this test running.
+    // If all requests completed, the test should finish.
+    // If some request have lost - the test will hangs.
+    console.log();
+    let ROWS_COUNT = 500;
+    let INSERT_BUF_SIZE = 20;
+    let SELECTS_COUNT = ROWS_COUNT;
+    let testResult = "";
+    let pool = createPool(10);
+    let readyCounter = 0;
+    let resolver;
+    let promise = new Promise((resolve, reject) => {
+        resolver = resolve;
+    });
+
+    let hashes = [];
+    for (let i = 0; i < ROWS_COUNT; ++i)
+        hashes.push(crypto.HashId.of(randomBytes(16)).digest);
+    for (let i = 0; i < ROWS_COUNT/INSERT_BUF_SIZE; ++i) {
+        pool.withConnection(con => {
+            let query = "INSERT INTO table1(hash,state,locked_by_id,created_at,expires_at) VALUES ";
+            let params = [];
+            for (let j = 0; j < INSERT_BUF_SIZE; ++j) {
+                let buf = "(?,?,0,?,?)";
+                params.push(hashes[i*INSERT_BUF_SIZE+j]);
+                params.push(4);
+                params.push((new Date().getTime()/1000).toFixed(0));
+                params.push((new Date().getTime()/1000 + 31536000).toFixed(0));
+                if (j > 0)
+                    query += ",";
+                query += buf;
+            }
+            query += " RETURNING id;";
+            con.executeUpdate(affectedRows => {
+                readyCounter += affectedRows;
+                pool.releaseConnection(con);
+                if (readyCounter >= ROWS_COUNT)
+                    resolver();
+            }, async e => {
+                pool.releaseConnection(con);
+                throw Error(e);
+            }, query, ...params);
+        });
+    }
+    await promise;
+
+    readyCounter = 0;
+    promise = new Promise((resolve, reject) => {resolver = resolve;});
+
+    let funcSelect = function(rowId) {
+        pool.withConnection(async con => {
+            con.executeQuery(r => {
+                readyCounter += 1;
+                pool.releaseConnection(con);
+                console.log("readyCounter="+readyCounter);
+                if (readyCounter >= SELECTS_COUNT)
+                    resolver();
+            }, async e => {
+                pool.releaseConnection(con);
+                await sleep(2000);
+                console.error("repeat select...")
+                funcSelect(rowId);
+            }, "SELECT state FROM table1, pg_sleep(1) WHERE hash=? LIMIT 1", rowId);
+        });
+    }
+
+    let t0 = new Date().getTime();
+    for (let i = 0; i < SELECTS_COUNT; ++i) {
+        if (Math.floor(i/10) % 10 == 0) {
+            while (readyCounter < i)
+                await sleep(100);
+            if (i % 10 == 0)
+                console.log("low load period started")
+            if (i % 10 == 9)
+                console.log("high load period started")
+        }
+        funcSelect(hashes[Math.floor(Math.random() * ROWS_COUNT)]);
+    }
+    await promise;
+    let dt = new Date().getTime() - t0;
+    testResult += "many single selects: " + dt + " ms ...";
 
     console.logPut(testResult);
-});
+});*/
