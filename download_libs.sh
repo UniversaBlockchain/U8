@@ -8,7 +8,7 @@ mkdir -p $download_path
 cd $download_path
 
 download_file() {
-    wget https://cxxlibs.universa.io/files/$platform/$1 -O $1
+    wget https://cxxlibs.universablockchain.com/files/$platform/$1 -O $1
 }
 
 unpack_archive() {
