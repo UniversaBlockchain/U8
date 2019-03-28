@@ -762,7 +762,7 @@ unit.test("performance: multithreading", async () => {
     readyCounter = 0;
     promise = new Promise((resolve, reject) => {resolver = resolve;});
 
-    let funcSelect = function(rowId) {
+    let funcSelect = function(hashId) {
         pool.withConnection(async con => {
             con.executeQuery(r => {
                 readyCounter += 1;
@@ -774,8 +774,8 @@ unit.test("performance: multithreading", async () => {
                 con.release();
                 await sleep(2000);
                 console.log("repeat select...")
-                funcSelect(rowId);
-            }, "SELECT state FROM table1, pg_sleep(1) WHERE hash=? LIMIT 1", rowId);
+                funcSelect(hashId);
+            }, "SELECT state FROM table1, pg_sleep(1) WHERE hash=? LIMIT 1", hashId);
         });
     }
 

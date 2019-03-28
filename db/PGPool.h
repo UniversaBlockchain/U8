@@ -231,7 +231,7 @@ namespace db {
         void withConnection(WithConnectionCallback callback);
 
         /**
-         * Need to be released by pgPool.releaseConnection()
+         * Need to be released by connection.release()
          * @param callback db::PGPool::BusyConnection
          */
         void withConnection(WithConnectionCallbackJs callback);

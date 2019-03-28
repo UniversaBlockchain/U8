@@ -643,3 +643,94 @@ TEST_CASE("PGPool_replacePlaceholders") {
     s = db::replacePlaceholders("-$1-$2-$3-");
     REQUIRE(s == "-$1-$2-$3-");
 }
+
+/*TEST_CASE("PGPool_check_connections_restore") {
+    // For success testing, restart pg daemon manually several times during this test running.
+    // If all requests completed, the test should finish.
+    // If some request have lost - the test will hangs.
+    const int ROWS_COUNT = 400;
+    const int INSERT_BUF_SIZE = 20;
+    const int SELECTS_COUNT = ROWS_COUNT;
+    db::PGPool pgPool(10, "host=localhost port=5432 dbname=unit_tests");
+    Semaphore sem;
+    atomic<int> readyCounter(0);
+    std::minstd_rand minstdRand(std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now().time_since_epoch()).count());
+
+    vector<HashId> hashes;
+    for (int i = 0; i < ROWS_COUNT; ++i)
+        hashes.push_back(HashId::createRandom());
+    for (int i = 0; i < ROWS_COUNT/INSERT_BUF_SIZE; ++i) {
+        pgPool.withConnection([&hashes,i,&sem,&readyCounter](db::BusyConnection& con){
+            string query = "INSERT INTO table1(hash,state,locked_by_id,created_at,expires_at) VALUES ";
+            vector<any> params;
+            for (int j = 0; j < INSERT_BUF_SIZE; ++j) {
+                char buf[64];
+                snprintf(buf, sizeof(buf), "($%i,$%i,0,$%i,$%i)", j*4+1, j*4+2, j*4+3, j*4+4);
+                params.push_back(hashes.at(i*INSERT_BUF_SIZE+j).getDigest());
+                params.push_back(i*INSERT_BUF_SIZE+j);
+                params.push_back((int)getCurrentTimeMillis() / 1000);
+                params.push_back(getCurrentTimeMillis() / 1000l + 31536000l);
+                if (j > 0)
+                    query += ",";
+                query += buf;
+            }
+            query += " RETURNING id;";
+            con.executeQueryArr(
+                    [&sem,&readyCounter](db::QueryResult&& qr) {
+                        for (int k = 0; k < qr.getRowsCount(); ++k) {
+                            ++readyCounter;
+                        }
+                        sem.notify();
+                    },
+                    [](const string &errText) {
+                        throw std::runtime_error(errText);
+                    },
+                    query,
+                    params
+            );
+        });
+    }
+    do {
+        sem.wait();
+        int counterState = int(readyCounter);
+    } while (readyCounter < ROWS_COUNT);
+    REQUIRE(readyCounter == ROWS_COUNT);
+
+    readyCounter = 0;
+    Semaphore sem2;
+    long long t0 = getCurrentTimeMillis();
+
+    std::function<void(HashId&)> funcSelect = [&pgPool,&hashes,&minstdRand,&readyCounter,&sem2,&funcSelect](HashId& hashId){
+        pgPool.withConnection([&hashes,&minstdRand,&readyCounter,&sem2,&funcSelect,&hashId](shared_ptr<db::BusyConnection> con){
+            con->executeQuery([&readyCounter,&sem2,con](db::QueryResult&& qr){
+                int counter = int(++readyCounter);
+                con->release();
+                printf("readyCounter=%i/%i\n", counter, SELECTS_COUNT);
+                if (counter >= SELECTS_COUNT)
+                    sem2.notify();
+            }, [con,&funcSelect,&hashId](const std::string& errText){
+                con->release();
+                this_thread::sleep_for(2s);
+                printf("repeat select...\n");
+                funcSelect(hashId);
+                //throw std::runtime_error(errText);
+            },
+            "SELECT state FROM table1, pg_sleep(1) WHERE hash=? LIMIT 1",
+            hashId.getDigest());
+        });
+    };
+
+    for (int i = 0; i < SELECTS_COUNT; ++i) {
+        if (i/10 % 10 == 0) {
+            while (readyCounter < i)
+                this_thread::sleep_for(100ms);
+            if (i % 10 == 0)
+                printf("low load period started\n");
+            if (i % 10 == 9)
+                printf("high load period started\n");
+        }
+        funcSelect(hashes[minstdRand()%ROWS_COUNT]);
+    }
+    sem2.wait();
+    cout << "many single selects: " << getCurrentTimeMillis()-t0 << " ms" << endl;
+}*/
