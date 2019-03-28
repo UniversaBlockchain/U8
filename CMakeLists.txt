@@ -45,7 +45,9 @@ file(GLOB LIBRARY_SRC
     tools/*.h tools/*.cpp
     types/*.h types/*.cpp
 )
+add_custom_target(cxxlibs ALL DEPENDS download_libs.stamp)
 add_library(u8_lib STATIC ${LIBRARY_SRC})
+add_dependencies(u8_lib cxxlibs)
 
 file(GLOB TESTS_SRC
     test/*.h test/*.cpp
@@ -62,8 +64,6 @@ message("platform: ${platform}")
 # Macos brew configuration
 if (${platform} STREQUAL macos)
     add_custom_command(OUTPUT ../download_libs.stamp WORKING_DIRECTORY .. COMMAND sh download_libs.sh ${platform} > download_libs.stamp)
-    add_custom_target(u8libs ALL DEPENDS download_libs.stamp)
-    add_dependencies(u8 u8libs)
     set(libtype .dylib)
     foreach (l libv8 libtomcrypt libuv libpq libssl)
         message( ext/${platform}/${l}/include)
@@ -81,8 +81,6 @@ elseif (${platform} STREQUAL macos_v8_monolith)
     target_link_libraries(u8 PUBLIC v8_monolith tomcrypt)
 elseif (${platform} STREQUAL linux)
     add_custom_command(OUTPUT ../download_libs.stamp WORKING_DIRECTORY .. COMMAND sh download_libs.sh ${platform} > download_libs.stamp)
-    add_custom_target(u8libs ALL DEPENDS download_libs.stamp)
-    add_dependencies(u8 u8libs)
     foreach (l libv8 libtomcrypt libuv libpq libssl)
         target_include_directories(u8_lib PUBLIC ext/${platform}/${l}/include)
         target_link_directories(u8_lib PUBLIC ext/${platform}/${l}/lib)
