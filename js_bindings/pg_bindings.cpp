@@ -359,7 +359,9 @@ static unordered_map<string, std::function<Local<Value>(ArgsContext &ac, const b
 
 Local<Value> getJsValueFromPgResult(ArgsContext &ac, const byte_vector& data, const string& pgType) {
     try {
-        if (Converter.find(pgType) != Converter.end())
+        if (data.size() == 0)
+            return v8::Null(ac.isolate);
+        else if (Converter.find(pgType) != Converter.end())
             return Converter[pgType](ac, data);
     } catch (const std::exception& e) {
         return ac.v8String(std::string("conversion error: ") + e.what());
