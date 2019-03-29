@@ -275,6 +275,11 @@ namespace db {
          */
         void checkAndResetAllConnections();
 
+        /**
+         * Releases all connections to database. Uses in JS if we don't want to wait for GC.
+         */
+        void close();
+
     private:
         std::shared_ptr<BusyConnection> getUnusedConnection();
         std::string loadOids();

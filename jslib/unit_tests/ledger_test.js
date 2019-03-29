@@ -11,7 +11,6 @@ function jsonStringify(obj) {
 }
 
 async function createTestLedger() {
-    //await sleep(500); // await gc collects db pool from previous test
     return new Ledger("host=localhost port=5432 dbname=unit_tests");
 }
 
@@ -19,6 +18,7 @@ unit.test("ledger_test: hello", async () => {
     let ledger = await createTestLedger();
     console.log(jsonStringify(await ledger.findOrCreate(HashId.of(randomBytes(64)))));
     console.log(jsonStringify(await ledger.getLedgerSize()));
+    ledger.close();
 });
 
 unit.test("ledger_test: ledgerBenchmark", async () => {
@@ -39,6 +39,7 @@ unit.test("ledger_test: ledgerBenchmark", async () => {
     let dt = new Date().getTime() - t0;
     console.log("total time: " + dt + " ms");
     console.log("  TPS: " + (nIds/dt*1000).toFixed(0));
+    ledger.close();
 });
 
 unit.test("ledger_test: getRecord", async () => {
@@ -59,4 +60,5 @@ unit.test("ledger_test: getRecord", async () => {
     assert(record.lockedByRecordId == null);
     assert(record.createdAt.getTime() / 1000 === row[4]);
     assert(record.expiresAt.getTime() / 1000 === Number(row[5]));
+    ledger.close();
 });

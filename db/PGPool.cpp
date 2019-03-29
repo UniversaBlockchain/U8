@@ -536,6 +536,13 @@ namespace db {
             releaseConnection(*it);
     }
 
+    void PGPool::close() {
+        std::lock_guard guard(poolMutex_);
+        while (!connPool_.empty())
+            connPool_.pop();
+        usedConnections_.clear();
+    }
+
     std::string replacePlaceholders(const std::string& s) {
         std::string res;
         int copyFrom = 0;

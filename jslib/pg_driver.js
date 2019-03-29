@@ -30,6 +30,10 @@ class PgDriverPool extends db.SqlDriverPool {
     availableConnections() {
         return this.pool._availableConnections();
     }
+
+    close() {
+        this.pool._close();
+    }
 }
 
 class PgDriverConnection extends db.SqlDriverConnection {

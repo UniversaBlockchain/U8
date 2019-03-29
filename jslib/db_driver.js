@@ -72,6 +72,13 @@ class SqlDriverPool {
     availableConnections() {
         return 0;
     }
+
+    /**
+     * Releases all connections to database.
+     */
+    close() {
+        throw new DatabaseError("not implemented");
+    }
 }
 
 /**

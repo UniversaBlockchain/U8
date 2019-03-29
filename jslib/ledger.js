@@ -12,7 +12,7 @@ class LedgerException extends Error {
 class Ledger {
 
     constructor(connectionString) {
-        this.MAX_CONNECTIONS = 4;//64;
+        this.MAX_CONNECTIONS = 64;
         //db.connect is synchronous inside
         db.connect(connectionString, (pool) => {
             this.dbPool_ = pool;
@@ -181,7 +181,11 @@ class Ledger {
     reload(stateRecord) {
     }
 
+    /**
+     * Releases all connections to database.
+     */
     close() {
+        this.dbPool_.close();
     }
 
     countRecords() {

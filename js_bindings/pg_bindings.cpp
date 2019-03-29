@@ -87,6 +87,17 @@ void JsPGPoolAvailableConnections(const FunctionCallbackInfo<Value> &args) {
     });
 }
 
+void JsPGPoolClose(const FunctionCallbackInfo<Value> &args) {
+    Scripter::unwrapArgs(args, [&](ArgsContext &ac) {
+        auto scripter = ac.scripter;
+        if (args.Length() != 0)
+            scripter->throwError("invalid number of arguments");
+
+        auto pool = unwrap<db::PGPool>(args.This());
+        pool->close();
+    });
+}
+
 // BusyConnection methods
 
 void JsBusyConnectionExecuteQuery(const FunctionCallbackInfo<Value> &args) {
@@ -237,6 +248,7 @@ void JsInitPGPool(Isolate *isolate, const Local<ObjectTemplate> &global) {
     prototype->Set(isolate, "_withConnection", FunctionTemplate::New(isolate, JsPGPoolWithConnection));
     prototype->Set(isolate, "_totalConnections", FunctionTemplate::New(isolate, JsPGPoolTotalConnections));
     prototype->Set(isolate, "_availableConnections", FunctionTemplate::New(isolate, JsPGPoolAvailableConnections));
+    prototype->Set(isolate, "_close", FunctionTemplate::New(isolate, JsPGPoolClose));
 
     // register it into global namespace
     PGPoolTemplate.Reset(isolate, tpl);
