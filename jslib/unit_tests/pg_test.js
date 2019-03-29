@@ -41,6 +41,8 @@ unit.test("pg_test: hello", async () => {
             await promise;
         }
 
+        pool.close();
+
     } catch (err) {
         console.log("error: "+err.constructor.name+"('" + err.message + "')");
     }
@@ -112,6 +114,8 @@ async function recreateTestTable() {
             boolean_val boolean
         );
     `);
+
+    pool.close();
 }
 
 unit.test("pg_test: tables", async () => {
@@ -148,6 +152,7 @@ unit.test("pg_test: tables", async () => {
     await promise;
     let dt = new Date().getTime() - t0;
     //console.log("dt = " + dt + " ms");
+    pool.close();
 });
 
 unit.test("insert and get new id", async () => {
@@ -175,6 +180,7 @@ unit.test("insert and get new id", async () => {
         });
         await promise;
     }
+    pool.close();
 });
 
 unit.test("insert, select and update bytea", async () => {
@@ -265,6 +271,7 @@ unit.test("insert, select and update bytea", async () => {
             rowId);
     });
     await promise;
+    pool.close();
 });
 
 unit.test("insert, select and update integer and bigint", async () => {
@@ -361,6 +368,7 @@ unit.test("insert, select and update integer and bigint", async () => {
             rowId);
     });
     await promise;
+    pool.close();
 });
 
 unit.test("insert, select and update text, boolean, double", async () => {
@@ -460,6 +468,7 @@ unit.test("insert, select and update text, boolean, double", async () => {
             rowId);
     });
     await promise;
+    pool.close();
 });
 
 unit.test("performance: insert line-by-line vs multi insert", async () => {
@@ -536,6 +545,7 @@ unit.test("performance: insert line-by-line vs multi insert", async () => {
     testResult += ", multi insert: " + dt + " ms ...";
 
     console.logPut(testResult);
+    pool.close();
 });
 
 unit.test("performance: select line-by-line vs array in 'where'", async () => {
@@ -633,6 +643,7 @@ unit.test("performance: select line-by-line vs array in 'where'", async () => {
     testResult += ", batch selects: " + dt + " ms ...";
 
     console.logPut(testResult);
+    pool.close();
 });
 
 unit.test("performance: multithreading", async () => {
@@ -710,6 +721,7 @@ unit.test("performance: multithreading", async () => {
     console.logPut(testResult);
     assert(dt > 300*0.8);
     assert(dt < 300*1.2);
+    pool.close();
 });
 
 /*unit.test("check pg connections restore, needs to run it manually", async () => {
@@ -796,4 +808,5 @@ unit.test("performance: multithreading", async () => {
     testResult += "many single selects: " + dt + " ms ...";
 
     console.logPut(testResult);
+    pool.close();
 });*/
