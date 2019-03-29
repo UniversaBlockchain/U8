@@ -142,5 +142,4 @@ class StateRecord {
     }
 }
 
-
-
+module.exports = {StateRecord};

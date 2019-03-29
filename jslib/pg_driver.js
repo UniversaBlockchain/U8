@@ -81,6 +81,13 @@ class PgDriverResultSet extends db.SqlDriverResultSet {
         return this.qr._getColNames();
     }
 
+    getColNamesMap() {
+        let res = {};
+        let arr = this.qr._getColNames();
+        arr.forEach((val, i) => {res[val] = i;});
+        return res;
+    }
+
     getColTypes() {
         return this.qr._getColTypes();
     }

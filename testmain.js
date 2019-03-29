@@ -129,6 +129,7 @@ require('unit_tests/revokepermission_test')
 require('unit_tests/splitjoinpermission_test')
 require('unit_tests/constraint_test')
 require('unit_tests/pg_test')
+require('unit_tests/ledger_test')
 
 
 async function main() {
