@@ -239,6 +239,10 @@ function convertToDate(data) {
         let res = new Date();
         res.setTime(data * 1000);
         return res;
+    } else if (typeof data === "bigint") {
+        let res = new Date();
+        res.setTime(Number(data) * 1000);
+        return res;
     } else if ((data.hasOwnProperty("__type") ||
         data.hasOwnProperty("__t")) &&
         data.hasOwnProperty("seconds")) {

@@ -1,5 +1,7 @@
 import * as db from 'pg_driver'
 
+const StateRecord = require("staterecord").StateRecord;
+
 class LedgerException extends Error {
     constructor(message = undefined) {
         super();
@@ -26,6 +28,36 @@ class Ledger {
      * @return instance or null if not found
      */
     getRecord(id) {
+        return new Promise((resolve, reject) => {
+            //let cached = this.getFromCache(id);
+            //if (cached != null)
+            //    resolve(cached);
+            //else
+                this.dbPool_.withConnection(con => {
+                    con.executeQuery(qr => {
+                            let row = qr.getRows(1)[0];
+                            con.release();
+
+                            if (row != null) {
+                                let record = StateRecord.initFrom(this, row);
+                                //putToCache(record);
+                                if (record.isExpired()) {
+                                    record.destroy();
+                                    resolve(null);
+                                } else
+                                    resolve(record);
+                            } else
+                                resolve(null);
+
+                        }, e => {
+                            con.release();
+                            reject(e);
+                        },
+                        "SELECT * FROM ledger WHERE hash = ? limit 1",
+                        id.digest
+                    );
+                });
+        });
     }
 
     /**

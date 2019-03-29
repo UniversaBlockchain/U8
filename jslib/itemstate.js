@@ -76,4 +76,4 @@ ItemState.byOrdinal.set(ItemState.DISCARDED.ordinal,ItemState.DISCARDED);
 ItemState.byOrdinal.set(ItemState.LOCKED_FOR_CREATION.ordinal,ItemState.LOCKED_FOR_CREATION);
 
 
-
+module.exports = {ItemState};

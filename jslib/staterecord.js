@@ -1,5 +1,6 @@
-const Ledger = require("ledger").Ledger;
+//const Ledger = require("ledger").Ledger;
 const ex = require("exceptions");
+const ItemState = require("itemstate").ItemState;
 
 class StateRecord {
     constructor(ledger) {
@@ -10,15 +11,48 @@ class StateRecord {
         this.createdAt = null;
         this.expiresAt = null;
         this.id = null;
+        this.state = ItemState.UNDEFINED;
 
+    }
+
+    static initFrom(ledger, row) {
+        let result = new StateRecord(ledger);
+
+        if (row == null)
+            throw new ex.IllegalArgumentError("Error initialization StateRecord: row is null");
+
+        result.recordId = row[0];
+        result.id = crypto.HashId.withDigest(row[1]);
+        result.state = ItemState.byOrdinal.get(row[2]);
+        result.lockedByRecordId = row[3];
+
+        result.createdAt = t.convertToDate(row[4]);
+        result.expiresAt = t.convertToDate(row[5]);
+        if (result.expiresAt == null) {
+            // todo: what we should do with items without expiresAt?
+            result.expiresAt = new Date();
+            result.expiresAt.setTime((Math.floor(result.createdAt.getTime() / 1000) + 90 * 24 * 3600) * 1000);
+            result.expiresAt.setMilliseconds(0);
+        }
+
+        return result;
     }
 
     toString() {
-        return "State<"+this.id+"/"+this.recordId+":"+state.val+":"+this.createdAt+"/"+this.expiresAt+">"
+        return "State<"+this.id+"/"+this.recordId+":"+this.state.val+":"+this.createdAt+"/"+this.expiresAt+">"
+    }
+
+    checkLedgerExists() {
+        if (this.ledger == null)
+            throw new ex.IllegalStateError("connect to ledger to set recordId");
+    }
+
+    isExpired() {
+        return this.expiresAt != null && this.expiresAt.getTime() < new Date().getTime();
     }
 
     lockToRevoke(idToRevoke) {
-        if(state !== ItemState.PENDING) {
+        if (this.state !== ItemState.PENDING) {
             throw new ex.IllegalStateError("only pending records are allowed to lock others");
         }
 
@@ -50,7 +84,7 @@ class StateRecord {
     checkLockedRecord(lockedRecord) {
         // It is locked bu us
 
-        if(lockedRecord.lockedByRecordId == this.recordId )
+        if(lockedRecord.lockedByRecordId === this.recordId )
             return true;
 
         let currentOwner = this.ledger.getLockOwnerOf(lockedRecord);
@@ -139,6 +173,11 @@ class StateRecord {
 
     save() {
         this.ledger.save(this);
+    }
+
+    destroy() {
+        this.checkLedgerExists();
+        this.ledger.destroy(this);
     }
 }
 
