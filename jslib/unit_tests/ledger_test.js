@@ -28,7 +28,7 @@ unit.test("ledger_test: ledgerBenchmark", async () => {
     console.log("prepare hashes...");
     let hashes = [];
     for (let i = 0; i < nIds; ++i)
-        hashes.push(crypto.HashId.of(randomBytes(16)).digest);
+        hashes.push(crypto.HashId.of(randomBytes(16)));
     console.log("start benchmark...");
     let t0 = new Date().getTime();
     let promises = [];
@@ -39,6 +39,7 @@ unit.test("ledger_test: ledgerBenchmark", async () => {
     let dt = new Date().getTime() - t0;
     console.log("total time: " + dt + " ms");
     console.log("  TPS: " + (nIds/dt*1000).toFixed(0));
+    console.log("  ledger size: " + jsonStringify(await ledger.getLedgerSize()));
     ledger.close();
 });
 
