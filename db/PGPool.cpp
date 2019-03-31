@@ -421,7 +421,7 @@ namespace db {
                 auto bcon = make_shared<BusyConnection>(this, con, i);
                 connPool_.push(bcon);
             } else {
-                return make_pair(false, "unable to connect db");
+                return make_pair(false, std::string("unable to connect db: ")+std::string(PQerrorMessage(pCon)));
             }
         }
         std::string err = loadOids();
