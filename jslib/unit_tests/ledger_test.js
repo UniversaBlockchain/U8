@@ -24,7 +24,7 @@ unit.test("ledger_test: hello", async () => {
 unit.test("ledger_test: ledgerBenchmark", async () => {
     let ledger = await createTestLedger();
     console.log();
-    let nIds = 400 * 32;
+    let nIds = 40 * 32;
     console.log("prepare hashes...");
     let hashes = [];
     for (let i = 0; i < nIds; ++i)

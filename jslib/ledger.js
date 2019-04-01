@@ -16,7 +16,7 @@ class Ledger {
         this.MAX_CONNECTIONS = 64;
 
         this.bufParams = {
-            findOrCreate: {enabled: true},
+            findOrCreate: {enabled: false},
             findOrCreate_insert: {enabled: true, bufSize: 200, delayMillis: 40, buf: [], ts: new Date().getTime()},
             findOrCreate_select: {enabled: true, bufSize: 400, delayMillis: 40, buf: [], ts: new Date().getTime()},
         };
