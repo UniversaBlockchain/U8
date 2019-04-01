@@ -16,9 +16,9 @@ class Ledger {
         this.MAX_CONNECTIONS = 64;
 
         this.bufParams = {
-            findOrCreate: {enabled: false},
-            findOrCreate_insert: {enabled: true, bufSize: 200, delayMillis: 50, buf: [], ts: new Date().getTime()},
-            findOrCreate_select: {enabled: true, bufSize: 400, delayMillis: 50, buf: [], ts: new Date().getTime()},
+            findOrCreate: {enabled: true},
+            findOrCreate_insert: {enabled: true, bufSize: 200, delayMillis: 40, buf: [], ts: new Date().getTime()},
+            findOrCreate_select: {enabled: true, bufSize: 400, delayMillis: 40, buf: [], ts: new Date().getTime()},
         };
 
         this.timers_ = [];
@@ -204,11 +204,11 @@ class Ledger {
                     let queryValues = [];
                     let params = [];
                     for (let j = 0; j < arr.length; ++j) {
-                        //queryValues.push("(?, 1, extract(epoch from timezone('GMT', now())), extract(epoch from timezone('GMT', now() + interval '5 minute')), NULL)");
-                        queryValues.push("(?,1,?,?,NULL)");
+                        queryValues.push("(?, 1, extract(epoch from timezone('GMT', now())), extract(epoch from timezone('GMT', now() + interval '5 minute')), NULL)");
+                        // queryValues.push("(?,1,?,?,NULL)");
                         params.push(arr[j][0]);
-                        params.push(Math.floor(new Date().getTime()/1000));
-                        params.push(Math.floor(new Date().getTime()/1000) + 5*60);
+                        // params.push(Math.floor(new Date().getTime()/1000));
+                        // params.push(Math.floor(new Date().getTime()/1000) + 5*60);
                     }
                     let queryString = "INSERT INTO ledger(hash, state, created_at, expires_at, locked_by_id) VALUES "+queryValues.join(",")+" ON CONFLICT (hash) DO NOTHING;";
                     con.executeUpdate(affectedRows => {
@@ -396,10 +396,19 @@ class Ledger {
     /**
      * Releases all connections to database.
      */
-    close() {
+    async close() {
         this.dbPool_.close();
         for (let i = 0; i < this.timers_.length; ++i)
             trs.clearTimeout(this.timers_[i]);
+
+        //wait for delayed timer callbacks
+        let delay = 50;
+        Object.keys(this.bufParams).forEach((key) => {
+            if ("delayMillis" in this.bufParams[key])
+                if (delay < this.bufParams[key].delayMillis)
+                    delay = this.bufParams[key].delayMillis;
+        });
+        await sleep(200+delay*1.5);
     }
 
     countRecords() {
