@@ -62,8 +62,9 @@ public:
 
     iterator insert( const_iterator pos, size_type count, const UObject& value );
 
-    template< class InputIt >
-    iterator insert( const_iterator pos, InputIt first, InputIt last );
+//    template< class InputIt >
+//    iterator insert( const_iterator pos, InputIt first, InputIt last );
+    iterator insert( const_iterator pos, const_iterator first, const_iterator last );
 
     iterator insert( const_iterator pos, std::initializer_list<UObject> ilist );
 

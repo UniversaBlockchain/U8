@@ -218,8 +218,9 @@ UArray::iterator UArray::insert(UArray::const_iterator pos, UArray::size_type co
     return data<UArrayData>().array.insert(pos,count, value);
 }
 
-template<class InputIt>
-UArray::iterator UArray::insert(UArray::const_iterator pos, InputIt first, InputIt last) {
+//template<class InputIt>
+//UArray::iterator UArray::insert(UArray::const_iterator pos, InputIt first, InputIt last) {
+UArray::iterator UArray::insert(UArray::const_iterator pos, UArray::const_iterator first, UArray::const_iterator last) {
     return data<UArrayData>().array.insert(pos,first, last);
 }
 
