@@ -33,7 +33,13 @@ unit.test("ledger_test: ledgerBenchmark", async () => {
     let t0 = new Date().getTime();
     let promises = [];
     for (let i = 0; i < nIds; ++i) {
-        promises.push(ledger.findOrCreate(hashes[i]));
+        //promises.push(ledger.findOrCreate(hashes[i]));
+        promises.push(new Promise(async (resolve, reject) => {
+            let row = await ledger.findOrCreate(hashes[i]);
+            if (!hashes[i].equals(crypto.HashId.withDigest(row[1])))
+                reject(new Error("findOrCreate returns wrong hashId"));
+            resolve();
+        }));
     }
     await Promise.all(promises);
     let dt = new Date().getTime() - t0;

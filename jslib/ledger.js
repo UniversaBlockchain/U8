@@ -1,4 +1,5 @@
 import * as db from 'pg_driver'
+import * as trs from 'timers'
 
 const StateRecord = require("staterecord").StateRecord;
 
@@ -13,12 +14,34 @@ class Ledger {
 
     constructor(connectionString) {
         this.MAX_CONNECTIONS = 64;
+
+        this.bufParams = {
+            findOrCreate: {enabled: false},
+            findOrCreate_insert: {enabled: true, bufSize: 200, delayMillis: 50, buf: [], ts: new Date().getTime()},
+            findOrCreate_select: {enabled: true, bufSize: 400, delayMillis: 50, buf: [], ts: new Date().getTime()},
+        };
+
+        this.timers_ = [];
+        if (this.bufParams.findOrCreate.enabled && this.bufParams.findOrCreate_insert.enabled)
+            this.addTimer(this.bufParams.findOrCreate_insert.delayMillis, this.findOrCreate_buffered_insert_processBuf.bind(this));
+        if (this.bufParams.findOrCreate.enabled && this.bufParams.findOrCreate_select.enabled)
+            this.addTimer(this.bufParams.findOrCreate_select.delayMillis, this.findOrCreate_buffered_select_processBuf.bind(this));
+
         //db.connect is synchronous inside
         db.connect(connectionString, (pool) => {
             this.dbPool_ = pool;
         }, (e) => {
             throw new LedgerException("connect.onError: " + e);
         }, this.MAX_CONNECTIONS);
+    }
+
+    addTimer(delay, block) {
+        let i = this.timers_.length;
+        let f = () => {
+            block();
+            this.timers_[i] = trs.timeout(delay, f);
+        };
+        this.timers_[i] = trs.timeout(delay, f);
     }
 
     /**
@@ -87,10 +110,17 @@ class Ledger {
      * documents. If the record exists, it returns it. If the record does not exists, it creates new one with {@link
         * ItemState#PENDING} state. The operation must be implemented as atomic.
      *
-     * @param itemdId hashId to register, or null if it is already in use
+     * @param itemId hashId to register, or null if it is already in use
      * @return found or created {@link StateRecord}
      */
-    findOrCreate(itemdId) {
+    findOrCreate(itemId) {
+        if (this.bufParams.findOrCreate.enabled)
+            return this.findOrCreate_buffered(itemId);
+        else
+            return this.findOrCreate_simple(itemId);
+    }
+
+    findOrCreate_simple(itemId) {
         return new Promise((resolve, reject) => {
             this.dbPool_.withConnection(con => {
                 con.executeUpdate(qr => {
@@ -101,7 +131,7 @@ class Ledger {
                         reject(e);
                     },
                     "INSERT INTO ledger(hash, state, created_at, expires_at, locked_by_id) VALUES (?, 1, extract(epoch from timezone('GMT', now())), extract(epoch from timezone('GMT', now() + interval '5 minute')), NULL) ON CONFLICT (hash) DO NOTHING;",
-                    itemdId.digest
+                    itemId.digest
                 );
             });
         }).then(() => {
@@ -116,11 +146,193 @@ class Ledger {
                             reject(e);
                         },
                         "SELECT * FROM ledger WHERE hash=? limit 1;",
-                        itemdId.digest
+                        itemId.digest
                     );
                 });
             });
         });
+    }
+
+    findOrCreate_buffered(itemId) {
+        return this.findOrCreate_buffered_insert(itemId).then(() => {
+            return this.findOrCreate_buffered_select(itemId);
+        });
+    }
+
+    findOrCreate_buffered_insert(itemId) {
+        if (this.bufParams.findOrCreate_insert.enabled) {
+            let resolver, rejecter;
+            let promise = new Promise((resolve, reject) => {resolver = resolve; rejecter = reject;});
+            this.bufParams.findOrCreate_insert.buf.push([itemId.digest, resolver, rejecter]);
+            this.findOrCreate_buffered_insert_processBuf();
+            return promise;
+        } else {
+            return new Promise((resolve, reject) => {
+                this.dbPool_.withConnection(con => {
+                    con.executeUpdate(qr => {
+                            con.release();
+                            resolve();
+                        }, e => {
+                            con.release();
+                            reject(e);
+                        },
+                        "INSERT INTO ledger(hash, state, created_at, expires_at, locked_by_id) VALUES (?, 1, extract(epoch from timezone('GMT', now())), extract(epoch from timezone('GMT', now() + interval '5 minute')), NULL) ON CONFLICT (hash) DO NOTHING;",
+                        itemId.digest
+                    );
+                });
+            });
+        }
+    }
+
+    findOrCreate_buffered_insert_processBuf() {
+        let processBuf = (withTail) => {
+            let arrOfBufs = [];
+            let arrOfBufs_length = Math.floor(this.bufParams.findOrCreate_insert.buf.length / this.bufParams.findOrCreate_insert.bufSize) + withTail ? 1 : 0;
+            for (let i = 0; i < arrOfBufs_length; ++i) {
+                let arr = [];
+                for (let j = i*this.bufParams.findOrCreate_insert.bufSize;
+                     j < Math.min((i+1)*this.bufParams.findOrCreate_insert.bufSize, this.bufParams.findOrCreate_insert.buf.length);
+                     ++j) {
+                    arr.push(this.bufParams.findOrCreate_insert.buf[j]);
+                }
+                arrOfBufs.push(arr);
+            }
+            for (let i = 0; i < arrOfBufs.length; ++i) {
+                let arr = arrOfBufs[i];
+
+                this.dbPool_.withConnection(con => {
+                    let queryValues = [];
+                    let params = [];
+                    for (let j = 0; j < arr.length; ++j) {
+                        //queryValues.push("(?, 1, extract(epoch from timezone('GMT', now())), extract(epoch from timezone('GMT', now() + interval '5 minute')), NULL)");
+                        queryValues.push("(?,1,?,?,NULL)");
+                        params.push(arr[j][0]);
+                        params.push(Math.floor(new Date().getTime()/1000));
+                        params.push(Math.floor(new Date().getTime()/1000) + 5*60);
+                    }
+                    let queryString = "INSERT INTO ledger(hash, state, created_at, expires_at, locked_by_id) VALUES "+queryValues.join(",")+" ON CONFLICT (hash) DO NOTHING;";
+                    con.executeUpdate(affectedRows => {
+                        let isAllInserted = (affectedRows == arr.length);
+                        con.release();
+                        for (let j = 0; j < arr.length; ++j) {
+                            if (isAllInserted)
+                                arr[j][1](); // call resolver
+                            else
+                                arr[j][2]("findOrCreate_buffered_insert_processBuf error: only "+affectedRows+" rows from "+arr.length+" has inserted"); // call rejecter
+                        }
+                    }, e => {
+                        con.release();
+                        for (let j = 0; j < arr.length; ++j)
+                            arr[j][2](e); // call rejecter
+
+                    }, queryString, ...params);
+                });
+            }
+            let newBuf = [];
+            if (!withTail) {
+                for (let i = arrOfBufs_length * this.bufParams.findOrCreate_insert.bufSize; i < this.bufParams.findOrCreate_insert.buf.length; ++i)
+                    newBuf.push(this.bufParams.findOrCreate_insert.buf[i]);
+            }
+            this.bufParams.findOrCreate_insert.buf = newBuf;
+        };
+
+        let now = new Date().getTime();
+        if (now - this.bufParams.findOrCreate_insert.ts >= this.bufParams.findOrCreate_insert.delayMillis) {
+            processBuf(true);
+            this.bufParams.findOrCreate_insert.ts = now;
+        } else if (this.bufParams.findOrCreate_insert.buf.length >= this.bufParams.findOrCreate_insert.bufSize) {
+            processBuf(false);
+            this.bufParams.findOrCreate_insert.ts = now;
+        } else {
+            // waiting for future messages, do nothing
+        }
+    }
+
+    findOrCreate_buffered_select(itemId) {
+        if (this.bufParams.findOrCreate_select.enabled) {
+            let resolver, rejecter;
+            let promise = new Promise((resolve, reject) => {resolver = resolve; rejecter = reject;});
+            this.bufParams.findOrCreate_select.buf.push([itemId.digest, resolver, rejecter]);
+            this.findOrCreate_buffered_select_processBuf();
+            return promise;
+        } else {
+            return new Promise((resolve, reject) => {
+                this.dbPool_.withConnection(con => {
+                    con.executeQuery(qr => {
+                            let row = qr.getRows(1)[0];
+                            con.release();
+                            resolve(row);
+                        }, e => {
+                            con.release();
+                            reject(e);
+                        },
+                        "SELECT * FROM ledger WHERE hash=? limit 1;",
+                        itemId.digest
+                    );
+                });
+            });
+        }
+    }
+
+    findOrCreate_buffered_select_processBuf() {
+        let processBuf = (withTail) => {
+            let arrOfBufs = [];
+            let arrOfBufs_length = Math.floor(this.bufParams.findOrCreate_select.buf.length / this.bufParams.findOrCreate_select.bufSize) + withTail ? 1 : 0;
+            for (let i = 0; i < arrOfBufs_length; ++i) {
+                let arr = [];
+                for (let j = i*this.bufParams.findOrCreate_select.bufSize;
+                     j < Math.min((i+1)*this.bufParams.findOrCreate_select.bufSize, this.bufParams.findOrCreate_select.buf.length);
+                     ++j) {
+                    arr.push(this.bufParams.findOrCreate_select.buf[j]);
+                }
+                arrOfBufs.push(arr);
+            }
+            for (let i = 0; i < arrOfBufs.length; ++i) {
+                let arr = arrOfBufs[i];
+
+                this.dbPool_.withConnection(con => {
+                    let queryValues = [];
+                    let params = [];
+                    for (let j = 0; j < arr.length; ++j) {
+                        queryValues.push("?");
+                        params.push(arr[j][0]);
+                    }
+                    let queryString = "SELECT * FROM ledger WHERE hash IN ("+queryValues.join(",")+") LIMIT "+params.length+";";
+                    con.executeQuery(qr => {
+                        let rows = qr.getRows(0);
+                        let names = qr.getColNamesMap();
+                        con.release();
+                        let resolversMap = {};
+                        for (let j = 0; j < arr.length; ++j)
+                            resolversMap[arr[j][0]] = arr[j][1];
+                        for (let j = 0; j < rows.length; ++j)
+                            resolversMap[rows[j][names["hash"]]](rows[j]); // call resolver
+                    }, e => {
+                        con.release();
+                        for (let j = 0; j < arr.length; ++j)
+                            arr[j][2](e); // call rejecter
+
+                    }, queryString, ...params);
+                });
+            }
+            let newBuf = [];
+            if (!withTail) {
+                for (let i = arrOfBufs_length * this.bufParams.findOrCreate_select.bufSize; i < this.bufParams.findOrCreate_select.buf.length; ++i)
+                    newBuf.push(this.bufParams.findOrCreate_select.buf[i]);
+            }
+            this.bufParams.findOrCreate_select.buf = newBuf;
+        };
+
+        let now = new Date().getTime();
+        if (now - this.bufParams.findOrCreate_select.ts >= this.bufParams.findOrCreate_select.delayMillis) {
+            processBuf(true);
+            this.bufParams.findOrCreate_select.ts = now;
+        } else if (this.bufParams.findOrCreate_select.buf.length >= this.bufParams.findOrCreate_select.bufSize) {
+            processBuf(false);
+            this.bufParams.findOrCreate_select.ts = now;
+        } else {
+            // waiting for future messages, do nothing
+        }
     }
 
     /**
@@ -186,6 +398,8 @@ class Ledger {
      */
     close() {
         this.dbPool_.close();
+        for (let i = 0; i < this.timers_.length; ++i)
+            trs.clearTimeout(this.timers_[i]);
     }
 
     countRecords() {
