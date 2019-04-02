@@ -18,7 +18,7 @@ unit.test("ledger_test: hello", async () => {
     let ledger = await createTestLedger();
     console.log(jsonStringify(await ledger.findOrCreate(HashId.of(randomBytes(64)))));
     console.log(jsonStringify(await ledger.getLedgerSize()));
-    ledger.close();
+    await ledger.close();
 });
 
 unit.test("ledger_test: ledgerBenchmark", async () => {
@@ -46,7 +46,7 @@ unit.test("ledger_test: ledgerBenchmark", async () => {
     console.log("total time: " + dt + " ms");
     console.log("  TPS: " + (nIds/dt*1000).toFixed(0));
     console.log("  ledger size: " + jsonStringify(await ledger.getLedgerSize()));
-    ledger.close();
+    await ledger.close();
 });
 
 unit.test("ledger_test: getRecord", async () => {
@@ -64,8 +64,53 @@ unit.test("ledger_test: getRecord", async () => {
     assert(record.id.equals(hash));
     assert(record.id.equals(crypto.HashId.withDigest(row[1])));
     assert(record.state === ItemState.PENDING);
-    assert(record.lockedByRecordId == null);
+    assert(record.lockedByRecordId === 0);
     assert(record.createdAt.getTime() / 1000 === row[4]);
     assert(record.expiresAt.getTime() / 1000 === Number(row[5]));
-    ledger.close();
+    await ledger.close();
+});
+
+unit.test("ledger_test: save", async () => {
+    let ledger = await createTestLedger();
+
+    //create and get
+    let hash = HashId.of(randomBytes(64));
+    await ledger.findOrCreate(hash);
+    let r1 = await ledger.getRecord(hash);
+    hash = HashId.of(randomBytes(64));
+    await ledger.findOrCreate(hash);
+    let r2 = await ledger.getRecord(hash);
+
+    r1.state = ItemState.APPROVED;
+    r2.state = ItemState.DECLINED;
+
+    await r1.save();
+    await r2.save();
+
+    await r1.reload();
+    let r3 = await ledger.getRecord(r1.id);
+
+    assert(r1.state === ItemState.APPROVED);
+    assert(r3.state === ItemState.APPROVED);
+
+    await r2.reload();
+    assert(r2.state === ItemState.DECLINED);
+
+    await ledger.close();
+});
+
+unit.test("ledger_test: destroy", async () => {
+    let ledger = await createTestLedger();
+
+    //create and get
+    let hash = HashId.of(randomBytes(64));
+    await ledger.findOrCreate(hash);
+    let record = await ledger.getRecord(hash);
+
+    await record.destroy();
+
+    record = await ledger.getRecord(record.id);
+
+    assert(record == null);
+    await ledger.close();
 });

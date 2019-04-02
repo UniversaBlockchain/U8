@@ -12,7 +12,6 @@ class StateRecord {
         this.expiresAt = null;
         this.id = null;
         this.state = ItemState.UNDEFINED;
-
     }
 
     static initFrom(ledger, row) {
@@ -25,6 +24,8 @@ class StateRecord {
         result.id = crypto.HashId.withDigest(row[1]);
         result.state = ItemState.byOrdinal.get(row[2]);
         result.lockedByRecordId = row[3];
+        if (result.lockedByRecordId == null)
+            result.lockedByRecordId = 0;
 
         result.createdAt = t.convertToDate(row[4]);
         result.expiresAt = t.convertToDate(row[5]);
@@ -52,9 +53,10 @@ class StateRecord {
     }
 
     lockToRevoke(idToRevoke) {
-        if (this.state !== ItemState.PENDING) {
+        if (this.state !== ItemState.PENDING)
             throw new ex.IllegalStateError("only pending records are allowed to lock others");
-        }
+
+        this.checkLedgerExists();
 
         let lockedRecord = this.ledger.getRecord(idToRevoke);
         if (lockedRecord == null)
@@ -86,6 +88,8 @@ class StateRecord {
 
         if(lockedRecord.lockedByRecordId === this.recordId )
             return true;
+
+        this.checkLedgerExists();
 
         let currentOwner = this.ledger.getLockOwnerOf(lockedRecord);
         // we can acquire the lock - it is dead
@@ -147,6 +151,8 @@ class StateRecord {
         if (state !== ItemState.PENDING)
             throw new ex.IllegalStateError("wrong state to createOutputLockRecord: " + state);
 
+        this.checkLedgerExists();
+
         let newRecord = this.ledger.getRecord(id);
         if (newRecord != null) {
             // if it is not locked for approval - failure
@@ -160,24 +166,25 @@ class StateRecord {
     }
 
     markTestRecord() {
+        this.checkLedgerExists();
         this.ledger.markTestRecord(this.id);
     }
 
     reload() {
         if (this.recordId === 0)
             throw new ex.IllegalStateError("can't reload record without recordId (new?)");
-        this.ledger.reload(this);
-        return this;
-
+        this.checkLedgerExists();
+        return this.ledger.reload(this);
     }
 
     save() {
-        this.ledger.save(this);
+        this.checkLedgerExists();
+        return this.ledger.save(this);
     }
 
     destroy() {
         this.checkLedgerExists();
-        this.ledger.destroy(this);
+        return this.ledger.destroy(this);
     }
 }
 

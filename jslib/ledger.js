@@ -2,6 +2,8 @@ import * as db from 'pg_driver'
 import * as trs from 'timers'
 
 const StateRecord = require("staterecord").StateRecord;
+const ItemState = require("itemstate").ItemState;
+const ex = require("exceptions");
 
 class LedgerException extends Error {
     constructor(message = undefined) {
@@ -47,10 +49,10 @@ class Ledger {
     /**
      * Get the record by its id
      *
-     * @param id to retreive
-     * @return instance or null if not found
+     * @param itemId to retreive
+     * @return {Promise<StateRecord>} record or null if not found
      */
-    getRecord(id) {
+    getRecord(itemId) {
         return new Promise((resolve, reject) => {
             //let cached = this.getFromCache(id);
             //if (cached != null)
@@ -63,11 +65,12 @@ class Ledger {
 
                             if (row != null) {
                                 let record = StateRecord.initFrom(this, row);
-                                //putToCache(record);
+
                                 if (record.isExpired()) {
                                     record.destroy();
                                     resolve(null);
                                 } else
+                                    //putToCache(record);
                                     resolve(record);
                             } else
                                 resolve(null);
@@ -77,7 +80,7 @@ class Ledger {
                             reject(e);
                         },
                         "SELECT * FROM ledger WHERE hash = ? limit 1",
-                        id.digest
+                        itemId.digest
                     );
                 });
         });
@@ -371,26 +374,140 @@ class Ledger {
     /**
      * Destroy the record and free space in the ledger.
      *
-     * @param record is {@link StateRecord} to destroy
+     * @param record is {@see StateRecord} to destroy
+     * @return {Promise<*>} resolved when record destroyed
      */
     destroy(record) {
+        if (record.recordId === 0)
+            throw new ex.IllegalStateError("can't destroy record without recordId");
+
+        //synchronized (cachedRecords)
+        //    cachedRecords.remove(record.getId());
+
+        //synchronized (cachedRecordsById)
+        //    cachedRecordsById.remove(record.getRecordId());
+
+        return new Promise((resolve, reject) => {
+            this.dbPool_.withConnection(con => {
+                con.executeUpdate(qr => {
+                        con.release();
+                        resolve();
+                    }, e => {
+                        con.release();
+                        reject(e);
+                    },
+                    "DELETE FROM items WHERE id = ?;",
+                    record.recordId
+                );
+            });
+        }).then(() => {
+            return new Promise((resolve, reject) => {
+                this.dbPool_.withConnection(con => {
+                    con.executeUpdate(qr => {
+                            con.release();
+                            resolve();
+                        }, e => {
+                            con.release();
+                            reject(e);
+                        },
+                        "DELETE FROM ledger WHERE id = ?;",
+                        record.recordId
+                    );
+                });
+            });
+        });
     }
 
     /**
      * save a record into the ledger
      *
-     * @param stateRecord is {@link StateRecord} to save
+     * @param record is {@see StateRecord} to save
+     * @return {Promise<*>} resolved when record saved
      */
-    save(stateRecord) {
+    save(record) {
+        if (record.ledger == null) {
+            record.ledger = this;
+        } else if (record.ledger !== this)
+            throw new ex.IllegalStateError("can't save with a different ledger (make a copy!)");
+
+        if (record.recordId === 0)
+            return new Promise((resolve, reject) => {
+                this.dbPool_.withConnection(con => {
+                    con.executeQuery(qr => {
+                            let row = qr.getRows(1)[0];
+                            con.release();
+
+                            if (row != null && row[0] != null)
+                                record.recordId = row[0];
+
+                            //putToCache(record);
+
+                            resolve();
+                        }, e => {
+                            con.release();
+                            reject(e);
+                        },
+                        "insert into ledger(hash, state, created_at, expires_at, locked_by_id) values(?,?,?,?,?) RETURNING id;",
+                        record.id.digest,
+                        record.state.ordinal,
+                        Math.floor(record.createdAt.getTime() / 1000),
+                        Math.floor(record.expiresAt.getTime() / 1000),
+                        record.lockedByRecordId
+                    );
+                });
+            });
+        else
+            return new Promise((resolve, reject) => {
+                this.dbPool_.withConnection(con => {
+                    con.executeUpdate(qr => {
+                            con.release();
+                            resolve();
+                        }, e => {
+                            con.release();
+                            reject(e);
+                        },
+                        "update ledger set state=?, expires_at=?, locked_by_id=? where id=?",
+                        record.state.ordinal,
+                        Math.floor(record.expiresAt.getTime() / 1000),
+                        record.lockedByRecordId,
+                        record.recordId
+                    );
+                });
+            });
     }
 
     /**
      * Refresh record.
      *
-     * @param stateRecord is {@link StateRecord} to reload
-     * @throws StateRecord.NotFoundException as itself
+     * @param record is {@see StateRecord} to reload
+     * @return {Promise<StateRecord>} reloaded record or null if record is expired
      */
-    reload(stateRecord) {
+    reload(record) {
+        return new Promise((resolve, reject) => {
+            this.dbPool_.withConnection(con => {
+                con.executeQuery(qr => {
+                        let row = qr.getRows(1)[0];
+                        con.release();
+
+                        if (row != null) {
+                            record = StateRecord.initFrom(this, row);
+                            if (record.isExpired()) {
+                                record.destroy();
+                                resolve(null);
+                            } else
+                                resolve(record);
+                        } else
+                            resolve(null);
+
+                    }, e => {
+                        con.release();
+                        reject(e);
+                    },
+                    "SELECT * FROM ledger WHERE hash = ? limit 1",
+                    record.id.digest
+                );
+            });
+        });
     }
 
     /**
