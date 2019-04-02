@@ -159,6 +159,8 @@ class Ledger {
     findOrCreate_buffered(itemId) {
         return this.findOrCreate_buffered_insert(itemId).then(() => {
             return this.findOrCreate_buffered_select(itemId);
+        }).catch(reason => {
+            console.error(reason);
         });
     }
 

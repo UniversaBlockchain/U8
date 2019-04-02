@@ -32,11 +32,12 @@ unit.test("ledger_test: ledgerBenchmark", async () => {
     console.log("start benchmark...");
     let t0 = new Date().getTime();
     let promises = [];
-    for (let i = 0; i < nIds; ++i) {
-        //promises.push(ledger.findOrCreate(hashes[i]));
+    for (let i = 0; i < nIds*2; ++i) {
+        let rnd = Math.floor(Math.random()*nIds);
+        //promises.push(ledger.findOrCreate(hashes[rnd]));
         promises.push(new Promise(async (resolve, reject) => {
-            let row = await ledger.findOrCreate(hashes[i]);
-            if (!hashes[i].equals(crypto.HashId.withDigest(row[1])))
+            let row = await ledger.findOrCreate(hashes[rnd]);
+            if (!hashes[rnd].equals(crypto.HashId.withDigest(row[1])))
                 reject(new Error("findOrCreate returns wrong hashId"));
             resolve();
         }));
@@ -44,7 +45,7 @@ unit.test("ledger_test: ledgerBenchmark", async () => {
     await Promise.all(promises);
     let dt = new Date().getTime() - t0;
     console.log("total time: " + dt + " ms");
-    console.log("  TPS: " + (nIds/dt*1000).toFixed(0));
+    console.log("  TPS: " + (nIds*2/dt*1000).toFixed(0));
     console.log("  ledger size: " + jsonStringify(await ledger.getLedgerSize()));
     await ledger.close();
 });
