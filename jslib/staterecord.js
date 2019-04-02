@@ -8,8 +8,13 @@ class StateRecord {
         this.dirty = false;
         this.recordId = 0;
         this.lockedByRecordId = 0;
-        this.createdAt = null;
-        this.expiresAt = null;
+
+        this.createdAt = new Date();
+        this.expiresAt = new Date();
+        this.expiresAt.setTime((Math.floor(this.expiresAt.getTime() / 1000) + 300) * 1000);
+        this.createdAt.setMilliseconds(0);
+        this.expiresAt.setMilliseconds(0);
+
         this.id = null;
         this.state = ItemState.UNDEFINED;
     }
@@ -147,13 +152,15 @@ class StateRecord {
 
     }
 
-    createOutputLockRecord(id) {
-        if (state !== ItemState.PENDING)
-            throw new ex.IllegalStateError("wrong state to createOutputLockRecord: " + state);
-
+    async createOutputLockRecord(id) {
         this.checkLedgerExists();
 
-        let newRecord = this.ledger.getRecord(id);
+        if (this.recordId === 0)
+            throw new ex.IllegalStateError("the record must be created");
+        if (this.state !== ItemState.PENDING)
+            throw new ex.IllegalStateError("wrong state to createOutputLockRecord: " + state);
+
+        let newRecord = await this.ledger.getRecord(id);
         if (newRecord != null) {
             // if it is not locked for approval - failure
             if (newRecord.state !== ItemState.LOCKED_FOR_CREATION)
@@ -161,13 +168,13 @@ class StateRecord {
             // it it is locked by us, ok
             return newRecord.lockedByRecordId === this.recordId ? newRecord : null;
         }
-        newRecord = this.ledger.createOutputLockRecord(this.recordId, id);
-        return newRecord;
+
+        return this.ledger.createOutputLockRecord(this.recordId, id);
     }
 
     markTestRecord() {
         this.checkLedgerExists();
-        this.ledger.markTestRecord(this.id);
+        return this.ledger.markTestRecord(this.id);
     }
 
     reload() {

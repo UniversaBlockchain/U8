@@ -87,8 +87,8 @@ class Ledger {
     }
 
     /**
-     * Create a record in {@link ItemState#LOCKED_FOR_CREATION} state locked by creatorRecordId. Does not check
-     * anything, the business logic of it is in the {@link StateRecord}. Still, if a database logic prevents creation of
+     * Create a record in {@see ItemState#LOCKED_FOR_CREATION} state locked by creatorRecordId. Does not check
+     * anything, the business logic of it is in the {@see StateRecord}. Still, if a database logic prevents creation of
      * a lock record (e.g. hash is already in use), it must return null.
      *
      * @param creatorRecordId record that want to create new item
@@ -101,12 +101,10 @@ class Ledger {
         r.lockedByRecordId = creatorRecordId;
         //r.dirty = true;
 
-        if (r.id == null || !r.id.equals(newItemHashId)) {
-            if (r.id != null)
-                throw new ex.IllegalStateError("can't change id of StateRecord");
-            r.id = newItemHashId;
-        }
-        //r.id = newItemHashId;
+        if (r.id != null && !r.id.equals(newItemHashId))
+            throw new ex.IllegalStateError("can't change id of StateRecord");
+
+        r.id = newItemHashId;
 
         return r.save();
     }
@@ -442,7 +440,7 @@ class Ledger {
      * save a record into the ledger
      *
      * @param record is {@see StateRecord} to save
-     * @return {Promise<*>} resolved when record saved
+     * @return {Promise<StateRecord>} resolved when record saved
      */
     save(record) {
         if (record.ledger == null) {
@@ -462,7 +460,7 @@ class Ledger {
 
                             //putToCache(record);
 
-                            resolve();
+                            resolve(record);
                         }, e => {
                             con.release();
                             reject(e);
@@ -481,7 +479,7 @@ class Ledger {
                 this.dbPool_.withConnection(con => {
                     con.executeUpdate(qr => {
                             con.release();
-                            resolve();
+                            resolve(record);
                         }, e => {
                             con.release();
                             reject(e);
@@ -582,27 +580,21 @@ class Ledger {
     getPayments(fromDate) {
     }
 
-
-
-
     markTestRecord(hash){
-/*        try (let db = dbPool.db()) {
-            try (
-                let statement =
-                db.statement(
-                    "insert into ledger_testrecords(hash) values(?) on conflict do nothing;"
-                )
-        ) {
-                statement.setBytes(1, hash.getDigest());
-                db.updateWithStatement(statement);
-            }
-
-        } catch (SQLException se) {
-            se.printStackTrace();
-            throw new Failure("StateRecord markTest failed:" + se);
-        } catch (Exception e) {
-            e.printStackTrace();
-        }*/
+        return new Promise((resolve, reject) => {
+            this.dbPool_.withConnection(con => {
+                con.executeUpdate(qr => {
+                        con.release();
+                        resolve();
+                    }, e => {
+                        con.release();
+                        reject(e);
+                    },
+                    "insert into ledger_testrecords(hash) values(?) on conflict do nothing;",
+                    hash.digest
+                );
+            });
+        });
     }
 
 

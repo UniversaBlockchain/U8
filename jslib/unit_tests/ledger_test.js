@@ -117,8 +117,6 @@ unit.test("ledger_test: destroy", async () => {
 });
 
 unit.test("ledger_test: createOutputLockRecord", async () => {
-    //ledger.enableCache(true);
-
     let ledger = await createTestLedger();
 
     let hash1 = HashId.of(randomBytes(64));
@@ -131,54 +129,73 @@ unit.test("ledger_test: createOutputLockRecord", async () => {
 
     let id = HashId.of(randomBytes(64));
 
-    console.log("test  createOutputLockRecord 1");
-
-    let r1 = owner.createOutputLockRecord(id);
-    r1.reload();
+    let r1 = await owner.createOutputLockRecord(id);
+    await r1.reload();
     assert(id === r1.id);
     assert(ItemState.LOCKED_FOR_CREATION === r1.state);
     assert(owner.recordId === r1.lockedByRecordId);
 
-    let r2 = owner.createOutputLockRecord(id);
-    assert(r2 === r1);
-    assert(owner.createOutputLockRecord(other.id) === 0);
+    let r2 = await other.createOutputLockRecord(id);
+    assert(r2 == null);
 
-    // And hacked low level operation must fail too
-    assert(ledger.createOutputLockRecord(owner.recordId, other.id) === 0);
+    let r3 = await owner.createOutputLockRecord(id);
+
+    assert(r3.recordId === r1.recordId);
+    assert(r3.id.equals(r1.id));
+    assert(r3.state === r1.state);
+    assert(r3.lockedByRecordId === r1.lockedByRecordId);
+    assert(r3.createdAt.getTime() === r1.createdAt.getTime());
+    assert(r3.expiresAt.getTime() === r1.expiresAt.getTime());
+
+    assert(await owner.createOutputLockRecord(other.id) == null);
+
+    let r4 = null;
+    try
+    {
+        // And hacked low level operation must fail too
+        r4 = await ledger.createOutputLockRecord(owner.recordId, other.id);
+    } catch (e) {}
+
+    assert(r4 == null);
 
     await ledger.close();
 });
 
-unit.test("ledger_test: moveToTestnet", async () => {
+function getTestRecordsCount(ledger, hashId) {
+    return new Promise((resolve, reject) => {
+        ledger.dbPool_.withConnection(con => {
+            con.executeQuery(qr => {
+                    con.release();
+                    resolve(Number(qr.getRows(1)[0][0]));
+                }, e => {
+                    con.release();
+                    reject(e);
+                },
+                "select count(*) from ledger_testrecords where hash = ?",
+                hashId.digest
+            );
+        });
+    });
+}
 
+unit.test("ledger_test: moveToTestnet", async () => {
     let ledger = await createTestLedger();
 
     let hashId = HashId.of(randomBytes(64));
     await ledger.findOrCreate(hashId);
     let r = await ledger.getRecord(hashId);
 
-    r.save();
+    await r.save();
 
-   /* ps = ledger.getDb().statement("select count(*) from ledger_testrecords where hash = ?", hashId.getDigest());
-    ResultSet
-    rs = ps.executeQuery();
-    assertTrue(rs.next());
-    assertEquals(rs.getInt(1), 0);
+    assert(await getTestRecordsCount(ledger, hashId) === 0);
 
-    r.markTestRecord();
+    await r.markTestRecord();
 
-    ps = ledger.getDb().statement("select count(*) from ledger_testrecords where hash = ?", hashId.getDigest());
-    rs = ps.executeQuery();
-    assertTrue(rs.next());
-    assertEquals(rs.getInt(1), 1);
+    assert(await getTestRecordsCount(ledger, hashId) === 1);
 
-    r.markTestRecord();
+    await r.markTestRecord();
 
-    ps = ledger.getDb().statement("select count(*) from ledger_testrecords where hash = ?", hashId.getDigest());
-    rs = ps.executeQuery();
-    assertTrue(rs.next());
-    assertEquals(rs.getInt(1), 1);
+    assert(await getTestRecordsCount(ledger, hashId) === 1);
 
     await ledger.close();
-    */
 });
