@@ -96,6 +96,19 @@ class Ledger {
      * @return ready saved instance or null if it can not be created (e.g. already exists)
      */
     createOutputLockRecord(creatorRecordId, newItemHashId) {
+        let r = new StateRecord(this);
+        r.state = ItemState.LOCKED_FOR_CREATION;
+        r.lockedByRecordId = creatorRecordId;
+        //r.dirty = true;
+
+        if (r.id == null || !r.id.equals(newItemHashId)) {
+            if (r.id != null)
+                throw new ex.IllegalStateError("can't change id of StateRecord");
+            r.id = newItemHashId;
+        }
+        //r.id = newItemHashId;
+
+        return r.save();
     }
 
     /**
@@ -572,7 +585,26 @@ class Ledger {
 
 
 
-    markTestRecord(hash){}
+    markTestRecord(hash){
+/*        try (let db = dbPool.db()) {
+            try (
+                let statement =
+                db.statement(
+                    "insert into ledger_testrecords(hash) values(?) on conflict do nothing;"
+                )
+        ) {
+                statement.setBytes(1, hash.getDigest());
+                db.updateWithStatement(statement);
+            }
+
+        } catch (SQLException se) {
+            se.printStackTrace();
+            throw new Failure("StateRecord markTest failed:" + se);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }*/
+    }
+
 
     isTestnet(itemId){}
 

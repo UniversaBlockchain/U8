@@ -115,3 +115,70 @@ unit.test("ledger_test: destroy", async () => {
     assert(record == null);
     await ledger.close();
 });
+
+unit.test("ledger_test: createOutputLockRecord", async () => {
+    //ledger.enableCache(true);
+
+    let ledger = await createTestLedger();
+
+    let hash1 = HashId.of(randomBytes(64));
+    await ledger.findOrCreate(hash1);
+    let owner = await ledger.getRecord(hash1);
+
+    let hash2 = HashId.of(randomBytes(64));
+    await ledger.findOrCreate(hash2);
+    let other = await ledger.getRecord(hash2);
+
+    let id = HashId.of(randomBytes(64));
+
+    console.log("test  createOutputLockRecord 1");
+
+    let r1 = owner.createOutputLockRecord(id);
+    r1.reload();
+    assert(id === r1.id);
+    assert(ItemState.LOCKED_FOR_CREATION === r1.state);
+    assert(owner.recordId === r1.lockedByRecordId);
+
+    let r2 = owner.createOutputLockRecord(id);
+    assert(r2 === r1);
+    assert(owner.createOutputLockRecord(other.id) === 0);
+
+    // And hacked low level operation must fail too
+    assert(ledger.createOutputLockRecord(owner.recordId, other.id) === 0);
+
+    await ledger.close();
+});
+
+unit.test("ledger_test: moveToTestnet", async () => {
+
+    let ledger = await createTestLedger();
+
+    let hashId = HashId.of(randomBytes(64));
+    await ledger.findOrCreate(hashId);
+    let r = await ledger.getRecord(hashId);
+
+    r.save();
+
+   /* ps = ledger.getDb().statement("select count(*) from ledger_testrecords where hash = ?", hashId.getDigest());
+    ResultSet
+    rs = ps.executeQuery();
+    assertTrue(rs.next());
+    assertEquals(rs.getInt(1), 0);
+
+    r.markTestRecord();
+
+    ps = ledger.getDb().statement("select count(*) from ledger_testrecords where hash = ?", hashId.getDigest());
+    rs = ps.executeQuery();
+    assertTrue(rs.next());
+    assertEquals(rs.getInt(1), 1);
+
+    r.markTestRecord();
+
+    ps = ledger.getDb().statement("select count(*) from ledger_testrecords where hash = ?", hashId.getDigest());
+    rs = ps.executeQuery();
+    assertTrue(rs.next());
+    assertEquals(rs.getInt(1), 1);
+
+    await ledger.close();
+    */
+});
