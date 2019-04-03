@@ -19,15 +19,14 @@ class Ledger {
         this.MAX_CONNECTIONS = 64;
 
         this.bufParams = {
-            findOrCreate: {enabled: true},
             findOrCreate_insert: {enabled: true, bufSize: 200, delayMillis: 40, buf: new Map(), bufInProc: new Map(), ts: new Date().getTime()},
             findOrCreate_select: {enabled: true, bufSize: 400, delayMillis: 40, buf: new Map(), ts: new Date().getTime()},
         };
 
         this.timers_ = [];
-        if (this.bufParams.findOrCreate.enabled && this.bufParams.findOrCreate_insert.enabled)
+        if (this.bufParams.findOrCreate_insert.enabled)
             this.addTimer(this.bufParams.findOrCreate_insert.delayMillis, this.findOrCreate_buffered_insert_processBuf.bind(this));
-        if (this.bufParams.findOrCreate.enabled && this.bufParams.findOrCreate_select.enabled)
+        if (this.bufParams.findOrCreate_select.enabled)
             this.addTimer(this.bufParams.findOrCreate_select.delayMillis, this.findOrCreate_buffered_select_processBuf.bind(this));
 
         //db.connect is synchronous inside
@@ -129,46 +128,6 @@ class Ledger {
      * @return found or created {@link StateRecord}
      */
     findOrCreate(itemId) {
-        if (this.bufParams.findOrCreate.enabled)
-            return this.findOrCreate_buffered(itemId);
-        else
-            return this.findOrCreate_simple(itemId);
-    }
-
-    findOrCreate_simple(itemId) {
-        return new Promise((resolve, reject) => {
-            this.dbPool_.withConnection(con => {
-                con.executeUpdate(qr => {
-                        con.release();
-                        resolve();
-                    }, e => {
-                        con.release();
-                        reject(e);
-                    },
-                    "INSERT INTO ledger(hash, state, created_at, expires_at, locked_by_id) VALUES (?, 1, extract(epoch from timezone('GMT', now())), extract(epoch from timezone('GMT', now() + interval '5 minute')), NULL) ON CONFLICT (hash) DO NOTHING;",
-                    itemId.digest
-                );
-            });
-        }).then(() => {
-            return new Promise((resolve, reject) => {
-                this.dbPool_.withConnection(con => {
-                    con.executeQuery(qr => {
-                            let row = qr.getRows(1)[0];
-                            con.release();
-                            resolve(row);
-                        }, e => {
-                            con.release();
-                            reject(e);
-                        },
-                        "SELECT * FROM ledger WHERE hash=? limit 1;",
-                        itemId.digest
-                    );
-                });
-            });
-        });
-    }
-
-    findOrCreate_buffered(itemId) {
         return this.findOrCreate_buffered_insert(itemId).then(() => {
             return this.findOrCreate_buffered_select(itemId);
         }).catch(reason => {
@@ -179,18 +138,18 @@ class Ledger {
     findOrCreate_buffered_insert(itemId) {
         if (this.bufParams.findOrCreate_insert.enabled) {
             let buf = this.bufParams.findOrCreate_insert.buf;
-            if (this.bufParams.findOrCreate_insert.bufInProc.has(itemId))
+            if (this.bufParams.findOrCreate_insert.bufInProc.has(itemId.base64))
                 buf = this.bufParams.findOrCreate_insert.bufInProc;
 
             let resolver, rejecter;
             let promise = new Promise((resolve, reject) => {resolver = resolve; rejecter = reject;});
 
-            if (buf.has(itemId)) {
-                let item = buf.get(itemId);
-                item[0].push(resolver);
-                item[1].push(rejecter);
+            if (buf.has(itemId.base64)) {
+                let item = buf.get(itemId.base64);
+                item[1].push(resolver);
+                item[2].push(rejecter);
             } else {
-                buf.set(itemId, [[resolver], [rejecter]]);
+                buf.set(itemId.base64, [itemId, [resolver], [rejecter]]);
             }
 
             this.findOrCreate_buffered_insert_processBuf();
@@ -239,7 +198,7 @@ class Ledger {
                     for (let [k,item] of map) {
                         queryValues.push("(?, 1, extract(epoch from timezone('GMT', now())), extract(epoch from timezone('GMT', now() + interval '5 minute')), NULL)");
                         // queryValues.push("(?,1,?,?,NULL)");
-                        params.push(k.digest);
+                        params.push(item[0].digest);
                         // params.push(Math.floor(new Date().getTime()/1000));
                         // params.push(Math.floor(new Date().getTime()/1000) + 5*60);
                     }
@@ -248,13 +207,13 @@ class Ledger {
                         con.release();
                         for (let [k,v] of map) {
                             this.bufParams.findOrCreate_insert.bufInProc.delete(k);
-                            v[0].forEach(v => {v();}); // call resolvers
+                            v[1].forEach(v => {v();}); // call resolvers
                         }
                     }, e => {
                         con.release();
                         for (let [k,v] of map) {
                             this.bufParams.findOrCreate_insert.bufInProc.delete(k);
-                            v[1].forEach(v => {v(e);}); // call rejecters
+                            v[2].forEach(v => {v(e);}); // call rejecters
                         }
                     }, queryString, ...params);
                 });
@@ -332,11 +291,8 @@ class Ledger {
                         let rows = qr.getRows(0);
                         let names = qr.getColNamesMap();
                         con.release();
-                        let resolversMap = new Map();
-                        for (let [k,v] of map)
-                            resolversMap.set(k, v[1]);
                         for (let j = 0; j < rows.length; ++j) {
-                            let resolversArr = resolversMap.get(crypto.HashId.withDigest(rows[j][names["hash"]]).base64);
+                            let resolversArr = map.get(crypto.HashId.withDigest(rows[j][names["hash"]]).base64)[1];
                             for (let k = 0; k < resolversArr.length; ++k)
                                 resolversArr[k](rows[j]); // call resolver
                         }
