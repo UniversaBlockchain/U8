@@ -24,7 +24,7 @@ unit.test("ledger_test: hello", async () => {
 unit.test("ledger_test: ledgerBenchmark", async () => {
     let ledger = await createTestLedger();
     console.log();
-    let nIds = 40 * 32;
+    let nIds = 400 * 32;
     console.log("prepare hashes...");
     let hashes = [];
     for (let i = 0; i < nIds; ++i)
@@ -47,6 +47,7 @@ unit.test("ledger_test: ledgerBenchmark", async () => {
     console.log("total time: " + dt + " ms");
     console.log("  TPS: " + (nIds*2/dt*1000).toFixed(0));
     console.log("  ledger size: " + jsonStringify(await ledger.getLedgerSize()));
+    assert(ledger.bufParams.findOrCreate_insert.bufInProc.size == 0);
     await ledger.close();
 });
 

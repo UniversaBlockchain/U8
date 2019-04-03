@@ -1,5 +1,6 @@
 import * as db from 'pg_driver'
 import * as trs from 'timers'
+import {HashId} from 'crypto'
 
 const StateRecord = require("staterecord").StateRecord;
 const ItemState = require("itemstate").ItemState;
@@ -20,7 +21,7 @@ class Ledger {
         this.bufParams = {
             findOrCreate: {enabled: true},
             findOrCreate_insert: {enabled: true, bufSize: 200, delayMillis: 40, buf: new Map(), bufInProc: new Map(), ts: new Date().getTime()},
-            findOrCreate_select: {enabled: false, bufSize: 400, delayMillis: 40, buf: [], ts: new Date().getTime()},
+            findOrCreate_select: {enabled: true, bufSize: 400, delayMillis: 40, buf: new Map(), ts: new Date().getTime()},
         };
 
         this.timers_ = [];
@@ -167,7 +168,7 @@ class Ledger {
         });
     }
 
-    async findOrCreate_buffered(itemId) {
+    findOrCreate_buffered(itemId) {
         return this.findOrCreate_buffered_insert(itemId).then(() => {
             return this.findOrCreate_buffered_select(itemId);
         }).catch(reason => {
@@ -194,7 +195,6 @@ class Ledger {
 
             this.findOrCreate_buffered_insert_processBuf();
             return promise;
-
         } else {
             return new Promise((resolve, reject) => {
                 this.dbPool_.withConnection(con => {
@@ -263,7 +263,7 @@ class Ledger {
 
         let now = new Date().getTime();
         if ((now - this.bufParams.findOrCreate_insert.ts >= this.bufParams.findOrCreate_insert.delayMillis) ||
-            (this.bufParams.findOrCreate_insert.buf.length >= this.bufParams.findOrCreate_insert.bufSize)) {
+            (this.bufParams.findOrCreate_insert.buf.size >= this.bufParams.findOrCreate_insert.bufSize)) {
             processBuf();
             this.bufParams.findOrCreate_insert.ts = now;
         } else {
@@ -275,7 +275,13 @@ class Ledger {
         if (this.bufParams.findOrCreate_select.enabled) {
             let resolver, rejecter;
             let promise = new Promise((resolve, reject) => {resolver = resolve; rejecter = reject;});
-            this.bufParams.findOrCreate_select.buf.push([itemId.digest, resolver, rejecter]);
+            if (this.bufParams.findOrCreate_select.buf.has(itemId.base64)) {
+                let item = this.bufParams.findOrCreate_select.buf.get(itemId.base64);
+                item[1].push(resolver);
+                item[2].push(rejecter);
+            } else {
+                this.bufParams.findOrCreate_select.buf.set(itemId.base64, [itemId, [resolver], [rejecter]]);
+            }
             this.findOrCreate_buffered_select_processBuf();
             return promise;
         } else {
@@ -298,60 +304,56 @@ class Ledger {
     }
 
     findOrCreate_buffered_select_processBuf() {
-        let processBuf = (withTail) => {
+        let processBuf = () => {
             let arrOfBufs = [];
-            let arrOfBufs_length = Math.floor(this.bufParams.findOrCreate_select.buf.length / this.bufParams.findOrCreate_select.bufSize) + withTail ? 1 : 0;
-            for (let i = 0; i < arrOfBufs_length; ++i) {
-                let arr = [];
-                for (let j = i*this.bufParams.findOrCreate_select.bufSize;
-                     j < Math.min((i+1)*this.bufParams.findOrCreate_select.bufSize, this.bufParams.findOrCreate_select.buf.length);
-                     ++j) {
-                    arr.push(this.bufParams.findOrCreate_select.buf[j]);
+            let map = new Map();
+            for (let [k,v] of this.bufParams.findOrCreate_select.buf) {
+                map.set(k, v);
+                if (map.size >= this.bufParams.findOrCreate_select.bufSize) {
+                    arrOfBufs.push(map);
+                    map = new Map();
                 }
-                arrOfBufs.push(arr);
             }
+            if (map.size > 0)
+                arrOfBufs.push(map);
+            this.bufParams.findOrCreate_select.buf = new Map();
             for (let i = 0; i < arrOfBufs.length; ++i) {
-                let arr = arrOfBufs[i];
+                let map = arrOfBufs[i];
 
                 this.dbPool_.withConnection(con => {
                     let queryValues = [];
                     let params = [];
-                    for (let j = 0; j < arr.length; ++j) {
+                    for (let [k,v] of map) {
                         queryValues.push("?");
-                        params.push(arr[j][0]);
+                        params.push(v[0].digest);
                     }
                     let queryString = "SELECT * FROM ledger WHERE hash IN ("+queryValues.join(",")+") LIMIT "+params.length+";";
                     con.executeQuery(qr => {
                         let rows = qr.getRows(0);
                         let names = qr.getColNamesMap();
                         con.release();
-                        let resolversMap = {};
-                        for (let j = 0; j < arr.length; ++j)
-                            resolversMap[arr[j][0]] = arr[j][1];
-                        for (let j = 0; j < rows.length; ++j)
-                            resolversMap[rows[j][names["hash"]]](rows[j]); // call resolver
+                        let resolversMap = new Map();
+                        for (let [k,v] of map)
+                            resolversMap.set(k, v[1]);
+                        for (let j = 0; j < rows.length; ++j) {
+                            let resolversArr = resolversMap.get(crypto.HashId.withDigest(rows[j][names["hash"]]).base64);
+                            for (let k = 0; k < resolversArr.length; ++k)
+                                resolversArr[k](rows[j]); // call resolver
+                        }
                     }, e => {
                         con.release();
-                        for (let j = 0; j < arr.length; ++j)
-                            arr[j][2](e); // call rejecter
+                        for (let [k,v] of map)
+                            v[2](e); // call rejecter
 
                     }, queryString, ...params);
                 });
             }
-            let newBuf = [];
-            if (!withTail) {
-                for (let i = arrOfBufs_length * this.bufParams.findOrCreate_select.bufSize; i < this.bufParams.findOrCreate_select.buf.length; ++i)
-                    newBuf.push(this.bufParams.findOrCreate_select.buf[i]);
-            }
-            this.bufParams.findOrCreate_select.buf = newBuf;
         };
 
         let now = new Date().getTime();
-        if (now - this.bufParams.findOrCreate_select.ts >= this.bufParams.findOrCreate_select.delayMillis) {
-            processBuf(true);
-            this.bufParams.findOrCreate_select.ts = now;
-        } else if (this.bufParams.findOrCreate_select.buf.length >= this.bufParams.findOrCreate_select.bufSize) {
-            processBuf(false);
+        if ((now - this.bufParams.findOrCreate_select.ts >= this.bufParams.findOrCreate_select.delayMillis) ||
+            (this.bufParams.findOrCreate_select.buf.size >= this.bufParams.findOrCreate_select.bufSize)) {
+            processBuf();
             this.bufParams.findOrCreate_select.ts = now;
         } else {
             // waiting for future messages, do nothing
