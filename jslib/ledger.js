@@ -18,8 +18,8 @@ class Ledger {
         this.MAX_CONNECTIONS = 64;
 
         this.bufParams = {
-            findOrCreate: {enabled: false},
-            findOrCreate_insert: {enabled: true, bufSize: 200, delayMillis: 40, buf: new Map(), ts: new Date().getTime()},
+            findOrCreate: {enabled: true},
+            findOrCreate_insert: {enabled: true, bufSize: 200, delayMillis: 40, buf: new Map(), bufInProc: new Map(), ts: new Date().getTime()},
             findOrCreate_select: {enabled: false, bufSize: 400, delayMillis: 40, buf: [], ts: new Date().getTime()},
         };
 
@@ -167,7 +167,7 @@ class Ledger {
         });
     }
 
-    findOrCreate_buffered(itemId) {
+    async findOrCreate_buffered(itemId) {
         return this.findOrCreate_buffered_insert(itemId).then(() => {
             return this.findOrCreate_buffered_select(itemId);
         }).catch(reason => {
@@ -177,19 +177,24 @@ class Ledger {
 
     findOrCreate_buffered_insert(itemId) {
         if (this.bufParams.findOrCreate_insert.enabled) {
+            let buf = this.bufParams.findOrCreate_insert.buf;
+            if (this.bufParams.findOrCreate_insert.bufInProc.has(itemId))
+                buf = this.bufParams.findOrCreate_insert.bufInProc;
+
             let resolver, rejecter;
             let promise = new Promise((resolve, reject) => {resolver = resolve; rejecter = reject;});
 
-            if (this.bufParams.findOrCreate_insert.buf.has(itemId.base64)) {
-                let item = this.bufParams.findOrCreate_insert.buf.get(itemId.base64);
-                item[1].push(resolver);
-                item[2].push(rejecter);
+            if (buf.has(itemId)) {
+                let item = buf.get(itemId);
+                item[0].push(resolver);
+                item[1].push(rejecter);
             } else {
-                this.bufParams.findOrCreate_insert.buf.set(itemId.base64, [itemId, [resolver], [rejecter]]);
+                buf.set(itemId, [[resolver], [rejecter]]);
             }
 
             this.findOrCreate_buffered_insert_processBuf();
             return promise;
+
         } else {
             return new Promise((resolve, reject) => {
                 this.dbPool_.withConnection(con => {
@@ -209,11 +214,11 @@ class Ledger {
     }
 
     findOrCreate_buffered_insert_processBuf() {
-        let processBuf = (withTail) => {
+        let processBuf = () => {
             let arrOfBufs = [];
-            // let arrOfBufs_length = Math.floor(this.bufParams.findOrCreate_insert.buf.size / this.bufParams.findOrCreate_insert.bufSize) + withTail ? 1 : 0;
             let map = new Map();
             for (let [k,v] of this.bufParams.findOrCreate_insert.buf) {
+                this.bufParams.findOrCreate_insert.bufInProc.set(k, v);
                 map.set(k, v);
                 if (map.size >= this.bufParams.findOrCreate_insert.bufSize) {
                     arrOfBufs.push(map);
@@ -222,13 +227,8 @@ class Ledger {
             }
             this.bufParams.findOrCreate_insert.buf = new Map();
             if (map.size > 0) {
-                if (withTail) {
-                    arrOfBufs.push(map);
-                    map = new Map();
-                } else {
-                    for (let [k,v] of map)
-                        this.bufParams.findOrCreate_insert.buf.set(k, v);
-                }
+                arrOfBufs.push(map);
+                map = new Map();
             }
             for (let i = 0; i < arrOfBufs.length; ++i) {
                 let map = arrOfBufs[i];
@@ -239,30 +239,32 @@ class Ledger {
                     for (let [k,item] of map) {
                         queryValues.push("(?, 1, extract(epoch from timezone('GMT', now())), extract(epoch from timezone('GMT', now() + interval '5 minute')), NULL)");
                         // queryValues.push("(?,1,?,?,NULL)");
-                        params.push(item[0].digest);
+                        params.push(k.digest);
                         // params.push(Math.floor(new Date().getTime()/1000));
                         // params.push(Math.floor(new Date().getTime()/1000) + 5*60);
                     }
                     let queryString = "INSERT INTO ledger(hash, state, created_at, expires_at, locked_by_id) VALUES "+queryValues.join(",")+" ON CONFLICT (hash) DO NOTHING;";
                     con.executeUpdate(affectedRows => {
                         con.release();
-                        for (let [k,v] of map)
-                            v[1].forEach(v => {v();}); // call resolvers
+                        for (let [k,v] of map) {
+                            this.bufParams.findOrCreate_insert.bufInProc.delete(k);
+                            v[0].forEach(v => {v();}); // call resolvers
+                        }
                     }, e => {
                         con.release();
-                        for (let [k,v] of map)
-                            v[2].forEach(v => {v(e);}); // call rejecters
+                        for (let [k,v] of map) {
+                            this.bufParams.findOrCreate_insert.bufInProc.delete(k);
+                            v[1].forEach(v => {v(e);}); // call rejecters
+                        }
                     }, queryString, ...params);
                 });
             }
         };
 
         let now = new Date().getTime();
-        if (now - this.bufParams.findOrCreate_insert.ts >= this.bufParams.findOrCreate_insert.delayMillis) {
-            processBuf(true);
-            this.bufParams.findOrCreate_insert.ts = now;
-        } else if (this.bufParams.findOrCreate_insert.buf.length >= this.bufParams.findOrCreate_insert.bufSize) {
-            processBuf(false);
+        if ((now - this.bufParams.findOrCreate_insert.ts >= this.bufParams.findOrCreate_insert.delayMillis) ||
+            (this.bufParams.findOrCreate_insert.buf.length >= this.bufParams.findOrCreate_insert.bufSize)) {
+            processBuf();
             this.bufParams.findOrCreate_insert.ts = now;
         } else {
             // waiting for future messages, do nothing
