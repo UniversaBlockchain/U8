@@ -243,3 +243,105 @@ unit.test("ledger_test: cache test", async () => {
     assert(record == null);
     await ledger.close();
 });
+
+unit.test("ledger_test: checkLockOwner", async () => {
+    let ledger = await createTestLedger();
+
+    let hash1 = HashId.of(randomBytes(64));
+    await ledger.findOrCreate(hash1);
+    let existing = await ledger.getRecord(hash1);
+
+    await existing.approve();
+
+    let hash2 = HashId.of(randomBytes(64));
+    await ledger.findOrCreate(hash2);
+    let r = await ledger.getRecord(hash2);
+
+    let r1 = r.lockToRevoke(existing.id);
+
+    await existing.reload();
+    await r.reload();
+
+    //assertSameRecords(existing === r1);
+    //assert(ItemState.LOCKED === existing.state);
+    //assert(r.recordId === existing.lockedByRecordId);
+
+   // StateRecord currentOwner = ledger.getLockOwnerOf(existing);
+
+    console.log("existing: " + jsonStringify(existing.id));
+    console.log("locker: " + jsonStringify(r.id));
+    //console.log("locked: " + r1.id);
+    //console.log("currentOwner: " + currentOwner.id);
+    //assertSameRecords(r, currentOwner);
+
+    await ledger.close();
+});
+
+unit.test("ledger_test: lockForRevoking", async () => {
+/*
+    StateRecord existing = ledger.findOrCreate(HashId.createRandom());
+    existing.approve();
+
+    StateRecord existing2 = ledger.findOrCreate(HashId.createRandom());
+    existing2.approve();
+
+    StateRecord r = ledger.findOrCreate(HashId.createRandom());
+    StateRecord r1 = r.lockToRevoke(existing.getId());
+
+    existing.reload();
+    r.reload();
+
+    assertSameRecords(existing, r1);
+    assertEquals(ItemState.LOCKED, existing.getState());
+    assertEquals(r.getRecordId(), existing.getLockedByRecordId());
+
+    // we lock again the same record it should fail:
+    StateRecord r2 = r.lockToRevoke(existing.getId());
+    assertNull(r2);
+    assertEquals(ItemState.LOCKED, existing.getState());
+    assertEquals(r.getRecordId(), existing.getLockedByRecordId());
+
+    StateRecord r3 = r.lockToRevoke(existing2.getId());
+    existing2.reload();
+    assertSameRecords(existing2, r3);
+    assertEquals(ItemState.LOCKED, existing2.getState());
+    assertEquals(r.getRecordId(), existing2.getLockedByRecordId());*/
+});
+
+unit.test("ledger_test: lockForCreationRevoked", async () => {
+/*
+    StateRecord r = ledger.findOrCreate(HashId.createRandom());
+    StateRecord r1 = r.createOutputLockRecord(HashId.createRandom());
+    assertEquals(ItemState.LOCKED_FOR_CREATION, r1.getState());
+    assertEquals(r.getRecordId(), r1.getLockedByRecordId());
+    StateRecord r2 = r.lockToRevoke(r1.getId());
+    assertEquals(ItemState.LOCKED_FOR_CREATION_REVOKED, r2.getState());
+    r1.reload();
+    assertSameRecords(r2, r1);
+    r.reload();
+    assertEquals(r.getRecordId(), r1.getLockedByRecordId());*/
+});
+
+unit.test("ledger_test: checkLockOwner", async () => {
+/*
+    StateRecord existing = ledger.findOrCreate(HashId.createRandom());
+    existing.approve();
+
+    StateRecord r = ledger.findOrCreate(HashId.createRandom());
+    StateRecord r1 = r.lockToRevoke(existing.getId());
+
+    existing.reload();
+    r.reload();
+
+    assertSameRecords(existing, r1);
+    assertEquals(ItemState.LOCKED, existing.getState());
+    assertEquals(r.getRecordId(), existing.getLockedByRecordId());
+
+    StateRecord currentOwner = ledger.getLockOwnerOf(existing);
+
+    System.out.println("existing: " + existing.getId());
+    System.out.println("locker: " + r.getId());
+    System.out.println("locked: " + r1.getId());
+    System.out.println("currentOwner: " + currentOwner.getId());
+    assertSameRecords(r, currentOwner);*/
+});

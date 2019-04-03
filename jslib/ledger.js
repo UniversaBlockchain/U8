@@ -1,3 +1,7 @@
+/**
+ * @module ledger
+ */
+
 import * as db from 'pg_driver'
 import * as trs from 'timers'
 import {HashId} from 'crypto'
@@ -14,6 +18,9 @@ class LedgerException extends Error {
     }
 }
 
+/**
+ * The basic SQL-based ledger.
+ */
 class Ledger {
 
     constructor(connectionString) {
@@ -83,10 +90,10 @@ class Ledger {
     }
 
     /**
-     * Get the record by its id
+     * Get the record by its id.
      *
-     * @param itemId to retreive
-     * @return {Promise<StateRecord>} record or null if not found
+     * @param {HashId} itemId - ItemId to retrieve.
+     * @return {Promise<StateRecord|null>} record or null if not found.
      */
     getRecord(itemId) {
         return new Promise((resolve, reject) => {
@@ -128,9 +135,9 @@ class Ledger {
      * anything, the business logic of it is in the {@see StateRecord}. Still, if a database logic prevents creation of
      * a lock record (e.g. hash is already in use), it must return null.
      *
-     * @param creatorRecordId record that want to create new item
-     * @param newItemHashId   new item hash
-     * @return ready saved instance or null if it can not be created (e.g. already exists)
+     * @param {number} creatorRecordId - Record that want to create new item.
+     * @param {HashId} newItemHashId - New item hash.
+     * @return {Promise<StateRecord|null>} ready saved instance or null if it can not be created (e.g. already exists).
      */
     createOutputLockRecord(creatorRecordId, newItemHashId) {
         let r = new StateRecord(this);
@@ -150,8 +157,8 @@ class Ledger {
      * Get the record that owns the lock. This method should only return the record, not analyze it or somehow process. Still
      * it never returns expired records. Note that <b>caller must clear the lock</b> if this method returns null.
      *
-     * @param rc locked record.
-     * @return the record or null if none found
+     * @param {StateRecord} rc - Locked record.
+     * @return {Promise<StateRecord|null>} the record or null if none found.
      */
     getLockOwnerOf(rc) {
     }
@@ -159,10 +166,10 @@ class Ledger {
     /**
      * Create new record for a given id and set it to the PENDING state. Normally, it is used to create new root
      * documents. If the record exists, it returns it. If the record does not exists, it creates new one with {@link
-        * ItemState#PENDING} state. The operation must be implemented as atomic.
+     * ItemState#PENDING} state. The operation must be implemented as atomic.
      *
-     * @param itemId hashId to register, or null if it is already in use
-     * @return found or created {@link StateRecord}
+     * @param {HashId} itemId - HashId to register, or null if it is already in use.
+     * @return {StateRecord} found or created {@link StateRecord}.
      */
     findOrCreate(itemId) {
         return this.findOrCreate_buffered_insert(itemId).then(() => {
@@ -357,7 +364,7 @@ class Ledger {
      * Shortcut method: check that record exists and its state returns {@link ItemState#isApproved()}}. Check it to
      * ensure its meaning.
      *
-     * @param id is {@link HashId} for checking item
+     * @param {HashId} id - HashId for checking item.
      * @return true if it is.
      */
     isApproved(id) {
@@ -367,7 +374,7 @@ class Ledger {
      * Shortcut method: check that record exists and its state returns {@link ItemState#isConsensusFound()}}. Check it to
      * ensure its meaning.
      *
-     * @param id is {@link HashId} for checking item
+     * @param {HashId} id - HashId for checking item.
      * @return true if it is.
      */
     isConsensusFound(id) {
@@ -389,8 +396,8 @@ class Ledger {
     /**
      * Destroy the record and free space in the ledger.
      *
-     * @param record is {@see StateRecord} to destroy
-     * @return {Promise<*>} resolved when record destroyed
+     * @param {StateRecord} record - StateRecord to destroy.
+     * @return {Promise} resolved when record destroyed.
      */
     destroy(record) {
         if (record.recordId === 0)
@@ -431,10 +438,10 @@ class Ledger {
     }
 
     /**
-     * save a record into the ledger
+     * Save a record into the ledger.
      *
-     * @param record is {@see StateRecord} to save
-     * @return {Promise<StateRecord>} resolved when record saved
+     * @param {StateRecord} record - StateRecord to save.
+     * @return {Promise<StateRecord>} resolved when record saved.
      */
     save(record) {
         if (record.ledger == null) {
@@ -491,8 +498,8 @@ class Ledger {
     /**
      * Refresh record.
      *
-     * @param record is {@see StateRecord} to reload
-     * @return {Promise<StateRecord>} reloaded record or null if record is expired
+     * @param {StateRecord} record - StateRecord to reload.
+     * @return {Promise<StateRecord|null>} reloaded record or null if record is expired.
      */
     reload(record) {
         return new Promise((resolve, reject) => {
@@ -543,7 +550,40 @@ class Ledger {
     countRecords() {
     }
 
-    getLockOwnerOf(itemId) {
+    /**
+     * Get the record that owns the lock. This method should only return the record, not analyze it or somehow process. Still
+     * it never returns expired records. Note that <b>caller must clear the lock</b> if this method returns null.
+     *
+     * @param rc - Locked record.
+     * @return {Promise} the record or null if none found.
+     */
+    getLockOwnerOf(rc) {
+        return new Promise((resolve, reject) => {
+            let cached = this.getFromCacheById(rc.lockedByRecordId);
+            if (cached != null)
+                resolve(cached);
+            else
+                this.dbPool_.withConnection(con => {
+                    /* StateRecord sr = protect(() ->
+                         dbPool.execute(db -> {
+                             try (ResultSet rs = db.queryRow("SELECT * FROM ledger WHERE id = ? limit 1", rc.getLockedByRecordId())) {
+                                 if (rs == null)
+                                     return null;
+                                 StateRecord r = new StateRecord(this, rs);
+                                 putToCache(r);
+                                 return r;
+                                 e.printStackTrace();
+                                 throw e;
+                             }
+                         })
+                     );
+                     if (sr != null && sr.isExpired()) {
+                         sr.destroy();
+                         return null;
+                     }
+                     return sr;*/
+                });
+        });
     }
 
     getLedgerSize(createdAfter = 0) {
@@ -574,6 +614,12 @@ class Ledger {
     getPayments(fromDate) {
     }
 
+    /**
+     * Marks the specified item as a test.
+     *
+     * @param {HashId} hash - Item HashId.
+     * @return {Promise}.
+     */
     markTestRecord(hash){
         return new Promise((resolve, reject) => {
             this.dbPool_.withConnection(con => {
