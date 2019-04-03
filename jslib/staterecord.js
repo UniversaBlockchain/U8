@@ -4,6 +4,9 @@ const ItemState = require("itemstate").ItemState;
 
 class StateRecord {
     constructor(ledger) {
+        if (ledger == null)
+            throw new ex.IllegalStateError("connect to null ledger");
+
         this.ledger = ledger;
         this.dirty = false;
         this.recordId = 0;
@@ -48,11 +51,6 @@ class StateRecord {
         return "State<"+this.id+"/"+this.recordId+":"+this.state.val+":"+this.createdAt+"/"+this.expiresAt+">"
     }
 
-    checkLedgerExists() {
-        if (this.ledger == null)
-            throw new ex.IllegalStateError("connect to ledger to set recordId");
-    }
-
     isExpired() {
         return this.expiresAt != null && this.expiresAt.getTime() < new Date().getTime();
     }
@@ -60,8 +58,6 @@ class StateRecord {
     lockToRevoke(idToRevoke) {
         if (this.state !== ItemState.PENDING)
             throw new ex.IllegalStateError("only pending records are allowed to lock others");
-
-        this.checkLedgerExists();
 
         let lockedRecord = this.ledger.getRecord(idToRevoke);
         if (lockedRecord == null)
@@ -93,8 +89,6 @@ class StateRecord {
 
         if(lockedRecord.lockedByRecordId === this.recordId )
             return true;
-
-        this.checkLedgerExists();
 
         let currentOwner = this.ledger.getLockOwnerOf(lockedRecord);
         // we can acquire the lock - it is dead
@@ -153,8 +147,6 @@ class StateRecord {
     }
 
     async createOutputLockRecord(id) {
-        this.checkLedgerExists();
-
         if (this.recordId === 0)
             throw new ex.IllegalStateError("the record must be created");
         if (this.state !== ItemState.PENDING)
@@ -173,24 +165,20 @@ class StateRecord {
     }
 
     markTestRecord() {
-        this.checkLedgerExists();
         return this.ledger.markTestRecord(this.id);
     }
 
     reload() {
         if (this.recordId === 0)
             throw new ex.IllegalStateError("can't reload record without recordId (new?)");
-        this.checkLedgerExists();
         return this.ledger.reload(this);
     }
 
     save() {
-        this.checkLedgerExists();
         return this.ledger.save(this);
     }
 
     destroy() {
-        this.checkLedgerExists();
         return this.ledger.destroy(this);
     }
 }

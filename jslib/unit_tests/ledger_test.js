@@ -200,3 +200,46 @@ unit.test("ledger_test: moveToTestnet", async () => {
 
     await ledger.close();
 });
+
+unit.test("ledger_test: cache test", async () => {
+    let ledger = await createTestLedger();
+
+    let hash = HashId.of(randomBytes(64));
+
+    assert(ledger.getFromCache(hash) == null);
+
+    //create and get
+    await ledger.findOrCreate(hash);
+    let record = await ledger.getRecord(hash);
+
+    let r1 = ledger.getFromCache(hash);
+    let r2 = ledger.getFromCacheById(record.recordId);
+    assert(r1 != null);
+    assert(r2 != null);
+
+    //compare records
+    assert(record.recordId === r1.recordId);
+    assert(record.id.equals(r1.id));
+    assert(record.state === r1.state);
+    assert(record.lockedByRecordId === r1.lockedByRecordId);
+    assert(record.createdAt.getTime() === r1.createdAt.getTime());
+    assert(record.expiresAt.getTime() === r1.expiresAt.getTime());
+
+    assert(record.recordId === r2.recordId);
+    assert(record.id.equals(r2.id));
+    assert(record.state === r2.state);
+    assert(record.lockedByRecordId === r2.lockedByRecordId);
+    assert(record.createdAt.getTime() === r2.createdAt.getTime());
+    assert(record.expiresAt.getTime() === r2.expiresAt.getTime());
+
+    await record.destroy();
+
+    assert(ledger.getFromCache(hash) == null);
+    assert(ledger.getFromCache(record.id) == null);
+    assert(ledger.getFromCacheById(record.recordId) == null);
+
+    record = await ledger.getRecord(record.id);
+
+    assert(record == null);
+    await ledger.close();
+});

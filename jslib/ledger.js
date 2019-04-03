@@ -4,6 +4,7 @@ import {HashId} from 'crypto'
 
 const StateRecord = require("staterecord").StateRecord;
 const ItemState = require("itemstate").ItemState;
+const t = require("tools");
 const ex = require("exceptions");
 
 class LedgerException extends Error {
@@ -17,6 +18,10 @@ class Ledger {
 
     constructor(connectionString) {
         this.MAX_CONNECTIONS = 64;
+
+        this.cachedRecords = new t.GenericMap();
+        this.cachedRecordsById = new t.GenericMap();
+        this.useCache = true;
 
         this.bufParams = {
             findOrCreate_insert: {enabled: true, bufSize: 200, delayMillis: 40, buf: new Map(), bufInProc: new Map(), ts: new Date().getTime()},
@@ -37,6 +42,37 @@ class Ledger {
         }, this.MAX_CONNECTIONS);
     }
 
+    // Cache methods
+    getFromCache(itemId) {
+        if (this.useCache) {
+            let record = this.cachedRecords.get(itemId);
+            if (record == null)
+                return null;
+            else
+                return record;
+        } else
+            return null;
+    }
+
+    getFromCacheById(recordId) {
+        if (this.useCache) {
+            let record = this.cachedRecordsById.get(recordId);
+            if (record == null)
+                return null;
+            else
+                return record;
+        } else
+            return null;
+    }
+
+    putToCache(record) {
+        if (this.useCache) {
+            this.cachedRecords.set(record.id, record);
+            this.cachedRecordsById.set(record.recordId, record);
+        }
+    }
+
+
     addTimer(delay, block) {
         let i = this.timers_.length;
         let f = () => {
@@ -54,10 +90,10 @@ class Ledger {
      */
     getRecord(itemId) {
         return new Promise((resolve, reject) => {
-            //let cached = this.getFromCache(id);
-            //if (cached != null)
-            //    resolve(cached);
-            //else
+            let cached = this.getFromCache(itemId);
+            if (cached != null)
+                resolve(cached);
+            else
                 this.dbPool_.withConnection(con => {
                     con.executeQuery(qr => {
                             let row = qr.getRows(1)[0];
@@ -69,9 +105,10 @@ class Ledger {
                                 if (record.isExpired()) {
                                     record.destroy();
                                     resolve(null);
-                                } else
-                                    //putToCache(record);
+                                } else {
+                                    this.putToCache(record);
                                     resolve(record);
+                                }
                             } else
                                 resolve(null);
 
@@ -359,11 +396,8 @@ class Ledger {
         if (record.recordId === 0)
             throw new ex.IllegalStateError("can't destroy record without recordId");
 
-        //synchronized (cachedRecords)
-        //    cachedRecords.remove(record.getId());
-
-        //synchronized (cachedRecordsById)
-        //    cachedRecordsById.remove(record.getRecordId());
+        this.cachedRecords.delete(record.id);
+        this.cachedRecordsById.delete(record.recordId);
 
         return new Promise((resolve, reject) => {
             this.dbPool_.withConnection(con => {
@@ -418,7 +452,7 @@ class Ledger {
                             if (row != null && row[0] != null)
                                 record.recordId = row[0];
 
-                            //putToCache(record);
+                            this.putToCache(record);
 
                             resolve(record);
                         }, e => {
