@@ -196,11 +196,11 @@ class Ledger {
                     let queryValues = [];
                     let params = [];
                     for (let [k,item] of map) {
-                        queryValues.push("(?, 1, extract(epoch from timezone('GMT', now())), extract(epoch from timezone('GMT', now() + interval '5 minute')), NULL)");
-                        // queryValues.push("(?,1,?,?,NULL)");
+                        // queryValues.push("(?, 1, extract(epoch from timezone('GMT', now())), extract(epoch from timezone('GMT', now() + interval '5 minute')), NULL)");
+                        queryValues.push("(?,1,?,?,NULL)");
                         params.push(item[0].digest);
-                        // params.push(Math.floor(new Date().getTime()/1000));
-                        // params.push(Math.floor(new Date().getTime()/1000) + 5*60);
+                        params.push(Math.floor(new Date().getTime()/1000));
+                        params.push(Math.floor(new Date().getTime()/1000) + 5*60 + Math.floor(Math.random()*10));
                     }
                     let queryString = "INSERT INTO ledger(hash, state, created_at, expires_at, locked_by_id) VALUES "+queryValues.join(",")+" ON CONFLICT (hash) DO NOTHING;";
                     con.executeUpdate(affectedRows => {
