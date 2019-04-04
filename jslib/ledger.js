@@ -89,7 +89,152 @@ class Ledger {
         this.timers_[i] = trs.timeout(delay, f);
     }
 
-    /**
+    transaction_test1(id1, id2, id3) {
+        console.log("start");
+        return new Promise((resolve, reject) => {
+            this.dbPool_.withConnection(con => {
+                con.executeUpdate(qr => {
+                        console.log("BEGIN done");
+                        con.executeUpdate(qr => {
+                                console.log("Update1 done");
+                                con.executeUpdate(qr => {
+                                        console.log("Update2 done");
+                                        con.executeUpdate(qr => {
+                                                console.log("Update3 done");
+                                                con.executeUpdate(qr => {
+                                                        console.log("COMMIT done");
+                                                        con.release();
+                                                        resolve();
+                                                    },
+                                                    e => {
+                                                        con.release();
+                                                        reject(e);
+                                                    },
+                                                    "COMMIT;"
+                                                );
+                                            },
+                                            e => {
+                                                con.release();
+                                                reject(e);
+                                            },
+                                            "INSERT INTO ledger(hash, state, created_at, expires_at, locked_by_id) VALUES (?, 1, extract(epoch from timezone('GMT', now())), extract(epoch from timezone('GMT', now() + interval '5 minute')), NULL) ON CONFLICT (hash) DO NOTHING;",
+                                            id3.digest
+                                        );
+                                    },
+                                    e => {
+                                        con.release();
+                                        reject(e);
+                                    },
+                                    "INSERT INTO ledger(hash, state, created_at, expires_at, locked_by_id) VALUES (?, 1, extract(epoch from timezone('GMT', now())), extract(epoch from timezone('GMT', now() + interval '5 minute')), NULL) ON CONFLICT (hash) DO NOTHING;",
+                                    id2.digest
+                                );
+                            },
+                            e => {
+                                con.release();
+                                reject(e);
+                            },
+                            "INSERT INTO ledger(hash, state, created_at, expires_at, locked_by_id) VALUES (?, 1, extract(epoch from timezone('GMT', now())), extract(epoch from timezone('GMT', now() + interval '5 minute')), NULL) ON CONFLICT (hash) DO NOTHING;",
+                            id1.digest
+                        );
+                        con.release();
+                        resolve();
+                    },
+                    e => {
+                        con.release();
+                        reject(e);
+                    },
+                    "BEGIN;"
+                );
+            });
+        });
+    }
+
+    transaction_test2(id1, id2, id3) {
+        console.log("start");
+        return new Promise((resolve, reject) => {
+            this.dbPool_.withConnection(async(con) => {
+
+                console.log("BEGIN");
+                await con.executeUpdate(qr => {console.log("BEGIN done");},
+                    e => {
+                        con.release();
+                        reject(e);
+                    },
+                    "BEGIN;"
+                );
+
+                console.log("Update1");
+                await con.executeUpdate(qr => {console.log("Update1 done");},
+                    e => {
+                        con.release();
+                        reject(e);
+                    },
+                    "INSERT INTO ledger(hash, state, created_at, expires_at, locked_by_id) VALUES (?, 1, extract(epoch from timezone('GMT', now())), extract(epoch from timezone('GMT', now() + interval '5 minute')), NULL) ON CONFLICT (hash) DO NOTHING;",
+                    id1.digest
+                );
+
+                console.log("Update2");
+                await con.executeUpdate(qr => {console.log("Update2 done");},
+                    e => {
+                        con.release();
+                        reject(e);
+                    },
+                    "INSERT INTO ledger(hash, state, created_at, expires_at, locked_by_id) VALUES (?, 1, extract(epoch from timezone('GMT', now())), extract(epoch from timezone('GMT', now() + interval '5 minute')), NULL) ON CONFLICT (hash) DO NOTHING;",
+                    id2.digest
+                );
+
+                console.log("Update3");
+                await con.executeUpdate(qr => {console.log("Update3 done");},
+                    e => {
+                        con.release();
+                        reject(e);
+                    },
+                    "INSERT INTO ledger(hash, state, created_at, expires_at, locked_by_id) VALUES (?, 1, extract(epoch from timezone('GMT', now())), extract(epoch from timezone('GMT', now() + interval '5 minute')), NULL) ON CONFLICT (hash) DO NOTHING;",
+                    id3.digest
+                );
+
+                console.log("COMMIT");
+                await con.executeUpdate(qr => {console.log("COMMIT done");},
+                    e => {
+                        con.release();
+                        reject(e);
+                    },
+                    "COMMIT;"
+                );
+
+                console.log("Finish");
+
+                con.release();
+                resolve();
+            });
+        });
+    }
+
+    transaction_test3(id1, id2, id3) {
+        return new Promise((resolve, reject) => {
+            this.dbPool_.withConnection(con => {
+                con.executeUpdate(qr => {
+                        con.release();
+                        resolve();
+                    },
+                    e => {
+                        con.release();
+                        reject(e);
+                    },
+                    "BEGIN;" +
+                    "INSERT INTO ledger(hash, state, created_at, expires_at, locked_by_id) VALUES (?, 1, extract(epoch from timezone('GMT', now())), extract(epoch from timezone('GMT', now() + interval '5 minute')), NULL) ON CONFLICT (hash) DO NOTHING;" +
+                    "INSERT INTO ledger(hash, state, created_at, expires_at, locked_by_id) VALUES (?, 1, extract(epoch from timezone('GMT', now())), extract(epoch from timezone('GMT', now() + interval '5 minute')), NULL) ON CONFLICT (hash) DO NOTHING;" +
+                    "INSERT INTO ledger(hash, state, created_at, expires_at, locked_by_id) VALUES (?, 1, extract(epoch from timezone('GMT', now())), extract(epoch from timezone('GMT', now() + interval '5 minute')), NULL) ON CONFLICT (hash) DO NOTHING;" +
+                    "COMMIT;",
+                    id1.digest,
+                    id2.digest,
+                    id3.digest
+                );
+            });
+        });
+    }
+
+/**
      * Get the record by its id.
      *
      * @param {HashId} itemId - ItemId to retrieve.

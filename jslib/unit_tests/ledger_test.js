@@ -348,3 +348,24 @@ unit.test("ledger_test: lockForCreationRevoked", async () => {
 
     await ledger.close();
 });
+
+/*unit.test("ledger_test: transaction", async () => {
+    let ledger = await createTestLedger();
+
+    let hash1 = HashId.of(randomBytes(64));
+    let hash2 = HashId.of(randomBytes(64));
+    let hash3 = HashId.of(randomBytes(64));
+
+    //await ledger.transaction_test1(hash1, hash2, hash3);
+    //await ledger.transaction_test1(hash1, hash2, hash3);
+    await ledger.transaction_test3(hash1, hash2, hash3);
+
+    let r1 = await ledger.getRecord(hash1);
+    let r2 = await ledger.getRecord(hash2);
+    let r3 = await ledger.getRecord(hash3);
+    assert(r1 != null);
+    assert(r2 != null);
+    assert(r3 != null);
+
+    await ledger.close();
+});*/
