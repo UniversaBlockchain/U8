@@ -273,11 +273,6 @@ unit.test("ledger_test: checkLockOwner", async () => {
 
     let currentOwner = await ledger.getLockOwnerOf(existing);
 
-    console.log("existing: " + jsonStringify(existing.id));
-    console.log("locker: " + jsonStringify(r.id));
-    console.log("locked: " + jsonStringify(r1.id));
-    console.log("currentOwner: " + jsonStringify(currentOwner.id));
-
     assertSameRecords(r, currentOwner);
 
     await ledger.close();
@@ -337,8 +332,7 @@ unit.test("ledger_test: lockForCreationRevoked", async () => {
     await ledger.findOrCreate(hash1);
     let r = await ledger.getRecord(hash1);
 
-    let hash2 = HashId.of(randomBytes(64));
-    let r1 = await r.createOutputLockRecord(hash2);
+    let r1 = await r.createOutputLockRecord(HashId.of(randomBytes(64)));
 
     assert(ItemState.LOCKED_FOR_CREATION === r1.state);
     assert(r.recordId === r1.lockedByRecordId);
