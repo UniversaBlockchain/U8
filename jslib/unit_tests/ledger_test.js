@@ -4,6 +4,7 @@ import {HashId} from 'crypto'
 import {randomBytes} from 'tools'
 
 const ItemState = require("itemstate").ItemState;
+const ex = require("exceptions");
 
 // with bigints
 function jsonStringify(obj) {
@@ -141,7 +142,7 @@ unit.test("ledger_test: createOutputLockRecord", async () => {
 
     let r1 = await owner.createOutputLockRecord(id);
     await r1.reload();
-    assert(id === r1.id);
+    assert(id.equals(r1.id));
     assert(ItemState.LOCKED_FOR_CREATION === r1.state);
     assert(owner.recordId === r1.lockedByRecordId);
 
@@ -352,20 +353,80 @@ unit.test("ledger_test: lockForCreationRevoked", async () => {
 unit.test("ledger_test: transaction", async () => {
     let ledger = await createTestLedger();
 
+    let hash0 = HashId.of(randomBytes(64));
     let hash1 = HashId.of(randomBytes(64));
     let hash2 = HashId.of(randomBytes(64));
     let hash3 = HashId.of(randomBytes(64));
-
-    //await ledger.transaction_test1(hash1, hash2, hash3);
-    await ledger.transaction_test2(hash1, hash2, hash3);
-    //await ledger.transaction_test3(hash1, hash2, hash3);
-
+    await ledger.findOrCreate(hash0);
+    await ledger.findOrCreate(hash1);
+    await ledger.findOrCreate(hash2);
+    await ledger.findOrCreate(hash3);
+    let r0 = await ledger.getRecord(hash0);
     let r1 = await ledger.getRecord(hash1);
     let r2 = await ledger.getRecord(hash2);
     let r3 = await ledger.getRecord(hash3);
-    assert(r1 != null);
-    assert(r2 != null);
-    assert(r3 != null);
+
+    await ledger.transaction(async() => {
+        await r0.destroy();
+        r1.state = ItemState.APPROVED;
+        r2.state = ItemState.DECLINED;
+        r3.state = ItemState.LOCKED_FOR_CREATION;
+        await r1.save();
+        await r2.save();
+        await r3.save();
+    });
+
+    r0 = await ledger.getRecord(hash0);
+    assert(r0 == null);
+    await r1.reload();
+    await r2.reload();
+    await r3.reload();
+    assert(r1.state === ItemState.APPROVED);
+    assert(r2.state === ItemState.DECLINED);
+    assert(r3.state === ItemState.LOCKED_FOR_CREATION);
+
+    await ledger.close();
+});
+
+unit.test("ledger_test: rollback transaction", async () => {
+    let ledger = await createTestLedger();
+
+    let hash0 = HashId.of(randomBytes(64));
+    let hash1 = HashId.of(randomBytes(64));
+    let hash2 = HashId.of(randomBytes(64));
+    let hash3 = HashId.of(randomBytes(64));
+    await ledger.findOrCreate(hash0);
+    await ledger.findOrCreate(hash1);
+    await ledger.findOrCreate(hash2);
+    await ledger.findOrCreate(hash3);
+    let r0 = await ledger.getRecord(hash0);
+    let r1 = await ledger.getRecord(hash1);
+    let r2 = await ledger.getRecord(hash2);
+    let r3 = await ledger.getRecord(hash3);
+
+    try {
+        await ledger.transaction(async() => {
+            await r0.destroy();
+            r1.state = ItemState.APPROVED;
+            r2.state = ItemState.DECLINED;
+            r3.state = ItemState.LOCKED_FOR_CREATION;
+            await r1.save();
+            await r2.save();
+            throw new ex.IllegalStateError("TEST_EXCEPTION");
+            await r3.save();
+        });
+    } catch (e) {
+        assert(e.message === "TEST_EXCEPTION");
+    }
+
+    await r0.reload();
+    await r1.reload();
+    await r2.reload();
+    await r3.reload();
+    assert(r0 != null);
+    assert(r1.state !== ItemState.APPROVED);
+    assert(r2.state !== ItemState.DECLINED);
+    assert(r3.state !== ItemState.LOCKED_FOR_CREATION);
 
     await ledger.close();
 });

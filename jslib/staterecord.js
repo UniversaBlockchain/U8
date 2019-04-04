@@ -21,6 +21,16 @@ class StateRecord {
         this.state = ItemState.UNDEFINED;
     }
 
+    copy(record) {
+        this.ledger = record.ledger;
+        this.recordId = record.recordId;
+        this.lockedByRecordId = record.lockedByRecordId;
+        this.id = record.id;
+        this.state = record.state;
+        this.createdAt = record.createdAt;
+        this.expiresAt = record.expiresAt;
+    }
+
     static initFrom(ledger, row) {
         let result = new StateRecord(ledger);
 
@@ -145,10 +155,17 @@ class StateRecord {
         return this.ledger.markTestRecord(this.id);
     }
 
-    reload() {
+    async reload() {
         if (this.recordId === 0)
             throw new ex.IllegalStateError("can't reload record without recordId (new?)");
-        return this.ledger.reload(this);
+
+        let result = await this.ledger.reload(this);
+        if (result == null)
+            throw new ex.IllegalStateError("record not found");
+
+        this.copy(result);
+
+        return this;
     }
 
     save() {

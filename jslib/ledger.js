@@ -89,153 +89,7 @@ class Ledger {
         this.timers_[i] = trs.timeout(delay, f);
     }
 
-    transaction_test1(id1, id2, id3) {
-        console.log("start");
-        return new Promise((resolve, reject) => {
-            this.dbPool_.withConnection(con => {
-                con.executeUpdate(qr => {
-                        console.log("BEGIN done");
-                        con.executeUpdate(qr => {
-                                console.log("Update1 done");
-                                con.executeUpdate(qr => {
-                                        console.log("Update2 done");
-                                        con.executeUpdate(qr => {
-                                                console.log("Update3 done");
-                                                con.executeUpdate(qr => {
-                                                        console.log("COMMIT done");
-                                                        con.release();
-                                                        resolve();
-                                                    },
-                                                    e => {
-                                                        con.release();
-                                                        reject(e);
-                                                    },
-                                                    "COMMIT;"
-                                                );
-                                            },
-                                            e => {
-                                                con.release();
-                                                reject(e);
-                                            },
-                                            "INSERT INTO ledger(hash, state, created_at, expires_at, locked_by_id) VALUES (?, 1, extract(epoch from timezone('GMT', now())), extract(epoch from timezone('GMT', now() + interval '5 minute')), NULL) ON CONFLICT (hash) DO NOTHING;",
-                                            id3.digest
-                                        );
-                                    },
-                                    e => {
-                                        con.release();
-                                        reject(e);
-                                    },
-                                    "INSERT INTO ledger(hash, state, created_at, expires_at, locked_by_id) VALUES (?, 1, extract(epoch from timezone('GMT', now())), extract(epoch from timezone('GMT', now() + interval '5 minute')), NULL) ON CONFLICT (hash) DO NOTHING;",
-                                    id2.digest
-                                );
-                            },
-                            e => {
-                                con.release();
-                                reject(e);
-                            },
-                            "INSERT INTO ledger(hash, state, created_at, expires_at, locked_by_id) VALUES (?, 1, extract(epoch from timezone('GMT', now())), extract(epoch from timezone('GMT', now() + interval '5 minute')), NULL) ON CONFLICT (hash) DO NOTHING;",
-                            id1.digest
-                        );
-                        con.release();
-                        resolve();
-                    },
-                    e => {
-                        con.release();
-                        reject(e);
-                    },
-                    "BEGIN;"
-                );
-            });
-        });
-    }
-
-    transaction_test2(id1, id2, id3) {
-        console.log("start");
-        return new Promise((resolve, reject) => {
-            this.dbPool_.withConnection(async(con) => {
-
-                console.log("BEGIN");
-                con.executeQuery(qr => {console.log("BEGIN done");},
-                    e => {
-                        con.release();
-                        reject(e);
-                    },
-                    "BEGIN;"
-                );
-
-                console.log("Update1");
-                con.executeUpdate(qr => {console.log("Update1 done");},
-                    e => {
-                        con.release();
-                        reject(e);
-                    },
-                    "INSERT INTO ledger(hash, state, created_at, expires_at, locked_by_id) VALUES (?, 1, extract(epoch from timezone('GMT', now())), extract(epoch from timezone('GMT', now() + interval '5 minute')), NULL) ON CONFLICT (hash) DO NOTHING;",
-                    id1.digest
-                );
-
-                console.log("Update2");
-                con.executeUpdate(qr => {console.log("Update2 done");},
-                    e => {
-                        con.release();
-                        reject(e);
-                    },
-                    "INSERT INTO ledger(hash, state, created_at, expires_at, locked_by_id) VALUES (?, 1, extract(epoch from timezone('GMT', now())), extract(epoch from timezone('GMT', now() + interval '5 minute')), NULL) ON CONFLICT (hash) DO NOTHING;",
-                    id2.digest
-                );
-
-                console.log("Update3");
-                con.executeUpdate(qr => {console.log("Update3 done");},
-                    e => {
-                        con.release();
-                        reject(e);
-                    },
-                    "INSERT INTO ledger(hash, state, created_at, expires_at, locked_by_id) VALUES (?, 1, extract(epoch from timezone('GMT', now())), extract(epoch from timezone('GMT', now() + interval '5 minute')), NULL) ON CONFLICT (hash) DO NOTHING;",
-                    id3.digest
-                );
-
-                console.log("COMMIT");
-                con.executeQuery(qr => {
-                        console.log("COMMIT done");
-                        con.release();
-                        resolve();
-                    },
-                    e => {
-                        con.release();
-                        reject(e);
-                    },
-                    "COMMIT;"
-                );
-
-                console.log("Finish");
-            });
-        });
-    }
-
-    transaction_test3(id1, id2, id3) {
-        return new Promise((resolve, reject) => {
-            this.dbPool_.withConnection(con => {
-                con.executeUpdate(qr => {
-                        con.release();
-                        resolve();
-                    },
-                    e => {
-                        con.release();
-                        reject(e);
-                    },
-                    "BEGIN;" +
-                    "INSERT INTO ledger(hash, state, created_at, expires_at, locked_by_id) VALUES (?, 1, extract(epoch from timezone('GMT', now())), extract(epoch from timezone('GMT', now() + interval '5 minute')), NULL) ON CONFLICT (hash) DO NOTHING;" +
-                    "INSERT INTO ledger(hash, state, created_at, expires_at, locked_by_id) VALUES (?, 1, extract(epoch from timezone('GMT', now())), extract(epoch from timezone('GMT', now() + interval '5 minute')), NULL) ON CONFLICT (hash) DO NOTHING;" +
-                    "INSERT INTO ledger(hash, state, created_at, expires_at, locked_by_id) VALUES (?, 1, extract(epoch from timezone('GMT', now())), extract(epoch from timezone('GMT', now() + interval '5 minute')), NULL) ON CONFLICT (hash) DO NOTHING;" +
-                    "COMMIT;",
-                    id1.digest,
-                    id2.digest,
-                    id3.digest
-                );
-            });
-        });
-    }
-
-/**
+    /**
      * Get the record by its id.
      *
      * @param {HashId} itemId - ItemId to retrieve.
@@ -519,13 +373,56 @@ class Ledger {
      * Perform a callable in a transaction. If the callable throws any exception, the transaction should be rolled back
      * to its initial state. Blocks until the callable returns, and returns what the callable returns. If an exception
      * is thrown by the callable, the transaction is rolled back and the exception will be rethrown unless it was a
-     * {@link Rollback} instance, which just rollbacks the transaction, in which case it always return null.
+     * instance, which just rollbacks the transaction, in which case it always return null.
      *
      * @param block to execute
-     * @return null if transaction is rolled back throwing a {@link Rollback} exception, otherwise what callable
+     * @return {Promise} null if transaction is rolled back throwing a exception, otherwise what callable
      * returns.
      */
     transaction(block) {
+        return new Promise((resolve, reject) => {
+            this.dbPool_.withConnection(async(con) => {
+                con.executeQuery(qr => {},
+                    e => {
+                        con.release();
+                        reject(e);
+                    },
+                    "BEGIN;"
+                );
+
+                try {
+                    this.transactionConn = con;
+                    await block();
+                    this.transactionConn = null;
+                } catch (err) {
+                    this.transactionConn = null;
+
+                    con.executeQuery(qr => {
+                            con.release();
+                            reject(err);
+                        },
+                        e => {
+                            con.release();
+                            reject(e);
+                        },
+                        "ROLLBACK;"
+                    );
+
+                    return;
+                }
+
+                con.executeQuery(qr => {
+                        con.release();
+                        resolve();
+                    },
+                    e => {
+                        con.release();
+                        reject(e);
+                    },
+                    "COMMIT;"
+                );
+            });
+        });
     }
 
     /**
@@ -540,6 +437,9 @@ class Ledger {
 
         this.cachedRecords.delete(record.id);
         this.cachedRecordsById.delete(record.recordId);
+
+        if (this.transactionConn != null)
+            return this.transactionDestroy(record);
 
         return new Promise((resolve, reject) => {
             this.dbPool_.withConnection(con => {
@@ -573,6 +473,40 @@ class Ledger {
     }
 
     /**
+     * Destroy the record in the ledger in opened transaction.
+     *
+     * @param {StateRecord} record - StateRecord to destroy.
+     * @return {Promise} resolved when record destroyed.
+     */
+    transactionDestroy(record) {
+        return new Promise((resolve, reject) => {
+            this.transactionConn.executeUpdate(qr => {
+                    this.transactionConn.release();
+                    resolve();
+                }, e => {
+                    this.transactionConn.release();
+                    reject(e);
+                },
+                "DELETE FROM items WHERE id = ?;",
+                record.recordId
+            );
+        }).then(() => {
+            return new Promise((resolve, reject) => {
+                this.transactionConn.executeUpdate(qr => {
+                        this.transactionConn.release();
+                        resolve();
+                    }, e => {
+                        this.transactionConn.release();
+                        reject(e);
+                    },
+                    "DELETE FROM ledger WHERE id = ?;",
+                    record.recordId
+                );
+            });
+        });
+    }
+
+    /**
      * Save a record into the ledger.
      *
      * @param {StateRecord} record - StateRecord to save.
@@ -583,6 +517,9 @@ class Ledger {
             record.ledger = this;
         } else if (record.ledger !== this)
             throw new ex.IllegalStateError("can't save with a different ledger (make a copy!)");
+
+        if (this.transactionConn != null)
+            return this.transactionSave(record);
 
         if (record.recordId === 0)
             return new Promise((resolve, reject) => {
@@ -627,6 +564,55 @@ class Ledger {
                         record.recordId
                     );
                 });
+            });
+    }
+
+    /**
+     * Save a record into the ledger in opened transaction.
+     *
+     * @param {StateRecord} record - StateRecord to save.
+     * @return {Promise<StateRecord>} resolved when record saved.
+     */
+    transactionSave(record) {
+        if (record.recordId === 0)
+            return new Promise((resolve, reject) => {
+                this.transactionConn.executeQuery(qr => {
+                        let row = qr.getRows(1)[0];
+                        this.transactionConn.release();
+
+                        if (row != null && row[0] != null)
+                            record.recordId = row[0];
+
+                        this.putToCache(record);
+
+                        resolve(record);
+                    }, e => {
+                        this.transactionConn.release();
+                        reject(e);
+                    },
+                    "insert into ledger(hash, state, created_at, expires_at, locked_by_id) values(?,?,?,?,?) RETURNING id;",
+                    record.id.digest,
+                    record.state.ordinal,
+                    Math.floor(record.createdAt.getTime() / 1000),
+                    Math.floor(record.expiresAt.getTime() / 1000),
+                    record.lockedByRecordId
+                );
+            });
+        else
+            return new Promise((resolve, reject) => {
+                this.transactionConn.executeUpdate(qr => {
+                        this.transactionConn.release();
+                        resolve(record);
+                    }, e => {
+                        this.transactionConn.release();
+                        reject(e);
+                    },
+                    "update ledger set state=?, expires_at=?, locked_by_id=? where id=?",
+                    record.state.ordinal,
+                    Math.floor(record.expiresAt.getTime() / 1000),
+                    record.lockedByRecordId,
+                    record.recordId
+                );
             });
     }
 
