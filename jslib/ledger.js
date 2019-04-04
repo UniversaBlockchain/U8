@@ -155,7 +155,7 @@ class Ledger {
             this.dbPool_.withConnection(async(con) => {
 
                 console.log("BEGIN");
-                await con.executeUpdate(qr => {console.log("BEGIN done");},
+                con.executeQuery(qr => {console.log("BEGIN done");},
                     e => {
                         con.release();
                         reject(e);
@@ -164,7 +164,7 @@ class Ledger {
                 );
 
                 console.log("Update1");
-                await con.executeUpdate(qr => {console.log("Update1 done");},
+                con.executeUpdate(qr => {console.log("Update1 done");},
                     e => {
                         con.release();
                         reject(e);
@@ -174,7 +174,7 @@ class Ledger {
                 );
 
                 console.log("Update2");
-                await con.executeUpdate(qr => {console.log("Update2 done");},
+                con.executeUpdate(qr => {console.log("Update2 done");},
                     e => {
                         con.release();
                         reject(e);
@@ -184,7 +184,7 @@ class Ledger {
                 );
 
                 console.log("Update3");
-                await con.executeUpdate(qr => {console.log("Update3 done");},
+                con.executeUpdate(qr => {console.log("Update3 done");},
                     e => {
                         con.release();
                         reject(e);
@@ -194,7 +194,11 @@ class Ledger {
                 );
 
                 console.log("COMMIT");
-                await con.executeUpdate(qr => {console.log("COMMIT done");},
+                con.executeQuery(qr => {
+                        console.log("COMMIT done");
+                        con.release();
+                        resolve();
+                    },
                     e => {
                         con.release();
                         reject(e);
@@ -205,7 +209,6 @@ class Ledger {
                 console.log("Finish");
 
                 con.release();
-                resolve();
             });
         });
     }

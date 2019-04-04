@@ -349,7 +349,7 @@ unit.test("ledger_test: lockForCreationRevoked", async () => {
     await ledger.close();
 });
 
-/*unit.test("ledger_test: transaction", async () => {
+unit.test("ledger_test: transaction", async () => {
     let ledger = await createTestLedger();
 
     let hash1 = HashId.of(randomBytes(64));
@@ -357,8 +357,8 @@ unit.test("ledger_test: lockForCreationRevoked", async () => {
     let hash3 = HashId.of(randomBytes(64));
 
     //await ledger.transaction_test1(hash1, hash2, hash3);
-    //await ledger.transaction_test1(hash1, hash2, hash3);
-    await ledger.transaction_test3(hash1, hash2, hash3);
+    await ledger.transaction_test2(hash1, hash2, hash3);
+    //await ledger.transaction_test3(hash1, hash2, hash3);
 
     let r1 = await ledger.getRecord(hash1);
     let r2 = await ledger.getRecord(hash2);
@@ -368,7 +368,7 @@ unit.test("ledger_test: lockForCreationRevoked", async () => {
     assert(r3 != null);
 
     await ledger.close();
-});*/
+});
 
 unit.test("ledger_test: recordExpiration", async () => {
     // todo: expired can't be get - it should be dropped by the database
