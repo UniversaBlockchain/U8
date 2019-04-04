@@ -14,6 +14,15 @@ async function createTestLedger() {
     return new Ledger("host=localhost port=5432 dbname=unit_tests");
 }
 
+function assertSameRecords(record1, record2) {
+    assert(record1.recordId === record2.recordId);
+    assert(record1.id.equals(record2.id));
+    assert(record1.state === record2.state);
+    assert(record1.lockedByRecordId === record2.lockedByRecordId);
+    assert(record1.createdAt.getTime() === record2.createdAt.getTime());
+    assert(record1.expiresAt.getTime() === record2.expiresAt.getTime())
+}
+
 unit.test("ledger_test: hello", async () => {
     let ledger = await createTestLedger();
     console.log(jsonStringify(await ledger.findOrCreate(HashId.of(randomBytes(64)))));
@@ -235,6 +244,7 @@ unit.test("ledger_test: cache test", async () => {
     record = await ledger.getRecord(record.id);
 
     assert(record == null);
+
     await ledger.close();
 });
 
@@ -256,7 +266,8 @@ unit.test("ledger_test: checkLockOwner", async () => {
     await existing.reload();
     await r.reload();
 
-    //assertSameRecords(existing === r1);
+    assertSameRecords(existing, r1);
+
     assert(ItemState.LOCKED === existing.state);
     assert(r.recordId === existing.lockedByRecordId);
 
@@ -266,7 +277,8 @@ unit.test("ledger_test: checkLockOwner", async () => {
     console.log("locker: " + jsonStringify(r.id));
     console.log("locked: " + jsonStringify(r1.id));
     console.log("currentOwner: " + jsonStringify(currentOwner.id));
-    //assertSameRecords(r, currentOwner);
+
+    assertSameRecords(r, currentOwner);
 
     await ledger.close();
 });
@@ -295,19 +307,23 @@ unit.test("ledger_test: lockForRevoking", async () => {
     await existing.reload();
     await r.reload();
 
-    //assertSameRecords(existing, r1);
+    assertSameRecords(existing, r1);
+
     assert(ItemState.LOCKED === existing.state);
     assert(r.recordId ===  existing.lockedByRecordId);
 
     // we lock again the same record it should fail:
-    let r2 = r.lockToRevoke(existing.id);
-   // assert(r2 == null);
+    let r2 = await r.lockToRevoke(existing.id);
+
+    assert(r2 == null);
     assert(ItemState.LOCKED === existing.state);
     assert(r.recordId === existing.lockedByRecordId);
 
-    let r3 = r.lockToRevoke(existing2.id);
+    let r3 = await r.lockToRevoke(existing2.id);
     await existing2.reload();
-    //assertSameRecords(existing2, r3);
+
+    assertSameRecords(existing2, r3);
+
     assert(ItemState.LOCKED === existing2.state);
     assert(r.recordId === existing2.lockedByRecordId);
 
@@ -327,49 +343,14 @@ unit.test("ledger_test: lockForCreationRevoked", async () => {
     assert(ItemState.LOCKED_FOR_CREATION === r1.state);
     assert(r.recordId === r1.lockedByRecordId);
 
-    let r2 = r.lockToRevoke(r1.id);
-    //assert(ItemState.LOCKED_FOR_CREATION_REVOKED === r2.state); !
+    let r2 = await r.lockToRevoke(r1.id);
+    assert(ItemState.LOCKED_FOR_CREATION_REVOKED === r2.state);
     await r1.reload();
 
-    //assertSameRecords(r2, r1);
+    assertSameRecords(r2, r1);
     await r.reload();
+
     assert(r.recordId === r1.lockedByRecordId);
-
-    await ledger.close();
-
-});
-
-unit.test("ledger_test: checkLockOwner", async () => {
-    let ledger = await createTestLedger();
-
-    let hash1 = HashId.of(randomBytes(64));
-    await ledger.findOrCreate(hash1);
-    let existing = await ledger.getRecord(hash1);
-
-    await existing.approve();
-
-    let hash2 = HashId.of(randomBytes(64));
-    await ledger.findOrCreate(hash2);
-    let r = await ledger.getRecord(hash2);
-
-    let r1 = await r.lockToRevoke(existing.id);
-
-    await existing.reload();
-    await r.reload();
-
-    //assertSameRecords(existing, r1);
-    assert(existing === r1);
-
-    assert(ItemState.LOCKED === existing.state);
-    assert(r.recordId, existing.lockedByRecordId);
-
-    let currentOwner = ledger.getLockOwnerOf(existing);
-
-    jsonStringify("existing: " + jsonStringify(existing.id));
-    console.log("locker: " + jsonStringify(r.id));
-    console.log("locked: " + jsonStringify(r1.id));
-    console.log("currentOwner: " + jsonStringify(currentOwner.id));
-    //assertSameRecords(r, currentOwner);
 
     await ledger.close();
 });
