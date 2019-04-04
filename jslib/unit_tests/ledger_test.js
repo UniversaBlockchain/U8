@@ -369,3 +369,95 @@ unit.test("ledger_test: lockForCreationRevoked", async () => {
 
     await ledger.close();
 });*/
+
+unit.test("ledger_test: recordExpiration", async () => {
+    // todo: expired can't be get - it should be dropped by the database
+
+    let ledger = await createTestLedger();
+
+    let hashId = HashId.of(randomBytes(64));
+    await ledger.findOrCreate(hashId);
+    let r = await ledger.getRecord(hashId);
+
+    assert(r.expiresAt != null);
+    //assert(r.getExpiresAt().isAfter(ZonedDateTime.now()));
+
+    let recordId = r.recordId;
+
+    //let inFuture = ZonedDateTime.now().plusHours(2);
+    //r.expiresAt = inFuture;
+
+    let r1 = await ledger.getRecord(hashId);
+    //assert(r1.getExpiresAt() !== inFuture);
+
+    await r.save();
+
+    r1 = await ledger.getRecord(hashId);
+    //assertAlmostSame(r.getExpiresAt(), r1.getExpiresAt());
+
+    //r.setExpiresAt(ZonedDateTime.now().minusHours(1));
+    await r.save();
+
+    r1 = await ledger.getRecord(hashId);
+    //assert(r1 == null);
+
+    await ledger.close();
+});
+
+unit.test("ledger_test: findOrCreateAndGet", async () => {
+    let ledger = await createTestLedger();
+
+    let id = HashId.of(randomBytes(64));
+    await ledger.findOrCreate(id);
+    let r = await ledger.getRecord(id);
+
+    assert(r !== null);
+    // assert(id === r.id);
+    assert(ItemState.PENDING === r.state);
+
+    //assertAlmostSame(ZonedDateTime.now(), r.getCreatedAt());
+
+    // returning existing record
+    await ledger.findOrCreate(id);
+    let r1 = await ledger.getRecord(id);
+
+    assertSameRecords(r, r1);
+
+    let r2 = await ledger.getRecord(id);
+
+    assertSameRecords(r, r2);
+
+    let idr = HashId.of(randomBytes(64));
+    let r3 = await ledger.getRecord(idr);
+
+    assert(r3 == null);
+
+    await ledger.close();
+});
+
+unit.test("ledger_test: approve", async () => {
+    let ledger = await createTestLedger();
+
+    let id = HashId.of(randomBytes(64));
+    await ledger.findOrCreate(id);
+    let r1 = await ledger.getRecord(id);
+
+    assert(r1.state !== ItemState.APPROVED);
+
+    await r1.approve();
+
+    assert(ItemState.APPROVED === r1.state);
+
+    assert (r1.state === ItemState.APPROVED);
+
+    await r1.reload();
+
+    assert (r1.state === ItemState.APPROVED);
+
+    /*assertThrows(IllegalStateException.class, () -> {
+        await r1.approve();
+        return null;
+    });*/
+
+    await ledger.close();
+});
