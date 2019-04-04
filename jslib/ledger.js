@@ -143,7 +143,6 @@ class Ledger {
         let r = new StateRecord(this);
         r.state = ItemState.LOCKED_FOR_CREATION;
         r.lockedByRecordId = creatorRecordId;
-        //r.dirty = true;
 
         if (r.id != null && !r.id.equals(newItemHashId))
             throw new ex.IllegalStateError("can't change id of StateRecord");
@@ -151,16 +150,6 @@ class Ledger {
         r.id = newItemHashId;
 
         return r.save();
-    }
-
-    /**
-     * Get the record that owns the lock. This method should only return the record, not analyze it or somehow process. Still
-     * it never returns expired records. Note that <b>caller must clear the lock</b> if this method returns null.
-     *
-     * @param {StateRecord} rc - Locked record.
-     * @return {Promise<StateRecord|null>} the record or null if none found.
-     */
-    getLockOwnerOf(rc) {
     }
 
     /**
@@ -554,34 +543,40 @@ class Ledger {
      * Get the record that owns the lock. This method should only return the record, not analyze it or somehow process. Still
      * it never returns expired records. Note that <b>caller must clear the lock</b> if this method returns null.
      *
-     * @param rc - Locked record.
-     * @return {Promise} the record or null if none found.
+     * @param {StateRecord} record - Locked record.
+     * @return {Promise<StateRecord|null>} the record or null if none found.
      */
-    getLockOwnerOf(rc) {
+    getLockOwnerOf(record) {
         return new Promise((resolve, reject) => {
-            let cached = this.getFromCacheById(rc.lockedByRecordId);
+            let cached = this.getFromCacheById(record.lockedByRecordId);
             if (cached != null)
                 resolve(cached);
             else
                 this.dbPool_.withConnection(con => {
-                    /* StateRecord sr = protect(() ->
-                         dbPool.execute(db -> {
-                             try (ResultSet rs = db.queryRow("SELECT * FROM ledger WHERE id = ? limit 1", rc.getLockedByRecordId())) {
-                                 if (rs == null)
-                                     return null;
-                                 StateRecord r = new StateRecord(this, rs);
-                                 putToCache(r);
-                                 return r;
-                                 e.printStackTrace();
-                                 throw e;
-                             }
-                         })
-                     );
-                     if (sr != null && sr.isExpired()) {
-                         sr.destroy();
-                         return null;
-                     }
-                     return sr;*/
+                    con.executeQuery(qr => {
+                            let row = qr.getRows(1)[0];
+                            con.release();
+
+                            if (row != null) {
+                                let record = StateRecord.initFrom(this, row);
+
+                                if (record.isExpired()) {
+                                    record.destroy();
+                                    resolve(null);
+                                } else {
+                                    this.putToCache(record);
+                                    resolve(record);
+                                }
+                            } else
+                                resolve(null);
+
+                        }, e => {
+                            con.release();
+                            reject(e);
+                        },
+                        "SELECT * FROM ledger WHERE id = ? limit 1",
+                        record.lockedByRecordId
+                    );
                 });
         });
     }

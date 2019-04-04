@@ -140,13 +140,7 @@ unit.test("ledger_test: createOutputLockRecord", async () => {
     assert(r2 == null);
 
     let r3 = await owner.createOutputLockRecord(id);
-
-    assert(r3.recordId === r1.recordId);
-    assert(r3.id.equals(r1.id));
-    assert(r3.state === r1.state);
-    assert(r3.lockedByRecordId === r1.lockedByRecordId);
-    assert(r3.createdAt.getTime() === r1.createdAt.getTime());
-    assert(r3.expiresAt.getTime() === r1.expiresAt.getTime());
+    assert(r3 == null);
 
     assert(await owner.createOutputLockRecord(other.id) == null);
 

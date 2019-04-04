@@ -1,7 +1,7 @@
 const ItemState = {
     /**
      * Bad state, can't process. For example, structure that is not yet initialized. Otherwise, the contract us unknown
-     * to the system, which could be used in the client API calls, to check the state of the exisitng contract.
+     * to the system, which could be used in the client API calls, to check the state of the existing contract.
      */
     UNDEFINED: {val:"UNDEFINED", isPending: false, isPositive: false, isApproved: false, ordinal:0},
     /**
@@ -23,18 +23,18 @@ const ItemState = {
      */
     APPROVED:{val:"APPROVED", isPending: false, isPositive: true, isApproved: true, ordinal:4},
     /**
-     * The item is locked for revokation by some transactoin
+     * The item is locked for revocation by some transaction
      */
     LOCKED:{val:"LOCKED", isPending: false, isPositive: true, isApproved: true, ordinal:5},
     /**
-     * The contract once approved by the netowork is now revoked and is neing kept in archive for approproate time.
-     * Archived signatures are kept only the time needed to prevent some sort of attacks and procees with any support
+     * The contract once approved by the network is now revoked and is being kept in archive for appropriate time.
+     * Archived signatures are kept only the time needed to prevent some sort of attacks and process with any support
      * requests. It could be, for example, 90 days.
      */
     REVOKED : {val:"REVOKED", isPending: false, isPositive: false, isApproved: false, ordinal:6},
     /**
-     * The contract was checked by the netwokr and negative consensus was found. Declined signatures are kept, like
-     * REVOKED contratcs, a limited time and with for the same reasons.
+     * The contract was checked by the network and negative consensus was found. Declined signatures are kept, like
+     * REVOKED contracts, a limited time and with for the same reasons.
      */
     DECLINED : {val:"DECLINED", isPending: false, isPositive: false, isApproved: false, ordinal:7},
     /**
@@ -42,12 +42,18 @@ const ItemState = {
      */
     DISCARDED : {val:"DISCARDED", isPending: false, isPositive: false, isApproved: false, ordinal:8},
     /**
-     * Special state: locked by another mending item that will create and approce this item if approved by the
+     * Special state: locked by another mending item that will create and approve this item if approved by the
      * consensus. This state is separated from others to detect attempt to create same item by different racing items
      * being voted, so only one os them will succeed, as only one of them will succeed to lock for creation its output
      * documents.
      */
-    LOCKED_FOR_CREATION : {val:"LOCKED_FOR_CREATION", isPending: false, isPositive: false, isApproved: false, ordinal:9}
+    LOCKED_FOR_CREATION : {val:"LOCKED_FOR_CREATION", isPending: false, isPositive: false, isApproved: false, ordinal:9},
+
+    /**
+     * Special state: LOCKED_FOR_CREATION item being revoke within the same transaction. This state differs from LOCKED
+     * as the it transfers into UNDEFINED rather than APPROVED in case of transaction rollback.
+     */
+    LOCKED_FOR_CREATION_REVOKED : {val:"LOCKED_FOR_CREATION_REVOKED", isPending: false, isPositive: false, isApproved: false, ordinal:10}
 };
 
 ItemState.byVal = new Map();
@@ -61,6 +67,7 @@ ItemState.byVal.set(ItemState.REVOKED.val,ItemState.REVOKED);
 ItemState.byVal.set(ItemState.DECLINED.val,ItemState.DECLINED);
 ItemState.byVal.set(ItemState.DISCARDED.val,ItemState.DISCARDED);
 ItemState.byVal.set(ItemState.LOCKED_FOR_CREATION.val,ItemState.LOCKED_FOR_CREATION);
+ItemState.byVal.set(ItemState.LOCKED_FOR_CREATION_REVOKED.val,ItemState.LOCKED_FOR_CREATION_REVOKED);
 
 
 ItemState.byOrdinal = new Map();
@@ -74,6 +81,7 @@ ItemState.byOrdinal.set(ItemState.REVOKED.ordinal,ItemState.REVOKED);
 ItemState.byOrdinal.set(ItemState.DECLINED.ordinal,ItemState.DECLINED);
 ItemState.byOrdinal.set(ItemState.DISCARDED.ordinal,ItemState.DISCARDED);
 ItemState.byOrdinal.set(ItemState.LOCKED_FOR_CREATION.ordinal,ItemState.LOCKED_FOR_CREATION);
+ItemState.byOrdinal.set(ItemState.LOCKED_FOR_CREATION_REVOKED.ordinal,ItemState.LOCKED_FOR_CREATION_REVOKED);
 
 
 module.exports = {ItemState};

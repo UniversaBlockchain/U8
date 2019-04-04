@@ -8,7 +8,6 @@ class StateRecord {
             throw new ex.IllegalStateError("connect to null ledger");
 
         this.ledger = ledger;
-        this.dirty = false;
         this.recordId = 0;
         this.lockedByRecordId = 0;
 
@@ -55,22 +54,35 @@ class StateRecord {
         return this.expiresAt != null && this.expiresAt.getTime() < new Date().getTime();
     }
 
-    lockToRevoke(idToRevoke) {
+    /**
+     * Lock the item with a given id as being revoked by this one. Check this state, looks for the record to lock and
+     * also checks its state first.
+     * <p>
+     * Note that the operation is allowed only to the records in {@see ItemState#PENDING}. If the item is already
+     * checked locally and is therefore in PENDING_NEGATIVE or PENDING_POSITIVE state, it can not lock any other items.
+     *
+     * @param {HashId} idToRevoke is id for item should be revoked
+     * @return {StateRecord} locked record id null if it could not be node
+     */
+    async lockToRevoke(idToRevoke) {
         if (this.state !== ItemState.PENDING)
             throw new ex.IllegalStateError("only pending records are allowed to lock others");
 
-        let lockedRecord = this.ledger.getRecord(idToRevoke);
+        let lockedRecord = await this.ledger.getRecord(idToRevoke);
         if (lockedRecord == null)
             return null;
 
+        let targetState = ItemState.LOCKED;
+
         switch (lockedRecord.state) {
-            case ItemState.LOCKED:
-                // if it is locked by us, it's ok
-                if( !this.checkLockedRecord(lockedRecord) )
-                    return null;
-                break;
             case ItemState.APPROVED:
                 // it's ok, we can lock it
+                break;
+            case ItemState.LOCKED_FOR_CREATION:
+                // the only possible situation is that records is locked by us.
+                if (lockedRecord.lockedByRecordId !== this.recordId)
+                    return null;
+                targetState = ItemState.LOCKED_FOR_CREATION_REVOKED;
                 break;
             default:
                 // wrong state, can't lock it
@@ -78,48 +90,22 @@ class StateRecord {
         }
 
         lockedRecord.lockedByRecordId = this.recordId;
-        lockedRecord.state = ItemState.LOCKED;
-        lockedRecord.save();
+        lockedRecord.state = targetState;
+        await lockedRecord.save();
 
         return lockedRecord;
     }
 
-    checkLockedRecord(lockedRecord) {
-        // It is locked bu us
-
-        if(lockedRecord.lockedByRecordId === this.recordId )
-            return true;
-
-        let currentOwner = this.ledger.getLockOwnerOf(lockedRecord);
-        // we can acquire the lock - it is dead
-        if( currentOwner == null )
-            return true;
-
-        // valid lock
-        if( currentOwner.state.isPending )
-            return false;
-
-        // This section process data structure errors than can opccur due to unhandled exceptions, data corruption and like
-        // in a safe manner:
-
-        // The locker is bad?
-        if( currentOwner.state === ItemState.DECLINED || currentOwner.state === ItemState.DISCARDED )
-            return true;
-
-        // report inconsistent data. We are not 100% sure this lock could be reacquired, further exploration
-        // needed. As for now, we can't lock it.
-        return false;
-    }
-
-    unlock() {
+    async unlock() {
         switch (this.state) {
             case ItemState.LOCKED:
                 this.state = ItemState.APPROVED;
                 this.lockedByRecordId = 0;
-                this.save();
+                await this.save();
                 break;
             case ItemState.LOCKED_FOR_CREATION:
-                this.destroy();
+            case ItemState.LOCKED_FOR_CREATION_REVOKED:
+                await this.destroy();
                 break;
             default:
                 break;
@@ -127,41 +113,32 @@ class StateRecord {
         return this;
     }
 
-    revoke() {
+    async revoke() {
         if (this.state === ItemState.LOCKED) {
             this.state = ItemState.REVOKED;
-            this.save();
-        } else {
+            await this.save();
+        } else
             throw new ex.IllegalStateError("can't archive record that is not in the locked state");
-        }
-
     }
 
-    approve() {
+    async approve() {
         if (this.state.isPending) {
             this.state = ItemState.APPROVED;
-            this.save();
+            await this.save();
         } else
             throw new ex.IllegalStateError("attempt to approve record that is not pending: " + state);
-
     }
 
-    async createOutputLockRecord(id) {
+    async createOutputLockRecord(idToCreate) {
         if (this.recordId === 0)
             throw new ex.IllegalStateError("the record must be created");
         if (this.state !== ItemState.PENDING)
             throw new ex.IllegalStateError("wrong state to createOutputLockRecord: " + state);
 
-        let newRecord = await this.ledger.getRecord(id);
-        if (newRecord != null) {
-            // if it is not locked for approval - failure
-            if (newRecord.state !== ItemState.LOCKED_FOR_CREATION)
-                return null;
-            // it it is locked by us, ok
-            return newRecord.lockedByRecordId === this.recordId ? newRecord : null;
-        }
+        if (await this.ledger.getRecord(idToCreate) != null)
+            return null;
 
-        return this.ledger.createOutputLockRecord(this.recordId, id);
+        return this.ledger.createOutputLockRecord(this.recordId, idToCreate);
     }
 
     markTestRecord() {
