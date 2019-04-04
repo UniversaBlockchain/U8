@@ -207,8 +207,6 @@ class Ledger {
                 );
 
                 console.log("Finish");
-
-                con.release();
             });
         });
     }
