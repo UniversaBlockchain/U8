@@ -66,7 +66,10 @@ namespace db {
     }
 
     int QueryResult::getAffectedRows() {
-        return std::stoi(PQcmdTuples(pgRes_.get()));
+        char* s = PQcmdTuples(pgRes_.get());
+        if (strlen(s) == 0)
+            return 0;
+        return std::stoi(s);
     }
 
     byte_vector QueryResult::getValueByIndex(int rowNum, int colIndex) {

@@ -382,7 +382,7 @@ class Ledger {
     transaction(block) {
         return new Promise((resolve, reject) => {
             this.dbPool_.withConnection(async(con) => {
-                con.executeQuery(qr => {},
+                con.executeUpdate(affectedRows => {},
                     e => {
                         con.release();
                         reject(e);
@@ -411,7 +411,7 @@ class Ledger {
                     return;
                 }
 
-                con.executeQuery(qr => {
+                con.executeUpdate(affectedRows => {
                         con.release();
                         resolve();
                     },
