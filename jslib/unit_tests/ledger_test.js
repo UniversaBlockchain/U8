@@ -34,7 +34,7 @@ unit.test("ledger_test: hello", async () => {
 unit.test("ledger_test: ledgerBenchmark", async () => {
     let ledger = await createTestLedger();
     console.log();
-    let nIds = 400 * 32;
+    let nIds = 4;
     console.log("prepare hashes...");
     let hashes = [];
     for (let i = 0; i < nIds; ++i)
@@ -441,22 +441,26 @@ unit.test("ledger_test: recordExpiration", async () => {
     let r = await ledger.getRecord(hashId);
 
     assert(r.expiresAt != null);
-    //assert(r.getExpiresAt().isAfter(ZonedDateTime.now()));
+    assert(r.expiresAt.getTime() > Date.now());
 
-    let recordId = r.recordId;
+    //let recordId = r.recordId;
 
-    //let inFuture = ZonedDateTime.now().plusHours(2);
-    //r.expiresAt = inFuture;
+    let inFuture = new Date();
+    inFuture.setTime((Math.floor(inFuture.getTime() / 1000) + 7200) * 1000);
+    inFuture.setMilliseconds(0);
+
+    r.expiresAt = inFuture;
 
     let r1 = await ledger.getRecord(hashId);
-    //assert(r1.getExpiresAt() !== inFuture);
+   // assert(r1.expiresAt !== inFuture);
 
     await r.save();
 
     r1 = await ledger.getRecord(hashId);
-    //assertAlmostSame(r.getExpiresAt(), r1.getExpiresAt());
+    assert(r.expiresAt === r1.expiresAt);//assertAlmostSame(r.getExpiresAt(), r1.getExpiresAt());
 
-    //r.setExpiresAt(ZonedDateTime.now().minusHours(1));
+    r.expiresAt.setTime((Math.floor(inFuture.getTime() / 1000) - 3600) * 1000);
+    r.expiresAt.setMilliseconds(0);
     await r.save();
 
     r1 = await ledger.getRecord(hashId);
@@ -503,22 +507,155 @@ unit.test("ledger_test: approve", async () => {
     await ledger.findOrCreate(id);
     let r1 = await ledger.getRecord(id);
 
-    assert(r1.state !== ItemState.APPROVED);
+    assert(!r1.state.isApproved);
 
     await r1.approve();
 
     assert(ItemState.APPROVED === r1.state);
 
-    assert (r1.state === ItemState.APPROVED);
+    assert(r1.state.isApproved);
 
     await r1.reload();
 
-    assert (r1.state === ItemState.APPROVED);
+    assert(r1.state.isApproved);
 
     /*assertThrows(IllegalStateException.class, () -> {
         await r1.approve();
         return null;
     });*/
+
+    await ledger.close();
+});
+
+unit.test("ledger_test: revoke", async () => {
+    let ledger = await createTestLedger();
+
+    let id = HashId.of(randomBytes(64));
+    await ledger.findOrCreate(id);
+    let r1 = await ledger.getRecord(id);
+
+    assert(!r1.isApproved);
+    assert(r1.state.isPending);
+    assert(ItemState.REVOKED !== r1.state);
+
+    await r1.approve();
+    await r1.reload();
+
+    assert(r1.state.isApproved);
+    assert(!r1.state.isPending);
+    assert(ItemState.REVOKED !== r1.state);
+
+    r1.state = ItemState.LOCKED;
+    await r1.revoke();
+
+    assert(!r1.state.isPending);
+    assert(!r1.state.isApproved);
+    assert(ItemState.REVOKED === r1.state);
+
+    await ledger.close();
+});
+
+unit.test("ledger_test: saveAndTransaction", async () => {
+    let ledger = await createTestLedger();
+
+    let hash = HashId.of(randomBytes(64));
+    await ledger.findOrCreate(hash);
+    let r1 = await ledger.getRecord(hash);
+
+    let hash1 = HashId.of(randomBytes(64));
+    await ledger.findOrCreate(hash1);
+    let r2 = await ledger.getRecord(hash1);
+
+    await ledger.transaction(async() => {
+        r1.state = ItemState.APPROVED;
+        r2.state = ItemState.DECLINED;
+        await r1.save();
+        await r2.save();
+    });
+
+     await r1.reload();
+
+    let r3 = await ledger.getRecord(r1.id);
+
+    assert(ItemState.APPROVED === r1.state);
+    assert(ItemState.APPROVED === r3.state);
+
+    await r2.reload();
+
+    assert(ItemState.DECLINED === r2.state);
+
+    try {
+        await ledger.transaction(async () => {
+            r1.state = ItemState.REVOKED;
+            r2.state = ItemState.DISCARDED;
+            await r1.save();
+            await r2.save();
+            throw new ex.IllegalStateError("test_saveAndTransaction");
+            //throw new Ledger.Rollback();
+        });
+    } catch (e) {
+        assert(e.message === "test_saveAndTransaction");
+    }
+
+    await r1.reload();
+
+    assert(ItemState.APPROVED === r1.state);
+
+    await r2.reload();
+
+    assert(ItemState.DECLINED === r2.state);
+
+    await ledger.close();
+});
+
+unit.test("ledger_test: ledgerCleanupTest", async () => {
+   let ledger = await createTestLedger();
+
+   /*  //Contract contract = new Contract(TestKeys.privateKey(0));
+    //contract.seal();
+
+    StateRecord r = ledger.findOrCreate(contract.getId());
+
+
+    r.setExpiresAt(ZonedDateTime.now().minusSeconds(1));
+    r.save();
+    ledger.putItem(r,contract,Instant.now().plusSeconds(300));
+
+    HashId hash1 = contract.getId();
+
+    contract = new Contract(TestKeys.privateKey(0));
+    contract.seal();
+    r = ledger.findOrCreate(contract.getId());
+    r.setExpiresAt(ZonedDateTime.now().plusMonths(1));
+    r.save();
+    ledger.putItem(r,contract,Instant.now().minusSeconds(1));
+
+    HashId hash2 = contract.getId();
+
+    ledger.cleanup(false);
+
+
+    PreparedStatement st = ledger.getDb().statement("select count(*) from ledger where hash = ?", hash1.getDigest());
+
+    try(ResultSet rs = st.executeQuery()) {
+        assertTrue(rs.next());
+        assertEquals(rs.getInt(1),0);
+    }
+
+
+    st = ledger.getDb().statement("select count(*) from ledger where hash = ?", hash2.getDigest());
+
+    try(ResultSet rs = st.executeQuery()) {
+        assertTrue(rs.next());
+        assertEquals(rs.getInt(1),1);
+    }
+
+    st = ledger.getDb().statement("select count(*) from items where id in (select id from ledger where hash = ?)", hash2.getDigest());
+
+    try(ResultSet rs = st.executeQuery()) {
+        assertTrue(rs.next());
+        assertEquals(rs.getInt(1),0);
+    }*/
 
     await ledger.close();
 });
