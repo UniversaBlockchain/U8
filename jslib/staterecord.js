@@ -168,12 +168,12 @@ class StateRecord {
         return this;
     }
 
-    save() {
-        return this.ledger.save(this);
+    save(con) {
+        return this.ledger.save(this, con);
     }
 
-    destroy() {
-        return this.ledger.destroy(this);
+    destroy(con) {
+        return this.ledger.destroy(this, con);
     }
 }
 

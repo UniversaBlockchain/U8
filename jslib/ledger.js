@@ -390,12 +390,11 @@ class Ledger {
                     "BEGIN;"
                 );
 
+                let result = null;
+
                 try {
-                    this.transactionConn = con;
-                    await block();
-                    this.transactionConn = null;
+                    result = await block(con);
                 } catch (err) {
-                    this.transactionConn = null;
 
                     con.executeQuery(qr => {
                             con.release();
@@ -413,7 +412,7 @@ class Ledger {
 
                 con.executeUpdate(affectedRows => {
                         con.release();
-                        resolve();
+                        resolve(result);
                     },
                     e => {
                         con.release();
@@ -429,17 +428,18 @@ class Ledger {
      * Destroy the record and free space in the ledger.
      *
      * @param {StateRecord} record - StateRecord to destroy.
+     * @param {db.SqlDriverConnection} connection - transaction connection for destroy record. Optional.
      * @return {Promise} resolved when record destroyed.
      */
-    destroy(record) {
+    destroy(record, connection) {
         if (record.recordId === 0)
             throw new ex.IllegalStateError("can't destroy record without recordId");
 
         this.cachedRecords.delete(record.id);
         this.cachedRecordsById.delete(record.recordId);
 
-        if (this.transactionConn != null)
-            return this.transactionDestroy(record);
+        if (connection !== undefined)
+            return this.transactionDestroy(record, connection);
 
         return new Promise((resolve, reject) => {
             this.dbPool_.withConnection(con => {
@@ -476,15 +476,16 @@ class Ledger {
      * Destroy the record in the ledger in opened transaction.
      *
      * @param {StateRecord} record - StateRecord to destroy.
+     * @param {db.SqlDriverConnection} connection - transaction connection for destroy record.
      * @return {Promise} resolved when record destroyed.
      */
-    transactionDestroy(record) {
+    transactionDestroy(record, connection) {
         return new Promise((resolve, reject) => {
-            this.transactionConn.executeUpdate(qr => {
-                    this.transactionConn.release();
+            connection.executeUpdate(qr => {
+                    connection.release();
                     resolve();
                 }, e => {
-                    this.transactionConn.release();
+                    connection.release();
                     reject(e);
                 },
                 "DELETE FROM items WHERE id = ?;",
@@ -492,11 +493,11 @@ class Ledger {
             );
         }).then(() => {
             return new Promise((resolve, reject) => {
-                this.transactionConn.executeUpdate(qr => {
-                        this.transactionConn.release();
+                connection.executeUpdate(qr => {
+                        connection.release();
                         resolve();
                     }, e => {
-                        this.transactionConn.release();
+                        connection.release();
                         reject(e);
                     },
                     "DELETE FROM ledger WHERE id = ?;",
@@ -510,16 +511,17 @@ class Ledger {
      * Save a record into the ledger.
      *
      * @param {StateRecord} record - StateRecord to save.
+     * @param {db.SqlDriverConnection} connection - transaction connection for save record. Optional.
      * @return {Promise<StateRecord>} resolved when record saved.
      */
-    save(record) {
+    save(record, connection) {
         if (record.ledger == null) {
             record.ledger = this;
         } else if (record.ledger !== this)
             throw new ex.IllegalStateError("can't save with a different ledger (make a copy!)");
 
-        if (this.transactionConn != null)
-            return this.transactionSave(record);
+        if (connection != null)
+            return this.transactionSave(record, connection);
 
         if (record.recordId === 0)
             return new Promise((resolve, reject) => {
@@ -571,14 +573,15 @@ class Ledger {
      * Save a record into the ledger in opened transaction.
      *
      * @param {StateRecord} record - StateRecord to save.
+     * @param {db.SqlDriverConnection} connection - transaction connection for save record.
      * @return {Promise<StateRecord>} resolved when record saved.
      */
-    transactionSave(record) {
+    transactionSave(record, connection) {
         if (record.recordId === 0)
             return new Promise((resolve, reject) => {
-                this.transactionConn.executeQuery(qr => {
+                connection.executeQuery(qr => {
                         let row = qr.getRows(1)[0];
-                        this.transactionConn.release();
+                        connection.release();
 
                         if (row != null && row[0] != null)
                             record.recordId = row[0];
@@ -587,7 +590,7 @@ class Ledger {
 
                         resolve(record);
                     }, e => {
-                        this.transactionConn.release();
+                        connection.release();
                         reject(e);
                     },
                     "insert into ledger(hash, state, created_at, expires_at, locked_by_id) values(?,?,?,?,?) RETURNING id;",
@@ -600,11 +603,11 @@ class Ledger {
             });
         else
             return new Promise((resolve, reject) => {
-                this.transactionConn.executeUpdate(qr => {
-                        this.transactionConn.release();
+                connection.executeUpdate(qr => {
+                        connection.release();
                         resolve(record);
                     }, e => {
-                        this.transactionConn.release();
+                        connection.release();
                         reject(e);
                     },
                     "update ledger set state=?, expires_at=?, locked_by_id=? where id=?",

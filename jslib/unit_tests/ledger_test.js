@@ -366,15 +366,18 @@ unit.test("ledger_test: transaction", async () => {
     let r2 = await ledger.getRecord(hash2);
     let r3 = await ledger.getRecord(hash3);
 
-    await ledger.transaction(async() => {
-        await r0.destroy();
+    let x = await ledger.transaction(async(con) => {
+        await r0.destroy(con);
         r1.state = ItemState.APPROVED;
         r2.state = ItemState.DECLINED;
         r3.state = ItemState.LOCKED_FOR_CREATION;
-        await r1.save();
-        await r2.save();
-        await r3.save();
+        await r1.save(con);
+        await r2.save(con);
+        await r3.save(con);
+        return 55;
     });
+
+    assert(x === 55);
 
     r0 = await ledger.getRecord(hash0);
     assert(r0 == null);
@@ -405,15 +408,15 @@ unit.test("ledger_test: rollback transaction", async () => {
     let r3 = await ledger.getRecord(hash3);
 
     try {
-        await ledger.transaction(async() => {
-            await r0.destroy();
+        await ledger.transaction(async(con) => {
+            await r0.destroy(con);
             r1.state = ItemState.APPROVED;
             r2.state = ItemState.DECLINED;
             r3.state = ItemState.LOCKED_FOR_CREATION;
-            await r1.save();
-            await r2.save();
+            await r1.save(con);
+            await r2.save(con);
             throw new ex.IllegalStateError("TEST_EXCEPTION");
-            await r3.save();
+            await r3.save(con);
         });
     } catch (e) {
         assert(e.message === "TEST_EXCEPTION");
@@ -427,6 +430,66 @@ unit.test("ledger_test: rollback transaction", async () => {
     assert(r1.state !== ItemState.APPROVED);
     assert(r2.state !== ItemState.DECLINED);
     assert(r3.state !== ItemState.LOCKED_FOR_CREATION);
+
+    await ledger.close();
+});
+
+unit.test("ledger_test: multi-threading transactions", async () => {
+    let ledger = await createTestLedger();
+
+    let hash0 = HashId.of(randomBytes(64));
+    let hash1 = HashId.of(randomBytes(64));
+    let hash2 = HashId.of(randomBytes(64));
+    let hash3 = HashId.of(randomBytes(64));
+    await ledger.findOrCreate(hash0);
+    await ledger.findOrCreate(hash1);
+    await ledger.findOrCreate(hash2);
+    await ledger.findOrCreate(hash3);
+    let r0 = await ledger.getRecord(hash0);
+    let r1 = await ledger.getRecord(hash1);
+    let r2 = await ledger.getRecord(hash2);
+    let r3 = await ledger.getRecord(hash3);
+
+    let promises = [];
+
+    promises.push(ledger.transaction(async(con) => {
+        await r0.destroy(con);
+        return 0;
+    }));
+
+    promises.push(ledger.transaction(async(con) => {
+        r1.state = ItemState.APPROVED;
+        await r1.save(con);
+        return 11;
+    }));
+
+    promises.push(ledger.transaction(async(con) => {
+        r2.state = ItemState.DECLINED;
+        await r2.save(con);
+        return 22;
+    }));
+
+    promises.push(ledger.transaction(async(con) => {
+        r3.state = ItemState.LOCKED_FOR_CREATION;
+        await r3.save(con);
+        return 33;
+    }));
+
+    let results = await Promise.all(promises);
+
+    assert(results[0] === 0);
+    assert(results[1] === 11);
+    assert(results[2] === 22);
+    assert(results[3] === 33);
+
+    r0 = await ledger.getRecord(hash0);
+    assert(r0 == null);
+    await r1.reload();
+    await r2.reload();
+    await r3.reload();
+    assert(r1.state === ItemState.APPROVED);
+    assert(r2.state === ItemState.DECLINED);
+    assert(r3.state === ItemState.LOCKED_FOR_CREATION);
 
     await ledger.close();
 });
@@ -566,11 +629,11 @@ unit.test("ledger_test: saveAndTransaction", async () => {
     await ledger.findOrCreate(hash1);
     let r2 = await ledger.getRecord(hash1);
 
-    await ledger.transaction(async() => {
+    await ledger.transaction(async(con) => {
         r1.state = ItemState.APPROVED;
         r2.state = ItemState.DECLINED;
-        await r1.save();
-        await r2.save();
+        await r1.save(con);
+        await r2.save(con);
     });
 
      await r1.reload();
@@ -585,11 +648,11 @@ unit.test("ledger_test: saveAndTransaction", async () => {
     assert(ItemState.DECLINED === r2.state);
 
     try {
-        await ledger.transaction(async () => {
+        await ledger.transaction(async(con) => {
             r1.state = ItemState.REVOKED;
             r2.state = ItemState.DISCARDED;
-            await r1.save();
-            await r2.save();
+            await r1.save(con);
+            await r2.save(con);
             throw new ex.IllegalStateError("test_saveAndTransaction");
             //throw new Ledger.Rollback();
         });
