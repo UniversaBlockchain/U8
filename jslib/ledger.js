@@ -838,8 +838,49 @@ class Ledger {
     removeNode(nodeInfo) {}
     findUnfinished() {}
 
-    getItem(record) {}
-    putItem(record, item, keepTill) {}
+    getItem(record) {
+        return new Promise((resolve, reject) => {
+            this.dbPool_.withConnection(con => {
+                con.executeQuery(qr => {
+                        let row = qr.getRows(1)[0];
+                        con.release();
+
+                        if (row != null && row[0] != null)
+                            resolve(Contract.fromPackedTransaction(row[0]));
+                        else
+                            resolve(null);
+                    }, e => {
+                        con.release();
+                        reject(e);
+                    },
+                    "select packed from items where id = ?",
+                    record.recordId
+                );
+            });
+        });
+    }
+
+    putItem(record, item, keepTill) {
+        if (!item instanceof Contract)
+            return;
+
+        return new Promise((resolve, reject) => {
+            this.dbPool_.withConnection(con => {
+                con.executeUpdate(qr => {
+                        con.release();
+                        resolve();
+                    }, e => {
+                        con.release();
+                        reject(e);
+                    },
+                    "insert into items(id,packed,keepTill) values(?,?,?);",
+                    record.recordId,
+                    item.getPackedTransaction(),
+                    Math.floor(keepTill.getTime() / 1000)
+                );
+            });
+        });
+    }
 
     getKeepingItem(itemId) {}
     putKeepingItem(record, item) {}

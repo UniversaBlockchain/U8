@@ -1887,6 +1887,46 @@ class Contract extends bs.BiSerializable {
 
         return new Contract().initializeWithDsl(root);
     }
+
+    /**
+     * Main .unicon read routine. Load any .unicon version and construct a linked Contract with counterparts (new and
+     * revoking items if present) and corresponding {@see TransactionPack} instance to pack it to store or send to
+     * approval.
+     * <p>
+     * The supported file variants are:
+     * <p>
+     * - v2 legacy unicon. Is loaded with packed counterparts if any. Only for compatibility, avoid using it.
+     * <p>
+     * - v3 compacted unicon. Is loaded without counterparts, should be added later if need with {@see #newItems}
+     * and {@see #revokingItems}. This is a good way to keep the long
+     * contract chain.
+     * <p>
+     * - v4 compacted unicon with arithmetical expressions in constraints.
+     * <p>
+     * - packed {@see TransactionPack}. This is a preferred way to keep current contract state.
+     * <p>
+     * To pack and write corresponding .unicon file use {@see #getPackedTransaction}.
+     *
+     * @param packedItem some packed from of the universa contract
+     * @return unpacked {@see Contract}
+     */
+    static fromPackedTransaction(packedItem) {
+        let tp = TransactionPack.unpack(packedItem);
+        return tp.contract;
+    }
+
+    /**
+     * Pack the contract to the most modern .unicon format, same as {@see TransactionPack#pack}. Uses bounded
+     * {@see TransactionPack} instance to save together the contract, revoking and new items (if any). This is a binary
+     * format using to submit for approval. Use {@see #fromPackedTransaction} to read this format.
+     *
+     * @return packed binary form.
+     */
+    getPackedTransaction() {
+        if (this.transactionPack == null)
+            this.transactionPack = new TransactionPack(this);
+        return this.transactionPack.pack();
+    }
 }
 
 
