@@ -2,6 +2,7 @@ import {expect, unit, assert, assertSilent} from 'test'
 import {Ledger} from 'ledger'
 import {HashId} from 'crypto'
 import {randomBytes} from 'tools'
+import * as tk from 'unit_tests/test_keys'
 
 const ItemState = require("itemstate").ItemState;
 const ex = require("exceptions");
@@ -167,6 +168,23 @@ unit.test("ledger_test: createOutputLockRecord", async () => {
 });
 
 function getTestRecordsCount(ledger, hashId) {
+    return new Promise((resolve, reject) => {
+        ledger.dbPool_.withConnection(con => {
+            con.executeQuery(qr => {
+                    con.release();
+                    resolve(Number(qr.getRows(1)[0][0]));
+                }, e => {
+                    con.release();
+                    reject(e);
+                },
+                "select count(*) from ledger_testrecords where hash = ?",
+                hashId.digest
+            );
+        });
+    });
+}
+
+function getRecordsCount(ledger, hashId) {
     return new Promise((resolve, reject) => {
         ledger.dbPool_.withConnection(con => {
             con.executeQuery(qr => {
@@ -509,8 +527,6 @@ unit.test("ledger_test: recordExpiration", async () => {
     assert(r.expiresAt != null);
     assert(r.expiresAt.getTime() > Date.now());
 
-    //let recordId = r.recordId;
-
     let inFuture = new Date();
     inFuture.setTime((Math.floor(inFuture.getTime() / 1000) + 7200) * 1000);
     inFuture.setMilliseconds(0);
@@ -525,7 +541,7 @@ unit.test("ledger_test: recordExpiration", async () => {
     r1 = await ledger.getRecord(hashId);
     assert(r.expiresAt === r1.expiresAt);//assertAlmostSame(r.getExpiresAt(), r1.getExpiresAt());
 
-    r.expiresAt.setTime((Math.floor(inFuture.getTime() / 1000) - 3600) * 1000);
+    r.expiresAt.setTime((Math.floor(r.expiresAt.getTime() / 1000) - 3600) * 1000);
     r.expiresAt.setMilliseconds(0);
     await r.save();
 
@@ -585,10 +601,16 @@ unit.test("ledger_test: approve", async () => {
 
     assert(r1.state.isApproved);
 
-    /*assertThrows(IllegalStateException.class, () -> {
+   /* try {
         await r1.approve();
-        return null;
-    });*/
+        throw new ex.IllegalStateError("TEST_EXCEPTION_approve");
+    } catch (e) {
+        if (e.name === "IllegalStateError") {
+            assert(e.message === "TEST_EXCEPTION_approve");
+        } else {
+            throw e;
+        }
+    }*/
 
     await ledger.close();
 });
@@ -639,7 +661,7 @@ unit.test("ledger_test: saveAndTransaction", async () => {
         await r2.save(con);
     });
 
-     await r1.reload();
+    await r1.reload();
 
     let r3 = await ledger.getRecord(r1.id);
 
@@ -657,7 +679,6 @@ unit.test("ledger_test: saveAndTransaction", async () => {
             await r1.save(con);
             await r2.save(con);
             throw new ex.IllegalStateError("test_saveAndTransaction");
-            //throw new Ledger.Rollback();
         });
     } catch (e) {
         assert(e.message === "test_saveAndTransaction");
@@ -675,53 +696,59 @@ unit.test("ledger_test: saveAndTransaction", async () => {
 });
 
 unit.test("ledger_test: ledgerCleanupTest", async () => {
-   let ledger = await createTestLedger();
+    let ledger = await createTestLedger();
 
-   /*  //Contract contract = new Contract(TestKeys.privateKey(0));
-    //contract.seal();
+    let privateKey = tk.TestKeys.getKey();
+    let contract = Contract.fromPrivateKey(privateKey); //!
+    await contract.seal();
 
-    StateRecord r = ledger.findOrCreate(contract.getId());
+    let hash = contract.id;
+    await ledger.findOrCreate(hash);
+    let r = await ledger.getRecord(hash);
 
+    r.expiresAt.setTime((Math.floor(r.expiresAt.getTime() / 1000) - 1) * 1000);
 
-    r.setExpiresAt(ZonedDateTime.now().minusSeconds(1));
-    r.save();
-    ledger.putItem(r,contract,Instant.now().plusSeconds(300));
+    await r.save();
 
-    HashId hash1 = contract.getId();
+ /*   //ledger.putItem(r,contract,Instant.now().plusSeconds(300)); //!!
 
-    contract = new Contract(TestKeys.privateKey(0));
-    contract.seal();
-    r = ledger.findOrCreate(contract.getId());
-    r.setExpiresAt(ZonedDateTime.now().plusMonths(1));
-    r.save();
-    ledger.putItem(r,contract,Instant.now().minusSeconds(1));
+    let hash1 = contract.id;
 
-    HashId hash2 = contract.getId();
+    contract = Contract.fromPrivateKey(privateKey);
+    await contract.seal();
 
-    ledger.cleanup(false);
+    r = await ledger.findOrCreate(contract.id);
 
+    r.expiresAt.setTime((Math.floor(r.expiresAt.getTime() / 1000) + 2592000) * 1000);
 
-    PreparedStatement st = ledger.getDb().statement("select count(*) from ledger where hash = ?", hash1.getDigest());
+    await r.save();
+    
+    //await ledger.putItem(r,contract,Instant.now().minusSeconds(1));
 
-    try(ResultSet rs = st.executeQuery()) {
-        assertTrue(rs.next());
-        assertEquals(rs.getInt(1),0);
-    }
+    let hash2 = contract.id;
 
+    await ledger.cleanup(false);
 
-    st = ledger.getDb().statement("select count(*) from ledger where hash = ?", hash2.getDigest());
+    assert(await getRecordsCount(ledger, hash1) === 0);
 
-    try(ResultSet rs = st.executeQuery()) {
-        assertTrue(rs.next());
-        assertEquals(rs.getInt(1),1);
-    }
+    assert(await getRecordsCount(ledger, hash2) === 1);
 
-    st = ledger.getDb().statement("select count(*) from items where id in (select id from ledger where hash = ?)", hash2.getDigest());
+    let st = new Promise((resolve, reject) => {
+        ledger.dbPool_.withConnection(con => {
+            con.executeQuery(qr => {
+                    con.release();
+                    resolve(Number(qr.getRows(1)[0][0]));
+                }, e => {
+                    con.release();
+                    reject(e);
+                },
+                "select count(*) from items where id in (select id from ledger where hash = ?)",
+                hash2.digest
+            );
+        });
+    });
 
-    try(ResultSet rs = st.executeQuery()) {
-        assertTrue(rs.next());
-        assertEquals(rs.getInt(1),0);
-    }*/
+    assert(st === false);*/
 
     await ledger.close();
 });

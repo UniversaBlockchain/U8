@@ -826,7 +826,23 @@ class Ledger {
     updateStorageExpiresAt(storageId, expiresAt) {}
     saveFollowerEnvironment(environmentId, expiresAt, mutedAt, spent, startedCallbacks) {}
 
-    updateNameRecord(id, expiresAt) {}
+    updateNameRecord(nameRecordId, expiresAt) {
+        return new Promise((resolve, reject) => {
+            this.dbPool_.withConnection(con => {
+                con.executeUpdate(qr => {
+                        con.release();
+                        resolve();
+                    }, e => {
+                        con.release();
+                        reject(e);
+                    },
+                    "UPDATE name_storage SET expires_at = ? WHERE id = ?",
+                    Math.floor(expiresAt.getTime() / 1000),
+                    nameRecordId
+                );
+            });
+        });
+    }
 
     saveEnvironment(environment) {}
 
@@ -894,7 +910,23 @@ class Ledger {
 
     saveContractInStorage(contractId, binData, expiresAt, origin, environmentId) {}
 
-    saveSubscriptionInStorage(hashId, subscriptionOnChain, expiresAt, environmentId) {}
+    saveSubscriptionInStorage(hashId, subscriptionOnChain, expiresAt, environmentId) {
+        return new Promise((resolve, reject) => {
+            this.dbPool_.withConnection(con => {
+                con.executeUpdate(qr => {
+                        con.release();
+                        resolve();
+                    }, e => {
+                        con.release();
+                        reject(e);
+                    },
+                    "INSERT INTO contract_subscription (hash_id, subscription_on_chain, expires_at, environment_id) VALUES(?,?,?,?) RETURNING id",
+                    hashId.digest,
+                    nameRecordId
+                );
+            });
+        });
+    }
 
     getSubscriptionEnviromentIds(id) {}
 
@@ -905,8 +937,52 @@ class Ledger {
     updateFollowerCallbackState(id, state) {}
     removeFollowerCallback(id) {}
 
-    clearExpiredStorages() {}
-    clearExpiredSubscriptions() {}
+    clearExpiredStorages() {
+  /*      try (PooledDb db = dbPool.db()) {
+            try (
+                PreparedStatement statement =
+                db.statement("INSERT INTO contract_subscription (hash_id, subscription_on_chain, expires_at, environment_id) VALUES(?,?,?,?) RETURNING id")
+        ) {
+                statement.setBytes(1, hashId.getDigest());
+                statement.setBoolean(2, subscriptionOnChain);
+                statement.setLong(3, Ut.unixTime(expiresAt));
+                statement.setLong(4, environmentId);
+                statement.closeOnCompletion();
+                ResultSet rs = statement.executeQuery();
+                if (rs == null)
+                    throw new Failure("saveSubscriptionInStorage failed: returning null");
+                rs.next();
+                long resId = rs.getLong(1);
+                rs.close();
+                return resId;
+            }
+        } catch (SQLException se) {
+            se.printStackTrace();
+            throw new Failure("saveSubscriptionInStorage failed: " + se);
+        } catch (Exception e) {
+            e.printStackTrace();
+            return 0;
+        }*/
+    }
+
+    clearExpiredSubscriptions() {
+        return new Promise((resolve, reject) => {
+            this.dbPool_.withConnection(con => {
+                con.executeUpdate(qr => {
+                        con.release();
+                        resolve();
+                    }, e => {
+                        con.release();
+                        reject(e);
+                    },
+                    "DELETE FROM contract_subscription WHERE expires_at < ?",
+                    Math.floor(Date.now() / 1000)
+                );
+            });
+        });
+    }
+
+
     clearExpiredStorageContractBinaries() {}
 
     getSmartContractById(smartContractId) {}
