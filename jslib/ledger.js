@@ -350,23 +350,15 @@ class Ledger {
     }
 
     /**
-     * Shortcut method: check that record exists and its state returns {@link ItemState#isApproved()}}. Check it to
+     * Shortcut method: check that record exists and its state returns {@link ItemState}. Check it to
      * ensure its meaning.
      *
-     * @param {HashId} id - HashId for checking item.
+     * @param {HashId} itemId - HashId for checking item.
      * @return true if it is.
      */
-    isApproved(id) {
-    }
-
-    /**
-     * Shortcut method: check that record exists and its state returns {@link ItemState#isConsensusFound()}}. Check it to
-     * ensure its meaning.
-     *
-     * @param {HashId} id - HashId for checking item.
-     * @return true if it is.
-     */
-    isConsensusFound(id) {
+    async isApproved(itemId) {
+        let r = await this.getRecord(id);
+        return r != null && r.state.isApproved;
     }
 
     /**
@@ -739,18 +731,64 @@ class Ledger {
     }
 
     savePayment(amount, date) {
+        return new Promise((resolve, reject) => {
+            this.dbPool_.withConnection(con => {
+                con.executeUpdate(qr => {
+                        con.release();
+                        resolve();
+                    }, e => {
+                        con.release();
+                        reject(e);
+                    },
+                    "insert into payments_summary (amount,date) VALUES (?,?) ON CONFLICT (date) DO UPDATE SET amount = payments_summary.amount + excluded.amount",
+                    amount,
+                    Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()) / 1000
+                );
+            });
+        });
     }
 
     getPayments(fromDate) {
+        return new Promise((resolve, reject) => {
+            this.dbPool_.withConnection(con => {
+                con.executeQuery(qr => {
+                        let payments = new Map();
+                        let count = qr.getRowsCount();
+                        while (count > 0) {
+                            let rows;
+                            if (count > 1024) {
+                                rows = qr.getRows(1024);
+                                count -= 1024;
+                            } else {
+                                rows = qr.getRows(count);
+                                count = 0;
+                            }
+
+                            for (let i = 0; i < rows.length; i++)
+                                if (rows[i] != null)
+                                    payments.set(rows[i][0], rows[i][1]);
+                        }
+
+                        con.release();
+                        resolve(payments);
+                    }, e => {
+                        con.release();
+                        reject(e);
+                    },
+                    "SELECT date, amount FROM payments_summary where date >= ?;",
+                    Date.UTC(fromDate.getUTCFullYear(), fromDate.getUTCMonth(), fromDate.getUTCDate()) / 1000
+                );
+            });
+        });
     }
 
     /**
      * Marks the specified item as a test.
      *
-     * @param {HashId} hash - Item HashId.
+     * @param {HashId} itemId - Item HashId.
      * @return {Promise}.
      */
-    markTestRecord(hash){
+    markTestRecord(itemId) {
         return new Promise((resolve, reject) => {
             this.dbPool_.withConnection(con => {
                 con.executeUpdate(qr => {
@@ -761,14 +799,28 @@ class Ledger {
                         reject(e);
                     },
                     "insert into ledger_testrecords(hash) values(?) on conflict do nothing;",
-                    hash.digest
+                    itemId.digest
                 );
             });
         });
     }
 
-
-    isTestnet(itemId){}
+    isTestnet(itemId) {
+        return new Promise((resolve, reject) => {
+            this.dbPool_.withConnection(con => {
+                con.executeQuery(qr => {
+                        con.release();
+                        resolve(Boolean(qr.getRows(1)[0][0]));
+                    }, e => {
+                        con.release();
+                        reject(e);
+                    },
+                    "select exists(select 1 from ledger_testrecords where hash=?)",
+                    itemId.digest
+                );
+            });
+        });
+    }
 
     updateSubscriptionInStorage(id, expiresAt) {}
     updateStorageExpiresAt(storageId, expiresAt) {}

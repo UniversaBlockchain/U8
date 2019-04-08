@@ -193,14 +193,17 @@ unit.test("ledger_test: moveToTestnet", async () => {
     await r.save();
 
     assert(await getTestRecordsCount(ledger, hashId) === 0);
+    assert(!await ledger.isTestnet(hashId));
 
     await r.markTestRecord();
 
     assert(await getTestRecordsCount(ledger, hashId) === 1);
+    assert(await ledger.isTestnet(hashId));
 
     await r.markTestRecord();
 
     assert(await getTestRecordsCount(ledger, hashId) === 1);
+    assert(await ledger.isTestnet(hashId));
 
     await ledger.close();
 });
@@ -597,7 +600,7 @@ unit.test("ledger_test: revoke", async () => {
     await ledger.findOrCreate(id);
     let r1 = await ledger.getRecord(id);
 
-    assert(!r1.isApproved);
+    assert(!r1.state.isApproved);
     assert(r1.state.isPending);
     assert(ItemState.REVOKED !== r1.state);
 
