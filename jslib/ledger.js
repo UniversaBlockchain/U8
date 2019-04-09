@@ -906,7 +906,16 @@ class Ledger {
                     },
                     "INSERT INTO contract_subscription (hash_id, subscription_on_chain, expires_at, environment_id) VALUES(?,?,?,?) RETURNING id",
                     hashId.digest,
-                    nameRecordId
+                    subscriptionOnChain,
+                    Math.floor(expiresAt.getTime() / 1000),
+                    environmentId,
+                   /* ResultSet rs = statement.executeQuery();
+                    if (rs == null)
+                        throw new Failure("saveSubscriptionInStorage failed: returning null");
+                    rs.next();
+                    long resId = rs.getLong(1);
+                    rs.close();
+                    return resId;*/
                 );
             });
         });
@@ -917,36 +926,78 @@ class Ledger {
     getFollowerCallbackStateById(id) {}
     getFollowerCallbacksToResyncByEnvId(environmentId) {}
     getFollowerCallbacksToResync() {}
-    addFollowerCallback(id, environmentId, expiresAt, storedUntil) {}
-    updateFollowerCallbackState(id, state) {}
-    removeFollowerCallback(id) {}
+
+    addFollowerCallback(id, environmentId, expiresAt, storedUntil) {
+        return new Promise((resolve, reject) => {
+            this.dbPool_.withConnection(con => {
+                con.executeUpdate(qr => {
+                        con.release();
+                        resolve();
+                    }, e => {
+                        con.release();
+                        reject(e);
+                    },
+                    "INSERT INTO follower_callbacks (id, state, environment_id, expires_at, stored_until) VALUES (?,?,?,?,?)",
+                    id.digest,
+                    //NCallbackService.FollowerCallbackState.STARTED.ordinal() TODO !!
+                    environmentId,
+                    Math.floor(expiresAt.getTime() / 1000),
+                    Math.floor(storedUntil.getTime() / 1000)
+                );
+            });
+        });
+    }
+
+    updateFollowerCallbackState(id, state) {
+        return new Promise((resolve, reject) => {
+            this.dbPool_.withConnection(con => {
+                con.executeUpdate(qr => {
+                        con.release();
+                        resolve();
+                    }, e => {
+                        con.release();
+                        reject(e);
+                    },
+                    "UPDATE follower_callbacks SET state = ? WHERE id = ?",
+                    //state.ordinal() // TODO !!
+                    id.digest
+                );
+            });
+        });
+    }
+
+    removeFollowerCallback(id) {
+        return new Promise((resolve, reject) => {
+            this.dbPool_.withConnection(con => {
+                con.executeUpdate(qr => {
+                        con.release();
+                        resolve();
+                    }, e => {
+                        con.release();
+                        reject(e);
+                    },
+                    "DELETE FROM follower_callbacks WHERE id = ?",
+                    id.digest
+                );
+            });
+        });
+    }
 
     clearExpiredStorages() {
-  /*      try (PooledDb db = dbPool.db()) {
-            try (
-                PreparedStatement statement =
-                db.statement("INSERT INTO contract_subscription (hash_id, subscription_on_chain, expires_at, environment_id) VALUES(?,?,?,?) RETURNING id")
-        ) {
-                statement.setBytes(1, hashId.getDigest());
-                statement.setBoolean(2, subscriptionOnChain);
-                statement.setLong(3, Ut.unixTime(expiresAt));
-                statement.setLong(4, environmentId);
-                statement.closeOnCompletion();
-                ResultSet rs = statement.executeQuery();
-                if (rs == null)
-                    throw new Failure("saveSubscriptionInStorage failed: returning null");
-                rs.next();
-                long resId = rs.getLong(1);
-                rs.close();
-                return resId;
-            }
-        } catch (SQLException se) {
-            se.printStackTrace();
-            throw new Failure("saveSubscriptionInStorage failed: " + se);
-        } catch (Exception e) {
-            e.printStackTrace();
-            return 0;
-        }*/
+        return new Promise((resolve, reject) => {
+            this.dbPool_.withConnection(con => {
+                con.executeUpdate(qr => {
+                        con.release();
+                        resolve();
+                    }, e => {
+                        con.release();
+                        reject(e);
+                    },
+                    "DELETE FROM contract_storage WHERE expires_at < ?",
+                    Math.floor(Date.now() / 1000)
+                );
+            });
+        });
     }
 
     clearExpiredSubscriptions() {
@@ -964,7 +1015,12 @@ class Ledger {
     removeEnvironmentSubscription(subscriptionId) {}
     removeEnvironmentStorage(storageId) {}
     removeEnvironment(ncontractHashId) {}
-    removeExpiredStoragesAndSubscriptionsCascade() {}
+
+    removeExpiredStoragesAndSubscriptionsCascade() {
+        this.clearExpiredSubscriptions();
+        this.clearExpiredStorages();
+        this.clearExpiredStorageContractBinaries();
+    }
 
     addNameRecord(nameRecordModel) {}
     removeNameRecord(nameReduced) {}
@@ -974,7 +1030,23 @@ class Ledger {
     isAllNameRecordsAvailable(reducedNames) {}
     isAllOriginsAvailable(origins) {}
     isAllAddressesAvailable(addresses) {}
-    clearExpiredNameRecords(holdDuration) {}
+
+    clearExpiredNameRecords(holdDuration) {
+        return new Promise((resolve, reject) => {
+            this.dbPool_.withConnection(con => {
+                con.executeUpdate(qr => {
+                        con.release();
+                        resolve();
+                    }, e => {
+                        con.release();
+                        reject(e);
+                    },
+                    "DELETE FROM name_storage WHERE expires_at < ? ",
+                    Math.floor(Date.now() / 1000) - holdDuration
+                );
+            });
+        });
+    }
 
     cleanup(isPermanetMode) {
         let now = Math.floor(Date.now() / 1000);
