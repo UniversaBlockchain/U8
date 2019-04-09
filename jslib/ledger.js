@@ -806,9 +806,63 @@ class Ledger {
         });
     }
 
-    updateSubscriptionInStorage(id, expiresAt) {}
-    updateStorageExpiresAt(storageId, expiresAt) {}
-    saveFollowerEnvironment(environmentId, expiresAt, mutedAt, spent, startedCallbacks) {}
+    updateSubscriptionInStorage(subscriptionId, expiresAt) {
+        return new Promise((resolve, reject) => {
+            this.dbPool_.withConnection(con => {
+                con.executeUpdate(qr => {
+                        con.release();
+                        resolve();
+                    }, e => {
+                        con.release();
+                        reject(e);
+                    },
+                    "UPDATE contract_subscription SET expires_at = ? WHERE id = ?",
+                    Math.floor(expiresAt.getTime() / 1000),
+                    subscriptionId
+                );
+            });
+        });
+    }
+    updateStorageExpiresAt(storageId, expiresAt) {
+        return new Promise((resolve, reject) => {
+            this.dbPool_.withConnection(con => {
+                con.executeUpdate(qr => {
+                        con.release();
+                        resolve();
+                    }, e => {
+                        con.release();
+                        reject(e);
+                    },
+                    "UPDATE contract_storage SET expires_at = ? WHERE id = ?",
+                    Math.floor(expiresAt.getTime() / 1000),
+                    storageId
+                );
+            });
+        });
+    }
+
+    saveFollowerEnvironment(environmentId, expiresAt, mutedAt, spent, startedCallbacks) {
+        return new Promise((resolve, reject) => {
+            this.dbPool_.withConnection(con => {
+                con.executeUpdate(qr => {
+                        con.release();
+                        resolve();
+                    }, e => {
+                        con.release();
+                        reject(e);
+                    },
+                    "INSERT INTO follower_environments (environment_id, expires_at, muted_at, spent_for_callbacks, started_callbacks) " +
+                    "VALUES (?,?,?,?,?) ON CONFLICT (environment_id) DO UPDATE SET expires_at = EXCLUDED.expires_at, " +
+                    "muted_at = EXCLUDED.muted_at, spent_for_callbacks = EXCLUDED.spent_for_callbacks, started_callbacks = EXCLUDED.started_callbacks",
+                    environmentId,
+                    Math.floor(expiresAt.getTime() / 1000),
+                    Math.floor(mutedAt.getTime() / 1000),
+                    spent,
+                    startedCallbacks
+                );
+            });
+        });
+    }
 
     updateNameRecord(nameRecordId, expiresAt) {
         return new Promise((resolve, reject) => {
@@ -890,9 +944,75 @@ class Ledger {
     getEnvironment(contractId) {}
     getEnvironment(smartContract) {}
 
-    updateEnvironment(id, ncontractType, ncontractHashId, kvStorage, transactionPack) {}
+    updateEnvironment(id, ncontractType, ncontractHashId, kvStorage, transactionPack) {
+        return new Promise((resolve, reject) => {
+            this.dbPool_.withConnection(con => {
+                con.executeUpdate(qr => {
+                        con.release();
+                        resolve();
+                    }, e => {
+                        con.release();
+                        reject(e);
+                    },
+                    "UPDATE environments  SET ncontract_type = ?,ncontract_hash_id = ?,kv_storage = ?,transaction_pack = ? WHERE id = ?",
+                    ncontractType,
+                    ncontractHashId.digest,
+                    kvStorage,
+                    transactionPack,
+                    id
+                );
+            });
+        });
+    }
 
-    saveContractInStorage(contractId, binData, expiresAt, origin, environmentId) {}
+    saveContractInStorage(contractId, binData, expiresAt, origin, environmentId) { //TODO
+  /*    try (PooledDb db = dbPool.db()) {
+            try (
+                PreparedStatement statement =
+                db.statement(
+                    "INSERT INTO contract_binary (hash_id, bin_data) VALUES (?,?) " +
+                    "ON CONFLICT (hash_id) DO UPDATE SET bin_data=EXCLUDED.bin_data"
+                )
+        ) {
+                statement.setBytes(1, contractId.getDigest());
+                statement.setBytes(2, binData);
+                db.updateWithStatement(statement);
+            }
+        } catch (SQLException se) {
+            se.printStackTrace();
+            throw new Failure("saveContractInStorage binary failed: " + se);
+        } catch (Exception e) {
+            e.printStackTrace();
+            return 0;
+        }
+
+        try (PooledDb db = dbPool.db()) {
+            try (
+                PreparedStatement statement =
+                db.statement("INSERT INTO contract_storage (hash_id, origin, expires_at, environment_id) VALUES (?,?,?,?) RETURNING id")
+        ) {
+                statement.setBytes(1, contractId.getDigest());
+                statement.setBytes(2, origin.getDigest());
+                statement.setLong(3, Ut.unixTime(expiresAt));
+                statement.setLong(4, environmentId);
+                statement.closeOnCompletion();
+                ResultSet rs = statement.executeQuery();
+                if (rs == null)
+                    throw new Failure("saveContractInStorage failed: returning null");
+                rs.next();
+                long resId = rs.getLong(1);
+                rs.close();
+                return resId;
+            }
+        } catch (SQLException se) {
+            se.printStackTrace();
+            throw new Failure("saveContractInStorage failed: " + se);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+
+        return 0;*/
+    }
 
     saveSubscriptionInStorage(hashId, subscriptionOnChain, expiresAt, environmentId) {
         return new Promise((resolve, reject) => {
@@ -967,54 +1087,49 @@ class Ledger {
     }
 
     removeFollowerCallback(id) {
-        return new Promise((resolve, reject) => {
-            this.dbPool_.withConnection(con => {
-                con.executeUpdate(qr => {
-                        con.release();
-                        resolve();
-                    }, e => {
-                        con.release();
-                        reject(e);
-                    },
-                    "DELETE FROM follower_callbacks WHERE id = ?",
-                    id.digest
-                );
-            });
-        });
+        return this.simpleUpdate("DELETE FROM follower_callbacks WHERE id = ?", id.digest);
     }
 
     clearExpiredStorages() {
-        return new Promise((resolve, reject) => {
-            this.dbPool_.withConnection(con => {
-                con.executeUpdate(qr => {
-                        con.release();
-                        resolve();
-                    }, e => {
-                        con.release();
-                        reject(e);
-                    },
-                    "DELETE FROM contract_storage WHERE expires_at < ?",
-                    Math.floor(Date.now() / 1000)
-                );
-            });
-        });
+        return this.simpleUpdate("DELETE FROM contract_storage WHERE expires_at < ?", Math.floor(Date.now() / 1000));
     }
 
     clearExpiredSubscriptions() {
         return this.simpleUpdate("DELETE FROM contract_subscription WHERE expires_at < ?", Math.floor(Date.now() / 1000));
     }
 
-
-    clearExpiredStorageContractBinaries() {}
+    clearExpiredStorageContractBinaries() {
+        //TODO: add trigger for delete expired contracts after deleting all subscriptions, and remove this function
+    }
 
     getSmartContractById(smartContractId) {}
     getContractInStorage(contractId) {}
     getContractInStorage(slotId, contractId) {}
     getContractsInStorageByOrigin(slotId, originId) {}
 
-    removeEnvironmentSubscription(subscriptionId) {}
-    removeEnvironmentStorage(storageId) {}
-    removeEnvironment(ncontractHashId) {}
+    removeEnvironmentSubscription(subscriptionId) {
+        return this.simpleUpdate("DELETE FROM contract_subscription WHERE id = ?", subscriptionId);
+    }
+
+    removeEnvironmentStorage(storageId) {
+        return this.simpleUpdate("DELETE FROM contract_storage WHERE id = ?", storageId);
+    }
+
+    removeSubscriptionsByEnvId(environmentId) {
+        return this.simpleUpdate("DELETE FROM contract_subscription WHERE environment_id = ?", environmentId);
+    }
+
+    removeStorageContractsByEnvId(environmentId) {
+        return this.simpleUpdate("DELETE FROM contract_storage WHERE environment_id = ?", environmentId);
+    }
+
+    removeEnvironment(ncontractHashId) {
+        let envId = this.getEnvironmentId(ncontractHashId);
+        this.removeSubscriptionsByEnvId(envId);
+        this.removeStorageContractsByEnvId(envId);
+        this.clearExpiredStorageContractBinaries();
+        return this.removeEnvironmentEx(ncontractHashId);
+    }
 
     removeExpiredStoragesAndSubscriptionsCascade() {
         this.clearExpiredSubscriptions();
@@ -1022,8 +1137,28 @@ class Ledger {
         this.clearExpiredStorageContractBinaries();
     }
 
-    addNameRecord(nameRecordModel) {}
-    removeNameRecord(nameReduced) {}
+    addNameRecord(nameRecord) { // TODO !!
+        /*let nameStorageId = this.addNameStorage(nameRecord);
+        if (nameStorageId !== 0) {
+            nameRecord.id = nameStorageId;
+            this.removeNameRecordEntries(nameStorageId);
+            for (NameRecordEntry nameRecordEntry : nameRecord.getEntries()) {
+                ((NNameRecordEntry) nameRecordEntry).setNameRecordId(nameStorageId);
+                addNameEntry((NNameRecordEntry) nameRecordEntry);
+            }
+        } else {
+            throw new Failure("addNameRecord failed");
+        }*/
+    }
+
+    removeNameRecord(nameReduced) {
+        return this.simpleUpdate("DELETE FROM name_storage WHERE name_reduced=?", nameReduced);
+    }
+
+    removeNameRecordEntries(nameStorageId) {
+        return this.simpleUpdate("DELETE FROM name_entry WHERE name_storage_id=?", nameStorageId);
+    }
+
     getNameRecord(nameReduced) {}
     getNameByAddress(address) {}
     getNameByOrigin(origin) {}
@@ -1032,20 +1167,7 @@ class Ledger {
     isAllAddressesAvailable(addresses) {}
 
     clearExpiredNameRecords(holdDuration) {
-        return new Promise((resolve, reject) => {
-            this.dbPool_.withConnection(con => {
-                con.executeUpdate(qr => {
-                        con.release();
-                        resolve();
-                    }, e => {
-                        con.release();
-                        reject(e);
-                    },
-                    "DELETE FROM name_storage WHERE expires_at < ? ",
-                    Math.floor(Date.now() / 1000) - holdDuration
-                );
-            });
-        });
+        return this.simpleUpdate("DELETE FROM name_storage WHERE expires_at < ? ", Math.floor(Date.now() / 1000) - holdDuration);
     }
 
     cleanup(isPermanetMode) {
