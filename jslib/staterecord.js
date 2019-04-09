@@ -136,14 +136,14 @@ class StateRecord {
             this.state = ItemState.APPROVED;
             await this.save();
         } else
-            throw new ex.IllegalStateError("attempt to approve record that is not pending: " + state);
+            throw new ex.IllegalStateError("attempt to approve record that is not pending: " + this.state.val);
     }
 
     async createOutputLockRecord(idToCreate) {
         if (this.recordId === 0)
             throw new ex.IllegalStateError("the record must be created");
         if (this.state !== ItemState.PENDING)
-            throw new ex.IllegalStateError("wrong state to createOutputLockRecord: " + state);
+            throw new ex.IllegalStateError("wrong state to createOutputLockRecord: " + this.state.val);
 
         if (await this.ledger.getRecord(idToCreate) != null)
             return null;

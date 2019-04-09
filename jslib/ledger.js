@@ -89,6 +89,23 @@ class Ledger {
         this.timers_[i] = trs.timeout(delay, f);
     }
 
+    simpleUpdate(sql, arg) {
+        return new Promise((resolve, reject) => {
+            this.dbPool_.withConnection(con => {
+                con.executeUpdate(qr => {
+                        con.release();
+                        resolve();
+                    }, e => {
+                        con.release();
+                        reject(e);
+                    },
+                    sql,
+                    arg
+                );
+            });
+        });
+    }
+
     /**
      * Get the record by its id.
      *
@@ -96,13 +113,18 @@ class Ledger {
      * @return {Promise<StateRecord|null>} record or null if not found.
      */
     getRecord(itemId) {
-        return new Promise((resolve, reject) => {
+        return new Promise(async(resolve, reject) => {
             let cached = this.getFromCache(itemId);
-            if (cached != null)
-                resolve(cached);
-            else
+            if (cached != null) {
+                if (cached.isExpired()) {
+                    await cached.destroy();
+                    resolve(null);
+                } else
+                    resolve(cached);
+
+            } else
                 this.dbPool_.withConnection(con => {
-                    con.executeQuery(qr => {
+                    con.executeQuery(async(qr) => {
                             let row = qr.getRows(1)[0];
                             con.release();
 
@@ -110,7 +132,7 @@ class Ledger {
                                 let record = StateRecord.initFrom(this, row);
 
                                 if (record.isExpired()) {
-                                    record.destroy();
+                                    await record.destroy();
                                     resolve(null);
                                 } else {
                                     this.putToCache(record);
@@ -433,35 +455,10 @@ class Ledger {
         if (connection !== undefined)
             return this.transactionDestroy(record, connection);
 
-        return new Promise((resolve, reject) => {
-            this.dbPool_.withConnection(con => {
-                con.executeUpdate(qr => {
-                        con.release();
-                        resolve();
-                    }, e => {
-                        con.release();
-                        reject(e);
-                    },
-                    "DELETE FROM items WHERE id = ?;",
-                    record.recordId
-                );
+        return this.simpleUpdate("DELETE FROM items WHERE id = ?;", record.recordId)
+            .then(() => {
+                return this.simpleUpdate("DELETE FROM ledger WHERE id = ?;", record.recordId);
             });
-        }).then(() => {
-            return new Promise((resolve, reject) => {
-                this.dbPool_.withConnection(con => {
-                    con.executeUpdate(qr => {
-                            con.release();
-                            resolve();
-                        }, e => {
-                            con.release();
-                            reject(e);
-                        },
-                        "DELETE FROM ledger WHERE id = ?;",
-                        record.recordId
-                    );
-                });
-            });
-        });
     }
 
     /**
@@ -620,14 +617,14 @@ class Ledger {
     reload(record) {
         return new Promise((resolve, reject) => {
             this.dbPool_.withConnection(con => {
-                con.executeQuery(qr => {
+                con.executeQuery(async(qr) => {
                         let row = qr.getRows(1)[0];
                         con.release();
 
                         if (row != null) {
                             record = StateRecord.initFrom(this, row);
                             if (record.isExpired()) {
-                                record.destroy();
+                                await record.destroy();
                                 resolve(null);
                             } else
                                 resolve(record);
@@ -680,7 +677,7 @@ class Ledger {
                 resolve(cached);
             else
                 this.dbPool_.withConnection(con => {
-                    con.executeQuery(qr => {
+                    con.executeQuery(async(qr) => {
                             let row = qr.getRows(1)[0];
                             con.release();
 
@@ -688,7 +685,7 @@ class Ledger {
                                 let record = StateRecord.initFrom(this, row);
 
                                 if (record.isExpired()) {
-                                    record.destroy();
+                                    await record.destroy();
                                     resolve(null);
                                 } else {
                                     this.putToCache(record);
@@ -789,20 +786,7 @@ class Ledger {
      * @return {Promise}.
      */
     markTestRecord(itemId) {
-        return new Promise((resolve, reject) => {
-            this.dbPool_.withConnection(con => {
-                con.executeUpdate(qr => {
-                        con.release();
-                        resolve();
-                    }, e => {
-                        con.release();
-                        reject(e);
-                    },
-                    "insert into ledger_testrecords(hash) values(?) on conflict do nothing;",
-                    itemId.digest
-                );
-            });
-        });
+        return this.simpleUpdate("insert into ledger_testrecords(hash) values(?) on conflict do nothing;", itemId.digest);
     }
 
     isTestnet(itemId) {
@@ -966,20 +950,7 @@ class Ledger {
     }
 
     clearExpiredSubscriptions() {
-        return new Promise((resolve, reject) => {
-            this.dbPool_.withConnection(con => {
-                con.executeUpdate(qr => {
-                        con.release();
-                        resolve();
-                    }, e => {
-                        con.release();
-                        reject(e);
-                    },
-                    "DELETE FROM contract_subscription WHERE expires_at < ?",
-                    Math.floor(Date.now() / 1000)
-                );
-            });
-        });
+        return this.simpleUpdate("DELETE FROM contract_subscription WHERE expires_at < ?", Math.floor(Date.now() / 1000));
     }
 
 
@@ -1005,7 +976,22 @@ class Ledger {
     isAllAddressesAvailable(addresses) {}
     clearExpiredNameRecords(holdDuration) {}
 
-    cleanup(isPermanetMode) {}
+    cleanup(isPermanetMode) {
+        let now = Math.floor(Date.now() / 1000);
+        return this.simpleUpdate("delete from items where id in (select id from ledger where expires_at < ?);", now)
+            .then(() => {
+                return this.simpleUpdate("delete from items where keepTill < ?;", now)
+                    .then(() => {
+                        let promise = this.simpleUpdate("delete from follower_callbacks where stored_until < ?;", now);
+                        if (!isPermanetMode)
+                            return promise.then(() => {
+                                return this.simpleUpdate("delete from ledger where expires_at < ?;", now)
+                            });
+                        else
+                            return promise;
+                    });
+            });
+    }
 }
 
 module.exports = {Ledger};

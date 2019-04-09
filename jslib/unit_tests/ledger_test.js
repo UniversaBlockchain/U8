@@ -25,6 +25,11 @@ function assertSameRecords(record1, record2) {
     assert(record1.expiresAt.getTime() === record2.expiresAt.getTime())
 }
 
+function assertAlmostSame(time1, time2) {
+    let delta = time1.getTime() - time2.getTime();
+    assert(delta < 5000 && delta > -5000);  //5 sec
+}
+
 unit.test("ledger_test: hello", async () => {
     let ledger = await createTestLedger();
     console.log(jsonStringify(await ledger.findOrCreate(HashId.of(randomBytes(64)))));
@@ -194,7 +199,7 @@ function getRecordsCount(ledger, hashId) {
                     con.release();
                     reject(e);
                 },
-                "select count(*) from ledger_testrecords where hash = ?",
+                "select count(*) from ledger where hash = ?",
                 hashId.digest
             );
         });
@@ -243,19 +248,8 @@ unit.test("ledger_test: cache test", async () => {
     assert(r2 != null);
 
     //compare records
-    assert(record.recordId === r1.recordId);
-    assert(record.id.equals(r1.id));
-    assert(record.state === r1.state);
-    assert(record.lockedByRecordId === r1.lockedByRecordId);
-    assert(record.createdAt.getTime() === r1.createdAt.getTime());
-    assert(record.expiresAt.getTime() === r1.expiresAt.getTime());
-
-    assert(record.recordId === r2.recordId);
-    assert(record.id.equals(r2.id));
-    assert(record.state === r2.state);
-    assert(record.lockedByRecordId === r2.lockedByRecordId);
-    assert(record.createdAt.getTime() === r2.createdAt.getTime());
-    assert(record.expiresAt.getTime() === r2.expiresAt.getTime());
+    assertSameRecords(record, r1);
+    assertSameRecords(record, r2);
 
     await record.destroy();
 
@@ -516,8 +510,6 @@ unit.test("ledger_test: multi-threading transactions", async () => {
 });
 
 unit.test("ledger_test: recordExpiration", async () => {
-    // todo: expired can't be get - it should be dropped by the database
-
     let ledger = await createTestLedger();
 
     let hashId = HashId.of(randomBytes(64));
@@ -531,22 +523,21 @@ unit.test("ledger_test: recordExpiration", async () => {
     inFuture.setTime((Math.floor(inFuture.getTime() / 1000) + 7200) * 1000);
     inFuture.setMilliseconds(0);
 
-    r.expiresAt = inFuture;
-
     let r1 = await ledger.getRecord(hashId);
-   // assert(r1.expiresAt !== inFuture);
+    assert(r1.expiresAt.getTime() !== inFuture.getTime());
 
+    r.expiresAt = inFuture;
     await r.save();
 
-    r1 = await ledger.getRecord(hashId);
-    assert(r.expiresAt === r1.expiresAt);//assertAlmostSame(r.getExpiresAt(), r1.getExpiresAt());
+    await r1.reload();
+    assert(r.expiresAt.getTime() === r1.expiresAt.getTime());
 
-    r.expiresAt.setTime((Math.floor(r.expiresAt.getTime() / 1000) - 3600) * 1000);
+    r.expiresAt.setTime((Math.floor(r.expiresAt.getTime() / 1000) - 10800) * 1000);
     r.expiresAt.setMilliseconds(0);
     await r.save();
 
     r1 = await ledger.getRecord(hashId);
-    //assert(r1 == null);
+    assert(r1 == null);
 
     await ledger.close();
 });
@@ -559,10 +550,10 @@ unit.test("ledger_test: findOrCreateAndGet", async () => {
     let r = await ledger.getRecord(id);
 
     assert(r !== null);
-    // assert(id === r.id);
+    assert(id.equals(r.id));
     assert(ItemState.PENDING === r.state);
 
-    //assertAlmostSame(ZonedDateTime.now(), r.getCreatedAt());
+    assertAlmostSame(new Date(), r.createdAt);
 
     // returning existing record
     await ledger.findOrCreate(id);
@@ -570,14 +561,8 @@ unit.test("ledger_test: findOrCreateAndGet", async () => {
 
     assertSameRecords(r, r1);
 
-    let r2 = await ledger.getRecord(id);
-
-    assertSameRecords(r, r2);
-
-    let idr = HashId.of(randomBytes(64));
-    let r3 = await ledger.getRecord(idr);
-
-    assert(r3 == null);
+    let r2 = await ledger.getRecord(HashId.of(randomBytes(64)));
+    assert(r2 == null);
 
     await ledger.close();
 });
@@ -594,23 +579,21 @@ unit.test("ledger_test: approve", async () => {
     await r1.approve();
 
     assert(ItemState.APPROVED === r1.state);
-
     assert(r1.state.isApproved);
 
     await r1.reload();
 
     assert(r1.state.isApproved);
 
-   /* try {
+    let except = false;
+    try {
         await r1.approve();
-        throw new ex.IllegalStateError("TEST_EXCEPTION_approve");
     } catch (e) {
-        if (e.name === "IllegalStateError") {
-            assert(e.message === "TEST_EXCEPTION_approve");
-        } else {
-            throw e;
-        }
-    }*/
+        assert(e.message === "attempt to approve record that is not pending: " + r1.state.val);
+        except = true;
+    }
+
+    assert(except);
 
     await ledger.close();
 });
@@ -685,11 +668,9 @@ unit.test("ledger_test: saveAndTransaction", async () => {
     }
 
     await r1.reload();
-
-    assert(ItemState.APPROVED === r1.state);
-
     await r2.reload();
 
+    assert(ItemState.APPROVED === r1.state);
     assert(ItemState.DECLINED === r2.state);
 
     await ledger.close();
@@ -699,41 +680,36 @@ unit.test("ledger_test: ledgerCleanupTest", async () => {
     let ledger = await createTestLedger();
 
     let privateKey = tk.TestKeys.getKey();
-    let contract = Contract.fromPrivateKey(privateKey); //!
-    await contract.seal();
+    let contract1 = Contract.fromPrivateKey(privateKey);
+    await contract1.seal();
 
-    let hash = contract.id;
-    await ledger.findOrCreate(hash);
-    let r = await ledger.getRecord(hash);
+    await ledger.findOrCreate(contract1.id);
+    let r1 = await ledger.getRecord(contract1.id);
 
-    r.expiresAt.setTime((Math.floor(r.expiresAt.getTime() / 1000) - 1) * 1000);
+    r1.expiresAt.setTime((Math.floor(Date.now() / 1000) - 1) * 1000);
 
-    await r.save();
+    await r1.save();
 
- /*   //ledger.putItem(r,contract,Instant.now().plusSeconds(300)); //!!
+    await ledger.putItem(r1, contract1, new Date((Date.now() / 1000 + 300) * 1000));
 
-    let hash1 = contract.id;
+    let contract2 = Contract.fromPrivateKey(privateKey);
+    await contract2.seal();
 
-    contract = Contract.fromPrivateKey(privateKey);
-    await contract.seal();
+    await ledger.findOrCreate(contract2.id);
+    let r2 = await ledger.getRecord(contract2.id);
 
-    r = await ledger.findOrCreate(contract.id);
+    r2.expiresAt.setTime((Math.floor(Date.now() / 1000) + 30 * 24 * 3600) * 1000);
 
-    r.expiresAt.setTime((Math.floor(r.expiresAt.getTime() / 1000) + 2592000) * 1000);
-
-    await r.save();
+    await r2.save();
     
-    //await ledger.putItem(r,contract,Instant.now().minusSeconds(1));
-
-    let hash2 = contract.id;
+    await ledger.putItem(r2, contract2, new Date((Date.now() / 1000 - 1) * 1000));
 
     await ledger.cleanup(false);
 
-    assert(await getRecordsCount(ledger, hash1) === 0);
+    assert(await getRecordsCount(ledger, contract1.id) === 0);
+    assert(await getRecordsCount(ledger, contract2.id) === 1);
 
-    assert(await getRecordsCount(ledger, hash2) === 1);
-
-    let st = new Promise((resolve, reject) => {
+    let count = await new Promise((resolve, reject) => {
         ledger.dbPool_.withConnection(con => {
             con.executeQuery(qr => {
                     con.release();
@@ -743,12 +719,12 @@ unit.test("ledger_test: ledgerCleanupTest", async () => {
                     reject(e);
                 },
                 "select count(*) from items where id in (select id from ledger where hash = ?)",
-                hash2.digest
+                contract2.id.digest
             );
         });
     });
 
-    assert(st === false);*/
+    assert(count === 0);
 
     await ledger.close();
 });
