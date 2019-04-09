@@ -728,3 +728,53 @@ unit.test("ledger_test: ledgerCleanupTest", async () => {
 
     await ledger.close();
 });
+
+unit.test("ledger_test: paymentSaveGetTest", async () => {
+    let ledger = await createTestLedger();
+
+    await new Promise((resolve, reject) => {
+        ledger.dbPool_.withConnection(con => {
+            con.executeUpdate(qr => {
+                    con.release();
+                    resolve();
+                }, e => {
+                    con.release();
+                    reject(e);
+                },
+                "delete from payments_summary;"
+            );
+        });
+    });
+
+    let now  = Date.now();
+    let dateNow = new Date();
+    let year = dateNow.getUTCFullYear();
+    let month = dateNow.getUTCMonth();
+    if (month === 0) {
+        month = 11;
+        year--;
+    } else
+        month--;
+
+    let dateAfter = Date.UTC(year, month);
+    let dateTime = dateAfter;
+    let i = 0;
+    while (dateTime < now + 1000) {
+        await ledger.savePayment(100, new Date(dateTime));
+        await ledger.savePayment(12, new Date(dateTime));
+        dateTime += 24 * 3600000;
+        i++;
+    }
+
+    let payments = await ledger.getPayments(new Date(dateAfter));
+    let pays = 0;
+    for (let [date, pay] of payments) {
+        assertSilent(pay === 112);
+        assertSilent(date >= dateAfter / 1000 && date <= now / 1000);
+        pays += pay;
+    }
+
+    assert(pays === 112 * i);
+
+    await ledger.close();
+});
