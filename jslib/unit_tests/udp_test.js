@@ -11,11 +11,14 @@ unit.test("hello network", async () => {
     let sum = 0;
     let n = network.NodeInfo.withParameters(newKey.publicKey, 33, "node-33", "127.0.0.1", "192.168.1.101", 7007, 8008, 9009);
     let nc = new network.NetConfig();
+    nc.addNode(n);
+    let udp = new network.UDPAdapter(newKey, 33, nc);
     //nc.addNode(n);
     //for (let i = 0; i < 1000000000; ++i) {
     for (let i = 0; i < 1000; ++i) {
         let n = network.NodeInfo.withParameters(newKey.publicKey, i, 2, 3, 4, 5, 6, 7);
-        nc.addNode(n);
+        if (i != 33)
+            nc.addNode(n);
         let ncopy = nc.getInfo(n.number);
         n.publicKey.shortAddress;
         n.number;
@@ -90,4 +93,25 @@ unit.test("network.NetConfig", async () => {
     assert(n2.clientAddress.port === n2c.clientAddress.port);
     assert(n2.serverAddress.host === n2c.serverAddress.host);
     assert(n2.serverAddress.port === n2c.serverAddress.port);
+});
+
+unit.test("network.UDPAdapter", async () => {
+    let nc = new network.NetConfig();
+    let pk1 = tk.TestKeys.getKey();
+    let pk2 = tk.TestKeys.getKey();
+    let n1 = network.NodeInfo.withParameters(pk1.publicKey, 1, "node-1", "127.0.0.1", "192.168.1.101", 7001, 8001, 9001);
+    let n2 = network.NodeInfo.withParameters(pk2.publicKey, 2, "node-2", "127.0.0.1", "192.168.1.101", 7002, 8002, 9002);
+    nc.addNode(n1);
+    nc.addNode(n2);
+    let udp1 = new network.UDPAdapter(pk1, 1, nc);
+    let udp2 = new network.UDPAdapter(pk2, 2, nc);
+
+    udp1.send(2, "payload1");
+    udp1.send(2, "payload11");
+    udp1.send(2, "payload111");
+    udp2.send(1, "payload2");
+    udp2.send(1, "payload22");
+    udp2.send(1, "payload222");
+
+    await sleep(1000);
 });

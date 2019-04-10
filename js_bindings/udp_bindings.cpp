@@ -12,7 +12,7 @@ using namespace crypto;
 static Persistent<FunctionTemplate> NodeInfoTpl;
 static Persistent<FunctionTemplate> SocketAddressTpl;
 static Persistent<FunctionTemplate> NetConfigTpl;
-static Persistent<FunctionTemplate> UDPAdapterTemplate;
+static Persistent<FunctionTemplate> UDPAdapterTpl;
 
 void nodeInfoGetPublicKey(const FunctionCallbackInfo<Value> &args) {
     Scripter::unwrapArgs(args, [](ArgsContext &ac) {
@@ -234,12 +234,62 @@ Local<FunctionTemplate> initNetConfig(Isolate *isolate) {
     return tpl;
 }
 
+void udpAdapter_send(const FunctionCallbackInfo<Value> &args) {
+    Scripter::unwrapArgs(args, [](ArgsContext &ac) {
+        if (ac.args.Length() == 2) {
+            auto udpAdapter = unwrap<UDPAdapter>(ac.args.This());
+            int destNodeNumber = ac.asInt(0);
+            auto contents = ac.args[1].As<TypedArray>()->Buffer()->GetContents();
+            byte_vector bv(contents.ByteLength());
+            memcpy(&bv[0], contents.Data(), contents.ByteLength());
+            udpAdapter->send(destNodeNumber, bv);
+            return;
+        }
+        ac.throwError("invalid arguments");
+    });
+}
+
+Local<FunctionTemplate> initUDPAdapter(Isolate *isolate) {
+    Local<FunctionTemplate> tpl = bindCppClass<UDPAdapter>(
+            isolate,
+            "UDPAdapterImpl",
+            [=](const FunctionCallbackInfo<Value> &args) -> UDPAdapter* {
+                if (args.Length() == 4) {
+                    auto contents = args[0].As<TypedArray>()->Buffer()->GetContents();
+                    crypto::PrivateKey privateKey(contents.Data(), contents.ByteLength());
+                    try {
+                        return new UDPAdapter(
+                                privateKey,                                                      // ownPrivateKey
+                                args[1]->Int32Value(isolate->GetCurrentContext()).FromJust(),    // ownNodeNumber
+                                *unwrap<NetConfig>(Local<Object>::Cast(args[2])),                // netConfig
+                                [](const byte_vector &packet, const NodeInfo &fromNode) {
+                                    printf("packet received, size=%zu\n", packet.size());
+                                }
+                        );
+                    } catch (const std::exception& e) {
+                        isolate->ThrowException(
+                                Exception::TypeError(String::NewFromUtf8(isolate, e.what())));
+                        return nullptr;
+                    }
+                }
+                isolate->ThrowException(
+                        Exception::TypeError(String::NewFromUtf8(isolate, "invalid number of arguments")));
+                return nullptr;
+            });
+    auto prototype = tpl->PrototypeTemplate();
+    prototype->Set(isolate, "__send", FunctionTemplate::New(isolate, udpAdapter_send));
+
+    UDPAdapterTpl.Reset(isolate, tpl);
+    return tpl;
+}
+
 void JsInitNetwork(Isolate *isolate, const Local<ObjectTemplate> &global) {
     auto network = ObjectTemplate::New(isolate);
 
     network->Set(isolate, "NodeInfoImpl", initNodeInfo(isolate));
     network->Set(isolate, "SocketAddressImpl", initSocketAddress(isolate));
     network->Set(isolate, "NetConfigImpl", initNetConfig(isolate));
+    network->Set(isolate, "UDPAdapterImpl", initUDPAdapter(isolate));
 
     global->Set(isolate, "network", network);
 }

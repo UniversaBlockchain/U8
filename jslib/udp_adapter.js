@@ -83,4 +83,15 @@ network.NetConfig = class {
     }
 };
 
+network.UDPAdapter = class {
+    constructor(ownPrivateKey, ownNodeNumber, netConfig) {
+        this.udpAdapter_ = new network.UDPAdapterImpl(ownPrivateKey.packed, ownNodeNumber, netConfig.netConfig_, ()=>{});
+    }
+
+    send(destNodeNumber, payload) {
+        let data = typeof(payload) == 'string' ? utf8Encode(payload) : payload;
+        this.udpAdapter_.__send(destNodeNumber, data);
+    }
+};
+
 module.exports = network;
