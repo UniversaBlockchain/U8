@@ -11,6 +11,7 @@ using namespace crypto;
 
 static Persistent<FunctionTemplate> NodeInfoTpl;
 static Persistent<FunctionTemplate> SocketAddressTpl;
+static Persistent<FunctionTemplate> NetConfigTpl;
 static Persistent<FunctionTemplate> UDPAdapterTemplate;
 
 void nodeInfoGetPublicKey(const FunctionCallbackInfo<Value> &args) {
@@ -171,11 +172,74 @@ Local<FunctionTemplate> initSocketAddress(Isolate *isolate) {
     return tpl;
 }
 
+void socketAddress_addNode(const FunctionCallbackInfo<Value> &args) {
+    Scripter::unwrapArgs(args, [](ArgsContext &ac) {
+        if (ac.args.Length() == 1) {
+            auto netConfig = unwrap<NetConfig>(ac.args.This());
+            auto nodeInfo = unwrap<NodeInfo>(Local<Object>::Cast(ac.args[0]));
+            try {
+                netConfig->addNode(*nodeInfo);
+            } catch (const std::exception& e) {
+                ac.throwError(e.what());
+            }
+            return;
+        }
+        ac.throwError("invalid arguments");
+    });
+}
+
+void socketAddress_getInfo(const FunctionCallbackInfo<Value> &args) {
+    Scripter::unwrapArgs(args, [](ArgsContext &ac) {
+        if (ac.args.Length() == 1) {
+            auto netConfig = unwrap<NetConfig>(ac.args.This());
+            auto nodeId = ac.asInt(0);
+            try {
+                const NodeInfo* pni = &netConfig->getInfo(nodeId);
+                Local<Value> res[1] {wrap(NodeInfoTpl, ac.isolate, const_cast<NodeInfo*>(pni))};
+                ac.setReturnValue(res[0]);
+            } catch (const std::exception& e) {
+                ac.throwError(e.what());
+            }
+            return;
+        }
+        ac.throwError("invalid arguments");
+    });
+}
+
+void socketAddress_find(const FunctionCallbackInfo<Value> &args) {
+    Scripter::unwrapArgs(args, [](ArgsContext &ac) {
+        if (ac.args.Length() == 1) {
+            auto netConfig = unwrap<NetConfig>(ac.args.This());
+            auto nodeId = ac.asInt(0);
+            try {
+                ac.setReturnValue(netConfig->find(nodeId));
+            } catch (const std::exception& e) {
+                ac.throwError(e.what());
+            }
+            return;
+        }
+        ac.throwError("invalid arguments");
+    });
+}
+
+Local<FunctionTemplate> initNetConfig(Isolate *isolate) {
+    Local<FunctionTemplate> tpl = bindCppClass<NetConfig>(isolate, "NetConfigImpl");
+
+    auto prototype = tpl->PrototypeTemplate();
+    prototype->Set(isolate, "__addNode", FunctionTemplate::New(isolate, socketAddress_addNode));
+    prototype->Set(isolate, "__getInfo", FunctionTemplate::New(isolate, socketAddress_getInfo));
+    prototype->Set(isolate, "__find", FunctionTemplate::New(isolate, socketAddress_find));
+
+    NetConfigTpl.Reset(isolate, tpl);
+    return tpl;
+}
+
 void JsInitNetwork(Isolate *isolate, const Local<ObjectTemplate> &global) {
     auto network = ObjectTemplate::New(isolate);
 
     network->Set(isolate, "NodeInfoImpl", initNodeInfo(isolate));
     network->Set(isolate, "SocketAddressImpl", initSocketAddress(isolate));
+    network->Set(isolate, "NetConfigImpl", initNetConfig(isolate));
 
     global->Set(isolate, "network", network);
 }

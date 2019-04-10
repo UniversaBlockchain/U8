@@ -1,9 +1,21 @@
 import {MemoiseMixin} from 'tools'
 
 network.NodeInfo = class {
-    constructor(publicKey, number, nodeName, host, publicHost, datagramPort, clientHttpPort, serverHttpPort) {
-        this.nodeInfo_ = new network.NodeInfoImpl(
+    constructor() {
+        this.nodeInfo_ = null;
+    }
+
+    static copyImpl(nodeInfoImpl) {
+        let res = new network.NodeInfo();
+        res.nodeInfo_ = nodeInfoImpl;
+        return res;
+    }
+
+    static withParameters(publicKey, number, nodeName, host, publicHost, datagramPort, clientHttpPort, serverHttpPort) {
+        let res = new network.NodeInfo();
+        res.nodeInfo_ = new network.NodeInfoImpl(
             publicKey.packed, number, nodeName, host, publicHost, datagramPort, clientHttpPort, serverHttpPort);
+        return res;
     }
 
     get publicKey() {
@@ -52,5 +64,23 @@ network.SocketAddress = class {
     }
 };
 Object.assign(network.SocketAddress.prototype, MemoiseMixin);
+
+network.NetConfig = class {
+    constructor() {
+        this.netConfig_ = new network.NetConfigImpl();
+    }
+
+    addNode(nodeInfo) {
+        this.netConfig_.__addNode(nodeInfo.nodeInfo_);
+    }
+
+    getInfo(nodeNumber) {
+        return network.NodeInfo.copyImpl(this.netConfig_.__getInfo(nodeNumber));
+    }
+
+    find(nodeNumber) {
+        return this.netConfig_.__find(nodeNumber);
+    }
+};
 
 module.exports = network;
