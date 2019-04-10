@@ -89,7 +89,7 @@ class Ledger {
         this.timers_[i] = trs.timeout(delay, f);
     }
 
-    simpleUpdate(sql, arg) {
+    simpleUpdate(sql, ...params) {
         return new Promise((resolve, reject) => {
             this.dbPool_.withConnection(con => {
                 con.executeUpdate(qr => {
@@ -100,7 +100,33 @@ class Ledger {
                         reject(e);
                     },
                     sql,
-                    arg
+                    ...params
+                );
+            });
+        });
+    }
+
+    simpleQuery(sql, processValue, ...params) {
+        return new Promise((resolve, reject) => {
+            this.dbPool_.withConnection(con => {
+                con.executeQuery(qr => {
+                        let row = qr.getRows(1)[0];
+                        con.release();
+
+                        let value = null;
+                        if (row != null && row[0] != null)
+                            value = row[0];
+
+                        if (processValue != null)
+                            resolve(processValue(value));
+                        else
+                            resolve(value);
+                    }, e => {
+                        con.release();
+                        reject(e);
+                    },
+                    sql,
+                    ...params
                 );
             });
         });
@@ -539,23 +565,11 @@ class Ledger {
                 });
             });
         else
-            return new Promise((resolve, reject) => {
-                this.dbPool_.withConnection(con => {
-                    con.executeUpdate(qr => {
-                            con.release();
-                            resolve(record);
-                        }, e => {
-                            con.release();
-                            reject(e);
-                        },
-                        "update ledger set state=?, expires_at=?, locked_by_id=? where id=?",
-                        record.state.ordinal,
-                        Math.floor(record.expiresAt.getTime() / 1000),
-                        record.lockedByRecordId,
-                        record.recordId
-                    );
-                });
-            });
+            return this.simpleUpdate("update ledger set state=?, expires_at=?, locked_by_id=? where id=?",
+                record.state.ordinal,
+                Math.floor(record.expiresAt.getTime() / 1000),
+                record.lockedByRecordId,
+                record.recordId);
     }
 
     /**
@@ -728,21 +742,9 @@ class Ledger {
     }
 
     savePayment(amount, date) {
-        return new Promise((resolve, reject) => {
-            this.dbPool_.withConnection(con => {
-                con.executeUpdate(qr => {
-                        con.release();
-                        resolve();
-                    }, e => {
-                        con.release();
-                        reject(e);
-                    },
-                    "insert into payments_summary (amount,date) VALUES (?,?) ON CONFLICT (date) DO UPDATE SET amount = payments_summary.amount + excluded.amount",
-                    amount,
-                    Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()) / 1000
-                );
-            });
-        });
+        return this.simpleUpdate("insert into payments_summary (amount,date) VALUES (?,?) ON CONFLICT (date) DO UPDATE SET amount = payments_summary.amount + excluded.amount",
+            amount,
+            Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()) / 1000);
     }
 
     getPayments(fromDate) {
@@ -790,96 +792,38 @@ class Ledger {
     }
 
     isTestnet(itemId) {
-        return new Promise((resolve, reject) => {
-            this.dbPool_.withConnection(con => {
-                con.executeQuery(qr => {
-                        con.release();
-                        resolve(Boolean(qr.getRows(1)[0][0]));
-                    }, e => {
-                        con.release();
-                        reject(e);
-                    },
-                    "select exists(select 1 from ledger_testrecords where hash=?)",
-                    itemId.digest
-                );
-            });
-        });
+        return this.simpleQuery("select exists(select 1 from ledger_testrecords where hash=?)",
+            x => Boolean(x),
+            itemId.digest);
     }
 
     updateSubscriptionInStorage(subscriptionId, expiresAt) {
-        return new Promise((resolve, reject) => {
-            this.dbPool_.withConnection(con => {
-                con.executeUpdate(qr => {
-                        con.release();
-                        resolve();
-                    }, e => {
-                        con.release();
-                        reject(e);
-                    },
-                    "UPDATE contract_subscription SET expires_at = ? WHERE id = ?",
-                    Math.floor(expiresAt.getTime() / 1000),
-                    subscriptionId
-                );
-            });
-        });
+        return this.simpleUpdate("UPDATE contract_subscription SET expires_at = ? WHERE id = ?",
+            Math.floor(expiresAt.getTime() / 1000),
+            subscriptionId);
     }
+
     updateStorageExpiresAt(storageId, expiresAt) {
-        return new Promise((resolve, reject) => {
-            this.dbPool_.withConnection(con => {
-                con.executeUpdate(qr => {
-                        con.release();
-                        resolve();
-                    }, e => {
-                        con.release();
-                        reject(e);
-                    },
-                    "UPDATE contract_storage SET expires_at = ? WHERE id = ?",
-                    Math.floor(expiresAt.getTime() / 1000),
-                    storageId
-                );
-            });
-        });
+        return this.simpleUpdate("UPDATE contract_storage SET expires_at = ? WHERE id = ?",
+            Math.floor(expiresAt.getTime() / 1000),
+            storageId);
     }
 
     saveFollowerEnvironment(environmentId, expiresAt, mutedAt, spent, startedCallbacks) {
-        return new Promise((resolve, reject) => {
-            this.dbPool_.withConnection(con => {
-                con.executeUpdate(qr => {
-                        con.release();
-                        resolve();
-                    }, e => {
-                        con.release();
-                        reject(e);
-                    },
-                    "INSERT INTO follower_environments (environment_id, expires_at, muted_at, spent_for_callbacks, started_callbacks) " +
-                    "VALUES (?,?,?,?,?) ON CONFLICT (environment_id) DO UPDATE SET expires_at = EXCLUDED.expires_at, " +
-                    "muted_at = EXCLUDED.muted_at, spent_for_callbacks = EXCLUDED.spent_for_callbacks, started_callbacks = EXCLUDED.started_callbacks",
-                    environmentId,
-                    Math.floor(expiresAt.getTime() / 1000),
-                    Math.floor(mutedAt.getTime() / 1000),
-                    spent,
-                    startedCallbacks
-                );
-            });
-        });
+        return this.simpleUpdate("INSERT INTO follower_environments (environment_id, expires_at, muted_at, spent_for_callbacks, started_callbacks) " +
+            "VALUES (?,?,?,?,?) ON CONFLICT (environment_id) DO UPDATE SET expires_at = EXCLUDED.expires_at, " +
+            "muted_at = EXCLUDED.muted_at, spent_for_callbacks = EXCLUDED.spent_for_callbacks, started_callbacks = EXCLUDED.started_callbacks",
+            environmentId,
+            Math.floor(expiresAt.getTime() / 1000),
+            Math.floor(mutedAt.getTime() / 1000),
+            spent,
+            startedCallbacks);
     }
 
     updateNameRecord(nameRecordId, expiresAt) {
-        return new Promise((resolve, reject) => {
-            this.dbPool_.withConnection(con => {
-                con.executeUpdate(qr => {
-                        con.release();
-                        resolve();
-                    }, e => {
-                        con.release();
-                        reject(e);
-                    },
-                    "UPDATE name_storage SET expires_at = ? WHERE id = ?",
-                    Math.floor(expiresAt.getTime() / 1000),
-                    nameRecordId
-                );
-            });
-        });
+        return this.simpleUpdate("UPDATE name_storage SET expires_at = ? WHERE id = ?",
+            Math.floor(expiresAt.getTime() / 1000),
+            nameRecordId);
     }
 
     saveEnvironment(environment) {}
@@ -893,47 +837,19 @@ class Ledger {
     findUnfinished() {}
 
     getItem(record) {
-        return new Promise((resolve, reject) => {
-            this.dbPool_.withConnection(con => {
-                con.executeQuery(qr => {
-                        let row = qr.getRows(1)[0];
-                        con.release();
-
-                        if (row != null && row[0] != null)
-                            resolve(Contract.fromPackedTransaction(row[0]));
-                        else
-                            resolve(null);
-                    }, e => {
-                        con.release();
-                        reject(e);
-                    },
-                    "select packed from items where id = ?",
-                    record.recordId
-                );
-            });
-        });
+        return this.simpleQuery("select packed from items where id = ?",
+            x => Contract.fromPackedTransaction(x),
+            record.recordId);
     }
 
     putItem(record, item, keepTill) {
         if (!item instanceof Contract)
             return;
 
-        return new Promise((resolve, reject) => {
-            this.dbPool_.withConnection(con => {
-                con.executeUpdate(qr => {
-                        con.release();
-                        resolve();
-                    }, e => {
-                        con.release();
-                        reject(e);
-                    },
-                    "insert into items(id,packed,keepTill) values(?,?,?);",
-                    record.recordId,
-                    item.getPackedTransaction(),
-                    Math.floor(keepTill.getTime() / 1000)
-                );
-            });
-        });
+        return this.simpleUpdate("insert into items(id,packed,keepTill) values(?,?,?);",
+            record.recordId,
+            item.getPackedTransaction(),
+            Math.floor(keepTill.getTime() / 1000));
     }
 
     getKeepingItem(itemId) {}
@@ -945,100 +861,45 @@ class Ledger {
     getEnvironment(smartContract) {}
 
     updateEnvironment(id, ncontractType, ncontractHashId, kvStorage, transactionPack) {
-        return new Promise((resolve, reject) => {
-            this.dbPool_.withConnection(con => {
-                con.executeUpdate(qr => {
-                        con.release();
-                        resolve();
-                    }, e => {
-                        con.release();
-                        reject(e);
-                    },
-                    "UPDATE environments  SET ncontract_type = ?,ncontract_hash_id = ?,kv_storage = ?,transaction_pack = ? WHERE id = ?",
-                    ncontractType,
-                    ncontractHashId.digest,
-                    kvStorage,
-                    transactionPack,
-                    id
-                );
-            });
-        });
+        return this.simpleUpdate("UPDATE environments  SET ncontract_type = ?,ncontract_hash_id = ?,kv_storage = ?,transaction_pack = ? WHERE id = ?",
+            ncontractType,
+            ncontractHashId.digest,
+            kvStorage,
+            transactionPack,
+            id);
     }
 
-    saveContractInStorage(contractId, binData, expiresAt, origin, environmentId) { //TODO
-  /*    try (PooledDb db = dbPool.db()) {
-            try (
-                PreparedStatement statement =
-                db.statement(
-                    "INSERT INTO contract_binary (hash_id, bin_data) VALUES (?,?) " +
-                    "ON CONFLICT (hash_id) DO UPDATE SET bin_data=EXCLUDED.bin_data"
-                )
-        ) {
-                statement.setBytes(1, contractId.getDigest());
-                statement.setBytes(2, binData);
-                db.updateWithStatement(statement);
-            }
-        } catch (SQLException se) {
-            se.printStackTrace();
-            throw new Failure("saveContractInStorage binary failed: " + se);
-        } catch (Exception e) {
-            e.printStackTrace();
-            return 0;
-        }
-
-        try (PooledDb db = dbPool.db()) {
-            try (
-                PreparedStatement statement =
-                db.statement("INSERT INTO contract_storage (hash_id, origin, expires_at, environment_id) VALUES (?,?,?,?) RETURNING id")
-        ) {
-                statement.setBytes(1, contractId.getDigest());
-                statement.setBytes(2, origin.getDigest());
-                statement.setLong(3, Ut.unixTime(expiresAt));
-                statement.setLong(4, environmentId);
-                statement.closeOnCompletion();
-                ResultSet rs = statement.executeQuery();
-                if (rs == null)
-                    throw new Failure("saveContractInStorage failed: returning null");
-                rs.next();
-                long resId = rs.getLong(1);
-                rs.close();
-                return resId;
-            }
-        } catch (SQLException se) {
-            se.printStackTrace();
-            throw new Failure("saveContractInStorage failed: " + se);
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-
-        return 0;*/
+    saveContractInStorage(contractId, binData, expiresAt, origin, environmentId) {
+        return this.simpleUpdate("INSERT INTO contract_binary (hash_id, bin_data) VALUES (?,?) ON CONFLICT (hash_id) DO UPDATE SET bin_data=EXCLUDED.bin_data",
+            contractId.digest,
+            binData)
+            .then(() => {
+                return this.simpleQuery("INSERT INTO contract_storage (hash_id, origin, expires_at, environment_id) VALUES (?,?,?,?) RETURNING id",
+                    x => {
+                        if (x == null)
+                            throw new ex.Failure("saveContractInStorage failed: returning null");
+                        else
+                            return Number(x);
+                    },
+                    contractId.digest,
+                    origin.digest,
+                    Math.floor(expiresAt.getTime() / 1000),
+                    environmentId);
+            });
     }
 
     saveSubscriptionInStorage(hashId, subscriptionOnChain, expiresAt, environmentId) {
-        return new Promise((resolve, reject) => {
-            this.dbPool_.withConnection(con => {
-                con.executeUpdate(qr => {
-                        con.release();
-                        resolve();
-                    }, e => {
-                        con.release();
-                        reject(e);
-                    },
-                    "INSERT INTO contract_subscription (hash_id, subscription_on_chain, expires_at, environment_id) VALUES(?,?,?,?) RETURNING id",
-                    hashId.digest,
-                    subscriptionOnChain,
-                    Math.floor(expiresAt.getTime() / 1000),
-                    environmentId,
-                   /* ResultSet rs = statement.executeQuery();
-                    if (rs == null)
-                        throw new Failure("saveSubscriptionInStorage failed: returning null");
-                    rs.next();
-                    long resId = rs.getLong(1);
-                    rs.close();
-                    return resId;*/
-                );
-            });
-        });
+        return this.simpleQuery("INSERT INTO contract_subscription (hash_id, subscription_on_chain, expires_at, environment_id) VALUES(?,?,?,?) RETURNING id",
+            x => {
+                if (x == null)
+                    throw new ex.Failure("saveSubscriptionInStorage failed: returning null");
+                else
+                    return Number(x);
+            },
+            hashId.digest,
+            subscriptionOnChain,
+            Math.floor(expiresAt.getTime() / 1000),
+            environmentId);
     }
 
     getSubscriptionEnviromentIds(id) {}
@@ -1048,42 +909,18 @@ class Ledger {
     getFollowerCallbacksToResync() {}
 
     addFollowerCallback(id, environmentId, expiresAt, storedUntil) {
-        return new Promise((resolve, reject) => {
-            this.dbPool_.withConnection(con => {
-                con.executeUpdate(qr => {
-                        con.release();
-                        resolve();
-                    }, e => {
-                        con.release();
-                        reject(e);
-                    },
-                    "INSERT INTO follower_callbacks (id, state, environment_id, expires_at, stored_until) VALUES (?,?,?,?,?)",
-                    id.digest,
-                    //NCallbackService.FollowerCallbackState.STARTED.ordinal() TODO !!
-                    environmentId,
-                    Math.floor(expiresAt.getTime() / 1000),
-                    Math.floor(storedUntil.getTime() / 1000)
-                );
-            });
-        });
+        return this.simpleUpdate("INSERT INTO follower_callbacks (id, state, environment_id, expires_at, stored_until) VALUES (?,?,?,?,?)",
+            id.digest,
+            0, //NCallbackService.FollowerCallbackState.STARTED.ordinal() TODO !!
+            environmentId,
+            Math.floor(expiresAt.getTime() / 1000),
+            Math.floor(storedUntil.getTime() / 1000));
     }
 
     updateFollowerCallbackState(id, state) {
-        return new Promise((resolve, reject) => {
-            this.dbPool_.withConnection(con => {
-                con.executeUpdate(qr => {
-                        con.release();
-                        resolve();
-                    }, e => {
-                        con.release();
-                        reject(e);
-                    },
-                    "UPDATE follower_callbacks SET state = ? WHERE id = ?",
-                    //state.ordinal() // TODO !!
-                    id.digest
-                );
-            });
-        });
+        return this.simpleUpdate("UPDATE follower_callbacks SET state = ? WHERE id = ?",
+            0, //state.ordinal() // TODO !!
+            id.digest);
     }
 
     removeFollowerCallback(id) {
