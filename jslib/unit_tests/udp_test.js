@@ -3,46 +3,50 @@ import {NodeInfo} from 'udp_adapter'
 import * as tk from 'unit_tests/test_keys'
 
 unit.test("hello network", async () => {
-    console.log();
-    let newKey = await crypto.PrivateKey.generate(2048);
-    console.log("newKey: " + newKey.publicKey.shortAddress);
+    //console.log();
     let t0 = new Date().getTime();
     let i0 = 0;
-    let sum = 0;
-    let n = network.NodeInfo.withParameters(newKey.publicKey, 33, "node-33", "127.0.0.1", "192.168.1.101", 7007, 8008, 9009);
+
     let nc = new network.NetConfig();
-    nc.addNode(n);
-    let udp = new network.UDPAdapter(newKey, 33, nc);
-    //nc.addNode(n);
-    //for (let i = 0; i < 1000000000; ++i) {
-    for (let i = 0; i < 1000; ++i) {
-        let n = network.NodeInfo.withParameters(newKey.publicKey, i, 2, 3, 4, 5, 6, 7);
-        if (i != 33)
-            nc.addNode(n);
-        let ncopy = nc.getInfo(n.number);
-        n.publicKey.shortAddress;
-        n.number;
-        n.nodeAddress;
-        n.clientAddress;
-        n.serverAddress;
-        n.name;
-        // console.log(n.name);
-        // console.log("nodeAddress: ", n.nodeAddress.host, n.nodeAddress.port);
-        // console.log("clientAddress: ", n.clientAddress.host, n.clientAddress.port);
-        // console.log("serverAddress: ", n.serverAddress.host, n.serverAddress.port);
-        // let s = new network.SocketAddress("localhost", 3333);
-        // s.host;
-        // s.port;
-        //sum += n.getNumber();
-        //console.log(n.getNumber());
+    let pk1 = tk.TestKeys.getKey();
+    let pk2 = tk.TestKeys.getKey();
+    let n1 = network.NodeInfo.withParameters(pk1.publicKey, 1, "node-1", "127.0.0.1", "192.168.1.101", 7001, 8001, 9001);
+    let n2 = network.NodeInfo.withParameters(pk2.publicKey, 2, "node-2", "127.0.0.1", "192.168.1.101", 7002, 8002, 9002);
+    nc.addNode(n1);
+    nc.addNode(n2);
+    let udp1 = new network.UDPAdapter(pk1, 1, nc);
+    let udp2 = new network.UDPAdapter(pk2, 2, nc);
+
+    let receiveCounter = 0;
+    udp1.setReceiveCallback((packet, fromNode)=>{
+        ++receiveCounter;
+    });
+    udp2.setReceiveCallback((packet, fromNode)=>{
+        ++receiveCounter;
+    });
+
+    //let totalCount = 100000000;
+    let totalCount = 100;
+    for (let i = 0; i < totalCount; ++i) {
+
+        udp1.send(2, "payload1");
+        udp2.send(1, "payload2");
+
+        while (receiveCounter+1000 < 2*i)
+            await sleep(10);
+
         if (new Date().getTime() - t0 >= 1000) {
-            console.log("i = " + i + ", speed = " + (i - i0) + ", sum = " + sum);
+            console.log("receiveCounter = " + receiveCounter + ", speed = " + (receiveCounter - i0));
             t0 = new Date().getTime();
-            i0 = i;
+            i0 = receiveCounter;
             //gc();
         }
     }
-    //console.log(n);
+
+    while (receiveCounter < 2*totalCount)
+        await sleep(10);
+    udp1.close();
+    udp2.close();
 });
 
 unit.test("network.SocketAddress", async () => {
@@ -107,12 +111,25 @@ unit.test("network.UDPAdapter", async () => {
     let udp1 = new network.UDPAdapter(pk1, 1, nc);
     let udp2 = new network.UDPAdapter(pk2, 2, nc);
 
-    udp1.send(2, "payload1");
-    udp1.send(2, "payload11");
-    udp1.send(2, "payload111");
-    udp2.send(1, "payload2");
-    udp2.send(1, "payload22");
-    udp2.send(1, "payload222");
+    let receiveCounter = 0;
+    udp1.setReceiveCallback((packet, fromNode)=>{
+        //console.log("udp1 receive from "+fromNode.number+": " + utf8Decode(packet));
+        assert(utf8Decode(packet) === "payload2");
+        assert(fromNode.number === 2);
+        ++receiveCounter;
+    });
+    udp2.setReceiveCallback((packet, fromNode)=>{
+        //console.log("udp2 receive from "+fromNode.number+": " + utf8Decode(packet));
+        assert(utf8Decode(packet) === "payload1");
+        assert(fromNode.number === 1);
+        ++receiveCounter;
+    });
 
-    await sleep(1000);
+    udp1.send(2, "payload1");
+    udp2.send(1, "payload2");
+
+    while (receiveCounter < 2)
+        await sleep(10);
+    udp1.close();
+    udp2.close();
 });

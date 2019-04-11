@@ -246,10 +246,47 @@ Local<FunctionTemplate> initNetConfig(Isolate *isolate) {
     return tpl;
 }
 
+class UDPAdapterWrapper {
+public:
+    virtual ~UDPAdapterWrapper() {
+        close();
+    }
+    void create(const crypto::PrivateKey& ownPrivateKey, int ownNodeNumber, const NetConfig& netConfig) {
+        udpAdapterPtr_ = new UDPAdapter(ownPrivateKey, ownNodeNumber, netConfig, [](const byte_vector &packet, const NodeInfo &fromNode){});
+    }
+    void close() {
+        delete udpAdapterPtr_;
+        udpAdapterPtr_ = nullptr;
+    }
+    void send(int destNodeNumber, const byte_vector& payload) {
+        udpAdapterPtr_->send(destNodeNumber, payload);
+    }
+    void setReceiveCallback(Persistent<Function>* pcb, shared_ptr<Scripter> se) {
+        delete pcb_;
+        pcb_ = pcb;
+        udpAdapterPtr_->setReceiveCallback([=](const byte_vector &packet, const NodeInfo &fromNode) {
+            se->inPool([=](Local<Context> &context) {
+                auto fn = pcb->Get(context->GetIsolate());
+                if (fn->IsNull()) {
+                    se->throwError("null callback in setReceiveCallback");
+                } else {
+                    auto ab = ArrayBuffer::New(se->isolate(), packet.size());
+                    memcpy(ab->GetContents().Data(), &packet[0], packet.size());
+                    Local<Value> res[2] {Uint8Array::New(ab, 0, packet.size()), Integer::New(se->isolate(), fromNode.getNumber())};
+                    fn->Call(fn, 2, res);
+                }
+            });
+        });
+    }
+private:
+    UDPAdapter* udpAdapterPtr_ = nullptr;
+    Persistent<Function>* pcb_ = nullptr;
+};
+
 void udpAdapter_send(const FunctionCallbackInfo<Value> &args) {
     Scripter::unwrapArgs(args, [](ArgsContext &ac) {
         if (ac.args.Length() == 2) {
-            auto udpAdapter = unwrap<UDPAdapter>(ac.args.This());
+            auto udpAdapter = unwrap<UDPAdapterWrapper>(ac.args.This());
             int destNodeNumber = ac.asInt(0);
             auto contents = ac.args[1].As<TypedArray>()->Buffer()->GetContents();
             byte_vector bv(contents.ByteLength());
@@ -261,23 +298,45 @@ void udpAdapter_send(const FunctionCallbackInfo<Value> &args) {
     });
 }
 
+void udpAdapter_setReceiveCallback(const FunctionCallbackInfo<Value> &args) {
+    Scripter::unwrap(args, [&](const shared_ptr<Scripter> se, auto isolate, auto context) {
+        if (args.Length() == 1) {
+            auto udpAdapter = unwrap<UDPAdapterWrapper>(args.This());
+            Persistent<Function> *pcb = new Persistent<Function>(isolate, args[0].As<Function>());
+            udpAdapter->setReceiveCallback(pcb, se);
+            return;
+        }
+        se->throwError("invalid arguments");
+    });
+}
+
+void udpAdapter_close(const FunctionCallbackInfo<Value> &args) {
+    Scripter::unwrap(args, [&](const shared_ptr<Scripter> se, auto isolate, auto context) {
+        if (args.Length() == 0) {
+            auto udpAdapter = unwrap<UDPAdapterWrapper>(args.This());
+            udpAdapter->close();
+            return;
+        }
+        se->throwError("invalid arguments");
+    });
+}
+
 Local<FunctionTemplate> initUDPAdapter(Isolate *isolate) {
-    Local<FunctionTemplate> tpl = bindCppClass<UDPAdapter>(
+    Local<FunctionTemplate> tpl = bindCppClass<UDPAdapterWrapper>(
             isolate,
             "UDPAdapterImpl",
-            [=](const FunctionCallbackInfo<Value> &args) -> UDPAdapter* {
-                if (args.Length() == 4) {
-                    auto contents = args[0].As<TypedArray>()->Buffer()->GetContents();
-                    crypto::PrivateKey privateKey(contents.Data(), contents.ByteLength());
+            [=](const FunctionCallbackInfo<Value> &args) -> UDPAdapterWrapper* {
+                if (args.Length() == 3) {
                     try {
-                        return new UDPAdapter(
-                                privateKey,                                                      // ownPrivateKey
-                                args[1]->Int32Value(isolate->GetCurrentContext()).FromJust(),    // ownNodeNumber
-                                *unwrap<NetConfig>(Local<Object>::Cast(args[2])),                // netConfig
-                                [](const byte_vector &packet, const NodeInfo &fromNode) {
-                                    printf("packet received, size=%zu\n", packet.size());
-                                }
+                        auto contents = args[0].As<TypedArray>()->Buffer()->GetContents();
+                        crypto::PrivateKey privateKey(contents.Data(), contents.ByteLength());
+                        auto res = new UDPAdapterWrapper();
+                        res->create(
+                            privateKey,                                                      // ownPrivateKey
+                            args[1]->Int32Value(isolate->GetCurrentContext()).FromJust(),    // ownNodeNumber
+                            *unwrap<NetConfig>(Local<Object>::Cast(args[2]))                 // netConfig
                         );
+                        return res;
                     } catch (const std::exception& e) {
                         isolate->ThrowException(
                                 Exception::TypeError(String::NewFromUtf8(isolate, e.what())));
@@ -290,6 +349,8 @@ Local<FunctionTemplate> initUDPAdapter(Isolate *isolate) {
             });
     auto prototype = tpl->PrototypeTemplate();
     prototype->Set(isolate, "__send", FunctionTemplate::New(isolate, udpAdapter_send));
+    prototype->Set(isolate, "__setReceiveCallback", FunctionTemplate::New(isolate, udpAdapter_setReceiveCallback));
+    prototype->Set(isolate, "__close", FunctionTemplate::New(isolate, udpAdapter_close));
 
     UDPAdapterTpl.Reset(isolate, tpl);
     return tpl;
