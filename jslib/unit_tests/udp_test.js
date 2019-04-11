@@ -56,6 +56,7 @@ unit.test("network.NodeInfo", async () => {
     let n = network.NodeInfo.withParameters(newKey.publicKey, 33, "node-33", "127.0.0.1", "192.168.1.101", 7007, 8008, 9009);
     assert(n.number === 33);
     assert(n.name === "node-33");
+    assert(n.publicHost === "192.168.1.101");
     assert(n.publicKey.equals(newKey.publicKey));
     assert(n.nodeAddress.host === "127.0.0.1");
     assert(n.nodeAddress.port === 7007);

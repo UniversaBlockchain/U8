@@ -53,4 +53,8 @@ namespace network {
         return nodeName_;
     }
 
+    const std::string& NodeInfo::getPublicHost() const {
+        return publicHost_;
+    }
+
 };

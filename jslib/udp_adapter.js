@@ -41,6 +41,10 @@ network.NodeInfo = class {
     get name() {
         return this.memoise('__getName', () => this.nodeInfo_.__getName());
     }
+
+    get publicHost() {
+        return this.memoise('__getPublicHost', () => this.nodeInfo_.__getPublicHost());
+    }
 };
 Object.assign(network.NodeInfo.prototype, MemoiseMixin);
 

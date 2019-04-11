@@ -52,6 +52,8 @@ namespace network {
         /** String node name is a secondary identificator */
         const std::string& getName() const;
 
+        const std::string& getPublicHost() const;
+
     private:
         crypto::PublicKey publicKey_;
         SocketAddress nodeAddress_;

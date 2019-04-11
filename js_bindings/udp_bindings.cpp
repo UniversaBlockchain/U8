@@ -86,6 +86,17 @@ void nodeInfoGetName(const FunctionCallbackInfo<Value> &args) {
     });
 }
 
+void nodeInfoGetPublicHost(const FunctionCallbackInfo<Value> &args) {
+    Scripter::unwrapArgs(args, [](ArgsContext &ac) {
+        if (ac.args.Length() == 0) {
+            auto nodeInfo = unwrap<NodeInfo>(ac.args.This());
+            ac.setReturnValue(ac.v8String(nodeInfo->getPublicHost()));
+            return;
+        }
+        ac.throwError("invalid arguments");
+    });
+}
+
 Local<FunctionTemplate> initNodeInfo(Isolate *isolate) {
     Local<FunctionTemplate> tpl = bindCppClass<NodeInfo>(
             isolate,
@@ -122,6 +133,7 @@ Local<FunctionTemplate> initNodeInfo(Isolate *isolate) {
     prototype->Set(isolate, "__getServerAddress", FunctionTemplate::New(isolate, nodeInfoGetServerAddress));
     prototype->Set(isolate, "__getNumber", FunctionTemplate::New(isolate, nodeInfoGetNumber));
     prototype->Set(isolate, "__getName", FunctionTemplate::New(isolate, nodeInfoGetName));
+    prototype->Set(isolate, "__getPublicHost", FunctionTemplate::New(isolate, nodeInfoGetPublicHost));
 
     NodeInfoTpl.Reset(isolate, tpl);
     return tpl;
