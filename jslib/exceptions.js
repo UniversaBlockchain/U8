@@ -15,12 +15,4 @@ class IllegalArgumentError extends Error {
     }
 }
 
-class Failure extends Error {
-    constructor(message = undefined) {
-        super();
-        if (message !== undefined)
-            this.message = message;
-    }
-}
-
-module.exports = {IllegalStateError,IllegalArgumentError,Failure}
+module.exports = {IllegalStateError,IllegalArgumentError}

@@ -4,7 +4,8 @@
 
 import * as db from 'pg_driver'
 import * as trs from 'timers'
-import {HashId} from 'crypto'
+import {HashId, PrivateKey} from 'crypto'
+import {NodeInfo, NetConfig} from 'udp_adapter'
 
 const StateRecord = require("staterecord").StateRecord;
 const ItemState = require("itemstate").ItemState;
@@ -893,10 +894,111 @@ class Ledger {
         });
     }
 
-    saveConfig(myInfo, netConfig, nodeKey) {}
-    loadConfig() {}
-    addNode(nodeInfo) {}
-    removeNode(nodeInfo) {}
+    async saveConfig(myInfo, netConfig, nodeKey) {
+        await this.simpleUpdate("delete from config;");
+
+        for (let nodeInfo of netConfig.toList()) {
+            let sqlText;
+            let params = [nodeInfo.clientAddress.port,
+                nodeInfo.serverAddress.port,
+                nodeInfo.nodeAddress.port,
+                nodeInfo.number,
+                nodeInfo.name,
+                nodeInfo.publicHost,
+                nodeInfo.clientAddress.host,
+                nodeInfo.publicKey.packed];
+
+            if (nodeInfo.number === myInfo.number) {
+                sqlText = "insert into config(http_client_port,http_server_port,udp_server_port, node_number, node_name, public_host,host,public_key,private_key) values(?,?,?,?,?,?,?,?,?);";
+                params.push(nodeKey.packed);
+            } else
+                sqlText = "insert into config(http_client_port,http_server_port,udp_server_port, node_number, node_name, public_host,host,public_key) values(?,?,?,?,?,?,?,?);";
+
+            await this.simpleUpdate(sqlText, ...params);
+        }
+    }
+
+    loadConfig() {
+        return new Promise(async(resolve, reject) => {
+            this.dbPool_.withConnection(con => {
+                con.executeQuery(async(qr) => {
+                        let result = {
+                            myInfo : null,
+                            netConfig : null,
+                            nodeKey : null
+                        };
+                        let nodeInfos = [];
+
+                        let names = qr.getColNamesMap();
+                        let count = qr.getRowsCount();
+
+                        while (count > 0) {
+                            let rows;
+                            if (count > 1024) {
+                                rows = qr.getRows(1024);
+                                count -= 1024;
+                            } else {
+                                rows = qr.getRows(count);
+                                count = 0;
+                            }
+
+                            for (let i = 0; i < rows.length; i++)
+                                if (rows[i] != null) {
+                                    let nodeInfo = NodeInfo.withParameters(rows[i][names["public_key"]],
+                                        rows[i][names["node_number"]],
+                                        rows[i][names["node_name"]],
+                                        rows[i][names["host"]],
+                                        rows[i][names["public_host"]],
+                                        rows[i][names["udp_server_port"]],
+                                        rows[i][names["http_client_port"]],
+                                        rows[i][names["http_server_port"]]);
+
+                                    nodeInfos.push(nodeInfo);
+
+                                    let packedKey = rows[i][names["private_key"]];
+                                    if (packedKey != null) {
+                                        result.myInfo = nodeInfo;
+                                        result.nodeKey = new crypto.PrivateKey(packedKey);
+                                    }
+                                }
+                        }
+
+                        con.release();
+
+                        if (nodeInfos.length === 0)
+                            throw new LedgerException("config not found");
+
+                        result.netConfig = new NetConfig();
+                        for (let i = 0; i < nodeInfos.length; i++)
+                            result.netConfig.addNode(nodeInfos[i]);
+
+                        resolve(result);
+                    }, e => {
+                        con.release();
+                        reject(e);
+                    },
+                    "SELECT * FROM config;"
+                );
+            });
+        });
+    }
+
+    addNode(nodeInfo) {
+        return this.simpleUpdate("insert into config(http_client_port,http_server_port,udp_server_port, node_number, node_name, public_host,host,public_key) values(?,?,?,?,?,?,?,?);",
+            nodeInfo.clientAddress.port,
+            nodeInfo.serverAddress.port,
+            nodeInfo.nodeAddress.port,
+            nodeInfo.number,
+            nodeInfo.name,
+            nodeInfo.publicHost,
+            nodeInfo.clientAddress.host,
+            nodeInfo.publicKey.packed);
+    }
+
+    removeNode(nodeInfo) {
+        return this.simpleUpdate("delete from config where node_number = ?;",
+            nodeInfo.number);
+    }
 
     findUnfinished() {
         return new Promise(async(resolve, reject) => {
@@ -978,7 +1080,7 @@ class Ledger {
                 return this.simpleQuery("INSERT INTO contract_storage (hash_id, origin, expires_at, environment_id) VALUES (?,?,?,?) RETURNING id",
                     x => {
                         if (x == null)
-                            throw new ex.Failure("saveContractInStorage failed: returning null");
+                            throw new LedgerException("saveContractInStorage failed: returning null");
                         else
                             return Number(x);
                     },
@@ -993,7 +1095,7 @@ class Ledger {
         return this.simpleQuery("INSERT INTO contract_subscription (hash_id, subscription_on_chain, expires_at, environment_id) VALUES(?,?,?,?) RETURNING id",
             x => {
                 if (x == null)
-                    throw new ex.Failure("saveSubscriptionInStorage failed: returning null");
+                    throw new LedgerException("saveSubscriptionInStorage failed: returning null");
                 else
                     return Number(x);
             },
@@ -1085,7 +1187,7 @@ class Ledger {
                 addNameEntry((NNameRecordEntry) nameRecordEntry);
             }
         } else {
-            throw new Failure("addNameRecord failed");
+            throw new LedgerException("addNameRecord failed");
         }*/
     }
 
