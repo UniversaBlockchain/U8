@@ -674,7 +674,14 @@ class Ledger {
         await sleep(200+delay*1.5);
     }
 
+    /**
+     * Get count of records in Ledger.
+     *
+     * @return {Promise<Number>} count of records.
+     */
     countRecords() {
+        return this.simpleQuery("SELECT COUNT(*) FROM ledger",
+            x => Number(x));
     }
 
     /**
@@ -791,6 +798,12 @@ class Ledger {
         return this.simpleUpdate("insert into ledger_testrecords(hash) values(?) on conflict do nothing;", itemId.digest);
     }
 
+    /**
+     * Check the specified item is a test.
+     *
+     * @param {HashId} itemId - Item HashId.
+     * @return {Promise<Boolean>}.
+     */
     isTestnet(itemId) {
         return this.simpleQuery("select exists(select 1 from ledger_testrecords where hash=?)",
             x => Boolean(x),
@@ -828,13 +841,101 @@ class Ledger {
 
     saveEnvironment(environment) {}
 
-    findBadReferencesOf(ids) {}
+    /**
+     * Find bad (not approved) items in ledger by set of IDs.
+     *
+     * @param {Set<HashId>} ids - set of HashId`s.
+     * @return {Promise<Set<HashId>>} - set of IDs not approved items.
+     */
+    findBadReferencesOf(ids) {
+        if (ids.size < 1)
+            throw new ex.IllegalArgumentError("Error findBadReferencesOf: empty IDs set");
+
+        let query = "SELECT hash FROM ledger WHERE hash IN (?";
+        for (let i = 1; i < ids.size; i++)
+            query += ",?";
+
+        query += ") AND state = " + ItemState.APPROVED.ordinal;
+
+        let arr = [];
+        for (let id of ids)
+            arr.push(id.digest);
+
+        return new Promise(async(resolve, reject) => {
+            this.dbPool_.withConnection(con => {
+                con.executeQuery(async(qr) => {
+                        let count = qr.getRowsCount();
+                        while (count > 0) {
+                            let rows;
+                            if (count > 1024) {
+                                rows = qr.getRows(1024);
+                                count -= 1024;
+                            } else {
+                                rows = qr.getRows(count);
+                                count = 0;
+                            }
+
+                            for (let i = 0; i < rows.length; i++)
+                                if (rows[i] != null)
+                                    ids.delete(crypto.HashId.withDigest(rows[i][0]));
+                        }
+
+                        con.release();
+                        resolve(ids);
+                    }, e => {
+                        con.release();
+                        reject(e);
+                    },
+                    query,
+                    ...arr
+                );
+            });
+        });
+    }
 
     saveConfig(myInfo, netConfig, nodeKey) {}
     loadConfig() {}
     addNode(nodeInfo) {}
     removeNode(nodeInfo) {}
-    findUnfinished() {}
+
+    findUnfinished() {
+        return new Promise(async(resolve, reject) => {
+            this.dbPool_.withConnection(con => {
+                con.executeQuery(async(qr) => {
+                        let map = new t.GenericMap();
+                        let count = qr.getRowsCount();
+                        while (count > 0) {
+                            let rows;
+                            if (count > 1024) {
+                                rows = qr.getRows(1024);
+                                count -= 1024;
+                            } else {
+                                rows = qr.getRows(count);
+                                count = 0;
+                            }
+
+                            for (let i = 0; i < rows.length; i++)
+                                if (rows[i] != null) {
+                                    let record = StateRecord.initFrom(this, rows[i]);
+
+                                    if (record.isExpired())
+                                        await record.destroy();
+                                    else
+                                        map.set(record.id, record);
+                                }
+                        }
+
+                        con.release();
+                        resolve(map);
+                    }, e => {
+                        con.release();
+                        reject(e);
+                    },
+                    "select * from sr_find_unfinished()"
+                );
+            });
+        });
+    }
 
     getItem(record) {
         return this.simpleQuery("select packed from items where id = ?",
@@ -999,29 +1100,176 @@ class Ledger {
     getNameRecord(nameReduced) {}
     getNameByAddress(address) {}
     getNameByOrigin(origin) {}
-    isAllNameRecordsAvailable(reducedNames) {}
-    isAllOriginsAvailable(origins) {}
-    isAllAddressesAvailable(addresses) {}
+
+    /**
+     * Get unavailable names for UNS.
+     *
+     * @param {Array<string>} reducedNames - array of reduced names for check availability.
+     * @return {Promise<Array<string>>} - array of unavailable names.
+     */
+    isAllNameRecordsAvailable(reducedNames) {
+        if (reducedNames.length < 1)
+            throw new ex.IllegalArgumentError("Error isAllNameRecordsAvailable: empty reducedNames");
+
+        let query = "SELECT name_reduced FROM name_storage WHERE name_reduced IN (?";
+        for (let i = 1; i < reducedNames.length; i++)
+            query += ",?";
+
+        query += ")";
+
+        return new Promise(async(resolve, reject) => {
+            this.dbPool_.withConnection(con => {
+                con.executeQuery(async(qr) => {
+                        let res = [];
+                        let count = qr.getRowsCount();
+                        while (count > 0) {
+                            let rows;
+                            if (count > 1024) {
+                                rows = qr.getRows(1024);
+                                count -= 1024;
+                            } else {
+                                rows = qr.getRows(count);
+                                count = 0;
+                            }
+
+                            for (let i = 0; i < rows.length; i++)
+                                if (rows[i] != null)
+                                    res.push(rows[i][0]);
+                        }
+
+                        con.release();
+                        resolve(res);
+                    }, e => {
+                        con.release();
+                        reject(e);
+                    },
+                    query,
+                    ...reducedNames
+                );
+            });
+        });
+    }
+
+    /**
+     * Get unavailable origins for UNS.
+     *
+     * @param {Array<HashId>} origins - array of origins (@see HashId) for check availability.
+     * @return {Promise<Array<string>>} - array of unavailable origins (as base64 strings).
+     */
+    isAllOriginsAvailable(origins) {
+        if (origins.length < 1)
+            throw new ex.IllegalArgumentError("Error isAllOriginsAvailable: empty origins");
+
+        let query = "SELECT origin FROM name_entry WHERE origin IN (?";
+        for (let i = 1; i < origins.length; i++)
+            query += ",?";
+
+        query += ")";
+
+        let arr = [];
+        for (let id of origins)
+            arr.push(id.digest);
+
+        return new Promise(async(resolve, reject) => {
+            this.dbPool_.withConnection(con => {
+                con.executeQuery(async(qr) => {
+                        let res = [];
+                        let count = qr.getRowsCount();
+                        while (count > 0) {
+                            let rows;
+                            if (count > 1024) {
+                                rows = qr.getRows(1024);
+                                count -= 1024;
+                            } else {
+                                rows = qr.getRows(count);
+                                count = 0;
+                            }
+
+                            for (let i = 0; i < rows.length; i++)
+                                if (rows[i] != null)
+                                    res.push(crypto.HashId.withDigest(rows[i][0]).base64);
+                        }
+
+                        con.release();
+                        resolve(res);
+                    }, e => {
+                        con.release();
+                        reject(e);
+                    },
+                    query,
+                    ...arr
+                );
+            });
+        });
+    }
+
+    /**
+     * Get unavailable addresses for UNS.
+     *
+     * @param {Array<string>} addresses - array of addresses for check availability.
+     * @return {Promise<Array<string>>} - array of unavailable addresses (shorts and longs).
+     */
+    isAllAddressesAvailable(addresses) {
+        if (addresses.length < 1)
+            throw new ex.IllegalArgumentError("Error isAllNameRecordsAvailable: empty reducedNames");
+
+        let queryPart = "?";
+        for (let i = 1; i < addresses.length; i++)
+            queryPart += ",?";
+
+        let query = "SELECT short_addr, long_addr FROM name_entry WHERE short_addr IN (" +
+            queryPart +") OR long_addr IN (" + queryPart + ")";
+
+
+
+        return new Promise(async(resolve, reject) => {
+            this.dbPool_.withConnection(con => {
+                con.executeQuery(async(qr) => {
+                        let res = [];
+                        let count = qr.getRowsCount();
+                        while (count > 0) {
+                            let rows;
+                            if (count > 1024) {
+                                rows = qr.getRows(1024);
+                                count -= 1024;
+                            } else {
+                                rows = qr.getRows(count);
+                                count = 0;
+                            }
+
+                            for (let i = 0; i < rows.length; i++)
+                                if (rows[i] != null) {
+                                    res.push(rows[i][0]);
+                                    res.push(rows[i][1]);
+                                }
+                        }
+
+                        con.release();
+                        resolve(res);
+                    }, e => {
+                        con.release();
+                        reject(e);
+                    },
+                    query,
+                    ...addresses,
+                    ...addresses
+                );
+            });
+        });
+    }
 
     clearExpiredNameRecords(holdDuration) {
         return this.simpleUpdate("DELETE FROM name_storage WHERE expires_at < ? ", Math.floor(Date.now() / 1000) - holdDuration);
     }
 
-    cleanup(isPermanetMode) {
+    async cleanup(isPermanetMode) {
         let now = Math.floor(Date.now() / 1000);
-        return this.simpleUpdate("delete from items where id in (select id from ledger where expires_at < ?);", now)
-            .then(() => {
-                return this.simpleUpdate("delete from items where keepTill < ?;", now)
-                    .then(() => {
-                        let promise = this.simpleUpdate("delete from follower_callbacks where stored_until < ?;", now);
-                        if (!isPermanetMode)
-                            return promise.then(() => {
-                                return this.simpleUpdate("delete from ledger where expires_at < ?;", now)
-                            });
-                        else
-                            return promise;
-                    });
-            });
+
+        await this.simpleUpdate("delete from items where id in (select id from ledger where expires_at < ?);", now);
+        await this.simpleUpdate("delete from items where keepTill < ?;", now);
+        await this.simpleUpdate("delete from follower_callbacks where stored_until < ?;", now);
+        if (!isPermanetMode)
+            await this.simpleUpdate("delete from ledger where expires_at < ?;", now);
     }
 }
 

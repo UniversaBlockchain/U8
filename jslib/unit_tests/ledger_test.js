@@ -73,10 +73,14 @@ unit.test("ledger_test: getRecord", async () => {
     //get empty
     assert(await ledger.getRecord(HashId.of(randomBytes(64))) == null);
 
+    let records = await ledger.countRecords();
+
     //create and get
     let hash = HashId.of(randomBytes(64));
     let row = await ledger.findOrCreate(hash);
     let record = await ledger.getRecord(hash);
+
+    assert(await ledger.countRecords() === records + 1);
 
     assert(record.recordId === row[0]);
     assert(record.id.equals(hash));
@@ -173,37 +177,15 @@ unit.test("ledger_test: createOutputLockRecord", async () => {
 });
 
 function getTestRecordsCount(ledger, hashId) {
-    return new Promise((resolve, reject) => {
-        ledger.dbPool_.withConnection(con => {
-            con.executeQuery(qr => {
-                    con.release();
-                    resolve(Number(qr.getRows(1)[0][0]));
-                }, e => {
-                    con.release();
-                    reject(e);
-                },
-                "select count(*) from ledger_testrecords where hash = ?",
-                hashId.digest
-            );
-        });
-    });
+    return ledger.simpleQuery("select count(*) from ledger_testrecords where hash = ?",
+        x => Number(x),
+        hashId.digest);
 }
 
 function getRecordsCount(ledger, hashId) {
-    return new Promise((resolve, reject) => {
-        ledger.dbPool_.withConnection(con => {
-            con.executeQuery(qr => {
-                    con.release();
-                    resolve(Number(qr.getRows(1)[0][0]));
-                }, e => {
-                    con.release();
-                    reject(e);
-                },
-                "select count(*) from ledger where hash = ?",
-                hashId.digest
-            );
-        });
-    });
+    return ledger.simpleQuery("select count(*) from ledger where hash = ?",
+        x => Number(x),
+        hashId.digest);
 }
 
 unit.test("ledger_test: moveToTestnet", async () => {
@@ -676,6 +658,23 @@ unit.test("ledger_test: saveAndTransaction", async () => {
     await ledger.close();
 });
 
+unit.test("ledger_test: getItemTest", async () => {
+    let ledger = await createTestLedger();
+
+    let contract = Contract.fromPrivateKey(tk.TestKeys.getKey());
+    await contract.seal();
+
+    await ledger.findOrCreate(contract.id);
+    let r = await ledger.getRecord(contract.id);
+
+    await ledger.putItem(r, contract, new Date((Date.now() / 1000 + 300) * 1000));
+    let gottenContract = await ledger.getItem(r);
+
+    assert(gottenContract.sealedBinary.equals(contract.sealedBinary));
+
+    await ledger.close();
+});
+
 unit.test("ledger_test: ledgerCleanupTest", async () => {
     let ledger = await createTestLedger();
 
@@ -709,20 +708,9 @@ unit.test("ledger_test: ledgerCleanupTest", async () => {
     assert(await getRecordsCount(ledger, contract1.id) === 0);
     assert(await getRecordsCount(ledger, contract2.id) === 1);
 
-    let count = await new Promise((resolve, reject) => {
-        ledger.dbPool_.withConnection(con => {
-            con.executeQuery(qr => {
-                    con.release();
-                    resolve(Number(qr.getRows(1)[0][0]));
-                }, e => {
-                    con.release();
-                    reject(e);
-                },
-                "select count(*) from items where id in (select id from ledger where hash = ?)",
-                contract2.id.digest
-            );
-        });
-    });
+    let count = await ledger.simpleQuery("select count(*) from items where id in (select id from ledger where hash = ?)",
+        x => Number(x),
+        contract2.id.digest);
 
     assert(count === 0);
 
@@ -732,19 +720,7 @@ unit.test("ledger_test: ledgerCleanupTest", async () => {
 unit.test("ledger_test: paymentSaveGetTest", async () => {
     let ledger = await createTestLedger();
 
-    await new Promise((resolve, reject) => {
-        ledger.dbPool_.withConnection(con => {
-            con.executeUpdate(qr => {
-                    con.release();
-                    resolve();
-                }, e => {
-                    con.release();
-                    reject(e);
-                },
-                "delete from payments_summary;"
-            );
-        });
-    });
+    await ledger.simpleUpdate("delete from payments_summary;");
 
     let now  = Date.now();
     let dateNow = new Date();
@@ -775,6 +751,32 @@ unit.test("ledger_test: paymentSaveGetTest", async () => {
     }
 
     assert(pays === 112 * i);
+
+    await ledger.close();
+});
+
+unit.test("ledger_test: findBadReferencesOfTest", async () => {
+    let ledger = await createTestLedger();
+
+    let hash1 = HashId.of(randomBytes(64));
+    await ledger.findOrCreate(hash1);
+    let r1 = await ledger.getRecord(hash1);
+
+    let hash2 = HashId.of(randomBytes(64));
+    await ledger.findOrCreate(hash2);
+    let r2 = await ledger.getRecord(hash2);
+
+    await ledger.transaction(async(con) => {
+        r1.state = ItemState.APPROVED;
+        r2.state = ItemState.DECLINED;
+        await r1.save(con);
+        await r2.save(con);
+    });
+
+    let ids = await ledger.findBadReferencesOf(new Set([hash1, hash2]));
+
+    assert(ids.size === 1);
+    assert(ids.has(hash2));
 
     await ledger.close();
 });
