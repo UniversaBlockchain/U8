@@ -727,6 +727,13 @@ class Ledger {
         });
     }
 
+    /**
+     * Get an Object, the keys of which are the states of the Ledger items,
+     * and the values are the number of items that are in this state.
+     *
+     * @param {Date} createdAfter=0 -Creation time, those elements that are created after this time are taken into account.
+     * @return {Promise<object>}
+     */
     getLedgerSize(createdAfter = 0) {
         return new Promise((resolve, reject) => {
             this.dbPool_.withConnection(con => {
@@ -749,12 +756,25 @@ class Ledger {
         });
     }
 
+    /**
+     * Save the payment (the amount on a specific date) for the subsequent collection of statistics.
+     *
+     * @param {number} amount - Amount of payment.
+     * @param {Date} date - Payment date.
+     * @return {Promise}
+     */
     savePayment(amount, date) {
         return this.simpleUpdate("insert into payments_summary (amount,date) VALUES (?,?) ON CONFLICT (date) DO UPDATE SET amount = payments_summary.amount + excluded.amount",
             amount,
             Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()) / 1000);
     }
 
+    /**
+     * Get all payments aggregated by day from a specific date.
+     *
+     * @param {Date} fromDate - Specific date.
+     * @return {Promise<Map>}
+     */
     getPayments(fromDate) {
         return new Promise((resolve, reject) => {
             this.dbPool_.withConnection(con => {
@@ -1055,9 +1075,23 @@ class Ledger {
             Math.floor(keepTill.getTime() / 1000));
     }
 
-    getKeepingItem(itemId) {}
-    putKeepingItem(record, item) {}
-    getKeepingByOrigin(origin, limit) {}
+    getKeepingItem(itemId) {
+        return this.simpleQuery("select * from keeping_items where hash = ? limit 1",
+            null,
+            itemId.digest);
+    }
+    putKeepingItem(record, item) {
+        if (!item instanceof Contract)
+            return;
+
+        return this.simpleUpdate("insert into keeping_items (id,hash,origin,parent,packed) values(?,?,?,?,?);",
+        record != null ? record.recordId : null,
+        item.id.digest,
+        item.origin.digest,
+        item.parent != null ? item.parent.digest : null
+    );
+
+    }
 
     getEnvironment(environmentId) {}
     getEnvironment(contractId) {}
@@ -1105,10 +1139,54 @@ class Ledger {
             environmentId);
     }
 
-    getSubscriptionEnviromentIds(id) {}
+    getSubscriptionEnviromentIds(id) {
+        return new Promise(async(resolve, reject) => {
+            this.dbPool_.withConnection(con => {
+                con.executeQuery(async(qr) => {
+                        let environmentIds = new Set();
+                        let count = qr.getRowsCount();
+                        while (count > 0) {
+                            let rows;
+                            if (count > 1024) {
+                                rows = qr.getRows(1024);
+                                count -= 1024;
+                            } else {
+                                rows = qr.getRows(count);
+                                count = 0;
+                            }
+                            for (let i = 0; i < rows.length; i++) {
+                                if (rows[i] != null)
+                                    environmentIds.add(rows[i][0]);
+                            }
+                        }
 
-    getFollowerCallbackStateById(id) {}
-    getFollowerCallbacksToResyncByEnvId(environmentId) {}
+                        con.release();
+                        resolve(environmentIds);
+                    }, e => {
+                        con.release();
+                        reject(e);
+                    },
+                    "SELECT environment_id FROM contract_subscription WHERE hash_id = ? GROUP BY environment_id",
+                    id.digest
+                );
+            });
+        });
+    }
+
+    getFollowerCallbackStateById(id) { // TODO !!
+        return this.simpleQuery("SELECT state FROM follower_callbacks WHERE id = ?",
+            x => {
+                if (x == null)
+                    return NCallbackService.FollowerCallbackState.UNDEFINED;
+                else
+                    return NCallbackService.FollowerCallbackState.values()[x];
+            },
+            id.digest);
+    }
+
+    getFollowerCallbacksToResyncByEnvId(environmentId) {
+
+    }
     getFollowerCallbacksToResync() {}
 
     addFollowerCallback(id, environmentId, expiresAt, storedUntil) {
@@ -1140,12 +1218,74 @@ class Ledger {
 
     clearExpiredStorageContractBinaries() {
         //TODO: add trigger for delete expired contracts after deleting all subscriptions, and remove this function
+        return this.simpleUpdate("DELETE FROM contract_binary WHERE hash_id NOT IN (SELECT hash_id FROM contract_storage GROUP BY hash_id)");
     }
 
-    getSmartContractById(smartContractId) {}
-    getContractInStorage(contractId) {}
-    getContractInStorage(slotId, contractId) {}
-    getContractsInStorageByOrigin(slotId, originId) {}
+    getSmartContractById(smartContractId) {
+        return this.simpleQuery("" +
+            "SELECT transaction_pack FROM environments " +
+            "WHERE ncontract_hash_id=?",
+            null,
+            smartContractId.digest);
+    }
+
+    getContractInStorage(contractId) {
+        return this.simpleQuery("" +
+            "SELECT bin_data FROM contract_binary " +
+            "WHERE hash_id=?",
+            null,
+            contractId.digest);
+    }
+
+    getContractInStorage(slotId, contractId) {
+        return this.simpleQuery("" +
+            "SELECT bin_data FROM environments " +
+            "LEFT JOIN contract_storage ON environments.id=contract_storage.environment_id " +
+            "LEFT JOIN contract_binary ON contract_binary.hash_id=contract_storage.hash_id " +
+            "WHERE environments.ncontract_hash_id=? AND contract_storage.hash_id=?",
+            null,
+            slotId.digest,
+            contractId.digest);
+    }
+
+    getContractsInStorageByOrigin(slotId, originId) {
+        return new Promise(async(resolve, reject) => {
+            this.dbPool_.withConnection(con => {
+                con.executeQuery(async(qr) => {
+                        let res = [];
+                        let count = qr.getRowsCount();
+                        while (count > 0) {
+                            let rows;
+                            if (count > 1024) {
+                                rows = qr.getRows(1024);
+                                count -= 1024;
+                            } else {
+                                rows = qr.getRows(count);
+                                count = 0;
+                            }
+                            for (let i = 0; i < rows.length; i++) {
+                                if (rows[i] != null)
+                                    res.push(rows[i][0]);
+                            }
+                        }
+
+                        con.release();
+                        resolve(res);
+                    }, e => {
+                        con.release();
+                        reject(e);
+                    },
+                    "" +
+                    "SELECT bin_data FROM environments " +
+                    "LEFT JOIN contract_storage ON environments.id=contract_storage.environment_id " +
+                    "LEFT JOIN contract_binary ON contract_binary.hash_id=contract_storage.hash_id " +
+                    "WHERE environments.ncontract_hash_id=? AND contract_storage.origin=?",
+                    slotId.digest,
+                    originId.digest
+                );
+            });
+        });
+    }
 
     removeEnvironmentSubscription(subscriptionId) {
         return this.simpleUpdate("DELETE FROM contract_subscription WHERE id = ?", subscriptionId);
