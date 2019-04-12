@@ -98,6 +98,16 @@ unit.test("network.NetConfig", async () => {
     assert(n2.clientAddress.port === n2c.clientAddress.port);
     assert(n2.serverAddress.host === n2c.serverAddress.host);
     assert(n2.serverAddress.port === n2c.serverAddress.port);
+    let list = nc.toList();
+    assert(list.length === 3);
+    let numbers = [1,2,3];
+    let ports = [n1.serverAddress.port, n2.serverAddress.port, n3.serverAddress.port];
+    assert(numbers.includes(list[0].number));
+    assert(numbers.includes(list[1].number));
+    assert(numbers.includes(list[2].number));
+    assert(ports.includes(list[0].serverAddress.port));
+    assert(ports.includes(list[1].serverAddress.port));
+    assert(ports.includes(list[2].serverAddress.port));
 });
 
 unit.test("network.UDPAdapter", async () => {

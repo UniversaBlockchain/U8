@@ -184,7 +184,7 @@ Local<FunctionTemplate> initSocketAddress(Isolate *isolate) {
     return tpl;
 }
 
-void socketAddress_addNode(const FunctionCallbackInfo<Value> &args) {
+void netConfig_addNode(const FunctionCallbackInfo<Value> &args) {
     Scripter::unwrapArgs(args, [](ArgsContext &ac) {
         if (ac.args.Length() == 1) {
             auto netConfig = unwrap<NetConfig>(ac.args.This());
@@ -200,7 +200,7 @@ void socketAddress_addNode(const FunctionCallbackInfo<Value> &args) {
     });
 }
 
-void socketAddress_getInfo(const FunctionCallbackInfo<Value> &args) {
+void netConfig_getInfo(const FunctionCallbackInfo<Value> &args) {
     Scripter::unwrapArgs(args, [](ArgsContext &ac) {
         if (ac.args.Length() == 1) {
             auto netConfig = unwrap<NetConfig>(ac.args.This());
@@ -218,7 +218,7 @@ void socketAddress_getInfo(const FunctionCallbackInfo<Value> &args) {
     });
 }
 
-void socketAddress_find(const FunctionCallbackInfo<Value> &args) {
+void netConfig_find(const FunctionCallbackInfo<Value> &args) {
     Scripter::unwrapArgs(args, [](ArgsContext &ac) {
         if (ac.args.Length() == 1) {
             auto netConfig = unwrap<NetConfig>(ac.args.This());
@@ -234,13 +234,29 @@ void socketAddress_find(const FunctionCallbackInfo<Value> &args) {
     });
 }
 
+void netConfig_toList(const FunctionCallbackInfo<Value> &args) {
+    Scripter::unwrapArgs(args, [](ArgsContext &ac) {
+        if (ac.args.Length() == 0) {
+            auto netConfig = unwrap<NetConfig>(ac.args.This());
+            vector<NodeInfo*> list = netConfig->toList();
+            Local<Array> arr = Array::New(ac.isolate, list.size());
+            for (int i = 0; i < list.size(); ++i)
+                arr->Set(i, wrap(NodeInfoTpl, ac.isolate, list[i]));
+            ac.setReturnValue(arr);
+            return;
+        }
+        ac.throwError("invalid arguments");
+    });
+}
+
 Local<FunctionTemplate> initNetConfig(Isolate *isolate) {
     Local<FunctionTemplate> tpl = bindCppClass<NetConfig>(isolate, "NetConfigImpl");
 
     auto prototype = tpl->PrototypeTemplate();
-    prototype->Set(isolate, "__addNode", FunctionTemplate::New(isolate, socketAddress_addNode));
-    prototype->Set(isolate, "__getInfo", FunctionTemplate::New(isolate, socketAddress_getInfo));
-    prototype->Set(isolate, "__find", FunctionTemplate::New(isolate, socketAddress_find));
+    prototype->Set(isolate, "__addNode", FunctionTemplate::New(isolate, netConfig_addNode));
+    prototype->Set(isolate, "__getInfo", FunctionTemplate::New(isolate, netConfig_getInfo));
+    prototype->Set(isolate, "__find", FunctionTemplate::New(isolate, netConfig_find));
+    prototype->Set(isolate, "__toList", FunctionTemplate::New(isolate, netConfig_toList));
 
     NetConfigTpl.Reset(isolate, tpl);
     return tpl;

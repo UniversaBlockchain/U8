@@ -22,4 +22,11 @@ namespace network {
         return byNumber.find(nodeId) != byNumber.end();
     }
 
+    std::vector<NodeInfo*> NetConfig::toList() {
+        std::vector<NodeInfo*> res;
+        for (auto& it: byNumber)
+            res.push_back(&it.second);
+        return res;
+    }
+
 };

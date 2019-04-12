@@ -85,6 +85,14 @@ network.NetConfig = class {
     find(nodeNumber) {
         return this.netConfig_.__find(nodeNumber);
     }
+
+    toList() {
+        let res = [];
+        let implList = this.netConfig_.__toList();
+        for (let i = 0; i < implList.length; ++i)
+            res.push(network.NodeInfo.copyImpl(implList[i]))
+        return res;
+    }
 };
 
 network.UDPAdapter = class {
