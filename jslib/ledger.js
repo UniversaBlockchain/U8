@@ -732,7 +732,7 @@ class Ledger {
      * and the values are the number of items that are in this state.
      *
      * @param {Date} createdAfter=0 -Creation time, those elements that are created after this time are taken into account.
-     * @return {Promise<object>}
+     * @return {Promise<Object>}
      */
     getLedgerSize(createdAfter = 0) {
         return new Promise((resolve, reject) => {
@@ -1076,20 +1076,22 @@ class Ledger {
     }
 
     getKeepingItem(itemId) {
-        return this.simpleQuery("select * from keeping_items where hash = ? limit 1",
+        return this.simpleQuery("select packed from keeping_items where hash = ? limit 1",
             null,
             itemId.digest);
     }
+
     putKeepingItem(record, item) {
         if (!item instanceof Contract)
             return;
 
         return this.simpleUpdate("insert into keeping_items (id,hash,origin,parent,packed) values(?,?,?,?,?);",
-        record != null ? record.recordId : null,
-        item.id.digest,
-        item.origin.digest,
-        item.parent != null ? item.parent.digest : null
-    );
+            record != null ? record.recordId : null,
+            item.id.digest,
+            item.origin.digest,
+            item.parent != null ? item.parent.digest : null,
+            item.getPackedTransaction()
+        );
 
     }
 
@@ -1174,14 +1176,14 @@ class Ledger {
     }
 
     getFollowerCallbackStateById(id) { // TODO !!
-        return this.simpleQuery("SELECT state FROM follower_callbacks WHERE id = ?",
+        /*return this.simpleQuery("SELECT state FROM follower_callbacks WHERE id = ?",
             x => {
                 if (x == null)
                     return NCallbackService.FollowerCallbackState.UNDEFINED;
                 else
                     return NCallbackService.FollowerCallbackState.values()[x];
             },
-            id.digest);
+            id.digest);*/
     }
 
     getFollowerCallbacksToResyncByEnvId(environmentId) {
@@ -1222,24 +1224,19 @@ class Ledger {
     }
 
     getSmartContractById(smartContractId) {
-        return this.simpleQuery("" +
-            "SELECT transaction_pack FROM environments " +
-            "WHERE ncontract_hash_id=?",
+        return this.simpleQuery("SELECT transaction_pack FROM environments WHERE ncontract_hash_id=?",
             null,
             smartContractId.digest);
     }
 
     getContractInStorage(contractId) {
-        return this.simpleQuery("" +
-            "SELECT bin_data FROM contract_binary " +
-            "WHERE hash_id=?",
+        return this.simpleQuery("SELECT bin_data FROM contract_binary WHERE hash_id=?",
             null,
             contractId.digest);
     }
 
     getContractInStorage(slotId, contractId) {
-        return this.simpleQuery("" +
-            "SELECT bin_data FROM environments " +
+        return this.simpleQuery("SELECT bin_data FROM environments " +
             "LEFT JOIN contract_storage ON environments.id=contract_storage.environment_id " +
             "LEFT JOIN contract_binary ON contract_binary.hash_id=contract_storage.hash_id " +
             "WHERE environments.ncontract_hash_id=? AND contract_storage.hash_id=?",
@@ -1275,7 +1272,6 @@ class Ledger {
                         con.release();
                         reject(e);
                     },
-                    "" +
                     "SELECT bin_data FROM environments " +
                     "LEFT JOIN contract_storage ON environments.id=contract_storage.environment_id " +
                     "LEFT JOIN contract_binary ON contract_binary.hash_id=contract_storage.hash_id " +
