@@ -99,7 +99,13 @@ network.UDPAdapter = class {
     }
 
     setReceiveCallback(callback) {
-        this.udpAdapter_.__setReceiveCallback((packet, fromNode)=>{callback(packet, this.netConfig_.getInfo(fromNode));});
+        this.udpAdapter_.__setReceiveCallback((arr)=>{
+            for (let i = 0; i < Math.floor(arr.length/2); ++i) {
+                let packet = arr[i*2];
+                let fromNode = arr[i*2 + 1];
+                callback(packet, this.netConfig_.getInfo(fromNode));
+            }
+        });
     }
 
     close() {

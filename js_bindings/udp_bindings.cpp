@@ -248,6 +248,11 @@ Local<FunctionTemplate> initNetConfig(Isolate *isolate) {
 
 class UDPAdapterWrapper {
 public:
+    UDPAdapterWrapper() {
+        timer_.scheduleAtFixedRate([this](){
+            sendAllFromBuf();
+        }, 20, 20);
+    }
     virtual ~UDPAdapterWrapper() {
         close();
     }
@@ -255,6 +260,8 @@ public:
         udpAdapterPtr_ = new UDPAdapter(ownPrivateKey, ownNodeNumber, netConfig, [](const byte_vector &packet, const NodeInfo &fromNode){});
     }
     void close() {
+        timer_.stop();
+        se_ = nullptr;
         delete udpAdapterPtr_;
         udpAdapterPtr_ = nullptr;
     }
@@ -264,23 +271,52 @@ public:
     void setReceiveCallback(Persistent<Function>* pcb, shared_ptr<Scripter> se) {
         delete pcb_;
         pcb_ = pcb;
+        se_ = se;
         udpAdapterPtr_->setReceiveCallback([=](const byte_vector &packet, const NodeInfo &fromNode) {
-            se->inPool([=](Local<Context> &context) {
-                auto fn = pcb->Get(context->GetIsolate());
+            atomic<bool> needSend(false);
+            {
+                lock_guard lock(mutex_);
+                buf_.emplace_back(make_pair(packet, fromNode.getNumber()));
+                if (buf_.size() >= 100)
+                    needSend = true;
+            }
+            if (needSend) {
+                sendAllFromBuf();
+            }
+        });
+    }
+private:
+    void sendAllFromBuf() {
+        lock_guard lock(mutex_);
+        if ((se_ != nullptr) && (buf_.size() > 0)) {
+            auto bufCopy = buf_;
+            buf_.clear();
+            se_->inPool([=](Local<Context> &context) {
+                auto fn = pcb_->Get(context->GetIsolate());
                 if (fn->IsNull()) {
-                    se->throwError("null callback in setReceiveCallback");
+                    se_->throwError("null callback in setReceiveCallback");
                 } else {
-                    auto ab = ArrayBuffer::New(se->isolate(), packet.size());
-                    memcpy(ab->GetContents().Data(), &packet[0], packet.size());
-                    Local<Value> res[2] {Uint8Array::New(ab, 0, packet.size()), Integer::New(se->isolate(), fromNode.getNumber())};
-                    fn->Call(fn, 2, res);
+                    Local<Array> arr = Array::New(se_->isolate(), bufCopy.size() * 2);
+                    for (int i = 0; i < bufCopy.size(); ++i) {
+                        auto &p = bufCopy[i].first;
+                        auto ab = ArrayBuffer::New(se_->isolate(), p.size());
+                        memcpy(ab->GetContents().Data(), &p[0], p.size());
+                        arr->Set(i * 2, Uint8Array::New(ab, 0, p.size()));
+                        arr->Set(i * 2 + 1, Integer::New(se_->isolate(), bufCopy[i].second));
+                    }
+                    Local<Value> result = arr;
+                    fn->Call(fn, 1, &result);
                 }
             });
-        });
+        }
     }
 private:
     UDPAdapter* udpAdapterPtr_ = nullptr;
     Persistent<Function>* pcb_ = nullptr;
+    shared_ptr<Scripter> se_ = nullptr;
+    vector<pair<byte_vector,int>> buf_;
+    TimerThread timer_;
+    std::mutex mutex_;
 };
 
 void udpAdapter_send(const FunctionCallbackInfo<Value> &args) {
