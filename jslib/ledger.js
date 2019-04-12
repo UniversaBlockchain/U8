@@ -289,13 +289,13 @@ class Ledger {
                         con.release();
                         for (let [k,v] of map) {
                             this.bufParams.findOrCreate_insert.bufInProc.delete(k);
-                            v[1].forEach(v => {v();}); // call resolvers
+                            v[1].forEach(v => v()); // call resolvers
                         }
                     }, e => {
                         con.release();
                         for (let [k,v] of map) {
                             this.bufParams.findOrCreate_insert.bufInProc.delete(k);
-                            v[2].forEach(v => {v(e);}); // call rejecters
+                            v[2].forEach(v => v(e)); // call rejecters
                         }
                     }, queryString, ...params);
                 });
@@ -498,10 +498,8 @@ class Ledger {
     transactionDestroy(record, connection) {
         return new Promise((resolve, reject) => {
             connection.executeUpdate(qr => {
-                    connection.release();
                     resolve();
                 }, e => {
-                    connection.release();
                     reject(e);
                 },
                 "DELETE FROM items WHERE id = ?;",
@@ -510,10 +508,8 @@ class Ledger {
         }).then(() => {
             return new Promise((resolve, reject) => {
                 connection.executeUpdate(qr => {
-                        connection.release();
                         resolve();
                     }, e => {
-                        connection.release();
                         reject(e);
                     },
                     "DELETE FROM ledger WHERE id = ?;",
@@ -585,7 +581,6 @@ class Ledger {
             return new Promise((resolve, reject) => {
                 connection.executeQuery(qr => {
                         let row = qr.getRows(1)[0];
-                        connection.release();
 
                         if (row != null && row[0] != null)
                             record.recordId = row[0];
@@ -594,7 +589,6 @@ class Ledger {
 
                         resolve(record);
                     }, e => {
-                        connection.release();
                         reject(e);
                     },
                     "insert into ledger(hash, state, created_at, expires_at, locked_by_id) values(?,?,?,?,?) RETURNING id;",
@@ -608,10 +602,8 @@ class Ledger {
         else
             return new Promise((resolve, reject) => {
                 connection.executeUpdate(qr => {
-                        connection.release();
                         resolve(record);
                     }, e => {
-                        connection.release();
                         reject(e);
                     },
                     "update ledger set state=?, expires_at=?, locked_by_id=? where id=?",
@@ -667,7 +659,7 @@ class Ledger {
 
         //wait for delayed timer callbacks
         let delay = 50;
-        Object.keys(this.bufParams).forEach((key) => {
+        Object.keys(this.bufParams).forEach(key => {
             if ("delayMillis" in this.bufParams[key])
                 if (delay < this.bufParams[key].delayMillis)
                     delay = this.bufParams[key].delayMillis;
@@ -740,9 +732,7 @@ class Ledger {
                 con.executeQuery(qr => {
                         let res = {};
                         let rows = qr.getRows(0);
-                        rows.forEach((r, i, arr) => {
-                            res[r[1]] = r[0];
-                        });
+                        rows.forEach(r => res[r[1]] = r[0]);
                         con.release();
                         resolve(res);
                     }, e => {

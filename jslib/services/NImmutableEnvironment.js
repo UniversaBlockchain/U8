@@ -1,4 +1,7 @@
 const bs = require("biserializable");
+const NameCache = require("./namecache").NameCache;
+const e = require("errors");
+const ErrorRecord = e.ErrorRecord;
 
 /**
  * Implements {@see ImmutableEnvironment} interface for smart contract.
@@ -38,6 +41,65 @@ class NImmutableEnvironment extends ImmutableEnvironment, bs.BiSerializable {
         this.storagesSet = new Set(storages);
         this.nameRecordsSet = new Set(nameRecords);
         this.followerService = followerService;
+    }
+
+    subscriptions() {
+        return this.subscriptionsSet;
+    }
+
+    storages() {
+        return this.storagesSet;
+    }
+
+    nameRecords() {
+        return this.nameRecordsSet;
+    }
+
+    getFollowerService(init) {
+        if (init === true && this.followerService == null)
+            this.followerService = new NFollowerService(this.ledger, this.id);
+
+        return this.followerService;
+    }
+
+    tryAllocate(reducedNamesToAllocate, originsToAllocate, addressesToAllocate) {
+        let namesErrors = this.isNamesAvailable(reducedNamesToAllocate);
+        let originsErrors = this.isOriginsAvailable(originsToAllocate);
+        let addressesErrors = this.isAddressesAvailable(addressesToAllocate);
+        let checkResult = namesErrors.length === 0 && originsErrors.length === 0 && addressesErrors.length === 0;
+
+        if (!checkResult) {
+            if (namesErrors.length === 0)
+                this.nameCache.unlockNameList(reducedNamesToAllocate);
+            if (originsErrors.length === 0)
+                this.nameCache.unlockOriginList(originsToAllocate);
+            if (addressesErrors.length === 0)
+                this.nameCache.unlockAddressList(addressesToAllocate);
+        }
+
+        let res = [];
+        namesErrors.forEach(s => res.push(new ErrorRecord(Errors.FAILED_CHECK, "names", "name '" + s + "' is not available")));
+        originsErrors.forEach(s => res.push(new ErrorRecord(Errors.FAILED_CHECK, "origins", "origin '" + s + "' is not available")));
+        addressesErrors.forEach(s => res.push(new ErrorRecord(Errors.FAILED_CHECK, "addresses", "address '" + s + "' is not available")));
+
+        return res;
+    }
+
+    isNamesAvailable(reducedNames) {
+        if (reducedNames.length === 0)
+            return [];
+
+        let unavailableNamesCache = this.nameCache.lockNameList(reducedNames);
+        if (unavailableNamesCache.length > 0)
+            return unavailableNamesCache;
+
+        let unavailableNamesLedger = this.ledger.isAllNameRecordsAvailable(reducedNames);
+        if (unavailableNamesLedger.length > 0) {
+            this.nameCache.unlockNameList(reducedNames);
+            return unavailableNamesLedger;
+        }
+
+        return [];
     }
 
 

@@ -10,39 +10,6 @@
 class ImmutableEnvironment {
 
     /**
-     * There is always and instance of the contract available.
-     *
-     * @return {Contract} the contract that this environment is created for.
-     */
-    getContract() {
-        throw new Error("not implemented");
-    }
-
-    /**
-     * Read access to the instance server-size key-value store. Note that if the store is not created, it always return
-     * default value, this is not an error.
-     *
-     * @param {string} keyName - key name
-     * @param defaultValue - value to return if the KV store is empty
-     *
-     * @return the stored value or the default value
-     */
-    get(keyName, defaultValue) {
-        throw new Error("not implemented");
-    }
-
-    /**
-     * The instance when this contract was created at THIS NODE (calling Node). This is effectively the time when the
-     * node has started processing the contract, the {@see Ledger} stored, e.g.
-     * {@see StateRecord#createdAt} will be the right value.
-     *
-     * @return {Date} creation contract time at this node.
-     */
-    instanceCreatedAt() {
-        throw new Error("not implemented");
-    }
-
-    /**
      * Get array of contract subscription.
      *
      * @return {[ContractSubscription]} array of contract subscription.
