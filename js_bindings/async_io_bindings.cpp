@@ -60,6 +60,7 @@ void JsAsyncFileOpen(const FunctionCallbackInfo<Value> &args) {
                             res = BigInt::New(isolate, result);
                         fn->Call(fn, 1, &res);
                     }
+                    pcb->Reset();
                     delete pcb;
                 });
             });
@@ -103,6 +104,9 @@ void JsAsyncHandleRead(const FunctionCallbackInfo<Value> &args) {
                           fn->Call(fn, 2, res);
                       }
                   }
+                  pcb->Reset();
+                  pResult->Reset();
+                  pBuffer->Reset();
                   delete pcb;
                   delete pResult;
                   delete pBuffer;
@@ -140,6 +144,8 @@ void JsAsyncHandleWrite(const FunctionCallbackInfo<Value> &args) {
                   auto fn = pcb->Get(isolate);
                   Local<Value> res = Integer::New(isolate, result);
                   fn->Call(fn, 1, &res);
+                  pcb->Reset();
+                  pBuffer->Reset();
                   delete pcb;
                   delete pBuffer;
               });
@@ -167,6 +173,7 @@ void JsAsyncHandleClose(const FunctionCallbackInfo<Value> &args) {
                 auto fn = pcb->Get(isolate);
                 Local<Value> res = Integer::New(isolate, result);
                 fn->Call(fn, 1, &res);
+                pcb->Reset();
                 delete pcb;
             });
         });
@@ -191,6 +198,7 @@ void JsAsyncTCPListen(const FunctionCallbackInfo<Value> &args) {
             handle->open(ac.asString(0).data(), ac.asInt(1), [=](ssize_t result) {
                 scripter->lockedContext([=](auto context) {
                     auto fn = onReady->Get(isolate);
+                    onReady->Reset();
                     delete onReady;
                     Local<Value> jsResult = Integer::New(isolate, result);
                     fn->Call(fn, 1, &jsResult);
@@ -223,6 +231,7 @@ void JsAsyncTCPConnect(const FunctionCallbackInfo<Value> &args) {
             handle->connect(bindIp.data(), bindPort, connectToHost.data(), connectToPort, [=](ssize_t result) {
                 scripter->lockedContext([=](auto context) {
                     auto fn = onReady->Get(isolate);
+                    onReady->Reset();
                     delete onReady;
                     Local<Value> jsResult = Integer::New(isolate, result);
                     fn->Call(fn, 1, &jsResult);
@@ -273,6 +282,7 @@ void JsAsyncTLSListen(const FunctionCallbackInfo<Value> &args) {
             handle->open(ac.asString(0).data(), ac.asInt(1),ac.asString(2).data(),ac.asString(3).data(), [=](ssize_t result) {
                 scripter->lockedContext([=](auto context) {
                     auto fn = onReady->Get(isolate);
+                    onReady->Reset();
                     delete onReady;
                     Local<Value> jsResult = Integer::New(isolate, result);
                     fn->Call(fn, 1, &jsResult);
@@ -306,6 +316,7 @@ void JsAsyncTLSConnect(const FunctionCallbackInfo<Value> &args) {
             handle->connect(bindIp.data(), bindPort, connectToHost.data(), connectToPort, ac.asString(4).data(), ac.asString(5).data(), [=](ssize_t result) {
                 scripter->lockedContext([=](auto context) {
                     auto fn = onReady->Get(isolate);
+                    onReady->Reset();
                     delete onReady;
                     Local<Value> jsResult = Integer::New(isolate, result);
                     fn->Call(fn, 1, &jsResult);
@@ -343,6 +354,7 @@ void JsAsyncTLSAccept(const FunctionCallbackInfo<Value> &args) {
             int code = serverHandle->acceptFromListeningSocket(connectionHandle, [=](asyncio::IOTLS* handle, ssize_t result) {
                 scripter->lockedContext([=](auto context) {
                     auto fn = onReady->Get(isolate);
+                    onReady->Reset();
                     delete onReady;
                     Local<Value> jsResult = Integer::New(isolate, result);
                     fn->Call(fn, 1, &jsResult);
@@ -405,6 +417,8 @@ void JsAsyncUDPRecv(const FunctionCallbackInfo<Value> &args) {
                                             String::NewFromUtf8(isolate, strIP.data()), Integer::New(isolate, port)};
                         fn->Call(fn, 4, res);
 
+                        pResult->Reset();
+                        pBuffer->Reset();
                         delete pResult;
                         delete pBuffer;
                     } else {
@@ -450,6 +464,8 @@ void JsAsyncUDPSend(const FunctionCallbackInfo<Value> &args) {
                 auto fn = pcb->Get(isolate);
                 Local<Value> res = Integer::New(isolate, result);
                 fn->Call(fn, 1, &res);
+                pcb->Reset();
+                pBuffer->Reset();
                 delete pcb;
                 delete pBuffer;
             });
@@ -460,6 +476,7 @@ void JsAsyncUDPSend(const FunctionCallbackInfo<Value> &args) {
 void deleteUDPRecvPersistent(const FunctionCallbackInfo<Value> &args, const ArgsContext &ac) {
     Local<Value> pcb = args.This()->Get(String::NewFromUtf8(ac.isolate, "_pcb"));
     if (!pcb->IsNullOrUndefined()) {
+        ((Persistent<Function>*)pcb->ToBigInt(ac.context).ToLocalChecked()->Uint64Value())->Reset();
         delete (Persistent<Function>*) pcb->ToBigInt(ac.context).ToLocalChecked()->Uint64Value();
         args.This()->Set(String::NewFromUtf8(ac.isolate, "_pcb"), Undefined(ac.isolate));
     }
@@ -500,6 +517,7 @@ void JsAsyncUDPClose(const FunctionCallbackInfo<Value> &args) {
                 auto fn = pcb->Get(isolate);
                 Local<Value> res = Integer::New(isolate, result);
                 fn->Call(fn, 1, &res);
+                pcb->Reset();
                 delete pcb;
             });
         });
