@@ -39,6 +39,7 @@ static void privateKeySign(const FunctionCallbackInfo<Value> &args) {
                         auto signature = key->sign(data, size, ht);
                         scripter->lockedContext([=](Local<Context> cxt) {
                             auto fn = onReady->Get(scripter->isolate());
+                            onReady->Reset();
                             delete onReady;
                             if (fn->IsFunction()) {
                                 Local<Value> result = vectorToV8(isolate, signature);
@@ -75,6 +76,8 @@ static void privateKeyDecrypt(const FunctionCallbackInfo<Value> &args) {
                             auto plain = key->decrypt(data, size);
                             scripter->lockedContext([=](Local<Context> cxt) {
                                 auto fn = onReady->Get(scripter->isolate());
+                                onReady->Reset();
+                                onError->Reset();
                                 delete onReady;
                                 delete onError;
                                 if (fn->IsFunction()) {
@@ -88,6 +91,8 @@ static void privateKeyDecrypt(const FunctionCallbackInfo<Value> &args) {
                         catch(const exception &e) {
                             scripter->lockedContext([=](Local<Context> cxt) {
                                 auto fn = onError->Get(scripter->isolate());
+                                onReady->Reset();
+                                onError->Reset();
                                 delete onReady;
                                 delete onError;
                                 if (fn->IsFunction()) {
@@ -132,6 +137,7 @@ static void privateKeyGenerate(const FunctionCallbackInfo<Value> &args) {
                     auto key = new PrivateKey(strength);
                     scripter->lockedContext([=](Local<Context> cxt) {
                         auto fn = onReady->Get(scripter->isolate());
+                        onReady->Reset();
                         delete onReady;
                         if (fn->IsNull()) {
                             scripter->throwError("null callback in PrivateKey::generate");
@@ -179,6 +185,7 @@ static void publicKeyVerify(const FunctionCallbackInfo<Value> &args) {
                     bool result = key->verify(sigData, sigSize, dataData, dataSize, ht);
                     scripter->lockedContext([=](Local<Context> cxt) {
                         auto fn = onReady->Get(isolate);
+                        onReady->Reset();
                         delete onReady;
                         if (fn->IsFunction()) {
                             Local<Value> res = Boolean::New(isolate, result);
@@ -210,6 +217,7 @@ static void publicKeyEncrypt(const FunctionCallbackInfo<Value> &args) {
                     auto result = key->encrypt(data, size);
                     scripter->lockedContext([=](Local<Context> cxt) {
                         auto fn = onReady->Get(isolate);
+                        onReady->Reset();
                         delete onReady;
                         if (fn->IsFunction()) {
                             Local<Value> res = vectorToV8(isolate, result);
