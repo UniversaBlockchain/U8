@@ -102,5 +102,61 @@ class NImmutableEnvironment extends ImmutableEnvironment, bs.BiSerializable {
         return [];
     }
 
+    isOriginsAvailable(origins) {
+        if (origins.length === 0)
+            return [];
 
+        let unavailableOriginsCache = this.nameCache.lockOriginList(origins);
+        if (unavailableOriginsCache.length > 0)
+            return unavailableOriginsCache;
+
+        let unavailableOriginsLedger = this.ledger.isAllOriginsAvailable(origins);
+        if (unavailableOriginsLedger.length > 0) {
+            this.nameCache.unlockOriginList(origins);
+            return unavailableOriginsLedger;
+        }
+
+        return [];
+    }
+
+    isAddressesAvailable(addresses) {
+        if (addresses.length === 0)
+            return [];
+
+        let unavailableAddressesCache = this.nameCache.lockAddressList(addresses);
+        if (unavailableAddressesCache.length > 0)
+            return unavailableAddressesCache;
+
+        let unavailableAddressesLedger = this.ledger.isAllAddressesAvailable(addresses);
+        if (unavailableAddressesLedger.length > 0) {
+            this.nameCache.unlockAddressList(addresses);
+            return unavailableAddressesLedger;
+        }
+
+        return [];
+    }
+
+    getMutable() {
+        return new NMutableEnvironment(this);
+    }
+
+    serialize(serializer) {
+        return {
+            contract : this.contract.getPackedTransaction(),
+            createdAt : serializer.serialize(this.createdAt),
+            subscriptions : serializer.serialize(Array.from(this.subscriptionsSet)),
+            storages : serializer.serialize(Array.from(this.storagesSet)),
+            nameRecords : serializer.serialize(Array.from(this.nameRecordsSet)),
+            kvStore : serializer.serialize(this.kvStore)
+        };
+    }
+
+    deserialize(data, deserializer) {
+        this.createdAt = deserializer.deserialize(data.createdAt);
+        this.subscriptionsSet = new Set(deserializer.deserialize(data.subscriptions));
+        this.storagesSet = new Set(deserializer.deserialize(data.storages));
+        this.nameRecordsSet = new Set(deserializer.deserialize(data.nameRecords));
+        this.contract = Contract.fromPackedTransaction(data.contract);
+        this.kvStore = deserializer.deserialize(data.kvStore);
+    }
 }

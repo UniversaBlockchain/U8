@@ -915,7 +915,7 @@ class Ledger {
                 nodeInfo.number,
                 nodeInfo.name,
                 nodeInfo.publicHost,
-                nodeInfo.clientAddress.host,
+                nodeInfo.serverAddress.host,
                 nodeInfo.publicKey.packed];
 
             if (nodeInfo.number === myInfo.number) {
@@ -931,7 +931,7 @@ class Ledger {
     loadConfig() {
         return new Promise(async(resolve, reject) => {
             this.dbPool_.withConnection(con => {
-                con.executeQuery(async(qr) => {
+                con.executeQuery(qr => {
                         let result = {
                             myInfo : null,
                             netConfig : null,
@@ -954,7 +954,8 @@ class Ledger {
 
                             for (let i = 0; i < rows.length; i++)
                                 if (rows[i] != null) {
-                                    let nodeInfo = NodeInfo.withParameters(rows[i][names["public_key"]],
+                                    let nodeInfo = NodeInfo.withParameters(
+                                        new crypto.PublicKey(rows[i][names["public_key"]]),
                                         rows[i][names["node_number"]],
                                         rows[i][names["node_name"]],
                                         rows[i][names["host"]],
@@ -1001,7 +1002,7 @@ class Ledger {
             nodeInfo.number,
             nodeInfo.name,
             nodeInfo.publicHost,
-            nodeInfo.clientAddress.host,
+            nodeInfo.serverAddress.host,
             nodeInfo.publicKey.packed);
     }
 

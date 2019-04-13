@@ -3,6 +3,7 @@ import {Ledger} from 'ledger'
 import {HashId} from 'crypto'
 import {randomBytes} from 'tools'
 import * as tk from 'unit_tests/test_keys'
+import {NodeInfo, NetConfig} from 'udp_adapter'
 
 const ItemState = require("itemstate").ItemState;
 const ex = require("exceptions");
@@ -777,6 +778,70 @@ unit.test("ledger_test: findBadReferencesOfTest", async () => {
 
     assert(ids.size === 1);
     assert(ids.has(hash2));
+
+    await ledger.close();
+});
+
+unit.test("ledger_test: configTest", async () => {
+    let ledger = await createTestLedger();
+
+    let nc = new NetConfig();
+    let pk = tk.TestKeys.getKey();
+
+    for (let i = 0; i < 10; i++)
+        nc.addNode(NodeInfo.withParameters(tk.TestKeys.getKey().publicKey, i, "node-" + i,
+            "127.0.0.1", "192.168.1.101", 7001, 8001, 9001));
+
+    await ledger.saveConfig(nc.getInfo(7), nc, pk);
+
+    let pk10 = tk.TestKeys.getKey().publicKey;
+    await ledger.addNode(NodeInfo.withParameters(pk10, 10, "node-10",
+        "127.0.0.100", "192.168.1.111", 17001, 18001, 19001));
+
+    await ledger.removeNode(nc.getInfo(2));
+
+    let loaded = await ledger.loadConfig();
+
+    assert(loaded.nodeKey.equals(pk));
+    assert(loaded.myInfo.number === 7);
+    assert(!loaded.netConfig.find(2));
+
+    loaded.netConfig.toList().forEach(ni => {
+        if (ni.number === 10) {
+            assertSilent(ni.publicKey.equals(pk10));
+            assertSilent(ni.nodeAddress.host === "127.0.0.100");
+            assertSilent(ni.nodeAddress.port === 17001);
+            assertSilent(ni.clientAddress.host === "192.168.1.111");
+            assertSilent(ni.clientAddress.port === 18001);
+            assertSilent(ni.serverAddress.host === "127.0.0.100");
+            assertSilent(ni.serverAddress.port === 19001);
+            assertSilent(ni.name === "node-10");
+            assertSilent(ni.publicHost === "192.168.1.111");
+
+        } else {
+            assertSilent(ni.publicKey.equals(nc.getInfo(ni.number).publicKey));
+            assertSilent(ni.nodeAddress.host === nc.getInfo(ni.number).nodeAddress.host);
+            assertSilent(ni.nodeAddress.port === nc.getInfo(ni.number).nodeAddress.port);
+            assertSilent(ni.clientAddress.host === nc.getInfo(ni.number).clientAddress.host);
+            assertSilent(ni.clientAddress.port === nc.getInfo(ni.number).clientAddress.port);
+            assertSilent(ni.serverAddress.host === nc.getInfo(ni.number).serverAddress.host);
+            assertSilent(ni.serverAddress.port === nc.getInfo(ni.number).serverAddress.port);
+            assertSilent(ni.name === nc.getInfo(ni.number).name);
+            assertSilent(ni.publicHost === nc.getInfo(ni.number).publicHost);
+
+            if (ni.number === 7) {
+                assertSilent(ni.publicKey.equals(loaded.myInfo.publicKey));
+                assertSilent(ni.nodeAddress.host === loaded.myInfo.nodeAddress.host);
+                assertSilent(ni.nodeAddress.port === loaded.myInfo.nodeAddress.port);
+                assertSilent(ni.clientAddress.host === loaded.myInfo.clientAddress.host);
+                assertSilent(ni.clientAddress.port === loaded.myInfo.clientAddress.port);
+                assertSilent(ni.serverAddress.host === loaded.myInfo.serverAddress.host);
+                assertSilent(ni.serverAddress.port === loaded.myInfo.serverAddress.port);
+                assertSilent(ni.name === loaded.myInfo.name);
+                assertSilent(ni.publicHost === loaded.myInfo.publicHost);
+            }
+        }
+    });
 
     await ledger.close();
 });
