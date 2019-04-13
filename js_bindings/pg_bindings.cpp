@@ -52,6 +52,7 @@ void JsPGPoolWithConnection(const FunctionCallbackInfo<Value> &args) {
                 auto fn = pcb->Get(isolate);
                 Local<Value> res[1] {wrap(BusyConnectionTemplate, isolate, conn.get())};
                 fn->Call(fn, 1, res);
+                pcb->Reset();
                 delete pcb;
                 //pool->releaseConnection(conn);
             });
@@ -144,6 +145,8 @@ void JsBusyConnectionExecuteQuery(const FunctionCallbackInfo<Value> &args) {
                 auto fn = onSuccessPcb->Get(isolate);
                 Local<Value> res[1] {wrap(QueryResultTemplate, isolate, pqr)};
                 fn->Call(fn, 1, res);
+                onSuccessPcb->Reset();
+                onErrorPcb->Reset();
                 delete onSuccessPcb;
                 delete onErrorPcb;
                 delete pqr;
@@ -154,6 +157,8 @@ void JsBusyConnectionExecuteQuery(const FunctionCallbackInfo<Value> &args) {
                 auto fn = onErrorPcb->Get(isolate);
                 Local<Value> result = scripter->v8String(err);
                 fn->Call(fn, 1, &result);
+                onSuccessPcb->Reset();
+                onErrorPcb->Reset();
                 delete onSuccessPcb;
                 delete onErrorPcb;
             });
@@ -205,6 +210,8 @@ void JsBusyConnectionExecuteUpdate(const FunctionCallbackInfo<Value> &args) {
                 auto fn = onSuccessPcb->Get(isolate);
                 Local<v8::Value> prm = Number::New(ac.isolate, affectedRows);
                 fn->Call(fn, 1, &prm);
+                onSuccessPcb->Reset();
+                onErrorPcb->Reset();
                 delete onSuccessPcb;
                 delete onErrorPcb;
             });
@@ -214,6 +221,8 @@ void JsBusyConnectionExecuteUpdate(const FunctionCallbackInfo<Value> &args) {
                 auto fn = onErrorPcb->Get(isolate);
                 Local<Value> result = scripter->v8String(err);
                 fn->Call(fn, 1, &result);
+                onSuccessPcb->Reset();
+                onErrorPcb->Reset();
                 delete onSuccessPcb;
                 delete onErrorPcb;
             });

@@ -285,7 +285,10 @@ public:
         udpAdapterPtr_->send(destNodeNumber, payload);
     }
     void setReceiveCallback(Persistent<Function>* pcb, shared_ptr<Scripter> se) {
-        delete pcb_;
+        if (pcb_ != nullptr) {
+            pcb_->Reset();
+            delete pcb_;
+        }
         pcb_ = pcb;
         se_ = se;
         udpAdapterPtr_->setReceiveCallback([=](const byte_vector &packet, const NodeInfo &fromNode) {
