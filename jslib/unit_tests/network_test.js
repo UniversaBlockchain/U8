@@ -150,7 +150,7 @@ unit.test("multi udp", async () => {
     await sock2.close();
 });
 
-unit.test("multi udp 1000", async () => {
+unit.test("multi udp 100", async () => {
 
     let sock1 = udp.open({port: 18107}, (error) => {
         unit.fail("open failed: " + error);
@@ -177,7 +177,7 @@ unit.test("multi udp 1000", async () => {
     });
 
     let t0 = now();
-    let count_to_send = 1000;
+    let count_to_send = 100;
     for (var i = 0; i < count_to_send; ++i) {
         await sock2.send("qwerty", {port: 18107});
     }
