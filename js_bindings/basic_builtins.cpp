@@ -60,7 +60,12 @@ void JsTimer(const v8::FunctionCallbackInfo<v8::Value> &args) {
         // resetTimer( millis, callback)
         long millis = args[0].As<v8::Integer>()->Value();
         // callback function must persist context change, so we need a persistent handle
-        auto jsCallback = new v8::Persistent<v8::Function>(isolate, args[1].As<v8::Function>());
+        std::shared_ptr<v8::Persistent<v8::Function>> jsCallback (
+            new v8::Persistent<v8::Function>(isolate, args[1].As<v8::Function>()), [](auto p){
+                p->Reset();
+                delete p;
+            }
+        );
         se->asyncSleep.delay(millis, [=]() {
             // We need to re-enter in context as we are in another thread and stack, and as we do
             // it from another thread, we MUST use lockedContext:
@@ -70,8 +75,7 @@ void JsTimer(const v8::FunctionCallbackInfo<v8::Value> &args) {
                 // call it using the function as the this context:
                 fn->Call(fn, 0, nullptr);
                 // now we must free the persistent handle as it is single operation
-                jsCallback->Reset();
-//                delete jsCallback;
+                // this performs automatically from shared_ptr
             });
         });
     });
