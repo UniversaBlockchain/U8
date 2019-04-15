@@ -416,8 +416,8 @@ class Ledger {
      * is thrown by the callable, the transaction is rolled back and the exception will be rethrown unless it was a
      * instance, which just rollbacks the transaction, in which case it always return null.
      *
-     * @param block to execute
-     * @return {Promise} null if transaction is rolled back throwing a exception, otherwise what callable
+     * @param block - Block to execute.
+     * @return {Promise} null if transaction is rolled back throwing a exception, otherwise what callable.
      * returns.
      */
     transaction(block) {
@@ -469,7 +469,7 @@ class Ledger {
      * Destroy the record and free space in the ledger.
      *
      * @param {StateRecord} record - StateRecord to destroy.
-     * @param {db.SqlDriverConnection} connection - transaction connection for destroy record. Optional.
+     * @param {db.SqlDriverConnection} connection - Transaction connection for destroy record. Optional.
      * @return {Promise} resolved when record destroyed.
      */
     destroy(record, connection) {
@@ -492,7 +492,7 @@ class Ledger {
      * Destroy the record in the ledger in opened transaction.
      *
      * @param {StateRecord} record - StateRecord to destroy.
-     * @param {db.SqlDriverConnection} connection - transaction connection for destroy record.
+     * @param {db.SqlDriverConnection} connection - Transaction connection for destroy record.
      * @return {Promise} resolved when record destroyed.
      */
     transactionDestroy(record, connection) {
@@ -523,7 +523,7 @@ class Ledger {
      * Save a record into the ledger.
      *
      * @param {StateRecord} record - StateRecord to save.
-     * @param {db.SqlDriverConnection} connection - transaction connection for save record. Optional.
+     * @param {db.SqlDriverConnection} connection - Transaction connection for save record. Optional.
      * @return {Promise<StateRecord>} resolved when record saved.
      */
     save(record, connection) {
@@ -573,7 +573,7 @@ class Ledger {
      * Save a record into the ledger in opened transaction.
      *
      * @param {StateRecord} record - StateRecord to save.
-     * @param {db.SqlDriverConnection} connection - transaction connection for save record.
+     * @param {db.SqlDriverConnection} connection - Transaction connection for save record.
      * @return {Promise<StateRecord>} resolved when record saved.
      */
     transactionSave(record, connection) {
@@ -723,7 +723,7 @@ class Ledger {
      * Get an Object, the keys of which are the states of the Ledger items,
      * and the values are the number of items that are in this state.
      *
-     * @param {Date} createdAfter=0 -Creation time, those elements that are created after this time are taken into account.
+     * @param {Date} createdAfter=0 - Creation time, those elements that are created after this time are taken into account.
      * @return {Promise<Object>}
      */
     getLedgerSize(createdAfter = 0) {
@@ -751,7 +751,7 @@ class Ledger {
      *
      * @param {number} amount - Amount of payment.
      * @param {Date} date - Payment date.
-     * @return {Promise}
+     * @return {Promise<void>}
      */
     savePayment(amount, date) {
         return this.simpleUpdate("insert into payments_summary (amount,date) VALUES (?,?) ON CONFLICT (date) DO UPDATE SET amount = payments_summary.amount + excluded.amount",
@@ -803,7 +803,7 @@ class Ledger {
      * Marks the specified item as a test.
      *
      * @param {HashId} itemId - Item HashId.
-     * @return {Promise}.
+     * @return {Promise<void>}
      */
     markTestRecord(itemId) {
         return this.simpleUpdate("insert into ledger_testrecords(hash) values(?) on conflict do nothing;", itemId.digest);
@@ -821,18 +821,42 @@ class Ledger {
             itemId.digest);
     }
 
+    /**
+     * Update the expiration time of subscription to contract.
+     *
+     * @param {number} subscriptionId - Subscription ID.
+     * @param {Date} expiresAt - Expiration time.
+     * @return {Promise<void>}
+     */
     updateSubscriptionInStorage(subscriptionId, expiresAt) {
         return this.simpleUpdate("UPDATE contract_subscription SET expires_at = ? WHERE id = ?",
             Math.floor(expiresAt.getTime() / 1000),
             subscriptionId);
     }
 
+    /**
+     * Update the expiration time of the binary representation of the contract.
+     *
+     * @param {number} storageId - Storage Id.
+     * @param {Date} expiresAt - Expiration time.
+     * @return {Promise<void>}
+     */
     updateStorageExpiresAt(storageId, expiresAt) {
         return this.simpleUpdate("UPDATE contract_storage SET expires_at = ? WHERE id = ?",
             Math.floor(expiresAt.getTime() / 1000),
             storageId);
     }
 
+    /**
+     * Save the follower contract environment with the specified environment id.
+     *
+     * @param {number} environmentId - Environment id.
+     * @param {Date} expiresAt - The date of expiry of the period of storage environments.
+     * @param {Date} mutedAt - The time before which the contract sends notifications.
+     * @param {number} spent - Amount of money spent on sending the callbacks.
+     * @param {number} startedCallbacks - How many callbacks are running.
+     * @return {Promise<void>}
+     */
     saveFollowerEnvironment(environmentId, expiresAt, mutedAt, spent, startedCallbacks) {
         return this.simpleUpdate("INSERT INTO follower_environments (environment_id, expires_at, muted_at, spent_for_callbacks, started_callbacks) " +
             "VALUES (?,?,?,?,?) ON CONFLICT (environment_id) DO UPDATE SET expires_at = EXCLUDED.expires_at, " +
@@ -844,19 +868,30 @@ class Ledger {
             startedCallbacks);
     }
 
+    /**
+     * Update UNS name record.
+     *
+     * @param {number} nameRecordId - Name record id.
+     * @param {Date} expiresAt - Storage expiration time name record.
+     * @return {Promise<void>}
+     */
     updateNameRecord(nameRecordId, expiresAt) {
         return this.simpleUpdate("UPDATE name_storage SET expires_at = ? WHERE id = ?",
             Math.floor(expiresAt.getTime() / 1000),
             nameRecordId);
     }
 
+    /**
+     *
+     * @param environment
+     */
     saveEnvironment(environment) {}
 
     /**
      * Find bad (not approved) items in ledger by set of IDs.
      *
      * @param {Set<HashId>} ids - set of HashId`s.
-     * @return {Promise<Set<HashId>>} - set of IDs not approved items.
+     * @return {Promise<Set<HashId>>} set of IDs not approved items.
      */
     findBadReferencesOf(ids) {
         if (ids.size < 1)
@@ -904,6 +939,14 @@ class Ledger {
         });
     }
 
+    /**
+     * Save configuration to database.
+     *
+     * @param {NodeInfo} myInfo - Node information.
+     * @param {NetConfig} netConfig - Network configuration.
+     * @param {PrivateKey} nodeKey - Private key node.
+     * @return {Promise<void>}
+     */
     async saveConfig(myInfo, netConfig, nodeKey) {
         await this.simpleUpdate("delete from config;");
 
@@ -928,6 +971,11 @@ class Ledger {
         }
     }
 
+    /**
+     * Load configuration from storage.
+     *
+     * @return {Promise<Object>} which stores configuration information.
+     */
     loadConfig() {
         return new Promise(async(resolve, reject) => {
             this.dbPool_.withConnection(con => {
@@ -994,6 +1042,12 @@ class Ledger {
         });
     }
 
+    /**
+     * Add information about node in configuration in database.
+     *
+     * @param {NodeInfo} nodeInfo - Node information.
+     * @return {Promise<void>}
+     */
     addNode(nodeInfo) {
         return this.simpleUpdate("insert into config(http_client_port,http_server_port,udp_server_port, node_number, node_name, public_host,host,public_key) values(?,?,?,?,?,?,?,?);",
             nodeInfo.clientAddress.port,
@@ -1006,11 +1060,22 @@ class Ledger {
             nodeInfo.publicKey.packed);
     }
 
+    /**
+     * Remove node from config.
+     *
+     * @param nodeInfo - Node information.
+     * @return {Promise<void>}
+     */
     removeNode(nodeInfo) {
         return this.simpleUpdate("delete from config where node_number = ?;",
             nodeInfo.number);
     }
 
+    /**
+     * Search for unfinished items in Ledger.
+     *
+     * @return {Promise<Map<HashId, StateRecord>>} from incomplete records.
+     */
     findUnfinished() {
         return new Promise(async(resolve, reject) => {
             this.dbPool_.withConnection(con => {
@@ -1050,12 +1115,26 @@ class Ledger {
         });
     }
 
+    /**
+     * Get a contract from Ledger by his record.
+     *
+     * @param {StateRecord} record - Record of the contract you want to get.
+     * @return {Promise<Number[]>}
+     */
     getItem(record) {
         return this.simpleQuery("select packed from items where id = ?",
             x => Contract.fromPackedTransaction(x),
             record.recordId);
     }
 
+    /**
+     * Put a contract from Ledger.
+     *
+     * @param {StateRecord} record - Record in storage.
+     * @param {Contract} item - Contract.
+     * @param {Date} keepTill - Time keep till.
+     * @return {Promise<void>}
+     */
     putItem(record, item, keepTill) {
         if (!item instanceof Contract)
             return;
@@ -1066,12 +1145,25 @@ class Ledger {
             Math.floor(keepTill.getTime() / 1000));
     }
 
+    /**
+     * Get stored item on his contract id.
+     *
+     * @param {HashId} itemId - Item id.
+     * @return {Promise<Object>}
+     */
     getKeepingItem(itemId) {
         return this.simpleQuery("select packed from keeping_items where hash = ? limit 1",
             null,
             itemId.digest);
     }
 
+    /**
+     * Put item in storage.
+     *
+     * @param {StateRecord} record - State record.
+     * @param {Contract} item - Contract.
+     * @return {Promise<void>}
+     */
     putKeepingItem(record, item) {
         if (!item instanceof Contract)
             return;
@@ -1090,6 +1182,16 @@ class Ledger {
     getEnvironment(contractId) {}
     getEnvironment(smartContract) {}
 
+    /**
+     * Updates the contract environment with the specified environment id.
+     *
+     * @param {number} id - Environment id.
+     * @param {string} ncontractType - Ncontract type.
+     * @param {HashId} ncontractHashId - Ncontract hash id.
+     * @param {number[]} kvStorage - Key-value storage.
+     * @param {number[]} transactionPack - Contract transaction pack.
+     * @return {Promise<void>}
+     */
     updateEnvironment(id, ncontractType, ncontractHashId, kvStorage, transactionPack) {
         return this.simpleUpdate("UPDATE environments  SET ncontract_type = ?,ncontract_hash_id = ?,kv_storage = ?,transaction_pack = ? WHERE id = ?",
             ncontractType,
@@ -1099,6 +1201,16 @@ class Ledger {
             id);
     }
 
+    /**
+     * Save the contract with the specified ID in the storage.
+     *
+     * @param {HashId} contractId - Contract id.
+     * @param {number[]} binData
+     * @param {Date} expiresAt - Epiration time.
+     * @param {HashId} origin - Origin Id.
+     * @param {number} environmentId - Environment id.
+     * @return {Promise}
+     */
     saveContractInStorage(contractId, binData, expiresAt, origin, environmentId) {
         return this.simpleUpdate("INSERT INTO contract_binary (hash_id, bin_data) VALUES (?,?) ON CONFLICT (hash_id) DO UPDATE SET bin_data=EXCLUDED.bin_data",
             contractId.digest,
@@ -1118,6 +1230,15 @@ class Ledger {
             });
     }
 
+    /**
+     * Save the subscription in the storage.
+     *
+     * @param {HashId} hashId - Hash id.
+     * @param {boolean} subscriptionOnChain
+     * @param {Date} expiresAt - Expiration time.
+     * @param {number} environmentId - Environment id.
+     * @return {Promise<>}
+     */
     saveSubscriptionInStorage(hashId, subscriptionOnChain, expiresAt, environmentId) {
         return this.simpleQuery("INSERT INTO contract_subscription (hash_id, subscription_on_chain, expires_at, environment_id) VALUES(?,?,?,?) RETURNING id",
             x => {
@@ -1132,6 +1253,12 @@ class Ledger {
             environmentId);
     }
 
+    /**
+     * Get a list of identifiers of all environments that are subscribed to a contract with the specified id.
+     *
+     * @param {HashId} id - Contract id.
+     * @return {Promise<Set<number>>}
+     */
     getSubscriptionEnviromentIds(id) {
         return new Promise(async(resolve, reject) => {
             this.dbPool_.withConnection(con => {
@@ -1182,6 +1309,15 @@ class Ledger {
     }
     getFollowerCallbacksToResync() {}
 
+    /**
+     * Add to the repository an entry about the callback follower contract.
+     *
+     * @param {HashId} id - Callback ID.
+     * @param {number} environmentId - Environment id.
+     * @param {Date} expiresAt - Expiration time.
+     * @param {Date} storedUntil - Time stored until.
+     * @return {Promise<void>}
+     */
     addFollowerCallback(id, environmentId, expiresAt, storedUntil) {
         return this.simpleUpdate("INSERT INTO follower_callbacks (id, state, environment_id, expires_at, stored_until) VALUES (?,?,?,?,?)",
             id.digest,
@@ -1191,41 +1327,88 @@ class Ledger {
             Math.floor(storedUntil.getTime() / 1000));
     }
 
+    /**
+     * Update in the storage the callback record of the follower contract.
+     *
+     * @param {HashId} id - callback ID.
+     * @param state
+     * @return {Promise<void>}
+     */
     updateFollowerCallbackState(id, state) {
         return this.simpleUpdate("UPDATE follower_callbacks SET state = ? WHERE id = ?",
             0, //state.ordinal() // TODO !!
             id.digest);
     }
 
+    /**
+     * Delete the callback entry from the storage.
+     *
+     * @param {HashId} id - callback ID.
+     * @return {Promise<void>}
+     */
     removeFollowerCallback(id) {
         return this.simpleUpdate("DELETE FROM follower_callbacks WHERE id = ?", id.digest);
     }
 
+    /**
+     * Delete expired contract storage subscriptions.
+     *
+     * @return {Promise<void>}
+     */
     clearExpiredStorages() {
         return this.simpleUpdate("DELETE FROM contract_storage WHERE expires_at < ?", Math.floor(Date.now() / 1000));
     }
 
+    /**
+     * Delete Expired Subscriptions.
+     *
+     * @return {Promise<void>}
+     */
     clearExpiredSubscriptions() {
         return this.simpleUpdate("DELETE FROM contract_subscription WHERE expires_at < ?", Math.floor(Date.now() / 1000));
     }
 
+    /**
+     * Remove binary storage contracts.
+     *
+     * @return {Promise<void>}
+     */
     clearExpiredStorageContractBinaries() {
         //TODO: add trigger for delete expired contracts after deleting all subscriptions, and remove this function
         return this.simpleUpdate("DELETE FROM contract_binary WHERE hash_id NOT IN (SELECT hash_id FROM contract_storage GROUP BY hash_id)");
     }
 
+    /**
+     * Get smartcontract by id.
+     *
+     * @param {HashId} smartContractId - Contract id.
+     * @return {Promise<number>}
+     */
     getSmartContractById(smartContractId) {
         return this.simpleQuery("SELECT transaction_pack FROM environments WHERE ncontract_hash_id=?",
             null,
             smartContractId.digest);
     }
 
+    /**
+     * Get a contract from storage.
+     *
+     * @param {HashId} contractId - Contract id.
+     * @return {Promise<number>}
+     */
     getContractInStorage(contractId) {
         return this.simpleQuery("SELECT bin_data FROM contract_binary WHERE hash_id=?",
             null,
             contractId.digest);
     }
 
+    /**
+     * Get a contract from storage.
+     *
+     * @param {HashId} slotId
+     * @param {HashId} contractId - Contract id.
+     * @return {Promise<number>}
+     */
     getContractInStorage(slotId, contractId) {
         return this.simpleQuery("SELECT bin_data FROM environments " +
             "LEFT JOIN contract_storage ON environments.id=contract_storage.environment_id " +
@@ -1236,6 +1419,13 @@ class Ledger {
             contractId.digest);
     }
 
+    /**
+     * Get a list of binary representations of contracts from the repository by origin.
+     *
+     * @param {HashId} slotId
+     * @param {HashId} originId
+     * @return {Promise<number[][]>}
+     */
     getContractsInStorageByOrigin(slotId, originId) {
         return new Promise(async(resolve, reject) => {
             this.dbPool_.withConnection(con => {
@@ -1274,22 +1464,51 @@ class Ledger {
         });
     }
 
+    /**
+     * Remove subscription by id.
+     *
+     * @param subscriptionId - Subscription id.
+     * @return {Promise<void>}
+     */
     removeEnvironmentSubscription(subscriptionId) {
         return this.simpleUpdate("DELETE FROM contract_subscription WHERE id = ?", subscriptionId);
     }
 
+    /**
+     * Remove storage subscription by id.
+     *
+     * @param {number} storageId - storage id.
+     * @return {Promise<void>}
+     */
     removeEnvironmentStorage(storageId) {
         return this.simpleUpdate("DELETE FROM contract_storage WHERE id = ?", storageId);
     }
 
+    /**
+     * Remove subscription by environment id.
+     *
+     * @param {number} environmentId - Environment id.
+     * @return {Promise<void>}
+     */
     removeSubscriptionsByEnvId(environmentId) {
         return this.simpleUpdate("DELETE FROM contract_subscription WHERE environment_id = ?", environmentId);
     }
 
+    /**
+     * Remove storage contract by environment id.
+     * @param environmentId - Environment id.
+     * @return {Promise<void>}
+     */
     removeStorageContractsByEnvId(environmentId) {
         return this.simpleUpdate("DELETE FROM contract_storage WHERE environment_id = ?", environmentId);
     }
 
+    /**
+     * Remove environment by contract id.
+     *
+     * @param {HashId} ncontractHashId - Ncontract hash id.
+     * @return {number}
+     */
     removeEnvironment(ncontractHashId) {
         let envId = this.getEnvironmentId(ncontractHashId);
         this.removeSubscriptionsByEnvId(envId);
@@ -1298,12 +1517,20 @@ class Ledger {
         return this.removeEnvironmentEx(ncontractHashId);
     }
 
+    /**
+     * Delete expired subscriptions and stored contracts.
+     *
+     */
     removeExpiredStoragesAndSubscriptionsCascade() {
         this.clearExpiredSubscriptions();
         this.clearExpiredStorages();
         this.clearExpiredStorageContractBinaries();
     }
 
+    /**
+     *
+     * @param nameRecord
+     */
     addNameRecord(nameRecord) { // TODO !!
         /*let nameStorageId = this.addNameStorage(nameRecord);
         if (nameStorageId !== 0) {
@@ -1318,10 +1545,22 @@ class Ledger {
         }*/
     }
 
+    /**
+     * Remove UNS name record.
+     *
+     * @param {string} nameReduced
+     * @return {Promise<void>}
+     */
     removeNameRecord(nameReduced) {
         return this.simpleUpdate("DELETE FROM name_storage WHERE name_reduced=?", nameReduced);
     }
 
+    /**
+     * Remove UNS name record entries.
+     *
+     * @param {number} nameStorageId
+     * @return {Promise<void>}
+     */
     removeNameRecordEntries(nameStorageId) {
         return this.simpleUpdate("DELETE FROM name_entry WHERE name_storage_id=?", nameStorageId);
     }
@@ -1333,8 +1572,8 @@ class Ledger {
     /**
      * Get unavailable names for UNS.
      *
-     * @param {Array<string>} reducedNames - array of reduced names for check availability.
-     * @return {Promise<Array<string>>} - array of unavailable names.
+     * @param {Array<string>} reducedNames - Array of reduced names for check availability.
+     * @return {Promise<Array<string>>} array of unavailable names.
      */
     isAllNameRecordsAvailable(reducedNames) {
         if (reducedNames.length < 1)
@@ -1382,8 +1621,8 @@ class Ledger {
     /**
      * Get unavailable origins for UNS.
      *
-     * @param {Array<HashId>} origins - array of origins (@see HashId) for check availability.
-     * @return {Promise<Array<string>>} - array of unavailable origins (as base64 strings).
+     * @param {Array<HashId>} origins - Array of origins (@see HashId) for check availability.
+     * @return {Promise<Array<string>>} array of unavailable origins (as base64 strings).
      */
     isAllOriginsAvailable(origins) {
         if (origins.length < 1)
@@ -1435,12 +1674,12 @@ class Ledger {
     /**
      * Get unavailable addresses for UNS.
      *
-     * @param {Array<string>} addresses - array of addresses for check availability.
-     * @return {Promise<Array<string>>} - array of unavailable addresses (shorts and longs).
+     * @param {Array<string>} addresses - Array of addresses for check availability.
+     * @return {Promise<Array<string>>} array of unavailable addresses (shorts and longs).
      */
     isAllAddressesAvailable(addresses) {
         if (addresses.length < 1)
-            throw new ex.IllegalArgumentError("Error isAllNameRecordsAvailable: empty reducedNames");
+            throw new ex.IllegalArgumentError("Error isAllAddressesAvailable: empty addresses");
 
         let queryPart = "?";
         for (let i = 1; i < addresses.length; i++)
@@ -1487,10 +1726,23 @@ class Ledger {
         });
     }
 
+    /**
+     *
+     * Delete the names of records that have expired earlier than the holdDuration seconds to date.
+     *
+     * @param {Date} holdDuration - Number of seconds.
+     * @return {Promise<void>}
+     */
     clearExpiredNameRecords(holdDuration) {
         return this.simpleUpdate("DELETE FROM name_storage WHERE expires_at < ? ", Math.floor(Date.now() / 1000) - holdDuration);
     }
 
+    /**
+     * Clearing all expired database entries
+     *
+     * @param isPermanetMode - Is the network in Permanet mode?
+     * @return {Promise<void>}
+     */
     async cleanup(isPermanetMode) {
         let now = Math.floor(Date.now() / 1000);
 
