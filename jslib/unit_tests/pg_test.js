@@ -36,7 +36,7 @@ unit.test("pg_test: hello", async () => {
                     console.error("con.executeQuery.onError: " + e);
                     con.release();
                     resolver();
-                }, "SELECT 1 AS one, 2::bigint AS two, 3 AS three, 'some text' AS text, $1, $2, $3, $4, $5;", 1, 2.333e+170, 3, 4.34, "ololo");
+                }, "SELECT 1 AS one, 2::bigint AS two, 3 AS three, 'some text' AS text;");
             });
             await promise;
         }
