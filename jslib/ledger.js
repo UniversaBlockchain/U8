@@ -1237,7 +1237,7 @@ class Ledger {
      * @param {boolean} subscriptionOnChain
      * @param {Date} expiresAt - Expiration time.
      * @param {number} environmentId - Environment id.
-     * @return {Promise<>}
+     * @return {Promise}
      */
     saveSubscriptionInStorage(hashId, subscriptionOnChain, expiresAt, environmentId) {
         return this.simpleQuery("INSERT INTO contract_subscription (hash_id, subscription_on_chain, expires_at, environment_id) VALUES(?,?,?,?) RETURNING id",
