@@ -48,6 +48,8 @@ namespace network {
         Packet(const byte_vector& packedData);
         Packet(const Packet&) = default;
         Packet(Packet&&) = default;
+        Packet& operator=(const Packet&) = default;
+        Packet& operator=(Packet &&) = default;
 
         /**
          * Pack header and payload to bytes array.
