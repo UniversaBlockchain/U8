@@ -416,7 +416,7 @@ class Ledger {
      * is thrown by the callable, the transaction is rolled back and the exception will be rethrown unless it was a
      * instance, which just rollbacks the transaction, in which case it always return null.
      *
-     * @param block - Block to execute.
+     * @param {Function} block - Block to execute.
      * @return {Promise} null if transaction is rolled back throwing a exception, otherwise what callable.
      * returns.
      */
@@ -723,7 +723,7 @@ class Ledger {
      * Get an Object, the keys of which are the states of the Ledger items,
      * and the values are the number of items that are in this state.
      *
-     * @param {Date} createdAfter=0 - Creation time, those elements that are created after this time are taken into account.
+     * @param {Date} createdAfter - Creation time, those elements that are created after this time are taken into account.
      * @return {Promise<Object>}
      */
     getLedgerSize(createdAfter = 0) {
@@ -835,7 +835,7 @@ class Ledger {
     }
 
     /**
-     * Update the expiration time of the binary representation of the contract.
+     * Update the expiration contract storage time.
      *
      * @param {number} storageId - Storage Id.
      * @param {Date} expiresAt - Expiration time.
@@ -848,13 +848,13 @@ class Ledger {
     }
 
     /**
-     * Save the follower contract environment with the specified environment id.
+     * Save the follower contract environment with the specified environment ID.
      *
-     * @param {number} environmentId - Environment id.
+     * @param {number} environmentId - Environment ID.
      * @param {Date} expiresAt - The date of expiry of the period of storage environments.
      * @param {Date} mutedAt - The time before which the contract sends notifications.
-     * @param {number} spent - Amount of money spent on sending the callbacks.
-     * @param {number} startedCallbacks - How many callbacks are running.
+     * @param {number} spent - Amount of U spent on sending the callbacks.
+     * @param {number} startedCallbacks - Number of running callbacks.
      * @return {Promise<void>}
      */
     saveFollowerEnvironment(environmentId, expiresAt, mutedAt, spent, startedCallbacks) {
@@ -974,7 +974,7 @@ class Ledger {
     /**
      * Load configuration from storage.
      *
-     * @return {Promise<Object>} which stores configuration information.
+     * @return {Promise<{myInfo: NodeInfo, netConfig: NetConfig, nodeKey: PrivateKey}>} which stores configuration information.
      */
     loadConfig() {
         return new Promise(async(resolve, reject) => {
@@ -1063,7 +1063,7 @@ class Ledger {
     /**
      * Remove node from config.
      *
-     * @param nodeInfo - Node information.
+     * @param {NodeInfo} nodeInfo - Node information.
      * @return {Promise<void>}
      */
     removeNode(nodeInfo) {
@@ -1119,7 +1119,7 @@ class Ledger {
      * Get a contract from Ledger by his record.
      *
      * @param {StateRecord} record - Record of the contract you want to get.
-     * @return {Promise<Number[]>}
+     * @return {Promise<number[]>}
      */
     getItem(record) {
         return this.simpleQuery("select packed from items where id = ?",
@@ -1146,10 +1146,10 @@ class Ledger {
     }
 
     /**
-     * Get stored item on his contract id.
+     * Get stored item on his contract ID.
      *
-     * @param {HashId} itemId - Item id.
-     * @return {Promise<Object>}
+     * @param {HashId} itemId - Contract ID.
+     * @return {Promise<number[]>} packed Contract
      */
     getKeepingItem(itemId) {
         return this.simpleQuery("select packed from keeping_items where hash = ? limit 1",
@@ -1183,11 +1183,11 @@ class Ledger {
     getEnvironment(smartContract) {}
 
     /**
-     * Updates the contract environment with the specified environment id.
+     * Updates the contract environment with the specified environment ID.
      *
-     * @param {number} id - Environment id.
+     * @param {number} id - Environment ID.
      * @param {string} ncontractType - Ncontract type.
-     * @param {HashId} ncontractHashId - Ncontract hash id.
+     * @param {HashId} ncontractHashId - Ncontract HashId.
      * @param {number[]} kvStorage - Key-value storage.
      * @param {number[]} transactionPack - Contract transaction pack.
      * @return {Promise<void>}
@@ -1204,11 +1204,11 @@ class Ledger {
     /**
      * Save the contract with the specified ID in the storage.
      *
-     * @param {HashId} contractId - Contract id.
+     * @param {HashId} contractId - Contract ID.
      * @param {number[]} binData
-     * @param {Date} expiresAt - Epiration time.
-     * @param {HashId} origin - Origin Id.
-     * @param {number} environmentId - Environment id.
+     * @param {Date} expiresAt - Expiration time.
+     * @param {HashId} origin - Contracts chain origin.
+     * @param {number} environmentId - Environment ID.
      * @return {Promise}
      */
     saveContractInStorage(contractId, binData, expiresAt, origin, environmentId) {
@@ -1233,10 +1233,10 @@ class Ledger {
     /**
      * Save the subscription in the storage.
      *
-     * @param {HashId} hashId - Hash id.
-     * @param {boolean} subscriptionOnChain
+     * @param {HashId} hashId - subscription HashId (contract ID or origin).
+     * @param {boolean} subscriptionOnChain - true if subscribe by contract ID, false if subscribe by origin.
      * @param {Date} expiresAt - Expiration time.
-     * @param {number} environmentId - Environment id.
+     * @param {number} environmentId - Environment ID.
      * @return {Promise}
      */
     saveSubscriptionInStorage(hashId, subscriptionOnChain, expiresAt, environmentId) {
@@ -1254,10 +1254,10 @@ class Ledger {
     }
 
     /**
-     * Get a list of identifiers of all environments that are subscribed to a contract with the specified id.
+     * Get a set of IDs of all environments that are subscribed to a contract with the specified ID.
      *
-     * @param {HashId} id - Contract id.
-     * @return {Promise<Set<number>>}
+     * @param {HashId} id - Subscription HashId (contract ID or origin).
+     * @return {Promise<Set<number>>} - set of environments IDs.
      */
     getSubscriptionEnviromentIds(id) {
         return new Promise(async(resolve, reject) => {
@@ -1313,7 +1313,7 @@ class Ledger {
      * Add to the repository an entry about the callback follower contract.
      *
      * @param {HashId} id - Callback ID.
-     * @param {number} environmentId - Environment id.
+     * @param {number} environmentId - Environment ID.
      * @param {Date} expiresAt - Expiration time.
      * @param {Date} storedUntil - Time stored until.
      * @return {Promise<void>}
@@ -1330,8 +1330,8 @@ class Ledger {
     /**
      * Update in the storage the callback record of the follower contract.
      *
-     * @param {HashId} id - callback ID.
-     * @param state
+     * @param {HashId} id - Callback ID.
+     * @param state - Callback state.
      * @return {Promise<void>}
      */
     updateFollowerCallbackState(id, state) {
@@ -1341,9 +1341,9 @@ class Ledger {
     }
 
     /**
-     * Delete the callback entry from the storage.
+     * Remove the callback entry from the storage.
      *
-     * @param {HashId} id - callback ID.
+     * @param {HashId} id - Callback ID.
      * @return {Promise<void>}
      */
     removeFollowerCallback(id) {
@@ -1351,7 +1351,7 @@ class Ledger {
     }
 
     /**
-     * Delete expired contract storage subscriptions.
+     * Remove expired contract storage subscriptions.
      *
      * @return {Promise<void>}
      */
@@ -1360,7 +1360,7 @@ class Ledger {
     }
 
     /**
-     * Delete Expired Subscriptions.
+     * Remove expired Subscriptions.
      *
      * @return {Promise<void>}
      */
@@ -1369,7 +1369,7 @@ class Ledger {
     }
 
     /**
-     * Remove binary storage contracts.
+     * Remove expired stored contracts.
      *
      * @return {Promise<void>}
      */
@@ -1379,10 +1379,10 @@ class Ledger {
     }
 
     /**
-     * Get smartcontract by id.
+     * Get smart contract by ID.
      *
-     * @param {HashId} smartContractId - Contract id.
-     * @return {Promise<number>}
+     * @param {HashId} smartContractId - Contract ID.
+     * @return {Promise<number[]>} - packed smart contract.
      */
     getSmartContractById(smartContractId) {
         return this.simpleQuery("SELECT transaction_pack FROM environments WHERE ncontract_hash_id=?",
@@ -1393,8 +1393,8 @@ class Ledger {
     /**
      * Get a contract from storage.
      *
-     * @param {HashId} contractId - Contract id.
-     * @return {Promise<number>}
+     * @param {HashId} contractId - Contract ID.
+     * @return {Promise<number[]>} - packed contract.
      */
     getContractInStorage(contractId) {
         return this.simpleQuery("SELECT bin_data FROM contract_binary WHERE hash_id=?",
@@ -1403,28 +1403,11 @@ class Ledger {
     }
 
     /**
-     * Get a contract from storage.
+     * Get a list of packed contracts from the repository by origin.
      *
-     * @param {HashId} slotId
-     * @param {HashId} contractId - Contract id.
-     * @return {Promise<number>}
-     */
-    getContractInStorage(slotId, contractId) {
-        return this.simpleQuery("SELECT bin_data FROM environments " +
-            "LEFT JOIN contract_storage ON environments.id=contract_storage.environment_id " +
-            "LEFT JOIN contract_binary ON contract_binary.hash_id=contract_storage.hash_id " +
-            "WHERE environments.ncontract_hash_id=? AND contract_storage.hash_id=?",
-            null,
-            slotId.digest,
-            contractId.digest);
-    }
-
-    /**
-     * Get a list of binary representations of contracts from the repository by origin.
-     *
-     * @param {HashId} slotId
-     * @param {HashId} originId
-     * @return {Promise<number[][]>}
+     * @param {HashId} slotId - Slot contract ID.
+     * @param {HashId} originId - Contracts chain origin.
+     * @return {Promise<number[][]>} - list of packed contracts.
      */
     getContractsInStorageByOrigin(slotId, originId) {
         return new Promise(async(resolve, reject) => {
@@ -1465,9 +1448,9 @@ class Ledger {
     }
 
     /**
-     * Remove subscription by id.
+     * Remove subscription by ID.
      *
-     * @param subscriptionId - Subscription id.
+     * @param subscriptionId - Subscription ID.
      * @return {Promise<void>}
      */
     removeEnvironmentSubscription(subscriptionId) {
@@ -1475,9 +1458,9 @@ class Ledger {
     }
 
     /**
-     * Remove storage subscription by id.
+     * Remove storage subscription by ID.
      *
-     * @param {number} storageId - storage id.
+     * @param {number} storageId - Storage ID.
      * @return {Promise<void>}
      */
     removeEnvironmentStorage(storageId) {
@@ -1485,9 +1468,9 @@ class Ledger {
     }
 
     /**
-     * Remove subscription by environment id.
+     * Remove subscription by environment ID.
      *
-     * @param {number} environmentId - Environment id.
+     * @param {number} environmentId - Environment ID.
      * @return {Promise<void>}
      */
     removeSubscriptionsByEnvId(environmentId) {
@@ -1495,8 +1478,8 @@ class Ledger {
     }
 
     /**
-     * Remove storage contract by environment id.
-     * @param environmentId - Environment id.
+     * Remove storage contract by environment ID.
+     * @param environmentId - Environment ID.
      * @return {Promise<void>}
      */
     removeStorageContractsByEnvId(environmentId) {
@@ -1504,9 +1487,9 @@ class Ledger {
     }
 
     /**
-     * Remove environment by contract id.
+     * Remove environment by contract ID.
      *
-     * @param {HashId} ncontractHashId - Ncontract hash id.
+     * @param {HashId} ncontractHashId - Contract ID.
      * @return {number}
      */
     removeEnvironment(ncontractHashId) {
@@ -1548,7 +1531,7 @@ class Ledger {
     /**
      * Remove UNS name record.
      *
-     * @param {string} nameReduced
+     * @param {string} nameReduced - Reduced name of UNS name record.
      * @return {Promise<void>}
      */
     removeNameRecord(nameReduced) {
@@ -1558,7 +1541,7 @@ class Ledger {
     /**
      * Remove UNS name record entries.
      *
-     * @param {number} nameStorageId
+     * @param {number} nameStorageId - UNS name record ID.
      * @return {Promise<void>}
      */
     removeNameRecordEntries(nameStorageId) {
@@ -1572,8 +1555,8 @@ class Ledger {
     /**
      * Get unavailable names for UNS.
      *
-     * @param {Array<string>} reducedNames - Array of reduced names for check availability.
-     * @return {Promise<Array<string>>} array of unavailable names.
+     * @param {string[]} reducedNames - Array of reduced names for check availability.
+     * @return {Promise<string[]>} array of unavailable names.
      */
     isAllNameRecordsAvailable(reducedNames) {
         if (reducedNames.length < 1)
@@ -1621,8 +1604,8 @@ class Ledger {
     /**
      * Get unavailable origins for UNS.
      *
-     * @param {Array<HashId>} origins - Array of origins (@see HashId) for check availability.
-     * @return {Promise<Array<string>>} array of unavailable origins (as base64 strings).
+     * @param {HashId[]} origins - Array of origins (@see HashId) for check availability.
+     * @return {Promise<string[]>} array of unavailable origins (as base64 strings).
      */
     isAllOriginsAvailable(origins) {
         if (origins.length < 1)
@@ -1674,8 +1657,8 @@ class Ledger {
     /**
      * Get unavailable addresses for UNS.
      *
-     * @param {Array<string>} addresses - Array of addresses for check availability.
-     * @return {Promise<Array<string>>} array of unavailable addresses (shorts and longs).
+     * @param {string[]} addresses - Array of addresses for check availability.
+     * @return {Promise<string[]>} array of unavailable addresses (shorts and longs).
      */
     isAllAddressesAvailable(addresses) {
         if (addresses.length < 1)
@@ -1738,9 +1721,9 @@ class Ledger {
     }
 
     /**
-     * Clearing all expired database entries
+     * Clearing all expired database entries.
      *
-     * @param isPermanetMode - Is the network in Permanet mode?
+     * @param isPermanetMode - Permanet mode.
      * @return {Promise<void>}
      */
     async cleanup(isPermanetMode) {

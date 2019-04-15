@@ -43,6 +43,13 @@ class NImmutableEnvironment extends ImmutableEnvironment, bs.BiSerializable {
         this.followerService = followerService;
     }
 
+    get(keyName, defaultValue) {
+        if (this.kvStore.has(keyName))
+            return this.kvStore.get(keyName);
+
+        return defaultValue;
+    }
+
     subscriptions() {
         return this.subscriptionsSet;
     }

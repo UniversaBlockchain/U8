@@ -1,7 +1,7 @@
 /**
- * The RW envitonment for {@see NContract} instance, where it can change its server state.
+ * The RW environment for {@see NContract} instance, where it can change its server state.
  *
- * It implemets KV store for the server-state. It is created automatically first time {@link #set(String, Object)} is
+ * It implements KV store for the server-state. It is created automatically first time {@link #set(String, Object)} is
  * called and must commit any changes to the ledger when the new contract state is being approved. Before this the
  * ledger state must not be altered.
  *
@@ -11,6 +11,18 @@
  * @interface MutableEnvironment
  */
 class MutableEnvironment extends ImmutableEnvironment {
+
+    /**
+     * Writes a key to the KV store. See the logic description above.
+     *
+     * @param {string} key
+     * @param value
+     *
+     * @return if an existing key is passed then the previous value gets returned, else undefined is returned.
+     */
+    set(key, value) {
+        throw new Error("not implemented");
+    }
 
     /**
      * Create follower subscription to the chain of contracts
@@ -80,6 +92,16 @@ class MutableEnvironment extends ImmutableEnvironment {
     }
 
     /**
+     * Set expiration time for storing UNS name.
+     *
+     * @param {NameRecord} nameRecord - UNS name record.
+     * @param {Date} expiresAt - Time to expiration UNS name.
+     */
+    setNameRecordExpiresAt(nameRecord, expiresAt) {
+        throw new Error("not implemented");
+    }
+
+    /**
      * Remove subscription from the ledger.
      *
      * @param {ContractSubscription} subscription - Subscription.
@@ -94,16 +116,6 @@ class MutableEnvironment extends ImmutableEnvironment {
      * @param {ContractStorage} contractStorage - Contract storage.
      */
     destroyStorage(contractStorage) {
-        throw new Error("not implemented");
-    }
-
-    /**
-     * Set expiration time for storing UNS name.
-     *
-     * @param {NameRecord} nameRecord - UNS name record.
-     * @param {Date} expiresAt - Time to expiration UNS name.
-     */
-    setNameRecordExpiresAt(nameRecord, expiresAt) {
         throw new Error("not implemented");
     }
 

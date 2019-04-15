@@ -3,11 +3,22 @@
  * {@see NContract#query(ImmutableEnvironment, String, Binder)} and
  * {@see NContract#onRevoked(ImmutableEnvironment)} and like.
  *
- * Note tha the environment associated with {@see NContract} must be destroyed when the NContract is revoked.
+ * Note that the environment associated with {@see NContract} must be destroyed when the NContract is revoked.
  *
  * @interface ImmutableEnvironment
  */
 class ImmutableEnvironment {
+
+    /**
+     * Read access to the instance server-size key-value store. Note that if the store is not created, it always return
+     * default value, this is not an error.
+     *
+     * @param {string} keyName - key name
+     * @param defaultValue - value to return if the KV store is empty
+     *
+     * @return the stored value or the default value
+     */
+    get(keyName, defaultValue);
 
     /**
      * Get array of contract subscription.
