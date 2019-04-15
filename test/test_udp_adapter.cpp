@@ -178,7 +178,7 @@ void SendEachOtherAndReceive(const int attempts, const int numSends) {
 
 TEST_CASE("SendEachOtherAndReceive") {
     const int attempts = 500;
-    const int numSends = 100;
+    const int numSends = 50;
     SendEachOtherAndReceive(attempts, numSends);
 }
 
@@ -191,7 +191,7 @@ TEST_CASE("SendEachOtherReceiveCloseSessionAndTryAgain") {
 }
 
 TEST_CASE("CreateNodeToMany") {
-    const int numNodes = 100;
+    const int numNodes = 50;
     const int attempts = 5;
     const int numSends = 5;
 
@@ -236,9 +236,9 @@ TEST_CASE("CreateNodeToMany") {
 }
 
 TEST_CASE("CreateManyNodesToOne") {
-    const int numNodes = 100;
+    const int numNodes = 20;
     const int attempts = 5;
-    const int numSends = 5;
+    const int numSends = 15;
 
     atomic<long> receiveCounter(0);
     atomic<long> answerCounter(0);
@@ -269,7 +269,7 @@ TEST_CASE("CreateManyNodesToOne") {
             for (int k = 1; k <= numNodes; ++k)
                 env.adapters[k]->send(0, byte_vector(messageBody.begin(), messageBody.end()));
         }
-        this_thread::sleep_for(200ms);
+        this_thread::sleep_for(400ms);
     }
 
     if (prs.get_future().wait_for(40s) != future_status::ready) {
@@ -488,7 +488,7 @@ TEST_CASE("TwoAdapters") {
     atomic<bool> stopFlag0(false);
     atomic<bool> stopFlag1(false);
 
-    const int sendSpeed = 20;
+    const int sendSpeed = 10;
 
     string payloadA("test data set 1");
     string payloadB("test data set 2");
@@ -566,7 +566,7 @@ TEST_CASE("ConcurrencySend") {
     atomic<bool> stopFlag0(false);
     atomic<bool> stopFlag1(false);
 
-    const int sendSpeed = 5;
+    const int sendSpeed = 3;
 
     string payloadA("test data set 1");
     string payloadB("test data set 2");
@@ -595,7 +595,7 @@ TEST_CASE("ConcurrencySend") {
                     env.adapters[0]->send(1, byte_vector(payloadA.begin(), payloadA.end()));
                     ++sendCounter0;
                 }
-                this_thread::sleep_for(1ms);
+                this_thread::sleep_for(2ms);
                 if (stopFlag0)
                     break;
             }
@@ -606,7 +606,7 @@ TEST_CASE("ConcurrencySend") {
                     env.adapters[1]->send(0, byte_vector(payloadB.begin(), payloadB.end()));
                     ++sendCounter1;
                 }
-                this_thread::sleep_for(1ms);
+                this_thread::sleep_for(2ms);
                 if (stopFlag1)
                     break;
             }

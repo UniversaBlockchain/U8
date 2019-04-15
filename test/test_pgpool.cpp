@@ -16,11 +16,12 @@
 using namespace std;
 using namespace crypto;
 
+db::PGPool pgPool_g(1, "host=localhost port=5432 dbname=unit_tests");
+
 void recreateTestTable() {
     //alter database unit_tests SET client_min_messages TO WARNING;
-    db::PGPool pgPool(1, "host=localhost port=5432 dbname=unit_tests");
     Semaphore sem;
-    pgPool.exec("drop table if exists table1;"
+    pgPool_g.exec("drop table if exists table1;"
                 "create table table1("
                 "    id serial primary key,"
                 "    hash bytea not null,"
