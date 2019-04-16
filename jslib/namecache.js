@@ -20,7 +20,7 @@ class NameCache {
 
     cleanUp() {
         let now = Math.floor(Date.now() / 1000);
-        for (let [n,r] of this.records)
+        for (let r of this.records.values())
             r.checkExpiration(now);
     }
 

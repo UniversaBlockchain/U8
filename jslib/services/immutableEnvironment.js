@@ -1,6 +1,5 @@
 /**
  * The environment accessible to readonly {@see NContract} methods, e.g.
- * {@see NContract#query(ImmutableEnvironment, String, Binder)} and
  * {@see NContract#onRevoked(ImmutableEnvironment)} and like.
  *
  * Note that the environment associated with {@see NContract} must be destroyed when the NContract is revoked.

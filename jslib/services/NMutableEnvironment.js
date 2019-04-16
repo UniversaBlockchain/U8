@@ -1,4 +1,5 @@
 const NImmutableEnvironment = require("NImmutableEnvironment").NImmutableEnvironment;
+const Boss = require("boss");
 
 /**
  * Implements {@see MutableEnvironment} interface for smart contracts.
@@ -94,96 +95,83 @@ class NMutableEnvironment extends NImmutableEnvironment, MutableEnvironment {
         this.nameRecordsToDestroy.add(nameRecord);
     }
 
-    save() {
-        /*ledger.updateEnvironment(getId(),contract.getExtendedType(),contract.getId(), Boss.pack(kvStore),contract.getPackedTransaction());
+    async save() {
+        await this.ledger.updateEnvironment(this.id, this.contract.getExtendedType(), this.contract.id,
+            Boss.dump(this.kvStore), this.contract.getPackedTransaction());
 
-        subscriptionsToDestroy.forEach(sub -> ledger.removeEnvironmentSubscription(sub.getId()));
+        this.subscriptionsToDestroy.forEach(async(sub) => await this.ledger.removeEnvironmentSubscription(sub.id));
 
-        subscriptionsToSave.forEach(sub-> ledger.updateSubscriptionInStorage(sub.getId(), sub.expiresAt()));
+        this.subscriptionsToSave.forEach(async(sub) => await this.ledger.updateSubscriptionInStorage(sub.id, sub.expiresAt));
 
-        subscriptionsToAdd.forEach(sub -> {
-                long subId = ledger.saveSubscriptionInStorage(sub.getHashId(), sub.isChainSubscription(), sub.expiresAt(), getId());
-                sub.setId(subId);
-            }
+        this.subscriptionsToAdd.forEach(async(sub) =>
+            sub.id = await this.ledger.saveSubscriptionInStorage(sub.hashId, sub.isChainSubscription, sub.expiresAt, this.id)
         );
 
-        storagesToDestroy.forEach(storage -> ledger.removeEnvironmentStorage(storage.getId()));
+        this.storagesToDestroy.forEach(async(storage) => await this.ledger.removeEnvironmentStorage(storage.id));
 
-        storagesToSave.forEach(storage-> ledger.updateStorageExpiresAt(storage.getId(), storage.expiresAt()));
+        this.storagesToSave.forEach(async(storage) => await this.ledger.updateStorageExpiresAt(storage.id, storage.expiresAt));
 
-        storagesToAdd.forEach(storage -> {
-                long storageId = ledger.saveContractInStorage(storage.getContract().getId(), storage.getPackedContract(),
-                storage.expiresAt(), storage.getContract().getOrigin(), getId());
-                storage.setId(storageId);
-            }
+        this.storagesToAdd.forEach(async(storage) =>
+                storage.id = await this.ledger.saveContractInStorage(storage.contract.id, storage.packedContract,
+                    storage.expiresAt, storage.contract.getOrigin(), this.id)
         );
 
-        nameRecordsToDestroy.forEach(nameRecord -> ledger.removeNameRecord(nameRecord.getNameReduced()));
+        this.nameRecordsToDestroy.forEach(async(nameRecord) => await this.ledger.removeNameRecord(nameRecord.nameReduced));
 
-        ledger.clearExpiredStorageContractBinaries();
+        await this.ledger.clearExpiredStorageContractBinaries();
 
-        List<String> addressList = new LinkedList<>();
-        List<String> nameList = new LinkedList<>();
-        List<HashId> originsList = new LinkedList<>();
+        let addressList = [];
+        let nameList = [];
+        let originsList = [];
 
+        this.nameRecordsToSave.forEach(async(nameRecord) => {
+            await this.ledger.updateNameRecord(nameRecord.id, nameRecord.expiresAt);
+            nameList.push(nameRecord.nameReduced);
+            nameRecord.getEntries().forEach( e => {
+                if (e.getOrigin() != null)
+                    originsList.push(e.getOrigin());
 
-        nameRecordsToSave.forEach(nameRecord -> {
-            ledger.updateNameRecord(nameRecord.getId(),nameRecord.expiresAt());
-            nameList.add(nameRecord.getNameReduced());
-            nameRecord.getEntries().forEach( e -> {
-                if(e.getOrigin() != null) {
-                    originsList.add(e.getOrigin());
-                }
+                if (e.getLongAddress() != null)
+                    addressList.push(e.getLongAddress());
 
-                if(e.getLongAddress() != null) {
-                    addressList.add(e.getLongAddress());
-                }
-
-                if(e.getShortAddress() != null) {
-                    addressList.add(e.getShortAddress());
-                }
-
-            });
-        });
-        nameRecordsToAdd.forEach(nameRecord -> {
-            ledger.addNameRecord(nameRecord);
-            nameList.add(nameRecord.getNameReduced());
-            nameRecord.getEntries().forEach( e -> {
-                if(e.getOrigin() != null) {
-                    originsList.add(e.getOrigin());
-                }
-
-                if(e.getLongAddress() != null) {
-                    addressList.add(e.getLongAddress());
-                }
-
-                if(e.getShortAddress() != null) {
-                    addressList.add(e.getShortAddress());
-                }
-
+                if (e.getShortAddress() != null)
+                    addressList.push(e.getShortAddress());
             });
         });
 
+        this.nameRecordsToAdd.forEach(async(nameRecord) => {
+            await this.ledger.addNameRecord(nameRecord);
+            nameList.push(nameRecord.nameReduced);
+            nameRecord.getEntries().forEach( e => {
+                if (e.getOrigin() != null)
+                    originsList.push(e.getOrigin());
 
-        nameCache.unlockAddressList(addressList);
-        nameCache.unlockNameList(nameList);
-        nameCache.unlockOriginList(originsList);
+                if (e.getLongAddress() != null)
+                    addressList.push(e.getLongAddress());
 
-        immutable.subscriptionsSet.removeAll(subscriptionsToDestroy);
-        immutable.subscriptionsSet.addAll(subscriptionsToAdd);
+                if (e.getShortAddress() != null)
+                    addressList.push(e.getShortAddress());
+            });
+        });
 
-        immutable.storagesSet.removeAll(storagesToDestroy);
-        immutable.storagesSet.addAll(storagesToAdd);
+        this.nameCache.unlockAddressList(addressList);
+        this.nameCache.unlockNameList(nameList);
+        this.nameCache.unlockOriginList(originsList);
 
-        immutable.nameRecordsSet.removeAll(nameRecordsToDestroy);
-        immutable.nameRecordsSet.addAll(nameRecordsToAdd);
+        this.subscriptionsToDestroy.forEach(sub => this.immutable.subscriptionsSet.delete(sub));
+        this.subscriptionsToAdd.forEach(sub => this.immutable.subscriptionsSet.add(sub));
 
-        immutable.kvStore.clear();
-        for (String key : kvStore.keySet()) {
-            immutable.kvStore.set(key, kvStore.get(key));
-        }
+        this.storagesToDestroy.forEach(stor => this.immutable.storagesSet.delete(stor));
+        this.storagesToAdd.forEach(stor => this.immutable.storagesSet.add(stor));
 
-        if (followerService != null)
-            followerService.save();*/
+        this.nameRecordsToDestroy.forEach(nr => this.immutable.nameRecordsSet.delete(nr));
+        this.nameRecordsToAdd.forEach(nr => this.immutable.nameRecordsSet.add(nr));
+
+        this.immutable.kvStore.clear();
+        for (let [k, v] of this.kvStore)
+            this.immutable.kvStore.set(k, v);
+
+        if (this.followerService != null)
+            this.followerService.save();
     }
 }
