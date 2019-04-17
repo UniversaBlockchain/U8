@@ -1,4 +1,4 @@
-const ImmutableEnvironment = require("immutableEnvironment").ImmutableEnvironment;
+const ImmutableEnvironment = require("services/immutableEnvironment").ImmutableEnvironment;
 
 /**
  * The RW environment for {@see NContract} instance, where it can change its server state.
@@ -22,9 +22,7 @@ class MutableEnvironment extends ImmutableEnvironment {
      *
      * @return if an existing key is passed then the previous value gets returned, else undefined is returned.
      */
-    set(key, value) {
-        throw new Error("not implemented");
-    }
+    set(key, value);
 
     /**
      * Create follower subscription to the chain of contracts
@@ -34,9 +32,7 @@ class MutableEnvironment extends ImmutableEnvironment {
      *
      * @return {ContractSubscription} follower subscription.
      */
-    createChainSubscription(origin, expiresAt) {
-        throw new Error("not implemented");
-    }
+    createChainSubscription(origin, expiresAt);
 
     /**
      * Create subscription to a packed contract. It always creates the subscription to new or existing contract.
@@ -46,9 +42,7 @@ class MutableEnvironment extends ImmutableEnvironment {
      *
      * @return {ContractSubscription} storage subscription.
      */
-    createContractSubscription(id, expiresAt) {
-        throw new Error("not implemented");
-    }
+    createContractSubscription(id, expiresAt);
 
     /**
      * Create storage for a packed contract.
@@ -60,18 +54,14 @@ class MutableEnvironment extends ImmutableEnvironment {
      *
      * @return {ContractStorage} storage subscription.
      */
-    createContractStorage(packedTransaction, expiresAt) {
-        throw new Error("not implemented");
-    }
+    createContractStorage(packedTransaction, expiresAt);
 
     /**
      *
      * @param {UnsName} unsName - UNS name.
      * @param {Date} expiresAt -
      */
-    createNameRecord(unsName, expiresAt) {
-        throw new Error("not implemented");
-    }
+    createNameRecord(unsName, expiresAt);
 
     /**
      * Set expiration time for subscription.
@@ -79,9 +69,7 @@ class MutableEnvironment extends ImmutableEnvironment {
      * @param {ContractSubscription} subscription - Subscription.
      * @param {Date} expiresAt - Time to expiration subscription.
      */
-    setSubscriptionExpiresAt(subscription, expiresAt) {
-        throw new Error("not implemented");
-    }
+    setSubscriptionExpiresAt(subscription, expiresAt);
 
     /**
      * Set expiration time for contract storage.
@@ -89,9 +77,7 @@ class MutableEnvironment extends ImmutableEnvironment {
      * @param {ContractStorage} storage - Contract storage.
      * @param {Date} expiresAt - Time to expiration contract storage.
      */
-    setStorageExpiresAt(storage, expiresAt) {
-        throw new Error("not implemented");
-    }
+    setStorageExpiresAt(storage, expiresAt);
 
     /**
      * Set expiration time for storing UNS name.
@@ -99,36 +85,28 @@ class MutableEnvironment extends ImmutableEnvironment {
      * @param {NameRecord} nameRecord - UNS name record.
      * @param {Date} expiresAt - Time to expiration UNS name.
      */
-    setNameRecordExpiresAt(nameRecord, expiresAt) {
-        throw new Error("not implemented");
-    }
+    setNameRecordExpiresAt(nameRecord, expiresAt);
 
     /**
      * Remove subscription from the ledger.
      *
      * @param {ContractSubscription} subscription - Subscription.
      */
-    destroySubscription(subscription) {
-        throw new Error("not implemented");
-    }
+    destroySubscription(subscription);
 
     /**
      * Remove stored contract from the ledger.
      *
      * @param {ContractStorage} contractStorage - Contract storage.
      */
-    destroyStorage(contractStorage) {
-        throw new Error("not implemented");
-    }
+    destroyStorage(contractStorage);
 
     /**
      * Remove UNS name from the ledger.
      *
      * @param {NameRecord} nameRecord - UNS name record.
      */
-    destroyNameRecord(nameRecord) {
-        throw new Error("not implemented");
-    }
+    destroyNameRecord(nameRecord);
 }
 
 module.exports = {MutableEnvironment};

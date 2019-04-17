@@ -1325,7 +1325,7 @@ class Contract extends bs.BiSerializable {
 
     /**
      * Get contract origin
-     * @returns {crypto.HashId} contract origin
+     * @returns {HashId} contract origin
      */
     getOrigin() {
         if(this.state.origin == null) {
@@ -1934,7 +1934,7 @@ class Contract extends bs.BiSerializable {
      * To pack and write corresponding .unicon file use {@see #getPackedTransaction}.
      *
      * @param packedItem some packed from of the universa contract
-     * @return unpacked {@see Contract}
+     * @return {Contract} unpacked contract
      */
     static fromPackedTransaction(packedItem) {
         let tp = TransactionPack.unpack(packedItem);
@@ -1946,7 +1946,7 @@ class Contract extends bs.BiSerializable {
      * {@see TransactionPack} instance to save together the contract, revoking and new items (if any). This is a binary
      * format using to submit for approval. Use {@see #fromPackedTransaction} to read this format.
      *
-     * @return packed binary form.
+     * @return {number[]} packed binary form.
      */
     getPackedTransaction() {
         if (this.transactionPack == null)

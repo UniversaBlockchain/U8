@@ -67,7 +67,7 @@ class NContract {
      *
      * @param {ContractSubscription.Event} event
      */
-    onContractSubscriptionEvent(event) {}
+    onContractSubscriptionEvent(event);
 }
 
 module.exports = {NContract};

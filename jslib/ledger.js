@@ -12,6 +12,11 @@ const ItemState = require("itemstate").ItemState;
 const t = require("tools");
 const ex = require("exceptions");
 const Boss = require("boss");
+const NContractSubscription = require("services/NContractSubscription").NContractSubscription;
+const NContractStorage = require("services/NContractStorage").NContractStorage;
+const NNameRecord = require("services/NNameRecord").NNameRecord;
+const NNameRecordEntry = require("services/NNameRecordEntry").NNameRecordEntry;
+const NImmutableEnvironment = require("services/NImmutableEnvironment").NImmutableEnvironment;
 
 class LedgerException extends Error {
     constructor(message = undefined) {
@@ -135,7 +140,7 @@ class Ledger {
     }
 
     /**
-     * Get the record by its id.
+     * Get the record by its ID.
      *
      * @param {HashId} itemId - ItemId to retrieve.
      * @return {Promise<StateRecord|null>} record or null if not found.
@@ -1017,16 +1022,16 @@ class Ledger {
             await this.removeEnvironment(nsc.id);
             let envId = await this.saveEnvironmentToStorage(nsc.getExtendedType(), nsc.id, Boss.dump(environment.getMutable().kvStore), nsc.getPackedTransaction());
 
-            environment.nameRecords().forEach(async(nr)=> {
+            await Promise.all(Array.from(environment.nameRecords()).map(async(nr)=> {
                 nr.environmentId = envId;
                 await this.addNameRecord(nr);
-            });
+            }));
 
-            environment.subscriptions().forEach(async(css) =>
-                await this.saveSubscriptionInStorage(css.getHashId(), css.isChainSubscription(), css.expiresAt(), envId));
+            await Promise.all(Array.from(environment.subscriptions()).map(async(css) =>
+                await this.saveSubscriptionInStorage(css.getHashId(), css.isChainSubscription(), css.expiresAt(), envId)));
 
-            environment.storages().forEach(async(cst) =>
-                await this.saveContractInStorage(cst.getContract().id, cst.getPackedContract(), cst.expiresAt(), cst.getContract().getOrigin(), envId));
+            await Promise.all(Array.from(environment.storages()).map(async(cst) =>
+                await this.saveContractInStorage(cst.getContract().id, cst.getPackedContract(), cst.expiresAt(), cst.getContract().getOrigin(), envId)));
 
             let fs = environment.getFollowerService();
             if (fs != null)
@@ -1326,9 +1331,286 @@ class Ledger {
 
     }
 
-    getEnvironment(environmentId) {}
-    getEnvironment(contractId) {}
-    getEnvironment(smartContract) {}
+    /**
+     * Get data of smart contract with the specified environment ID.
+     *
+     * @param {number} environmentId - Environment ID.
+     *
+     * @return {Promise<{pack: number[], kvStorage: number[], hashDigest: number[]}>} smart contract data.
+     */
+    getSmartContractForEnvironmentId(environmentId) {
+        return new Promise((resolve, reject) => {
+            this.dbPool_.withConnection(con => {
+                con.executeQuery(qr => {
+                        let row = qr.getRows(1)[0];
+                        con.release();
+
+                        if (row == null)
+                            resolve(null);
+                        else
+                            resolve({
+                                pack: row[0],
+                                kvStorage: row[1],
+                                hashDigest: row[2]
+                            });
+                    }, e => {
+                        con.release();
+                        reject(e);
+                    },
+                    "SELECT transaction_pack, kv_storage, ncontract_hash_id FROM environments WHERE id=?",
+                    environmentId
+                );
+            });
+        });
+    }
+
+    /**
+     * Get contract subscriptions with the specified environment ID.
+     *
+     * @param {number} environmentId - Environment ID.
+     *
+     * @return {Promise<NContractSubscription[]>} list of contract subscriptions.
+     */
+    getContractSubscriptions(environmentId) {
+        return new Promise(async(resolve, reject) => {
+            this.dbPool_.withConnection(con => {
+                con.executeQuery(qr => {
+                        let result = [];
+                        let count = qr.getRowsCount();
+                        while (count > 0) {
+                            let rows;
+                            if (count > 1024) {
+                                rows = qr.getRows(1024);
+                                count -= 1024;
+                            } else {
+                                rows = qr.getRows(count);
+                                count = 0;
+                            }
+
+                            for (let i = 0; i < rows.length; i++)
+                                if (rows[i] != null) {
+                                    let css = new NContractSubscription(crypto.HashId.withDigest(rows[i][0]),
+                                        Boolean(rows[i][1]), new Date(rows[i][2] * 1000));
+                                    css.id = rows[i][3];
+                                    result.push(css);
+                                }
+                        }
+
+                        con.release();
+                        resolve(result);
+                    }, e => {
+                        con.release();
+                        reject(e);
+                    },
+                    "SELECT hash_id, subscription_on_chain, expires_at, id FROM contract_subscription WHERE environment_id = ?",
+                    environmentId
+                );
+            });
+        });
+    }
+
+    /**
+     * Get contract storages with the specified environment ID.
+     *
+     * @param {number} environmentId - Environment ID.
+     *
+     * @return {Promise<NContractStorage[]>} list of contract storages.
+     */
+    getContractStorages(environmentId) {
+        return new Promise(async(resolve, reject) => {
+            this.dbPool_.withConnection(con => {
+                con.executeQuery(qr => {
+                        let result = [];
+                        let count = qr.getRowsCount();
+                        while (count > 0) {
+                            let rows;
+                            if (count > 1024) {
+                                rows = qr.getRows(1024);
+                                count -= 1024;
+                            } else {
+                                rows = qr.getRows(count);
+                                count = 0;
+                            }
+
+                            for (let i = 0; i < rows.length; i++)
+                                if (rows[i] != null) {
+                                    let cst = new NContractStorage(rows[i][0], new Date(rows[i][1] * 1000));
+                                    cst.id = rows[i][2];
+                                    result.push(cst);
+                                }
+                        }
+
+                        con.release();
+                        resolve(result);
+                    }, e => {
+                        con.release();
+                        reject(e);
+                    },
+                    "SELECT bin_data, expires_at, id FROM contract_storage JOIN contract_binary " +
+                    "ON contract_binary.hash_id = contract_storage.hash_id WHERE environment_id = ?",
+                    environmentId
+                );
+            });
+        });
+    }
+
+    /**
+     * Get UNS reduced names by the specified environment ID.
+     *
+     * @param {number} environmentId - Environment ID.
+     *
+     * @return {Promise<string[]>} list of UNS reduced names.
+     */
+    getReducedNames(environmentId) {
+        return new Promise(async(resolve, reject) => {
+            this.dbPool_.withConnection(con => {
+                con.executeQuery(qr => {
+                        let result = [];
+                        let count = qr.getRowsCount();
+                        while (count > 0) {
+                            let rows;
+                            if (count > 1024) {
+                                rows = qr.getRows(1024);
+                                count -= 1024;
+                            } else {
+                                rows = qr.getRows(count);
+                                count = 0;
+                            }
+
+                            for (let i = 0; i < rows.length; i++)
+                                if (rows[i] != null)
+                                    result.push(rows[i][0]);
+                        }
+
+                        con.release();
+                        resolve(result);
+                    }, e => {
+                        con.release();
+                        reject(e);
+                    },
+                    "SELECT DISTINCT name_storage.name_reduced AS name_reduced " +
+                    "FROM name_storage JOIN name_entry ON name_storage.id=name_entry.name_storage_id " +
+                    "WHERE name_storage.environment_id=?",
+                    environmentId
+                );
+            });
+        });
+    }
+
+    /**
+     * Get follower service by the specified environment ID.
+     *
+     * @param {number} environmentId - Environment ID.
+     *
+     * @return {Promise<NFollowerservice>} follower service.
+     */
+    getFollowerService(environmentId) {
+        return new Promise((resolve, reject) => {
+            this.dbPool_.withConnection(con => {
+                con.executeQuery(qr => {
+                        let row = qr.getRows(1)[0];
+                        con.release();
+
+                        if (row == null)
+                            resolve(null);
+                        else
+                            resolve(new NFollowerService(this,
+                                new Date(row[0] * 1000),
+                                new Date(row[1] * 1000),
+                                environmentId,
+                                row[2],
+                                row[3]));
+                    }, e => {
+                        con.release();
+                        reject(e);
+                    },
+                    "SELECT expires_at, muted_at, spent_for_callbacks, started_callbacks FROM follower_environments WHERE environment_id = ?",
+                    environmentId
+                );
+            });
+        });
+    }
+
+    /**
+     * Get environment ID by specified smart contract ID.
+     *
+     * @param {HashId} smartContractId - Smart contract ID.
+     *
+     * @return {Promise<number>} environment ID.
+     */
+    getEnvironmentIdForSmartContractId(smartContractId) {
+        return this.simpleQuery("SELECT id FROM environments WHERE ncontract_hash_id=?",
+            null,
+            smartContractId.digest);
+    }
+
+    /**
+     * Get contract environment with the specified environment ID.
+     *
+     * @param {number} environmentId - Environment ID.
+     *
+     * @return {Promise<NImmutableEnvironment>} environment.
+     */
+    async getEnvironment(environmentId) {
+        let smkv = await this.getSmartContractForEnvironmentId(environmentId);
+        let nContractHashId = crypto.HashId.withDigest(smkv.hashDigest);
+        let contract = NSmartContract.fromPackedTransaction(smkv.pack);
+        let findNContract = (contract.transactionPack != null) ? contract.transactionPack.subItems.get(nContractHashId) : null;
+        contract = (findNContract == null) ? contract : findNContract;
+        let kvStorage = Boss.load(smkv.kvStorage);
+
+        let contractSubscriptions = await this.getContractSubscriptions(environmentId);
+        let contractStorages = await this.getContractStorages(environmentId);
+        let followerService = await this.getFollowerService(environmentId);
+        let reducedNames = await this.getReducedNames(environmentId);
+
+        let nameRecords = [];
+        await Promise.all(reducedNames.map(async(name) => nameRecords.push(await this.getNameRecord(name))));
+
+        let nImmutableEnvironment = new NImmutableEnvironment(contract, this, kvStorage, contractSubscriptions,
+            contractStorages, nameRecords, followerService);
+        nImmutableEnvironment.id = environmentId;
+
+        return nImmutableEnvironment;
+    }
+
+    /**
+     * Get contract environment by specified smart contract ID.
+     *
+     * @param {HashId} smartContractId - Smart contract ID.
+     *
+     * @return {Promise<NImmutableEnvironment> | null} environment or null if error.
+     */
+    async getEnvironmentByContractID(smartContractId) {
+        let envId = await this.getEnvironmentIdForSmartContractId(smartContractId);
+        if (envId != null)
+            return this.getEnvironment(envId);
+        return null;
+    }
+
+    /**
+     * Get contract environment by specified smart contract.
+     * If environment not found (also by parent contract), save new environment.
+     *
+     * @param {NSmartContract} smartContract - Smart contract.
+     *
+     * @return {Promise<NImmutableEnvironment>} environment.
+     */
+    async getEnvironmentByContract(smartContract) {
+        let nim = await this.getEnvironmentByContractID(smartContract.id);
+
+        if (nim == null && smartContract.state.parent != null)
+            nim = await this.getEnvironmentByContractID(smartContract.state.parent);
+
+        if (nim == null) {
+            let envId = await this.saveEnvironmentToStorage(smartContract.getExtendedType(), smartContract.id,
+                Boss.dump({}), smartContract.getPackedTransaction());
+            nim = await this.getEnvironment(envId);
+        } else
+            nim.contract = smartContract;
+
+        return nim;
+    }
 
     /**
      * Updates the contract environment with the specified environment ID.
@@ -1627,6 +1909,7 @@ class Ledger {
 
     /**
      * Remove storage contract by environment ID.
+     *
      * @param environmentId - Environment ID.
      * @return {Promise<void>}
      */
@@ -1635,17 +1918,41 @@ class Ledger {
     }
 
     /**
-     * Remove environment by contract ID.
+     * Get environment ID by smart contract ID.
      *
-     * @param {HashId} ncontractHashId - Contract ID.
-     * @return {number}
+     * @param {HashId} ncontractHashId - smart contract ID.
+     * @return {Promise<number>} environment ID.
+     */
+    getEnvironmentId(ncontractHashId) {
+        return this.simpleQuery("SELECT id FROM environments WHERE ncontract_hash_id=?",
+            x => {
+                if (x == null)
+                    throw new LedgerException("getEnvironmentId failed: returning null");
+                else
+                    return Number(x);
+            },
+            ncontractHashId.digest);
+    }
+
+    /**
+     * Remove environment by smart contract ID.
+     *
+     * @param {HashId} ncontractHashId - smart contract ID.
+     * @return {Promise<number>} removed environment ID.
      */
     async removeEnvironment(ncontractHashId) {
         let envId = await this.getEnvironmentId(ncontractHashId);
         await this.removeSubscriptionsByEnvId(envId);
         await this.removeStorageContractsByEnvId(envId);
         await this.clearExpiredStorageContractBinaries();
-        return await this.removeEnvironmentEx(ncontractHashId);
+        return this.simpleQuery("DELETE FROM environments WHERE ncontract_hash_id=? RETURNING id",
+            x => {
+                if (x == null)
+                    throw new LedgerException("removeEnvironment failed: returning null");
+                else
+                    return Number(x);
+            },
+            ncontractHashId.digest);
     }
 
     /**
@@ -1659,27 +1966,80 @@ class Ledger {
     }
 
     /**
+     * Save UNS name.
      *
-     * @param nameRecord
+     * @param {NNameRecord} nameRecord - UNS name.
+     *
+     * @return {Promise<number>} created name record ID.
      */
-    addNameRecord(nameRecord) { // TODO !!
-        /*let nameStorageId = this.addNameStorage(nameRecord);
+    addNameStorage(nameRecord) {
+        return this.simpleQuery(
+            "INSERT INTO name_storage (name_reduced,name_full,description,url,expires_at,environment_id) " +
+            "VALUES (?,?,?,?,?,?) ON CONFLICT (name_reduced) DO UPDATE SET name_full=EXCLUDED.name_full, " +
+            "description=EXCLUDED.description, url=EXCLUDED.url, expires_at=EXCLUDED.expires_at, " +
+            "environment_id=EXCLUDED.environment_id RETURNING id",
+            x => {
+                if (x == null)
+                    throw new LedgerException("addNameStorage failed: returning null");
+                else
+                    return Number(x);
+            },
+            nameRecord.nameReduced,
+            nameRecord.name,
+            nameRecord.description,
+            nameRecord.url,
+            Math.floor(nameRecord.expiresAt.getTime() / 1000),
+            nameRecord.environmentId);
+    }
+
+    /**
+     * Save UNS name record entry.
+     *
+     * @param {NNameRecordEntry} nameRecordEntry - UNS name record entry.
+     *
+     * @return {Promise<number>} created name record entry ID.
+     */
+    addNameEntry(nameRecordEntry) {
+        return this.simpleQuery(
+            "INSERT INTO name_entry (name_storage_id,short_addr,long_addr,origin) VALUES (?,?,?,?) RETURNING entry_id",
+            x => {
+                if (x == null)
+                    throw new LedgerException("addNameEntry failed: returning null");
+                else
+                    return Number(x);
+            },
+            nameRecordEntry.nameRecordId,
+            nameRecordEntry.shortAddress,
+            nameRecordEntry.longAddress,
+            (nameRecordEntry.origin == null) ? null : nameRecordEntry.origin.digest);
+    }
+
+    /**
+     * Save UNS name record.
+     *
+     * @param {NNameRecord} nameRecord - UNS name record.
+     *
+     * @return {Promise<void>}
+     */
+    async addNameRecord(nameRecord) {
+        let nameStorageId = await this.addNameStorage(nameRecord);
         if (nameStorageId !== 0) {
             nameRecord.id = nameStorageId;
-            this.removeNameRecordEntries(nameStorageId);
-            for (NameRecordEntry nameRecordEntry : nameRecord.getEntries()) {
-                ((NNameRecordEntry) nameRecordEntry).setNameRecordId(nameStorageId);
-                addNameEntry((NNameRecordEntry) nameRecordEntry);
-            }
-        } else {
+            await this.removeNameRecordEntries(nameStorageId);
+
+            await Promise.all(nameRecord.entries.map(async(entry) => {
+                entry.nameRecordId = nameStorageId;
+                await this.addNameEntry(entry);
+            }));
+        } else
             throw new LedgerException("addNameRecord failed");
-        }*/
     }
 
     /**
      * Remove UNS name record.
      *
      * @param {string} nameReduced - Reduced name of UNS name record.
+     *
      * @return {Promise<void>}
      */
     removeNameRecord(nameReduced) {
@@ -1690,15 +2050,139 @@ class Ledger {
      * Remove UNS name record entries.
      *
      * @param {number} nameStorageId - UNS name record ID.
+     *
      * @return {Promise<void>}
      */
     removeNameRecordEntries(nameStorageId) {
         return this.simpleUpdate("DELETE FROM name_entry WHERE name_storage_id=?", nameStorageId);
     }
 
-    getNameRecord(nameReduced) {}
-    getNameByAddress(address) {}
-    getNameByOrigin(origin) {}
+    /**
+     * Get UNS name record with specified SQL clause WHERE.
+     *
+     * @param {string} clause - SQL clause WHERE.
+     * @param params - query parameters.
+     *
+     * @return {Promise<NNameRecord>} UNS name record.
+     */
+    getNameBy(clause, ...params) {
+        let query = "SELECT " +
+            "  name_storage.id AS id, " +
+            "  name_storage.name_reduced AS name_reduced, " +
+            "  name_storage.name_full AS name_full, " +
+            "  name_storage.description AS description, " +
+            "  name_storage.url AS url, " +
+            "  name_storage.expires_at AS expires_at, " +
+            "  name_storage.environment_id AS environment_id, " +
+            "  name_entry.entry_id AS entry_id, " +
+            "  name_entry.short_addr AS short_addr, " +
+            "  name_entry.long_addr AS long_addr, " +
+            "  name_entry.origin AS origin " +
+            "FROM name_storage JOIN name_entry ON name_storage.id=name_entry.name_storage_id " +
+            clause;
+
+        return new Promise(async(resolve, reject) => {
+            this.dbPool_.withConnection(con => {
+                con.executeQuery(qr => {
+                        let unsName = new UnsName();
+                        let nameRecord_id = 0;
+                        let nameRecord_expiresAt = new Date();
+                        let nameRecord_environmentId = 0;
+                        let entries = new Set();
+                        let firstRow = true;
+                        let rowsCount = 0;
+
+                        let count = qr.getRowsCount();
+                        let names = qr.getColNamesMap();
+
+                        while (count > 0) {
+                            let rows;
+                            if (count > 1024) {
+                                rows = qr.getRows(1024);
+                                count -= 1024;
+                            } else {
+                                rows = qr.getRows(count);
+                                count = 0;
+                            }
+
+                            for (let i = 0; i < rows.length; i++)
+                                if (rows[i] != null) {
+                                    rowsCount++;
+
+                                    if (firstRow) {
+                                        nameRecord_id = rows[i][names["id"]];
+                                        unsName.unsReducedName = rows[i][names["name_reduced"]];
+                                        unsName.unsName = rows[i][names["name_full"]];
+                                        unsName.unsDescription = rows[i][names["description"]];
+                                        unsName.unsURL = rows[i][names["url"]];
+                                        nameRecord_expiresAt = new Date(rows[i][names["expires_at"]] * 1000);
+                                        nameRecord_environmentId = rows[i][names["environment_id"]];
+                                        firstRow = false;
+                                    }
+
+                                    let nameRecordEntry = new NNameRecordEntry(
+                                        crypto.HashId.withDigest(rows[i][names["origin"]]),
+                                        rows[i][names["short_addr"]],
+                                        rows[i][names["long_addr"]]);
+
+                                    nameRecordEntry.id = rows[i][names["entry_id"]];
+                                    nameRecordEntry.nameRecordId = nameRecord_id;
+
+                                    entries.add(nameRecordEntry);
+                                }
+                        }
+
+                        con.release();
+                        if (count > 0)
+                            resolve(new NNameRecord(unsName, nameRecord_expiresAt, entries, nameRecord_id, nameRecord_environmentId));
+                        else
+                            resolve(null);
+
+                    }, e => {
+                        con.release();
+                        reject(e);
+                    },
+                    query,
+                    ...params
+                );
+            });
+        });
+    }
+
+    /**
+     * Get UNS name record by reduced name.
+     *
+     * @param {string} nameReduced - reduced name.
+     *
+     * @return {Promise<NNameRecord>} UNS name record.
+     */
+    getNameRecord(nameReduced) {
+        return this.getNameBy("WHERE name_storage.name_reduced=?", nameReduced);
+    }
+
+    /**
+     * Get UNS name record by address.
+     *
+     * @param {string} address - name record address.
+     *
+     * @return {Promise<NNameRecord>} UNS name record.
+     */
+    getNameByAddress(address) {
+        return this.getNameBy(
+            "WHERE name_storage.id=(SELECT name_storage_id FROM name_entry WHERE short_addr=? OR long_addr=? LIMIT 1)",
+            address, address);
+    }
+
+    /**
+     * Get UNS name record by origin.
+     *
+     * @param {number[]} origin - digest of name record origin.
+     *
+     * @return {Promise<NNameRecord>} UNS name record.
+     */
+    getNameByOrigin(origin) {
+        return this.getNameBy("WHERE name_storage.id=(SELECT name_storage_id FROM name_entry WHERE origin=?)", origin);
+    }
 
     /**
      * Get unavailable names for UNS.

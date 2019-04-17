@@ -24,27 +24,21 @@ class ImmutableEnvironment {
      *
      * @return {[ContractSubscription]} array of contract subscription.
      */
-    subscriptions() {
-        throw new Error("not implemented");
-    }
+    subscriptions();
 
     /**
      * Get array of contract storages.
      *
      * @return {[ContractStorage]} array of contract storages.
      */
-    storages() {
-        throw new Error("not implemented");
-    }
+    storages();
 
     /**
      * Get array of UNS mame records.
      *
      * @return {[NameRecord]} array of UNS mame records.
      */
-    nameRecords() {
-        throw new Error("not implemented");
-    }
+    nameRecords();
 
     /**
      * Get follower contract service.
@@ -52,9 +46,7 @@ class ImmutableEnvironment {
      * @param {boolean} init - initialize follower service if not initialized. Optional. Default - false.
      * @return {FollowerService} follower contract service.
      */
-    getFollowerService(init) {
-        throw new Error("not implemented");
-    }
+    getFollowerService(init);
 
     /**
      * Availability check for reduced names, origins and addresses.
@@ -64,9 +56,7 @@ class ImmutableEnvironment {
      * @param {[string]} addressesToAllocate - addresses for availability check.
      * @return {[ErrorRecord]} array of availability errors.
      */
-    tryAllocate(reducedNamesToAllocate, originsToAllocate, addressesToAllocate) {
-        throw new Error("not implemented");
-    }
+    tryAllocate(reducedNamesToAllocate, originsToAllocate, addressesToAllocate);
 }
 
 module.exports = {ImmutableEnvironment};

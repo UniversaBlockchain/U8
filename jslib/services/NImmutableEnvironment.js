@@ -1,13 +1,12 @@
 const bs = require("biserializable");
-const NameCache = require("./namecache").NameCache;
+const NameCache = require("namecache").NameCache;
 const e = require("errors");
 const ErrorRecord = e.ErrorRecord;
-const ImmutableEnvironment = require("immutableEnvironment").ImmutableEnvironment;
 
 /**
  * Implements {@see ImmutableEnvironment} interface for smart contract.
  */
-class NImmutableEnvironment extends ImmutableEnvironment, bs.BiSerializable {
+class NImmutableEnvironment extends bs.BiSerializable {
     /**
      * Restore NImmutableEnvironment
      *
@@ -21,6 +20,7 @@ class NImmutableEnvironment extends ImmutableEnvironment, bs.BiSerializable {
      */
     constructor(contract, ledger, kvBinder, subscriptions, storages, nameRecords, followerService) {
         super();
+        this.id = 0;
         this.contract = contract;
         this.ledger = ledger;
         this.createdAt = Math.floor(Date.now() / 1000);

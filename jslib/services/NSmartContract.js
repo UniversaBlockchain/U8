@@ -1,5 +1,4 @@
-const Contract = require("./contract").Contract;
-const NContract = require("ncontract").NContract;
+const Contract = require("contract").Contract;
 const e = require("errors");
 const Errors = e.Errors;
 const ErrorRecord = e.ErrorRecord;
@@ -8,7 +7,7 @@ const ex = require("exceptions");
 /**
  * Implements {@see NContract} interface for contract {@see Contract}.
  */
-class NSmartContract extends Contract, NContract {
+class NSmartContract extends Contract {
 
     static PAID_U_FIELD_NAME = "paid_U";
 
@@ -94,6 +93,8 @@ class NSmartContract extends Contract, NContract {
     }
 
     onRevoked(c) {}
+
+    onContractSubscriptionEvent(event) {}
 
     /**
      * Asynchronously checks smart contract filling the {@link Contract.errors}.

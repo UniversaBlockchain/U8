@@ -1,11 +1,10 @@
-const NImmutableEnvironment = require("NImmutableEnvironment").NImmutableEnvironment;
-const MutableEnvironment = require("mutableEnvironment").MutableEnvironment;
+const NImmutableEnvironment = require("services/NImmutableEnvironment").NImmutableEnvironment;
 const Boss = require("boss");
 
 /**
  * Implements {@see MutableEnvironment} interface for smart contracts.
  */
-class NMutableEnvironment extends NImmutableEnvironment, MutableEnvironment {
+class NMutableEnvironment extends NImmutableEnvironment {
 
     constructor(ime) {
         super(ime.contract, ime.kvStore, ime.subscriptionsSet, ime.storagesSet, ime.nameRecordsSet, ime.followerService, ime.ledger);
@@ -100,24 +99,35 @@ class NMutableEnvironment extends NImmutableEnvironment, MutableEnvironment {
         await this.ledger.updateEnvironment(this.id, this.contract.getExtendedType(), this.contract.id,
             Boss.dump(this.kvStore), this.contract.getPackedTransaction());
 
-        this.subscriptionsToDestroy.forEach(async(sub) => await this.ledger.removeEnvironmentSubscription(sub.id));
+        await Promise.all(Array.from(this.subscriptionsToDestroy).map(
+            async(sub) => await this.ledger.removeEnvironmentSubscription(sub.id)
+        ));
 
-        this.subscriptionsToSave.forEach(async(sub) => await this.ledger.updateSubscriptionInStorage(sub.id, sub.expiresAt));
+        await Promise.all(Array.from(this.subscriptionsToSave).map(
+            async(sub) => await this.ledger.updateSubscriptionInStorage(sub.id, sub.expiresAt)
+        ));
 
-        this.subscriptionsToAdd.forEach(async(sub) =>
-            sub.id = await this.ledger.saveSubscriptionInStorage(sub.hashId, sub.isChainSubscription, sub.expiresAt, this.id)
-        );
+        await Promise.all(Array.from(this.subscriptionsToAdd).map(
+            async(sub) => sub.id = await this.ledger.saveSubscriptionInStorage(
+                sub.hashId, sub.isChainSubscription, sub.expiresAt, this.id)
+        ));
 
-        this.storagesToDestroy.forEach(async(storage) => await this.ledger.removeEnvironmentStorage(storage.id));
+        await Promise.all(Array.from(this.storagesToDestroy).map(
+            async(storage) => await this.ledger.removeEnvironmentStorage(storage.id)
+        ));
 
-        this.storagesToSave.forEach(async(storage) => await this.ledger.updateStorageExpiresAt(storage.id, storage.expiresAt));
+        await Promise.all(Array.from(this.storagesToSave).map(
+            async(storage) => await this.ledger.updateStorageExpiresAt(storage.id, storage.expiresAt)
+        ));
 
-        this.storagesToAdd.forEach(async(storage) =>
-                storage.id = await this.ledger.saveContractInStorage(storage.contract.id, storage.packedContract,
-                    storage.expiresAt, storage.contract.getOrigin(), this.id)
-        );
+        await Promise.all(Array.from(this.storagesToAdd).map(
+            async(storage) => storage.id = await this.ledger.saveContractInStorage(
+                storage.contract.id, storage.packedContract, storage.expiresAt, storage.contract.getOrigin(), this.id)
+        ));
 
-        this.nameRecordsToDestroy.forEach(async(nameRecord) => await this.ledger.removeNameRecord(nameRecord.nameReduced));
+        await Promise.all(Array.from(this.nameRecordsToDestroy).map(
+            async(nameRecord) => await this.ledger.removeNameRecord(nameRecord.nameReduced)
+        ));
 
         await this.ledger.clearExpiredStorageContractBinaries();
 
@@ -125,10 +135,10 @@ class NMutableEnvironment extends NImmutableEnvironment, MutableEnvironment {
         let nameList = [];
         let originsList = [];
 
-        this.nameRecordsToSave.forEach(async(nameRecord) => {
+        await Promise.all(Array.from(this.nameRecordsToSave).map(async(nameRecord) => {
             await this.ledger.updateNameRecord(nameRecord.id, nameRecord.expiresAt);
             nameList.push(nameRecord.nameReduced);
-            nameRecord.getEntries().forEach( e => {
+            nameRecord.getEntries().forEach(e => {
                 if (e.getOrigin() != null)
                     originsList.push(e.getOrigin());
 
@@ -138,12 +148,12 @@ class NMutableEnvironment extends NImmutableEnvironment, MutableEnvironment {
                 if (e.getShortAddress() != null)
                     addressList.push(e.getShortAddress());
             });
-        });
+        }));
 
-        this.nameRecordsToAdd.forEach(async(nameRecord) => {
+        await Promise.all(Array.from(this.nameRecordsToAdd).map(async(nameRecord) => {
             await this.ledger.addNameRecord(nameRecord);
             nameList.push(nameRecord.nameReduced);
-            nameRecord.getEntries().forEach( e => {
+            nameRecord.getEntries().forEach(e => {
                 if (e.getOrigin() != null)
                     originsList.push(e.getOrigin());
 
@@ -153,7 +163,7 @@ class NMutableEnvironment extends NImmutableEnvironment, MutableEnvironment {
                 if (e.getShortAddress() != null)
                     addressList.push(e.getShortAddress());
             });
-        });
+        }));
 
         this.nameCache.unlockAddressList(addressList);
         this.nameCache.unlockNameList(nameList);
