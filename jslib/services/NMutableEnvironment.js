@@ -1,4 +1,5 @@
 const NImmutableEnvironment = require("NImmutableEnvironment").NImmutableEnvironment;
+const MutableEnvironment = require("mutableEnvironment").MutableEnvironment;
 const Boss = require("boss");
 
 /**
@@ -175,3 +176,5 @@ class NMutableEnvironment extends NImmutableEnvironment, MutableEnvironment {
             this.followerService.save();
     }
 }
+
+module.exports = {NMutableEnvironment};

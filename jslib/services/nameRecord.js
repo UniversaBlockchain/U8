@@ -35,3 +35,5 @@ class NameRecord {
      */
     getEntries();
 }
+
+module.exports = {NameRecord};

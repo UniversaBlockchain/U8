@@ -1,5 +1,6 @@
 const bs = require("biserializable");
 const ex = require("exceptions");
+const ContractStorage = require("contractStorage").ContractStorage;
 
 /**
  * Implements {@see ContractStorage} interface for contract.
@@ -44,3 +45,5 @@ class NContractStorage extends ContractStorage, bs.BiSerializable {
         };
     }
 }
+
+module.exports = {NContractStorage};

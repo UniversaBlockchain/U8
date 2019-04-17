@@ -31,3 +31,5 @@ class ContractStorage {
      */
     getPackedContract();
 }
+
+module.exports = {ContractStorage};

@@ -26,3 +26,5 @@ class NameRecordEntry {
      */
     getOrigin();
 }
+
+module.exports = {NameRecordEntry};

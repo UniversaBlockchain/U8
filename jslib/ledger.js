@@ -11,6 +11,7 @@ const StateRecord = require("staterecord").StateRecord;
 const ItemState = require("itemstate").ItemState;
 const t = require("tools");
 const ex = require("exceptions");
+const Boss = require("boss");
 
 class LedgerException extends Error {
     constructor(message = undefined) {
@@ -881,11 +882,158 @@ class Ledger {
             nameRecordId);
     }
 
+    saveEnvironmentToStorage(ncontractType, ncontractHashId, kvStorage, transactionPack) {
+        return this.simpleQuery(
+            "INSERT INTO environments (ncontract_type,ncontract_hash_id,kv_storage,transaction_pack) VALUES (?,?,?,?) " +
+            "ON CONFLICT (ncontract_hash_id) DO UPDATE SET ncontract_type=EXCLUDED.ncontract_type, " +
+            "kv_storage=EXCLUDED.kv_storage, transaction_pack=EXCLUDED.transaction_pack RETURNING id",
+            x => {
+                if (x == null)
+                    throw new LedgerException("saveEnvironmentToStorage failed: returning null");
+                else
+                    return Number(x);
+            },
+            ncontractType,
+            ncontractHashId.digest,
+            kvStorage,
+            transactionPack);
+    }
+
+    saveEnvironment_getConflicts(environment) {
+        let ownSmartContractId = environment.contract.id;
+
+        let namesToCheck = [];
+        let originsToCheck = [];
+        let addressesToCheck = [];
+        environment.nameRecordsSet.forEach(nr => {
+            namesToCheck.push(nr.nameReduced);
+            nr.entries.forEach(entry => {
+                if (entry.getOrigin() != null)
+                    originsToCheck.push(entry.getOrigin());
+                if (entry.getShortAddress() != null)
+                    addressesToCheck.push(entry.getShortAddress());
+                if (entry.getLongAddress() != null)
+                    addressesToCheck.push(entry.getLongAddress());
+            });
+        });
+
+        let queries = [];
+
+        if (namesToCheck.length > 0) {
+            let qpNames = "?";
+            for (let i = 1; i < namesToCheck.length; i++)
+                qpNames += ",?";
+
+            queries.push("(SELECT environments.ncontract_hash_id " +
+                "FROM name_storage JOIN environments ON name_storage.environment_id=environments.id " +
+                "WHERE name_storage.name_reduced IN (" + qpNames + ") AND environments.ncontract_hash_id<>?)");
+        }
+
+        if (originsToCheck.length > 0) {
+            let qpOrigins = "?";
+            for (let i = 1; i < originsToCheck.length; i++)
+                qpOrigins += ",?";
+
+            queries.push("(SELECT environments.ncontract_hash_id " +
+                "FROM name_entry JOIN name_storage ON name_entry.name_storage_id=name_storage.id " +
+                "JOIN environments ON name_storage.environment_id=environments.id " +
+                "WHERE name_entry.origin IN (" + qpOrigins + ") AND environments.ncontract_hash_id<>?)");
+        }
+
+        if (addressesToCheck.length > 0) {
+            let qpAddresses = "?";
+            for (let i = 1; i < addressesToCheck.length; i++)
+                qpAddresses += ",?";
+
+            queries.push("(SELECT environments.ncontract_hash_id " +
+                "FROM name_entry JOIN name_storage ON name_entry.name_storage_id=name_storage.id " +
+                "JOIN environments ON name_storage.environment_id=environments.id " +
+                "WHERE (name_entry.short_addr IN (" + qpAddresses + ") OR name_entry.long_addr IN (" + qpAddresses +
+                ")) AND environments.ncontract_hash_id<>?)");
+        }
+
+        if (queries.length === 0)
+            return new Set();
+
+        let sqlQuery = queries.join(" UNION ");
+
+        let params = [];
+        namesToCheck.forEach(name => params.push(name));
+        if (namesToCheck.length > 0)
+            params.push(ownSmartContractId.digest);
+
+        originsToCheck.forEach(origin => params.push(origin.digest));
+        if (originsToCheck.length > 0)
+            params.push(ownSmartContractId.digest);
+
+        addressesToCheck.forEach(address => params.push(address));
+        addressesToCheck.forEach(address => params.push(address));
+        if (addressesToCheck.length > 0)
+            params.push(ownSmartContractId.digest);
+
+        return new Promise((resolve, reject) => {
+            this.dbPool_.withConnection(con => {
+                con.executeQuery(qr => {
+                        let result = new Set();
+                        let count = qr.getRowsCount();
+                        while (count > 0) {
+                            let rows;
+                            if (count > 1024) {
+                                rows = qr.getRows(1024);
+                                count -= 1024;
+                            } else {
+                                rows = qr.getRows(count);
+                                count = 0;
+                            }
+
+                            for (let i = 0; i < rows.length; i++)
+                                if (rows[i] != null)
+                                    result.add(crypto.HashId.withDigest(rows[i][0]));
+                        }
+
+                        con.release();
+                        resolve(result);
+                    }, e => {
+                        con.release();
+                        reject(e);
+                    },
+                    sqlQuery,
+                    ...params
+                );
+            });
+        });
+    }
+
     /**
+     * Save environment.
      *
-     * @param environment
+     * @param {NImmutableEnvironment} environment.
      */
-    saveEnvironment(environment) {}
+    async saveEnvironment(environment) {
+        let conflicts = await this.saveEnvironment_getConflicts(environment);
+
+        if (conflicts.length === 0) {
+            let nsc = environment.contract;
+            await this.removeEnvironment(nsc.id);
+            let envId = await this.saveEnvironmentToStorage(nsc.getExtendedType(), nsc.id, Boss.dump(environment.getMutable().kvStore), nsc.getPackedTransaction());
+
+            environment.nameRecords().forEach(async(nr)=> {
+                nr.environmentId = envId;
+                await this.addNameRecord(nr);
+            });
+
+            environment.subscriptions().forEach(async(css) =>
+                await this.saveSubscriptionInStorage(css.getHashId(), css.isChainSubscription(), css.expiresAt(), envId));
+
+            environment.storages().forEach(async(cst) =>
+                await this.saveContractInStorage(cst.getContract().id, cst.getPackedContract(), cst.expiresAt(), cst.getContract().getOrigin(), envId));
+
+            let fs = environment.getFollowerService();
+            if (fs != null)
+                await this.saveFollowerEnvironment(envId, fs.expiresAt(), fs.mutedAt(), fs.getCallbacksSpent(), fs.getStartedCallbacks());
+        }
+        return conflicts;
+    }
 
     /**
      * Find bad (not approved) items in ledger by set of IDs.
@@ -1492,22 +1640,22 @@ class Ledger {
      * @param {HashId} ncontractHashId - Contract ID.
      * @return {number}
      */
-    removeEnvironment(ncontractHashId) {
-        let envId = this.getEnvironmentId(ncontractHashId);
-        this.removeSubscriptionsByEnvId(envId);
-        this.removeStorageContractsByEnvId(envId);
-        this.clearExpiredStorageContractBinaries();
-        return this.removeEnvironmentEx(ncontractHashId);
+    async removeEnvironment(ncontractHashId) {
+        let envId = await this.getEnvironmentId(ncontractHashId);
+        await this.removeSubscriptionsByEnvId(envId);
+        await this.removeStorageContractsByEnvId(envId);
+        await this.clearExpiredStorageContractBinaries();
+        return await this.removeEnvironmentEx(ncontractHashId);
     }
 
     /**
      * Delete expired subscriptions and stored contracts.
      *
      */
-    removeExpiredStoragesAndSubscriptionsCascade() {
-        this.clearExpiredSubscriptions();
-        this.clearExpiredStorages();
-        this.clearExpiredStorageContractBinaries();
+    async removeExpiredStoragesAndSubscriptionsCascade() {
+        await this.clearExpiredSubscriptions();
+        await this.clearExpiredStorages();
+        await this.clearExpiredStorageContractBinaries();
     }
 
     /**

@@ -2,6 +2,7 @@ const bs = require("biserializable");
 const NameCache = require("./namecache").NameCache;
 const e = require("errors");
 const ErrorRecord = e.ErrorRecord;
+const ImmutableEnvironment = require("immutableEnvironment").ImmutableEnvironment;
 
 /**
  * Implements {@see ImmutableEnvironment} interface for smart contract.
@@ -167,3 +168,5 @@ class NImmutableEnvironment extends ImmutableEnvironment, bs.BiSerializable {
         this.kvStore = deserializer.deserialize(data.kvStore);
     }
 }
+
+module.exports = {NImmutableEnvironment};

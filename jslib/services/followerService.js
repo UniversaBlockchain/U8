@@ -105,3 +105,5 @@ class FollowerService {
      */
     save();
 }
+
+module.exports = {FollowerService};

@@ -63,20 +63,11 @@ class NContract {
     onRevoked(me);
 
     /**
-     * Call the readonly method (query) that does not change the contract inner state (neither the contract nor
-     * any associated data) and return the result.
-     *
-     * @param {ImmutableEnvironment} e
-     * @param {string} methodName
-     * @param {Object|Null} params - Params or null.
-     * @return {Object} the results.
-     */
-    //query(e, methodName, params);
-
-    /**
      * For the {@link ContractSubscription} the instance will receive event notifications with this callback.
      *
      * @param {ContractSubscription.Event} event
      */
     onContractSubscriptionEvent(event) {}
 }
+
+module.exports = {NContract};

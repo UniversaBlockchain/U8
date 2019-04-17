@@ -101,3 +101,6 @@ class CompletedEvent extends Event {}
 class FailedEvent extends Event {}
 
 class SpentEvent extends Event {}
+
+module.exports = {ContractSubscription, Event, SubscriptionEvent, ApprovedEvent, RevokedEvent, CallbackEvent,
+    ApprovedWithCallbackEvent, RevokedWithCallbackEvent, CompletedEvent, FailedEvent, SpentEvent};

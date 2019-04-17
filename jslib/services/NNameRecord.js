@@ -1,4 +1,5 @@
 const bs = require("biserializable");
+const NameRecord = require("nameRecord").NameRecord;
 
 /**
  * Implements {@see NameRecord} interface for UNS contract.
@@ -95,3 +96,5 @@ class NNameRecord extends NameRecord, bs.BiSerializable {
         };
     }
 }
+
+module.exports = {NNameRecord};

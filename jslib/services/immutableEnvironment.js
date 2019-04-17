@@ -68,3 +68,5 @@ class ImmutableEnvironment {
         throw new Error("not implemented");
     }
 }
+
+module.exports = {ImmutableEnvironment};

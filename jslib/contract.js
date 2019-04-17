@@ -1763,6 +1763,28 @@ class Contract extends bs.BiSerializable {
         throw new ex.IllegalArgumentError("cant make role from " + JSON.stringify(roleObject));
     }
 
+    isU(issuerKeys, issuerName) {
+        let issuer = this.roles.issuer;
+        if(!(issuer instanceof roles.SimpleRole))
+            return false;
+
+        let thisIssuerAddresses = new Set(issuer.keyAddresses);
+
+        issuer.keyRecords.keys().forEach(pk => thisIssuerAddresses.add(pk.shortAddress));
+
+        let found = false;
+        for (let k of issuerKeys)
+            if (thisIssuerAddresses.has(k)) {
+                found = true;
+                break;
+            }
+
+        if (!found)
+            return false;
+
+        return issuerName === this.definition.data.issuerName;
+    }
+
     /**
      * Creates a default empty new contract using a provided key as issuer and owner and sealer. Default expiration is
      * set to 90 days.
@@ -1773,10 +1795,11 @@ class Contract extends bs.BiSerializable {
      * <p>
      * Change owner permission is added by default
      * @param key for creating roles "issuer", "owner", "creator" and signing the contract
-     * @returns {Contract} created
+     * @param contract - init contract (example, NSmartContract). Optional.
+     * @returns {Contract | NSmartContract} created contract
      */
-    static fromPrivateKey(key) {
-        let c = new Contract();
+    static fromPrivateKey(key, contract = undefined) {
+        let c = (contract === undefined) ? new Contract() : contract;
         let now = new Date();
         now.setTime((Math.floor(now.getTime()/1000)+90*24*3600)*1000);
         now.setMilliseconds(0);
@@ -1803,11 +1826,12 @@ class Contract extends bs.BiSerializable {
      * It is recommended to call {@link #check()} after construction to see the errors.
      *
      * @param sealed binary sealed contract.
-     * @param transactionPack   the transaction pack to resolve dependencies against.
-     * @returns {Contract} extracted contract
+     * @param transactionPack the transaction pack to resolve dependencies against.
+     * @param contract - init contract (example, NSmartContract). Optional.
+     * @returns {Contract | NSmartContract} extracted contract
      */
-    static fromSealedBinary(sealed,transactionPack) {
-        let result = new Contract();
+    static fromSealedBinary(sealed, transactionPack, contract = undefined) {
+        let result = (contract === undefined) ? new Contract() : contract;
         if(!transactionPack)
             transactionPack = new TransactionPack(result);
 
@@ -1877,15 +1901,17 @@ class Contract extends bs.BiSerializable {
      * It is required to add signatures before check.
      *
      * @param {string} fileName - Path to file containing YAML representation of a contract.
-     * @return {Contract} initialized contract.
+     * @param contract - init contract (example, NSmartContract). Optional.
+     * @return {Contract | NSmartContract} initialized contract.
      */
-    static async fromDslFile(fileName) {
+    static async fromDslFile(fileName, contract = undefined) {
         let input = await io.openRead(fileName);
         let data = await input.allAsString();
 
         let root = DefaultBiMapper.getInstance().deserialize(yaml.load(data));
 
-        return new Contract().initializeWithDsl(root);
+        let c = (contract === undefined) ? new Contract() : contract;
+        return c.initializeWithDsl(root);
     }
 
     /**

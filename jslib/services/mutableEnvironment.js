@@ -1,3 +1,5 @@
+const ImmutableEnvironment = require("immutableEnvironment").ImmutableEnvironment;
+
 /**
  * The RW environment for {@see NContract} instance, where it can change its server state.
  *
@@ -128,3 +130,5 @@ class MutableEnvironment extends ImmutableEnvironment {
         throw new Error("not implemented");
     }
 }
+
+module.exports = {MutableEnvironment};

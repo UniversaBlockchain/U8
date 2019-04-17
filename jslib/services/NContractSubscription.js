@@ -1,4 +1,5 @@
 const bs = require("biserializable");
+const ContractSubscription = require("contractSubscription").ContractSubscription;
 
 /**
  * Implements {@see ContractSubscription} interface for contract.
@@ -52,3 +53,5 @@ class NContractSubscription extends ContractSubscription, bs.BiSerializable {
         };
     }
 }
+
+module.exports = {NContractSubscription};
