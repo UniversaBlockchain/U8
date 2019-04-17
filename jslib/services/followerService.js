@@ -21,21 +21,6 @@ class FollowerService {
     mutedAt();
 
     /**
-     * Set expiration time for follower service.
-     *
-     * @param {Date} expiresAt - Expiration time for follower service.
-     */
-    setExpiresAt(expiresAt);
-
-    /**
-     * Set muted time for follower service.
-     * Muted follower service is not removed from the ledger, but callbacks are no longer executed (due to lack of funds).
-     *
-     * @param {Date} mutedAt - Muted time for follower service.
-     */
-    setMutedAt( mutedAt);
-
-    /**
      * Set expiration and muted time for follower service.
      * Muted follower service is not removed from the ledger, but callbacks are no longer executed (due to lack of funds).
      *
