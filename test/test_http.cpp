@@ -27,18 +27,27 @@ TEST_CASE("http_hello") {
 
     Semaphore sem;
     atomic<int> readyCounter(0);
-    int countToSend = 10000;
+    //int countToSend = 200000000;
+    int countToSend = 2000;
 
-    auto handler = [&sem,&readyCounter,countToSend](int respCode, string&& body){
+    long ts0 = getCurrentTimeMillis();
+    int counter0 = 0;
+    auto handler = [&sem,&readyCounter,countToSend,&ts0,&counter0](int respCode, string&& body){
         //printf("resp(%i): %s\n", respCode, body.c_str());
         if (++readyCounter >= countToSend)
             sem.notify();
+        long dts = getCurrentTimeMillis() - ts0;
+        if (dts >= 1000) {
+            printf("readyCounter=%i, rps=%li\n", int(readyCounter), (readyCounter-counter0)*1000/dts);
+            counter0 = readyCounter;
+            ts0 = getCurrentTimeMillis();
+        }
     };
 
     long t0 = getCurrentTimeMillis();
     for (int i = 0; i < countToSend; ++i) {
         httpClient.sendGetRequest("localhost:8080/testPage", handler);
-        if (readyCounter+100 < i)
+        if (readyCounter+200 < i)
             this_thread::sleep_for(10ms);
     }
 
