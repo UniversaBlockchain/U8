@@ -1,10 +1,10 @@
-const bs = require("biserializable");
+const NameRecord = require("services/nameRecord").NameRecord;
 const NNameRecordEntry = require("services/NNameRecordEntry").NNameRecordEntry;
 
 /**
  * Implements {@see NameRecord} interface for UNS contract.
  */
-class NNameRecord extends bs.BiSerializable {
+class NNameRecord extends NameRecord {
 
     constructor(unsName, expiresAt, entries, id, environmentId) {
         super();
@@ -46,7 +46,7 @@ class NNameRecord extends bs.BiSerializable {
             this.environmentId = 0;
     }
 
-    expiresAt() {
+    getExpiresAt() {
         return this.expiresAt;
     }
 

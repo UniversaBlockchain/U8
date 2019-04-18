@@ -13,7 +13,9 @@ class NContract {
      *
      * @return {string }string tag, e.g. "SLOT1".
      */
-    getExtendedType();
+    getExtendedType() {
+        throw new Error("not implemented");
+    }
 
     /**
      * Check the smart contract could be created.
@@ -21,7 +23,9 @@ class NContract {
      * @param {ImmutableEnvironment} e
      * @return {boolean} true it if can be created.
      */
-    beforeCreate(e);
+    beforeCreate(e) {
+        throw new Error("not implemented");
+    }
 
     /**
      * Check the smart contract could be updated (e.g. new revision could be registered).
@@ -29,7 +33,9 @@ class NContract {
      * @param {ImmutableEnvironment} e
      * @return {boolean} true it if can be created.
      */
-    beforeUpdate(e);
+    beforeUpdate(e) {
+        throw new Error("not implemented");
+    }
 
     /**
      * Check the smart contract could be revoked.
@@ -37,7 +43,9 @@ class NContract {
      * @param {ImmutableEnvironment} e
      * @return {boolean} true it if can be created.
      */
-    beforeRevoke(e);
+    beforeRevoke(e) {
+        throw new Error("not implemented");
+    }
 
     /**
      * Called after the new contract is approved by the network.
@@ -45,7 +53,9 @@ class NContract {
      * @param {MutableEnvironment} me
      * @return {Object} extra data to pass to the calling client or null.
      */
-    onCreated(me);
+    onCreated(me) {
+        throw new Error("not implemented");
+    }
 
     /**
      * Called after the new contract revision is approved by the network.
@@ -53,21 +63,27 @@ class NContract {
      * @param {MutableEnvironment} me
      * @return {Object} extra data to pass to the calling client or null.
      */
-    onUpdated(me);
+    onUpdated(me) {
+        throw new Error("not implemented");
+    }
 
     /**
      * Called when the contract is just revoked by the network.
      *
      * @param {ImmutableEnvironment} me
      */
-    onRevoked(me);
+    onRevoked(me) {
+        throw new Error("not implemented");
+    }
 
     /**
      * For the {@link ContractSubscription} the instance will receive event notifications with this callback.
      *
      * @param {ContractSubscription.Event} event
      */
-    onContractSubscriptionEvent(event);
+    onContractSubscriptionEvent(event) {
+        throw new Error("not implemented");
+    }
 }
 
 module.exports = {NContract};

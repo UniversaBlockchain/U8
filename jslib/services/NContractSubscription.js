@@ -1,9 +1,9 @@
-const bs = require("biserializable");
+const ContractSubscription = require("services/contractSubscription").ContractSubscription;
 
 /**
  * Implements {@see ContractSubscription} interface for contract.
  */
-class NContractSubscription extends bs.BiSerializable {
+class NContractSubscription extends ContractSubscription {
 
     constructor(hashId, isChainSubscription, expiresAt) {
         super();
@@ -13,8 +13,12 @@ class NContractSubscription extends bs.BiSerializable {
         this.expiresAt = expiresAt;
     }
 
-    expiresAt() {
+    getExpiresAt() {
         return this.expiresAt;
+    }
+
+    getIsChainSubscription() {
+        return this.isChainSubscription;
     }
 
     getHashId() {
@@ -33,10 +37,6 @@ class NContractSubscription extends bs.BiSerializable {
             return this.hashId;
         else
             return null;
-    }
-
-    isChainSubscription() {
-        return this.isChainSubscription;
     }
 
     deserialize(data, deserializer) {

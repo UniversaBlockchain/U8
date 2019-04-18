@@ -1,9 +1,9 @@
-const bs = require("biserializable");
+const NameRecordEntry = require("services/nameRecordEntry").NameRecordEntry;
 
 /**
  * Implements {@see NameRecordEntry} interface for UNS contract.
  */
-class NNameRecordEntry extends bs.BiSerializable {
+class NNameRecordEntry extends NameRecordEntry {
 
     constructor(origin, shortAddress, longAddress) {
         super();

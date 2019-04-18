@@ -17,28 +17,36 @@ class ImmutableEnvironment {
      *
      * @return the stored value or the default value
      */
-    get(keyName, defaultValue);
+    get(keyName, defaultValue) {
+        throw new Error("not implemented");
+    }
 
     /**
      * Get array of contract subscription.
      *
      * @return {[ContractSubscription]} array of contract subscription.
      */
-    subscriptions();
+    subscriptions() {
+        throw new Error("not implemented");
+    }
 
     /**
      * Get array of contract storages.
      *
      * @return {[ContractStorage]} array of contract storages.
      */
-    storages();
+    storages() {
+        throw new Error("not implemented");
+    }
 
     /**
      * Get array of UNS mame records.
      *
      * @return {[NameRecord]} array of UNS mame records.
      */
-    nameRecords();
+    nameRecords() {
+        throw new Error("not implemented");
+    }
 
     /**
      * Get follower contract service.
@@ -46,7 +54,9 @@ class ImmutableEnvironment {
      * @param {boolean} init - initialize follower service if not initialized. Optional. Default - false.
      * @return {FollowerService} follower contract service.
      */
-    getFollowerService(init);
+    getFollowerService(init) {
+        throw new Error("not implemented");
+    }
 
     /**
      * Availability check for reduced names, origins and addresses.
@@ -56,7 +66,9 @@ class ImmutableEnvironment {
      * @param {[string]} addressesToAllocate - addresses for availability check.
      * @return {[ErrorRecord]} array of availability errors.
      */
-    tryAllocate(reducedNamesToAllocate, originsToAllocate, addressesToAllocate);
+    tryAllocate(reducedNamesToAllocate, originsToAllocate, addressesToAllocate) {
+        throw new Error("not implemented");
+    }
 }
 
 module.exports = {ImmutableEnvironment};

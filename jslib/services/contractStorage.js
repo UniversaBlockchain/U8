@@ -15,21 +15,27 @@ class ContractStorage {
      *
      * @return {Date} the expiration time for contract storage.
      */
-    expiresAt();
+    getExpiresAt() {
+        throw new Error("not implemented");
+    }
 
     /**
      * Get contract.
      *
      * @return {Contract} the unpacked stored contract. Note that this instance could be cached/shared among subscribers.
      */
-    getContract();
+    getContract() {
+        throw new Error("not implemented");
+    }
 
     /**
      * Get stored transaction pack.
      *
      * @return {number[]} stored packed representation (transaction pack).
      */
-    getPackedContract();
+    getPackedContract() {
+        throw new Error("not implemented");
+    }
 }
 
 module.exports = {ContractStorage};

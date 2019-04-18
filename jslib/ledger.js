@@ -16,6 +16,7 @@ const NContractSubscription = require("services/NContractSubscription").NContrac
 const NContractStorage = require("services/NContractStorage").NContractStorage;
 const NNameRecord = require("services/NNameRecord").NNameRecord;
 const NNameRecordEntry = require("services/NNameRecordEntry").NNameRecordEntry;
+const NFollowerService = require("services/NFollowerService").NFollowerService;
 const NImmutableEnvironment = require("services/NImmutableEnvironment").NImmutableEnvironment;
 
 class LedgerException extends Error {
@@ -1515,9 +1516,9 @@ class Ledger {
                             resolve(null);
                         else
                             resolve(new NFollowerService(this,
+                                environmentId,
                                 new Date(row[0] * 1000),
                                 new Date(row[1] * 1000),
-                                environmentId,
                                 row[2],
                                 row[3]));
                     }, e => {

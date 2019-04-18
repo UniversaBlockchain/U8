@@ -8,32 +8,44 @@ class NameRecord {
     /**
      * @return {Date} the expiration time.
      */
-    expiresAt();
+    getExpiresAt() {
+        throw new Error("not implemented");
+    }
 
     /**
      * @return {string}
      */
-    getName();
+    getName() {
+        throw new Error("not implemented");
+    }
 
     /**
      * @return {string}
      */
-    getNameReduced();
+    getNameReduced() {
+        throw new Error("not implemented");
+    }
 
     /**
      * @return {string}
      */
-    getDescription();
+    getDescription() {
+        throw new Error("not implemented");
+    }
 
     /**
      * @return {string}
      */
-    getUrl();
+    getUrl() {
+        throw new Error("not implemented");
+    }
 
     /**
      * @return {[NameRecordEntry]}
      */
-    getEntries();
+    getEntries() {
+        throw new Error("not implemented");
+    }
 }
 
 module.exports = {NameRecord};

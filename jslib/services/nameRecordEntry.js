@@ -10,21 +10,27 @@ class NameRecordEntry {
      *
      * @return {string} long address.
      */
-    getLongAddress();
+    getLongAddress() {
+        throw new Error("not implemented");
+    }
 
     /**
      * Get short address.
      *
      * @return {string} short address.
      */
-    getShortAddress();
+    getShortAddress() {
+        throw new Error("not implemented");
+    }
 
     /**
      * Get origin.
      *
      * @return {HashId} origin.
      */
-    getOrigin();
+    getOrigin() {
+        throw new Error("not implemented");
+    }
 }
 
 module.exports = {NameRecordEntry};

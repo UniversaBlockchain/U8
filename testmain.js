@@ -131,7 +131,7 @@ require('unit_tests/constraint_test')
 require('unit_tests/pg_test')
 require('unit_tests/ledger_test')
 require('unit_tests/udp_test')
-
+require('unit_tests/environment_test')
 
 async function main() {
 

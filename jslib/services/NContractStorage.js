@@ -1,10 +1,10 @@
-const bs = require("biserializable");
+const ContractStorage = require("services/contractStorage").ContractStorage;
 const ex = require("exceptions");
 
 /**
  * Implements {@see ContractStorage} interface for contract.
  */
-class NContractStorage extends bs.BiSerializable {
+class NContractStorage extends ContractStorage {
 
     constructor(packedContract, expiresAt) {
         super();
@@ -19,7 +19,7 @@ class NContractStorage extends bs.BiSerializable {
         }
     }
 
-    expiresAt() {
+    getExpiresAt() {
         return this.expiresAt;
     }
 

@@ -22,7 +22,9 @@ class MutableEnvironment extends ImmutableEnvironment {
      *
      * @return if an existing key is passed then the previous value gets returned, else undefined is returned.
      */
-    set(key, value);
+    set(key, value) {
+        throw new Error("not implemented");
+    }
 
     /**
      * Create follower subscription to the chain of contracts
@@ -32,7 +34,9 @@ class MutableEnvironment extends ImmutableEnvironment {
      *
      * @return {ContractSubscription} follower subscription.
      */
-    createChainSubscription(origin, expiresAt);
+    createChainSubscription(origin, expiresAt) {
+        throw new Error("not implemented");
+    }
 
     /**
      * Create subscription to a packed contract. It always creates the subscription to new or existing contract.
@@ -42,7 +46,9 @@ class MutableEnvironment extends ImmutableEnvironment {
      *
      * @return {ContractSubscription} storage subscription.
      */
-    createContractSubscription(id, expiresAt);
+    createContractSubscription(id, expiresAt) {
+        throw new Error("not implemented");
+    }
 
     /**
      * Create storage for a packed contract.
@@ -54,14 +60,18 @@ class MutableEnvironment extends ImmutableEnvironment {
      *
      * @return {ContractStorage} storage subscription.
      */
-    createContractStorage(packedTransaction, expiresAt);
+    createContractStorage(packedTransaction, expiresAt) {
+        throw new Error("not implemented");
+    }
 
     /**
      *
      * @param {UnsName} unsName - UNS name.
      * @param {Date} expiresAt -
      */
-    createNameRecord(unsName, expiresAt);
+    createNameRecord(unsName, expiresAt) {
+        throw new Error("not implemented");
+    }
 
     /**
      * Set expiration time for subscription.
@@ -69,7 +79,9 @@ class MutableEnvironment extends ImmutableEnvironment {
      * @param {ContractSubscription} subscription - Subscription.
      * @param {Date} expiresAt - Time to expiration subscription.
      */
-    setSubscriptionExpiresAt(subscription, expiresAt);
+    setSubscriptionExpiresAt(subscription, expiresAt) {
+        throw new Error("not implemented");
+    }
 
     /**
      * Set expiration time for contract storage.
@@ -77,7 +89,9 @@ class MutableEnvironment extends ImmutableEnvironment {
      * @param {ContractStorage} storage - Contract storage.
      * @param {Date} expiresAt - Time to expiration contract storage.
      */
-    setStorageExpiresAt(storage, expiresAt);
+    setStorageExpiresAt(storage, expiresAt) {
+        throw new Error("not implemented");
+    }
 
     /**
      * Set expiration time for storing UNS name.
@@ -85,28 +99,36 @@ class MutableEnvironment extends ImmutableEnvironment {
      * @param {NameRecord} nameRecord - UNS name record.
      * @param {Date} expiresAt - Time to expiration UNS name.
      */
-    setNameRecordExpiresAt(nameRecord, expiresAt);
+    setNameRecordExpiresAt(nameRecord, expiresAt) {
+        throw new Error("not implemented");
+    }
 
     /**
      * Remove subscription from the ledger.
      *
      * @param {ContractSubscription} subscription - Subscription.
      */
-    destroySubscription(subscription);
+    destroySubscription(subscription) {
+        throw new Error("not implemented");
+    }
 
     /**
      * Remove stored contract from the ledger.
      *
      * @param {ContractStorage} contractStorage - Contract storage.
      */
-    destroyStorage(contractStorage);
+    destroyStorage(contractStorage) {
+        throw new Error("not implemented");
+    }
 
     /**
      * Remove UNS name from the ledger.
      *
      * @param {NameRecord} nameRecord - UNS name record.
      */
-    destroyNameRecord(nameRecord);
+    destroyNameRecord(nameRecord) {
+        throw new Error("not implemented");
+    }
 }
 
 module.exports = {MutableEnvironment};

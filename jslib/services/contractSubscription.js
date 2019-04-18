@@ -13,27 +13,37 @@ class ContractSubscription {
     /**
      * @return {Date} the expiration time of subscription.
      */
-    expiresAt();
+    getExpiresAt() {
+        throw new Error("not implemented");
+    }
 
     /**
      * @return {HashId} the {@link HashId} of subscribed contract or contracts chain.
      */
-    getHashId();
+    getHashId() {
+        throw new Error("not implemented");
+    }
 
     /**
      * @return {HashId} the id of subscribed contract.
      */
-    getContractId();
+    getContractId() {
+        throw new Error("not implemented");
+    }
 
     /**
      * @return {HashId} the origin of contracts chain of subscription.
      */
-    getOrigin();
+    getOrigin() {
+        throw new Error("not implemented");
+    }
 
     /**
      * @return {boolean} true if subscription for contracts chain.
      */
-    isChainSubscription();
+    getIsChainSubscription() {
+        throw new Error("not implemented");
+    }
 }
 
 /**
@@ -43,7 +53,9 @@ class Event {
     /**
      * @return {MutableEnvironment}
      */
-    getEnvironment();
+    getEnvironment() {
+        throw new Error("not implemented");
+    }
 }
 
 /**
@@ -54,19 +66,25 @@ class SubscriptionEvent {
     /**
      * @return {ContractSubscription}
      */
-    getSubscription();
+    getSubscription() {
+        throw new Error("not implemented");
+    }
 }
 
 class ApprovedEvent extends SubscriptionEvent {
     /**
      * @return {Contract} new revision just approved as the Contract.
      */
-    getNewRevision();
+    getNewRevision() {
+        throw new Error("not implemented");
+    }
 
     /**
      * @return {number[]} Packed transaction of the new revision just approved.
      */
-    getPackedTransaction();
+    getPackedTransaction() {
+        throw new Error("not implemented");
+    }
 }
 
 class RevokedEvent extends SubscriptionEvent {}
@@ -79,21 +97,27 @@ class CallbackEvent extends Event {
     /**
      * @return {CallbackService} service for callback sending.
      */
-    getCallbackService();
+    getCallbackService() {
+        throw new Error("not implemented");
+    }
 }
 
 class ApprovedWithCallbackEvent extends CallbackEvent {
     /**
      * @return {Contract} new revision just approved as the Contract.
      */
-    getNewRevision();
+    getNewRevision() {
+        throw new Error("not implemented");
+    }
 }
 
 class RevokedWithCallbackEvent extends CallbackEvent {
     /**
      * @return {Contract} revoking item as the Contract.
      */
-    getRevokingItem();
+    getRevokingItem() {
+        throw new Error("not implemented");
+    }
 }
 
 class CompletedEvent extends Event {}

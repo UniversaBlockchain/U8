@@ -1,5 +1,9 @@
-const NImmutableEnvironment = require("services/NImmutableEnvironment").NImmutableEnvironment;
 const Boss = require("boss");
+
+const NImmutableEnvironment = require("services/NImmutableEnvironment").NImmutableEnvironment;
+const NContractSubscription = require("services/NContractSubscription").NContractSubscription;
+const NContractStorage = require("services/NContractStorage").NContractStorage;
+const NNameRecord = require("services/NNameRecord").NNameRecord;
 
 /**
  * Implements {@see MutableEnvironment} interface for smart contracts.

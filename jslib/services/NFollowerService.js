@@ -1,25 +1,49 @@
-const bs = require("biserializable");
+const FollowerService = require("services/followerService").FollowerService;
+const ItemState = require("itemstate").ItemState;
 
 /**
  * Implements {@link FollowerService} interface for follower contract.
  */
-class NFollowerService extends FollowerService, bs.BiSerializable {
+class NFollowerService extends FollowerService {
 
-    constructor(ledger, expiresAt, mutedAt, environmentId, spent, startedCallbacks) {
+    constructor(ledger, environmentId, expiresAt = undefined, mutedAt = undefined, spent = undefined, startedCallbacks = undefined) {
         super();
+        this.id = 0;
         this.ledger = ledger;
         this.environmentId = environmentId;
-        this.expiresAt = expiresAt;
-        this.mutedAt = mutedAt;
-        this.spent = spent;
-        this.startedCallbacks = startedCallbacks;
+
+        if (expiresAt !== undefined)
+            this.expiresAt = expiresAt;
+        else
+            this.expiresAt = new Date((Math.floor(Date.now() / 1000) + 30 * 24 * 3600) * 1000);
+
+        if (mutedAt !== undefined)
+            this.mutedAt = mutedAt;
+        else
+            this.mutedAt = new Date((Math.floor(Date.now() / 1000) + 30 * 24 * 3600) * 1000);
+
+        if (spent !== undefined)
+            this.spent = spent;
+        else
+            this.spent = 0;
+
+        if (startedCallbacks !== undefined)
+            this.startedCallbacks = startedCallbacks;
+        else
+            this.startedCallbacks = 0;
+
+        this.updatingItem = null;
+        this.state = ItemState.UNDEFINED;
+        this.contract = null;
+        this.me = null;
+        this.callbackService = null;
     }
 
-    expiresAt() {
+    getExpiresAt() {
         return this.expiresAt;
     }
 
-    mutedAt() {
+    getMutedAt() {
         return this.mutedAt;
     }
 
@@ -29,20 +53,16 @@ class NFollowerService extends FollowerService, bs.BiSerializable {
     }
 
     decreaseExpiresAt(decreaseSeconds) {
-        this.expiresAt.setTime(((this.expiresAt.getTime() / 1000) - decreaseSeconds) * 1000);
+        this.expiresAt.setTime(this.expiresAt.getTime() - decreaseSeconds * 1000);
     }
 
     changeMutedAt(deltaSeconds) {
-        this.expiresAt.setTime(((this.expiresAt.getTime() / 1000) + deltaSeconds) * 1000);
+        this.expiresAt.setTime(this.expiresAt.getTime() + deltaSeconds * 1000);
 
     }
 
     increaseCallbacksSpent(addSpent) {
         this.spent += addSpent;
-    }
-
-    getCallbacksSpent() {
-        return this.spent;
     }
 
     increaseStartedCallbacks() {
@@ -53,13 +73,17 @@ class NFollowerService extends FollowerService, bs.BiSerializable {
         this.startedCallbacks--;
     }
 
+    getCallbacksSpent() {
+        return this.spent;
+    }
+
     getStartedCallbacks() {
-        return startedCallbacks;
+        return this.startedCallbacks;
     }
 
     deserialize(data, deserializer) {
-        this. expiresAt = data.expiresAt;
-        this.mutedAt = data.mutedAt;
+        this.expiresAt = deserializer.deserialize(data.expiresAt);
+        this.mutedAt = deserializer.deserialize(data.mutedAt);
         this.spent = data.spent;
         this.startedCallbacks = data.startedCallbacks;
     }
@@ -81,13 +105,15 @@ class NFollowerService extends FollowerService, bs.BiSerializable {
         this.me = me;
     }
 
-    save() {
-        this.ledger.saveFollowerEnvironment(environmentId, expiresAt, mutedAt, spent, startedCallbacks);
+    async save() {
+        await this.ledger.saveFollowerEnvironment(this.environmentId, this.expiresAt, this.mutedAt, this.spent, this.startedCallbacks);
 
         if (this.callbackService != null) {
             // start scheduled callback processor
-            this.callbackService.startCallbackProcessor(updatingItem, state, contract, me);
+            this.callbackService.startCallbackProcessor(this.updatingItem, this.state, this.contract, this.me);
             this.callbackService = null;
         }
     }
 }
+
+module.exports = {NFollowerService};

@@ -1,12 +1,14 @@
-const bs = require("biserializable");
 const NameCache = require("namecache").NameCache;
 const e = require("errors");
 const ErrorRecord = e.ErrorRecord;
 
+const ImmutableEnvironment = require("services/immutableEnvironment").ImmutableEnvironment;
+const NFollowerService = require("services/NFollowerService").NFollowerService;
+
 /**
  * Implements {@see ImmutableEnvironment} interface for smart contract.
  */
-class NImmutableEnvironment extends bs.BiSerializable {
+class NImmutableEnvironment extends ImmutableEnvironment {
     /**
      * Restore NImmutableEnvironment
      *
@@ -18,7 +20,8 @@ class NImmutableEnvironment extends bs.BiSerializable {
      * @param {[NameRecord]} nameRecords - array of UNS mame records.
      * @param {FollowerService} followerService - follower contract service.
      */
-    constructor(contract, ledger, kvBinder, subscriptions, storages, nameRecords, followerService) {
+    constructor(contract, ledger, kvBinder = undefined, subscriptions = undefined, storages = undefined,
+                nameRecords = undefined, followerService = undefined) {
         super();
         this.id = 0;
         this.contract = contract;
@@ -145,7 +148,11 @@ class NImmutableEnvironment extends bs.BiSerializable {
     }
 
     getMutable() {
-        return new NMutableEnvironment(this);
+        // dynamic import
+        if (this.NMutableEnvironment == null)
+            this.NMutableEnvironment = require("services/NMutableEnvironment").NMutableEnvironment;
+
+        return new this.NMutableEnvironment(this);
     }
 
     serialize(serializer) {
