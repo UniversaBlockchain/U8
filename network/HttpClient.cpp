@@ -17,8 +17,8 @@ HttpClientWorker::HttpClientWorker(int newId, HttpClient& parent)
     mg_mgr_init(mgr_.get(), this);
 };
 
-void HttpClientWorker::sendGetRequest(const std::string& url, const std::function<void(int,std::string&&)>& callback) {
-    callback_ = callback;
+void HttpClientWorker::sendGetRequest(const std::string& url, std::function<void(int,std::string&&)>&& callback) {
+    callback_ = std::move(callback);
     worker_([this,url](){
         exitFlag_ = false;
         mg_connect_opts opts;
@@ -72,11 +72,15 @@ void HttpClient::releaseWorker(int workerId) {
 }
 
 void HttpClient::sendGetRequest(const std::string& url, const std::function<void(int,std::string&&)>& callback) {
-    poolControlThread_.execute([&callback, url, this]() {
-        auto client = getUnusedWorker();
-        client->sendGetRequest(url, callback);
-    });
+    std::function<void(int,std::string&&)> callbackCopy = callback;
+    sendGetRequest(url, std::move(callbackCopy));
+}
 
+void HttpClient::sendGetRequest(const std::string& url, std::function<void(int,std::string&&)>&& callback) {
+    poolControlThread_.execute([callback{std::move(callback)}, url, this]() mutable {
+        auto client = getUnusedWorker();
+        client->sendGetRequest(url, std::move(callback));
+    });
 }
 
 }

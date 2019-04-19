@@ -26,38 +26,25 @@ TEST_CASE("http_hello") {
 
     Semaphore sem;
     atomic<int> readyCounter(0);
-    int countToSend = 200000000;
-    //int countToSend = 2000;
+    //int countToSend = 200000000;
+    int countToSend = 2000;
 
     atomic<long> ts0 = getCurrentTimeMillis();
     atomic<int> counter0 = 0;
-    function<void(int,string&&)> handler = [&sem,&readyCounter,countToSend,&ts0,&counter0](int respCode, string&& body){
-        //printf("resp(%i): %s\n", respCode, body.c_str());
-        if (++readyCounter >= countToSend)
-            sem.notify();
-        long dts = getCurrentTimeMillis() - ts0;
-        if (dts >= 1000) {
-            printf("readyCounter=%i, rps=%li\n", int(readyCounter), (readyCounter-counter0)*1000/dts);
-            counter0 = int(readyCounter);
-            ts0 = getCurrentTimeMillis();
-        }
-    };
 
     long t0 = getCurrentTimeMillis();
     for (int i = 0; i < countToSend; ++i) {
-        httpClient.sendGetRequest("localhost:8080/testPage", handler);
-        //httpClient.sendGetRequest("localhost:8080/testPage", h0);
-//        httpClient.sendGetRequest("localhost:8080/testPage", [&sem,&readyCounter,countToSend,&ts0,&counter0](int respCode, string&& body){
-//            //printf("resp(%i): %s\n", respCode, body.c_str());
-//            if (++readyCounter >= countToSend)
-//                sem.notify();
-//            long dts = getCurrentTimeMillis() - ts0;
-//            if (dts >= 1000) {
-//                printf("readyCounter=%i, rps=%li\n", int(readyCounter), (readyCounter-counter0)*1000/dts);
-//                counter0 = int(readyCounter);
-//                ts0 = getCurrentTimeMillis();
-//            }
-//        });
+        httpClient.sendGetRequest("localhost:8080/testPage", [&sem,&readyCounter,countToSend,&ts0,&counter0](int respCode, string&& body){
+            //printf("resp(%i): %s\n", respCode, body.c_str());
+            if (++readyCounter >= countToSend)
+                sem.notify();
+            long dts = getCurrentTimeMillis() - ts0;
+            if (dts >= 1000) {
+                printf("readyCounter=%i, rps=%li\n", int(readyCounter), (readyCounter-counter0)*1000/dts);
+                counter0 = int(readyCounter);
+                ts0 = getCurrentTimeMillis();
+            }
+        });
         if (readyCounter+1000 < i)
             this_thread::sleep_for(10ms);
     }

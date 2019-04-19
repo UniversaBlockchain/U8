@@ -22,7 +22,7 @@ class HttpClient;
 class HttpClientWorker {
 public:
     HttpClientWorker(int newId, HttpClient& parent);
-    void sendGetRequest(const std::string& url, const std::function<void(int,std::string&&)>& callback);
+    void sendGetRequest(const std::string& url, std::function<void(int,std::string&&)>&& callback);
     int getId() {return id_;}
 private:
     int id_;
@@ -39,6 +39,7 @@ public:
     HttpClient();
 
     void sendGetRequest(const std::string& url, const std::function<void(int,std::string&&)>& callback);
+    void sendGetRequest(const std::string& url, std::function<void(int,std::string&&)>&& callback);
 
 private:
     std::shared_ptr<HttpClientWorker> getUnusedWorker();
