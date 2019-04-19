@@ -11,34 +11,46 @@
 #include <functional>
 #include <unordered_map>
 #include <mutex>
+#include <queue>
 #include "../network/mongoose/mongoose.h"
+#include "../tools/ThreadPool.h"
 
 namespace network {
+
+class HttpClient;
+
+class HttpClientWorker {
+public:
+    HttpClientWorker(int newId, HttpClient& parent);
+    void sendGetRequest(const std::string& url, const std::function<void(int,std::string&&)>& callback);
+    int getId() {return id_;}
+private:
+    int id_;
+    HttpClient& parentRef_;
+    ThreadPool worker_;
+    std::shared_ptr<mg_mgr> mgr_;
+    bool exitFlag_ = false;
+    std::function<void(int,std::string&&)> callback_;
+};
 
 class HttpClient {
 
 public:
     HttpClient();
 
-    void start();
-    void stop();
-    void join();
-
     void sendGetRequest(const std::string& url, const std::function<void(int,std::string&&)>& callback);
 
 private:
-    long saveCallback(const std::function<void(int,std::string&&)>& callback);
-    std::function<void(int,std::string&&)> getCallback(long reqId);
-    void eraseCallback(long reqId);
+    std::shared_ptr<HttpClientWorker> getUnusedWorker();
+    void releaseWorker(int workerId);
+    friend HttpClientWorker;
 
 private:
-    std::shared_ptr<mg_mgr> mgr_;
-    std::atomic<bool> exitFlag_ = false;
-    std::shared_ptr<std::thread> clientThread_;
-
-    std::atomic<long> nextReqId_ = 1;
-    std::unordered_map<long, std::function<void(int,std::string&&)>> reqCallbacks_;
-    std::mutex mapMutex_;
+    std::queue<std::shared_ptr<HttpClientWorker>> pool_;
+    std::mutex poolMutex_;
+    std::condition_variable poolCV_;
+    ThreadPool poolControlThread_;
+    std::unordered_map<int, std::shared_ptr<HttpClientWorker>> usedWorkers_;
 
 };
 

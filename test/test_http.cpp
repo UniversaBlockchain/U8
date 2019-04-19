@@ -23,23 +23,22 @@ TEST_CASE("http_hello") {
     httpServer.start();
 
     HttpClient httpClient;
-    httpClient.start();
 
     Semaphore sem;
     atomic<int> readyCounter(0);
-    //int countToSend = 200000000;
-    int countToSend = 2000;
+    int countToSend = 200000000;
+    //int countToSend = 2000;
 
-    long ts0 = getCurrentTimeMillis();
-    int counter0 = 0;
-    auto handler = [&sem,&readyCounter,countToSend,&ts0,&counter0](int respCode, string&& body){
+    atomic<long> ts0 = getCurrentTimeMillis();
+    atomic<int> counter0 = 0;
+    function<void(int,string&&)> handler = [&sem,&readyCounter,countToSend,&ts0,&counter0](int respCode, string&& body){
         //printf("resp(%i): %s\n", respCode, body.c_str());
         if (++readyCounter >= countToSend)
             sem.notify();
         long dts = getCurrentTimeMillis() - ts0;
         if (dts >= 1000) {
             printf("readyCounter=%i, rps=%li\n", int(readyCounter), (readyCounter-counter0)*1000/dts);
-            counter0 = readyCounter;
+            counter0 = int(readyCounter);
             ts0 = getCurrentTimeMillis();
         }
     };
@@ -47,7 +46,19 @@ TEST_CASE("http_hello") {
     long t0 = getCurrentTimeMillis();
     for (int i = 0; i < countToSend; ++i) {
         httpClient.sendGetRequest("localhost:8080/testPage", handler);
-        if (readyCounter+200 < i)
+        //httpClient.sendGetRequest("localhost:8080/testPage", h0);
+//        httpClient.sendGetRequest("localhost:8080/testPage", [&sem,&readyCounter,countToSend,&ts0,&counter0](int respCode, string&& body){
+//            //printf("resp(%i): %s\n", respCode, body.c_str());
+//            if (++readyCounter >= countToSend)
+//                sem.notify();
+//            long dts = getCurrentTimeMillis() - ts0;
+//            if (dts >= 1000) {
+//                printf("readyCounter=%i, rps=%li\n", int(readyCounter), (readyCounter-counter0)*1000/dts);
+//                counter0 = int(readyCounter);
+//                ts0 = getCurrentTimeMillis();
+//            }
+//        });
+        if (readyCounter+1000 < i)
             this_thread::sleep_for(10ms);
     }
 
@@ -57,7 +68,5 @@ TEST_CASE("http_hello") {
 
     httpServer.stop();
     httpServer.join();
-    httpClient.stop();
-    httpClient.join();
     printf("all done, stop server and client... ok\n");
 }
