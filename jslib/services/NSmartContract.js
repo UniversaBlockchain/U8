@@ -1,3 +1,4 @@
+const bs = require("biserializable");
 const Contract = require("contract").Contract;
 const e = require("errors");
 const Errors = e.Errors;
@@ -30,8 +31,8 @@ class NSmartContract extends Contract {
      * <p>
      * It is recommended to call {@link #check()} after construction to see the errors.
      *
-     * @param sealed - binary sealed contract.
-     * @param pack - the transaction pack to resolve dependencies again.
+     * @param {number[]} sealed - binary sealed contract.
+     * @param {TransactionPack} pack - the transaction pack to resolve dependencies again.
      *
      * @return {NSmartContract} extracted smart contract.
      */
@@ -47,7 +48,7 @@ class NSmartContract extends Contract {
      * it is necessary to put real data to it first. It is allowed to change owner, expiration and data fields after
      * creation (but before sealing).
      *
-     * @param key is {@link PrivateKey} for creating roles "issuer", "owner", "creator" and sign contract
+     * @param {PrivateKey} key is {@link PrivateKey} for creating roles "issuer", "owner", "creator" and sign contract
      *
      * @return {NSmartContract} created smart contract.
      */
@@ -60,7 +61,7 @@ class NSmartContract extends Contract {
     /**
      * Method creates smart contract from dsl file where contract is described.
      *
-     * @param fileName is path to dsl file with yaml structure of data for contract.
+     * @param {string} fileName is path to dsl file with yaml structure of data for contract.
      *
      * @return {NSmartContract} initialized smart contract.
      */
@@ -211,14 +212,18 @@ class NodeInfoProvider {
      *
      * @return {Set<KeyAddress>} set of key addresses.
      */
-    getUIssuerKeys();
+    getUIssuerKeys() {
+        throw new Error("not implemented");
+    }
 
     /**
      * Get issuer name of U-contract.
      *
      * @return {string} issuer name.
      */
-    getUIssuerName();
+    getUIssuerName() {
+        throw new Error("not implemented");
+    }
 
     /**
      * Get min payment for smart contract by type.
@@ -227,7 +232,9 @@ class NodeInfoProvider {
      *
      * @return {number} min payment in U.
      */
-    getMinPayment(extendedType);
+    getMinPayment(extendedType) {
+        throw new Error("not implemented");
+    }
 
     /**
      * Get rate for smart contract by type.
@@ -236,7 +243,9 @@ class NodeInfoProvider {
      *
      * @return {number} rate in U.
      */
-    getServiceRate(extendedType);
+    getServiceRate(extendedType) {
+        throw new Error("not implemented");
+    }
 
     /**
      * Get additional public keys for sing by type of smart contract.
@@ -245,7 +254,12 @@ class NodeInfoProvider {
      *
      * @return {Set<PublicKey>} set of additional public keys.
      */
-    getAdditionalKeysToSignWith(extendedType);
+    getAdditionalKeysToSignWith(extendedType) {
+        throw new Error("not implemented");
+    }
 }
+
+const smartContractAdapter = new bs.BiAdapter("UniversaContract", NSmartContract);
+DefaultBiMapper.getInstance().adapters.set(smartContractAdapter.getType(), smartContractAdapter);
 
 module.exports = {NSmartContract};

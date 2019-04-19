@@ -263,6 +263,12 @@ function randomBytes(count) {
     return result;
 }
 
+function getOrDefault(obj, key, def) {
+    if (obj.hasOwnProperty(key))
+        return obj[key];
 
-module.exports = {arraysEqual,valuesEqual,randomString, MemoiseMixin, PackedEqMixin,DigestEqMixin,GenericMap,THROW_EXCEPTIONS,
-    convertToDate,randomBytes};
+    return def;
+}
+
+module.exports = {arraysEqual, valuesEqual, randomString, MemoiseMixin, PackedEqMixin, DigestEqMixin, GenericMap, equals,
+    THROW_EXCEPTIONS, convertToDate, randomBytes, getOrDefault};

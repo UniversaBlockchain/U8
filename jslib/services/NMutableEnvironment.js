@@ -11,7 +11,7 @@ const NNameRecord = require("services/NNameRecord").NNameRecord;
 class NMutableEnvironment extends NImmutableEnvironment {
 
     constructor(ime) {
-        super(ime.contract, ime.kvStore, ime.subscriptionsSet, ime.storagesSet, ime.nameRecordsSet, ime.followerService, ime.ledger);
+        super(ime.contract, ime.ledger, ime.kvStore, ime.subscriptionsSet, ime.storagesSet, ime.nameRecordsSet, ime.followerService);
 
         this.nameCache = ime.nameCache;
         this.id = ime.id;
@@ -31,8 +31,8 @@ class NMutableEnvironment extends NImmutableEnvironment {
     }
 
     set(key, value) {
-        let previous = this.kvStore.get(key);
-        this.kvStore.set(key, value);
+        let previous = this.kvStore[key];
+        this.kvStore[key] = value;
 
         return previous;
     }
@@ -182,9 +182,7 @@ class NMutableEnvironment extends NImmutableEnvironment {
         this.nameRecordsToDestroy.forEach(nr => this.immutable.nameRecordsSet.delete(nr));
         this.nameRecordsToAdd.forEach(nr => this.immutable.nameRecordsSet.add(nr));
 
-        this.immutable.kvStore.clear();
-        for (let [k, v] of this.kvStore)
-            this.immutable.kvStore.set(k, v);
+        this.immutable.kvStore = this.kvStore;
 
         if (this.followerService != null)
             this.followerService.save();

@@ -12,6 +12,8 @@ const ItemState = require("itemstate").ItemState;
 const t = require("tools");
 const ex = require("exceptions");
 const Boss = require("boss");
+
+const NSmartContract = require("services/NSmartContract").NSmartContract;
 const NContractSubscription = require("services/NContractSubscription").NContractSubscription;
 const NContractStorage = require("services/NContractStorage").NContractStorage;
 const NNameRecord = require("services/NNameRecord").NNameRecord;
@@ -1018,10 +1020,11 @@ class Ledger {
     async saveEnvironment(environment) {
         let conflicts = await this.saveEnvironment_getConflicts(environment);
 
-        if (conflicts.length === 0) {
+        if (conflicts.size === 0) {
             let nsc = environment.contract;
             await this.removeEnvironment(nsc.id);
-            let envId = await this.saveEnvironmentToStorage(nsc.getExtendedType(), nsc.id, Boss.dump(environment.getMutable().kvStore), nsc.getPackedTransaction());
+            let envId = await this.saveEnvironmentToStorage(nsc.getExtendedType(), nsc.id,
+                Boss.dump(environment.getMutable().kvStore), nsc.getPackedTransaction());
 
             await Promise.all(Array.from(environment.nameRecords()).map(async(nr)=> {
                 nr.environmentId = envId;
@@ -1541,7 +1544,7 @@ class Ledger {
      */
     getEnvironmentIdForSmartContractId(smartContractId) {
         return this.simpleQuery("SELECT id FROM environments WHERE ncontract_hash_id=?",
-            null,
+            x => (x != null) ? Number(x) : null,
             smartContractId.digest);
     }
 
@@ -1585,7 +1588,7 @@ class Ledger {
     async getEnvironmentByContractID(smartContractId) {
         let envId = await this.getEnvironmentIdForSmartContractId(smartContractId);
         if (envId != null)
-            return this.getEnvironment(envId);
+            return await this.getEnvironment(envId);
         return null;
     }
 
@@ -1928,7 +1931,7 @@ class Ledger {
         return this.simpleQuery("SELECT id FROM environments WHERE ncontract_hash_id=?",
             x => {
                 if (x == null)
-                    throw new LedgerException("getEnvironmentId failed: returning null");
+                    return 0;
                 else
                     return Number(x);
             },
@@ -1943,13 +1946,16 @@ class Ledger {
      */
     async removeEnvironment(ncontractHashId) {
         let envId = await this.getEnvironmentId(ncontractHashId);
+        if (envId === 0)
+            return 0;
+
         await this.removeSubscriptionsByEnvId(envId);
         await this.removeStorageContractsByEnvId(envId);
         await this.clearExpiredStorageContractBinaries();
-        return this.simpleQuery("DELETE FROM environments WHERE ncontract_hash_id=? RETURNING id",
+        return await this.simpleQuery("DELETE FROM environments WHERE ncontract_hash_id=? RETURNING id",
             x => {
                 if (x == null)
-                    throw new LedgerException("removeEnvironment failed: returning null");
+                    return 0;
                 else
                     return Number(x);
             },

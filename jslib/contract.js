@@ -746,7 +746,7 @@ class Contract extends bs.BiSerializable {
      * @param isTransactionRoot indicates if contract is transaction root and  transaction pack should be created
      * @return contract's sealed unicapsule
      */
-    async seal(isTransactionRoot) {
+    async seal(isTransactionRoot = false) {
 
         let revokingIds = [];
         for(let ri of this.revokingItems) {
@@ -777,12 +777,12 @@ class Contract extends bs.BiSerializable {
             version: 3,
             data: contractBytes,
             signatures: signatures
-        }
+        };
         this.setOwnBinary(result);
 
         await this.addSignatureToSeal(this.keysToSignWith);
 
-        if(isTransactionRoot)
+        if (isTransactionRoot)
             this.transactionPack = new TransactionPack(this);
 
         return this.sealedBinary;
@@ -1902,7 +1902,7 @@ class Contract extends bs.BiSerializable {
      *
      * @param {string} fileName - Path to file containing YAML representation of a contract.
      * @param contract - init contract (example, NSmartContract). Optional.
-     * @return {Contract | NSmartContract} initialized contract.
+     * @return {Contract | NSmartContract | SlotContract} initialized contract.
      */
     static async fromDslFile(fileName, contract = undefined) {
         let input = await io.openRead(fileName);

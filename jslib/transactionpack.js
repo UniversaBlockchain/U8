@@ -97,8 +97,34 @@ class TransactionPack {
                 throw new ex.IllegalStateError("circle deps in contracts tree");
         }
 
-        this.contract = Contract.fromSealedBinary(deserializer.deserialize(data.contract),this);
+        let bin = deserializer.deserialize(data.contract);
 
+        if (data.extended_type != null) {
+            // dynamic import
+            if (this.NSmartContract == null)
+                this.NSmartContract = require("services/NSmartContract").NSmartContract;
+
+            if (this.NSmartContract.SmartContractType.hasOwnProperty(data.extended_type)) {
+                switch (data.extended_type) {
+                    case this.NSmartContract.SmartContractType.N_SMART_CONTRACT:
+                        this.contract = this.NSmartContract.fromSealedBinary(bin, this);
+                        break;
+
+                    case this.NSmartContract.SmartContractType.SLOT1:
+                        this.contract = SlotContract.fromSealedBinary(bin, this);
+                        break;
+
+                    case this.NSmartContract.SmartContractType.UNS1:
+                        this.contract = UnsContract.fromSealedBinary(bin, this);
+                        break;
+
+                    case this.NSmartContract.SmartContractType.FOLLOWER1:
+                        this.contract = FollowerContract.fromSealedBinary(bin, this);
+                        break;
+                }
+            }
+        } else
+            this.contract = Contract.fromSealedBinary(bin, this);
     }
 
     serialize(serializer) {

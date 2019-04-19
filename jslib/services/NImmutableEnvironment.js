@@ -14,22 +14,23 @@ class NImmutableEnvironment extends ImmutableEnvironment {
      *
      * @param {NSmartContract} contract smart contract this environment belongs to
      * @param {Ledger} ledger - database ledger.
-     * @param {Object} kvBinder - map stored in the ledger.
+     * @param {Object} kvStorage - key-value data stored in the ledger.
      * @param {[ContractSubscription]} subscriptions - array of contract subscription.
      * @param {[ContractStorage]} storages - array of contract storages.
      * @param {[NameRecord]} nameRecords - array of UNS mame records.
      * @param {FollowerService} followerService - follower contract service.
      */
-    constructor(contract, ledger, kvBinder = undefined, subscriptions = undefined, storages = undefined,
+    constructor(contract, ledger, kvStorage = undefined, subscriptions = undefined, storages = undefined,
                 nameRecords = undefined, followerService = undefined) {
         super();
         this.id = 0;
         this.contract = contract;
         this.ledger = ledger;
-        this.createdAt = Math.floor(Date.now() / 1000);
-        this.kvStore = new Map();
+        this.createdAt = new Date();
+        this.createdAt.setMilliseconds(0);
+        this.kvStore = {};
 
-        if (kvBinder === undefined || subscriptions === undefined || storages === undefined ||
+        if (kvStorage === undefined || subscriptions === undefined || storages === undefined ||
             nameRecords === undefined || followerService === undefined) {
             this.subscriptionsSet = new Set();
             this.storagesSet = new Set();
@@ -37,9 +38,8 @@ class NImmutableEnvironment extends ImmutableEnvironment {
             return;
         }
 
-        if (kvBinder != null)
-            for (let [k, v] of kvBinder)
-                this.kvStore.set(k, v);
+        if (kvStorage != null)
+            this.kvStore = kvStorage;
 
         this.subscriptionsSet = new Set(subscriptions);
         this.storagesSet = new Set(storages);
@@ -48,8 +48,8 @@ class NImmutableEnvironment extends ImmutableEnvironment {
     }
 
     get(keyName, defaultValue) {
-        if (this.kvStore.has(keyName))
-            return this.kvStore.get(keyName);
+        if (this.kvStore.hasOwnProperty(keyName))
+            return this.kvStore[keyName];
 
         return defaultValue;
     }
