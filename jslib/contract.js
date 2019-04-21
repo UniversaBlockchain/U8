@@ -1772,14 +1772,7 @@ class Contract extends bs.BiSerializable {
 
         issuer.keyRecords.keys().forEach(pk => thisIssuerAddresses.add(pk.shortAddress));
 
-        let found = false;
-        for (let k of issuerKeys)
-            if (thisIssuerAddresses.has(k)) {
-                found = true;
-                break;
-            }
-
-        if (!found)
+        if (!issuerKeys.some(k => thisIssuerAddresses.has(k)))
             return false;
 
         return issuerName === this.definition.data.issuerName;

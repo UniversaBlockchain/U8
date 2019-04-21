@@ -1,6 +1,7 @@
 const roles = require('roles');
 const permissions = require('permissions');
 const t = require("tools");
+const ex = require("exceptions");
 
 const NSmartContract = require("services/NSmartContract").NSmartContract;
 
@@ -166,25 +167,163 @@ class SlotContract extends NSmartContract {
         let contracts = [];
         let trackingHashesAsBase64 = this.state.data[SlotContract.TRACKING_CONTRACT_FIELD_NAME];
 
-        /*for (String k : trackingHashesAsBase64.keySet()) {
-            byte[] packed = trackingHashesAsBase64.getBinary(k);
-            if(packed != null) {
-                Contract c = Contract.fromPackedTransaction(packed);
-                if(c != null) {
-                    contracts.add(c);
-                } else {
-                    System.err.println("reconstruction storing contract from slot.state.data failed: null");
-                }
+        for(let k of Object.keys(trackingHashesAsBase64)) {
+            let packed = trackingHashesAsBase64[k];
+            if (packed != null) {
+                let c = Contract.fromPackedTransaction(packed);
+                if (c != null)
+                    contracts.push(c);
+                else
+                    throw new ex.IllegalStateError("reconstruction storing contract from slot.state.data failed: null");
             }
         }
-        Collections.sort(contracts, Comparator.comparingInt(Contract::getRevision));
-        for (Contract c : contracts) {
-            if(trackingContracts != null) {
-                trackingContracts.addFirst(c);
-                packedTrackingContracts.addFirst(c.getPackedTransaction());
-            } else {
-                System.err.println("trackingContracts: " + trackingContracts + " packedTrackingContracts: " + packedTrackingContracts);
-            }
-        }*/
+
+        contracts.sort((a, b) => a.state.revision - b.state.revision);
+        contracts.forEach(c => {
+            this.trackingContracts.unshift(c);
+            this.packedTrackingContracts.unshift(c.getPackedTransaction());
+        });
+    }
+
+    /**
+     * Override seal method to recalculate holding at the state.data values
+     */
+    seal() {
+        this.saveTrackingContractsToState();
+        this.calculatePrepaidKilobytesForDays(true);
+
+        return super.seal();
+    }
+
+    saveTrackingContractsToState() {
+        let forState = {};
+        this.trackingContracts.forEach(tc => forState[tc.id.base64] = tc.getPackedTransaction());
+        this.state.data[SlotContract.TRACKING_CONTRACT_FIELD_NAME] = forState;
+    }
+
+    /**
+     * @return {Uint8Array} last revision of the tracking contract packed as {@link TransactionPack}.
+     */
+    getPackedTrackingContract() {
+        if (this.packedTrackingContracts != null && this.packedTrackingContracts.length > 0)
+            return this.packedTrackingContracts[0];
+
+        return null;
+    }
+
+    /**
+     * @return {Contract} last revision of the tracking contract.
+     */
+    getTrackingContract() {
+        if (this.trackingContracts != null && this.trackingContracts.length > 0)
+            return this.trackingContracts[0];
+
+        return null;
+    }
+
+    /**
+     * @param {HashId} hashId contract's id to check
+     * @return {boolean} true if hashId is present in tracking revisions
+     */
+    isContractTracking(hashId) {
+        if (this.trackingContracts != null && this.trackingContracts.length > 0)
+            return this.trackingContracts.some(c => c.id.equals(hashId));
+
+        return false;
+    }
+
+
+    /**
+     * Put contract to the tracking contract's revisions queue.
+     * If queue contains more then {@link SlotContract#keepRevisions} revisions then last one will removed.
+     * @param {Contract} c is revision of tracking {@link Contract}.
+     */
+    putTrackingContract(c) {
+        this.trackingContracts.unshift(c);
+        this.packedTrackingContracts.unshift(c.getPackedTransaction());
+
+        this.updateTrackingContracts();
+    }
+
+    /**
+     * Sets number of revisions of tracking contract to hold in the storage.
+     * @param {number} keepRevisions is number of revisions to keep.
+     */
+    setKeepRevisions(keepRevisions) {
+        if (keepRevisions < 1)
+            throw new ex.IllegalArgumentError("Keep revisions should be positive");
+
+        this.state.data[SlotContract.KEEP_REVISIONS_FIELD_NAME] = keepRevisions;
+        this.keepRevisions = keepRevisions;
+        this.updateTrackingContracts();
+    }
+
+    updateTrackingContracts() {
+        this.trackingContracts.splice(this.keepRevisions, this.trackingContracts.length);
+        this.packedTrackingContracts.splice(this.keepRevisions, this.packedTrackingContracts.length);
+    }
+
+    /**
+     * It is private method that looking for U contract in the new items of this slot contract. Then calculates
+     * new payment, looking for already paid, summize it and calculate new prepaid period for storing, that sets to
+     * {@link SlotContract#prepaidKilobytesForDays}. This field is measured in the kilobytes*days, means how many kilobytes
+     * storage can hold for how many days.
+     * But if withSaveToState param is false, calculated value
+     * do not saving to state. It is useful for checking set state.data values.
+     * <br><br> Additionally will be calculated new times of payment refilling, and storing info for previous revision of slot.
+     * It is also useful for slot checking.
+     * @param {boolean} withSaveToState if true, calculated values is saving to  state.data
+     * @return {number} calculated {@link SlotContract#prepaidKilobytesForDays}.
+     */
+    calculatePrepaidKilobytesForDays(withSaveToState) {
+
+        this.paidU = this.getPaidU();
+
+        // then looking for prepaid early U that can be find at the stat.data
+        // additionally we looking for and calculate times of payment fillings and some other data
+        /*ZonedDateTime now = ZonedDateTime.ofInstant(Instant.ofEpochSecond(ZonedDateTime.now().toEpochSecond()), ZoneId.systemDefault());
+        double wasPrepaidKilobytesForDays;
+        long wasPrepaidFrom = now.toEpochSecond();
+        long spentEarlyKDsTimeSecs = now.toEpochSecond();
+        Contract parentContract = getRevokingItem(getParent());
+        if(parentContract != null) {
+            wasPrepaidKilobytesForDays = parentContract.getStateData().getDouble(PREPAID_KD_FIELD_NAME);
+            wasPrepaidFrom = parentContract.getStateData().getLong(PREPAID_FROM_TIME_FIELD_NAME, now.toEpochSecond());
+            storedEarlyBytes = parentContract.getStateData().getLong(STORED_BYTES_FIELD_NAME, 0);
+            spentEarlyKDs = parentContract.getStateData().getDouble(SPENT_KD_FIELD_NAME);
+            spentEarlyKDsTimeSecs = parentContract.getStateData().getLong(SPENT_KD_TIME_FIELD_NAME, now.toEpochSecond());
+        } else {
+            wasPrepaidKilobytesForDays = 0;
+        }
+
+        spentEarlyKDsTime = ZonedDateTime.ofInstant(Instant.ofEpochSecond(spentEarlyKDsTimeSecs), ZoneId.systemDefault());
+        prepaidFrom = ZonedDateTime.ofInstant(Instant.ofEpochSecond(wasPrepaidFrom), ZoneId.systemDefault());
+        prepaidKilobytesForDays = wasPrepaidKilobytesForDays + paidU * getRate().doubleValue();
+
+        spentKDsTime = now;
+
+        long spentSeconds = (spentKDsTime.toEpochSecond() - spentEarlyKDsTime.toEpochSecond());
+        double spentDays = (double) spentSeconds / (3600 * 24);
+        spentKDs = spentEarlyKDs + spentDays * (storedEarlyBytes / 1024);
+
+        // if true we save it to stat.data
+        if(withSaveToState) {
+            getStateData().set(PAID_U_FIELD_NAME, paidU);
+
+            getStateData().set(PREPAID_KD_FIELD_NAME, prepaidKilobytesForDays);
+            if(getRevision() == 1)
+                getStateData().set(PREPAID_FROM_TIME_FIELD_NAME, now.toEpochSecond());
+
+            int storingBytes = 0;
+            for(byte[] p : packedTrackingContracts)
+            storingBytes += p.length;
+
+            getStateData().set(STORED_BYTES_FIELD_NAME, storingBytes);
+
+            getStateData().set(SPENT_KD_FIELD_NAME, spentKDs);
+            getStateData().set(SPENT_KD_TIME_FIELD_NAME, spentKDsTime.toEpochSecond());
+        }
+
+        return prepaidKilobytesForDays;*/
     }
 }
