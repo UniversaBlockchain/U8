@@ -8,6 +8,8 @@
 #include "../network/HttpServer.h"
 #include "../network/HttpClient.h"
 #include "../tools/Semaphore.h"
+#include "../crypto/PrivateKey.h"
+#include "../crypto/PublicKey.h"
 
 using namespace std;
 using namespace network;
@@ -15,10 +17,14 @@ using namespace network;
 TEST_CASE("http_hello") {
     HttpServer httpServer("0.0.0.0", 8080);
     atomic<int> counter(0);
-    httpServer.addEndpoint("/testPage", [&counter](HttpServerRequest& request){
+    crypto::PrivateKey privateKey(4096);
+    crypto::PublicKey publicKey(privateKey);
+    httpServer.addEndpoint("/testPage", [&counter,&publicKey](HttpServerRequest& request){
         request.setHeader("Server", "Universa node");
-        request.setAnswerBody("testPage answer #"+to_string(++counter));
-        request.sendAnswer();
+        string answer("testPage answer #"+to_string(++counter));
+        byte_vector bv(answer.begin(), answer.end());
+        request.setAnswerBody(publicKey.encrypt(bv));
+        request.sendAnswerFromAnotherThread();
     });
     httpServer.start();
 

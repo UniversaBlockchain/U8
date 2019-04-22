@@ -7,9 +7,10 @@
 
 namespace network {
 
-HttpServerRequest::HttpServerRequest(mg_connection* con, http_message *hm) {
+HttpServerRequest::HttpServerRequest(mg_connection* con, http_message *hm, std::shared_ptr<mg_mgr> mgr) {
     con_ = con;
     msg_ = hm;
+    mgr_ = mgr;
     extHeaders_["Content-Type"] = "text/plain";
     extHeaders_["Connection"] = "close";
 }
@@ -35,6 +36,18 @@ void HttpServerRequest::setAnswerBody(const std::string& text) {
     setAnswerBody(byte_vector(text.begin(), text.end()));
 }
 
+void HttpServerRequest::sendAnswerFromAnotherThread() {
+    long addr = (long)this;
+    mg_broadcast(mgr_.get(), [](mg_connection *nc, int ev, void *ev_data){
+        long addr = *((long*)ev_data);
+        HttpServerRequest* pReq = (HttpServerRequest*) addr;
+        if (nc == pReq->con_) {
+            pReq->sendAnswer();
+            delete pReq;
+        }
+    }, (void*)(&addr), sizeof(addr));
+}
+
 void HttpServerRequest::sendAnswer() {
     std::string extHeaders;
     if (extHeaders_.size() > 0) {
@@ -51,7 +64,8 @@ void HttpServerRequest::sendAnswer() {
 }
 
 HttpServer::HttpServer(std::string host, int port)
-  : mgr_(new mg_mgr(), [](auto p){mg_mgr_free(p);delete p;}) {
+  : mgr_(new mg_mgr(), [](auto p){mg_mgr_free(p);delete p;})
+  , receivePool_(4) {
     mg_mgr_init(mgr_.get(), this);
     std::string addr = host + ":" + std::to_string(port);
     listener_ = mg_bind(mgr_.get(), addr.c_str(), [](mg_connection *nc, int ev, void *ev_data){
@@ -60,8 +74,10 @@ HttpServer::HttpServer(std::string host, int port)
             http_message* hm = (http_message*)ev_data;
             std::string strUri = std::string(hm->uri.p, hm->uri.len);
             if (server->routes_.find(strUri) != server->routes_.end()) {
-                HttpServerRequest request(nc, hm);
-                server->routes_[strUri](request);
+                HttpServerRequest* request = new HttpServerRequest(nc, hm, server->mgr_);
+                server->receivePool_.execute([server,strUri,request](){
+                    server->routes_[strUri](*request);
+                });
             } else {
                 mg_http_send_error(nc, 404, nullptr);
             }
