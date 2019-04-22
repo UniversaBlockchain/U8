@@ -10,6 +10,7 @@
 #include "../tools/Semaphore.h"
 #include "../crypto/PrivateKey.h"
 #include "../crypto/PublicKey.h"
+#include "../crypto/base64.h"
 
 using namespace std;
 using namespace network;
@@ -23,7 +24,7 @@ TEST_CASE("http_hello") {
         request.setHeader("Server", "Universa node");
         string answer("testPage answer #"+to_string(++counter));
         byte_vector bv(answer.begin(), answer.end());
-        request.setAnswerBody(publicKey.encrypt(bv));
+        request.setAnswerBody(answer + ", encrypted: " + base64_encode(publicKey.encrypt(bv)));
         request.sendAnswerFromAnotherThread();
     });
     httpServer.start();
