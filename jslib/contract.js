@@ -1895,7 +1895,7 @@ class Contract extends bs.BiSerializable {
      *
      * @param {string} fileName - Path to file containing YAML representation of a contract.
      * @param contract - init contract (example, NSmartContract). Optional.
-     * @return {Contract | NSmartContract | SlotContract} initialized contract.
+     * @return {Contract | NSmartContract | SlotContract | FollowerContract} initialized contract.
      */
     static async fromDslFile(fileName, contract = undefined) {
         let input = await io.openRead(fileName);

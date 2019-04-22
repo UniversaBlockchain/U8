@@ -5,7 +5,7 @@ let passedChecksCount = 0;
 let failedCheckssCount = 0;
 let failedTestsCount = 0;
 
-const allTests = []
+const allTests = [];
 
 
 function checkPassed() {
@@ -104,7 +104,7 @@ const unit = {
     fail(message) {
         checkFailed(message);
     }
-}
+};
 
 // shortcuts
 expect.eq = expect.equal;
@@ -113,4 +113,4 @@ expect.ne = expect.notEqual;
 let assert = expect.that;
 let assertSilent = expect.silentThat;
 
-module.exports = {unit, expect, assert, assertSilent}
+module.exports = {unit, expect, assert, assertSilent};
