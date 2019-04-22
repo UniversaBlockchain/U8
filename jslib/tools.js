@@ -136,12 +136,27 @@ Object.prototype.equals = function(to) {
 
 class GenericMap extends Map {
     get(x) {
-        for(let k of this.keys()) {
-            if(valuesEqual(k,x)) {
+        for (let k of this.keys())
+            if (valuesEqual(k, x))
                 return super.get(k);
-            }
-        }
+
         return null;
+    }
+
+    has(x) {
+        for (let k of this.keys())
+            if (valuesEqual(k, x))
+                return true;
+
+        return false;
+    }
+
+    delete(x) {
+        for (let k of this.keys())
+            if (valuesEqual(k, x))
+                return super.delete(k);
+
+        return false;
     }
 }
 
@@ -158,7 +173,7 @@ Date.prototype.equals = function(to) {
         return false;
 
     return this.getTime() === to.getTime();
-}
+};
 
 Set.prototype.has = function(value) {
     for(let k of this) {
@@ -170,21 +185,24 @@ Set.prototype.has = function(value) {
 
 Set.prototype.add = function(value) {
     if(!this.has(value))
-        addFunc.call(this,value);
+        return addFunc.call(this,value);
+
+    return this;
 };
 
 Set.prototype.delete = function (value) {
     let found = null;
-    for(let k of this) {
-        if(valuesEqual(value,k)) {
+    for (let k of this) {
+        if (valuesEqual(value,k)) {
             found = k;
             break;
         }
     }
-    if(found != null) {
-        deleteFunc.call(this,found);
-    }
 
+    if (found != null)
+        return deleteFunc.call(this, found);
+
+    return false;
 };
 
 function randomString(length) {

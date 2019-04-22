@@ -79,5 +79,7 @@ unit.test("environment_test: kvStorage", async () => {
     assert(mutable.id === env.id);
     assert(env.get("key") === "value");
 
+    immutable.nameCache.shutdown();
+
     await ledger.close();
 });

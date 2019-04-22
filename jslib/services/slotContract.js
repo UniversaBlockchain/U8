@@ -188,11 +188,11 @@ class SlotContract extends NSmartContract {
     /**
      * Override seal method to recalculate holding at the state.data values
      */
-    seal() {
+    seal(isTransactionRoot = false) {
         this.saveTrackingContractsToState();
         this.calculatePrepaidKilobytesForDays(true);
 
-        return super.seal();
+        return super.seal(isTransactionRoot);
     }
 
     saveTrackingContractsToState() {
@@ -281,49 +281,97 @@ class SlotContract extends NSmartContract {
 
         // then looking for prepaid early U that can be find at the stat.data
         // additionally we looking for and calculate times of payment fillings and some other data
-        /*ZonedDateTime now = ZonedDateTime.ofInstant(Instant.ofEpochSecond(ZonedDateTime.now().toEpochSecond()), ZoneId.systemDefault());
-        double wasPrepaidKilobytesForDays;
-        long wasPrepaidFrom = now.toEpochSecond();
-        long spentEarlyKDsTimeSecs = now.toEpochSecond();
-        Contract parentContract = getRevokingItem(getParent());
-        if(parentContract != null) {
-            wasPrepaidKilobytesForDays = parentContract.getStateData().getDouble(PREPAID_KD_FIELD_NAME);
-            wasPrepaidFrom = parentContract.getStateData().getLong(PREPAID_FROM_TIME_FIELD_NAME, now.toEpochSecond());
-            storedEarlyBytes = parentContract.getStateData().getLong(STORED_BYTES_FIELD_NAME, 0);
-            spentEarlyKDs = parentContract.getStateData().getDouble(SPENT_KD_FIELD_NAME);
-            spentEarlyKDsTimeSecs = parentContract.getStateData().getLong(SPENT_KD_TIME_FIELD_NAME, now.toEpochSecond());
-        } else {
+        this.spentKDsTime = new Date();
+        let now = Math.floor(Date.now() / 1000);
+        let wasPrepaidKilobytesForDays;
+        let wasPrepaidFrom = now;
+        let spentEarlyKDsTimeSecs = now;
+        let parentContract = this.getRevokingItem(this.state.parent);
+        if (parentContract != null) {
+            wasPrepaidKilobytesForDays = t.getOrDefault(parentContract.state.data, SlotContract.PREPAID_KD_FIELD_NAME, 0);
+            wasPrepaidFrom = t.getOrDefault(parentContract.state.data, SlotContract.PREPAID_FROM_TIME_FIELD_NAME, now);
+            spentEarlyKDsTimeSecs = t.getOrDefault(parentContract.state.data, SlotContract.SPENT_KD_TIME_FIELD_NAME, now);
+            this.storedEarlyBytes = t.getOrDefault(parentContract.state.data, SlotContract.STORED_BYTES_FIELD_NAME, 0);
+            this.spentEarlyKDs = t.getOrDefault(parentContract.state.data, SlotContract.SPENT_KD_FIELD_NAME, 0);
+        } else
             wasPrepaidKilobytesForDays = 0;
-        }
 
-        spentEarlyKDsTime = ZonedDateTime.ofInstant(Instant.ofEpochSecond(spentEarlyKDsTimeSecs), ZoneId.systemDefault());
-        prepaidFrom = ZonedDateTime.ofInstant(Instant.ofEpochSecond(wasPrepaidFrom), ZoneId.systemDefault());
-        prepaidKilobytesForDays = wasPrepaidKilobytesForDays + paidU * getRate().doubleValue();
+        this.spentEarlyKDsTime = new Date(spentEarlyKDsTimeSecs * 1000);
+        this.prepaidFrom = new Date(wasPrepaidFrom * 1000);
+        this.prepaidKilobytesForDays = wasPrepaidKilobytesForDays + this.paidU * this.getRate();        //TODO: getRate return BigDecimal (need cast), bigint or number?
 
-        spentKDsTime = now;
-
-        long spentSeconds = (spentKDsTime.toEpochSecond() - spentEarlyKDsTime.toEpochSecond());
-        double spentDays = (double) spentSeconds / (3600 * 24);
-        spentKDs = spentEarlyKDs + spentDays * (storedEarlyBytes / 1024);
+        let spentSeconds = Math.floor((this.spentKDsTime.getTime() - this.spentEarlyKDsTime.getTime()) / 1000);
+        let spentDays = spentSeconds / (3600 * 24);
+        this.spentKDs = this.spentEarlyKDs + spentDays * (this.storedEarlyBytes / 1024);
 
         // if true we save it to stat.data
-        if(withSaveToState) {
-            getStateData().set(PAID_U_FIELD_NAME, paidU);
+        if (withSaveToState) {
+            this.state.data[SlotContract.PAID_U_FIELD_NAME] = this.paidU;
 
-            getStateData().set(PREPAID_KD_FIELD_NAME, prepaidKilobytesForDays);
-            if(getRevision() == 1)
-                getStateData().set(PREPAID_FROM_TIME_FIELD_NAME, now.toEpochSecond());
+            this.state.data[SlotContract.PREPAID_KD_FIELD_NAME] = this.prepaidKilobytesForDays;
+            if (this.state.revision === 1)
+                this.state.data[SlotContract.PREPAID_FROM_TIME_FIELD_NAME] = now;
 
-            int storingBytes = 0;
-            for(byte[] p : packedTrackingContracts)
-            storingBytes += p.length;
+            let storingBytes = 0;
+            this.packedTrackingContracts.forEach(p => storingBytes += p.length);
+            this.state.data[SlotContract.STORED_BYTES_FIELD_NAME] = storingBytes;
 
-            getStateData().set(STORED_BYTES_FIELD_NAME, storingBytes);
-
-            getStateData().set(SPENT_KD_FIELD_NAME, spentKDs);
-            getStateData().set(SPENT_KD_TIME_FIELD_NAME, spentKDsTime.toEpochSecond());
+            this.state.data[SlotContract.SPENT_KD_FIELD_NAME] = this.spentKDs;
+            this.state.data[SlotContract.SPENT_KD_TIME_FIELD_NAME] = now;
         }
 
-        return prepaidKilobytesForDays;*/
+        return this.prepaidKilobytesForDays;
+    }
+
+    /**
+     * Own private slot's method for saving subscription. It calls
+     * from {@link SlotContract#onContractSubscriptionEvent(ContractSubscription.Event)} (when tracking
+     * contract have registered new revision, from {@link SlotContract#onCreated(MutableEnvironment)} and
+     * from {@link SlotContract#onUpdated(MutableEnvironment)} (both when this slot contract have registered new revision).
+     * It recalculate storing params (storing time) and update expiring dates for each revision at the ledger.
+     * @param {MutableEnvironment} me is {@link MutableEnvironment} object with some data.
+     */
+    updateSubscriptions(me) {
+        // recalculate storing info without saving to state to get valid storing data
+        this.calculatePrepaidKilobytesForDays(false);
+
+        let storingBytes = 0;
+        this.packedTrackingContracts.forEach(p => storingBytes += p.length);
+
+        // calculate time that will be added to now as new expiring time
+        // it is difference of all prepaid KD (kilobytes*days) and already spent divided to new storing volume.
+        let days = (this.prepaidKilobytesForDays - this.spentKDs) * 1024 / storingBytes;
+        let milliseconds = days * 24 * 3600 * 1000;
+        let newExpires = new Date(Date.now() + milliseconds);
+        newExpires.setMilliseconds(0);
+
+        let newContracts = new t.GenericMap();
+        this.trackingContracts.forEach(c => newContracts.set(c.id, c));
+
+        let newContractIds = new Set(newContracts.keys());
+
+        // update storages
+        me.storages().forEach(storage => {
+            let id = storage.getContract().id;
+            if (newContracts.has(id)) {
+                me.setStorageExpiresAt(storage, newExpires);
+                newContracts.delete(id);
+            } else
+                me.destroyStorage(storage);
+        });
+
+        newContracts.values().forEach(tc => me.createContractStorage(tc.getPackedTransaction(), newExpires));
+
+        // update subscriptions
+        me.subscriptions().forEach(sub => {
+            let id = sub.getContractId();
+            if (newContractIds.has(id)) {
+                me.setSubscriptionExpiresAt(sub, newExpires);
+                newContractIds.delete(id);
+            } else
+                me.destroySubscription(sub);
+        });
+
+        newContractIds.forEach(id => me.createContractSubscription(id, newExpires));
     }
 }
