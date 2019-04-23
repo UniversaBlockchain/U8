@@ -472,7 +472,7 @@ Local<FunctionTemplate> initHttpServer(Isolate *isolate) {
                         auto res = new HttpServer(
                             string(*String::Utf8Value(isolate, args[0])),                          // host
                             args[1]->Int32Value(isolate->GetCurrentContext()).FromJust(),          // port
-                            args[1]->Int32Value(isolate->GetCurrentContext()).FromJust()           // poolSize
+                            args[2]->Int32Value(isolate->GetCurrentContext()).FromJust()           // poolSize
                         );
                         return res;
                     } catch (const std::exception& e) {
