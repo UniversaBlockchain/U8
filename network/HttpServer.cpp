@@ -63,9 +63,9 @@ void HttpServerRequest::sendAnswer() {
     con_->flags |= MG_F_SEND_AND_CLOSE;
 }
 
-HttpServer::HttpServer(std::string host, int port)
+HttpServer::HttpServer(std::string host, int port, int poolSize)
   : mgr_(new mg_mgr(), [](auto p){mg_mgr_free(p);delete p;})
-  , receivePool_(4) {
+  , receivePool_(poolSize) {
     mg_mgr_init(mgr_.get(), this);
     std::string addr = host + ":" + std::to_string(port);
     listener_ = mg_bind(mgr_.get(), addr.c_str(), [](mg_connection *nc, int ev, void *ev_data){

@@ -11,5 +11,6 @@ using namespace v8;
 using namespace std;
 
 void JsInitNetwork(Isolate *isolate, const Local<ObjectTemplate> &global);
+void JsInitHttpServerRequest(Isolate *isolate, const Local<ObjectTemplate> &global);
 
 #endif //U8_UDP_BINDINGS_H

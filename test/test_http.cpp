@@ -16,7 +16,7 @@ using namespace std;
 using namespace network;
 
 TEST_CASE("http_hello") {
-    HttpServer httpServer("0.0.0.0", 8080);
+    HttpServer httpServer("0.0.0.0", 8080, 4);
     atomic<int> counter(0);
     crypto::PrivateKey privateKey(4096);
     crypto::PublicKey publicKey(privateKey);

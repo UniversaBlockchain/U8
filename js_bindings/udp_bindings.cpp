@@ -4,6 +4,7 @@
 
 #include "udp_bindings.h"
 #include "binding_tools.h"
+#include "../network/HttpServer.h"
 #include "../network/UDPAdapter.h"
 
 using namespace network;
@@ -13,6 +14,8 @@ static Persistent<FunctionTemplate> NodeInfoTpl;
 static Persistent<FunctionTemplate> SocketAddressTpl;
 static Persistent<FunctionTemplate> NetConfigTpl;
 static Persistent<FunctionTemplate> UDPAdapterTpl;
+static Persistent<FunctionTemplate> HttpServerTpl;
+static Persistent<FunctionTemplate> HttpServerRequestTpl;
 
 void nodeInfoGetPublicKey(const FunctionCallbackInfo<Value> &args) {
     Scripter::unwrapArgs(args, [](ArgsContext &ac) {
@@ -411,13 +414,161 @@ Local<FunctionTemplate> initUDPAdapter(Isolate *isolate) {
     return tpl;
 }
 
+void httpServer_startServer(const FunctionCallbackInfo<Value> &args) {
+    Scripter::unwrapArgs(args, [](ArgsContext &ac) {
+        if (ac.args.Length() == 0) {
+            auto httpServer = unwrap<HttpServer>(ac.args.This());
+            httpServer->start();
+            return;
+        }
+        ac.throwError("invalid arguments");
+    });
+}
+
+void httpServer_stopServer(const FunctionCallbackInfo<Value> &args) {
+    Scripter::unwrapArgs(args, [](ArgsContext &ac) {
+        if (ac.args.Length() == 0) {
+            auto httpServer = unwrap<HttpServer>(ac.args.This());
+            httpServer->stop();
+            httpServer->join();
+            return;
+        }
+        ac.throwError("invalid arguments");
+    });
+}
+
+void httpServer_addEndpoint(const FunctionCallbackInfo<Value> &args) {
+    Scripter::unwrapArgs(args, [](ArgsContext &ac) {
+        if (ac.args.Length() == 2) {
+            auto httpServer = unwrap<HttpServer>(ac.args.This());
+            std::shared_ptr<v8::Persistent<v8::Function>> jsCallback (
+                    new v8::Persistent<v8::Function>(ac.isolate, ac.args[1].As<v8::Function>()), [](auto p){
+                        p->Reset();
+                        delete p;
+                    }
+            );
+            auto se = ac.scripter;
+            httpServer->addEndpoint(ac.asString(0), [jsCallback,se](HttpServerRequest& request){
+                HttpServerRequest* hsrp = &request;
+                se->inPool([=](Local<Context> &context) {
+                    auto fn = jsCallback->Get(context->GetIsolate());
+                    Local<Value> res[1] {wrap(HttpServerRequestTpl, se->isolate(), hsrp)};
+                    fn->Call(fn, 1, res);
+                });
+            });
+            return;
+        }
+        ac.throwError("invalid arguments");
+    });
+}
+
+Local<FunctionTemplate> initHttpServer(Isolate *isolate) {
+    Local<FunctionTemplate> tpl = bindCppClass<HttpServer>(
+            isolate,
+            "HttpServerTpl",
+            [=](const FunctionCallbackInfo<Value> &args) -> HttpServer* {
+                if (args.Length() == 3) {
+                    try {
+                        auto res = new HttpServer(
+                            string(*String::Utf8Value(isolate, args[0])),                          // host
+                            args[1]->Int32Value(isolate->GetCurrentContext()).FromJust(),          // port
+                            args[1]->Int32Value(isolate->GetCurrentContext()).FromJust()           // poolSize
+                        );
+                        return res;
+                    } catch (const std::exception& e) {
+                        isolate->ThrowException(
+                                Exception::TypeError(String::NewFromUtf8(isolate, e.what())));
+                        return nullptr;
+                    }
+                }
+                isolate->ThrowException(
+                        Exception::TypeError(String::NewFromUtf8(isolate, "invalid number of arguments")));
+                return nullptr;
+            });
+    auto prototype = tpl->PrototypeTemplate();
+    prototype->Set(isolate, "__startServer", FunctionTemplate::New(isolate, httpServer_startServer));
+    prototype->Set(isolate, "__stopServer", FunctionTemplate::New(isolate, httpServer_stopServer));
+    prototype->Set(isolate, "__addEndpoint", FunctionTemplate::New(isolate, httpServer_addEndpoint));
+
+    HttpServerTpl.Reset(isolate, tpl);
+    return tpl;
+}
+
 void JsInitNetwork(Isolate *isolate, const Local<ObjectTemplate> &global) {
+
+    JsInitHttpServerRequest(isolate, global);
+
     auto network = ObjectTemplate::New(isolate);
 
     network->Set(isolate, "NodeInfoImpl", initNodeInfo(isolate));
     network->Set(isolate, "SocketAddressImpl", initSocketAddress(isolate));
     network->Set(isolate, "NetConfigImpl", initNetConfig(isolate));
     network->Set(isolate, "UDPAdapterImpl", initUDPAdapter(isolate));
+    network->Set(isolate, "HttpServerImpl", initHttpServer(isolate));
 
     global->Set(isolate, "network", network);
+}
+
+void HttpServerRequest_setStatusCode(const FunctionCallbackInfo<Value> &args) {
+    Scripter::unwrapArgs(args, [](ArgsContext &ac) {
+        if (ac.args.Length() == 1) {
+            auto httpServerRequest = unwrap<HttpServerRequest>(ac.args.This());
+            httpServerRequest->setStatusCode(ac.asInt(0));
+            return;
+        }
+        ac.throwError("invalid arguments");
+    });
+}
+
+void HttpServerRequest_setHeader(const FunctionCallbackInfo<Value> &args) {
+    Scripter::unwrapArgs(args, [](ArgsContext &ac) {
+        if (ac.args.Length() == 2) {
+            auto httpServerRequest = unwrap<HttpServerRequest>(ac.args.This());
+            httpServerRequest->setHeader(ac.asString(0), ac.asString(1));
+            return;
+        }
+        ac.throwError("invalid arguments");
+    });
+}
+
+void HttpServerRequest_setAnswerBody(const FunctionCallbackInfo<Value> &args) {
+    Scripter::unwrapArgs(args, [](ArgsContext &ac) {
+        if (ac.args.Length() == 1) {
+            auto httpServerRequest = unwrap<HttpServerRequest>(ac.args.This());
+            auto contents = ac.args[0].As<TypedArray>()->Buffer()->GetContents();
+            byte_vector bv(contents.ByteLength());
+            memcpy(&bv[0], contents.Data(), contents.ByteLength());
+            httpServerRequest->setAnswerBody(std::move(bv));
+            return;
+        }
+        ac.throwError("invalid arguments");
+    });
+}
+
+void HttpServerRequest_sendAnswer(const FunctionCallbackInfo<Value> &args) {
+    Scripter::unwrapArgs(args, [](ArgsContext &ac) {
+        if (ac.args.Length() == 0) {
+            auto httpServerRequest = unwrap<HttpServerRequest>(ac.args.This());
+            httpServerRequest->sendAnswerFromAnotherThread();
+            return;
+        }
+        ac.throwError("invalid arguments");
+    });
+}
+
+void JsInitHttpServerRequest(Isolate *isolate, const Local<ObjectTemplate> &global) {
+    // Bind object with default constructor
+    Local<FunctionTemplate> tpl = bindCppClass<network::HttpServerRequest>(isolate, "HttpServerRequest");
+
+    // instance methods
+    auto prototype = tpl->PrototypeTemplate();
+    prototype->Set(isolate, "version", String::NewFromUtf8(isolate, "0.0.1"));
+    prototype->Set(isolate, "setStatusCode", FunctionTemplate::New(isolate, HttpServerRequest_setStatusCode));
+    prototype->Set(isolate, "setHeader", FunctionTemplate::New(isolate, HttpServerRequest_setHeader));
+    prototype->Set(isolate, "setAnswerBody", FunctionTemplate::New(isolate, HttpServerRequest_setAnswerBody));
+    prototype->Set(isolate, "sendAnswer", FunctionTemplate::New(isolate, HttpServerRequest_sendAnswer));
+
+    // register it into global namespace
+    HttpServerRequestTpl.Reset(isolate, tpl);
+    global->Set(isolate, "HttpServerRequest", tpl);
 }

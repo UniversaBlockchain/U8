@@ -18,6 +18,7 @@ namespace network {
 
 class HttpServerRequest {
 public:
+    HttpServerRequest() {}
     HttpServerRequest(mg_connection* con, http_message *hm, std::shared_ptr<mg_mgr> mgr);
 public:
     void setStatusCode(int code);
@@ -39,7 +40,7 @@ protected:
 class HttpServer {
 
 public:
-    HttpServer(std::string host, int port);
+    HttpServer(std::string host, int port, int poolSize);
 
     void start();
     void stop();

@@ -121,4 +121,33 @@ network.UDPAdapter = class {
     }
 };
 
+class HttpServerError extends Error {
+    constructor(message = undefined) {
+        super();
+        this.message = message;
+    }
+}
+
+network.HttpServer = class {
+    constructor(host, port, poolSize) {
+        this.httpServer_ = new network.HttpServerImpl(host, port, poolSize);
+    }
+
+    startServer() {
+        this.httpServer_.__startServer();
+    }
+
+    stopServer() {
+        this.httpServer_.__stopServer();
+    }
+
+    addEndpoint(endpoint, block) {
+        this.httpServer_.__addEndpoint(endpoint, block);
+    }
+
+    addSecureEndpoint(endpoint, block) {
+        throw new HttpServerError("not implemented");
+    }
+};
+
 module.exports = network;
