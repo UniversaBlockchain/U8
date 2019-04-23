@@ -1,9 +1,13 @@
 const roles = require('roles');
 const permissions = require('permissions');
 const t = require("tools");
+const e = require("errors");
+const Errors = e.Errors;
+const ErrorRecord = e.ErrorRecord;
 const ex = require("exceptions");
 
 const NSmartContract = require("services/NSmartContract").NSmartContract;
+const ApprovedEvent = require("services/contractSubscription").ApprovedEvent;
 
 /**
  * Slot contract is one of several types of smarts contracts that can be run on the node. Slot contract provides
@@ -30,8 +34,6 @@ class SlotContract extends NSmartContract {
         this.paidU = 0;
         // All KD (kilobytes*days) prepaid from first revision (sum of all paidU, converted to KD)
         this.prepaidKilobytesForDays = 0;
-        // Time of first payment
-        this.prepaidFrom = null;
         // Stored bytes for previous revision of slot. Use for calculate spent KDs
         this.storedEarlyBytes = 0;
         // Spent KDs for previous revision
@@ -145,6 +147,12 @@ class SlotContract extends NSmartContract {
         this.addPermission(modifyDataPermission);
     }
 
+    deserialize(data, deserializer) {
+        super.deserialize(data, deserializer);
+
+        this.deserializeForSlot();
+    }
+
     /**
      * Extract values from deserializing object for slot fields.
      */
@@ -158,10 +166,6 @@ class SlotContract extends NSmartContract {
 
         // extract saved prepaid KD (kilobytes*days) value
         this.prepaidKilobytesForDays = t.getOrDefault(this.state.data, SlotContract.PREPAID_KD_FIELD_NAME, 0);
-
-        // and extract time when first time payment was
-        let prepaidFromSeconds = t.getOrDefault(this.state.data, SlotContract.PREPAID_FROM_TIME_FIELD_NAME, 0);
-        this.prepaidFrom = new Date(prepaidFromSeconds * 1000);
 
         // extract and sort by revision number
         let contracts = [];
@@ -284,12 +288,10 @@ class SlotContract extends NSmartContract {
         this.spentKDsTime = new Date();
         let now = Math.floor(Date.now() / 1000);
         let wasPrepaidKilobytesForDays;
-        let wasPrepaidFrom = now;
         let spentEarlyKDsTimeSecs = now;
         let parentContract = this.getRevokingItem(this.state.parent);
         if (parentContract != null) {
             wasPrepaidKilobytesForDays = t.getOrDefault(parentContract.state.data, SlotContract.PREPAID_KD_FIELD_NAME, 0);
-            wasPrepaidFrom = t.getOrDefault(parentContract.state.data, SlotContract.PREPAID_FROM_TIME_FIELD_NAME, now);
             spentEarlyKDsTimeSecs = t.getOrDefault(parentContract.state.data, SlotContract.SPENT_KD_TIME_FIELD_NAME, now);
             this.storedEarlyBytes = t.getOrDefault(parentContract.state.data, SlotContract.STORED_BYTES_FIELD_NAME, 0);
             this.spentEarlyKDs = t.getOrDefault(parentContract.state.data, SlotContract.SPENT_KD_FIELD_NAME, 0);
@@ -297,7 +299,6 @@ class SlotContract extends NSmartContract {
             wasPrepaidKilobytesForDays = 0;
 
         this.spentEarlyKDsTime = new Date(spentEarlyKDsTimeSecs * 1000);
-        this.prepaidFrom = new Date(wasPrepaidFrom * 1000);
         this.prepaidKilobytesForDays = wasPrepaidKilobytesForDays + this.paidU * this.getRate();        //TODO: getRate return BigDecimal (need cast), bigint or number?
 
         let spentSeconds = Math.floor((this.spentKDsTime.getTime() - this.spentEarlyKDsTime.getTime()) / 1000);
@@ -374,4 +375,178 @@ class SlotContract extends NSmartContract {
 
         newContractIds.forEach(id => me.createContractSubscription(id, newExpires));
     }
+
+    onContractSubscriptionEvent(event) {
+        if (event instanceof ApprovedEvent) {
+            // recreate subscription:
+            this.putTrackingContract(event.getNewRevision());
+            this.saveTrackingContractsToState();
+
+            // and save new
+            this.updateSubscriptions(event.getEnvironment());
+        }
+    }
+
+    /**
+     * Additionally check the slot-contract.
+     *
+     * @param {ImmutableEnvironment} ime is {@link ImmutableEnvironment} object with some data.
+     */
+    additionallySlotCheck(ime) {
+        // check slot environment
+        if (ime == null) {
+            this.errors.push(new ErrorRecord(Errors.FAILED_CHECK, "", "Environment should be not null"));
+            return false;
+        }
+
+        // check that slot has known and valid type of smart contract
+        if (this.definition.extendedType !== NSmartContract.SmartContractType.SLOT1) {
+            this.errors.push(new ErrorRecord(Errors.FAILED_CHECK, "definition.extended_type",
+                "illegal value, should be " + NSmartContract.SmartContractType.SLOT1 + " instead " + this.definition.extendedType));
+            return false;
+        }
+
+        // check for tracking contract existing
+        let tracking = this.getTrackingContract();
+        if (tracking == null) {
+            this.errors.push(new ErrorRecord(Errors.FAILED_CHECK, "", "Tracking contract is missed"));
+            return false;
+        }
+
+        // check for all revisions of tracking contract has same origin
+        return this.trackingContracts.every(tc => {
+            if (!tracking.getOrigin().equals(tc.getOrigin())) {
+                this.errors.push(new ErrorRecord(Errors.FAILED_CHECK, "",
+                    "Slot-contract should store only contracts with same origin"));
+                return false;
+            } else
+                return true;
+        });
+    }
+
+    /**
+     * Callback called by the node before registering the slot-contract for his check.
+     *
+     * @param {ImmutableEnvironment} c is {@link ImmutableEnvironment} object with some data.
+     *
+     * @return {boolean} check result.
+     */
+    beforeCreate(c) {
+        let checkResult = true;
+
+        // recalculate storing info without saving to state to get valid storing data
+        this.calculatePrepaidKilobytesForDays(false);
+
+        if (this.paidU === 0) {
+            if (this.getPaidU(true) > 0)
+                this.errors.push(new ErrorRecord(Errors.FAILED_CHECK, "",
+                    "Test payment is not allowed for storing contracts in slots"));
+            checkResult = false;
+        } else if (this.paidU < this.getMinPayment()) {
+            this.errors.push(new ErrorRecord(Errors.FAILED_CHECK, "",
+                "Payment for slot contract is below minimum level of " + this.getMinPayment() + "U"));
+            checkResult = false;
+        }
+
+        if (!checkResult) {
+            this.errors.push(new ErrorRecord(Errors.FAILED_CHECK, "", "Slot contract hasn't valid payment"));
+            return false;
+        }
+
+        // check that payment was not hacked
+        if (this.prepaidKilobytesForDays !== t.getOrDefault(this.state.data, SlotContract.PREPAID_KD_FIELD_NAME, 0)) {
+            this.errors.push(new ErrorRecord(Errors.FAILED_CHECK, "state.data." + SlotContract.PREPAID_KD_FIELD_NAME,
+                "Should be sum of early paid U and paid U by current revision."));
+            return false;
+        }
+
+        // check for that last revision of tracking contract has same owner as creator of slot
+        if (this.getTrackingContract() != null &&
+            !this.getTrackingContract().roles.owner.isAllowedForKeys(this.effectiveKeys.keys())) {
+            this.errors.push(new ErrorRecord(Errors.FAILED_CHECK, "",
+                "Slot-contract signing keys must has allowed keys for owner of tracking contract"));
+            return false;
+        }
+
+        // and call common slot check
+        return this.additionallySlotCheck(c);
+    }
+
+    /**
+     * Callback called by the node before registering new revision of the slot-contract for his check.
+     *
+     * @param {ImmutableEnvironment} c is {@link ImmutableEnvironment} object with some data.
+     *
+     * @return {boolean} check result.
+     */
+    beforeUpdate(c) {
+        // recalculate storing info without saving to state to get valid storing data
+        this.calculatePrepaidKilobytesForDays(false);
+
+        // check that payment was not hacked
+        if (this.prepaidKilobytesForDays !== t.getOrDefault(this.state.data, SlotContract.PREPAID_KD_FIELD_NAME, 0)) {
+            this.errors.push(new ErrorRecord(Errors.FAILED_CHECK, "state.data." + SlotContract.PREPAID_KD_FIELD_NAME,
+                "Should be sum of early paid U and paid U by current revision."));
+            return false;
+        }
+
+        // check for that last revision of tracking contract has same owner as creator of slot
+        if (this.getTrackingContract() != null &&
+            !this.getTrackingContract().roles.owner.isAllowedForKeys(this.effectiveKeys.keys())) {
+            this.errors.push(new ErrorRecord(Errors.FAILED_CHECK, "",
+                "Slot-contract signing keys must has allowed keys for owner of tracking contract"));
+            return false;
+        }
+
+        // and call common slot check
+        return this.additionallySlotCheck(c);
+    }
+
+    /**
+     * Callback called by the node before revocation the slot-contract for his check.
+     *
+     * @param {ImmutableEnvironment} c is {@link ImmutableEnvironment} object with some data.
+     *
+     * @return {boolean} check result.
+     */
+    beforeRevoke(c) {
+        return this.additionallySlotCheck(c);
+    }
+
+    /**
+     * Callback called by the node after registering the slot-contract.
+     *
+     * @param {MutableEnvironment} me is {@link MutableEnvironment} object with some data.
+     *
+     * @return {Object} object contains operation status.
+     */
+    onCreated(me) {
+        this.updateSubscriptions(me);
+
+        return {status : "ok"};
+    }
+
+    /**
+     * Callback called by the node after registering new revision of the slot-contract.
+     *
+     * @param {MutableEnvironment} me is {@link MutableEnvironment} object with some data.
+     *
+     * @return {Object} object contains operation status.
+     */
+    onUpdated(me) {
+        this.updateSubscriptions(me);
+
+        return {status : "ok"};
+    }
+
+    /**
+     * Callback called by the node after revocation the slot-contract.
+     *
+     * @param {ImmutableEnvironment} ime is {@link ImmutableEnvironment} object with some data.
+     */
+    onRevoked(ime) {}
 }
+
+DefaultBiMapper.registerAdapter(new bs.BiAdapter("SlotContract", SlotContract));
+
+module.exports = {SlotContract};
