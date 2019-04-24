@@ -35,17 +35,87 @@ class FollowerContract extends NSmartContract {
         this.sealed = sealed;
         this.pack = pack;
 
+        // Calculate U paid with last revision of follower
         this.paidU = 0;
+        // All OD (origins*days) prepaid from first revision (sum of all paidU, converted to OD)
         this.prepaidOriginDays = 0;
+        // Time of first payment
         this.prepaidFrom = null;
+        // Followed origins for previous revision. Use for calculate spent ODs
         this.storedEarlyOrigins = 0;
+        // Spent ODs for previous revision
         this.spentEarlyODs = 0;
+        // Time of spent OD's calculation for previous revision
         this.spentEarlyODsTime = null;
+        // Spent ODs for current revision
         this.spentODs = 0;
+        // Time of spent OD's calculation for current revision
         this.spentODsTime = null;
+        // Current revision callback rate
         this.callbackRate = 0;
+    }
 
-        this.errors = [];
+    /**
+     * Follower contract is one of several types of smarts contracts that can be run on the node. Follower contract
+     * provides paid of sending callbacks when registering a new contract (revision) in the chain.
+     *
+     * Create a default empty new follower contract using a provided key as issuer and owner and sealer. Will set
+     * follower's specific permissions and values.
+     *
+     * This constructor adds key as sealing signature so it is ready to {@link #seal()} just after construction, thought
+     * it is necessary to put real data to it first. It is allowed to change owner, expiration and data fields after
+     * creation (but before sealing).
+     *
+     * @param {PrivateKey} key - Private key for creating roles "issuer", "owner", "creator" and sign contract.
+     * @return {FollowerContract} created follower contract.
+     */
+    static fromPrivateKey(key) {
+        let c = Contract.fromPrivateKey(key, new FollowerContract());
+
+        c.addFollowerSpecific();
+        return c;
+    }
+
+    /**
+     * Follower contract is one of several types of smarts contracts that can be run on the node. Follower contract
+     * provides paid of sending callbacks when registering a new contract (revision) in the chain.
+     *
+     * Extract contract from v2 or v3 sealed form, getting revoking and new items from the transaction pack supplied. If
+     * the transaction pack fails to resolve a link, no error will be reported - not sure it's a good idea. If need, the
+     * exception could be generated with the transaction pack.
+     *
+     * It is recommended to call {@link #check()} after construction to see the errors.
+     *
+     * @param {number[]} sealed - Binary sealed contract.
+     * @param {TransactionPack} pack - The transaction pack to resolve dependencies again.
+     * @return {FollowerContract} extracted follower contract.
+     */
+    static fromSealedBinary(sealed, pack) {
+        let c = Contract.fromSealedBinary(sealed, pack, new FollowerContract());
+
+        c.deserializeForFollower();
+        return c;
+    }
+
+    /**
+     * Method creates {@link FollowerContract} contract from dsl file where contract is described.
+     *
+     * @param {string} fileName - Path to dsl file with yaml structure of data for contract.
+     * @return {FollowerContract} created and ready {@link FollowerContract} contract.
+     */
+    static fromDslFile(fileName) {
+        return Contract.fromDslFile(fileName, new FollowerContract());
+    }
+
+    /**
+     * Method calls from {@link FollowerContract#fromDslFile(String)} and initialize contract from given binder.
+     *
+     * @param {Object} root - root object with initialized data.
+     * @return {FollowerContract} created and ready {@link FollowerContract} contract.
+     */
+    initializeWithDsl(root) {
+        super.initializeWithDsl(root);
+        return this;
     }
 
     /**
@@ -74,27 +144,6 @@ class FollowerContract extends NSmartContract {
 
         let modifyDataPermission = new permissions.ModifyDataPermission(ownerLink, {fields : fieldsMap});
         this.addPermission(modifyDataPermission);
-    }
-
-    /**
-     * Method calls from {@link FollowerContract#fromDslFile(String)} and initialize contract from given binder.
-     *
-     * @param {Object} root - root object with initialized data.
-     * @return {FollowerContract} created and ready {@link FollowerContract} contract.
-     */
-    initializeWithDsl(root) {
-        super.initializeWithDsl(root);
-        return this;
-    }
-
-    /**
-     * Method creates {@link FollowerContract} contract from dsl file where contract is described.
-     *
-     * @param {string} fileName - Path to dsl file with yaml structure of data for contract.
-     * @return {FollowerContract} created and ready {@link FollowerContract} contract.
-     */
-    static fromDslFile(fileName) {
-        return Contract.fromDslFile(fileName, new FollowerContract());
     }
 
     /**
@@ -547,13 +596,13 @@ class FollowerContract extends NSmartContract {
      * @param {ImmutableEnvironment} ime - Object with some data.
      */
     additionallyFollowerCheck(ime) {
-        // check slot environment
+        // check follower environment
         if (ime == null) {
             this.errors.push(new ErrorRecord(Errors.FAILED_CHECK, "Environment should be not null"));
             return false;
         }
 
-        // check that slot has known and valid type of smart contract
+        // check that follower has known and valid type of smart contract
         if(this.definition.extendedType !== NSmartContract.SmartContractType.FOLLOWER1) {
             this.errors.push(new ErrorRecord (ErrorRecord(Errors.FAILED_CHECK, "definition.extended_type",
                 "illegal value, should be " + NSmartContract.SmartContractType.FOLLOWER1 + " instead " + this.definition.extendedType)));

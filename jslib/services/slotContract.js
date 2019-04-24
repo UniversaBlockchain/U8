@@ -30,7 +30,7 @@ class SlotContract extends NSmartContract {
         this.trackingContracts = [];
         this.keepRevisions = 1;
 
-        // Calculate U paid with las revision of slot
+        // Calculate U paid with last revision of slot
         this.paidU = 0;
         // All KD (kilobytes*days) prepaid from first revision (sum of all paidU, converted to KD)
         this.prepaidKilobytesForDays = 0;
