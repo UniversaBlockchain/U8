@@ -58,7 +58,7 @@ class SlotContract extends NSmartContract {
      * it is necessary to put real data to it first. It is allowed to change owner, expiration and data fields after
      * creation (but before sealing).
      *
-     * @param {PrivateKey} key is {@link PrivateKey} for creating roles "issuer", "owner", "creator" and sign contract
+     * @param {PrivateKey} key is {@link PrivateKey} for creating roles "issuer", "owner", "creator" and sign contract.
      *
      * @return {SlotContract} created slot contract.
      */
@@ -104,9 +104,9 @@ class SlotContract extends NSmartContract {
     }
 
     /**
-     * Method calls from {@link SlotContract#fromDslFile(String)} and initialize contract from given binder.
+     * Method calls from {@link SlotContract#fromDslFile(String)} and initialize contract from given root object.
      *
-     * @param {Object} root object with initialized data
+     * @param {Object} root object with initialized data.
      *
      * @return {SlotContract} created and ready {@link SlotContract} contract.
      */
@@ -154,7 +154,7 @@ class SlotContract extends NSmartContract {
     }
 
     /**
-     * Extract values from deserializing object for slot fields.
+     * Extract values from deserialized object for slot fields.
      */
     deserializeForSlot() {
         // extract keep_revisions value
@@ -276,7 +276,7 @@ class SlotContract extends NSmartContract {
      * do not saving to state. It is useful for checking set state.data values.
      * <br><br> Additionally will be calculated new times of payment refilling, and storing info for previous revision of slot.
      * It is also useful for slot checking.
-     * @param {boolean} withSaveToState if true, calculated values is saving to  state.data
+     * @param {boolean} withSaveToState if true, calculated values is saving to state.data
      * @return {number} calculated {@link SlotContract#prepaidKilobytesForDays}.
      */
     calculatePrepaidKilobytesForDays(withSaveToState) {
@@ -305,7 +305,7 @@ class SlotContract extends NSmartContract {
         let spentDays = spentSeconds / (3600 * 24);
         this.spentKDs = this.spentEarlyKDs + spentDays * (this.storedEarlyBytes / 1024);
 
-        // if true we save it to stat.data
+        // if true we save it to state.data
         if (withSaveToState) {
             this.state.data[SlotContract.PAID_U_FIELD_NAME] = this.paidU;
 

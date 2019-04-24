@@ -1789,7 +1789,7 @@ class Contract extends bs.BiSerializable {
      * Change owner permission is added by default
      * @param key for creating roles "issuer", "owner", "creator" and signing the contract
      * @param contract - init contract (example, NSmartContract). Optional.
-     * @returns {Contract | NSmartContract} created contract
+     * @returns {Contract | NSmartContract | SlotContract | UnsContract | FollowerContract} created contract
      */
     static fromPrivateKey(key, contract = undefined) {
         let c = (contract === undefined) ? new Contract() : contract;
@@ -1821,7 +1821,7 @@ class Contract extends bs.BiSerializable {
      * @param sealed binary sealed contract.
      * @param transactionPack the transaction pack to resolve dependencies against.
      * @param contract - init contract (example, NSmartContract). Optional.
-     * @returns {Contract | NSmartContract} extracted contract
+     * @returns {Contract | NSmartContract | SlotContract | UnsContract | FollowerContract} extracted contract
      */
     static fromSealedBinary(sealed, transactionPack, contract = undefined) {
         let result = (contract === undefined) ? new Contract() : contract;
@@ -1895,7 +1895,7 @@ class Contract extends bs.BiSerializable {
      *
      * @param {string} fileName - Path to file containing YAML representation of a contract.
      * @param contract - init contract (example, NSmartContract). Optional.
-     * @return {Contract | NSmartContract | SlotContract | FollowerContract} initialized contract.
+     * @return {Contract | NSmartContract | SlotContract | UnsContract | FollowerContract} initialized contract.
      */
     static async fromDslFile(fileName, contract = undefined) {
         let input = await io.openRead(fileName);
