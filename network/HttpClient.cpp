@@ -47,7 +47,7 @@ void HttpClientWorker::sendGetRequest(const std::string& url, std::function<void
 
 HttpClient::HttpClient()
   : poolControlThread_(1) {
-    int poolSize = 100;
+    int poolSize = 10;
     for (int i = 0; i < poolSize; ++i) {
         std::shared_ptr<HttpClientWorker> client = make_shared<HttpClientWorker>(i,*this);
         pool_.push(client);
