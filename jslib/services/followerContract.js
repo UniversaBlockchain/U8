@@ -2,8 +2,12 @@ const BigDecimal  = require("big").Big;
 const roles = require('roles');
 const permissions = require('permissions');
 const t = require("tools");
+const e = require("errors");
+const Errors = e.Errors;
+const ErrorRecord = e.ErrorRecord;
 
 const NSmartContract = require("services/NSmartContract").NSmartContract;
+const events = require("services/contractSubscription");
 
 /**
  * Follower contract is one of several types of smarts contracts that can be run on the node. Follower contract provides
@@ -45,11 +49,11 @@ class FollowerContract extends NSmartContract {
     }
 
     /**
-     * Method adds follower's specific to contract:
+     * Method adds follower's specific to contract.
      */
      addFollowerSpecific() {
-        if(this.definition.extendedType == null || !this.definition.extendedType().equals(NSmartContract.SmartContractType.FOLLOWER1.name()))
-            this.definition.extendedType(NSmartContract.SmartContractType.FOLLOWER1.name());
+        if(this.definition.extendedType == null || !this.definition.extendedType().equals(NSmartContract.SmartContractType.FOLLOWER1))
+            this.definition.extendedType(NSmartContract.SmartContractType.FOLLOWER1);
 
         let ownerLink = new roles.RoleLink("owner_link", "owner");
         this.registerRole(ownerLink);
@@ -173,7 +177,6 @@ class FollowerContract extends NSmartContract {
      *    the contract is allowed for keys that signed this follower contract.
      *
      * @param {Contract} contract - Contract id {@link Contract} for traceability checking.
-     *
      * @return {boolean} true if {@link Contract} can be follow by this {@link FollowerContract}.
      */
     canFollowContract(contract) {
@@ -218,7 +221,6 @@ class FollowerContract extends NSmartContract {
      * It is useful for checking set state.data values.
      *
      * @param {boolean} withSaveToState - If true, calculated values is saving to state.data.
-     *
      * @return {number} calculated {@link FollowerContract#calculatePrepaidOriginDays}.
      */
     calculatePrepaidOriginDays(withSaveToState) {
@@ -226,49 +228,49 @@ class FollowerContract extends NSmartContract {
         this.paidU = this.getPaidU();
 
         if (this.callbackRate === 0)
-            this.callbackRate = this.getRate("callback").doubleValue();
+            this.callbackRate = this.getRate("callback");
 
         // then looking for prepaid early U that can be find at the stat.data
         // additionally we looking for and calculate times of payment fillings and some other data
-        let now = ZonedDateTime.ofInstant(Instant.ofEpochSecond(ZonedDateTime.now().toEpochSecond()), ZoneId.systemDefault());
+        let now = Math.floor(Date.now() / 1000);
         let wasPrepaidOriginDays;
-        let wasPrepaidFrom = now.toEpochSecond();
-        let spentEarlyODsTimeSecs = now.toEpochSecond();
-        let parentContract = this.getRevokingItem(this.state.parent); //TODO
+        let wasPrepaidFrom = now;
+        let spentEarlyODsTimeSecs = now;
+        let parentContract = this.getRevokingItem(this.state.parent);
         if(parentContract != null) {
-            wasPrepaidOriginDays = parentContract.state.data[FollowerContract.PREPAID_OD_FIELD_NAME];
-            wasPrepaidFrom = t.getOrDefault(parentContract.state.data, FollowerContract.PREPAID_FROM_TIME_FIELD_NAME, now.toEpochSecond()); //TODO
-            this.storedEarlyOrigins = t.getOrDefault(parentContract.state.data, FollowerContract.FOLLOWED_ORIGINS_FIELD_NAME, 0); //TODO def 0
-            this.spentEarlyODs = parentContract.state.data[FollowerContract.SPENT_OD_FIELD_NAME];
-            spentEarlyODsTimeSecs = t.getOrDefault(parentContract.state.data, FollowerContract.SPENT_OD_TIME_FIELD_NAME, now.toEpochSecond()); //TODO
+            wasPrepaidOriginDays = t.getOrDefault(parentContract.state.data, FollowerContract.PREPAID_OD_FIELD_NAME, 0);
+            wasPrepaidFrom = t.getOrDefault(parentContract.state.data, FollowerContract.PREPAID_FROM_TIME_FIELD_NAME, now);
+            this.storedEarlyOrigins = t.getOrDefault(parentContract.state.data, FollowerContract.FOLLOWED_ORIGINS_FIELD_NAME, 0);
+            this.spentEarlyODs = t.getOrDefault(parentContract.state.data, FollowerContract.SPENT_OD_FIELD_NAME, 0);
+            spentEarlyODsTimeSecs = t.getOrDefault(parentContract.state.data, FollowerContract.SPENT_OD_TIME_FIELD_NAME, now);
         } else {
             wasPrepaidOriginDays = 0;
         }
 
-        this.spendEarlyODsTime = new Date(spentEarlyODsTimeSecs * 1000);
+        this.spentEarlyODsTime = new Date(spentEarlyODsTimeSecs * 1000);
         this.prepaidFrom = new Date(wasPrepaidFrom * 1000);
-        this.prepaidOriginDays = wasPrepaidOriginDays + this.paidU * getRate().doubleValue();
+        this.prepaidOriginDays = wasPrepaidOriginDays + this.paidU * this.getRate();  //TODO:
 
-        this.spentODsTime = now;
+        this.spentODsTime = new Date();
 
-        let spentSeconds = (spentODsTime.toEpochSecond() - spentEarlyODsTime.toEpochSecond());
+        let spentSeconds = Math.floor((this.spentODsTime.getTime() - this.spentEarlyODsTime.getTime()) / 1000);
         let spentDays = spentSeconds / (3600 * 24);
         this.spentODs = this.spentEarlyODs + spentDays * this.storedEarlyOrigins;
 
         // if true we save it to stat.data
-        if(withSaveToState) {
-            this.state.data.set(FollowerContract.PAID_U_FIELD_NAME, this.paidU); //TODO ??
+        if (withSaveToState) {
+            this.state.data[FollowerContract.PAID_U_FIELD_NAME] = this.paidU;
 
-            this.state.data.set(FollowerContract.PREPAID_OD_FIELD_NAME, this.prepaidOriginDays);
-            if(this.getRevision() === 1)
-                this.state.data.set(FollowerContract.PREPAID_FROM_TIME_FIELD_NAME, now.toEpochSecond());
+            this.state.data[FollowerContract.PREPAID_OD_FIELD_NAME] = this.prepaidOriginDays;
+            if(this.state.revision() === 1)
+                this.state.data[FollowerContract.PREPAID_FROM_TIME_FIELD_NAME] = now;
 
-            this.state.data.set(FollowerContract.FOLLOWED_ORIGINS_FIELD_NAME, this.trackingOrigins.size);
+            this.state.data[FollowerContract.FOLLOWED_ORIGINS_FIELD_NAME] = this.trackingOrigins.size;
 
-            this.state.data.set(FollowerContract.SPENT_OD_FIELD_NAME, this.spentODs);
-            this.state.data.set(FollowerContract.SPENT_OD_TIME_FIELD_NAME, this.spentODsTime.toEpochSecond());
+            this.state.data[FollowerContract.SPENT_OD_FIELD_NAME] = this.spentODs;
+            this.state.data[FollowerContract.SPENT_OD_TIME_FIELD_NAME] = this.spentODsTime;
 
-            this.state.data.set(FollowerContract.CALLBACK_RATE_FIELD_NAME, this.callbackRate);
+            this.state.data[FollowerContract.CALLBACK_RATE_FIELD_NAME] = this.callbackRate;
         }
 
         return this.prepaidOriginDays;
@@ -280,7 +282,6 @@ class FollowerContract extends NSmartContract {
      * have registered new revision, from {@link FollowerContract#onCreated(MutableEnvironment)} and from
      * {@link FollowerContract#onUpdated(MutableEnvironment)} (both when this follower contract have registered new revision).
      * It recalculate params of follower contract and update expiring and muting times for each subscription at the ledger.
-     *
      * @param {MutableEnvironment} me - MutableEnvironment object with some data.
      */
     updateSubscriptions(me) {
@@ -292,34 +293,30 @@ class FollowerContract extends NSmartContract {
         // recalculate time that will be added to now as new expiring time
         // it is difference of all prepaid ODs (origins*days) and already spent divided to new number of tracking origins.
         let days = (this.prepaidOriginDays - this.spentODs - fs.getCallbacksSpent()) / this.trackingOrigins.size;
-        let seconds = days * 24 * 3600;
-        let newExpires = ZonedDateTime.ofInstant(Instant.ofEpochSecond(ZonedDateTime.now().toEpochSecond()), ZoneId.systemDefault()).plusSeconds(seconds);
+        let milliseconds = days * 24 * 3600 * 1000;
+        let newExpires = new Date(Date.now() + milliseconds);
+        newExpires.setMilliseconds(0);
 
         // recalculate muted period of follower contract subscription
         days = (fs.getStartedCallbacks() + 1) * this.callbackRate / this.trackingOrigins.size;
-        seconds = days * 24 * 3600;
-        let newMuted = newExpires.minusSeconds(seconds);
+        milliseconds = days * 24 * 3600 * 1000;
+        let newMuted = new Date(newExpires - milliseconds);   //TODO
+        newMuted.setMilliseconds(0);
 
         fs.setExpiresAndMutedAt(newExpires, newMuted);
 
-        /*Set<HashId> newOrigins = new HashSet<>(this.trackingOrigins.keySet()); //TODO ?
+        let newOrigins = new Set(this.trackingOrigins.key); //TODO ?
 
-        me.subscriptions().forEach(sub -> {
+        me.subscriptions().forEach(sub => {
             let origin = sub.getOrigin();
-            if (this.newOrigins.contains(origin)) {
+            if (newOrigins.has(origin)) {
                 me.setSubscriptionExpiresAt(sub, newExpires);
-            newOrigins.remove(origin);
+            newOrigins.delete(origin);
             } else
                 me.destroySubscription(sub);
         });
 
-        for (HashId origin: newOrigins) {
-            try {
-                let sub = me.createChainSubscription(origin, newExpires);
-            } catch (Exception e) {
-                e.printStackTrace();
-            }
-        }*/
+        newOrigins.forEach(origin => me.createChainSubscription(origin, newExpires));
     }
 
     /**
@@ -335,8 +332,8 @@ class FollowerContract extends NSmartContract {
         let me = event.getEnvironment();
         let fs = me.getFollowerService(true);
 
-        /*if (event instanceof ContractSubscription.ApprovedWithCallbackEvent) {
-            if (fs.mutedAt().isBefore(ZonedDateTime.now()))
+        if (event instanceof events.ApprovedWithCallbackEvent) {
+            if (fs.mutedAt.getTime() < new Date.now())
                 return;
 
             fs.increaseStartedCallbacks();
@@ -348,11 +345,11 @@ class FollowerContract extends NSmartContract {
             fs.changeMutedAt(deltaSeconds);
 
             // schedule callback processor
-            let callbackService = ((ContractSubscription.ApprovedWithCallbackEvent) event).getCallbackService();
-            fs.scheduleCallbackProcessor(((ContractSubscription.ApprovedWithCallbackEvent) event).getNewRevision(), ItemState.APPROVED, this, me, callbackService);
+            let callbackService = event.getCallbackService();
+            fs.scheduleCallbackProcessor(event.getNewRevision(), ItemState.APPROVED, this, me, callbackService);
 
-        } else if (event instanceof ContractSubscription.RevokedWithCallbackEvent) {
-            if (fs.mutedAt().isBefore(ZonedDateTime.now()))
+        } else if (event instanceof events.RevokedWithCallbackEvent) {
+            if (fs.mutedAt.getTime()  < Date.now())
                 return;
 
             fs.increaseStartedCallbacks();
@@ -364,21 +361,21 @@ class FollowerContract extends NSmartContract {
             fs.changeMutedAt(deltaSeconds);
 
             // schedule callback processor
-            let callbackService = ((ContractSubscription.RevokedWithCallbackEvent) event).getCallbackService();
-            fs.scheduleCallbackProcessor(((ContractSubscription.RevokedWithCallbackEvent) event).getRevokingItem(), ItemState.REVOKED, this, me, callbackService);
+            let callbackService = event.getCallbackService();
+            fs.scheduleCallbackProcessor(event.getRevokingItem(), ItemState.REVOKED, this, me, callbackService);
 
-        } else if (event instanceof ContractSubscription.CompletedEvent) {
+        } else if (event instanceof events.CompletedEvent) {
             fs.decreaseStartedCallbacks();
-            fs.increaseCallbacksSpent(callbackRate);
+            fs.increaseCallbacksSpent(this.callbackRate);
 
             // decrease expires period of all follower subscription in environment of contract
             let deltaDays = this.callbackRate / this.trackingOrigins.size;
             let deltaSeconds = deltaDays * 24 * 3600;
 
             fs.decreaseExpiresAt(deltaSeconds);
-            me.subscriptions().forEach(sub -> me.setSubscriptionExpiresAt(sub, sub.expiresAt().minusSeconds(deltaSeconds)));
+            me.subscriptions().forEach(sub => me.setSubscriptionExpiresAt(sub, sub.expiresAt - minusSeconds(deltaSeconds)));
 
-        }else if (event instanceof ContractSubscription.FailedEvent) {
+        }else if (event instanceof events.FailedEvent) {
             fs.decreaseStartedCallbacks();
 
             // increase muted period of all follower subscription in environment of contract
@@ -387,8 +384,8 @@ class FollowerContract extends NSmartContract {
 
             fs.changeMutedAt(deltaSeconds);
 
-        } else if (event instanceof ContractSubscription.SpentEvent) {
-            fs.increaseCallbacksSpent(callbackRate);
+        } else if (event instanceof events.SpentEvent) {
+            fs.increaseCallbacksSpent(this.callbackRate);
 
             let deltaDays = this.callbackRate / this.trackingOrigins.size;
             let deltaSeconds = deltaDays * 24 * 3600;
@@ -396,20 +393,18 @@ class FollowerContract extends NSmartContract {
             // decrease muted and expires period of all follower subscription in environment of contract
             fs.changeMutedAt(-deltaSeconds);
             fs.decreaseExpiresAt(deltaSeconds);
-            me.subscriptions().forEach(sub -> me.setSubscriptionExpiresAt(sub, sub.expiresAt().minusSeconds(deltaSeconds)));
-        }*/
+            me.subscriptions().forEach(sub => me.setSubscriptionExpiresAt(sub, sub.expiresAt().minusSeconds(deltaSeconds)));
+        }
     }
 
     /**
-     * We override seal method to recalculate holding at the state.data values
-     *
-     * @return {number[]}
+     * Override seal method to recalculate holding at the state.data values.
      */
-    seal() {
+    seal(isTransactionRoot = false) {
         this.saveTrackingOriginsToState();
         this.calculatePrepaidOriginDays(true);
 
-        return super.seal();
+        return super.seal(isTransactionRoot);
     }
 
     saveTrackingOriginsToState() {
@@ -478,46 +473,48 @@ class FollowerContract extends NSmartContract {
         }
     }
 
+    /**
+     * Callback called by the node before registering the follower contract for his check.
+     *
+     * @param {ImmutableEnvironment} c - Object with some data.
+     * @return {boolean} result.
+     */
     beforeCreate(c) {
         let checkResult = true;
 
         // recalculate prepaid origins*days without saving to state
         this.calculatePrepaidOriginDays(false);
 
-        let paidU = this.getPaidU();
-        if(paidU == 0) {                //TODO
-            if(this.getPaidU(true) > 0) {
-                this.errors.push(new Errors.FAILED_CHECK, "Test payment is not allowed for follower contracts");
-            }
-        let checkResult = false;
-        } else if(paidU < this.getMinPayment()) {
-            this.errors.push(new Errors.FAILED_CHECK, "Payment for follower contract is below minimum level of " + this.getMinPayment() + "U");
+        if (this.paidU === 0) {
+            if (this.getPaidU(true) > 0)             //TODO
+                this.errors.push(new ErrorRecord(Errors.FAILED_CHECK, "Test payment is not allowed for follower contracts"));
+            checkResult = false;
+        } else if(this.paidU < this.getMinPayment()) {
+            this.errors.push(new ErrorRecord(Errors.FAILED_CHECK, "Payment for follower contract is below minimum level of " + this.getMinPayment() + "U"));
             checkResult = false;
         }
 
         if(!checkResult) {
-            this.errors.push(new Errors.FAILED_CHECK, "Follower contract hasn't valid payment");
-            return checkResult;
+            this.errors.push(new ErrorRecord(Errors.FAILED_CHECK, "Follower contract hasn't valid payment"));
+            return false;
         }
 
         // check that payment was not hacked
-        checkResult = this.prepaidOriginDays === t.getOrDefault(this.state.data, FollowerContract.PREPAID_OD_FIELD_NAME, 0); //TODO def 0
-        if(!checkResult) {
-            this.errors.push(new Errors.FAILED_CHECK, "Wrong [state.data." + FollowerContract.PREPAID_OD_FIELD_NAME + "] value. " +
-                "Should be sum of early paid U and paid U by current revision.");
-            return checkResult;
+        if(this.prepaidOriginDays !== t.getOrDefault(this.state.data, FollowerContract.PREPAID_OD_FIELD_NAME, 0)) {
+            this.errors.push(new ErrorRecord(Errors.FAILED_CHECK, "Wrong [state.data." + FollowerContract.PREPAID_OD_FIELD_NAME + "] value. " +
+                "Should be sum of early paid U and paid U by current revision."));
+            return false;
         }
 
         // and call common follower check
-        checkResult = this.additionallyFollowerCheck(c);
-
-        return checkResult;
+        return this.additionallyFollowerCheck(c);
     }
 
     /**
+     * Callback called by the node before registering new revision of the follower contract for his check.
      *
-     * @param {ImmutableEnvironment} c
-     * @return {boolean}
+     * @param {ImmutableEnvironment} c - Object with some data.
+     * @return {boolean} result.
      */
     beforeUpdate(c) {
         // recalculate prepaid origins*days without saving to state
@@ -528,65 +525,90 @@ class FollowerContract extends NSmartContract {
             // and call common follower check
             return this.additionallyFollowerCheck(c);
 
-        this.errors.push(new Errors.FAILED_CHECK, "Wrong [state.data." + this.state.data[FollowerContract.PREPAID_OD_FIELD_NAME] + "] value. " +
-            "Should be sum of early paid U and paid U by current revision.");
+        this.errors.push(new ErrorRecord(Errors.FAILED_CHECK, "Wrong [state.data." + this.state.data[FollowerContract.PREPAID_OD_FIELD_NAME] + "] value. " +
+            "Should be sum of early paid U and paid U by current revision."));
 
         return false;
     }
 
+    /**
+     * Callback called by the node before revocation the follower contract for his check.
+     *
+     * @param {ImmutableEnvironment} c - Object with some data.
+     * @return {boolean} result.
+     */
     beforeRevoke(c) {
         return this.additionallyFollowerCheck(c);
     }
 
+    /**
+     * Additionally check the follower contract.
+     *
+     * @param {ImmutableEnvironment} ime - Object with some data.
+     */
     additionallyFollowerCheck(ime) {
-        //let checkResult = false;
-
         // check slot environment
-        let checkResult = ime !== null;
-        if(!checkResult) {
-            this.errors.push(new Errors.FAILED_CHECK, "Environment should be not null");
-            return checkResult;
+        if (ime == null) {
+            this.errors.push(new ErrorRecord(Errors.FAILED_CHECK, "Environment should be not null"));
+            return false;
         }
 
         // check that slot has known and valid type of smart contract
-        checkResult = this.getExtendedType().equals(NSmartContract.SmartContractType.FOLLOWER1.name());
-        if(!checkResult) {
-            this.errors.push(new Errors.FAILED_CHECK, "definition.extended_type", "illegal value, should be " + NSmartContract.SmartContractType.FOLLOWER1.name() + " instead " + getExtendedType());
-            return checkResult;
+        if(this.definition.extendedType !== NSmartContract.SmartContractType.FOLLOWER1) {
+            this.errors.push(new ErrorRecord (ErrorRecord(Errors.FAILED_CHECK, "definition.extended_type",
+                "illegal value, should be " + NSmartContract.SmartContractType.FOLLOWER1 + " instead " + this.definition.extendedType)));
+            return false;
         }
 
         // check for tracking origins existing
-        checkResult = this.trackingOrigins.size > 0;
-        if(!checkResult) {
-            this.errors.push(new Errors.FAILED_CHECK, "Tracking origin is missed");
-            return checkResult;
+        let tracking = this.trackingOrigins.size > 0;
+        if(tracking == 0) {                             // TODO
+            this.errors.push(new ErrorRecord(Errors.FAILED_CHECK, "Tracking origin is missed"));
+            return false;
         }
 
-        // check for any tracking origin contains callbacks data
-        checkResult = true;
-        for (let URL of this.trackingOrigins.values)
+        // check for any tracking origin contains callbacks data // TODO delete containsValue
+        /*for (let URL of this.trackingOrigins.values)
             if (!this.callbackKeys.has(URL))
                 checkResult = false;
-            if(!checkResult) {
-                this.errors.push(new Errors.FAILED_CHECK, "Callback key for tracking origin is missed");
-                return checkResult;
-            }
 
-        return checkResult;
+        if(!checkResult) {
+            this.errors.push(new ErrorRecord(Errors.FAILED_CHECK, "Callback key for tracking origin is missed"));
+            return checkResult;
+        }
+            return checkResult;
+        */
     }
 
+    /**
+     * Callback called by the node after registering the follower contract.
+     *
+     * @param {MutableEnvironment} me - Object with some data.
+     * @return {Object} object contains operation status.
+     */
     onCreated(me) {
         this.updateSubscriptions(me);
 
         return {status : "ok"};
     }
 
+    /**
+     * Callback called by the node after registering new revision of the follower contract.
+     *
+     * @param {MutableEnvironment} me - Object with some data.
+     * @return {Object} object contains operation status.
+     */
     onUpdated(me) {
         this.updateSubscriptions(me);
 
         return {status : "ok"};
     }
 
+    /**
+     * Callback called by the node after revocation the follower contract.
+     *
+     * @param {ImmutableEnvironment} ime - Object with some data.
+     */
     onRevoked(ime) {}
 }
 

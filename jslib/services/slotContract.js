@@ -59,7 +59,6 @@ class SlotContract extends NSmartContract {
      * creation (but before sealing).
      *
      * @param {PrivateKey} key is {@link PrivateKey} for creating roles "issuer", "owner", "creator" and sign contract.
-     *
      * @return {SlotContract} created slot contract.
      */
     static fromPrivateKey(key) {
@@ -82,7 +81,6 @@ class SlotContract extends NSmartContract {
      *
      * @param {number[]} sealed binary sealed contract.
      * @param {TransactionPack} pack the transaction pack to resolve dependencies again.
-     *
      * @return {SlotContract} extracted slot contract.
      */
     static fromSealedBinary(sealed, pack) {
@@ -96,7 +94,6 @@ class SlotContract extends NSmartContract {
      * Method creates {@link SlotContract} contract from dsl file where contract is described.
      *
      * @param {string} fileName is path to dsl file with yaml structure of data for contract.
-     *
      * @return {SlotContract} created and ready {@link SlotContract} contract.
      */
     static fromDslFile(fileName) {
@@ -107,7 +104,6 @@ class SlotContract extends NSmartContract {
      * Method calls from {@link SlotContract#fromDslFile(String)} and initialize contract from given root object.
      *
      * @param {Object} root object with initialized data.
-     *
      * @return {SlotContract} created and ready {@link SlotContract} contract.
      */
     initializeWithDsl(root) {
@@ -235,7 +231,6 @@ class SlotContract extends NSmartContract {
 
         return false;
     }
-
 
     /**
      * Put contract to the tracking contract's revisions queue.
@@ -428,7 +423,6 @@ class SlotContract extends NSmartContract {
      * Callback called by the node before registering the slot-contract for his check.
      *
      * @param {ImmutableEnvironment} c is {@link ImmutableEnvironment} object with some data.
-     *
      * @return {boolean} check result.
      */
     beforeCreate(c) {
@@ -476,7 +470,6 @@ class SlotContract extends NSmartContract {
      * Callback called by the node before registering new revision of the slot-contract for his check.
      *
      * @param {ImmutableEnvironment} c is {@link ImmutableEnvironment} object with some data.
-     *
      * @return {boolean} check result.
      */
     beforeUpdate(c) {
@@ -517,7 +510,6 @@ class SlotContract extends NSmartContract {
      * Callback called by the node after registering the slot-contract.
      *
      * @param {MutableEnvironment} me is {@link MutableEnvironment} object with some data.
-     *
      * @return {Object} object contains operation status.
      */
     onCreated(me) {
@@ -530,7 +522,6 @@ class SlotContract extends NSmartContract {
      * Callback called by the node after registering new revision of the slot-contract.
      *
      * @param {MutableEnvironment} me is {@link MutableEnvironment} object with some data.
-     *
      * @return {Object} object contains operation status.
      */
     onUpdated(me) {
