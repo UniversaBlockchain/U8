@@ -48,7 +48,7 @@ class NSmartContract extends Contract {
      * it is necessary to put real data to it first. It is allowed to change owner, expiration and data fields after
      * creation (but before sealing).
      *
-     * @param {PrivateKey} key is {@link PrivateKey} for creating roles "issuer", "owner", "creator" and sign contract
+     * @param {crypto.PrivateKey} key is {@link crypto.PrivateKey} for creating roles "issuer", "owner", "creator" and sign contract
      *
      * @return {NSmartContract} created smart contract.
      */
@@ -262,4 +262,4 @@ class NodeInfoProvider {
 const smartContractAdapter = new bs.BiAdapter("UniversaContract", NSmartContract);
 DefaultBiMapper.getInstance().adapters.set(smartContractAdapter.getType(), smartContractAdapter);
 
-module.exports = {NSmartContract};
+module.exports = {NSmartContract, NodeInfoProvider};

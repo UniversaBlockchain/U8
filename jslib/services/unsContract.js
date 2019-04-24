@@ -17,7 +17,6 @@ const CONSTRAINT_CONDITION_OPERATOR = 7;       // EQUAL
 class UnsContract extends NSmartContract {
 
     static NAMES_FIELD_NAME = "names";
-    static ENTRIES_FIELD_NAME = "entries";
     static PREPAID_ND_FIELD_NAME = "prepaid_ND";
     static PREPAID_ND_FROM_TIME_FIELD_NAME = "prepaid_ND_from";
     static STORED_ENTRIES_FIELD_NAME = "stored_entries";
@@ -26,15 +25,17 @@ class UnsContract extends NSmartContract {
 
     constructor() {
         super();
+        // Stored UNS names
         this.storedNames = [];
+        // Calculate U paid with las revision of UNS
         this.paidU = 0;
+        // All ND (names*days) prepaid from first revision (sum of all paidU, converted to ND)
         this.prepaidNamesForDays = 0;
-        this.storedEarlyEntries = 0;
-        this.spentEarlyNDs = 0;
+        // Spent NDs for current revision
         this.spentNDs = 0;
-        this.spentEarlyNDsTime = null;
-        this.prepaidFrom = null;
+        // Time of spent ND's calculation for current revision
         this.spentNDsTime = null;
+        // Need origins of referenced contracts
         this.originContracts = new t.GenericMap();
     }
 
@@ -119,9 +120,6 @@ class UnsContract extends NSmartContract {
 
         this.paidU = t.getOrDefault(this.state.data, UnsContract.PAID_U_FIELD_NAME, 0);
         this.prepaidNamesForDays = t.getOrDefault(this.state.data, UnsContract.PREPAID_ND_FIELD_NAME, 0);
-
-        let prepaidFromSeconds = t.getOrDefault(this.state.data, UnsContract.PREPAID_ND_FROM_TIME_FIELD_NAME, 0);
-        this.prepaidFrom = new Date(prepaidFromSeconds * 1000);
     }
 
     /**
@@ -170,7 +168,6 @@ class UnsContract extends NSmartContract {
      * <br><br> Additionally will be calculated new times of payment refilling, and storing info for previous revision of UNS.
      * It is also useful for UNS contract checking.
      * @param {boolean} withSaveToState if true, calculated values is saving to state.data
-     * @return {number} calculated {@link UnsContract#prepaidNamesForDays}.
      */
     calculatePrepaidNamesForDays(withSaveToState) {
 
@@ -179,25 +176,23 @@ class UnsContract extends NSmartContract {
         this.spentNDsTime = new Date();
         let now = Math.floor(Date.now() / 1000);
         let wasPrepaidNamesForDays;
-        let wasPrepaidFrom = now;
+        let storedEarlyEntries;
+        let spentEarlyNDs;
         let spentEarlyNDsTimeSecs = now;
         let parentContract = this.getRevokingItem(this.state.parent);
         if (parentContract != null) {
             wasPrepaidNamesForDays = t.getOrDefault(parentContract.state.data, UnsContract.PREPAID_ND_FIELD_NAME, 0);
-            wasPrepaidFrom = t.getOrDefault(parentContract.state.data, UnsContract.PREPAID_ND_FROM_TIME_FIELD_NAME, now);
             spentEarlyNDsTimeSecs = t.getOrDefault(parentContract.state.data, UnsContract.SPENT_ND_TIME_FIELD_NAME, now);
-            this.storedEarlyEntries = t.getOrDefault(parentContract.state.data, UnsContract.STORED_ENTRIES_FIELD_NAME, 0);
-            this.spentEarlyNDs = t.getOrDefault(parentContract.state.data, UnsContract.SPENT_ND_FIELD_NAME, 0);
+            storedEarlyEntries = t.getOrDefault(parentContract.state.data, UnsContract.STORED_ENTRIES_FIELD_NAME, 0);
+            spentEarlyNDs = t.getOrDefault(parentContract.state.data, UnsContract.SPENT_ND_FIELD_NAME, 0);
         } else
             wasPrepaidNamesForDays = 0;
 
-        this.spentEarlyNDsTime = new Date(spentEarlyNDsTimeSecs * 1000);
-        this.prepaidFrom = new Date(wasPrepaidFrom * 1000);
-        this.prepaidNamesForDays = wasPrepaidNamesForDays + this.paidU * this.getRate();        //TODO: getRate return BigDecimal (need cast), bigint or number?
+        this.prepaidNamesForDays = wasPrepaidNamesForDays + this.paidU * Number(this.getRate());
 
-        let spentSeconds = Math.floor((this.spentNDsTime.getTime() - this.spentEarlyNDsTime.getTime()) / 1000);
+        let spentSeconds = Math.floor(this.spentNDsTime.getTime() / 1000) - spentEarlyNDsTimeSecs;
         let spentDays = spentSeconds / (3600 * 24);
-        this.spentNDs = this.spentEarlyNDs + spentDays * this.storedEarlyEntries;
+        this.spentNDs = spentEarlyNDs + spentDays * storedEarlyEntries;
 
         if (withSaveToState) {
             this.state.data[UnsContract.PAID_U_FIELD_NAME] = this.paidU;
@@ -214,8 +209,6 @@ class UnsContract extends NSmartContract {
             this.state.data[UnsContract.SPENT_ND_FIELD_NAME] = this.spentNDs;
             this.state.data[UnsContract.SPENT_ND_TIME_FIELD_NAME] = now;
         }
-
-        return this.prepaidNamesForDays;
     }
 }
 

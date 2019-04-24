@@ -34,12 +34,6 @@ class SlotContract extends NSmartContract {
         this.paidU = 0;
         // All KD (kilobytes*days) prepaid from first revision (sum of all paidU, converted to KD)
         this.prepaidKilobytesForDays = 0;
-        // Stored bytes for previous revision of slot. Use for calculate spent KDs
-        this.storedEarlyBytes = 0;
-        // Spent KDs for previous revision
-        this.spentEarlyKDs = 0;
-        // Time of spent KD's calculation for previous revision
-        this.spentEarlyKDsTime = null;
         // Spent KDs for current revision
         this.spentKDs = 0;
         // Time of spent KD's calculation for current revision
@@ -272,7 +266,6 @@ class SlotContract extends NSmartContract {
      * <br><br> Additionally will be calculated new times of payment refilling, and storing info for previous revision of slot.
      * It is also useful for slot checking.
      * @param {boolean} withSaveToState if true, calculated values is saving to state.data
-     * @return {number} calculated {@link SlotContract#prepaidKilobytesForDays}.
      */
     calculatePrepaidKilobytesForDays(withSaveToState) {
 
@@ -283,22 +276,23 @@ class SlotContract extends NSmartContract {
         this.spentKDsTime = new Date();
         let now = Math.floor(Date.now() / 1000);
         let wasPrepaidKilobytesForDays;
+        let storedEarlyBytes;
+        let spentEarlyKDs;
         let spentEarlyKDsTimeSecs = now;
         let parentContract = this.getRevokingItem(this.state.parent);
         if (parentContract != null) {
             wasPrepaidKilobytesForDays = t.getOrDefault(parentContract.state.data, SlotContract.PREPAID_KD_FIELD_NAME, 0);
             spentEarlyKDsTimeSecs = t.getOrDefault(parentContract.state.data, SlotContract.SPENT_KD_TIME_FIELD_NAME, now);
-            this.storedEarlyBytes = t.getOrDefault(parentContract.state.data, SlotContract.STORED_BYTES_FIELD_NAME, 0);
-            this.spentEarlyKDs = t.getOrDefault(parentContract.state.data, SlotContract.SPENT_KD_FIELD_NAME, 0);
+            storedEarlyBytes = t.getOrDefault(parentContract.state.data, SlotContract.STORED_BYTES_FIELD_NAME, 0);
+            spentEarlyKDs = t.getOrDefault(parentContract.state.data, SlotContract.SPENT_KD_FIELD_NAME, 0);
         } else
             wasPrepaidKilobytesForDays = 0;
 
-        this.spentEarlyKDsTime = new Date(spentEarlyKDsTimeSecs * 1000);
-        this.prepaidKilobytesForDays = wasPrepaidKilobytesForDays + this.paidU * this.getRate();        //TODO: getRate return BigDecimal (need cast), bigint or number?
+        this.prepaidKilobytesForDays = wasPrepaidKilobytesForDays + this.paidU * Number(this.getRate());
 
-        let spentSeconds = Math.floor((this.spentKDsTime.getTime() - this.spentEarlyKDsTime.getTime()) / 1000);
+        let spentSeconds = Math.floor(this.spentKDsTime.getTime() / 1000) - spentEarlyKDsTimeSecs;
         let spentDays = spentSeconds / (3600 * 24);
-        this.spentKDs = this.spentEarlyKDs + spentDays * (this.storedEarlyBytes / 1024);
+        this.spentKDs = spentEarlyKDs + spentDays * (storedEarlyBytes / 1024);
 
         // if true we save it to state.data
         if (withSaveToState) {
@@ -315,8 +309,20 @@ class SlotContract extends NSmartContract {
             this.state.data[SlotContract.SPENT_KD_FIELD_NAME] = this.spentKDs;
             this.state.data[SlotContract.SPENT_KD_TIME_FIELD_NAME] = now;
         }
+    }
 
-        return this.prepaidKilobytesForDays;
+    calcExpiresAt() {
+        let storingBytes = 0;
+        this.packedTrackingContracts.forEach(p => storingBytes += p.length);
+
+        // calculate time that will be added to now as new expiring time
+        // it is difference of all prepaid KD (kilobytes*days) and already spent divided to new storing volume.
+        let days = (this.prepaidKilobytesForDays - this.spentKDs) * 1024 / storingBytes;
+        let milliseconds = days * 24 * 3600 * 1000;
+
+        let expires = new Date(this.spentKDsTime.getTime() + milliseconds);
+        expires.setMilliseconds(0);
+        return expires;
     }
 
     /**
@@ -331,15 +337,7 @@ class SlotContract extends NSmartContract {
         // recalculate storing info without saving to state to get valid storing data
         this.calculatePrepaidKilobytesForDays(false);
 
-        let storingBytes = 0;
-        this.packedTrackingContracts.forEach(p => storingBytes += p.length);
-
-        // calculate time that will be added to now as new expiring time
-        // it is difference of all prepaid KD (kilobytes*days) and already spent divided to new storing volume.
-        let days = (this.prepaidKilobytesForDays - this.spentKDs) * 1024 / storingBytes;
-        let milliseconds = days * 24 * 3600 * 1000;
-        let newExpires = new Date(Date.now() + milliseconds);
-        newExpires.setMilliseconds(0);
+        let newExpires = this.calcExpiresAt();
 
         let newContracts = new t.GenericMap();
         this.trackingContracts.forEach(c => newContracts.set(c.id, c));
@@ -536,6 +534,15 @@ class SlotContract extends NSmartContract {
      * @param {ImmutableEnvironment} ime is {@link ImmutableEnvironment} object with some data.
      */
     onRevoked(ime) {}
+
+    /**
+     * Creates {@see Object} that will be returned to client after slot contract have been approved.
+     * Contains subscription and contract storages expiration time.
+     * @return {Object}
+     */
+    getExtraResultForApprove() {
+        return {expires_at : Math.floor(this.calcExpiresAt().getTime() / 1000)};
+    }
 }
 
 DefaultBiMapper.registerAdapter(new bs.BiAdapter("SlotContract", SlotContract));
