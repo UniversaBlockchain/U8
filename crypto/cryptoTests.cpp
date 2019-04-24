@@ -569,7 +569,7 @@ void udpAdapterHelloWorld() {
     socket0.open("127.0.0.1", 4040, 4000000);
     socket1.open("127.0.0.1", 4041, 4000000);
 
-    long countToSend = 40000;
+    long countToSend = 400;
     atomic<long> counter(0);
 
     socket0.recv([&](ssize_t result, const asyncio::byte_vector& data, const char* IP, unsigned int port) {

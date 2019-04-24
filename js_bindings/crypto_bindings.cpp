@@ -43,7 +43,7 @@ static void privateKeySign(const FunctionCallbackInfo<Value> &args) {
                             delete onReady;
                             if (fn->IsFunction()) {
                                 Local<Value> result = vectorToV8(isolate, signature);
-                                fn->Call(fn, 1, &result);
+                                auto unused = fn->Call(cxt, fn, 1, &result);
                             }
                         });
                     });
@@ -82,7 +82,7 @@ static void privateKeyDecrypt(const FunctionCallbackInfo<Value> &args) {
                                 delete onError;
                                 if (fn->IsFunction()) {
                                     Local<Value> result = vectorToV8(isolate, plain);
-                                    fn->Call(fn, 1, &result);
+                                    auto unused = fn->Call(cxt, fn, 1, &result);
                                 } else {
                                     cerr << "PrivateKey::decrypt invalid callback\n";
                                 }
@@ -97,7 +97,7 @@ static void privateKeyDecrypt(const FunctionCallbackInfo<Value> &args) {
                                 delete onError;
                                 if (fn->IsFunction()) {
                                     Local<Value> result = scripter->v8String(e.what());
-                                    fn->Call(fn, 1, &result);
+                                    auto unused = fn->Call(cxt, fn, 1, &result);
                                 } else {
                                     cerr << "PrivateKey::decrypt invalid reject callback\n";
                                 }
@@ -143,7 +143,7 @@ static void privateKeyGenerate(const FunctionCallbackInfo<Value> &args) {
                             scripter->throwError("null callback in PrivateKey::generate");
                         } else {
                             Local<Value> res[1]{wrap(privateKeyTpl, scripter->isolate(), key)};
-                            fn->Call(fn, 1, res);
+                            auto unused = fn->Call(cxt, fn, 1, res);
                         }
                     });
                 });
@@ -189,7 +189,7 @@ static void publicKeyVerify(const FunctionCallbackInfo<Value> &args) {
                         delete onReady;
                         if (fn->IsFunction()) {
                             Local<Value> res = Boolean::New(isolate, result);
-                            fn->Call(fn, 1, &res);
+                            auto unused = fn->Call(cxt, fn, 1, &res);
                         } else {
                             cerr << "publicKey::verify: callback is not a function\n";
                         }
@@ -221,7 +221,7 @@ static void publicKeyEncrypt(const FunctionCallbackInfo<Value> &args) {
                         delete onReady;
                         if (fn->IsFunction()) {
                             Local<Value> res = vectorToV8(isolate, result);
-                            fn->Call(fn, 1, &res);
+                            auto unused = fn->Call(cxt, fn, 1, &res);
                         } else {
                             cerr << "publicKey::encrypt: callback is not a function\n";
                         }

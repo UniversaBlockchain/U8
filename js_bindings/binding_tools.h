@@ -222,14 +222,21 @@ inline Local<Uint8Array> vectorToV8(Isolate* isolate, const byte_vector& data) {
 template<typename T>
 Local<Value> wrap(Persistent<FunctionTemplate>& objectTemplate, Isolate *isolate, T *cppObject) {
     auto tpl = objectTemplate.Get(isolate);
-    auto obj = tpl->InstanceTemplate()->NewInstance();
-    if (obj->InternalFieldCount() < 1) {
-        isolate->ThrowException(Exception::Error(String::NewFromUtf8(isolate, "no internal field")));
+    auto objMaybeLocal = tpl->InstanceTemplate()->NewInstance(isolate->GetCurrentContext());
+    Local<Object> obj;
+    if (objMaybeLocal.ToLocal(&obj)) {
+        if (obj->InternalFieldCount() < 1) {
+            isolate->ThrowException(Exception::Error(String::NewFromUtf8(isolate, "no internal field")));
+            delete cppObject;
+            return Undefined(isolate);
+        } else {
+            obj->SetInternalField(0, External::New(isolate, cppObject));
+            return obj;
+        }
+    } else {
+        isolate->ThrowException(Exception::Error(String::NewFromUtf8(isolate, "objMaybeLocal.ToLocal returns false")));
         delete cppObject;
         return Undefined(isolate);
-    } else {
-        obj->SetInternalField(0, External::New(isolate, cppObject));
-        return obj;
     }
 }
 

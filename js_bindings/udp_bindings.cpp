@@ -327,7 +327,7 @@ private:
                         arr->Set(i * 2 + 1, Integer::New(se_->isolate(), bufCopy[i].second));
                     }
                     Local<Value> result = arr;
-                    fn->Call(fn, 1, &result);
+                    auto unused = fn->Call(context, fn, 1, &result);
                 }
             });
         }
@@ -453,7 +453,7 @@ void httpServer_addEndpoint(const FunctionCallbackInfo<Value> &args) {
                 se->inPool([=](Local<Context> &context) {
                     auto fn = jsCallback->Get(context->GetIsolate());
                     Local<Value> res[1] {wrap(HttpServerRequestTpl, se->isolate(), hsrp)};
-                    fn->Call(fn, 1, res);
+                    auto unused = fn->Call(context, fn, 1, res);
                 });
             });
             return;

@@ -32,7 +32,7 @@ download_archive() {
 }
 
 if [ "$platform" = "linux" ]; then
-    download_archive libv8.7z
+    download_archive libv8-v7.4.301.7z
     download_archive libtomcrypt.7z
     download_archive libuv.7z
     download_archive libpq.7z

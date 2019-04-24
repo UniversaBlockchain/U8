@@ -51,7 +51,7 @@ void JsPGPoolWithConnection(const FunctionCallbackInfo<Value> &args) {
                 Isolate *isolate = context->GetIsolate();
                 auto fn = pcb->Get(isolate);
                 Local<Value> res[1] {wrap(BusyConnectionTemplate, isolate, conn.get())};
-                fn->Call(fn, 1, res);
+                auto unused = fn->Call(context, fn, 1, res);
                 pcb->Reset();
                 delete pcb;
                 //pool->releaseConnection(conn);
@@ -144,7 +144,7 @@ void JsBusyConnectionExecuteQuery(const FunctionCallbackInfo<Value> &args) {
                 Isolate *isolate = context->GetIsolate();
                 auto fn = onSuccessPcb->Get(isolate);
                 Local<Value> res[1] {wrap(QueryResultTemplate, isolate, pqr)};
-                fn->Call(fn, 1, res);
+                auto unused = fn->Call(context, fn, 1, res);
                 onSuccessPcb->Reset();
                 onErrorPcb->Reset();
                 delete onSuccessPcb;
@@ -156,7 +156,7 @@ void JsBusyConnectionExecuteQuery(const FunctionCallbackInfo<Value> &args) {
                 Isolate *isolate = context->GetIsolate();
                 auto fn = onErrorPcb->Get(isolate);
                 Local<Value> result = scripter->v8String(err);
-                fn->Call(fn, 1, &result);
+                auto unused = fn->Call(context, fn, 1, &result);
                 onSuccessPcb->Reset();
                 onErrorPcb->Reset();
                 delete onSuccessPcb;
@@ -209,7 +209,7 @@ void JsBusyConnectionExecuteUpdate(const FunctionCallbackInfo<Value> &args) {
                 Isolate *isolate = context->GetIsolate();
                 auto fn = onSuccessPcb->Get(isolate);
                 Local<v8::Value> prm = Number::New(ac.isolate, affectedRows);
-                fn->Call(fn, 1, &prm);
+                auto unused = fn->Call(context, fn, 1, &prm);
                 onSuccessPcb->Reset();
                 onErrorPcb->Reset();
                 delete onSuccessPcb;
@@ -220,7 +220,7 @@ void JsBusyConnectionExecuteUpdate(const FunctionCallbackInfo<Value> &args) {
                 Isolate *isolate = context->GetIsolate();
                 auto fn = onErrorPcb->Get(isolate);
                 Local<Value> result = scripter->v8String(err);
-                fn->Call(fn, 1, &result);
+                auto unused = fn->Call(context, fn, 1, &result);
                 onSuccessPcb->Reset();
                 onErrorPcb->Reset();
                 delete onSuccessPcb;

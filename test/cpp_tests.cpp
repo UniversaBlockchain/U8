@@ -3,6 +3,7 @@
 //
 #include <thread>
 #include <atomic>
+#include <v8-version.h>
 
 #define CATCH_CONFIG_MAIN
 
@@ -135,4 +136,10 @@ TEST_CASE("Semaphore") {
 
     REQUIRE(long(counter) == WEIGHT*10);
     REQUIRE(sem.count() == 0);
+}
+
+TEST_CASE("Check_V8_version") {
+    printf("V8_VERSION: %i.%i\n", V8_MAJOR_VERSION, V8_MINOR_VERSION);
+    REQUIRE(V8_MAJOR_VERSION == 7);
+    REQUIRE(V8_MINOR_VERSION == 4);
 }

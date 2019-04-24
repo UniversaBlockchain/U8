@@ -58,7 +58,7 @@ void JsAsyncFileOpen(const FunctionCallbackInfo<Value> &args) {
                             res = Integer::New(isolate, result);
                         else
                             res = BigInt::New(isolate, result);
-                        fn->Call(fn, 1, &res);
+                        auto unused = fn->Call(context, fn, 1, &res);
                     }
                     pcb->Reset();
                     delete pcb;
@@ -98,10 +98,10 @@ void JsAsyncHandleRead(const FunctionCallbackInfo<Value> &args) {
                   } else {
                       if (result > 0) {
                           Local<Value> res[2]{pResult->Get(isolate), Integer::New(isolate, result)};
-                          fn->Call(fn, 2, res);
+                          auto unused = fn->Call(context, fn, 2, res);
                       } else {
                           Local<Value> res[] = {Undefined(isolate), Integer::New(isolate, result)};
-                          fn->Call(fn, 2, res);
+                          auto unused = fn->Call(context, fn, 2, res);
                       }
                   }
                   pcb->Reset();
@@ -143,7 +143,7 @@ void JsAsyncHandleWrite(const FunctionCallbackInfo<Value> &args) {
                   Isolate *isolate = context->GetIsolate();
                   auto fn = pcb->Get(isolate);
                   Local<Value> res = Integer::New(isolate, result);
-                  fn->Call(fn, 1, &res);
+                  auto unused = fn->Call(context, fn, 1, &res);
                   pcb->Reset();
                   pBuffer->Reset();
                   delete pcb;
@@ -172,7 +172,7 @@ void JsAsyncHandleClose(const FunctionCallbackInfo<Value> &args) {
                 Isolate *isolate = context->GetIsolate();
                 auto fn = pcb->Get(isolate);
                 Local<Value> res = Integer::New(isolate, result);
-                fn->Call(fn, 1, &res);
+                auto unused = fn->Call(context, fn, 1, &res);
                 pcb->Reset();
                 delete pcb;
             });
@@ -201,7 +201,7 @@ void JsAsyncTCPListen(const FunctionCallbackInfo<Value> &args) {
                     onReady->Reset();
                     delete onReady;
                     Local<Value> jsResult = Integer::New(isolate, result);
-                    fn->Call(fn, 1, &jsResult);
+                    auto unused = fn->Call(context, fn, 1, &jsResult);
                 });
             }, maxConnections);
         } else {
@@ -234,7 +234,7 @@ void JsAsyncTCPConnect(const FunctionCallbackInfo<Value> &args) {
                     onReady->Reset();
                     delete onReady;
                     Local<Value> jsResult = Integer::New(isolate, result);
-                    fn->Call(fn, 1, &jsResult);
+                    auto unused = fn->Call(context, fn, 1, &jsResult);
                 });
             });
         } else {
@@ -285,7 +285,7 @@ void JsAsyncTLSListen(const FunctionCallbackInfo<Value> &args) {
                     onReady->Reset();
                     delete onReady;
                     Local<Value> jsResult = Integer::New(isolate, result);
-                    fn->Call(fn, 1, &jsResult);
+                    auto unused = fn->Call(context, fn, 1, &jsResult);
                 });
             }, maxConnections);
         } else {
@@ -319,7 +319,7 @@ void JsAsyncTLSConnect(const FunctionCallbackInfo<Value> &args) {
                     onReady->Reset();
                     delete onReady;
                     Local<Value> jsResult = Integer::New(isolate, result);
-                    fn->Call(fn, 1, &jsResult);
+                    auto unused = fn->Call(context, fn, 1, &jsResult);
                 });
             }, timeout);
         } else {
@@ -357,7 +357,7 @@ void JsAsyncTLSAccept(const FunctionCallbackInfo<Value> &args) {
                     onReady->Reset();
                     delete onReady;
                     Local<Value> jsResult = Integer::New(isolate, result);
-                    fn->Call(fn, 1, &jsResult);
+                    auto unused = fn->Call(context, fn, 1, &jsResult);
                 });
             }, timeout);
             ac.setReturnValue(code);
@@ -415,7 +415,7 @@ void JsAsyncUDPRecv(const FunctionCallbackInfo<Value> &args) {
 
                         Local<Value> res[4]{pResult->Get(isolate), Integer::New(isolate, result),
                                             String::NewFromUtf8(isolate, strIP.data()), Integer::New(isolate, port)};
-                        fn->Call(fn, 4, res);
+                        auto unused = fn->Call(context, fn, 4, res);
 
                         pResult->Reset();
                         pBuffer->Reset();
@@ -424,7 +424,7 @@ void JsAsyncUDPRecv(const FunctionCallbackInfo<Value> &args) {
                     } else {
                         Local<Value> res[] = {Undefined(isolate), Integer::New(isolate, result),
                                               Undefined(isolate), Undefined(isolate)};
-                        fn->Call(fn, 4, res);
+                        auto unused = fn->Call(context, fn, 4, res);
                     }
                 }
                 // delete after stopping recv:
@@ -463,7 +463,7 @@ void JsAsyncUDPSend(const FunctionCallbackInfo<Value> &args) {
                 Isolate *isolate = context->GetIsolate();
                 auto fn = pcb->Get(isolate);
                 Local<Value> res = Integer::New(isolate, result);
-                fn->Call(fn, 1, &res);
+                auto unused = fn->Call(context, fn, 1, &res);
                 pcb->Reset();
                 pBuffer->Reset();
                 delete pcb;
@@ -516,7 +516,7 @@ void JsAsyncUDPClose(const FunctionCallbackInfo<Value> &args) {
                 Isolate *isolate = context->GetIsolate();
                 auto fn = pcb->Get(isolate);
                 Local<Value> res = Integer::New(isolate, result);
-                fn->Call(fn, 1, &res);
+                auto unused = fn->Call(context, fn, 1, &res);
                 pcb->Reset();
                 delete pcb;
             });

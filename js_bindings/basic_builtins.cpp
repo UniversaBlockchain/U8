@@ -73,7 +73,7 @@ void JsTimer(const v8::FunctionCallbackInfo<v8::Value> &args) {
                 // get the local hadnle to function from persistent handle
                 auto fn = jsCallback->Get(context->GetIsolate());
                 // call it using the function as the this context:
-                fn->Call(fn, 0, nullptr);
+                auto unused = fn->Call(context, fn, 0, nullptr);
                 // now we must free the persistent handle as it is single operation
                 // this performs automatically from shared_ptr
             });
@@ -82,15 +82,18 @@ void JsTimer(const v8::FunctionCallbackInfo<v8::Value> &args) {
 }
 
 void JsInitTimers(const v8::FunctionCallbackInfo<v8::Value> &args) {
-    Scripter::unwrap(args, [&](auto se, auto isolate, auto context) {
+    Scripter::unwrap(args, [&](auto se, v8::Isolate* isolate, auto context) {
         se->log("CALLED TIMERS INIT");
         if (se->timersReady()) {
             se->log_e("SR timers already initialized");
         } else {
             // timer process should be initialized and function returned
-            args.GetReturnValue().Set(
-                    v8::Local(v8::Function::New(isolate, JsTimer))
-            );
+            auto foo = v8::Function::New(isolate->GetCurrentContext(), JsTimer);
+            v8::Local<Function> local;
+            if (foo.ToLocal(&local))
+                args.GetReturnValue().Set(local);
+            else
+                se->log_e("ToLocal returns false");
         }
     });
 }
