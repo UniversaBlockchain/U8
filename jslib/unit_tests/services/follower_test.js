@@ -3,47 +3,11 @@ import * as io from 'io'
 import * as tk from 'unit_tests/test_keys'
 
 const NSmartContract = require("services/NSmartContract").NSmartContract;
-const NodeInfoProvider = require("services/NSmartContract").NodeInfoProvider;
 const FollowerContract = require("services/followerContract").FollowerContract;
-const Config = require("config").Config;
-
-class TestNodeInfoProvider extends NodeInfoProvider {
-
-    constructor() {
-        super();
-    }
-
-    getUIssuerKeys() {
-        return Config.uIssuerKeys;
-    }
-
-    getUIssuerName() {
-        return Config.uIssuerName;
-    }
-
-    getMinPayment(extendedType) {
-        return Config.minPayment[extendedType];
-    }
-
-    getServiceRate(extendedType) {
-        return Config.rate[extendedType];
-    }
-
-    getAdditionalKeysToSignWith(extendedType) {
-        let set = new Set();
-        if (extendedType === NSmartContract.SmartContractType.UNS1)
-            set.add(Config.authorizedNameServiceCenterKey);
-
-        return set;
-    }
-}
-
-function createNodeInfoProvider() {
-    return new TestNodeInfoProvider();
-}
+const tt = require("test_tools");
 
 unit.test("follower_test: goodFollowerContract", async () => {
-    let nodeInfoProvider = createNodeInfoProvider();
+    let nodeInfoProvider = tt.createNodeInfoProvider();
 
     let key = new crypto.PrivateKey(await (await io.openRead("../test/_xer0yfe2nn1xthc.private.unikey")).allBytes());
     let key2 = new crypto.PrivateKey(await (await io.openRead("../test/test_network_whitekey.private.unikey")).allBytes());
@@ -57,16 +21,15 @@ unit.test("follower_test: goodFollowerContract", async () => {
 
     let smartContract = FollowerContract.fromPrivateKey(key);
 
-    //assert(smartContract instanceof FollowerContract);
+    assert(smartContract instanceof FollowerContract);
 
-    /*((FollowerContract)smartContract).setNodeInfoProvider(nodeInfoProvider);
-    ((FollowerContract)smartContract).putTrackingOrigin(simpleContract.getOrigin(), "http://localhost:7777/follow.callback", callbackKey);
+    smartContract.nodeInfoProvider = nodeInfoProvider;
+    smartContract.putTrackingOrigin(simpleContract.getOrigin(), "http://localhost:7777/follow.callback", callbackKey);
 
-    smartContract.seal();
-    smartContract.check();
-    smartContract.traceErrors();
-    assertTrue(smartContract.isOk());
+    //await smartContract.seal(true);
+    //assert(await smartContract.check());
 
+    /*
     assertEquals(NSmartContract.SmartContractType.FOLLOWER1.name(), smartContract.getDefinition().getExtendedType());
     assertEquals(NSmartContract.SmartContractType.FOLLOWER1.name(), smartContract.get("definition.extended_type"));
 

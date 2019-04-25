@@ -1,38 +1,38 @@
 import {expect, unit, assert, assertSilent} from 'test'
 
-import * as cnt from 'contract'
-import * as tp from 'transactionpack'
-import * as dbm from 'defaultbimapper'
-import * as bbm from 'bossbimapper'
-import * as constr from 'constraint'
 import * as t from 'tools'
 import * as d from 'deltas'
 import * as io from 'io'
-import * as tk from 'unit_tests/test_keys'
+
+const DefaultBiMapper = require("defaultbimapper").DefaultBiMapper;
+const BossBiMapper = require("bossbimapper").BossBiMapper;
+const TransactionPack = require("transactionpack").TransactionPack;
+const Constraint = require('constraint').Constraint;
+const TestKeys = require('unit_tests/test_keys').TestKeys;
 
 const ROOT_PATH = "../test/constraints/";
 
 unit.test("constraint copy test", () => {
 
-    let c1 = new constr.Constraint(Contract.fromPrivateKey(tk.TestKeys.getKey()));
+    let c1 = new Constraint(Contract.fromPrivateKey(TestKeys.getKey()));
     c1.name = "c1";
     c1.comment = "c1_comment";
     let conds = {};
-    conds[constr.Constraint.conditionsModeType.all_of] = ["this.state.data.n1 == 1", "ref.definition.data.s1 == \"string1\""];
+    conds[Constraint.conditionsModeType.all_of] = ["this.state.data.n1 == 1", "ref.definition.data.s1 == \"string1\""];
     c1.setConditions(conds);
 
     let c2 = c1.copy();
 
     c2.baseContract = null;
 
-    let s1 = bbm.BossBiMapper.getInstance().serialize(c1);
-    let s2 = bbm.BossBiMapper.getInstance().serialize(c2);
+    let s1 = BossBiMapper.getInstance().serialize(c1);
+    let s2 = BossBiMapper.getInstance().serialize(c2);
 
     assert(t.valuesEqual(s1,s2));
     assert(d.Delta.between(null,s1,s2) == null);
 
-    let ds1 = dbm.DefaultBiMapper.getInstance().serialize(c1);
-    let ds2 = dbm.DefaultBiMapper.getInstance().serialize(c2);
+    let ds1 = DefaultBiMapper.getInstance().serialize(c1);
+    let ds2 = DefaultBiMapper.getInstance().serialize(c2);
 
     assert(t.valuesEqual(ds1,ds2));
     assert(d.Delta.between(null,ds1,ds2) == null);
@@ -40,7 +40,7 @@ unit.test("constraint copy test", () => {
 
 unit.test("constraint test: simple check", async () => {
 
-    let privateKey = tk.TestKeys.getKey();
+    let privateKey = TestKeys.getKey();
     let contractBase = Contract.fromPrivateKey(privateKey);
 
     contractBase.state.data["str_val"] = "~~~ simple string! ===";
@@ -53,22 +53,22 @@ unit.test("constraint test: simple check", async () => {
     contractRef.state.data["ref_num_val"] = 32903103.5678;
     contractRef.state.data["ref_big_val"] = "4503290488913829183281920913092019320193097.7718423894839282493892109106";
 
-    let cr = new constr.Constraint(contractRef);
-    cr.type = constr.Constraint.TYPE_EXISTING_DEFINITION;
+    let cr = new Constraint(contractRef);
+    cr.type = Constraint.TYPE_EXISTING_DEFINITION;
     cr.name = "constraintRef";
     let conditionsRef = {};
-    conditionsRef[constr.Constraint.conditionsModeType.all_of] = ["ref.issuer == this.issuer"];
+    conditionsRef[Constraint.conditionsModeType.all_of] = ["ref.issuer == this.issuer"];
     cr.setConditions(conditionsRef);
     contractRef.addConstraint(cr);
 
     await contractRef.seal();
     contractBase.state.data["id_val"] = contractRef.id.base64;
 
-    let c = new constr.Constraint(contractBase);
-    c.type = constr.Constraint.TYPE_EXISTING_STATE;
+    let c = new Constraint(contractBase);
+    c.type = Constraint.TYPE_EXISTING_STATE;
     c.name = "base_constraint";
     let conditions = {};
-    conditions[constr.Constraint.conditionsModeType.all_of] = [
+    conditions[Constraint.conditionsModeType.all_of] = [
         "this.state.data.str_val == \"~~~ simple string! ===\"",
         "ref.state.data.ref_str_val == \"12345 another_string +++\"",
         "this.state.data.num_val >= -103.6903",
@@ -111,7 +111,7 @@ unit.test("constraint test: simple check", async () => {
     contractBase.addConstraint(c);
 
     await contractBase.seal();
-    contractBase.transactionPack = new tp.TransactionPack(contractBase);
+    contractBase.transactionPack = new TransactionPack(contractBase);
 
     let res = await contractBase.check();
     assert(!res);
@@ -122,7 +122,7 @@ unit.test("constraint test: simple check", async () => {
     //add referenced contract
     contractBase.newItems.add(contractRef);
     await contractBase.seal();
-    contractBase.transactionPack = new tp.TransactionPack(contractBase);
+    contractBase.transactionPack = new TransactionPack(contractBase);
 
     res = await contractBase.check();
     assert(res);
@@ -130,27 +130,27 @@ unit.test("constraint test: simple check", async () => {
 
 unit.test("constraint test: refLessOrEquals", async () => {
 
-    let privateKey = tk.TestKeys.getKey();
+    let privateKey = TestKeys.getKey();
     let contractA = Contract.fromPrivateKey(privateKey);
 
     contractA.state.data["val"] = 100;
 
-    let contractB = Contract.fromPrivateKey(tk.TestKeys.getKey());
+    let contractB = Contract.fromPrivateKey(TestKeys.getKey());
 
-    let c = new constr.Constraint(contractB);
-    c.type = constr.Constraint.TYPE_EXISTING_STATE;
+    let c = new Constraint(contractB);
+    c.type = Constraint.TYPE_EXISTING_STATE;
     let conditions = {};
-    conditions[constr.Constraint.conditionsModeType.all_of] = ["ref.state.data.val<=10"];
+    conditions[Constraint.conditionsModeType.all_of] = ["ref.state.data.val<=10"];
     c.setConditions(conditions);
 
     contractB.addConstraint(c);
 
-    let batch = Contract.fromPrivateKey(tk.TestKeys.getKey());
+    let batch = Contract.fromPrivateKey(TestKeys.getKey());
 
     batch.newItems.add(contractA);
     batch.newItems.add(contractB);
     await batch.seal();
-    batch.transactionPack = new tp.TransactionPack(batch);
+    batch.transactionPack = new TransactionPack(batch);
 
     let res = await batch.check();
     assert(!res);
@@ -158,27 +158,27 @@ unit.test("constraint test: refLessOrEquals", async () => {
 
 unit.test("constraint test: refMissingField", async () => {
 
-    let privateKey = tk.TestKeys.getKey();
+    let privateKey = TestKeys.getKey();
     let contractA = Contract.fromPrivateKey(privateKey);
 
     contractA.state.data["another_val"] = 100;
 
-    let contractB = Contract.fromPrivateKey(tk.TestKeys.getKey());
+    let contractB = Contract.fromPrivateKey(TestKeys.getKey());
 
-    let c = new constr.Constraint(contractB);
-    c.type = constr.Constraint.TYPE_EXISTING_STATE;
+    let c = new Constraint(contractB);
+    c.type = Constraint.TYPE_EXISTING_STATE;
     let conditions = {};
-    conditions[constr.Constraint.conditionsModeType.all_of] = ["ref.state.data.val>-100"];
+    conditions[Constraint.conditionsModeType.all_of] = ["ref.state.data.val>-100"];
     c.setConditions(conditions);
 
     contractB.addConstraint(c);
 
-    let batch = Contract.fromPrivateKey(tk.TestKeys.getKey());
+    let batch = Contract.fromPrivateKey(TestKeys.getKey());
 
     batch.newItems.add(contractA);
     batch.newItems.add(contractB);
     await batch.seal();
-    batch.transactionPack = new tp.TransactionPack(batch);
+    batch.transactionPack = new TransactionPack(batch);
 
     let res = await batch.check();
     assert(!res);
@@ -186,17 +186,17 @@ unit.test("constraint test: refMissingField", async () => {
 
 unit.test("constraint test: refMissingFieldConstantForEquals", async () => {
 
-    let privateKey = tk.TestKeys.getKey();
+    let privateKey = TestKeys.getKey();
     let contractA = Contract.fromPrivateKey(privateKey);
 
     contractA.state.data["another_val"] = 100;
 
-    let contractB = Contract.fromPrivateKey(tk.TestKeys.getKey());
+    let contractB = Contract.fromPrivateKey(TestKeys.getKey());
 
-    let c = new constr.Constraint(contractB);
-    c.type = constr.Constraint.TYPE_EXISTING_STATE;
+    let c = new Constraint(contractB);
+    c.type = Constraint.TYPE_EXISTING_STATE;
     let conditions = {};
-    conditions[constr.Constraint.conditionsModeType.all_of] = ["ref.state.data.val==false",
+    conditions[Constraint.conditionsModeType.all_of] = ["ref.state.data.val==false",
                                                                "ref.state.data.ival==0",
                                                                "false==ref.state.data.val",
                                                                "0==ref.state.data.ival"];
@@ -204,12 +204,12 @@ unit.test("constraint test: refMissingFieldConstantForEquals", async () => {
 
     contractB.addConstraint(c);
 
-    let batch = Contract.fromPrivateKey(tk.TestKeys.getKey());
+    let batch = Contract.fromPrivateKey(TestKeys.getKey());
 
     batch.newItems.add(contractA);
     batch.newItems.add(contractB);
     await batch.seal();
-    batch.transactionPack = new tp.TransactionPack(batch);
+    batch.transactionPack = new TransactionPack(batch);
 
     let res = await batch.check();
     assert(!res);
@@ -217,26 +217,26 @@ unit.test("constraint test: refMissingFieldConstantForEquals", async () => {
 
 unit.test("constraint test: refMissingFieldHashIdForEquals", async () => {
 
-    let privateKey = tk.TestKeys.getKey();
+    let privateKey = TestKeys.getKey();
     let contractA = Contract.fromPrivateKey(privateKey);
 
     contractA.state.data["another_val"] = 100;
 
-    let contractB = Contract.fromPrivateKey(tk.TestKeys.getKey());
-    let c = new constr.Constraint(contractB);
-    c.type = constr.Constraint.TYPE_EXISTING_STATE;
+    let contractB = Contract.fromPrivateKey(TestKeys.getKey());
+    let c = new Constraint(contractB);
+    c.type = Constraint.TYPE_EXISTING_STATE;
     let conditions = {};
-    conditions[constr.Constraint.conditionsModeType.all_of] = ["ref.state.data.val!=ref.id", "this.id!=ref.state.data.val"];
+    conditions[Constraint.conditionsModeType.all_of] = ["ref.state.data.val!=ref.id", "this.id!=ref.state.data.val"];
     c.setConditions(conditions);
 
     contractB.addConstraint(c);
 
-    let batch = Contract.fromPrivateKey(tk.TestKeys.getKey());
+    let batch = Contract.fromPrivateKey(TestKeys.getKey());
 
     batch.newItems.add(contractA);
     batch.newItems.add(contractB);
     await batch.seal();
-    batch.transactionPack = new tp.TransactionPack(batch);
+    batch.transactionPack = new TransactionPack(batch);
 
     let res = await batch.check();
     assert(!res);
@@ -244,25 +244,25 @@ unit.test("constraint test: refMissingFieldHashIdForEquals", async () => {
 
 unit.test("constraint test: refMissingFieldRoleForEquals", async () => {
 
-    let privateKey = tk.TestKeys.getKey();
+    let privateKey = TestKeys.getKey();
     let contractA = Contract.fromPrivateKey(privateKey);
 
     contractA.state.data["another_val"] = 100;
 
-    let contractB = Contract.fromPrivateKey(tk.TestKeys.getKey());
-    let c = new constr.Constraint(contractB);
-    c.type = constr.Constraint.TYPE_EXISTING_STATE;
+    let contractB = Contract.fromPrivateKey(TestKeys.getKey());
+    let c = new Constraint(contractB);
+    c.type = Constraint.TYPE_EXISTING_STATE;
     let conditions = {};
-    conditions[constr.Constraint.conditionsModeType.all_of] = ["ref.state.data.val!=ref.issuer", "this.issuer!=ref.state.data.val"];
+    conditions[Constraint.conditionsModeType.all_of] = ["ref.state.data.val!=ref.issuer", "this.issuer!=ref.state.data.val"];
     c.setConditions(conditions);
 
     contractB.addConstraint(c);
 
-    let batch = Contract.fromPrivateKey(tk.TestKeys.getKey());
+    let batch = Contract.fromPrivateKey(TestKeys.getKey());
     batch.newItems.add(contractA);
     batch.newItems.add(contractB);
     await batch.seal();
-    batch.transactionPack = new tp.TransactionPack(batch);
+    batch.transactionPack = new TransactionPack(batch);
 
     let res = await batch.check();
     assert(!res);
@@ -270,25 +270,25 @@ unit.test("constraint test: refMissingFieldRoleForEquals", async () => {
 
 unit.test("constraint test: refMissingFieldDateTimeForEquals", async () => {
 
-    let privateKey = tk.TestKeys.getKey();
+    let privateKey = TestKeys.getKey();
     let contractA = Contract.fromPrivateKey(privateKey);
 
     contractA.state.data["another_val"] = 100;
 
-    let contractB = Contract.fromPrivateKey(tk.TestKeys.getKey());
-    let c = new constr.Constraint(contractB);
-    c.type = constr.Constraint.TYPE_EXISTING_STATE;
+    let contractB = Contract.fromPrivateKey(TestKeys.getKey());
+    let c = new Constraint(contractB);
+    c.type = Constraint.TYPE_EXISTING_STATE;
     let conditions = {};
-    conditions[constr.Constraint.conditionsModeType.all_of] = ["ref.state.data.val!=ref.definition.created_at", "this.definition.created_at!=ref.state.data.val"];
+    conditions[Constraint.conditionsModeType.all_of] = ["ref.state.data.val!=ref.definition.created_at", "this.definition.created_at!=ref.state.data.val"];
     c.setConditions(conditions);
 
     contractB.addConstraint(c);
 
-    let batch = Contract.fromPrivateKey(tk.TestKeys.getKey());
+    let batch = Contract.fromPrivateKey(TestKeys.getKey());
     batch.newItems.add(contractA);
     batch.newItems.add(contractB);
     await batch.seal();
-    batch.transactionPack = new tp.TransactionPack(batch);
+    batch.transactionPack = new TransactionPack(batch);
 
     let res = await batch.check();
     assert(!res);
@@ -353,7 +353,7 @@ unit.test("constraint test: checkConstraints", async () => {
     // signature to check can_play operator
     await contract1.addSignatureToSeal(key);
 
-    let tpack = new tp.TransactionPack(contract1);
+    let tpack = new TransactionPack(contract1);
     tpack.subItems.set(contract2.id, contract2);
     tpack.referencedItems.set(contract2.id, contract2);
     tpack.subItems.set(contract3.id, contract3);
@@ -435,7 +435,7 @@ unit.test("constraint test: checkConstraintsAPILevel4", async () => {
     // signature to check can_play operator
     await contract1.addSignatureToSeal(key);
 
-    let tpack = new tp.TransactionPack(contract1);
+    let tpack = new TransactionPack(contract1);
     tpack.subItems.set(contract2.id, contract2);
     tpack.referencedItems.set(contract2.id, contract2);
     tpack.subItems.set(contract3.id, contract3);
@@ -468,7 +468,7 @@ unit.test("constraint test: checkConstraintsBetweenContracts", async () => {
     await contract2.seal();
     await contract3.seal();
 
-    let tpack = new tp.TransactionPack(contract1);
+    let tpack = new TransactionPack(contract1);
     tpack.subItems.set(contract1.id, contract1);
     tpack.referencedItems.set(contract1.id, contract1);
     tpack.subItems.set(contract2.id, contract2);
@@ -512,7 +512,7 @@ unit.test("constraint test: checkConstraintsBetweenContractsAPILevel4", async ()
     await contract2.seal();
     await contract3.seal();
 
-    let tpack = new tp.TransactionPack(contract1);
+    let tpack = new TransactionPack(contract1);
     tpack.subItems.set(contract1.id, contract1);
     tpack.referencedItems.set(contract1.id, contract1);
     tpack.subItems.set(contract2.id, contract2);

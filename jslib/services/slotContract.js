@@ -231,6 +231,7 @@ class SlotContract extends NSmartContract {
     /**
      * Put contract to the tracking contract's revisions queue.
      * If queue contains more then {@link SlotContract#keepRevisions} revisions then last one will removed.
+     *
      * @param {Contract} c is revision of tracking {@link Contract}.
      */
     putTrackingContract(c) {
@@ -242,6 +243,7 @@ class SlotContract extends NSmartContract {
 
     /**
      * Sets number of revisions of tracking contract to hold in the storage.
+     *
      * @param {number} keepRevisions is number of revisions to keep.
      */
     setKeepRevisions(keepRevisions) {
@@ -267,6 +269,7 @@ class SlotContract extends NSmartContract {
      * do not saving to state. It is useful for checking set state.data values.
      * <br><br> Additionally will be calculated new times of payment refilling, and storing info for previous revision of slot.
      * It is also useful for slot checking.
+     *
      * @param {boolean} withSaveToState if true, calculated values is saving to state.data
      */
     calculatePrepaidKilobytesForDays(withSaveToState) {
@@ -333,6 +336,7 @@ class SlotContract extends NSmartContract {
      * contract have registered new revision, from {@link SlotContract#onCreated(MutableEnvironment)} and
      * from {@link SlotContract#onUpdated(MutableEnvironment)} (both when this slot contract have registered new revision).
      * It recalculate storing params (storing time) and update expiring dates for each revision at the ledger.
+     *
      * @param {MutableEnvironment} me is {@link MutableEnvironment} object with some data.
      */
     updateSubscriptions(me) {
@@ -356,7 +360,7 @@ class SlotContract extends NSmartContract {
                 me.destroyStorage(storage);
         });
 
-        newContracts.values().forEach(tc => me.createContractStorage(tc.getPackedTransaction(), newExpires));
+        Array.from(newContracts.values()).forEach(tc => me.createContractStorage(tc.getPackedTransaction(), newExpires));
 
         // update subscriptions
         me.subscriptions().forEach(sub => {
@@ -386,6 +390,7 @@ class SlotContract extends NSmartContract {
      * Additionally check the slot-contract.
      *
      * @param {ImmutableEnvironment} ime is {@link ImmutableEnvironment} object with some data.
+     * @return {boolean} check result.
      */
     additionallySlotCheck(ime) {
         // check slot environment
@@ -498,8 +503,7 @@ class SlotContract extends NSmartContract {
     /**
      * Callback called by the node before revocation the slot-contract for his check.
      *
-     * @param {ImmutableEnvironment} c is {@link ImmutableEnvironment} object with some data.
-     *
+     * @param {ImmutableEnvironment} c is {@link ImmutableEnvironment} object with some data.     *
      * @return {boolean} check result.
      */
     beforeRevoke(c) {

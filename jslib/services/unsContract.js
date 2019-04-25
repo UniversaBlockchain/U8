@@ -2,6 +2,7 @@ const bs = require("biserializable");
 const DefaultBiMapper = require("defaultbimapper").DefaultBiMapper;
 const BossBiMapper = require("bossbimapper").BossBiMapper;
 const permissions = require('permissions');
+const Constraint = require('constraint').Constraint;
 const roles = require('roles');
 const t = require("tools");
 const e = require("errors");
@@ -154,7 +155,7 @@ class UnsContract extends NSmartContract {
 
     seal(isTransactionRoot = false) {
         this.saveNamesToState();
-        this.saveOriginReferencesToState();
+        this.saveOriginConstraintsToState();
         this.calculatePrepaidNamesForDays(true);
 
         return super.seal(isTransactionRoot);
@@ -211,6 +212,288 @@ class UnsContract extends NSmartContract {
             this.state.data[UnsContract.SPENT_ND_FIELD_NAME] = this.spentNDs;
             this.state.data[UnsContract.SPENT_ND_TIME_FIELD_NAME] = now;
         }
+    }
+
+    /**
+     * Checking of the constraint condition contains a comparison with the specified origin.
+     *
+     * @param {object} condition - object with parsed condition.
+     * @param {HashId} origin - origin for comparison.
+     * @return {boolean} true if origin condition.
+     */
+    static isOriginCondition(condition, origin) {
+        return condition.operator === CONSTRAINT_CONDITION_OPERATOR &&
+            condition.leftOperand != null && condition.leftOperand === CONSTRAINT_CONDITION_LEFT &&
+            condition.rightOperand != null && condition.rightOperand === origin.base64;
+    }
+
+    /**
+     * Save constraints with origin conditions to state.
+     */
+    saveOriginConstraintsToState() {
+        let origins = new Set();
+        let constraintsToRemove = new Set();
+
+        this.storedNames.forEach(sn => sn.unsRecords.forEach(unsRecord => {
+            if (unsRecord.unsOrigin != null)
+                origins.add(unsRecord.unsOrigin);
+        }));
+
+        Array.from(this.constraints.values()).forEach(constr => {
+            if (constr.conditions.hasOwnProperty(Constraint.conditionsModeType.all_of))
+                constr.conditions[Constraint.conditionsModeType.all_of].forEach(condition => {
+                    if (condition.operator === CONSTRAINT_CONDITION_OPERATOR && condition.leftOperand != null &&
+                        condition.leftOperand === CONSTRAINT_CONDITION_LEFT && condition.rightOperand != null) {
+                        let origin = crypto.HashId.withDigest(condition.rightOperand);
+                        if (!origins.has(origin))
+                            constraintsToRemove.add(constr);
+                    }
+                });
+        });
+
+        constraintsToRemove.forEach(constr => this.removeConstraint(constr));
+
+        origins.forEach( origin => {
+            if (!this.isOriginConstraintExists(origin))
+                this.addOriginConstraint(origin);
+            else {
+                let originConstr = null;
+                for (let c of this.constraints.values())
+                    if (c.conditions.hasOwnProperty(Constraint.conditionsModeType.all_of) &&
+                        c.conditions[Constraint.conditionsModeType.all_of].some(cond => UnsContract.isOriginCondition(cond, origin))) {
+                        originConstr = c;
+                        break;
+                    }
+
+                if (originConstr != null && originConstr.matchingItems.size === 0 && this.originContracts.has(origin))
+                    originConstr.addMatchingItem(this.originContracts.get(origin));
+            }
+        });
+    }
+
+    /**
+     * Save UNS names to state.
+     */
+    saveNamesToState() {
+        this.state.data[UnsContract.NAMES_FIELD_NAME] = this.storedNames;
+    }
+
+    /**
+     * Checking of the constraints contains a condition with the specified origin.
+     *
+     * @param {HashId} origin.
+     */
+    isOriginConstraintExists(origin) {
+        return Array.from(this.constraints.values()).some(c => c.conditions.hasOwnProperty(Constraint.conditionsModeType.all_of) &&
+            c.conditions[Constraint.conditionsModeType.all_of].some(cond => UnsContract.isOriginCondition(cond, origin)));
+    }
+
+    /**
+     * Add new constraint include condition with the specified origin.
+     *
+     * @param {HashId} origin.
+     */
+    addOriginConstraint(origin) {
+        let c = new Constraint(this);
+        c.type = Constraint.TYPE_EXISTING_STATE;
+        c.name = origin.toString();
+
+        let conditions = {};
+        conditions[Constraint.conditionsModeType.all_of] = [CONSTRAINT_CONDITION_PREFIX + "\"" + origin.base64 + "\""];
+        c.setConditions(conditions);
+
+        if (this.originContracts.has(origin))
+            c.addMatchingItem(this.originContracts.get(origin));
+
+        this.addConstraint(c);
+    }
+
+    /**
+     * Callback called by the node before registering the UNS-contract for his check.
+     *
+     * @param {ImmutableEnvironment} c is {@link ImmutableEnvironment} object with some data.
+     * @return {boolean} check result.
+     */
+    beforeCreate(c) {
+
+        let checkResult = true;
+
+        this.calculatePrepaidNamesForDays(false);
+
+        if (this.paidU === 0) {
+            if (this.getPaidU(true) > 0)
+                this.errors.push(new ErrorRecord(Errors.FAILED_CHECK, "",
+                    "Test payment is not allowed for storing names"));
+            checkResult = false;
+        } else if (this.paidU < this.getMinPayment()) {
+            this.errors.push(new ErrorRecord(Errors.FAILED_CHECK, "",
+                "Payment for UNS contract is below minimum level of " + this.getMinPayment() + "U"));
+            checkResult = false;
+        }
+
+        if (!checkResult) {
+            this.errors.push(new ErrorRecord(Errors.FAILED_CHECK, "", "UNS contract hasn't valid payment"));
+            return false;
+        }
+
+        // check that payment was not hacked
+        if (this.prepaidNamesForDays !== t.getOrDefault(this.state.data, UnsContract.PREPAID_ND_FIELD_NAME, 0)) {
+            this.errors.push(new ErrorRecord(Errors.FAILED_CHECK, "state.data." + UnsContract.PREPAID_ND_FIELD_NAME,
+                "Should be sum of early paid U and paid U by current revision."));
+            return false;
+        }
+
+        return this.additionallyUnsCheck(c);
+    }
+
+    /**
+     * Callback called by the node before registering new revision of the UNS-contract for his check.
+     *
+     * @param {ImmutableEnvironment} c is {@link ImmutableEnvironment} object with some data.
+     * @return {boolean} check result.
+     */
+    beforeUpdate(c) {
+        this.calculatePrepaidNamesForDays(false);
+
+        // check that payment was not hacked
+        if (this.prepaidNamesForDays !== t.getOrDefault(this.state.data, UnsContract.PREPAID_ND_FIELD_NAME, 0)) {
+            this.errors.push(new ErrorRecord(Errors.FAILED_CHECK, "state.data." + UnsContract.PREPAID_ND_FIELD_NAME,
+                "Should be sum of early paid U and paid U by current revision."));
+            return false;
+        }
+
+        return this.additionallyUnsCheck(c);
+    }
+
+    /**
+     * Callback called by the node before revocation the UNS-contract for his check.
+     *
+     * @param {ImmutableEnvironment} c is {@link ImmutableEnvironment} object with some data.     *
+     * @return {boolean} check result.
+     */
+    beforeRevoke(c) {
+        return true;
+    }
+
+    /**
+     * Additionally check the UNS-contract.
+     *
+     * @param {ImmutableEnvironment} ime is {@link ImmutableEnvironment} object with some data.
+     * @return {boolean} check result.
+     */
+    additionallyUnsCheck(ime) {
+        if (ime == null) {
+            this.errors.push(new ErrorRecord(Errors.FAILED_CHECK, "", "Environment should be not null"));
+            return false;
+        }
+
+        if (this.definition.extendedType !== NSmartContract.SmartContractType.UNS1) {
+            this.errors.push(new ErrorRecord(Errors.FAILED_CHECK, "definition.extended_type",
+                "illegal value, should be " + NSmartContract.SmartContractType.UNS1 + " instead " + this.definition.extendedType));
+            return false;
+        }
+
+        if (this.storedNames.length === 0) {
+            this.errors.push(new ErrorRecord(Errors.FAILED_CHECK, UnsContract.NAMES_FIELD_NAME, "Names for storing is missing"));
+            return false;
+        }
+
+        if (!this.storedNames.every(n => n.unsRecords.every(unsRecord => {
+            if (unsRecord.unsOrigin != null) {
+                if (unsRecord.unsAddresses.length > 0) {
+                    this.errors.push(new ErrorRecord(Errors.FAILED_CHECK, UnsContract.NAMES_FIELD_NAME,
+                        "name " + n.unsName + " referencing to origin AND addresses. Should be either origin or addresses"));
+                    return false;
+                }
+
+                //check reference exists in contract (ensures that matching contract was checked by system for being approved)
+                if (!this.isOriginConstraintExists(unsRecord.unsOrigin)) {
+                    this.errors.push(new ErrorRecord(Errors.FAILED_CHECK, UnsContract.NAMES_FIELD_NAME,
+                        "name " + n.unsName + " referencing to origin " + unsRecord.unsOrigin.toString() +
+                        " but no corresponding reference is found"));
+                    return false;
+                }
+
+                let matchingContracts = [];
+                if (this.transactionPack != null && this.transactionPack.referencedItems.size > 0)
+                    matchingContracts = Array.from(this.transactionPack.referencedItems.values()).filter(contract =>
+                        contract.id.equals(unsRecord.unsOrigin) || contract.getOrigin() != null && contract.getOrigin().equals(unsRecord.unsOrigin));
+
+                if (matchingContracts.length === 0) {
+                    this.errors.push(new ErrorRecord(Errors.FAILED_CHECK, UnsContract.NAMES_FIELD_NAME,
+                        "name " + n.unsName + " referencing to origin " + unsRecord.unsOrigin.toString() +
+                        " but no corresponding referenced contract is found"));
+                    return false;
+                }
+
+                if (!matchingContracts[0].roles.issuer.isAllowedForKeys(this.effectiveKeys.keys())) {
+                    this.errors.push(new ErrorRecord(Errors.FAILED_CHECK, UnsContract.NAMES_FIELD_NAME,
+                        "name " + n.unsName + " referencing to origin " + unsRecord.unsOrigin.toString() +
+                        ". UNS1 contract should be also signed by this contract issuer key."));
+                    return false;
+                }
+
+                return true;
+            }
+
+            if (unsRecord.unsAddresses.length === 0) {
+                this.errors.push(new ErrorRecord(Errors.FAILED_CHECK, UnsContract.NAMES_FIELD_NAME,
+                    "name " + n.unsName + " is missing both addresses and origin."));
+                return false;
+            }
+
+            if (unsRecord.unsAddresses.length > 2)
+                this.errors.push(new ErrorRecord(Errors.FAILED_CHECK, UnsContract.NAMES_FIELD_NAME,
+                    "name " + n.unsName + ": Addresses list should not be contains more 2 addresses"));
+
+            if (unsRecord.unsAddresses.length === 2 && unsRecord.unsAddresses[0].base64.length === unsRecord.unsAddresses[1].base64.length)
+                this.errors.push(new ErrorRecord(Errors.FAILED_CHECK, UnsContract.NAMES_FIELD_NAME,
+                    "name " + n.unsName + ": Addresses list may only contain one short and one long addresses"));
+
+            if (!unsRecord.unsAddresses.every(keyAddress =>
+                Array.from(this.effectiveKeys.keys()).some(key => keyAddress.match(key)))) {
+                this.errors.push(new ErrorRecord(Errors.FAILED_CHECK, UnsContract.NAMES_FIELD_NAME,
+                    "name " + n.unsName + " using address that missing corresponding key UNS contract signed with."));
+                return false;
+            }
+
+            return true;
+        })))
+            return false;
+
+        if (!Array.from(this.getAdditionalKeysToSignWith()).every(ak =>
+             Array.from(this.effectiveKeys.keys()).some(ek => ek.equals(ak)))) {
+            this.errors.push(new ErrorRecord(Errors.FAILED_CHECK, UnsContract.NAMES_FIELD_NAME,
+                "Authorized name service signature is missing"));
+            return false;
+        }
+
+        let reducedNamesToCkeck = this.getReducedNamesToCheck();
+        let originsToCheck = this.getOriginsToCheck();
+        let addressesToCheck = this.getAddressesToCheck();
+
+        let allocationErrors = ime.tryAllocate(reducedNamesToCkeck, originsToCheck, addressesToCheck);
+        if (allocationErrors.length > 0) {
+            allocationErrors.forEach(err => this.errors.push(err));
+            return false;
+        }
+
+        return true;
+    }
+
+    getReducedNamesToCheck() {
+        let reducedNames = new Set(this.storedNames.map(sn => sn.unsReducedName));
+
+        this.revokingItems.forEach(revoked => this.removeRevokedNames(revoked, reducedNames));
+
+        return Array.from(reducedNames);
+    }
+
+    removeRevokedNames(contract, set) {
+        if (contract instanceof UnsContract)
+            contract.storedNames.forEach(sn => set.delete(sn.unsReducedName));
+
+        contract.revokingItems.forEach(revoked => this.removeRevokedNames(revoked, set));
     }
 }
 

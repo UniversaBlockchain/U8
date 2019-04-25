@@ -9,7 +9,7 @@ const QuantiserProcesses = q.QuantiserProcesses;
 const QuantiserException = q.QuantiserException;
 const Boss = require('boss.js');
 const roles = require('roles');
-const constr = require('constraint');
+const Constraint = require('constraint').Constraint;
 const permissions = require('permissions');
 const e = require("errors");
 const Errors = e.Errors;
@@ -37,7 +37,7 @@ class Transactional {
     constructor(contract) {
         this.contract = contract;
         this.id = null;
-        this.constraints = [];
+        this.constraints = new Set();
         this.validUntil = null;
         this.data = {};
     }
@@ -69,13 +69,8 @@ class Transactional {
                 this.validUntil = data.valid_until;
             }
 
-
             this.data = data.data;
         }
-    }
-
-    addConstraint(c) {
-        this.constraints.push(c);
     }
 }
 
@@ -102,7 +97,7 @@ class State extends bs.BiSerializable {
         this.parent = null;
         this.data = {};
         this.branchId = null;
-        this.constraints = [];
+        this.constraints = new Set();
 
         //TODO:setJS
     }
@@ -135,7 +130,7 @@ class State extends bs.BiSerializable {
         if(!t.valuesEqual(this.branchId,to.branchId))
             return false;
 
-        return true;
+        return t.valuesEqual(this.constraints,to.constraints);;
     }
 
     getBranchRevision() {
@@ -220,10 +215,6 @@ class State extends bs.BiSerializable {
             this.origin = null;
     }
 
-    addConstraint(c) {
-        this.constraints.push(c);
-    }
-
     initializeWithDsl(root) {
         this.createdAt = t.convertToDate(root.created_at);
         this.expiresAt = t.convertToDate(root.expires_at);
@@ -263,7 +254,7 @@ class State extends bs.BiSerializable {
                     constraint = item.reference;
 
                 if (constraint != null)
-                    this.constraints.push(constr.Constraint.fromDsl(constraint, this.contract));
+                    this.constraints.add(Constraint.fromDsl(constraint, this.contract));
                 else
                     throw new ex.IllegalArgumentError("Expected constraint section");
             });
@@ -287,7 +278,7 @@ class Definition extends bs.BiSerializable {
         this.createdAt.setMilliseconds(0);
         this.expiresAt = null;
         this.data = {};
-        this.constraints = [];
+        this.constraints = new Set();
         this.extendedType = null;
         this.permissions = new Map();
 
@@ -316,12 +307,10 @@ class Definition extends bs.BiSerializable {
         if(!t.valuesEqual(this.extendedType,to.extendedType))
             return false;
 
-
         if(!t.valuesEqual(this.permissions,to.permissions))
             return false;
 
-        return true;
-
+        return t.valuesEqual(this.constraints,to.constraints);
     }
 
     serialize(serializer) {
@@ -422,10 +411,6 @@ class Definition extends bs.BiSerializable {
         this.permissions.get(permission.name).push(permission);
     }
 
-    addConstraint(c) {
-        this.constraints.push(c);
-    }
-
     initializeWithDsl(root) {
         this.contract.createRole("issuer", root.issuer);
 
@@ -455,7 +440,7 @@ class Definition extends bs.BiSerializable {
                     constraint = item.reference;
 
                 if (constraint != null)
-                    this.constraints.push(constr.Constraint.fromDsl(constraint, this.contract));
+                    this.constraints.add(Constraint.fromDsl(constraint, this.contract));
                 else
                     throw new ex.IllegalArgumentError("Expected constraint section");
             });
@@ -1364,17 +1349,16 @@ class Contract extends bs.BiSerializable {
     /**
      * Add constraint to the constraints list of the contract.
      *
-     * @param {Constraint} constr - Constraint to add.
+     * @param {Constraint} c - Constraint to add.
      */
     addConstraint(c) {
-
-        if (c.type === constr.Constraint.TYPE_TRANSACTIONAL) {
+        if (c.type === Constraint.TYPE_TRANSACTIONAL) {
             if (this.transactional != null)
-                this.transactional.addConstraint(c);
-        } else if (c.type === constr.Constraint.TYPE_EXISTING_DEFINITION)
-            this.definition.addConstraint(c);
-        else if(c.type === constr.Constraint.TYPE_EXISTING_STATE)
-            this.state.addConstraint(c);
+                this.transactional.constraints.add(c);
+        } else if (c.type === Constraint.TYPE_EXISTING_DEFINITION)
+            this.definition.constraints.add(c);
+        else if(c.type === Constraint.TYPE_EXISTING_STATE)
+            this.state.constraints.add(c);
 
         this.constraints.set(c.name, c);
     }
@@ -1382,7 +1366,30 @@ class Contract extends bs.BiSerializable {
     /**
      * Remove constraint from the constraints list of the contract.
      *
-     * @param removed - Constraint to remove.
+     * @param {Constraint} c - Constraint to remove.
+     */
+    removeConstraint(c) {
+        c.matchingItems.forEach(mi => {
+            if (mi instanceof Contract) {
+                this.newItems.delete(mi);
+                this.revokingItems.delete(mi);
+            }
+        });
+
+        if (c.type === Constraint.TYPE_TRANSACTIONAL && this.transactional != null)
+            this.transactional.constraints.delete(c);
+        else if (c.type === Constraint.TYPE_EXISTING_DEFINITION)
+            this.definition.constraints.delete(c);
+        else if (c.type === Constraint.TYPE_EXISTING_STATE)
+            this.state.constraints.delete(c);
+
+        this.constraints.delete(c.name);
+    }
+
+    /**
+     * Remove referenced contract from referenced (constraints matching), new and revoking items.
+     *
+     * @param {Contract} removed - referenced contract to remove.
      */
     removeReferencedItem(removed) {
 
@@ -1446,7 +1453,7 @@ class Contract extends bs.BiSerializable {
 
             // use all neighbourContracts to check constraint. at least one must be ok
             let c_check = false;
-            if (c.type === constr.Constraint.TYPE_TRANSACTIONAL) {
+            if (c.type === Constraint.TYPE_TRANSACTIONAL) {
                 for (let neighbour of neighbours)
                     if ((((c.transactional_id != null && neighbour.transactional != null && c.transactional_id.equals(neighbour.transactional.id)) ||
                         (c.contract_id != null && c.contract_id.equals(neighbour.id))) && this.checkOneConstraint(c, neighbour)) ||
@@ -1457,7 +1464,7 @@ class Contract extends bs.BiSerializable {
                             break;
                         }
 
-            } else if ((c.type === constr.Constraint.TYPE_EXISTING_DEFINITION) || (c.type === constr.Constraint.TYPE_EXISTING_STATE)) {
+            } else if ((c.type === Constraint.TYPE_EXISTING_DEFINITION) || (c.type === Constraint.TYPE_EXISTING_STATE)) {
                 for (let neighbour of neighbours)
                     if (c.isMatchingWith(neighbour, neighbours))
                         c.addMatchingItem(neighbour);
@@ -1468,7 +1475,7 @@ class Contract extends bs.BiSerializable {
             if (!c_check) {
                 if (!roleConstraint) {
                     allRefs_check = false;
-                    this.errors.push(new ErrorRecord(Errors.FAILED_CHECK, "contract (hashId=" + this.id.base64.substring(0, 8) + "…)", "checkConstraints return false"));
+                    this.errors.push(new ErrorRecord(Errors.FAILED_CHECK, "contract (hashId=" + this.id + ")", "checkConstraints return false"));
                 }
             } else {
                 if(roleConstraint)
@@ -1482,21 +1489,21 @@ class Contract extends bs.BiSerializable {
     checkOneConstraint(c, refContract) {
         let res = true;
 
-        if (c.type === constr.Constraint.TYPE_TRANSACTIONAL) {
+        if (c.type === Constraint.TYPE_TRANSACTIONAL) {
             if ((c.transactional_id == null) ||
                 (refContract.transactional == null) ||
                 (refContract.transactional.id == null) ||
                 (c.transactional_id === "") ||
                 (refContract.transactional.id === "")) {
                 res = false;
-                this.errors.push(new ErrorRecord(Errors.BAD_REF, "contract (hashId=" + this.id.base64.substring(0, 8) + "…)", "transactional is missing"));
+                this.errors.push(new ErrorRecord(Errors.BAD_REF, "contract (hashId=" + this.id + ")", "transactional is missing"));
             } else {
                 if (c.transactional_id != null && refContract.transactional == null) {
                     res = false;
-                    this.errors.push(new ErrorRecord(Errors.BAD_REF, "contract (hashId=" + this.id.base64.substring(0, 8) + "…)", "transactional not found"));
+                    this.errors.push(new ErrorRecord(Errors.BAD_REF, "contract (hashId=" + this.id + ")", "transactional not found"));
                 } else if (c.transactional_id !== refContract.transactional.id) {
                     res = false;
-                    this.errors.push(new ErrorRecord(Errors.BAD_REF, "contract (hashId=" + this.id.base64.substring(0, 8) + "…)", "transactional_id mismatch"));
+                    this.errors.push(new ErrorRecord(Errors.BAD_REF, "contract (hashId=" + this.id + ")", "transactional_id mismatch"));
                 }
             }
         }
@@ -1504,21 +1511,21 @@ class Contract extends bs.BiSerializable {
         if (c.contract_id != null) {
             if (!c.contract_id.equals(refContract.id)) {
                 res = false;
-                this.errors.push(new ErrorRecord(Errors.BAD_REF, "contract (hashId=" + this.id.base64.substring(0, 8) + "…)", "contract_id mismatch"));
+                this.errors.push(new ErrorRecord(Errors.BAD_REF, "contract (hashId=" + this.id + ")", "contract_id mismatch"));
             }
         }
 
         if (c.origin != null) {
             if (!c.origin.equals(refContract.getOrigin())) {
                 res = false;
-                this.errors.push(new ErrorRecord(Errors.BAD_REF, "contract (hashId=" + this.id.base64.substring(0, 8) + "…)", "origin mismatch"));
+                this.errors.push(new ErrorRecord(Errors.BAD_REF, "contract (hashId=" + this.id + ")", "origin mismatch"));
             }
         }
 
         for (let refRole of c.signed_by) {
             if (!refContract.isSignedBy(refRole)) {
                 res = false;
-                this.errors.push(new ErrorRecord(Errors.BAD_SIGNATURE, "contract (hashId=" + this.id.base64.substring(0, 8) + "…)", "fingerprint mismatch"));
+                this.errors.push(new ErrorRecord(Errors.BAD_SIGNATURE, "contract (hashId=" + this.id + ")", "fingerprint mismatch"));
             }
         }
 
@@ -1770,7 +1777,7 @@ class Contract extends bs.BiSerializable {
 
         let thisIssuerAddresses = new Set(issuer.keyAddresses);
 
-        issuer.keyRecords.keys().forEach(pk => thisIssuerAddresses.add(pk.shortAddress));
+        Array.from(issuer.keyRecords.keys()).forEach(pk => thisIssuerAddresses.add(pk.shortAddress));
 
         if (!issuerKeys.some(k => thisIssuerAddresses.has(k)))
             return false;

@@ -18,11 +18,10 @@ class UnsName extends bs.BiSerializable {
         this.unsDescription = description;
         this.unsURL = URL;
         this.unsReducedName = null;
+        this.unsRecords = [];
 
-        if (records != null && records instanceof Array) {
-            this.unsRecords = [];
+        if (records != null && records instanceof Array)
             records.forEach(record => this.unsRecords.push(record));
-        }
     }
 
     /**

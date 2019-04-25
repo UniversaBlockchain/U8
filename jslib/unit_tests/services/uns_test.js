@@ -3,44 +3,8 @@ import * as io from 'io'
 import * as tk from 'unit_tests/test_keys'
 
 const NSmartContract = require("services/NSmartContract").NSmartContract;
-const NodeInfoProvider = require("services/NSmartContract").NodeInfoProvider;
 const UnsContract = require("services/unsContract").UnsContract;
-const Config = require("config").Config;
-
-class TestNodeInfoProvider extends NodeInfoProvider {
-
-    constructor() {
-        super();
-    }
-
-    getUIssuerKeys() {
-        return Config.uIssuerKeys;
-    }
-
-    getUIssuerName() {
-        return Config.uIssuerName;
-    }
-
-    getMinPayment(extendedType) {
-        return Config.minPayment[extendedType];
-    }
-
-    getServiceRate(extendedType) {
-        return Config.rate[extendedType];
-    }
-
-    getAdditionalKeysToSignWith(extendedType) {
-        let set = new Set();
-        if (extendedType === NSmartContract.SmartContractType.UNS1)
-            set.add(Config.authorizedNameServiceCenterKey);
-
-        return set;
-    }
-}
-
-function createNodeInfoProvider() {
-    return new TestNodeInfoProvider();
-}
+const tt = require("test_tools");
 
 /*public void goodUnsContract() throws Exception {
     final PrivateKey key = new PrivateKey(Do.read(rootPath + "_xer0yfe2nn1xthc.private.unikey"));

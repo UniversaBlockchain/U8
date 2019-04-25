@@ -3,47 +3,11 @@ import * as io from 'io'
 import * as tk from 'unit_tests/test_keys'
 
 const NSmartContract = require("services/NSmartContract").NSmartContract;
-const NodeInfoProvider = require("services/NSmartContract").NodeInfoProvider;
 const SlotContract = require("services/slotContract").SlotContract;
-const Config = require("config").Config;
-
-class TestNodeInfoProvider extends NodeInfoProvider {
-
-    constructor() {
-        super();
-    }
-
-    getUIssuerKeys() {
-        return Config.uIssuerKeys;
-    }
-
-    getUIssuerName() {
-        return Config.uIssuerName;
-    }
-
-    getMinPayment(extendedType) {
-        return Config.minPayment[extendedType];
-    }
-
-    getServiceRate(extendedType) {
-        return Config.rate[extendedType];
-    }
-
-    getAdditionalKeysToSignWith(extendedType) {
-        let set = new Set();
-        if (extendedType === NSmartContract.SmartContractType.UNS1)
-            set.add(Config.authorizedNameServiceCenterKey);
-
-        return set;
-    }
-}
-
-function createNodeInfoProvider() {
-    return new TestNodeInfoProvider();
-}
+const tt = require("test_tools");
 
 unit.test("slot_test: goodSlotContract", async () => {
-    let nodeInfoProvider = createNodeInfoProvider();
+    let nodeInfoProvider = tt.createNodeInfoProvider();
 
     let key = new crypto.PrivateKey(await (await io.openRead("../test/_xer0yfe2nn1xthc.private.unikey")).allBytes());
 
@@ -58,7 +22,7 @@ unit.test("slot_test: goodSlotContract", async () => {
     assert(slotContract instanceof SlotContract);
 
     slotContract.putTrackingContract(simpleContract);
-    slotContract.NodeInfoProvider = nodeInfoProvider;
+    slotContract.nodeInfoProvider = nodeInfoProvider;
     /* slotContract.NewItems = paymentDecreased;
 
      await slotContract.seal(true);

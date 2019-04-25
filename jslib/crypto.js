@@ -280,6 +280,10 @@ crypto.HashId = class extends crypto.HashIdImpl {
     equals(anotherId) {
         return equalArrays(this.digest, anotherId.digest);
     }
+
+    toString() {
+        return this.base64.substring(0, 8) + "…";
+    }
 };
 
 Object.assign(crypto.HashId.prototype, MemoiseMixin);

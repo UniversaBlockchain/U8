@@ -466,7 +466,9 @@ class ListRole extends Role {
             required = 1;
         else if(this.mode === ListRoleMode.QUORUM)
             required = this.quorumSize;
-        keys = new Set(keys);
+
+        if (!keys instanceof Set)
+            keys = new Set(keys);
         for(let r of this.roles) {
             if(r.isAllowedForKeys(keys)) {
                 valid++;
