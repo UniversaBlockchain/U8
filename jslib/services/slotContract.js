@@ -1,3 +1,5 @@
+const bs = require("biserializable");
+const DefaultBiMapper = require("defaultbimapper").DefaultBiMapper;
 const roles = require('roles');
 const permissions = require('permissions');
 const t = require("tools");
@@ -52,7 +54,7 @@ class SlotContract extends NSmartContract {
      * it is necessary to put real data to it first. It is allowed to change owner, expiration and data fields after
      * creation (but before sealing).
      *
-     * @param {PrivateKey} key is {@link PrivateKey} for creating roles "issuer", "owner", "creator" and sign contract.
+     * @param {crypto.PrivateKey} key is {@link PrivateKey} for creating roles "issuer", "owner", "creator" and sign contract.
      * @return {SlotContract} created slot contract.
      */
     static fromPrivateKey(key) {
@@ -134,7 +136,7 @@ class SlotContract extends NSmartContract {
         fieldsMap[SlotContract.TRACKING_CONTRACT_FIELD_NAME] = null;
 
         let modifyDataPermission = new permissions.ModifyDataPermission(ownerLink, {fields : fieldsMap});
-        this.addPermission(modifyDataPermission);
+        this.definition.addPermission(modifyDataPermission);
     }
 
     deserialize(data, deserializer) {

@@ -1,3 +1,5 @@
+const bs = require("biserializable");
+const DefaultBiMapper = require("defaultbimapper").DefaultBiMapper;
 const BigDecimal  = require("big").Big;
 const roles = require('roles');
 const permissions = require('permissions');
@@ -122,8 +124,7 @@ class FollowerContract extends NSmartContract {
      * Method adds follower's specific to contract.
      */
      addFollowerSpecific() {
-        if(this.definition.extendedType == null || !this.definition.extendedType().equals(NSmartContract.SmartContractType.FOLLOWER1))
-            this.definition.extendedType(NSmartContract.SmartContractType.FOLLOWER1);
+        this.definition.extendedType = NSmartContract.SmartContractType.FOLLOWER1;
 
         let ownerLink = new roles.RoleLink("owner_link", "owner");
         this.registerRole(ownerLink);
@@ -143,7 +144,7 @@ class FollowerContract extends NSmartContract {
         fieldsMap[FollowerContract.CALLBACK_KEYS_FIELD_NAME] = null;
 
         let modifyDataPermission = new permissions.ModifyDataPermission(ownerLink, {fields : fieldsMap});
-        this.addPermission(modifyDataPermission);
+        this.definition.addPermission(modifyDataPermission);
     }
 
     /**
@@ -660,5 +661,7 @@ class FollowerContract extends NSmartContract {
      */
     onRevoked(ime) {}
 }
+
+DefaultBiMapper.registerAdapter(new bs.BiAdapter("FollowerContract", FollowerContract));
 
 module.exports = {FollowerContract};

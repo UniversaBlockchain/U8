@@ -1,3 +1,5 @@
+const bs = require("biserializable");
+const DefaultBiMapper = require("defaultbimapper").DefaultBiMapper;
 const BossBiMapper = require("bossbimapper").BossBiMapper;
 const permissions = require('permissions');
 const roles = require('roles');
@@ -144,10 +146,10 @@ class UnsContract extends NSmartContract {
         fieldsMap[UnsContract.SPENT_ND_TIME_FIELD_NAME] = null;
 
         let modifyDataPermission = new permissions.ModifyDataPermission(ownerLink, {fields : fieldsMap});
-        this.addPermission(modifyDataPermission);
+        this.definition.addPermission(modifyDataPermission);
 
         let revokePermission = new permissions.RevokePermission(ownerLink);
-        this.addPermission(revokePermission);
+        this.definition.addPermission(revokePermission);
     }
 
     seal(isTransactionRoot = false) {

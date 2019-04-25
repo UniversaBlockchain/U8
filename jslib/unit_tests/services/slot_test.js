@@ -1,57 +1,110 @@
 import {expect, unit, assert} from 'test'
+import * as io from 'io'
 import * as tk from 'unit_tests/test_keys'
 
 const NSmartContract = require("services/NSmartContract").NSmartContract;
+const NodeInfoProvider = require("services/NSmartContract").NodeInfoProvider;
+const SlotContract = require("services/slotContract").SlotContract;
+const Config = require("config").Config;
 
-/*unit.test("slot_test: goodSlotContract", async () => {});
+class TestNodeInfoProvider extends NodeInfoProvider {
 
-    let simpleContract = Contract.fromPrivateKey(tk.TestKeys.getKey());
-    await simpleContract.seal();
+    constructor() {
+        super();
+    }
 
-    let paymentDecreased = createSlotPayment();
+    getUIssuerKeys() {
+        return Config.uIssuerKeys;
+    }
 
-    let slotContract = new SlotContract(tk.TestKeys.getKey());
+    getUIssuerName() {
+        return Config.uIssuerName;
+    }
+
+    getMinPayment(extendedType) {
+        return Config.minPayment[extendedType];
+    }
+
+    getServiceRate(extendedType) {
+        return Config.rate[extendedType];
+    }
+
+    getAdditionalKeysToSignWith(extendedType) {
+        let set = new Set();
+        if (extendedType === NSmartContract.SmartContractType.UNS1)
+            set.add(Config.authorizedNameServiceCenterKey);
+
+        return set;
+    }
+}
+
+function createNodeInfoProvider() {
+    return new TestNodeInfoProvider();
+}
+
+unit.test("slot_test: goodSlotContract", async () => {
+    let nodeInfoProvider = createNodeInfoProvider();
+
+    let key = new crypto.PrivateKey(await (await io.openRead("../test/_xer0yfe2nn1xthc.private.unikey")).allBytes());
+
+    let simpleContract = Contract.fromPrivateKey(key);
+    await simpleContract.seal(true);
+    assert(await simpleContract.check());
+
+    //let paymentDecreased = createSlotPayment(); //TODO
+
+    let slotContract = SlotContract.fromPrivateKey(key);
 
     assert(slotContract instanceof SlotContract);
 
     slotContract.putTrackingContract(simpleContract);
-    slotContract.setNodeInfoProvider(this.nodeInfoProvider);
-    slotContract.addNewItems(paymentDecreased);
-    slotContract.seal();
-    slotContract.check();
+    slotContract.NodeInfoProvider = nodeInfoProvider;
+    /* slotContract.NewItems = paymentDecreased;
 
-    assert(NSmartContract.SmartContractType.SLOT1 === slotContract.definition.extendedType);
+     await slotContract.seal(true);
+     assert(await simpleContract.check());
 
-    let permissions = slotContract.getPermissions();
-    let mdp = permissions.get("modify_data");
-    assert(mdp !== null);
-    assert((mdp.iterator().next()).getFields().containsKey("action"));
+     assert(NSmartContract.SmartContractType.SLOT1 === slotContract.definition.extendedType);
 
-    assertEquals(simpleContract.getId(), ((SlotContract) smartContract).getTrackingContract().getId());
-    assertEquals(simpleContract.getId(), TransactionPack.unpack(((SlotContract) smartContract).getPackedTrackingContract()).getContract().getId());
+     let permissions = slotContract.definition.permission
+     /*  let mdp = permissions.get("modify_data");
+       assert(mdp !== null);
+       assert((mdp.iterator().next()).getFields().containsKey("action"));
 
-    Binder trackingHashesAsBase64 = smartContract.getStateData().getBinder("tracking_contract");
-    for (String k : trackingHashesAsBase64.keySet()) {
-        byte[] packed = trackingHashesAsBase64.getBinary(k);
-        if (packed != null) {
-            Contract c = Contract.fromPackedTransaction(packed);
-            assertEquals(simpleContract.getId(), c.getId());
-        }
-    }
+       assertEquals(simpleContract.getId(), ((SlotContract) slotContract).getTrackingContract().getId());
+       assertEquals(simpleContract.getId(), TransactionPack.unpack(((SlotContract) slotContract).getPackedTrackingContract()).getContract().getId);
+
+       /*Binder trackingHashesAsBase64 = slotContract.getStateData().getBinder("tracking_contract");
+       for (String k : trackingHashesAsBase64.keySet()) {
+           byte[] packed = trackingHashesAsBase64.getBinary(k);
+           if (packed != null) {
+               Contract c = Contract.fromPackedTransaction(packed);
+               assertEquals(simpleContract.getId(), c.getId());
+           }
+       }*/
 });
 
-unit.test("slot_test: goodSlotContractFromDSL", async () => {
-    final PrivateKey key = new PrivateKey(Do.read(rootPath + "_xer0yfe2nn1xthc.private.unikey"));
-    Contract simpleContract = new Contract(key);
-    simpleContract.seal();
 
-    Contract paymentDecreased = createSlotPayment();
+/*unit.test("slot_test: goodSlotContractFromDSL", async () => {
+    let nodeInfoProvider = createNodeInfoProvider();
+
+    let key = new crypto.PrivateKey(await (await io.openRead("../test/_xer0yfe2nn1xthc.private.unikey")).allBytes());
+
+    //Contract simpleContract = new Contract(key);
+    //simpleContract.seal();
+
+    let simpleContract = Contract.fromPrivateKey(key);
+    await simpleContract.seal(true);
+    assert(await simpleContract.check());
+
+    //Contract paymentDecreased = createSlotPayment();
 
     Contract smartContract = SlotContract.fromDslFile(rootPath + "SlotDSLTemplate.yml");
     smartContract.addSignerKeyFromFile(rootPath + "_xer0yfe2nn1xthc.private.unikey");
 
     assertTrue(smartContract instanceof SlotContract);
 
+    /*
     ((SlotContract)smartContract).putTrackingContract(simpleContract);
     ((SlotContract)smartContract).setNodeInfoProvider(nodeInfoProvider);
     smartContract.addNewItems(paymentDecreased);
