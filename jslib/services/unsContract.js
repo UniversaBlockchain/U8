@@ -67,7 +67,7 @@ class UnsContract extends NSmartContract {
      * <p>
      * It is recommended to call {@link #check()} after construction to see the errors.
      *
-     * @param {number[]} sealed binary sealed contract.
+     * @param {Uint8Array} sealed binary sealed contract.
      * @param {TransactionPack} pack the transaction pack to resolve dependencies again.
      *
      * @return {UnsContract} extracted UNS contract.
@@ -494,6 +494,165 @@ class UnsContract extends NSmartContract {
             contract.storedNames.forEach(sn => set.delete(sn.unsReducedName));
 
         contract.revokingItems.forEach(revoked => this.removeRevokedNames(revoked, set));
+    }
+
+    getOriginsToCheck() {
+        let origins = new Set();
+        this.storedNames.forEach(sn => sn.unsRecords.forEach(rec => {
+            if (rec.unsOrigin != null)
+                origins.add(rec.unsOrigin);
+        }));
+
+        this.revokingItems.forEach(revoked => this.removeRevokedOrigins(revoked, origins));
+
+        return Array.from(origins);
+    }
+
+    removeRevokedOrigins(contract, set) {
+        if (contract instanceof UnsContract)
+            contract.storedNames.forEach(sn => sn.unsRecords.forEach(rec => {
+                if (rec.unsOrigin != null)
+                    set.delete(rec.unsOrigin);
+            }));
+
+        contract.revokingItems.forEach(revoked => this.removeRevokedOrigins(revoked, set));
+    }
+
+    getAddressesToCheck() {
+        let addresses = new Set();
+        this.storedNames.forEach(sn => sn.unsRecords.forEach(rec =>
+            rec.unsAddresses.forEach(ka => addresses.add(ka.toString()))));
+
+        this.revokingItems.forEach(revoked => this.removeRevokedAddresses(revoked, addresses));
+
+        return Array.from(addresses);
+    }
+
+    removeRevokedAddresses(contract, set) {
+        if (contract instanceof UnsContract)
+            contract.forEach(sn => sn.unsRecords.forEach(rec =>
+                rec.unsAddresses.forEach(ka => set.remove(ka.toString()))));
+
+        contract.revokingItems.forEach(revoked => this.removeRevokedAddresses(revoked, set));
+    }
+
+    calcExpiresAt() {
+        // get number of entries
+        let entries = 0;
+        this.storedNames.forEach(sn => entries += sn.getRecordsCount());
+        if (entries === 0)
+            entries = 1;
+
+        // calculate time that will be added to now as new expiring time
+        // it is difference of all prepaid ND (names*days) and already spent divided to new number of entries.
+        let seconds = Math.floor((this.prepaidNamesForDays - this.spentNDs) * 24 * 3600 / entries);
+
+        return this.spentNDsTime.setSeconds(this.spentNDsTime.getSeconds() + seconds);
+    }
+
+    /**
+     * Callback called by the node after registering the UNS-contract.
+     *
+     * @param {MutableEnvironment} me is {@link MutableEnvironment} object with some data.
+     * @return {Object} object contains operation status.
+     */
+    onCreated(me) {
+        this.calculatePrepaidNamesForDays(false);
+        let expiresAt = this.calcExpiresAt();
+        this.storedNames.forEach(sn => me.createNameRecord(sn, expiresAt));
+        return {status : "ok"};
+    }
+
+    /**
+     * Callback called by the node after registering new revision of the UNS-contract.
+     *
+     * @param {MutableEnvironment} me is {@link MutableEnvironment} object with some data.
+     * @return {Object} object contains operation status.
+     */
+    onUpdated(me) {
+        this.calculatePrepaidNamesForDays(false);
+
+        let expiresAt = this.calcExpiresAt();
+
+        let newNames = new Map();
+        this.storedNames.forEach(sn => newNames.set(sn.unsName, sn));
+
+        me.nameRecords().forEach(nameRecord => {
+            let unsName = newNames.get(nameRecord.getName());
+            if (unsName != null && unsName.getRecordsCount() === nameRecord.getEntries().length &&
+                unsName.unsRecords.every(unsRecord => nameRecord.getEntries().some(entry => unsRecord.equalsTo(entry)))) {
+
+                me.setNameRecordExpiresAt(nameRecord, expiresAt);
+                newNames.delete(nameRecord.getName());
+            } else
+                me.destroyNameRecord(nameRecord);
+        });
+
+        Array.from(newNames.values()).forEach(sn => me.createNameRecord(sn, expiresAt));
+
+        return {status : "ok"};
+    }
+
+    /**
+     * Callback called by the node after revocation the UNS-contract.
+     *
+     * @param {ImmutableEnvironment} ime is {@link ImmutableEnvironment} object with some data.
+     */
+    onRevoked(ime) {}
+
+    /**
+     * Creates {@see Object} that will be returned to client after UNS-contract have been approved.
+     * Contains UNS names expiration time.
+     *
+     * @return {Object}
+     */
+    getExtraResultForApprove() {
+        return {expires_at : Math.floor(this.calcExpiresAt().getTime() / 1000)};
+    }
+
+    /**
+     * If {@link UnsName} references to origin contract, this contract should be placed into UnsContract with this method.
+     *
+     * @param {Contract} contract - origin contract.
+     */
+    addOriginContract(contract) {
+        this.originContracts.set(contract.getOrigin(), contract);
+    }
+
+    /**
+     * Add {@link UnsName} record that describes name that will be stored by this UnsContract.
+     *
+     * @param {UnsName} unsName record.
+     */
+    addUnsName(unsName) {
+        this.storedNames.push(unsName);
+    }
+
+    /**
+     * Returns {@link UnsName} record by it's name.
+     *
+     * @param {string} name of unsName record.
+     * @return {UnsName | null} unsName record or null if not found.
+     */
+    getUnsName(name) {
+        for (let unsName of this.storedNames)
+            if (unsName.unsName === name)
+                return unsName;
+
+        return null;
+    }
+
+    /**
+     * Remove {@link UnsName} record from names collection of stored by this UnsContract.
+     *
+     * @param {string} name of removing unsName record.
+     */
+    removeName(name) {
+        for (let i = 0; i < this.storedNames.length; i++)
+            if (this.storedNames[i].unsName === name) {
+                this.storedNames.splice(i, 1);
+                return;
+            }
     }
 }
 

@@ -1102,7 +1102,7 @@ class Contract extends bs.BiSerializable {
             }
 
             let expirationLimit = new Date();
-            expirationLimit.setTime(expirationLimit.getTime() + 24*3600*1000*Config.maxExpirationDaysInTestMode);
+            expirationLimit.setDate(expirationLimit.getDate() + Config.maxExpirationDaysInTestMode);
 
             if (this.getExpiresAt().getTime() > expirationLimit.getTime()) {
                 this.isSuitableForTestnet = false;
@@ -1801,9 +1801,10 @@ class Contract extends bs.BiSerializable {
     static fromPrivateKey(key, contract = undefined) {
         let c = (contract === undefined) ? new Contract() : contract;
         let now = new Date();
-        now.setTime((Math.floor(now.getTime()/1000)+90*24*3600)*1000);
+        now.setDate(now.getDate() + 90);
         now.setMilliseconds(0);
         c.state.expiresAt = now;
+
         let issuer = new roles.SimpleRole("issuer");
         issuer.keyAddresses.add(key.publicKey.longAddress);
         c.registerRole(issuer);

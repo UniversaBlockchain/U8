@@ -503,7 +503,7 @@ unit.test("ledger_test: recordExpiration", async () => {
     assert(r.expiresAt.getTime() > Date.now());
 
     let inFuture = new Date();
-    inFuture.setTime((Math.floor(inFuture.getTime() / 1000) + 7200) * 1000);
+    inFuture.setHours(inFuture.getHours() + 2);
     inFuture.setMilliseconds(0);
 
     let r1 = await ledger.getRecord(hashId);
@@ -515,7 +515,7 @@ unit.test("ledger_test: recordExpiration", async () => {
     await r1.reload();
     assert(r.expiresAt.getTime() === r1.expiresAt.getTime());
 
-    r.expiresAt.setTime((Math.floor(r.expiresAt.getTime() / 1000) - 10800) * 1000);
+    r.expiresAt.setHours(r.expiresAt.getHours() - 3);
     r.expiresAt.setMilliseconds(0);
     await r.save();
 
@@ -698,7 +698,7 @@ unit.test("ledger_test: ledgerCleanupTest", async () => {
     await ledger.findOrCreate(contract2.id);
     let r2 = await ledger.getRecord(contract2.id);
 
-    r2.expiresAt.setTime((Math.floor(Date.now() / 1000) + 30 * 24 * 3600) * 1000);
+    r2.expiresAt.setTime((Math.floor(Date.now() / 1000) + 300) * 1000);
 
     await r2.save();
     

@@ -53,12 +53,11 @@ class NFollowerService extends FollowerService {
     }
 
     decreaseExpiresAt(decreaseSeconds) {
-        this.expiresAt.setTime(this.expiresAt.getTime() - decreaseSeconds * 1000);
+        this.expiresAt.setSeconds(this.expiresAt.getSeconds() - decreaseSeconds);
     }
 
     changeMutedAt(deltaSeconds) {
-        this.expiresAt.setTime(this.expiresAt.getTime() + deltaSeconds * 1000);
-
+        this.expiresAt.setSeconds(this.expiresAt.getSeconds() + deltaSeconds);
     }
 
     increaseCallbacksSpent(addSpent) {

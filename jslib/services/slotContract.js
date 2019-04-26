@@ -75,7 +75,7 @@ class SlotContract extends NSmartContract {
      * <p>
      * It is recommended to call {@link #check()} after construction to see the errors.
      *
-     * @param {number[]} sealed binary sealed contract.
+     * @param {Uint8Array} sealed binary sealed contract.
      * @param {TransactionPack} pack the transaction pack to resolve dependencies again.
      * @return {SlotContract} extracted slot contract.
      */
@@ -201,7 +201,7 @@ class SlotContract extends NSmartContract {
      * @return {Uint8Array} last revision of the tracking contract packed as {@link TransactionPack}.
      */
     getPackedTrackingContract() {
-        if (this.packedTrackingContracts != null && this.packedTrackingContracts.length > 0)
+        if (this.packedTrackingContracts.length > 0)
             return this.packedTrackingContracts[0];
 
         return null;
@@ -211,7 +211,7 @@ class SlotContract extends NSmartContract {
      * @return {Contract} last revision of the tracking contract.
      */
     getTrackingContract() {
-        if (this.trackingContracts != null && this.trackingContracts.length > 0)
+        if (this.trackingContracts.length > 0)
             return this.trackingContracts[0];
 
         return null;
@@ -222,7 +222,7 @@ class SlotContract extends NSmartContract {
      * @return {boolean} true if hashId is present in tracking revisions
      */
     isContractTracking(hashId) {
-        if (this.trackingContracts != null && this.trackingContracts.length > 0)
+        if (this.trackingContracts.length > 0)
             return this.trackingContracts.some(c => c.id.equals(hashId));
 
         return false;
@@ -295,7 +295,7 @@ class SlotContract extends NSmartContract {
 
         this.prepaidKilobytesForDays = wasPrepaidKilobytesForDays + this.paidU * Number(this.getRate());
 
-        let spentSeconds = Math.floor(this.spentKDsTime.getTime() / 1000) - spentEarlyKDsTimeSecs;
+        let spentSeconds = now - spentEarlyKDsTimeSecs;
         let spentDays = spentSeconds / (3600 * 24);
         this.spentKDs = spentEarlyKDs + spentDays * (storedEarlyBytes / 1024);
 
@@ -544,6 +544,7 @@ class SlotContract extends NSmartContract {
     /**
      * Creates {@see Object} that will be returned to client after slot contract have been approved.
      * Contains subscription and contract storages expiration time.
+     *
      * @return {Object}
      */
     getExtraResultForApprove() {

@@ -13,7 +13,7 @@ class StateRecord {
 
         this.createdAt = new Date();
         this.expiresAt = new Date();
-        this.expiresAt.setTime((Math.floor(this.expiresAt.getTime() / 1000) + 300) * 1000);
+        this.expiresAt.setMinutes(this.expiresAt.getMinutes() + 5);
         this.createdAt.setMilliseconds(0);
         this.expiresAt.setMilliseconds(0);
 
@@ -46,12 +46,6 @@ class StateRecord {
 
         result.createdAt = t.convertToDate(row[4]);
         result.expiresAt = t.convertToDate(row[5]);
-        if (result.expiresAt == null) {
-            // todo: what we should do with items without expiresAt?
-            result.expiresAt = new Date();
-            result.expiresAt.setTime((Math.floor(result.createdAt.getTime() / 1000) + 90 * 24 * 3600) * 1000);
-            result.expiresAt.setMilliseconds(0);
-        }
 
         return result;
     }
