@@ -36,7 +36,7 @@ private:
 class HttpClient {
 
 public:
-    HttpClient();
+    HttpClient(int poolSize);
 
     void sendGetRequest(const std::string& url, const std::function<void(int,std::string&&)>& callback);
     void sendGetRequest(const std::string& url, std::function<void(int,std::string&&)>&& callback);

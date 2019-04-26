@@ -15,6 +15,34 @@ unit.test("hello web", async () => {
         request.sendAnswer();
     });
     httpServer.startServer();
-    await sleep(1000);
+
+    //let countToSend = 200000000;
+    let countToSend = 2000;
+    let receiveCounter = 0;
+
+    let httpClient = new network.HttpClient(20);
+    let t0 = new Date().getTime();
+    let counter0 = 0;
+    for (let i = 0; i < countToSend; ++i) {
+        httpClient.sendGetRequest("localhost:8080/testPage", (respCode, body) => {
+            //console.log("[" + respCode + "]: " + body);
+            ++receiveCounter;
+            let dt = new Date().getTime() - t0;
+            if (dt >= 1000) {
+                let rps = ((receiveCounter - counter0)*1000/dt).toFixed(0);
+                t0 = new Date().getTime();
+                counter0 = receiveCounter;
+                console.log("receiveCounter=" + receiveCounter + ", rps=" + rps);
+            }
+        });
+        if (receiveCounter+1000 < i)
+            await sleep(10);
+    }
+
+    while (receiveCounter < countToSend) {
+        await sleep(10);
+    }
+    assert(receiveCounter == countToSend);
+
     httpServer.stopServer();
 });

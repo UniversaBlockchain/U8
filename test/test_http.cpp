@@ -29,7 +29,7 @@ TEST_CASE("http_hello") {
     });
     httpServer.start();
 
-    HttpClient httpClient;
+    HttpClient httpClient(20);
 
     Semaphore sem;
     atomic<int> readyCounter(0);

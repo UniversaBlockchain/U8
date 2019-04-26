@@ -150,4 +150,14 @@ network.HttpServer = class {
     }
 };
 
+network.HttpClient = class {
+    constructor(poolSize) {
+        this.httpClient_ = new network.HttpClientImpl(poolSize);
+    }
+
+    sendGetRequest(url, block) {
+        this.httpClient_.__sendGetRequest(url, block);
+    }
+};
+
 module.exports = network;

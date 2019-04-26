@@ -5,6 +5,7 @@
 #include "udp_bindings.h"
 #include "binding_tools.h"
 #include "../network/HttpServer.h"
+#include "../network/HttpClient.h"
 #include "../network/UDPAdapter.h"
 
 using namespace network;
@@ -16,6 +17,7 @@ static Persistent<FunctionTemplate> NetConfigTpl;
 static Persistent<FunctionTemplate> UDPAdapterTpl;
 static Persistent<FunctionTemplate> HttpServerTpl;
 static Persistent<FunctionTemplate> HttpServerRequestTpl;
+static Persistent<FunctionTemplate> HttpClientTpl;
 
 void nodeInfoGetPublicKey(const FunctionCallbackInfo<Value> &args) {
     Scripter::unwrapArgs(args, [](ArgsContext &ac) {
@@ -494,6 +496,63 @@ Local<FunctionTemplate> initHttpServer(Isolate *isolate) {
     return tpl;
 }
 
+void httpClient_sendGetRequest(const FunctionCallbackInfo<Value> &args) {
+    Scripter::unwrapArgs(args, [](ArgsContext &ac) {
+        if (ac.args.Length() == 2) {
+            auto httpClient = unwrap<HttpClient>(ac.args.This());
+            std::shared_ptr<v8::Persistent<v8::Function>> jsCallback (
+                    new v8::Persistent<v8::Function>(ac.isolate, ac.args[1].As<v8::Function>()), [](auto p){
+                        p->Reset();
+                        delete p;
+                    }
+            );
+            auto se = ac.scripter;
+            httpClient->sendGetRequest(ac.asString(0), [se,jsCallback](int respCode, std::string&& body){
+                se->inPool([=](Local<Context> &context) {
+                    auto fn = jsCallback->Get(context->GetIsolate());
+                    Local<Value> res[2] {Integer::New(se->isolate(), respCode), se->v8String(body)};
+//                    Local<Value> res[2] {
+//                        Integer::New(se->isolate(), respCode),
+//                        Integer::New(se->isolate(), respCode)
+//                        //String::NewFromUtf8(se->isolate(), body.c_str(), NewStringType::kNormal, -1).ToLocalChecked()
+//                    };
+                    auto unused = fn->Call(context, fn, 2, res);
+                });
+            });
+            return;
+        }
+        ac.throwError("invalid arguments");
+    });
+}
+
+Local<FunctionTemplate> initHttpClient(Isolate *isolate) {
+    Local<FunctionTemplate> tpl = bindCppClass<HttpClient>(
+            isolate,
+            "HttpClientTpl",
+            [=](const FunctionCallbackInfo<Value> &args) -> HttpClient* {
+                if (args.Length() == 1) {
+                    try {
+                        auto res = new HttpClient(
+                            args[0]->Int32Value(isolate->GetCurrentContext()).FromJust()           // poolSize
+                        );
+                        return res;
+                    } catch (const std::exception& e) {
+                        isolate->ThrowException(
+                                Exception::TypeError(String::NewFromUtf8(isolate, e.what())));
+                        return nullptr;
+                    }
+                }
+                isolate->ThrowException(
+                        Exception::TypeError(String::NewFromUtf8(isolate, "invalid number of arguments")));
+                return nullptr;
+            });
+    auto prototype = tpl->PrototypeTemplate();
+    prototype->Set(isolate, "__sendGetRequest", FunctionTemplate::New(isolate, httpClient_sendGetRequest));
+
+    HttpClientTpl.Reset(isolate, tpl);
+    return tpl;
+}
+
 void JsInitNetwork(Isolate *isolate, const Local<ObjectTemplate> &global) {
 
     JsInitHttpServerRequest(isolate, global);
@@ -505,6 +564,7 @@ void JsInitNetwork(Isolate *isolate, const Local<ObjectTemplate> &global) {
     network->Set(isolate, "NetConfigImpl", initNetConfig(isolate));
     network->Set(isolate, "UDPAdapterImpl", initUDPAdapter(isolate));
     network->Set(isolate, "HttpServerImpl", initHttpServer(isolate));
+    network->Set(isolate, "HttpClientImpl", initHttpClient(isolate));
 
     global->Set(isolate, "network", network);
 }
