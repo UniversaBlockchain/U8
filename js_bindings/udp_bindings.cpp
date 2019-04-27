@@ -511,11 +511,6 @@ void httpClient_sendGetRequest(const FunctionCallbackInfo<Value> &args) {
                 se->inPool([=](Local<Context> &context) {
                     auto fn = jsCallback->Get(context->GetIsolate());
                     Local<Value> res[2] {Integer::New(se->isolate(), respCode), se->v8String(body)};
-//                    Local<Value> res[2] {
-//                        Integer::New(se->isolate(), respCode),
-//                        Integer::New(se->isolate(), respCode)
-//                        //String::NewFromUtf8(se->isolate(), body.c_str(), NewStringType::kNormal, -1).ToLocalChecked()
-//                    };
                     auto unused = fn->Call(context, fn, 2, res);
                 });
             });

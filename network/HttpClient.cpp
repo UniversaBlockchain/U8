@@ -29,6 +29,7 @@ void HttpClientWorker::sendGetRequest(const std::string& url, std::function<void
             if (ev == MG_EV_HTTP_REPLY) {
                 http_message *hm = (http_message*)ev_data;
                 clientWorker->callback_(hm->resp_code, std::string(hm->body.p, hm->body.len));
+                clientWorker->callback_ = nullptr;
                 nc->flags |= MG_F_CLOSE_IMMEDIATELY;
             } else if (ev == MG_EV_CONNECT) {
                 if (*(int *) ev_data != 0) {
