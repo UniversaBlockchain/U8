@@ -500,18 +500,15 @@ void httpClient_sendGetRequest(const FunctionCallbackInfo<Value> &args) {
     Scripter::unwrapArgs(args, [](ArgsContext &ac) {
         if (ac.args.Length() == 2) {
             auto httpClient = unwrap<HttpClient>(ac.args.This());
-            std::shared_ptr<v8::Persistent<v8::Function>> jsCallback (
-                    new v8::Persistent<v8::Function>(ac.isolate, ac.args[1].As<v8::Function>()), [](auto p){
-                        p->Reset();
-                        delete p;
-                    }
-            );
+            auto jsCallback = new v8::Persistent<v8::Function>(ac.isolate, ac.args[1].As<v8::Function>());
             auto se = ac.scripter;
             httpClient->sendGetRequest(ac.asString(0), [se,jsCallback](int respCode, std::string&& body){
                 se->inPool([=](Local<Context> &context) {
                     auto fn = jsCallback->Get(context->GetIsolate());
                     Local<Value> res[2] {Integer::New(se->isolate(), respCode), se->v8String(body)};
                     auto unused = fn->Call(context, fn, 2, res);
+                    jsCallback->Reset();
+                    delete jsCallback;
                 });
             });
             return;
