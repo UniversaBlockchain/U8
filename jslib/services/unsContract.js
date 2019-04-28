@@ -461,7 +461,7 @@ class UnsContract extends NSmartContract {
         })))
             return false;
 
-        if (!Array.from(this.getAdditionalKeysToSignWith()).every(ak =>
+        if (!this.getAdditionalKeysToSignWith().every(ak =>
              Array.from(this.effectiveKeys.keys()).some(ek => ek.equals(ak)))) {
             this.errors.push(new ErrorRecord(Errors.FAILED_CHECK, UnsContract.NAMES_FIELD_NAME,
                 "Authorized name service signature is missing"));

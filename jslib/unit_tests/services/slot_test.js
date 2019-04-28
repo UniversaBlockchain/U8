@@ -15,7 +15,7 @@ unit.test("slot_test: goodSlotContract", async () => {
     await simpleContract.seal(true);
     assert(await simpleContract.check());
 
-    let paymentDecreased = createSlotPayment(); //TODO
+    let paymentDecreased = await createSlotPayment();
 
     let slotContract = SlotContract.fromPrivateKey(key);
 
@@ -25,10 +25,10 @@ unit.test("slot_test: goodSlotContract", async () => {
     slotContract.nodeInfoProvider = nodeInfoProvider;
     slotContract.newItems.add(paymentDecreased);
 
-    /* await slotContract.seal(true);
+     await slotContract.seal(true);
      assert(await simpleContract.check());
 
-     assert(NSmartContract.SmartContractType.SLOT1 === slotContract.definition.extendedType);
+     /*assert(NSmartContract.SmartContractType.SLOT1 === slotContract.definition.extendedType);
 
      let permissions = slotContract.definition.permission;
 
@@ -257,15 +257,13 @@ unit.test("slot_test: keepRevisions", async () => {
     }
 });
 */
+
 async function createSlotPayment() {
     let ownerKey = new crypto.PrivateKey(await (await io.openRead("../test/keys/stepan_mamontov.private.unikey")).allBytes());
 
-    let keys = new Set();
-    keys.add(ownerKey.PublicKey); //TODO
-
-    let stepaU = tt.createFreshU(100000000, keys);
-    let paymentDecreased = stepaU.createRevision([ownerKey]);
-    paymentDecreased.state.data.transaction_units = stepaU.state.data.transaction_units - 100;
+    let slotU = await tt.createFreshU(100000000, [ownerKey.publicKey]);
+    let paymentDecreased = slotU.createRevision([ownerKey]);
+    paymentDecreased.state.data.transaction_units = slotU.state.data.transaction_units - 100;
 
     await paymentDecreased.seal(true);
 

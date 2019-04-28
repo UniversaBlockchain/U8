@@ -445,7 +445,7 @@ class FollowerContract extends NSmartContract {
     }
 
     /**
-     * Extract values from deserializing object for follower fields.
+     * Extract values from deserialized object for follower fields.
      */
     deserializeForFollower() {
         // extract paided U
@@ -457,24 +457,17 @@ class FollowerContract extends NSmartContract {
         // extract saved prepaid OD (origins*days) value
         this.prepaidOriginDays = t.getOrDefault(this.state.data, FollowerContract.PREPAID_OD_FIELD_NAME, 0);
 
-        // and extract time when first time payment was
-        let prepaidFromSeconds = t.getOrDefault(this.state.data, FollowerContract.PREPAID_FROM_TIME_FIELD_NAME, 0);
-        this.prepaidFrom = new Date(prepaidFromSeconds * 1000);
-
         // extract tracking origins nad callbacks data
         let trackingOriginsAsBase64 = this.state.data[FollowerContract.TRACKING_ORIGINS_FIELD_NAME];
         let callbacksData = this.state.data[FollowerContract.CALLBACK_KEYS_FIELD_NAME];
 
-        for (let URL of Object.keys(callbacksData)) {
-            let packedKey = callbacksData[URL];
+        for (let [URL, packedKey] of Object.entries(callbacksData)) {
             let key = new crypto.PublicKey(packedKey);
             this.callbackKeys.set(URL, key);
         }
 
-        for (let s of Object.keys(trackingOriginsAsBase64)) {
-            let URL = trackingOriginsAsBase64[s];
-            let origin = crypto.HashId.withBase64Digest(s); //TODO
-
+        for (let [originBase64, URL] of Object.entries(trackingOriginsAsBase64)) {
+            let origin = crypto.HashId.withBase64Digest(originBase64);
             if (this.callbackKeys.has(URL))
                 this.trackingOrigins.set(origin, URL);
         }
@@ -493,22 +486,24 @@ class FollowerContract extends NSmartContract {
         this.calculatePrepaidOriginDays(false);
 
         if (this.paidU === 0) {
-            if (this.getPaidU(true) > 0)             //TODO
-                this.errors.push(new ErrorRecord(Errors.FAILED_CHECK, "Test payment is not allowed for follower contracts"));
+            if (this.getPaidU(true) > 0)
+                this.errors.push(new ErrorRecord(Errors.FAILED_CHECK, "",
+                    "Test payment is not allowed for follower contracts"));
             checkResult = false;
         } else if(this.paidU < this.getMinPayment()) {
-            this.errors.push(new ErrorRecord(Errors.FAILED_CHECK, "Payment for follower contract is below minimum level of " + this.getMinPayment() + "U"));
+            this.errors.push(new ErrorRecord(Errors.FAILED_CHECK, "",
+                "Payment for follower contract is below minimum level of " + this.getMinPayment() + "U"));
             checkResult = false;
         }
 
-        if(!checkResult) {
-            this.errors.push(new ErrorRecord(Errors.FAILED_CHECK, "Follower contract hasn't valid payment"));
+        if (!checkResult) {
+            this.errors.push(new ErrorRecord(Errors.FAILED_CHECK, "", "Follower contract hasn't valid payment"));
             return false;
         }
 
         // check that payment was not hacked
-        if(this.prepaidOriginDays !== t.getOrDefault(this.state.data, FollowerContract.PREPAID_OD_FIELD_NAME, 0)) {
-            this.errors.push(new ErrorRecord(Errors.FAILED_CHECK, "Wrong [state.data." + FollowerContract.PREPAID_OD_FIELD_NAME + "] value. " +
+        if (this.prepaidOriginDays !== t.getOrDefault(this.state.data, FollowerContract.PREPAID_OD_FIELD_NAME, 0)) {
+            this.errors.push(new ErrorRecord(Errors.FAILED_CHECK, "state.data." + FollowerContract.PREPAID_OD_FIELD_NAME,
                 "Should be sum of early paid U and paid U by current revision."));
             return false;
         }
@@ -528,14 +523,14 @@ class FollowerContract extends NSmartContract {
         this.calculatePrepaidOriginDays(false);
 
         // check that payment was not hacked
-        if(this.prepaidOriginDays === this.state.data[FollowerContract.PREPAID_OD_FIELD_NAME])
-            // and call common follower check
-            return this.additionallyFollowerCheck(c);
+        if (this.prepaidOriginDays !== this.state.data[FollowerContract.PREPAID_OD_FIELD_NAME]) {
+            this.errors.push(new ErrorRecord(Errors.FAILED_CHECK, "state.data." + FollowerContract.PREPAID_OD_FIELD_NAME,
+                "Should be sum of early paid U and paid U by current revision."));
+            return false;
+        }
 
-        this.errors.push(new ErrorRecord(Errors.FAILED_CHECK, "Wrong [state.data." + this.state.data[FollowerContract.PREPAID_OD_FIELD_NAME] + "] value. " +
-            "Should be sum of early paid U and paid U by current revision."));
-
-        return false;
+        // and call common follower check
+        return this.additionallyFollowerCheck(c);
     }
 
     /**
@@ -556,35 +551,31 @@ class FollowerContract extends NSmartContract {
     additionallyFollowerCheck(ime) {
         // check follower environment
         if (ime == null) {
-            this.errors.push(new ErrorRecord(Errors.FAILED_CHECK, "Environment should be not null"));
+            this.errors.push(new ErrorRecord(Errors.FAILED_CHECK, "", "Environment should be not null"));
             return false;
         }
 
         // check that follower has known and valid type of smart contract
-        if(this.definition.extendedType !== NSmartContract.SmartContractType.FOLLOWER1) {
-            this.errors.push(new ErrorRecord (ErrorRecord(Errors.FAILED_CHECK, "definition.extended_type",
-                "illegal value, should be " + NSmartContract.SmartContractType.FOLLOWER1 + " instead " + this.definition.extendedType)));
+        if (this.definition.extendedType !== NSmartContract.SmartContractType.FOLLOWER1) {
+            this.errors.push(new ErrorRecord(Errors.FAILED_CHECK, "definition.extended_type",
+                "illegal value, should be " + NSmartContract.SmartContractType.FOLLOWER1 + " instead " + this.definition.extendedType));
             return false;
         }
 
         // check for tracking origins existing
-        let tracking = this.trackingOrigins.size > 0;
-        if(tracking == 0) {                             // TODO
-            this.errors.push(new ErrorRecord(Errors.FAILED_CHECK, "Tracking origin is missed"));
+        if (this.trackingOrigins.size === 0) {
+            this.errors.push(new ErrorRecord(Errors.FAILED_CHECK, "", "Tracking origin is missed"));
             return false;
         }
 
-        // check for any tracking origin contains callbacks data // TODO delete containsValue
-        /*for (let URL of this.trackingOrigins.values)
-            if (!this.callbackKeys.has(URL))
-                checkResult = false;
+        // check for any tracking origin contains callbacks data
+        for (let URL of Object.values(this.trackingOrigins))
+            if (!this.callbackKeys.has(URL)) {
+                this.errors.push(new ErrorRecord(Errors.FAILED_CHECK, "", "Callback key for tracking origin is missed"));
+                return false;
+            }
 
-        if(!checkResult) {
-            this.errors.push(new ErrorRecord(Errors.FAILED_CHECK, "Callback key for tracking origin is missed"));
-            return checkResult;
-        }
-            return checkResult;
-        */
+        return true;
     }
 
     /**

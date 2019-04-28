@@ -21,15 +21,15 @@ class Config {
     };
 
     static uIssuerName = "Universa Reserve System";
-    static uIssuerKeys = new Set([
+    static uIssuerKeys = [
         new crypto.KeyAddress("ZNuBikFEZbw71QQAFkNQtjfkmxFAdMgveTVPMGrFwo9vQwwPVE"),
         new crypto.KeyAddress("J3uaVvHE7JqhvVb1c26RyDhfJw9eP2KR1KRhm2VdmYx7NwHpzdHTyEPjcmKpgkJAtzWLSPUw")
-    ]);
+    ];
     static authorizedNameServiceCenterKey = new crypto.PublicKey(atob("HggcAQABxAABg9ideX6A3Wk9CuwnZrakXdvhYDiIiO0HA+YWmLArcZvhhaGMrw1i1mA6S9L6NPAuhYcZzm8Mxtwr1RESyJqm+HFwU+49s0yXHhCJsXcvK23Yx7NEpIrpGkKt9OCCdBGhQkls0Yc1lBBmGYCrShMntPC9xY9DJZ4sbMuBPIUQzpnWLYgRAbZb+KuZFXAIr7hRO0rNTZ6hE5zp6oPwlQLh9hBy6CsvZD/73Cf2WtKDunHD1qKuQU/KqruqVMMv2fd6ZKo692esWsqqIAiQztg1+sArAhf0Cr8lhRf53G5rndiiQx7RDs1P9Pp1wWK9e93UL1KF4PpVx7e7SznrCHTEdw"));
 
     static uTemplatePath = "../test/UTemplate.yml";                         //
     static testUTemplatePath = "../test/TestUTemplate.yml";                 // TODO It is temporary
-    static uKeyPath = "..test/keys/u_key.private.unikey";                   //
+    static uKeyPath = "../test/keys/u_key.private.unikey";                   //
 }
 
 

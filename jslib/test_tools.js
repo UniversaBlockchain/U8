@@ -28,11 +28,10 @@ class TestNodeInfoProvider extends NodeInfoProvider {
     }
 
     getAdditionalKeysToSignWith(extendedType) {
-        let set = new Set();
         if (extendedType === NSmartContract.SmartContractType.UNS1)
-            set.add(Config.authorizedNameServiceCenterKey);
+            return [Config.authorizedNameServiceCenterKey];
 
-        return set;
+        return [];
     }
 }
 
@@ -46,37 +45,28 @@ function createNodeInfoProvider() {
  * U contracts signs with special Universa keys and set as owner public keys from params.
  *
  * @param {number} amount - Initial number of U that will be have an owner.
- * @param ownerKeys is public keys that will became an owner of "U"
- * @param {boolean} withTestU - If true U will be created with test "U".
+ * @param ownerKeys is public keys that will became an owner of "U".
+ * @param {boolean} withTestU - If true U will be created with test "U". Optional. False by default.
  * @return sealed U contract; should be registered in the Universa by simplified procedure.
- * @throws IOException with exceptions while contract preparing
  */
- async function createFreshU(amount, ownerKeys, withTestU) {
+ async function createFreshU(amount, ownerKeys, withTestU = false) {
 
     let manufacturePrivateKey = new crypto.PrivateKey(await (await io.openRead(Config.uKeyPath)).allBytes()); //TODO
 
-    let u = withTestU ? Contract.fromDslFile(Config.testUTemplatePath) : Contract.fromDslFile(Config.uTemplatePath);
+    let u = await Contract.fromDslFile(withTestU ? Config.testUTemplatePath : Config.uTemplatePath);
 
-    let ownerRole = new roles.SimpleRole("owner");
-       for (let k of ownerKeys) {
-           let kr = new KeyRecord(k);
-           ownerRole.addKeyRecord(kr);
-    }
-
+    let ownerRole = new roles.SimpleRole("owner", ownerKeys);
     u.registerRole(ownerRole);
-    u.createRole("owner", ownerRole);
 
     u.state.data.transaction_units = amount;
 
-    if(withTestU) {
+    if(withTestU)
         u.state.data.test_transaction_units = amount * 100;
-    }
 
+    await u.seal();
     await u.addSignatureToSeal(manufacturePrivateKey);
-
-    await u.seal(true);
 
     return u;
 }
 
-module.exports = {createNodeInfoProvider};
+module.exports = {createNodeInfoProvider, createFreshU};
