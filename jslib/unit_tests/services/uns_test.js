@@ -5,141 +5,151 @@ import * as tk from 'unit_tests/test_keys'
 const NSmartContract = require("services/NSmartContract").NSmartContract;
 const UnsContract = require("services/unsContract").UnsContract;
 const tt = require("test_tools");
+const Config = require("config").Config;
+const UnsName = require("services/unsName").UnsName;
 
-/*public void goodUnsContract() throws Exception {
-    final PrivateKey key = new PrivateKey(Do.read(rootPath + "_xer0yfe2nn1xthc.private.unikey"));
-    PrivateKey randomPrivKey = new PrivateKey(2048);
+/*unit.test("uns_test: goodUnsContract", async () => {
+    let nodeInfoProvider = tt.createNodeInfoProvider();
 
-    PrivateKey authorizedNameServiceKey = TestKeys.privateKey(3);
-    config.setAuthorizedNameServiceCenterKeyData(new Bytes(authorizedNameServiceKey.getPublicKey().pack()));
+    let key = new crypto.PrivateKey(await (await io.openRead("../test/_xer0yfe2nn1xthc.private.unikey")).allBytes());
+    let randomPrivKey = await crypto.PrivateKey.generate(2048);
 
-    Contract referencesContract = new Contract(key);
-    referencesContract.seal();
+    let authorizedNameServiceKey = tk.TestKeys.getKey(3); //TODO
+    Config.authorizedNameServiceCenterKey = authorizedNameServiceKey.PublicKey.packed(); //TODO
 
-    Contract paymentDecreased = createUnsPayment();
+    let referencesContract = Contract.fromPrivateKey(key);
+    await referencesContract.seal(true);
+    assert(await referencesContract.check());
 
-    UnsContract uns = new UnsContract(key);
+    let paymentDecreased = createUnsPayment();
 
-    String reducedName = "testUnsContract" + Instant.now().getEpochSecond();
+    let uns = UnsContract.fromPrivateKey(key);
 
-    UnsName unsName = new UnsName(reducedName, "test description", "http://test.com");
-    unsName.setUnsReducedName(reducedName);
-    unsName.setUnsDescription("test description modified");
-    unsName.setUnsURL("http://test_modified.com");
+    let reducedName = "testUnsContract" + Math.floor(Date.now() / 1000);
 
-    UnsRecord unsRecord1 = new UnsRecord(randomPrivKey.getPublicKey());
-    UnsRecord unsRecord2 = new UnsRecord(referencesContract.getId());
+    let unsName = new UnsName(reducedName, "test description", "http://test.com");
+    unsName.unsReducedName = reducedName;
+    unsName.unsDescription = "test description modified";
+    unsName.unsURL = "http://test_modified.com";
+
+    let unsRecord1 = new UnsRecord(randomPrivKey.PublicKey);
+    let unsRecord2 = new UnsRecord(referencesContract.id);
     unsName.addUnsRecord(unsRecord1);
     unsName.addUnsRecord(unsRecord2);
-    uns.addUnsName(unsName);
-    uns.addOriginContract(referencesContract);
+    uns.unsName = unsName;
+    uns.addOriginContract(referencesContract); //TODO
 
-    uns.setNodeInfoProvider(nodeInfoProvider);
-    uns.addNewItems(paymentDecreased);
-    uns.addSignerKey(authorizedNameServiceKey);
-    uns.addSignerKey(randomPrivKey);
-    uns.seal();
-    uns.check();
-    uns.traceErrors();
-    assertTrue(uns.isOk());
+    uns.nodeInfoProvider = nodeInfoProvider; //TODO
+    uns.newItems.add(paymentDecreased);
 
-    assertEquals(NSmartContract.SmartContractType.UNS1.name(), uns.getDefinition().getExtendedType());
-    assertEquals(NSmartContract.SmartContractType.UNS1.name(), uns.get("definition.extended_type"));
+    await uns.addSignatureToSeal(authorizedNameServiceKey);
+    await uns.addSignatureToSeal(randomPrivKey);
 
-    assertTrue(uns instanceof UnsContract);
-    assertTrue(uns instanceof NSmartContract);
-    assertTrue(uns instanceof NContract);
+    await uns.seal(true);
+    assert(await uns.check());
 
-    Multimap<String, Permission> permissions = uns.getPermissions();
-    Collection<Permission> mdp = permissions.get("modify_data");
-    assertNotNull(mdp);
-    assertTrue(((ModifyDataPermission)mdp.iterator().next()).getFields().containsKey("action"));
+    assert(NSmartContract.SmartContractType.UNS1 === uns.definition.extendedType);
+    assert(NSmartContract.SmartContractType.UNS1 === uns.get("definition.extended_type"));
 
-    assertEquals(uns.getUnsName(reducedName).getUnsReducedName(), reducedName);
+    assert(uns instanceof UnsContract);
+    assert(uns instanceof NSmartContract);
+    assert(uns instanceof NContract); //TODO
+
+   // Multimap<String, Permission> permissions = uns.definition.permissions; //TODO
+    //Collection<Permission> mdp = permissions.get("modify_data");
+
+    assert(mdp !== 0);
+    assert((mdp.iterator().next()).getFields().containsKey("action")); //TODO
+
+    assert(uns.unsName(reducedName).getUnsReducedName(), reducedName);
     assertEquals(uns.getUnsName(reducedName).getUnsDescription(), "test description modified");
     assertEquals(uns.getUnsName(reducedName).getUnsURL(), "http://test_modified.com");
 
     assertNotEquals(uns.getUnsName(reducedName).findUnsRecordByOrigin(referencesContract.getOrigin()), -1);
     assertNotEquals(uns.getUnsName(reducedName).findUnsRecordByKey(randomPrivKey.getPublicKey()), -1);
     assertNotEquals(uns.getUnsName(reducedName).findUnsRecordByAddress(new KeyAddress(randomPrivKey.getPublicKey(), 0, true)), -1);
-}
+});
 
-@Test
-public void goodUnsContractFromDSL() throws Exception {
-    PrivateKey authorizedNameServiceKey = TestKeys.privateKey(3);
-    config.setAuthorizedNameServiceCenterKeyData(new Bytes(authorizedNameServiceKey.getPublicKey().pack()));
+unit.test("uns_test: goodUnsContractFromDSL", async () => {
+    let nodeInfoProvider = tt.createNodeInfoProvider();
 
-    Contract paymentDecreased = createUnsPayment();
+    let authorizedNameServiceKey = tk.TestKeys.getKey(3); //TODO
+    Config.authorizedNameServiceCenterKey = authorizedNameServiceKey.publicKey.packed();  //TODO
 
-    UnsContract uns = UnsContract.fromDslFile(rootPath + "uns/simple_uns_contract.yml");
-    uns.setNodeInfoProvider(nodeInfoProvider);
-    uns.addSignerKeyFromFile(rootPath + "_xer0yfe2nn1xthc.private.unikey");
-    uns.addSignerKey(authorizedNameServiceKey);
-    uns.addNewItems(paymentDecreased);
-    uns.seal();
-    uns.check();
-    uns.traceErrors();
-    assertTrue(uns.isOk());
+    let paymentDecreased = createUnsPayment();
 
-    assertEquals(NSmartContract.SmartContractType.UNS1.name(), uns.getDefinition().getExtendedType());
-    assertEquals(NSmartContract.SmartContractType.UNS1.name(), uns.get("definition.extended_type"));
+    let uns = UnsContract.fromDslFile("../test/services/simple_uns_contract.yml");
+    uns.nodeInfoProvider = nodeInfoProvider;
+    let key = new crypto.PrivateKey(await (await io.openRead("../test/_xer0yfe2nn1xthc.private.unikey")).allBytes());
+    await uns.addSignatureToSeal(key);
+    await uns.addSignatureToSeal(authorizedNameServiceKey);
 
-    assertTrue(uns instanceof UnsContract);
-    assertTrue(uns instanceof NSmartContract);
-    assertTrue(uns instanceof NContract);
-}
+    uns.newItems.add(paymentDecreased);
+    await uns.seal(true);
+    assert(await uns.check());
 
-@Test
-public void serializeUnsContract() throws Exception {
-    final PrivateKey key = new PrivateKey(Do.read(rootPath + "_xer0yfe2nn1xthc.private.unikey"));
-    PrivateKey randomPrivKey = new PrivateKey(2048);
+    assert(NSmartContract.SmartContractType.UNS1 === uns.definition.extendedType);
+    assert(NSmartContract.SmartContractType.UNS1 === uns.get("definition.extended_type"));
 
-    PrivateKey authorizedNameServiceKey = TestKeys.privateKey(3);
-    config.setAuthorizedNameServiceCenterKeyData(new Bytes(authorizedNameServiceKey.getPublicKey().pack()));
+    assert(uns instanceof UnsContract);
+    assert(uns instanceof NSmartContract);
+    //assert(uns instanceof NContract); //TODO
+});
 
-    Contract referencesContract = new Contract(key);
-    referencesContract.seal();
+unit.test("uns_test: serializeUnsContract", async () => {
+    let nodeInfoProvider = tt.createNodeInfoProvider();
 
-    Contract paymentDecreased = createUnsPayment();
+    let key = new crypto.PrivateKey(await (await io.openRead("../test/_xer0yfe2nn1xthc.private.unikey")).allBytes());
+    let randomPrivKey = await crypto.PrivateKey.generate(2048);
 
-    UnsContract uns = new UnsContract(key);
+    let authorizedNameServiceKey = tk.TestKeys.getKey(3); //TODO
+    Config.authorizedNameServiceCenterKey = authorizedNameServiceKey.publicKey.packed();  //TODO
 
-    String reducedName = "testUnsContract" + Instant.now().getEpochSecond();
+    let referencesContract = Contract.fromPrivateKey(key);
+    await referencesContract.seal(true);
+    assert(await referencesContract.check());
 
-    UnsName unsName = new UnsName(reducedName, "test description", "http://test.com");
-    unsName.setUnsReducedName(reducedName);
-    UnsRecord unsRecord1 = new UnsRecord(randomPrivKey.getPublicKey());
-    UnsRecord unsRecord2 = new UnsRecord(referencesContract.getId());
+    let paymentDecreased = createUnsPayment();
+
+    let uns = UnsContract.fromPrivateKey(key);
+
+    let reducedName = "testUnsContract" + Math.floor(Date.now() / 1000);
+
+    let unsName = new UnsName(reducedName, "test description", "http://test.com");
+    unsName.unsReducedName = reducedName;
+    let unsRecord1 = new UnsRecord(randomPrivKey.PublicKey);
+    let unsRecord2 = new UnsRecord(referencesContract.id);
     unsName.addUnsRecord(unsRecord1);
     unsName.addUnsRecord(unsRecord2);
-    uns.addUnsName(unsName);
-    uns.addOriginContract(referencesContract);
+    uns.unsName = unsName;
+    uns.addOriginContract(referencesContract);// TODO
 
-    uns.setNodeInfoProvider(nodeInfoProvider);
-    uns.addNewItems(paymentDecreased);
-    uns.addSignerKey(authorizedNameServiceKey);
-    uns.addSignerKey(randomPrivKey);
-    uns.seal();
-    uns.check();
-    uns.traceErrors();
-    assertTrue(uns.isOk());
+    uns.nodeInfoProvider = nodeInfoProvider; //TODO
+    uns.newItems.add(paymentDecreased);
 
-    Binder b = BossBiMapper.serialize(uns);
-    Contract desUns = DefaultBiMapper.deserialize(b);
+    await uns.addSignatureToSeal(authorizedNameServiceKey);
+    await uns.addSignatureToSeal(randomPrivKey);
 
-    assertEquals(NSmartContract.SmartContractType.UNS1.name(), desUns.getDefinition().getExtendedType());
-    assertEquals(NSmartContract.SmartContractType.UNS1.name(), desUns.get("definition.extended_type"));
+    await uns.seal(true);
+    assert(await uns.check());
 
-    assertTrue(desUns instanceof UnsContract);
-    assertTrue(desUns instanceof NSmartContract);
-    assertTrue(desUns instanceof NContract);
+    let b = BossBiMapper.serialize(uns);
+    let desUns = DefaultBiMapper.deserialize(b);
 
-    Multimap<String, Permission> permissions = desUns.getPermissions();
-    Collection<Permission> mdp = permissions.get("modify_data");
-    assertNotNull(mdp);
-    assertTrue(((ModifyDataPermission)mdp.iterator().next()).getFields().containsKey("action"));
+    assert(NSmartContract.SmartContractType.UNS1 === desUns.definition.extendedType);
+    assert(NSmartContract.SmartContractType.UNS1 === desUns.get("definition.extended_type"));
 
-    assertEquals(((UnsContract)desUns).getUnsName(reducedName).getUnsReducedName(), reducedName);
+    assert(desUns instanceof UnsContract);
+    assert(desUns instanceof NSmartContract);
+    //assertTrue(desUns instanceof NContract); //TODO
+
+    //Multimap<String, Permission> permissions = desUns.definition.permissions;
+    //Collection<Permission> mdp = permissions.get("modify_data");
+
+    assert(mdp !== null);
+    assert((mdp.iterator().next()).getFields().containsKey("action")); //TODO
+
+    assert(desUns.getUnsName(reducedName).getUnsReducedName(), reducedName);
     assertEquals(((UnsContract)desUns).getUnsName(reducedName).getUnsDescription(), "test description");
     assertEquals(((UnsContract)desUns).getUnsName(reducedName).getUnsURL(), "http://test.com");
 
@@ -147,39 +157,40 @@ public void serializeUnsContract() throws Exception {
     assertNotEquals(((UnsContract)desUns).getUnsName(reducedName).findUnsRecordByKey(randomPrivKey.getPublicKey()), -1);
     assertNotEquals(((UnsContract)desUns).getUnsName(reducedName).findUnsRecordByAddress(new KeyAddress(randomPrivKey.getPublicKey(), 0, true)), -1);
 
-    Contract copiedUns = uns.copy();
+    let copiedUns = uns.copy();
 
-    assertEquals(NSmartContract.SmartContractType.UNS1.name(), copiedUns.getDefinition().getExtendedType());
-    assertEquals(NSmartContract.SmartContractType.UNS1.name(), copiedUns.get("definition.extended_type"));
+    assert(NSmartContract.SmartContractType.UNS1 === copiedUns.definition.extendedType);
+    assert(NSmartContract.SmartContractType.UNS1 === copiedUns.get("definition.extended_type"));
 
-    assertTrue(copiedUns instanceof UnsContract);
-    assertTrue(copiedUns instanceof NSmartContract);
-    assertTrue(copiedUns instanceof NContract);
+    assert(copiedUns instanceof UnsContract);
+    assert(copiedUns instanceof NSmartContract);
+    //assertTrue(copiedUns instanceof NContract); //TODO
 
-    permissions = copiedUns.getPermissions();
-    mdp = permissions.get("modify_data");
-    assertNotNull(mdp);
-    assertTrue(((ModifyDataPermission)mdp.iterator().next()).getFields().containsKey("action"));
+     permissions = copiedUns.definition.permissions;
+     mdp = permissions.get("modify_data");
+     assertNotNull(mdp !== null);
+     assert((mdp.iterator().next()).getFields().containsKey("action")); //TODO
 
-    assertEquals(((UnsContract)copiedUns).getUnsName(reducedName).getUnsReducedName(), reducedName);
-    assertEquals(((UnsContract)copiedUns).getUnsName(reducedName).getUnsDescription(), "test description");
-    assertEquals(((UnsContract)copiedUns).getUnsName(reducedName).getUnsURL(), "http://test.com");
+     assertEquals(((UnsContract)copiedUns).getUnsName(reducedName).getUnsReducedName(), reducedName);
+     assertEquals(((UnsContract)copiedUns).getUnsName(reducedName).getUnsDescription(), "test description");
+     assertEquals(((UnsContract)copiedUns).getUnsName(reducedName).getUnsURL(), "http://test.com");
 
-    assertNotEquals(((UnsContract)copiedUns).getUnsName(reducedName).findUnsRecordByOrigin(referencesContract.getOrigin()), -1);
-    assertNotEquals(((UnsContract)copiedUns).getUnsName(reducedName).findUnsRecordByKey(randomPrivKey.getPublicKey()), -1);
-    assertNotEquals(((UnsContract)copiedUns).getUnsName(reducedName).findUnsRecordByAddress(new KeyAddress(randomPrivKey.getPublicKey(), 0, true)), -1);
-}
+     assertNotEquals(((UnsContract)copiedUns).getUnsName(reducedName).findUnsRecordByOrigin(referencesContract.getOrigin()), -1);
+     assertNotEquals(((UnsContract)copiedUns).getUnsName(reducedName).findUnsRecordByKey(randomPrivKey.getPublicKey()), -1);
+     assertNotEquals(((UnsContract)copiedUns).getUnsName(reducedName).findUnsRecordByAddress(new KeyAddress(randomPrivKey.getPublicKey(), 0, true)), -1);
+});
+*/
+async function createUnsPayment() {
+    let ownerKey = new crypto.PrivateKey(await (await io.openRead("../test/keys/stepan_mamontov.private.unikey")).allBytes());
 
-public Contract createUnsPayment() throws IOException {
+    let keys = new Set();
+    keys.add(ownerKey.PublicKey); //TODO
 
-    PrivateKey ownerKey = new PrivateKey(Do.read(rootPath + "keys/stepan_mamontov.private.unikey"));
-    Set<PublicKey> keys = new HashSet();
-    keys.add(ownerKey.getPublicKey());
-    Contract stepaU = InnerContractsService.createFreshU(100000000, keys);
-    Contract paymentDecreased = stepaU.createRevision(ownerKey);
-    paymentDecreased.getStateData().set("transaction_units", stepaU.getStateData().getIntOrThrow("transaction_units") - 2000);
-    paymentDecreased.seal();
+    let stepaU = tt.createFreshU(100000000, keys);
+    let paymentDecreased = stepaU.createRevision([ownerKey]);
+
+    paymentDecreased.state.data.transaction_units = stepaU.state.data.transaction_units - 2000;
+    await paymentDecreased.seal(true);
 
     return paymentDecreased;
 }
-}*/

@@ -15,7 +15,7 @@ unit.test("slot_test: goodSlotContract", async () => {
     await simpleContract.seal(true);
     assert(await simpleContract.check());
 
-    //let paymentDecreased = createSlotPayment(); //TODO
+    let paymentDecreased = createSlotPayment(); //TODO
 
     let slotContract = SlotContract.fromPrivateKey(key);
 
@@ -23,118 +23,123 @@ unit.test("slot_test: goodSlotContract", async () => {
 
     slotContract.putTrackingContract(simpleContract);
     slotContract.nodeInfoProvider = nodeInfoProvider;
-    /* slotContract.NewItems = paymentDecreased;
+    slotContract.newItems.add(paymentDecreased);
 
-     await slotContract.seal(true);
+    /* await slotContract.seal(true);
      assert(await simpleContract.check());
 
      assert(NSmartContract.SmartContractType.SLOT1 === slotContract.definition.extendedType);
 
-     let permissions = slotContract.definition.permission
-     /*  let mdp = permissions.get("modify_data");
-       assert(mdp !== null);
-       assert((mdp.iterator().next()).getFields().containsKey("action"));
+     let permissions = slotContract.definition.permission;
 
-       assertEquals(simpleContract.getId(), ((SlotContract) slotContract).getTrackingContract().getId());
-       assertEquals(simpleContract.getId(), TransactionPack.unpack(((SlotContract) slotContract).getPackedTrackingContract()).getContract().getId);
+     let mdp = permissions.get("modify_data");
+     assert(mdp !== null);
+     assert((mdp.iterator().next()).getFields().containsKey("action")); //TODO
 
-       /*Binder trackingHashesAsBase64 = slotContract.getStateData().getBinder("tracking_contract");
-       for (String k : trackingHashesAsBase64.keySet()) {
-           byte[] packed = trackingHashesAsBase64.getBinary(k);
-           if (packed != null) {
-               Contract c = Contract.fromPackedTransaction(packed);
-               assertEquals(simpleContract.getId(), c.getId());
-           }
-       }*/
+     assert(simpleContract.id === slotContract.getTrackingContract().id);
+     assert(simpleContract.id === TransactionPack.unpack(slotContract.getPackedTrackingContract()).getContract.id);
+
+    /* let trackingHashesAsBase64 = slotContract.state.data("tracking_contract"); //TODO
+
+     for (let k of trackingHashesAsBase64.keySet()) {
+         let packed = trackingHashesAsBase64.getBinary(k);
+         if (packed != null) {
+             let c = Contract.fromPackedTransaction(packed);
+             assert(simpleContract.id, c.id);
+         }
+     }*/
 });
 
 
 /*unit.test("slot_test: goodSlotContractFromDSL", async () => {
-    let nodeInfoProvider = createNodeInfoProvider();
+    let nodeInfoProvider = tt.createNodeInfoProvider();
 
     let key = new crypto.PrivateKey(await (await io.openRead("../test/_xer0yfe2nn1xthc.private.unikey")).allBytes());
-
-    //Contract simpleContract = new Contract(key);
-    //simpleContract.seal();
 
     let simpleContract = Contract.fromPrivateKey(key);
     await simpleContract.seal(true);
     assert(await simpleContract.check());
 
-    //Contract paymentDecreased = createSlotPayment();
+    let paymentDecreased = createSlotPayment(); //TODO
 
-    Contract smartContract = SlotContract.fromDslFile(rootPath + "SlotDSLTemplate.yml");
-    smartContract.addSignerKeyFromFile(rootPath + "_xer0yfe2nn1xthc.private.unikey");
+    let slotContract = SlotContract.fromDslFile("../test/services/SlotDSLTemplate.yml");
+    await slotContract.addSignatureToSeal(key);
 
-    assertTrue(smartContract instanceof SlotContract);
+    assert(slotContract instanceof SlotContract);
 
-    /*
-    ((SlotContract)smartContract).putTrackingContract(simpleContract);
-    ((SlotContract)smartContract).setNodeInfoProvider(nodeInfoProvider);
-    smartContract.addNewItems(paymentDecreased);
-    smartContract.seal();
-    smartContract.check();
-    smartContract.traceErrors();
-    assertTrue(smartContract.isOk());
+    slotContract.putTrackingContract(simpleContract);
+    slotContract.nodeInfoProvider = nodeInfoProvider;
+    slotContract.newItems.add(paymentDecreased);
 
-    assertEquals(NSmartContract.SmartContractType.SLOT1.name(), smartContract.getDefinition().getExtendedType());
-    assertEquals(NSmartContract.SmartContractType.SLOT1.name(), smartContract.get("definition.extended_type"));
+    await slotContract.seal(true);
+    assert(await slotContract.check());
 
-    assertEquals(2, ((SlotContract) smartContract).getKeepRevisions());
+    assert(NSmartContract.SmartContractType.SLOT1 === slotContract.definition.extendedType);
 
-    Multimap<String, Permission> permissions = smartContract.getPermissions();
-    Collection<Permission> mdp = permissions.get("modify_data");
-    assertNotNull(mdp);
-    assertTrue(((ModifyDataPermission)mdp.iterator().next()).getFields().containsKey("action"));
+    assert(2 === slotContract.keepRevisions);
 
-    assertEquals(simpleContract.getId(), ((SlotContract) smartContract).getTrackingContract().getId());
-    assertEquals(simpleContract.getId(), TransactionPack.unpack(((SlotContract) smartContract).getPackedTrackingContract()).getContract().getId());
+    //Multimap<String, Permission> permissions = slotContract.definition.permissions;
 
-    Binder trackingHashesAsBase64 = smartContract.getStateData().getBinder("tracking_contract");
-    for (String k : trackingHashesAsBase64.keySet()) {
-        byte[] packed = trackingHashesAsBase64.getBinary(k);
+    //Collection<Permission> mdp = permissions.get("modify_data");
+
+    assert(mdp !== null);
+    //assert(mdp.iterator().next()).getFields().containsKey("action") === true); //TODO
+
+    assert(simpleContract.id === slotContract.getTrackingContract().id);
+    assert(simpleContract.id === TransactionPack.unpack(slotContract.getPackedTrackingContract()).getContract().id);
+
+    let trackingHashesAsBase64 = slotContract.state.data("tracking_contract");
+
+    for (let k : trackingHashesAsBase64.keySet()) {
+        let packed = trackingHashesAsBase64.getBinary(k);
         if (packed != null) {
-            Contract c = Contract.fromPackedTransaction(packed);
-            assertEquals(simpleContract.getId(), c.getId());
+            let c = Contract.fromPackedTransaction(packed);
+            assert(simpleContract.id, c.id);
         }
     }
 });
 
 unit.test("slot_test: serializeSlotContract", async () => {
-    final PrivateKey key = new PrivateKey(Do.read(rootPath + "_xer0yfe2nn1xthc.private.unikey"));
-    Contract simpleContract = new Contract(key);
-    simpleContract.seal();
+    let nodeInfoProvider = tt.createNodeInfoProvider();
 
-    Contract paymentDecreased = createSlotPayment();
+    let key = new crypto.PrivateKey(await (await io.openRead("../test/_xer0yfe2nn1xthc.private.unikey")).allBytes());
 
-    Contract smartContract = new SlotContract(key);
+    let simpleContract = Contract.fromPrivateKey(key);
+    await simpleContract.seal(true);
+    assert(await simpleContract.check());
 
-    assertTrue(smartContract instanceof SlotContract);
+    let paymentDecreased = createSlotPayment();
 
-    ((SlotContract)smartContract).putTrackingContract(simpleContract);
-    ((SlotContract)smartContract).setNodeInfoProvider(nodeInfoProvider);
-    smartContract.addNewItems(paymentDecreased);
-    smartContract.seal();
-    smartContract.check();
-    smartContract.traceErrors();
-    assertTrue(smartContract.isOk());
+    let slotContract = SlotContract.fromPrivateKey(key);
 
-    Binder b = BossBiMapper.serialize(smartContract);
-    Contract desContract = DefaultBiMapper.deserialize(b);
-    assertSameContracts(smartContract, desContract);
-    assertEquals(NSmartContract.SmartContractType.SLOT1.name(), desContract.getDefinition().getExtendedType());
-    assertEquals(NSmartContract.SmartContractType.SLOT1.name(), desContract.get("definition.extended_type"));
-    assertTrue(desContract instanceof SlotContract);
+    assert(slotContract instanceof SlotContract);
 
-    Multimap<String, Permission> permissions = desContract.getPermissions();
-    Collection<Permission> mdp = permissions.get("modify_data");
-    assertNotNull(mdp);
-    assertTrue(((ModifyDataPermission)mdp.iterator().next()).getFields().containsKey("action"));
+    slotContract.putTrackingContract(simpleContract);
+    slotContract.nodeInfoProvider = nodeInfoProvider;
+    slotContract.newItems.add(paymentDecreased);
 
-    assertEquals(simpleContract.getId(), ((SlotContract) desContract).getTrackingContract().getId());
-    assertEquals(simpleContract.getId(), TransactionPack.unpack(((SlotContract) desContract).getPackedTrackingContract()).getContract().getId());
+    await slotContract.seal(true);
+    assert(await slotContract.check());
 
-    Binder trackingHashesAsBase64 = desContract.getStateData().getBinder("tracking_contract");
+    //Binder b = BossBiMapper.serialize(smartContract);
+    let desContract = DefaultBiMapper.deserialize(b);
+
+    assertSameContracts(slotContract, desContract); //TODO
+    assert(NSmartContract.SmartContractType.SLOT1 === desContract.definition.extendedType);
+
+    assert(desContract instanceof SlotContract);
+
+    //Multimap<String, Permission> permissions = desContract.definition.permissions;
+    //Collection<Permission> mdp = permissions.get("modify_data");
+    assert(mdp !== null);
+   // assertTrue((mdp.iterator().next()).getFields().containsKey("action")); //TODO
+
+    assert(simpleContract.id === desContract.getTrackingContract().id);
+    assert(simpleContract.id === TransactionPack.unpack(desContract.getPackedTrackingContract()).getContract().id);
+
+    Binder trackingHashesAsBase64 = desContract.getStateData().getBinder("tracking_contract"); //TODO
+
+
     for (String k : trackingHashesAsBase64.keySet()) {
         byte[] packed = trackingHashesAsBase64.getBinary(k);
         if (packed != null) {
@@ -143,21 +148,22 @@ unit.test("slot_test: serializeSlotContract", async () => {
         }
     }
 
-    Contract copiedContract = smartContract.copy();
-    assertSameContracts(smartContract, copiedContract);
-    assertEquals(NSmartContract.SmartContractType.SLOT1.name(), copiedContract.getDefinition().getExtendedType());
-    assertEquals(NSmartContract.SmartContractType.SLOT1.name(), copiedContract.get("definition.extended_type"));
-    assertTrue(copiedContract instanceof SlotContract);
+    let copiedContract = slotContract.copy();
 
-    permissions = copiedContract.getPermissions();
-    mdp = permissions.get("modify_data");
-    assertNotNull(mdp);
-    assertTrue(((ModifyDataPermission)mdp.iterator().next()).getFields().containsKey("action"));
+    //assertSameContracts(slotContract, copiedContract);
+    assert(NSmartContract.SmartContractType.SLOT1 === copiedContract.definition.extendedType);
+    assert(NSmartContract.SmartContractType.SLOT1 === copiedContract.get("definition.extended_type"));
+    assert(copiedContract instanceof SlotContract);
 
-    assertEquals(simpleContract.getId(), ((SlotContract) copiedContract).getTrackingContract().getId());
-    assertEquals(simpleContract.getId(), TransactionPack.unpack(((SlotContract) copiedContract).getPackedTrackingContract()).getContract().getId());
+    let permissions = copiedContract.definition.permissions;
+    let mdp = permissions.get("modify_data");
+    assert(mdp !== 0);
+    //assert((mdp.iterator().next()).getFields().containsKey("action") === true);
 
-    trackingHashesAsBase64 = copiedContract.getStateData().getBinder("tracking_contract");
+    assert(simpleContract.id === copiedContract.getTrackingContract().id);
+    assert(simpleContract.id === TransactionPack.unpack(copiedContract.getPackedTrackingContract()).getContract().id);
+
+    /*trackingHashesAsBase64 = copiedContract.getStateData().getBinder("tracking_contract"); //TODO
     for (String k : trackingHashesAsBase64.keySet()) {
         byte[] packed = trackingHashesAsBase64.getBinary(k);
         if (packed != null) {
@@ -167,31 +173,32 @@ unit.test("slot_test: serializeSlotContract", async () => {
     }
 });
 
-unit.test("slot_test: goodSlotContract", async () => {
+unit.test("slot_test: keepRevisions", async () => {
+    let nodeInfoProvider = tt.createNodeInfoProvider();
 
-    final PrivateKey key = new PrivateKey(Do.read(rootPath + "_xer0yfe2nn1xthc.private.unikey"));
+    let key = new crypto.PrivateKey(await (await io.openRead("../test/_xer0yfe2nn1xthc.private.unikey")).allBytes());
 
-    Contract simpleContract = new Contract(key);
-    simpleContract.seal();
+    let simpleContract = Contract.fromPrivateKey(key);
+    await simpleContract.seal(true);
+    assert(await simpleContract.check());
 
-    Contract paymentDecreased = createSlotPayment();
+    let paymentDecreased = createSlotPayment();
 
-    Contract smartContract = new SlotContract(key);
+    let slotContract = SlotContract.fromPrivateKey(key);
 
-    assertTrue(smartContract instanceof SlotContract);
+    assert(slotContract instanceof SlotContract);
 
-    ((SlotContract)smartContract).putTrackingContract(simpleContract);
-    ((SlotContract)smartContract).setNodeInfoProvider(nodeInfoProvider);
-    ((SlotContract)smartContract).setKeepRevisions(2);
-    smartContract.addNewItems(paymentDecreased);
-    smartContract.seal();
-    smartContract.check();
-    smartContract.traceErrors();
-    assertTrue(smartContract.isOk());
+    slotContract.putTrackingContract(simpleContract);
+    slotContract.nodeInfoProvider(nodeInfoProvider);
+    slotContract.setKeepRevisions(2);
+    slotContract.newItems.add(paymentDecreased);
 
-    assertEquals(1, ((SlotContract)smartContract).getTrackingContracts().size());
-    assertEquals(simpleContract.getId(), ((SlotContract) smartContract).getTrackingContract().getId());
-    assertEquals(simpleContract.getId(), TransactionPack.unpack(((SlotContract) smartContract).getPackedTrackingContract()).getContract().getId());
+    await slotContract.seal(true);
+    assert(await slotContract.check());
+
+    assert(1 === slotContract.trackingContracts().size());              //TODO
+    assert(simpleContract.id === slotContract.getTrackingContract().id);
+    assert(simpleContract.id(), TransactionPack.unpack(slotContract.getPackedTrackingContract()).getContract().id);
 
     Binder trackingHashesAsBase64 = smartContract.getStateData().getBinder("tracking_contract");
     for (String k : trackingHashesAsBase64.keySet()) {
@@ -202,17 +209,17 @@ unit.test("slot_test: goodSlotContract", async () => {
         }
     }
 
-    Contract simpleContract2 = simpleContract.createRevision(key);
-    simpleContract2.seal();
-    ((SlotContract)smartContract).putTrackingContract(simpleContract2);
-    smartContract.seal();
-    smartContract.check();
-    smartContract.traceErrors();
-    assertTrue(smartContract.isOk());
+    let simpleContract2 = simpleContract.createRevision(key);
+    await simpleContract2.seal(true);
 
-    assertEquals(2, ((SlotContract)smartContract).getTrackingContracts().size());
-    assertEquals(simpleContract2.getId(), ((SlotContract) smartContract).getTrackingContract().getId());
-    assertEquals(simpleContract2.getId(), TransactionPack.unpack(((SlotContract) smartContract).getPackedTrackingContract()).getContract().getId());
+    slotContract.putTrackingContract(simpleContract2);
+
+    await slotContract.seal(true);
+    assert(await slotContract.check());
+
+    assert(2 === slotContract.trackingContracts.size());            //TODO
+    assert(simpleContract2.id, smartContract.getTrackingContract().id);
+    assert(simpleContract2.id, TransactionPack.unpack(smartContract.getPackedTrackingContract()).getContract().id);
 
     trackingHashesAsBase64 = smartContract.getStateData().getBinder("tracking_contract");
     for (String k : trackingHashesAsBase64.keySet()) {
@@ -223,19 +230,20 @@ unit.test("slot_test: goodSlotContract", async () => {
         }
     }
 
-    Contract simpleContract3 = simpleContract2.createRevision(key);
-    simpleContract3.seal();
-    ((SlotContract)smartContract).putTrackingContract(simpleContract3);
-    smartContract.seal();
-    smartContract.check();
-    smartContract.traceErrors();
-    assertTrue(smartContract.isOk());
+    let simpleContract3 = simpleContract2.createRevision(key);
 
-    assertEquals(2, ((SlotContract)smartContract).getTrackingContracts().size());
-    assertEquals(simpleContract3.getId(), ((SlotContract) smartContract).getTrackingContract().getId());
-    assertEquals(simpleContract3.getId(), TransactionPack.unpack(((SlotContract) smartContract).getPackedTrackingContract()).getContract().getId());
+    await simpleContract3.seal(true);
 
-    trackingHashesAsBase64 = smartContract.getStateData().getBinder("tracking_contract");
+    slotContract.putTrackingContract(simpleContract3);
+
+    await slotContract.seal(true);
+    assert(await slotContract.check());
+
+    assert(2 === slotContract.trackingContracts().size());
+    assert(simpleContract3.id === slotContract.getTrackingContract().id);
+    assert(simpleContract3.id() === TransactionPack.unpack(slotContract.getPackedTrackingContract()).getContract().id());
+
+    //trackingHashesAsBase64 = slotContract.state.data.getBinder("tracking_contract"); //TODO
     for (String k : trackingHashesAsBase64.keySet()) {
         byte[] packed = trackingHashesAsBase64.getBinary(k);
         if (packed != null) {
@@ -248,15 +256,19 @@ unit.test("slot_test: goodSlotContract", async () => {
         }
     }
 });
+*/
+async function createSlotPayment() {
+    let ownerKey = new crypto.PrivateKey(await (await io.openRead("../test/keys/stepan_mamontov.private.unikey")).allBytes());
 
-function createSlotPayment() {
+    let keys = new Set();
+    keys.add(ownerKey.PublicKey); //TODO
 
-    let stepaU = InnerContractsService.createFreshU(100000000, tk.TestKeys.getKey(1));
+    let stepaU = tt.createFreshU(100000000, keys);
+    let paymentDecreased = stepaU.createRevision([ownerKey]);
+    paymentDecreased.state.data.transaction_units = stepaU.state.data.transaction_units - 100;
 
-    let paymentDecreased = stepaU.createRevision(ownerKey);//TODO
-    paymentDecreased.state.data["transaction_units"] = stepaU.state.data[transaction_units] - 100;
-    paymentDecreased.seal();
+    await paymentDecreased.seal(true);
 
     return paymentDecreased;
-}*/
+}
 
