@@ -5,10 +5,10 @@ import * as tk from 'unit_tests/test_keys'
 const NSmartContract = require("services/NSmartContract").NSmartContract;
 const FollowerContract = require("services/followerContract").FollowerContract;
 const tt = require("test_tools");
+const DefaultBiMapper = require("defaultbimapper").DefaultBiMapper;
+const BossBiMapper = require("bossbimapper").BossBiMapper;
 
 unit.test("follower_test: goodFollowerContract", async () => {
-    let nodeInfoProvider = tt.createNodeInfoProvider();
-
     let key = new crypto.PrivateKey(await (await io.openRead("../test/_xer0yfe2nn1xthc.private.unikey")).allBytes());
     let key2 = new crypto.PrivateKey(await (await io.openRead("../test/test_network_whitekey.private.unikey")).allBytes());
 
@@ -19,48 +19,172 @@ unit.test("follower_test: goodFollowerContract", async () => {
     let privateKey = tk.TestKeys.getKey();
     let callbackKey = privateKey.publicKey;
 
-    let smartContract = FollowerContract.fromPrivateKey(key);
+    let followerContract = FollowerContract.fromPrivateKey(key);
 
-    assert(smartContract instanceof FollowerContract);
+    assert(followerContract instanceof FollowerContract);
 
-    smartContract.nodeInfoProvider = nodeInfoProvider;
-    smartContract.putTrackingOrigin(simpleContract.getOrigin(), "http://localhost:7777/follow.callback", callbackKey);
+    followerContract.nodeInfoProvider = tt.createNodeInfoProvider();
+    followerContract.putTrackingOrigin(simpleContract.getOrigin(), "http://localhost:7777/follow.callback", callbackKey);
 
-    await smartContract.seal(true);
-    assert(await smartContract.check());
+    await followerContract.seal(true);
+    assert(await followerContract.check());
 
-    assert(NSmartContract.SmartContractType.FOLLOWER1 === smartContract.definition.extendedType);
+    assert(NSmartContract.SmartContractType.FOLLOWER1 === followerContract.definition.extendedType);
 
-    let mdp = smartContract.definition.permissions.get("modify_data");
+    let mdp = followerContract.definition.permissions.get("modify_data");
     assert(mdp != null);
     assert(mdp instanceof Array);
     assert(mdp[0].fields.hasOwnProperty("action"));
 
-    assert(callbackKey.equals(smartContract.callbackKeys.get("http://localhost:7777/follow.callback")));
-    assert(smartContract.trackingOrigins.get(simpleContract.getOrigin()) === "http://localhost:7777/follow.callback");
-    assert(smartContract.isOriginTracking(simpleContract.getOrigin()));
-    assert(smartContract.isCallbackURLUsed("http://localhost:7777/follow.callback"));
+    assert(callbackKey.equals(followerContract.callbackKeys.get("http://localhost:7777/follow.callback")));
+    assert(followerContract.trackingOrigins.get(simpleContract.getOrigin()) === "http://localhost:7777/follow.callback");
+    assert(followerContract.isOriginTracking(simpleContract.getOrigin()));
+    assert(followerContract.isCallbackURLUsed("http://localhost:7777/follow.callback"));
 
     //updateCallbackKey
 
     privateKey = tk.TestKeys.getKey();
     let newCallbackKey = privateKey.publicKey;
-    assert(!smartContract.updateCallbackKey("http://localhost:8888/follow.callback", newCallbackKey));
-    assert(smartContract.updateCallbackKey("http://localhost:7777/follow.callback", newCallbackKey));
+    assert(!followerContract.updateCallbackKey("http://localhost:8888/follow.callback", newCallbackKey));
+    assert(followerContract.updateCallbackKey("http://localhost:7777/follow.callback", newCallbackKey));
 
-    assert(newCallbackKey.equals(smartContract.callbackKeys.get("http://localhost:7777/follow.callback")));
-    assert(!callbackKey.equals(smartContract.callbackKeys.get("http://localhost:7777/follow.callback")));
+    assert(newCallbackKey.equals(followerContract.callbackKeys.get("http://localhost:7777/follow.callback")));
+    assert(!callbackKey.equals(followerContract.callbackKeys.get("http://localhost:7777/follow.callback")));
 
-    assert(smartContract.trackingOrigins.get(simpleContract.getOrigin()) === "http://localhost:7777/follow.callback");
-    assert(smartContract.isOriginTracking(simpleContract.getOrigin()));
-    assert(smartContract.isCallbackURLUsed("http://localhost:7777/follow.callback"));
+    assert(followerContract.trackingOrigins.get(simpleContract.getOrigin()) === "http://localhost:7777/follow.callback");
+    assert(followerContract.isOriginTracking(simpleContract.getOrigin()));
+    assert(followerContract.isCallbackURLUsed("http://localhost:7777/follow.callback"));
 
     //removeTrackingOrigin
 
-    smartContract.removeTrackingOrigin(simpleContract.getOrigin());
+    followerContract.removeTrackingOrigin(simpleContract.getOrigin());
 
-    assert(smartContract.callbackKeys.get("http://localhost:7777/follow.callback") == null);
-    assert(smartContract.trackingOrigins.get(simpleContract.getOrigin()) !== "http://localhost:7777/follow.callback");
-    assert(!smartContract.isOriginTracking(simpleContract.getOrigin()));
-    assert(!smartContract.isCallbackURLUsed("http://localhost:7777/follow.callback"));
+    assert(followerContract.callbackKeys.get("http://localhost:7777/follow.callback") == null);
+    assert(followerContract.trackingOrigins.get(simpleContract.getOrigin()) !== "http://localhost:7777/follow.callback");
+    assert(!followerContract.isOriginTracking(simpleContract.getOrigin()));
+    assert(!followerContract.isCallbackURLUsed("http://localhost:7777/follow.callback"));
+});
+
+unit.test("follower_test: goodFollowerContractFromDSL", async () => {
+    let key = new crypto.PrivateKey(await (await io.openRead("../test/_xer0yfe2nn1xthc.private.unikey")).allBytes());
+    let key2 = new crypto.PrivateKey(await (await io.openRead("../test/test_network_whitekey.private.unikey")).allBytes());
+
+    let simpleContract = Contract.fromPrivateKey(key2);
+    await simpleContract.seal(true);
+    assert(await simpleContract.check());
+
+    let privateKey = tk.TestKeys.getKey();
+    let callbackKey = privateKey.publicKey;
+
+    let followerContract = await FollowerContract.fromDslFile("../test/services/FollowerDSLTemplate.yml");
+    followerContract.keysToSignWith.add(key);
+
+    assert(followerContract instanceof FollowerContract);
+
+    followerContract.nodeInfoProvider = tt.createNodeInfoProvider();
+    followerContract.putTrackingOrigin(simpleContract.getOrigin(), "http://localhost:7777/follow.callback", callbackKey);
+
+    await followerContract.seal(true);
+    assert(await followerContract.check());
+
+    assert(NSmartContract.SmartContractType.FOLLOWER1 === followerContract.definition.extendedType);
+
+    let mdp = followerContract.definition.permissions.get("modify_data");
+    assert(mdp != null);
+    assert(mdp instanceof Array);
+    assert(mdp[0].fields.hasOwnProperty("action"));
+
+    assert(callbackKey.equals(followerContract.callbackKeys.get("http://localhost:7777/follow.callback")));
+    assert(followerContract.trackingOrigins.get(simpleContract.getOrigin()) === "http://localhost:7777/follow.callback");
+    assert(followerContract.isOriginTracking(simpleContract.getOrigin()));
+    assert(followerContract.isCallbackURLUsed("http://localhost:7777/follow.callback"));
+});
+
+unit.test("follower_test: serializeFollowerContract", async () => {
+    let key = new crypto.PrivateKey(await (await io.openRead("../test/_xer0yfe2nn1xthc.private.unikey")).allBytes());
+    let key2 = new crypto.PrivateKey(await (await io.openRead("../test/test_network_whitekey.private.unikey")).allBytes());
+
+    let simpleContract = Contract.fromPrivateKey(key2);
+    await simpleContract.seal(true);
+    assert(await simpleContract.check());
+
+    let privateKey = tk.TestKeys.getKey();
+    let callbackKey = privateKey.publicKey;
+
+    let followerContract = FollowerContract.fromPrivateKey(key);
+
+    assert(followerContract instanceof FollowerContract);
+
+    followerContract.nodeInfoProvider = tt.createNodeInfoProvider();
+
+    await followerContract.seal(true);
+    assert(await followerContract.check());
+
+    let b = BossBiMapper.getInstance().serialize(followerContract);
+    let b2 = DefaultBiMapper.getInstance().serialize(followerContract);
+
+    let desContract = BossBiMapper.getInstance().deserialize(b);
+    let desContract2 = DefaultBiMapper.getInstance().deserialize(b2);
+
+    tt.assertSameContracts(desContract, followerContract);
+    tt.assertSameContracts(desContract2, followerContract);
+
+    assert(NSmartContract.SmartContractType.FOLLOWER1 === desContract.definition.extendedType);
+    assert(NSmartContract.SmartContractType.FOLLOWER1 === desContract2.definition.extendedType);
+
+    let mdp = desContract.definition.permissions.get("modify_data");
+    assert(mdp != null);
+    assert(mdp instanceof Array);
+    assert(mdp[0].fields.hasOwnProperty("action"));
+
+    desContract.putTrackingOrigin(simpleContract.getOrigin(), "http://localhost:7777/follow.callback", callbackKey);
+
+    assert(callbackKey.equals(desContract.callbackKeys.get("http://localhost:7777/follow.callback")));
+    assert(desContract.trackingOrigins.get(simpleContract.getOrigin()) === "http://localhost:7777/follow.callback");
+    assert(desContract.isOriginTracking(simpleContract.getOrigin()));
+    assert(desContract.isCallbackURLUsed("http://localhost:7777/follow.callback"));
+
+    mdp = desContract2.definition.permissions.get("modify_data");
+    assert(mdp != null);
+    assert(mdp instanceof Array);
+    assert(mdp[0].fields.hasOwnProperty("action"));
+
+    desContract2.putTrackingOrigin(simpleContract.getOrigin(), "http://localhost:7777/follow.callback", callbackKey);
+
+    assert(callbackKey.equals(desContract2.callbackKeys.get("http://localhost:7777/follow.callback")));
+    assert(desContract2.trackingOrigins.get(simpleContract.getOrigin()) === "http://localhost:7777/follow.callback");
+    assert(desContract2.isOriginTracking(simpleContract.getOrigin()));
+    assert(desContract2.isCallbackURLUsed("http://localhost:7777/follow.callback"));
+
+    let copiedContract = followerContract.copy();
+
+    tt.assertSameContracts(followerContract, copiedContract);
+
+    assert(copiedContract instanceof FollowerContract);
+
+    assert(NSmartContract.SmartContractType.FOLLOWER1 === copiedContract.definition.extendedType);
+
+    mdp = copiedContract.definition.permissions.get("modify_data");
+    assert(mdp != null);
+    assert(mdp instanceof Array);
+    assert(mdp[0].fields.hasOwnProperty("action"));
+
+    copiedContract.putTrackingOrigin(simpleContract.getOrigin(), "http://localhost:7777/follow.callback", callbackKey);
+
+    assert(callbackKey.equals(copiedContract.callbackKeys.get("http://localhost:7777/follow.callback")));
+    assert(copiedContract.trackingOrigins.get(simpleContract.getOrigin()) === "http://localhost:7777/follow.callback");
+    assert(copiedContract.isOriginTracking(simpleContract.getOrigin()));
+    assert(copiedContract.isCallbackURLUsed("http://localhost:7777/follow.callback"));
+});
+
+unit.test("follower_test: followerContractNewRevision", async () => {
+
+});
+
+unit.test("follower_test: testCanFollowContract", async () => {
+
+});
+
+unit.test("follower_test: testAllCanFollowContract", async () => {
+
 });

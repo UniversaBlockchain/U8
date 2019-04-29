@@ -1,4 +1,5 @@
 import * as io from 'io'
+import {assert} from 'test'
 
 const NodeInfoProvider = require("services/NSmartContract").NodeInfoProvider;
 const Config = require("config").Config;
@@ -49,8 +50,7 @@ function createNodeInfoProvider() {
  * @param {boolean} withTestU - If true U will be created with test "U". Optional. False by default.
  * @return sealed U contract; should be registered in the Universa by simplified procedure.
  */
- async function createFreshU(amount, ownerKeys, withTestU = false) {
-
+async function createFreshU(amount, ownerKeys, withTestU = false) {
     let manufacturePrivateKey = new crypto.PrivateKey(await (await io.openRead(Config.uKeyPath)).allBytes()); //TODO
 
     let u = await Contract.fromDslFile(withTestU ? Config.testUTemplatePath : Config.uTemplatePath);
@@ -69,4 +69,48 @@ function createNodeInfoProvider() {
     return u;
 }
 
-module.exports = {createNodeInfoProvider, createFreshU};
+function assertSameContracts(c1, c2) {
+    // check issuer
+    assert(c1.roles.issuer != null);
+    assert(c2.roles.issuer != null);
+    assert(c1.roles.issuer.equals(c2.roles.issuer));
+
+    // check creator
+    assert(c1.roles.creator != null);
+    assert(c2.roles.creator != null);
+    assert(c1.roles.creator.equals(c2.roles.creator));
+
+    // check owner
+    assert(c1.roles.owner != null);
+    assert(c2.roles.owner != null);
+    assert(c1.roles.owner.equals(c2.roles.owner));
+
+    // check times
+    assert(c1.definition.createdAt.getTime() === c2.definition.createdAt.getTime());
+    if (c1.definition.expiresAt != null)
+        assert(c1.definition.expiresAt.getTime() === c2.definition.expiresAt.getTime());
+    else
+        assert(c1.definition.expiresAt === c2.definition.expiresAt);
+    assert(c1.state.createdAt.getTime() === c2.state.createdAt.getTime());
+    if (c1.state.expiresAt != null)
+        assert(c1.state.expiresAt.getTime() === c2.state.expiresAt.getTime());
+    else
+        assert(c1.state.expiresAt === c2.state.expiresAt);
+
+    // check data
+    assert(c1.definition.data.equals(c2.definition.data));
+    assert(c1.state.data.equals(c2.state.data));
+
+    // check definition
+    assert(c1.definition.extendedType === c2.definition.extendedType);
+
+    // check state
+    assert(c1.state.revision === c2.state.revision);
+    assert(c1.state.branchId === c2.state.branchId);
+    assert(c1.state.getBranchRevision() === c2.state.getBranchRevision());
+
+    // check constraints
+    assert(Array.from(c1.constraints.values()).every(c => c.equals(c2.findConstraintByName(c.name))));
+}
+
+module.exports = {createNodeInfoProvider, createFreshU, assertSameContracts};

@@ -181,7 +181,7 @@ class State extends bs.BiSerializable {
         else if (data.hasOwnProperty("references"))
             this.constraints = deserializer.deserialize(data.references);
         else
-            this.constraints = [];
+            this.constraints = new Set();
 
         let r = this.contract.registerRole(deserializer.deserialize(data.owner))
         if(r.name !== "owner")
@@ -219,12 +219,12 @@ class State extends bs.BiSerializable {
         this.createdAt = t.convertToDate(root.created_at);
         this.expiresAt = t.convertToDate(root.expires_at);
 
-        if (root.hasOwnProperty("revision"))
+        if (root.revision != null)
             this.revision = root.revision;
         else
             throw new ex.IllegalArgumentError("state.revision not found");
 
-        if (root.hasOwnProperty("data"))
+        if (root.data != null)
             this.data = root.data;
         else
             this.data = {};
@@ -239,10 +239,10 @@ class State extends bs.BiSerializable {
         this.contract.createRole("owner", root.owner);
         this.contract.createRole("creator", root.created_by);
 
-        let constrs;
-        if (root.hasOwnProperty("constraints"))
+        let constrs = null;
+        if (root.constraints != null)
             constrs = root.constraints;
-        if (root.hasOwnProperty("references"))
+        if (root.references != null)
             constrs = root.references;
 
         if (constrs != null)
@@ -374,7 +374,7 @@ class Definition extends bs.BiSerializable {
         else if (data.hasOwnProperty("references"))
             this.constraints = deserializer.deserialize(data.references);
         else
-            this.constraints = [];
+            this.constraints = new Set();
 
         let perms = deserializer.deserialize(data.permissions);
         for(let pid of Object.keys(perms)) {
@@ -417,7 +417,7 @@ class Definition extends bs.BiSerializable {
         this.createdAt = t.convertToDate(root.created_at);
         this.expiresAt = t.convertToDate(root.expires_at);
 
-        if (root.hasOwnProperty("data"))
+        if (root.data != null)
             this.data = root.data;
         else
             this.data = {};
@@ -425,10 +425,10 @@ class Definition extends bs.BiSerializable {
         if (root.hasOwnProperty("extended_type"))
             this.extendedType = root.extended_type;
 
-        let constrs;
-        if (root.hasOwnProperty("constraints"))
+        let constrs = null;
+        if (root.constraints != null)
             constrs = root.constraints;
-        if (root.hasOwnProperty("references"))
+        if (root.references != null)
             constrs = root.references;
 
         if (constrs != null)
@@ -1722,7 +1722,7 @@ class Contract extends bs.BiSerializable {
     initializeWithDsl(root) {
         this.apiLevel = root.api_level;
         this.definition = new Definition(this).initializeWithDsl(root.definition);
-        this.state = new State(this).initializeWithDsl(root.state);
+        this.state = (new State(this)).initializeWithDsl(root.state);
 
         // fill constraints list
         if (this.definition != null && this.definition.constraints != null) {
@@ -1794,7 +1794,7 @@ class Contract extends bs.BiSerializable {
      * creation (but before sealing).
      * <p>
      * Change owner permission is added by default
-     * @param key for creating roles "issuer", "owner", "creator" and signing the contract
+     * @param {PrivateKey} key for creating roles "issuer", "owner", "creator" and signing the contract
      * @param contract - init contract (example, NSmartContract). Optional.
      * @returns {Contract | NSmartContract | SlotContract | UnsContract | FollowerContract} created contract
      */
@@ -1826,8 +1826,8 @@ class Contract extends bs.BiSerializable {
      * <p>
      * It is recommended to call {@link #check()} after construction to see the errors.
      *
-     * @param sealed binary sealed contract.
-     * @param transactionPack the transaction pack to resolve dependencies against.
+     * @param {Uint8Array} sealed binary sealed contract.
+     * @param {TransactionPack} transactionPack the transaction pack to resolve dependencies against.
      * @param contract - init contract (example, NSmartContract). Optional.
      * @returns {Contract | NSmartContract | SlotContract | UnsContract | FollowerContract} extracted contract
      */
@@ -1903,7 +1903,7 @@ class Contract extends bs.BiSerializable {
      *
      * @param {string} fileName - Path to file containing YAML representation of a contract.
      * @param contract - init contract (example, NSmartContract). Optional.
-     * @return {Contract | NSmartContract | SlotContract | UnsContract | FollowerContract} initialized contract.
+     * @return {Promise<Contract | NSmartContract | SlotContract | UnsContract | FollowerContract>} initialized contract.
      */
     static async fromDslFile(fileName, contract = undefined) {
         let input = await io.openRead(fileName);

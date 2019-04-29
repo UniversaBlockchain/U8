@@ -90,7 +90,7 @@ class FollowerContract extends NSmartContract {
      * Method creates {@link FollowerContract} contract from dsl file where contract is described.
      *
      * @param {string} fileName - Path to dsl file with yaml structure of data for contract.
-     * @return {FollowerContract} created and ready {@link FollowerContract} contract.
+     * @return {Promise<FollowerContract>} created and ready {@link FollowerContract} contract.
      */
     static fromDslFile(fileName) {
         return Contract.fromDslFile(fileName, new FollowerContract());
@@ -254,9 +254,9 @@ class FollowerContract extends NSmartContract {
         // then looking for prepaid early U that can be find at the stat.data
         // additionally we looking for and calculate times of payment fillings and some other data
         let now = Math.floor(Date.now() / 1000);
-        let wasPrepaidOriginDays;
-        let storedEarlyOrigins;
-        let spentEarlyODs;
+        let wasPrepaidOriginDays = 0;
+        let storedEarlyOrigins = 0;
+        let spentEarlyODs = 0;
         let spentEarlyODsTimeSecs = now;
         let parentContract = this.getRevokingItem(this.state.parent);
         if (parentContract != null) {
@@ -264,8 +264,7 @@ class FollowerContract extends NSmartContract {
             storedEarlyOrigins = t.getOrDefault(parentContract.state.data, FollowerContract.FOLLOWED_ORIGINS_FIELD_NAME, 0);
             spentEarlyODs = t.getOrDefault(parentContract.state.data, FollowerContract.SPENT_OD_FIELD_NAME, 0);
             spentEarlyODsTimeSecs = t.getOrDefault(parentContract.state.data, FollowerContract.SPENT_OD_TIME_FIELD_NAME, now);
-        } else
-            wasPrepaidOriginDays = 0;
+        }
 
         this.prepaidOriginDays = wasPrepaidOriginDays + this.paidU * Number(this.getRate());
 
