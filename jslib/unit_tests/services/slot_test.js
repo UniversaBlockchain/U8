@@ -114,6 +114,7 @@ unit.test("slot_test: serializeSlotContract", async () => {
     assert(NSmartContract.SmartContractType.SLOT1 === desContract.definition.extendedType);
 
     assert(desContract instanceof SlotContract);
+    //assert(desContract2 instanceof SlotContract);
 
     let mdp = slotContract.definition.permissions.get("modify_data");
     assert(mdp !== null);
