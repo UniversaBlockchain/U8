@@ -416,6 +416,85 @@ Local<FunctionTemplate> initUDPAdapter(Isolate *isolate) {
     return tpl;
 }
 
+class HttpServerBuffered {
+public:
+    HttpServerBuffered(std::string host, int port, int poolSize, int bufSize)
+     : srv_(host, port, poolSize)
+     , bufSize_(bufSize) {
+        timer_.scheduleAtFixedRate([this](){
+            sendAllFromBuf();
+        }, 20, 20);
+    }
+
+    void addEndpoint(const std::string &endpoint) {
+        srv_.addEndpoint(endpoint, [this](HttpServerRequest *req) {
+            atomic<bool> needSend(false);
+            {
+                lock_guard lock(mutex_);
+                buf_.emplace_back(req);
+                if (buf_.size() >= bufSize_)
+                    needSend = true;
+            }
+            if (needSend) {
+                sendAllFromBuf();
+            }
+        });
+    }
+
+    void setBufferedCallback(Persistent<Function>* pcb, shared_ptr<Scripter> se) {
+        if (pcb_ != nullptr) {
+            pcb_->Reset();
+            delete pcb_;
+        }
+        pcb_ = pcb;
+        se_ = se;
+    }
+
+private:
+    void sendAllFromBuf() {
+        lock_guard lock(mutex_);
+        if ((se_ != nullptr) && (buf_.size() > 0)) {
+            auto bufCopy = buf_;
+            buf_.clear();
+            se_->inPool([=](Local<Context> &context) {
+                auto fn = pcb_->Get(context->GetIsolate());
+                if (fn->IsNull()) {
+                    se_->throwError("null callback in setBufferedCallback");
+                } else {
+                    Local<Array> arr = Array::New(se_->isolate(), bufCopy.size());
+                    for (int i = 0; i < bufCopy.size(); ++i) {
+                        HttpServerRequest* hsrp = bufCopy[i];
+                        arr->Set(i, wrap(HttpServerRequestTpl, se_->isolate(), hsrp));
+                    }
+                    Local<Value> result = arr;
+                    auto unused = fn->Call(context, fn, 1, &result);
+                }
+            });
+        }
+    }
+
+private:
+    HttpServer srv_;
+    std::vector<HttpServerRequest*> buf_;
+    std::mutex mutex_;
+    Persistent<Function>* pcb_ = nullptr;
+    shared_ptr<Scripter> se_ = nullptr;
+    TimerThread timer_;
+    const int bufSize_ = 1;
+};
+
+void httpServer_setBufferedCallback(const FunctionCallbackInfo<Value> &args) {
+    Scripter::unwrap(args, [&](const shared_ptr<Scripter> se, auto isolate, auto context) {
+        if (args.Length() == 1) {
+            auto httpServer = unwrap<HttpServerBuffered>(args.This());
+            Persistent<Function> *pcb = new Persistent<Function>(isolate, args[0].As<Function>());
+            httpServer->setBufferedCallback(pcb, se);
+            return;
+        }
+        se->throwError("invalid arguments");
+    });
+}
+
 void httpServer_startServer(const FunctionCallbackInfo<Value> &args) {
     Scripter::unwrapArgs(args, [](ArgsContext &ac) {
         if (ac.args.Length() == 0) {
@@ -441,8 +520,8 @@ void httpServer_stopServer(const FunctionCallbackInfo<Value> &args) {
 
 void httpServer_addEndpoint(const FunctionCallbackInfo<Value> &args) {
     Scripter::unwrapArgs(args, [](ArgsContext &ac) {
-        if (ac.args.Length() == 2) {
-            auto httpServer = unwrap<HttpServer>(ac.args.This());
+        if (ac.args.Length() == 1) {
+            auto httpServer = unwrap<HttpServerBuffered>(ac.args.This());
             std::shared_ptr<v8::Persistent<v8::Function>> jsCallback (
                     new v8::Persistent<v8::Function>(ac.isolate, ac.args[1].As<v8::Function>()), [](auto p){
                         p->Reset();
@@ -450,14 +529,7 @@ void httpServer_addEndpoint(const FunctionCallbackInfo<Value> &args) {
                     }
             );
             auto se = ac.scripter;
-            httpServer->addEndpoint(ac.asString(0), [jsCallback,se](HttpServerRequest& request){
-                HttpServerRequest* hsrp = &request;
-                se->inPool([=](Local<Context> &context) {
-                    auto fn = jsCallback->Get(context->GetIsolate());
-                    Local<Value> res[1] {wrap(HttpServerRequestTpl, se->isolate(), hsrp)};
-                    auto unused = fn->Call(context, fn, 1, res);
-                });
-            });
+            httpServer->addEndpoint(ac.asString(0));
             return;
         }
         ac.throwError("invalid arguments");
@@ -465,16 +537,17 @@ void httpServer_addEndpoint(const FunctionCallbackInfo<Value> &args) {
 }
 
 Local<FunctionTemplate> initHttpServer(Isolate *isolate) {
-    Local<FunctionTemplate> tpl = bindCppClass<HttpServer>(
+    Local<FunctionTemplate> tpl = bindCppClass<HttpServerBuffered>(
             isolate,
             "HttpServerTpl",
-            [=](const FunctionCallbackInfo<Value> &args) -> HttpServer* {
-                if (args.Length() == 3) {
+            [=](const FunctionCallbackInfo<Value> &args) -> HttpServerBuffered* {
+                if (args.Length() == 4) {
                     try {
-                        auto res = new HttpServer(
+                        auto res = new HttpServerBuffered(
                             string(*String::Utf8Value(isolate, args[0])),                          // host
                             args[1]->Int32Value(isolate->GetCurrentContext()).FromJust(),          // port
-                            args[2]->Int32Value(isolate->GetCurrentContext()).FromJust()           // poolSize
+                            args[2]->Int32Value(isolate->GetCurrentContext()).FromJust(),          // poolSize
+                            args[3]->Int32Value(isolate->GetCurrentContext()).FromJust()           // bufSize
                         );
                         return res;
                     } catch (const std::exception& e) {
@@ -488,6 +561,7 @@ Local<FunctionTemplate> initHttpServer(Isolate *isolate) {
                 return nullptr;
             });
     auto prototype = tpl->PrototypeTemplate();
+    prototype->Set(isolate, "__setBufferedCallback", FunctionTemplate::New(isolate, httpServer_setBufferedCallback));
     prototype->Set(isolate, "__startServer", FunctionTemplate::New(isolate, httpServer_startServer));
     prototype->Set(isolate, "__stopServer", FunctionTemplate::New(isolate, httpServer_stopServer));
     prototype->Set(isolate, "__addEndpoint", FunctionTemplate::New(isolate, httpServer_addEndpoint));
@@ -608,6 +682,17 @@ void HttpServerRequest_sendAnswer(const FunctionCallbackInfo<Value> &args) {
     });
 }
 
+void HttpServerRequest_getEndpoint(const FunctionCallbackInfo<Value> &args) {
+    Scripter::unwrapArgs(args, [](ArgsContext &ac) {
+        if (ac.args.Length() == 0) {
+            auto httpServerRequest = unwrap<HttpServerRequest>(ac.args.This());
+            ac.setReturnValue(ac.v8String(httpServerRequest->getEndpoint()));
+            return;
+        }
+        ac.throwError("invalid arguments");
+    });
+}
+
 void JsInitHttpServerRequest(Isolate *isolate, const Local<ObjectTemplate> &global) {
     // Bind object with default constructor
     Local<FunctionTemplate> tpl = bindCppClass<network::HttpServerRequest>(isolate, "HttpServerRequest");
@@ -619,6 +704,7 @@ void JsInitHttpServerRequest(Isolate *isolate, const Local<ObjectTemplate> &glob
     prototype->Set(isolate, "setHeader", FunctionTemplate::New(isolate, HttpServerRequest_setHeader));
     prototype->Set(isolate, "setAnswerBody", FunctionTemplate::New(isolate, HttpServerRequest_setAnswerBody));
     prototype->Set(isolate, "sendAnswer", FunctionTemplate::New(isolate, HttpServerRequest_sendAnswer));
+    prototype->Set(isolate, "getEndpoint", FunctionTemplate::New(isolate, HttpServerRequest_getEndpoint));
 
     // register it into global namespace
     HttpServerRequestTpl.Reset(isolate, tpl);

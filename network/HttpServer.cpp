@@ -7,10 +7,11 @@
 
 namespace network {
 
-HttpServerRequest::HttpServerRequest(mg_connection* con, http_message *hm, std::shared_ptr<mg_mgr> mgr) {
+HttpServerRequest::HttpServerRequest(mg_connection* con, http_message *hm, std::shared_ptr<mg_mgr> mgr, std::string endpoint) {
     con_ = con;
     msg_ = hm;
     mgr_ = mgr;
+    endpoint_ = endpoint;
     extHeaders_["Content-Type"] = "text/plain";
     extHeaders_["Connection"] = "close";
 }
@@ -74,9 +75,9 @@ HttpServer::HttpServer(std::string host, int port, int poolSize)
             http_message* hm = (http_message*)ev_data;
             std::string strUri = std::string(hm->uri.p, hm->uri.len);
             if (server->routes_.find(strUri) != server->routes_.end()) {
-                HttpServerRequest* request = new HttpServerRequest(nc, hm, server->mgr_);
+                HttpServerRequest* request = new HttpServerRequest(nc, hm, server->mgr_, strUri);
                 server->receivePool_.execute([server,strUri,request](){
-                    server->routes_[strUri](*request);
+                    server->routes_[strUri](request);
                 });
             } else {
                 mg_http_send_error(nc, 404, nullptr);
@@ -103,7 +104,7 @@ void HttpServer::join() {
     serverThread_->join();
 }
 
-void HttpServer::addEndpoint(const std::string& endpoint, const std::function<void(HttpServerRequest&)>& callback) {
+void HttpServer::addEndpoint(const std::string& endpoint, const std::function<void(HttpServerRequest*)>& callback) {
     routes_[endpoint] = callback;
 }
 

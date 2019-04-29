@@ -129,8 +129,22 @@ class HttpServerError extends Error {
 }
 
 network.HttpServer = class {
-    constructor(host, port, poolSize) {
-        this.httpServer_ = new network.HttpServerImpl(host, port, poolSize);
+    constructor(host, port, poolSize, bufSize) {
+        this.httpServer_ = new network.HttpServerImpl(host, port, poolSize, bufSize);
+        this.endpoints_ = new Map();
+        this.httpServer_.__setBufferedCallback((reqArr) => {
+            for (let i = 0; i < reqArr.length; ++i) {
+                let req = reqArr[i];
+                let endpoint = req.getEndpoint();
+                if (this.endpoints_.has(endpoint)) {
+                    this.endpoints_.get(endpoint)(req);
+                } else {
+                    req.setStatusCode(404);
+                    req.setAnswerBody(utf8Encode("404 page not found"));
+                    req.sendAnswer();
+                }
+            }
+        });
     }
 
     startServer() {
@@ -142,7 +156,8 @@ network.HttpServer = class {
     }
 
     addEndpoint(endpoint, block) {
-        this.httpServer_.__addEndpoint(endpoint, block);
+        this.httpServer_.__addEndpoint(endpoint);
+        this.endpoints_.set(endpoint, block);
     }
 
     addSecureEndpoint(endpoint, block) {

@@ -19,7 +19,7 @@ namespace network {
 class HttpServerRequest {
 public:
     HttpServerRequest() {}
-    HttpServerRequest(mg_connection* con, http_message *hm, std::shared_ptr<mg_mgr> mgr);
+    HttpServerRequest(mg_connection* con, http_message *hm, std::shared_ptr<mg_mgr> mgr, std::string endpoint);
 public:
     void setStatusCode(int code);
     void setHeader(const std::string& key, const std::string& value);
@@ -28,6 +28,7 @@ public:
     void setAnswerBody(const std::string& text);
     void sendAnswerFromAnotherThread();
     void sendAnswer();
+    std::string getEndpoint() {return endpoint_;}
 protected:
     mg_connection* con_;
     http_message* msg_;
@@ -35,6 +36,7 @@ protected:
     int statusCode_ = 200;
     std::unordered_map<std::string, std::string> extHeaders_;
     byte_vector answerBody_;
+    std::string endpoint_;
 };
 
 class HttpServer {
@@ -46,13 +48,13 @@ public:
     void stop();
     void join();
 
-    void addEndpoint(const std::string& endpoint, const std::function<void(HttpServerRequest&)>& callback);
+    void addEndpoint(const std::string& endpoint, const std::function<void(HttpServerRequest*)>& callback);
     void addSecureEndpoint();
 
 private:
     std::shared_ptr<mg_mgr> mgr_;
     mg_connection* listener_;
-    std::unordered_map<std::string, std::function<void(HttpServerRequest&)>> routes_;
+    std::unordered_map<std::string, std::function<void(HttpServerRequest*)>> routes_;
     std::atomic<bool> exitFlag_ = false;
     std::shared_ptr<std::thread> serverThread_;
     ThreadPool receivePool_;

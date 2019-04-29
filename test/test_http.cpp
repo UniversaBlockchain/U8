@@ -20,12 +20,12 @@ TEST_CASE("http_hello") {
     atomic<int> counter(0);
     crypto::PrivateKey privateKey(4096);
     crypto::PublicKey publicKey(privateKey);
-    httpServer.addEndpoint("/testPage", [&counter,&publicKey](HttpServerRequest& request){
-        request.setHeader("Server", "Universa node");
+    httpServer.addEndpoint("/testPage", [&counter,&publicKey](HttpServerRequest* request){
+        request->setHeader("Server", "Universa node");
         string answer("testPage answer #"+to_string(++counter));
         byte_vector bv(answer.begin(), answer.end());
-        request.setAnswerBody(answer + ", encrypted: " + base64_encode(publicKey.encrypt(bv)));
-        request.sendAnswerFromAnotherThread();
+        request->setAnswerBody(answer + ", encrypted: " + base64_encode(publicKey.encrypt(bv)));
+        request->sendAnswerFromAnotherThread();
     });
     httpServer.start();
 

@@ -3,7 +3,7 @@ import {HttpServer} from 'udp_adapter'
 import * as tk from 'unit_tests/test_keys'
 
 unit.test("hello web", async () => {
-    let httpServer = new network.HttpServer("0.0.0.0", 8080, 4);
+    let httpServer = new network.HttpServer("0.0.0.0", 8080, 4, 10);
     let counter = 0;
     httpServer.addEndpoint("/testPage", (request) => {
         ++counter;
@@ -12,6 +12,10 @@ unit.test("hello web", async () => {
         request.setHeader("header2", "header_value_2");
         request.setAnswerBody(utf8Encode("httpServer: on /testPage counter="+counter));
         //typeof(plainText) == 'string' ? utf8Encode(plainText) : plainText
+        request.sendAnswer();
+    });
+    httpServer.addEndpoint("/testPage2", (request) => {
+        request.setAnswerBody(utf8Encode("httpServer: on /testPage2 some text"));
         request.sendAnswer();
     });
     httpServer.startServer();
