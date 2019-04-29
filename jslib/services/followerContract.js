@@ -1,6 +1,5 @@
 const bs = require("biserializable");
 const DefaultBiMapper = require("defaultbimapper").DefaultBiMapper;
-const BigDecimal  = require("big").Big;
 const roles = require('roles');
 const permissions = require('permissions');
 const t = require("tools");
@@ -26,7 +25,7 @@ class FollowerContract extends NSmartContract {
     static TRACKING_ORIGINS_FIELD_NAME = "tracking_origins";
     static CALLBACK_KEYS_FIELD_NAME = "callback_keys";
 
-    // in data (definition.data, state.data or transactional.data) of following contract
+    // array roles in data (definition.data, state.data or transactional.data) of following contract
     static FOLLOWER_ROLES_FIELD_NAME = "follower_roles";
 
     constructor() {
@@ -214,36 +213,25 @@ class FollowerContract extends NSmartContract {
      * @return {boolean} true if {@link Contract} can be follow by this {@link FollowerContract}.
      */
     canFollowContract(contract) {
-    // check for contract owner
-    /*let owner = contract.getOwner();
-    if (owner.isAllowedForKeys(getSealedByKeys()))
-        return true;
-
-    // check for roles from field data.follower_roles in all sections of contract
-    List<String> sections = Arrays.asList("definition", "state", "transactional");
-
-    return (sections.stream().anyMatch(section -> {
-        try {
-            Object followerRoles = contract.get(section + ".data." + FOLLOWER_ROLES_FIELD_NAME);
-            if (((followerRoles != null) && followerRoles instanceof Collection) &&
-                (((Collection)followerRoles).stream().anyMatch(r -> {
-                    Role role;
-                    if (r instanceof Binder)
-                        role = new BiDeserializer().deserialize((Binder) r);
-                    else if (r instanceof Role)
-                        role = (Role) r;
-                    else
-                        return false;
-
-                    if ((!(role instanceof Role)) || ((role instanceof RoleLink) && (role.getContract() == null)))
-                        return false;
-                    return role.isAllowedForKeys(getSealedByKeys());
-                })))
+        // check for contract owner
+        if (contract.roles.owner.isAllowedForKeys(this.sealedByKeys.keys()))
             return true;
-        } catch (Exception e) {} // no followable roles in <section>.data
 
-        return false;
-    }));*/
+        // check for roles from field data.follower_roles in all sections of contract
+        let sections = ["definition", "state", "transactional"];
+
+        return sections.some(section => {
+            try {
+                let followerRoles = contract.get(section + ".data." + FollowerContract.FOLLOWER_ROLES_FIELD_NAME);
+                if (followerRoles != null && followerRoles instanceof Array && followerRoles.some(role =>
+                    role instanceof roles.Role && !(role instanceof roles.RoleLink && role.contract == null) &&
+                    role.isAllowedForKeys(this.sealedByKeys.keys())
+                    ))
+                    return true;
+            } catch (err) {} // no followable roles in <section>.data
+
+            return false;
+        });
     }
 
     /**
@@ -290,7 +278,7 @@ class FollowerContract extends NSmartContract {
             this.state.data[FollowerContract.PAID_U_FIELD_NAME] = this.paidU;
 
             this.state.data[FollowerContract.PREPAID_OD_FIELD_NAME] = this.prepaidOriginDays;
-            if (this.state.revision() === 1)
+            if (this.state.revision === 1)
                 this.state.data[FollowerContract.PREPAID_FROM_TIME_FIELD_NAME] = now;
 
             this.state.data[FollowerContract.FOLLOWED_ORIGINS_FIELD_NAME] = this.trackingOrigins.size;
