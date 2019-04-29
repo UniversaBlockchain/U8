@@ -21,7 +21,7 @@ const UnsName = require("services/unsName").UnsName;
     await referencesContract.seal(true);
     assert(await referencesContract.check());
 
-    let paymentDecreased = createUnsPayment();
+    let paymentDecreased = await createUnsPayment();
 
     let uns = UnsContract.fromPrivateKey(key);
 
@@ -55,11 +55,10 @@ const UnsName = require("services/unsName").UnsName;
     assert(uns instanceof NSmartContract);
     assert(uns instanceof NContract); //TODO
 
-   // Multimap<String, Permission> permissions = uns.definition.permissions; //TODO
-    //Collection<Permission> mdp = permissions.get("modify_data");
-
+    let mdp = uns.definition.permissions.get("modify_data");
     assert(mdp !== 0);
-    assert((mdp.iterator().next()).getFields().containsKey("action")); //TODO
+    assert(mdp instanceof Array);
+    assert(mdp[0].fields.hasOwnProperty("action"));
 
     assert(uns.unsName(reducedName).getUnsReducedName(), reducedName);
     assertEquals(uns.getUnsName(reducedName).getUnsDescription(), "test description modified");
@@ -76,7 +75,7 @@ unit.test("uns_test: goodUnsContractFromDSL", async () => {
     let authorizedNameServiceKey = tk.TestKeys.getKey(3); //TODO
     Config.authorizedNameServiceCenterKey = authorizedNameServiceKey.publicKey.packed();  //TODO
 
-    let paymentDecreased = createUnsPayment();
+    let paymentDecreased = await createUnsPayment();
 
     let uns = UnsContract.fromDslFile("../test/services/simple_uns_contract.yml");
     uns.nodeInfoProvider = nodeInfoProvider;
@@ -109,7 +108,7 @@ unit.test("uns_test: serializeUnsContract", async () => {
     await referencesContract.seal(true);
     assert(await referencesContract.check());
 
-    let paymentDecreased = createUnsPayment();
+    let paymentDecreased = await createUnsPayment();
 
     let uns = UnsContract.fromPrivateKey(key);
 

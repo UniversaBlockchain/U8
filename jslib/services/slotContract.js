@@ -90,7 +90,7 @@ class SlotContract extends NSmartContract {
      * Method creates {@link SlotContract} contract from dsl file where contract is described.
      *
      * @param {string} fileName is path to dsl file with yaml structure of data for contract.
-     * @return {SlotContract} created and ready {@link SlotContract} contract.
+     * @return {Promise<SlotContract>} created and ready {@link SlotContract} contract.
      */
     static fromDslFile(fileName) {
         return Contract.fromDslFile(fileName, new SlotContract());

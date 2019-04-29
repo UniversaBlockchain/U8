@@ -84,7 +84,7 @@ class UnsContract extends NSmartContract {
      *
      * @param {string} fileName is path to dsl file with yaml structure of data for contract.
      *
-     * @return {UnsContract} created and ready {@link UnsContract} contract.
+     * @return {Promise<UnsContract>} created and ready {@link UnsContract} contract.
      */
     static fromDslFile(fileName) {
         return Contract.fromDslFile(fileName, new UnsContract());
