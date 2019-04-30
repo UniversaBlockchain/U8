@@ -85,7 +85,7 @@ class TransactionPack {
                 if(!found) {
                     removed = true;
                     //TODO: NContracts
-                    let c = new Contract.fromSealedBinary(allDeps[i].binary,this);
+                    let c = Contract.fromSealedBinary(allDeps[i].binary, this);
                     this.subItems.set(c.id,c);
                     missingIds.delete(c.id);
                     allDeps.splice(i,1);

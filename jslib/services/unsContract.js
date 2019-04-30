@@ -178,9 +178,9 @@ class UnsContract extends NSmartContract {
 
         this.spentNDsTime = new Date();
         let now = Math.floor(Date.now() / 1000);
-        let wasPrepaidNamesForDays;
-        let storedEarlyEntries;
-        let spentEarlyNDs;
+        let wasPrepaidNamesForDays = 0;
+        let storedEarlyEntries = 0;
+        let spentEarlyNDs = 0;
         let spentEarlyNDsTimeSecs = now;
         let parentContract = this.getRevokingItem(this.state.parent);
         if (parentContract != null) {
@@ -188,8 +188,7 @@ class UnsContract extends NSmartContract {
             spentEarlyNDsTimeSecs = t.getOrDefault(parentContract.state.data, UnsContract.SPENT_ND_TIME_FIELD_NAME, now);
             storedEarlyEntries = t.getOrDefault(parentContract.state.data, UnsContract.STORED_ENTRIES_FIELD_NAME, 0);
             spentEarlyNDs = t.getOrDefault(parentContract.state.data, UnsContract.SPENT_ND_FIELD_NAME, 0);
-        } else
-            wasPrepaidNamesForDays = 0;
+        }
 
         this.prepaidNamesForDays = wasPrepaidNamesForDays + this.paidU * Number(this.getRate());
 

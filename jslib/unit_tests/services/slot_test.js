@@ -106,15 +106,14 @@ unit.test("slot_test: serializeSlotContract", async () => {
     let b2 = DefaultBiMapper.getInstance().serialize(slotContract);
 
     let desContract = BossBiMapper.getInstance().deserialize(b);
-    //let desContract2 = DefaultBiMapper.getInstance().deserialize(b2);
+    let desContract2 = DefaultBiMapper.getInstance().deserialize(b2);
 
-    //tt.assertSameContracts(desContract, slotContract); //TODO
-    //tt.assertSameContracts(desContract2, slotContract); //
+    tt.assertSameContracts(desContract, slotContract);
 
     assert(NSmartContract.SmartContractType.SLOT1 === desContract.definition.extendedType);
 
     assert(desContract instanceof SlotContract);
-    //assert(desContract2 instanceof SlotContract);
+    assert(desContract2 instanceof SlotContract);
 
     let mdp = slotContract.definition.permissions.get("modify_data");
     assert(mdp !== null);
@@ -132,11 +131,11 @@ unit.test("slot_test: serializeSlotContract", async () => {
 
     let copiedContract = slotContract.copy();
 
-    //tt.assertSameContracts(slotContract, copiedContract);
+    tt.assertSameContracts(slotContract, copiedContract);
+
     assert(NSmartContract.SmartContractType.SLOT1 === copiedContract.definition.extendedType);
     assert(NSmartContract.SmartContractType.SLOT1 === copiedContract.get("definition.extended_type"));
     assert(copiedContract instanceof SlotContract);
-
 
     mdp = copiedContract.definition.permissions.get("modify_data");
     assert(mdp !== 0);
@@ -193,14 +192,13 @@ unit.test("slot_test: keepRevisions", async () => {
 
     assert(2 === slotContract.trackingContracts.length);
     assert(simpleContract2.id.equals(slotContract.getTrackingContract().id));
-    //assert(simpleContract2.id.equals(TransactionPack.unpack(slotContract.getPackedTrackingContract()).contract.id));
-
+    assert(simpleContract2.id.equals(TransactionPack.unpack(slotContract.getPackedTrackingContract()).contract.id));
 
     trackingHashesAsBase64 = slotContract.state.data["tracking_contract"];
     for (let [hash, binary] of Object.entries(trackingHashesAsBase64)) {
-        //assert(hash === simpleContract2.id.base64);
-        //assert(simpleContract2.id.equals(Contract.fromPackedTransaction(binary).id));
-        //assertThat(c.getId(), Matchers.anyOf(equalTo(simpleContract.getId()), equalTo(simpleContract2.getId()))); //
+        assert(hash === simpleContract.id.base64 || hash === simpleContract2.id.base64);
+        let cid = Contract.fromPackedTransaction(binary).id;
+        assert(cid.equals(simpleContract.id) || cid.equals(simpleContract2.id));
     }
 
     let simpleContract3 = simpleContract2.createRevision([key]);
@@ -214,15 +212,14 @@ unit.test("slot_test: keepRevisions", async () => {
 
     assert(2 === slotContract.trackingContracts.length);
     assert(simpleContract3.id.equals(slotContract.getTrackingContract().id));
-   // assert(simpleContract3.id.equals(TransactionPack.unpack(slotContract.getPackedTrackingContract()).contract.id));
+    assert(simpleContract3.id.equals(TransactionPack.unpack(slotContract.getPackedTrackingContract()).contract.id));
 
     trackingHashesAsBase64 = slotContract.state.data["tracking_contract"];
 
     for (let [hash, binary] of Object.entries(trackingHashesAsBase64)) {
-       // assert(hash === simpleContract.id.base64);
-       // assert(simpleContract.id.equals(Contract.fromPackedTransaction(binary).id));
-       // assert(simpleContract2.id.equals(Contract.fromPackedTransaction(binary).id));
-       // assert(simpleContract3.id.equals(Contract.fromPackedTransaction(binary).id));
+        assert(hash === simpleContract.id.base64 || hash === simpleContract2.id.base64 || hash === simpleContract3.id.base64);
+        let cid = Contract.fromPackedTransaction(binary).id;
+        assert(cid.equals(simpleContract.id) || cid.equals(simpleContract2.id) || cid.equals(simpleContract3.id));
     }
 });
 

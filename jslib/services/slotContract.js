@@ -142,13 +142,13 @@ class SlotContract extends NSmartContract {
     deserialize(data, deserializer) {
         super.deserialize(data, deserializer);
 
-        this.deserializeForSlot();
+        this.deserializeForSlot(deserializer);
     }
 
     /**
      * Extract values from deserialized object for slot fields.
      */
-    deserializeForSlot() {
+    deserializeForSlot(deserializer) {
         // extract keep_revisions value
         let numRevisions = this.state.data[SlotContract.KEEP_REVISIONS_FIELD_NAME];
         if (numRevisions > 0)
@@ -161,9 +161,9 @@ class SlotContract extends NSmartContract {
 
         // extract and sort by revision number
         let contracts = [];
-        let trackingHashesAsBase64 = this.state.data[SlotContract.TRACKING_CONTRACT_FIELD_NAME];
+        let trackingHashesAsBase64 = deserializer.deserialize(this.state.data[SlotContract.TRACKING_CONTRACT_FIELD_NAME]);
 
-        for(let k of Object.keys(trackingHashesAsBase64)) {
+        for (let k of Object.keys(trackingHashesAsBase64)) {
             let packed = trackingHashesAsBase64[k];
             if (packed != null) {
                 let c = Contract.fromPackedTransaction(packed);
@@ -280,9 +280,9 @@ class SlotContract extends NSmartContract {
         // additionally we looking for and calculate times of payment fillings and some other data
         this.spentKDsTime = new Date();
         let now = Math.floor(Date.now() / 1000);
-        let wasPrepaidKilobytesForDays;
-        let storedEarlyBytes;
-        let spentEarlyKDs;
+        let wasPrepaidKilobytesForDays = 0;
+        let storedEarlyBytes = 0;
+        let spentEarlyKDs = 0;
         let spentEarlyKDsTimeSecs = now;
         let parentContract = this.getRevokingItem(this.state.parent);
         if (parentContract != null) {
@@ -290,8 +290,7 @@ class SlotContract extends NSmartContract {
             spentEarlyKDsTimeSecs = t.getOrDefault(parentContract.state.data, SlotContract.SPENT_KD_TIME_FIELD_NAME, now);
             storedEarlyBytes = t.getOrDefault(parentContract.state.data, SlotContract.STORED_BYTES_FIELD_NAME, 0);
             spentEarlyKDs = t.getOrDefault(parentContract.state.data, SlotContract.SPENT_KD_FIELD_NAME, 0);
-        } else
-            wasPrepaidKilobytesForDays = 0;
+        }
 
         this.prepaidKilobytesForDays = wasPrepaidKilobytesForDays + this.paidU * Number(this.getRate());
 

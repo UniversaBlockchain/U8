@@ -24,7 +24,7 @@ unit.test("uns_test: goodUnsContract", async () => {
 
     let paymentDecreased = await createUnsPayment();
     let unsContract = UnsContract.fromPrivateKey(key);
-    let reducedName = "testUnsContract" + Math.floor(Date.now() / 1000);
+    let reducedName = "testUnsContract" + Date.now();
 
     let unsName = new UnsName(reducedName, "test description", "http://test.com");
     unsName.unsReducedName = reducedName;
@@ -36,7 +36,7 @@ unit.test("uns_test: goodUnsContract", async () => {
 
     unsName.addUnsRecord(unsRecord1);
     unsName.addUnsRecord(unsRecord2);
-    unsContract.unsName = unsName;
+    unsContract.addUnsName(unsName);
     unsContract.addOriginContract(referencesContract);
 
     unsContract.nodeInfoProvider = tt.createNodeInfoProvider();
@@ -52,20 +52,20 @@ unit.test("uns_test: goodUnsContract", async () => {
     assert(NSmartContract.SmartContractType.UNS1 === unsContract.get("definition.extended_type"));
 
     assert(unsContract instanceof UnsContract);
-    assert(unsContract instanceof NSmartContract);
 
     let mdp = unsContract.definition.permissions.get("modify_data");
     assert(mdp !== 0);
     assert(mdp instanceof Array);
     assert(mdp[0].fields.hasOwnProperty("action"));
 
-    /*assert(unsContract.getUnsName(reducedName).unsReducedName === reducedName);                              //TODO
+    assert(unsContract.getUnsName(reducedName).unsReducedName === reducedName);
     assert(unsContract.getUnsName(reducedName).unsDescription === "test description modified");
     assert(unsContract.getUnsName(reducedName).unsURL === "http://test_modified.com");
 
-    assert(unsContract.getUnsName(reducedName).findUnsRecordByOrigin(referencesContract.getOrigin()) !== -1); //TODO
-    assert(unsContract.getUnsName(reducedName).findUnsRecordByKey(randomPrivKey.publicKey()) !== -1);
-    //assert(unsContract.getUnsName(reducedName).findUnsRecordByAddress(new crypto.KeyAddress(randomPrivKey.publicKey, 0, true)) !== -1); */
+    assert(unsContract.getUnsName(reducedName).findUnsRecordByOrigin(referencesContract.getOrigin()) !== -1);
+    assert(unsContract.getUnsName(reducedName).findUnsRecordByKey(randomPrivKey.publicKey) !== -1);
+    assert(unsContract.getUnsName(reducedName).findUnsRecordByAddress(new crypto.KeyAddress(randomPrivKey.publicKey, 0, true)) !== -1);
+    assert(unsContract.getUnsName(reducedName).findUnsRecordByAddress(new crypto.KeyAddress(randomPrivKey.publicKey, 0, false)) !== -1);
 });
 
 unit.test("uns_test: goodUnsContractFromDSL", async () => {
@@ -95,7 +95,7 @@ unit.test("uns_test: goodUnsContractFromDSL", async () => {
 
 unit.test("uns_test: serializeUnsContract", async () => {
     let key = new crypto.PrivateKey(await (await io.openRead("../test/_xer0yfe2nn1xthc.private.unikey")).allBytes());
-    let randomPrivKey = await crypto.PrivateKey.generate(2048);
+    let randomPrivKey = tk.TestKeys.getKey();
 
     let authorizedNameServiceKey = tk.TestKeys.getKey();
     Config.authorizedNameServiceCenterKey = authorizedNameServiceKey.publicKey.packed;
@@ -108,7 +108,7 @@ unit.test("uns_test: serializeUnsContract", async () => {
 
     let unsContract = await UnsContract.fromPrivateKey(key);
 
-    let reducedName = "testUnsContract" + Math.floor(Date.now() / 1000);
+    let reducedName = "testUnsContract" + Date.now();
     let unsName = new UnsName(reducedName, "test description", "http://test.com");
     unsName.unsReducedName = reducedName;
 
@@ -116,7 +116,7 @@ unit.test("uns_test: serializeUnsContract", async () => {
     let unsRecord2 = UnsRecord.fromOrigin(referencesContract.id);
     unsName.addUnsRecord(unsRecord1);
     unsName.addUnsRecord(unsRecord2);
-    unsContract.unsName = unsName;
+    unsContract.addUnsName(unsName);
     unsContract.addOriginContract(referencesContract);
 
     unsContract.nodeInfoProvider = tt.createNodeInfoProvider();
@@ -132,43 +132,43 @@ unit.test("uns_test: serializeUnsContract", async () => {
     let b2 = DefaultBiMapper.getInstance().serialize(unsContract);
 
     let desContract = BossBiMapper.getInstance().deserialize(b);
-    let desContract2 = DefaultBiMapper.getInstance().deserialize(b2);
+    //let desContract2 = DefaultBiMapper.getInstance().deserialize(b2);
 
-    //tt.assertSameContracts(desContract, unsContract); // TODO
+    //tt.assertSameContracts(desContract, unsContract);
     //tt.assertSameContracts(desContract2, unsContract);
 
     assert(NSmartContract.SmartContractType.UNS1 === desContract.definition.extendedType);
     assert(NSmartContract.SmartContractType.UNS1 === desContract.get("definition.extended_type"));
 
     assert(desContract instanceof UnsContract);
-    assert(desContract instanceof NSmartContract);
 
     let mdp = desContract.definition.permissions.get("modify_data");
     assert(mdp != null);
     assert(mdp instanceof Array);
     assert(mdp[0].fields.hasOwnProperty("action"));
 
-    /*assert(desContract.getUnsName(reducedName).getUnsReducedName(), reducedName);
-    assertEquals(((UnsContract)desContract).getUnsName(reducedName).getUnsDescription(), "test description");
-    assertEquals(((UnsContract)desContract).getUnsName(reducedName).getUnsURL(), "http://test.com");
+    assert(desContract.getUnsName(reducedName).unsReducedName === reducedName);
+    assert(desContract.getUnsName(reducedName).unsDescription === "test description");
+    assert(desContract.getUnsName(reducedName).unsURL === "http://test.com");
 
-    assertNotEquals(((UnsContract)desContract).getUnsName(reducedName).findUnsRecordByOrigin(referencesContract.getOrigin()), -1);
-    assertNotEquals(((UnsContract)desContract).getUnsName(reducedName).findUnsRecordByKey(randomPrivKey.getPublicKey()), -1);
-    assertNotEquals(((UnsContract)desContract).getUnsName(reducedName).findUnsRecordByAddress(new KeyAddress(randomPrivKey.getPublicKey(), 0, true)), -1);*/
+    assert(desContract.getUnsName(reducedName).findUnsRecordByOrigin(referencesContract.getOrigin()) !== -1);
+    assert(desContract.getUnsName(reducedName).findUnsRecordByKey(randomPrivKey.publicKey) !== -1);
+    assert(desContract.getUnsName(reducedName).findUnsRecordByAddress(new crypto.KeyAddress(randomPrivKey.publicKey, 0, true)) !== -1);
+    assert(desContract.getUnsName(reducedName).findUnsRecordByAddress(new crypto.KeyAddress(randomPrivKey.publicKey, 0, false)) !== -1);
 
-    mdp = desContract2.definition.permissions.get("modify_data");
+    /*mdp = desContract2.definition.permissions.get("modify_data");
     assert(mdp != null);
     assert(mdp instanceof Array);
     assert(mdp[0].fields.hasOwnProperty("action"));
 
-    /*assert(desContract2.getUnsName(reducedName).getUnsReducedName(), reducedName);
-    assertEquals(((UnsContract)desContract2).getUnsName(reducedName).getUnsDescription(), "test description");
-    assertEquals(((UnsContract)desContract2).getUnsName(reducedName).getUnsURL(), "http://test.com");
+    assert(desContract2.getUnsName(reducedName).unsReducedName === reducedName);
+    assert(desContract2.getUnsName(reducedName).unsDescription === "test description");
+    assert(desContract2.getUnsName(reducedName).unsURL === "http://test.com");
 
-    assertNotEquals(((UnsContract)desContract2).getUnsName(reducedName).findUnsRecordByOrigin(referencesContract.getOrigin()), -1);
-    assertNotEquals(((UnsContract)desContract2).getUnsName(reducedName).findUnsRecordByKey(randomPrivKey.getPublicKey()), -1);
-    assertNotEquals(((UnsContract)desContract2).getUnsName(reducedName).findUnsRecordByAddress(new KeyAddress(randomPrivKey.getPublicKey(), 0, true)), -1);*/
-
+    assert(desContract2.getUnsName(reducedName).findUnsRecordByOrigin(referencesContract.getOrigin()) !== -1);
+    assert(desContract2.getUnsName(reducedName).findUnsRecordByKey(randomPrivKey.publicKey) !== -1);
+    assert(desContract2.getUnsName(reducedName).findUnsRecordByAddress(new crypto.KeyAddress(randomPrivKey.publicKey, 0, true)) !== -1);
+    assert(desContract2.getUnsName(reducedName).findUnsRecordByAddress(new crypto.KeyAddress(randomPrivKey.publicKey, 0, false)) !== -1);*/
 
     let copiedUns = unsContract.copy();
 
@@ -183,13 +183,14 @@ unit.test("uns_test: serializeUnsContract", async () => {
     assert(mdp instanceof Array);
     assert(mdp[0].fields.hasOwnProperty("action"));
 
-    /*assertEquals(((UnsContract)copiedUns).getUnsName(reducedName).getUnsReducedName(), reducedName);
-    assertEquals(((UnsContract)copiedUns).getUnsName(reducedName).getUnsDescription(), "test description");
-    assertEquals(((UnsContract)copiedUns).getUnsName(reducedName).getUnsURL(), "http://test.com");
+    assert(copiedUns.getUnsName(reducedName).unsReducedName === reducedName);
+    assert(copiedUns.getUnsName(reducedName).unsDescription === "test description");
+    assert(copiedUns.getUnsName(reducedName).unsURL === "http://test.com");
 
-    assertNotEquals(((UnsContract)copiedUns).getUnsName(reducedName).findUnsRecordByOrigin(referencesContract.getOrigin()), -1);
-    assertNotEquals(((UnsContract)copiedUns).getUnsName(reducedName).findUnsRecordByKey(randomPrivKey.getPublicKey()), -1);
-    assertNotEquals(((UnsContract)copiedUns).getUnsName(reducedName).findUnsRecordByAddress(new KeyAddress(randomPrivKey.getPublicKey(), 0, true)), -1);*/
+    assert(copiedUns.getUnsName(reducedName).findUnsRecordByOrigin(referencesContract.getOrigin()) !== -1);
+    assert(copiedUns.getUnsName(reducedName).findUnsRecordByKey(randomPrivKey.publicKey) !== -1);
+    assert(copiedUns.getUnsName(reducedName).findUnsRecordByAddress(new crypto.KeyAddress(randomPrivKey.publicKey, 0, true)) !== -1);
+    assert(copiedUns.getUnsName(reducedName).findUnsRecordByAddress(new crypto.KeyAddress(randomPrivKey.publicKey, 0, false)) !== -1);
 });
 
 async function createUnsPayment() {

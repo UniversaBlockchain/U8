@@ -121,6 +121,9 @@ class UnsRecord extends bs.BiSerializable {
      * @return {boolean} if UNS record contains origin.
      */
     isMatchingOrigin(origin) {
+        if (this.unsOrigin == null)
+            return origin == null;
+
         return origin.equals(this.unsOrigin);
     }
 
