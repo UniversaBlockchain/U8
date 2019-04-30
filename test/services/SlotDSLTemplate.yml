@@ -26,7 +26,7 @@ definition:
 
      # to show to the user
      description: >
-       Notary.
+       Slot.
 
   # required. time of contract creation. must not be in the futute or too long in the past (few days are allowed,
   # consult current Universa state, maximum delayed contract creation time varies. This time we make a template
@@ -89,13 +89,13 @@ state:
              RgQpcaNreuKDJdqkrJ3I/g9eAHbvLcnoAWyUwKH+zgXhBa7ZCYYy62V0nCa5B9T27X10t8zx
              r+PPBrzzkNup+18kCyv+aimKStY4mgAQvRPqzET7WZN57n9z4xvfA6aA9in0dG7P8Wfw5mms
              yFVFyKqld+3KdZfhSsxvvO+4jm2VG3spX0BkP1/t2PbRmiYxnUkI8ZUB4SDlldUp6w==
-    # stepan_mamontov.unikey
+    # test_payment_owner.unikey
 
     # the rest is optional and application-specific
     name:
-      salutation: Mr.
-      first: Stepan
-      last: Mamontov
+      salutation: Dr.
+      first: Gordon
+      last: Freeman
 
   # required. who has created this document. for the root contract it is always the issues, for changed
   # states it is almost always the owner. The contract should be signed by this key.

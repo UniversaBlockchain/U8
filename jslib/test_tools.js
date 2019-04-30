@@ -1,6 +1,8 @@
 import * as io from 'io'
 import {assert} from 'test'
 
+const DefaultBiMapper = require("defaultbimapper").DefaultBiMapper;
+const BossBiMapper = require("bossbimapper").BossBiMapper;
 const NodeInfoProvider = require("services/NSmartContract").NodeInfoProvider;
 const Config = require("config").Config;
 const KeyRecord = require("keyrecord").KeyRecord;
@@ -97,17 +99,19 @@ function assertSameContracts(c1, c2) {
     else
         assert(c1.state.expiresAt === c2.state.expiresAt);
 
-    // check data
-    assert(c1.definition.data.equals(c2.definition.data));
-    assert(c1.state.data.equals(c2.state.data));
-
     // check definition
     assert(c1.definition.extendedType === c2.definition.extendedType);
+
+    assert(c1.definition.data.equals(c2.definition.data));
 
     // check state
     assert(c1.state.revision === c2.state.revision);
     assert(c1.state.branchId === c2.state.branchId);
     assert(c1.state.getBranchRevision() === c2.state.getBranchRevision());
+
+    assert(c1.state.data.equals(c2.state.data) ||
+        BossBiMapper.getInstance().serialize(c1.state.data).equals(BossBiMapper.getInstance().serialize(c2.state.data)) ||
+        DefaultBiMapper.getInstance().serialize(c1.state.data).equals(DefaultBiMapper.getInstance().serialize(c2.state.data)));
 
     // check constraints
     assert(Array.from(c1.constraints.values()).every(c => c.equals(c2.findConstraintByName(c.name))));

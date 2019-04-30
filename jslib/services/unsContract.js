@@ -1,6 +1,5 @@
 const bs = require("biserializable");
 const DefaultBiMapper = require("defaultbimapper").DefaultBiMapper;
-const BossBiMapper = require("bossbimapper").BossBiMapper;
 const permissions = require('permissions');
 const Constraint = require('constraint').Constraint;
 const roles = require('roles');
@@ -112,14 +111,14 @@ class UnsContract extends NSmartContract {
     deserialize(data, deserializer) {
         super.deserialize(data, deserializer);
 
-        this.deserializeForUns();
+        this.deserializeForUns(deserializer);
     }
 
     /**
      * Extract values from deserialized object for UNS fields.
      */
-    deserializeForUns() {
-        this.storedNames = BossBiMapper.getInstance().deserialize(t.getOrDefault(this.state.data, UnsContract.NAMES_FIELD_NAME, null));
+    deserializeForUns(deserializer) {
+        this.storedNames = deserializer.deserialize(t.getOrDefault(this.state.data, UnsContract.NAMES_FIELD_NAME, null));
 
         this.paidU = t.getOrDefault(this.state.data, UnsContract.PAID_U_FIELD_NAME, 0);
         this.prepaidNamesForDays = t.getOrDefault(this.state.data, UnsContract.PREPAID_ND_FIELD_NAME, 0);

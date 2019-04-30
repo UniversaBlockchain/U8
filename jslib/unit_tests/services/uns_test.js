@@ -13,14 +13,15 @@ const DefaultBiMapper = require("defaultbimapper").DefaultBiMapper;
 
 unit.test("uns_test: goodUnsContract", async () => {
     let key = new crypto.PrivateKey(await (await io.openRead("../test/_xer0yfe2nn1xthc.private.unikey")).allBytes());
-    let randomPrivKey = await crypto.PrivateKey.generate(2048);
+    let randomPrivKey = tk.TestKeys.getKey();
 
     let authorizedNameServiceKey = tk.TestKeys.getKey();
+    let authorizedNameServiceKeyBackup = Config.authorizedNameServiceCenterKey;
     Config.authorizedNameServiceCenterKey = authorizedNameServiceKey.publicKey.packed;
 
-    let referencesContract = Contract.fromPrivateKey(key);
-    await referencesContract.seal(true);
-    assert(await referencesContract.check());
+    let constraintsContract = Contract.fromPrivateKey(key);
+    await constraintsContract.seal(true);
+    assert(await constraintsContract.check());
 
     let paymentDecreased = await createUnsPayment();
     let unsContract = UnsContract.fromPrivateKey(key);
@@ -28,16 +29,17 @@ unit.test("uns_test: goodUnsContract", async () => {
 
     let unsName = new UnsName(reducedName, "test description", "http://test.com");
     unsName.unsReducedName = reducedName;
+    //modify unsName
     unsName.unsDescription = "test description modified";
     unsName.unsURL = "http://test_modified.com";
 
     let unsRecord1 = UnsRecord.fromKey(randomPrivKey.publicKey);
-    let unsRecord2 = UnsRecord.fromOrigin(referencesContract.id);
+    let unsRecord2 = UnsRecord.fromOrigin(constraintsContract.id);
 
     unsName.addUnsRecord(unsRecord1);
     unsName.addUnsRecord(unsRecord2);
     unsContract.addUnsName(unsName);
-    unsContract.addOriginContract(referencesContract);
+    unsContract.addOriginContract(constraintsContract);
 
     unsContract.nodeInfoProvider = tt.createNodeInfoProvider();
     unsContract.newItems.add(paymentDecreased);
@@ -54,7 +56,7 @@ unit.test("uns_test: goodUnsContract", async () => {
     assert(unsContract instanceof UnsContract);
 
     let mdp = unsContract.definition.permissions.get("modify_data");
-    assert(mdp !== 0);
+    assert(mdp !== null);
     assert(mdp instanceof Array);
     assert(mdp[0].fields.hasOwnProperty("action"));
 
@@ -62,22 +64,25 @@ unit.test("uns_test: goodUnsContract", async () => {
     assert(unsContract.getUnsName(reducedName).unsDescription === "test description modified");
     assert(unsContract.getUnsName(reducedName).unsURL === "http://test_modified.com");
 
-    assert(unsContract.getUnsName(reducedName).findUnsRecordByOrigin(referencesContract.getOrigin()) !== -1);
+    assert(unsContract.getUnsName(reducedName).findUnsRecordByOrigin(constraintsContract.getOrigin()) !== -1);
     assert(unsContract.getUnsName(reducedName).findUnsRecordByKey(randomPrivKey.publicKey) !== -1);
     assert(unsContract.getUnsName(reducedName).findUnsRecordByAddress(new crypto.KeyAddress(randomPrivKey.publicKey, 0, true)) !== -1);
     assert(unsContract.getUnsName(reducedName).findUnsRecordByAddress(new crypto.KeyAddress(randomPrivKey.publicKey, 0, false)) !== -1);
+
+    Config.authorizedNameServiceCenterKey = authorizedNameServiceKeyBackup;
 });
 
 unit.test("uns_test: goodUnsContractFromDSL", async () => {
+    let key = new crypto.PrivateKey(await (await io.openRead("../test/_xer0yfe2nn1xthc.private.unikey")).allBytes());
+
     let authorizedNameServiceKey = tk.TestKeys.getKey();
+    let authorizedNameServiceKeyBackup = Config.authorizedNameServiceCenterKey;
     Config.authorizedNameServiceCenterKey = authorizedNameServiceKey.publicKey.packed;
 
     let paymentDecreased = await createUnsPayment();
 
-    let unsContract = await UnsContract.fromDslFile("../test/services/simple_uns_contract.yml");
+    let unsContract = await UnsContract.fromDslFile("../test/services/UnsDSLTemplate.yml");
     unsContract.nodeInfoProvider = tt.createNodeInfoProvider();
-
-    let key = new crypto.PrivateKey(await (await io.openRead("../test/_xer0yfe2nn1xthc.private.unikey")).allBytes());
 
     unsContract.keysToSignWith.add(key);
     unsContract.keysToSignWith.add(authorizedNameServiceKey);
@@ -90,7 +95,13 @@ unit.test("uns_test: goodUnsContractFromDSL", async () => {
     assert(NSmartContract.SmartContractType.UNS1 === unsContract.get("definition.extended_type"));
 
     assert(unsContract instanceof UnsContract);
-    assert(unsContract instanceof NSmartContract);
+
+    let mdp = unsContract.definition.permissions.get("modify_data");
+    assert(mdp !== null);
+    assert(mdp instanceof Array);
+    assert(mdp[0].fields.hasOwnProperty("action"));
+
+    Config.authorizedNameServiceCenterKey = authorizedNameServiceKeyBackup;
 });
 
 unit.test("uns_test: serializeUnsContract", async () => {
@@ -98,11 +109,12 @@ unit.test("uns_test: serializeUnsContract", async () => {
     let randomPrivKey = tk.TestKeys.getKey();
 
     let authorizedNameServiceKey = tk.TestKeys.getKey();
+    let authorizedNameServiceKeyBackup = Config.authorizedNameServiceCenterKey;
     Config.authorizedNameServiceCenterKey = authorizedNameServiceKey.publicKey.packed;
 
-    let referencesContract = Contract.fromPrivateKey(key);
-    await referencesContract.seal(true);
-    assert(await referencesContract.check());
+    let constraintsContract = Contract.fromPrivateKey(key);
+    await constraintsContract.seal(true);
+    assert(await constraintsContract.check());
 
     let paymentDecreased = await createUnsPayment();
 
@@ -113,11 +125,11 @@ unit.test("uns_test: serializeUnsContract", async () => {
     unsName.unsReducedName = reducedName;
 
     let unsRecord1 = UnsRecord.fromKey(randomPrivKey.publicKey);
-    let unsRecord2 = UnsRecord.fromOrigin(referencesContract.id);
+    let unsRecord2 = UnsRecord.fromOrigin(constraintsContract.id);
     unsName.addUnsRecord(unsRecord1);
     unsName.addUnsRecord(unsRecord2);
     unsContract.addUnsName(unsName);
-    unsContract.addOriginContract(referencesContract);
+    unsContract.addOriginContract(constraintsContract);
 
     unsContract.nodeInfoProvider = tt.createNodeInfoProvider();
     unsContract.newItems.add(paymentDecreased);
@@ -132,10 +144,10 @@ unit.test("uns_test: serializeUnsContract", async () => {
     let b2 = DefaultBiMapper.getInstance().serialize(unsContract);
 
     let desContract = BossBiMapper.getInstance().deserialize(b);
-    //let desContract2 = DefaultBiMapper.getInstance().deserialize(b2);
+    let desContract2 = DefaultBiMapper.getInstance().deserialize(b2);
 
-    //tt.assertSameContracts(desContract, unsContract);
-    //tt.assertSameContracts(desContract2, unsContract);
+    tt.assertSameContracts(desContract, unsContract);
+    tt.assertSameContracts(desContract2, unsContract);
 
     assert(NSmartContract.SmartContractType.UNS1 === desContract.definition.extendedType);
     assert(NSmartContract.SmartContractType.UNS1 === desContract.get("definition.extended_type"));
@@ -151,12 +163,12 @@ unit.test("uns_test: serializeUnsContract", async () => {
     assert(desContract.getUnsName(reducedName).unsDescription === "test description");
     assert(desContract.getUnsName(reducedName).unsURL === "http://test.com");
 
-    assert(desContract.getUnsName(reducedName).findUnsRecordByOrigin(referencesContract.getOrigin()) !== -1);
+    assert(desContract.getUnsName(reducedName).findUnsRecordByOrigin(constraintsContract.getOrigin()) !== -1);
     assert(desContract.getUnsName(reducedName).findUnsRecordByKey(randomPrivKey.publicKey) !== -1);
     assert(desContract.getUnsName(reducedName).findUnsRecordByAddress(new crypto.KeyAddress(randomPrivKey.publicKey, 0, true)) !== -1);
     assert(desContract.getUnsName(reducedName).findUnsRecordByAddress(new crypto.KeyAddress(randomPrivKey.publicKey, 0, false)) !== -1);
 
-    /*mdp = desContract2.definition.permissions.get("modify_data");
+    mdp = desContract2.definition.permissions.get("modify_data");
     assert(mdp != null);
     assert(mdp instanceof Array);
     assert(mdp[0].fields.hasOwnProperty("action"));
@@ -165,10 +177,10 @@ unit.test("uns_test: serializeUnsContract", async () => {
     assert(desContract2.getUnsName(reducedName).unsDescription === "test description");
     assert(desContract2.getUnsName(reducedName).unsURL === "http://test.com");
 
-    assert(desContract2.getUnsName(reducedName).findUnsRecordByOrigin(referencesContract.getOrigin()) !== -1);
+    assert(desContract2.getUnsName(reducedName).findUnsRecordByOrigin(constraintsContract.getOrigin()) !== -1);
     assert(desContract2.getUnsName(reducedName).findUnsRecordByKey(randomPrivKey.publicKey) !== -1);
     assert(desContract2.getUnsName(reducedName).findUnsRecordByAddress(new crypto.KeyAddress(randomPrivKey.publicKey, 0, true)) !== -1);
-    assert(desContract2.getUnsName(reducedName).findUnsRecordByAddress(new crypto.KeyAddress(randomPrivKey.publicKey, 0, false)) !== -1);*/
+    assert(desContract2.getUnsName(reducedName).findUnsRecordByAddress(new crypto.KeyAddress(randomPrivKey.publicKey, 0, false)) !== -1);
 
     let copiedUns = unsContract.copy();
 
@@ -176,7 +188,6 @@ unit.test("uns_test: serializeUnsContract", async () => {
     assert(NSmartContract.SmartContractType.UNS1 === copiedUns.get("definition.extended_type"));
 
     assert(copiedUns instanceof UnsContract);
-    assert(copiedUns instanceof NSmartContract);
 
     mdp = copiedUns.definition.permissions.get("modify_data");
     assert(mdp != null);
@@ -187,14 +198,16 @@ unit.test("uns_test: serializeUnsContract", async () => {
     assert(copiedUns.getUnsName(reducedName).unsDescription === "test description");
     assert(copiedUns.getUnsName(reducedName).unsURL === "http://test.com");
 
-    assert(copiedUns.getUnsName(reducedName).findUnsRecordByOrigin(referencesContract.getOrigin()) !== -1);
+    assert(copiedUns.getUnsName(reducedName).findUnsRecordByOrigin(constraintsContract.getOrigin()) !== -1);
     assert(copiedUns.getUnsName(reducedName).findUnsRecordByKey(randomPrivKey.publicKey) !== -1);
     assert(copiedUns.getUnsName(reducedName).findUnsRecordByAddress(new crypto.KeyAddress(randomPrivKey.publicKey, 0, true)) !== -1);
     assert(copiedUns.getUnsName(reducedName).findUnsRecordByAddress(new crypto.KeyAddress(randomPrivKey.publicKey, 0, false)) !== -1);
+
+    Config.authorizedNameServiceCenterKey = authorizedNameServiceKeyBackup;
 });
 
 async function createUnsPayment() {
-    let ownerKey = new crypto.PrivateKey(await (await io.openRead("../test/keys/stepan_mamontov.private.unikey")).allBytes());
+    let ownerKey = new crypto.PrivateKey(await (await io.openRead("../test/keys/test_payment_owner.private.unikey")).allBytes());
 
     let unsU = await tt.createFreshU(100000000, [ownerKey.publicKey]);
     let paymentDecreased = unsU.createRevision([ownerKey]);

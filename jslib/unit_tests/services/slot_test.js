@@ -109,6 +109,7 @@ unit.test("slot_test: serializeSlotContract", async () => {
     let desContract2 = DefaultBiMapper.getInstance().deserialize(b2);
 
     tt.assertSameContracts(desContract, slotContract);
+    tt.assertSameContracts(desContract2, slotContract);
 
     assert(NSmartContract.SmartContractType.SLOT1 === desContract.definition.extendedType);
 
@@ -138,14 +139,14 @@ unit.test("slot_test: serializeSlotContract", async () => {
     assert(copiedContract instanceof SlotContract);
 
     mdp = copiedContract.definition.permissions.get("modify_data");
-    assert(mdp !== 0);
+    assert(mdp !== null);
     assert(mdp instanceof Array);
     assert(mdp[0].fields.hasOwnProperty("action"));
 
     assert(simpleContract.id.equals(copiedContract.getTrackingContract().id));
     assert(simpleContract.id.equals(TransactionPack.unpack(copiedContract.getPackedTrackingContract()).contract.id));
 
-    trackingHashesAsBase64 = slotContract.state.data["tracking_contract"];
+    trackingHashesAsBase64 = copiedContract.state.data["tracking_contract"];
     for (let [hash, binary] of Object.entries(trackingHashesAsBase64)) {
         assert(hash === simpleContract.id.base64);
         assert(simpleContract.id.equals(Contract.fromPackedTransaction(binary).id));
@@ -224,7 +225,7 @@ unit.test("slot_test: keepRevisions", async () => {
 });
 
 async function createSlotPayment() {
-    let ownerKey = new crypto.PrivateKey(await (await io.openRead("../test/keys/stepan_mamontov.private.unikey")).allBytes());
+    let ownerKey = new crypto.PrivateKey(await (await io.openRead("../test/keys/test_payment_owner.private.unikey")).allBytes());
 
     let slotU = await tt.createFreshU(100000000, [ownerKey.publicKey]);
     let paymentDecreased = slotU.createRevision([ownerKey]);
