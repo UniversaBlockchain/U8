@@ -570,36 +570,115 @@ Local<FunctionTemplate> initHttpServer(Isolate *isolate) {
     return tpl;
 }
 
+struct HttpClientAnswer {
+    int reqId;
+    int respStatus;
+    std::string body;
+};
+
+class HttpClientBuffered {
+public:
+    HttpClientBuffered(int poolSize, int bufSize): httpClient_(poolSize), bufSize_(bufSize) {
+        timer_.scheduleAtFixedRate([this](){
+            sendAllFromBuf();
+        }, 20, 20);
+    }
+
+    void sendGetRequest(int reqId, const std::string& url) {
+        httpClient_.sendGetRequest(url, [this,reqId](int respStatus, std::string&& body) {
+            atomic<bool> needSend(false);
+            {
+                lock_guard lock(mutex_);
+                HttpClientAnswer ans;
+                ans.reqId = reqId;
+                ans.respStatus = respStatus;
+                ans.body = std::move(body);
+                buf_.emplace_back(ans);
+                if (buf_.size() >= bufSize_)
+                    needSend = true;
+            }
+            if (needSend) {
+                sendAllFromBuf();
+            }
+        });
+    }
+
+    void setBufferedCallback(Persistent<Function>* pcb, shared_ptr<Scripter> se) {
+        if (pcb_ != nullptr) {
+            pcb_->Reset();
+            delete pcb_;
+        }
+        pcb_ = pcb;
+        se_ = se;
+    }
+
+private:
+    void sendAllFromBuf() {
+        lock_guard lock(mutex_);
+        if ((se_ != nullptr) && (buf_.size() > 0)) {
+            auto bufCopy = buf_;
+            buf_.clear();
+            se_->inPool([=](Local<Context> &context) {
+                auto fn = pcb_->Get(context->GetIsolate());
+                if (fn->IsNull()) {
+                    se_->throwError("null callback in setBufferedCallback");
+                } else {
+                    Local<Array> arr = Array::New(se_->isolate(), bufCopy.size()*3);
+                    for (int i = 0; i < bufCopy.size(); ++i) {
+                        arr->Set(i * 3 + 0, Integer::New(se_->isolate(), bufCopy[i].reqId));
+                        arr->Set(i * 3 + 1, Integer::New(se_->isolate(), bufCopy[i].respStatus));
+                        arr->Set(i * 3 + 2, String::NewFromUtf8(se_->isolate(), bufCopy[i].body.c_str()));
+                    }
+                    Local<Value> result = arr;
+                    auto unused = fn->Call(context, fn, 1, &result);
+                }
+            });
+        }
+    }
+
+private:
+    HttpClient httpClient_;
+    Persistent<Function>* pcb_ = nullptr;
+    shared_ptr<Scripter> se_ = nullptr;
+    std::vector<HttpClientAnswer> buf_;
+    std::mutex mutex_;
+    const int bufSize_ = 1;
+    TimerThread timer_;
+};
+
 void httpClient_sendGetRequest(const FunctionCallbackInfo<Value> &args) {
     Scripter::unwrapArgs(args, [](ArgsContext &ac) {
         if (ac.args.Length() == 2) {
-            auto httpClient = unwrap<HttpClient>(ac.args.This());
-            auto jsCallback = new v8::Persistent<v8::Function>(ac.isolate, ac.args[1].As<v8::Function>());
-            auto se = ac.scripter;
-            httpClient->sendGetRequest(ac.asString(0), [se,jsCallback](int respCode, std::string&& body){
-                se->inPool([=](Local<Context> &context) {
-                    auto fn = jsCallback->Get(context->GetIsolate());
-                    Local<Value> res[2] {Integer::New(se->isolate(), respCode), se->v8String(body)};
-                    auto unused = fn->Call(context, fn, 2, res);
-                    jsCallback->Reset();
-                    delete jsCallback;
-                });
-            });
+            auto httpClient = unwrap<HttpClientBuffered>(ac.args.This());
+            httpClient->sendGetRequest(ac.asInt(0), ac.asString(1));
             return;
         }
         ac.throwError("invalid arguments");
     });
 }
 
+void httpClient_setBufferedCallback(const FunctionCallbackInfo<Value> &args) {
+    Scripter::unwrap(args, [&](const shared_ptr<Scripter> se, auto isolate, auto context) {
+        if (args.Length() == 1) {
+            auto httpServer = unwrap<HttpClientBuffered>(args.This());
+            Persistent<Function> *pcb = new Persistent<Function>(isolate, args[0].As<Function>());
+            httpServer->setBufferedCallback(pcb, se);
+            return;
+        }
+        se->throwError("invalid arguments");
+    });
+}
+
 Local<FunctionTemplate> initHttpClient(Isolate *isolate) {
-    Local<FunctionTemplate> tpl = bindCppClass<HttpClient>(
+    Local<FunctionTemplate> tpl = bindCppClass<HttpClientBuffered>(
             isolate,
             "HttpClientTpl",
-            [=](const FunctionCallbackInfo<Value> &args) -> HttpClient* {
-                if (args.Length() == 1) {
+            [=](const FunctionCallbackInfo<Value> &args) -> HttpClientBuffered* {
+                if (args.Length() == 2) {
                     try {
-                        auto res = new HttpClient(
-                            args[0]->Int32Value(isolate->GetCurrentContext()).FromJust()           // poolSize
+                        auto res = new HttpClientBuffered(
+                            args[0]->Int32Value(isolate->GetCurrentContext()).FromJust(),          // poolSize
+                            args[1]->Int32Value(isolate->GetCurrentContext()).FromJust()           // bufSize
                         );
                         return res;
                     } catch (const std::exception& e) {
@@ -614,6 +693,7 @@ Local<FunctionTemplate> initHttpClient(Isolate *isolate) {
             });
     auto prototype = tpl->PrototypeTemplate();
     prototype->Set(isolate, "__sendGetRequest", FunctionTemplate::New(isolate, httpClient_sendGetRequest));
+    prototype->Set(isolate, "__setBufferedCallback", FunctionTemplate::New(isolate, httpClient_setBufferedCallback));
 
     HttpClientTpl.Reset(isolate, tpl);
     return tpl;

@@ -24,7 +24,7 @@ unit.test("hello web", async () => {
     let countToSend = 2000;
     let receiveCounter = 0;
 
-    let httpClient = new network.HttpClient(20);
+    let httpClient = new network.HttpClient(20, 20);
     let t0 = new Date().getTime();
     let counter0 = 0;
     for (let i = 0; i < countToSend; ++i) {

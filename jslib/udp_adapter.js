@@ -166,12 +166,33 @@ network.HttpServer = class {
 };
 
 network.HttpClient = class {
-    constructor(poolSize) {
-        this.httpClient_ = new network.HttpClientImpl(poolSize);
+    constructor(poolSize, bufSize) {
+        this.httpClient_ = new network.HttpClientImpl(poolSize, bufSize);
+        this.callbacks_ = new Map();
+        this.nextReqId_ = 1;
+        this.httpClient_.__setBufferedCallback((ansArr) => {
+            for (let i = 0; i < Math.floor(ansArr.length/3); ++i) {
+                let reqId = ansArr[i*3 + 0];
+                if (this.callbacks_.has(reqId)) {
+                    this.callbacks_.get(reqId)(ansArr[i*3 + 1], ansArr[i*3 + 2]);
+                    this.callbacks_.delete(reqId);
+                }
+            }
+        });
     }
 
     sendGetRequest(url, block) {
-        this.httpClient_.__sendGetRequest(url, block);
+        let reqId = this.getReqId();
+        this.callbacks_.set(reqId, block)
+        this.httpClient_.__sendGetRequest(reqId, url);
+    }
+
+    getReqId() {
+        let id = this.nextReqId_;
+        this.nextReqId_ += 1;
+        if (this.nextReqId_ > 2000000000)
+            this.nextReqId_ = 1;
+        return id;
     }
 };
 
