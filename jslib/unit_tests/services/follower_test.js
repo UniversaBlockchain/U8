@@ -282,30 +282,33 @@ unit.test("follower_test: followerContractNewRevision", async () => {
 });
 
 unit.test("follower_test: testCanFollowContract", async () => {
-    /*let key = new crypto.PrivateKey(await (await io.openRead("../test/_xer0yfe2nn1xthc.private.unikey")).allBytes());
+    let key = new crypto.PrivateKey(await (await io.openRead("../test/_xer0yfe2nn1xthc.private.unikey")).allBytes());
     let key2 = new crypto.PrivateKey(await (await io.openRead("../test/test_network_whitekey.private.unikey")).allBytes());
 
     let simpleContract = Contract.fromPrivateKey(key2);
     await simpleContract.seal(true);
     assert(await simpleContract.check());
 
-    let owner1 = new roles.SimpleRole("owner", KeyRecord(key.publicKey)); //todo
-    let owner2 = new roles.SimpleRole("owner", KeyRecord(key2.publicKey));
+    let owner1 = new roles.SimpleRole("owner", key.publicKey);
+    let owner2 = new roles.SimpleRole("owner", key2.publicKey);
 
-    let ownerKeys = new roles.ListRole("owner", ListRole.Mode.ANY,Do.listOf(owner1, owner2)); //TODO
+    let ownerKeys = new roles.ListRole("owner");
+    ownerKeys.mode = roles.ListRoleMode.ANY;
+    ownerKeys.roles = [owner1, owner2];
 
     let simpleContract2 = Contract.fromPrivateKey(key2);
     simpleContract2.registerRole(ownerKeys);
     await simpleContract2.seal(true);
     assert(await simpleContract2.check());
 
-    let callbackKey = tk.TestKeys.getKey();
+    let callbackKey = tk.TestKeys.getKey().publicKey;
     let followerContract = FollowerContract.fromPrivateKey(key);
     assert(followerContract instanceof FollowerContract);
 
     followerContract.nodeInfoProvider = tt.createNodeInfoProvider();
-    followerContract.putTrackingOrigin(simpleContract.getOrigin(), "http://localhost:7777/follow.callback", callbackKey.publicKey);
+    followerContract.putTrackingOrigin(simpleContract.getOrigin(), "http://localhost:7777/follow.callback", callbackKey);
     await followerContract.seal(true);
+    assert(await followerContract.check());
 
     // check canFollowContract
     assert(followerContract.canFollowContract(simpleContract2));
@@ -313,16 +316,17 @@ unit.test("follower_test: testCanFollowContract", async () => {
     // can not follow simpleContract (owner = key2) by followerContract (signed by key)
     assert(!followerContract.canFollowContract(simpleContract));
 
-    let newR = Do.listOf(followerContract.getRole("owner").resolve()); ///
+    let newRoles = [followerContract.roles.owner.resolve()];
 
-    simpleContract.definition.data[FOLLOWER_ROLES_FIELD_NAME] =  newR;
+    //definition
+    simpleContract.definition.data[FollowerContract.FOLLOWER_ROLES_FIELD_NAME] = newRoles;
 
     await simpleContract.seal(true);
     assert(await simpleContract.check());
 
     assert(followerContract.canFollowContract(simpleContract));
 
-    data.remove(FOLLOWER_ROLES_FIELD_NAME);
+    delete simpleContract.definition.data[FollowerContract.FOLLOWER_ROLES_FIELD_NAME];
 
     await simpleContract.seal(true);
     assert(await simpleContract.check());
@@ -330,14 +334,14 @@ unit.test("follower_test: testCanFollowContract", async () => {
     assert(!followerContract.canFollowContract(simpleContract));
 
     //state
-    simpleContract.state.data[FOLLOWER_ROLES_FIELD_NAME] =  newR;
+    simpleContract.state.data[FollowerContract.FOLLOWER_ROLES_FIELD_NAME] =  newRoles;
 
     await simpleContract.seal(true);
     assert(await simpleContract.check());
 
     assert(followerContract.canFollowContract(simpleContract));
 
-    simpleContract.getStateData().remove(FOLLOWER_ROLES_FIELD_NAME);
+    delete simpleContract.state.data[FollowerContract.FOLLOWER_ROLES_FIELD_NAME];
 
     await simpleContract.seal(true);
     assert(await simpleContract.check());
@@ -345,51 +349,53 @@ unit.test("follower_test: testCanFollowContract", async () => {
     assert(!followerContract.canFollowContract(simpleContract));
 
     //transactional
-    simpleContract.transactional.data[FOLLOWER_ROLES_FIELD_NAME] = newR;
+    simpleContract.createTransactionalSection();
+    simpleContract.transactional.data[FollowerContract.FOLLOWER_ROLES_FIELD_NAME] = newRoles;
 
     await simpleContract.seal(true);
     assert(await simpleContract.check());
 
     assert(followerContract.canFollowContract(simpleContract));
 
-    simpleContract.getTransactionalData().remove(FOLLOWER_ROLES_FIELD_NAME);
+    delete simpleContract.transactional.data[FollowerContract.FOLLOWER_ROLES_FIELD_NAME];
 
     await simpleContract.seal(true);
     assert(await simpleContract.check());
 
-    assert(!followerContract.canFollowContract(simpleContract));*/
+    assert(!followerContract.canFollowContract(simpleContract));
 });
 
 unit.test("follower_test: testAllCanFollowContract", async () => {
-    /*let key = new crypto.PrivateKey(await (await io.openRead("../test/_xer0yfe2nn1xthc.private.unikey")).allBytes());
+    let key = new crypto.PrivateKey(await (await io.openRead("../test/_xer0yfe2nn1xthc.private.unikey")).allBytes());
     let followerKey = tk.TestKeys.getKey();
 
     let simpleContract = Contract.fromPrivateKey(key);
     await simpleContract.seal(true);
     assert(await simpleContract.check());
 
-    let callbackKey = tk.TestKeys.getKey();
+    let callbackKey = tk.TestKeys.getKey().publicKey;
 
     let followerContract = FollowerContract.fromPrivateKey(followerKey);
 
     followerContract.nodeInfoProvider = tt.createNodeInfoProvider();
-    followerContract.putTrackingOrigin(simpleContract.getOrigin(), "http://localhost:7777/follow.callback", callbackKey.publicKey);
+    followerContract.putTrackingOrigin(simpleContract.getOrigin(), "http://localhost:7777/follow.callback", callbackKey);
     await followerContract.seal(true);
 
     // can not follow simpleContract (owner = key2) by smartContract (signed by key)
     assert(!followerContract.canFollowContract(simpleContract));
 
-    //ListRole followerAllRole = new ListRole("all", 0, new ArrayList<>()); //TODO
-    //List<Role> followerAllRoles = Do.listOf(followerAllRole);
+    let followerAllRole = new roles.ListRole("all");
+    followerAllRole.mode = roles.ListRoleMode.QUORUM;
 
-    simpleContract.definition.data[FOLLOWER_ROLES_FIELD_NAME] =  followerAllRoles;
+    //definition
+    simpleContract.definition.data[FollowerContract.FOLLOWER_ROLES_FIELD_NAME] = [followerAllRole];
 
     await simpleContract.seal(true);
     assert(await simpleContract.check());
 
     assert(followerContract.canFollowContract(simpleContract));
 
-    data.remove(FOLLOWER_ROLES_FIELD_NAME);
+    delete simpleContract.definition.data[FollowerContract.FOLLOWER_ROLES_FIELD_NAME];
 
     await simpleContract.seal(true);
     assert(await simpleContract.check());
@@ -397,14 +403,14 @@ unit.test("follower_test: testAllCanFollowContract", async () => {
     assert(!followerContract.canFollowContract(simpleContract));
 
     //state
-    simpleContract.state.data[FOLLOWER_ROLES_FIELD_NAME] = followerAllRoles;
+    simpleContract.state.data[FollowerContract.FOLLOWER_ROLES_FIELD_NAME] = [followerAllRole];
 
     await simpleContract.seal(true);
     assert(await simpleContract.check());
 
     assert(followerContract.canFollowContract(simpleContract));
 
-    simpleContract.getStateData().remove(FOLLOWER_ROLES_FIELD_NAME);
+    delete simpleContract.state.data[FollowerContract.FOLLOWER_ROLES_FIELD_NAME];
 
     await simpleContract.seal(true);
     assert(await simpleContract.check());
@@ -412,17 +418,18 @@ unit.test("follower_test: testAllCanFollowContract", async () => {
     assert(!followerContract.canFollowContract(simpleContract));
 
     //transactional
-    simpleContract.transactional.data[FOLLOWER_ROLES_FIELD_NAME] =  followerAllRoles;
+    simpleContract.createTransactionalSection();
+    simpleContract.transactional.data[FollowerContract.FOLLOWER_ROLES_FIELD_NAME] = [followerAllRole];
 
     await simpleContract.seal(true);
     assert(await simpleContract.check());
 
     assert(followerContract.canFollowContract(simpleContract));
 
-    simpleContract.getTransactionalData().remove(FOLLOWER_ROLES_FIELD_NAME);
+    delete simpleContract.transactional.data[FollowerContract.FOLLOWER_ROLES_FIELD_NAME];
 
     await simpleContract.seal(true);
     assert(await simpleContract.check());
 
-    assert(!followerContract.canFollowContract(simpleContract));*/
+    assert(!followerContract.canFollowContract(simpleContract));
 });

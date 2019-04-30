@@ -472,12 +472,12 @@ class ListRole extends Role {
         for(let r of this.roles) {
             if(r.isAllowedForKeys(keys)) {
                 valid++;
-                if(valid >= required)
+                if (valid >= required)
                     return true;
             }
         }
 
-        return false;
+        return valid >= required;
     }
 
     initWithDsl(serializedRole) {
@@ -515,7 +515,7 @@ class SimpleRole extends Role {
      * IMPORTANT, This class express "all_of" logic, e.g. if all of the presented keys are listed, then the role is allowed.
 
      * @param name {string} name of the role
-     * @param param {(crypto.PrivateKey|crypto.KeyAddress|iterable<crypto.PrivateKey>|iterable<crypto.KeyAddress>)}
+     * @param param {(crypto.PublicKey|crypto.KeyAddress|iterable<crypto.PublicKey>|iterable<crypto.KeyAddress>)}
      *
      * @constructor
      */

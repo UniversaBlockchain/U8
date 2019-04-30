@@ -44,16 +44,16 @@ class Transactional {
 
     serialize(serializer) {
 
-        let b = {
+        let of = {
             id: this.id,
             constraints : serializer.serialize(this.constraints),
             data : this.data,
         };
 
         if (this.validUntil != null)
-            b.valid_until = this.validUntil;
+            of.valid_until = this.validUntil;
 
-        return b;
+        return serializer.serialize(of);
     }
 
     deserialize(data, deserializer) {
@@ -1783,6 +1783,11 @@ class Contract extends bs.BiSerializable {
             return false;
 
         return issuerName === this.definition.data.issuerName;
+    }
+
+    createTransactionalSection() {
+        if (this.transactional == null)
+            this.transactional = new Transactional(this);
     }
 
     /**
