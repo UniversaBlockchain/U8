@@ -7,6 +7,8 @@ const FollowerContract = require("services/followerContract").FollowerContract;
 const tt = require("test_tools");
 const DefaultBiMapper = require("defaultbimapper").DefaultBiMapper;
 const BossBiMapper = require("bossbimapper").BossBiMapper;
+const KeyRecord = require("keyrecord").KeyRecord;
+const roles = require('roles');
 
 unit.test("follower_test: goodFollowerContract", async () => {
     let key = new crypto.PrivateKey(await (await io.openRead("../test/_xer0yfe2nn1xthc.private.unikey")).allBytes());
@@ -224,7 +226,6 @@ unit.test("follower_test: followerContractNewRevision", async () => {
 
     newRevFollowerContract.nodeInfoProvider = provider;
     newRevFollowerContract.putTrackingOrigin(simpleContract2.getOrigin(), "http://localhost:7777/follow.callbackTwo", callbackKey);
-
     await newRevFollowerContract.seal(true);
     assert(await newRevFollowerContract.check());
 
@@ -281,9 +282,147 @@ unit.test("follower_test: followerContractNewRevision", async () => {
 });
 
 unit.test("follower_test: testCanFollowContract", async () => {
+    /*let key = new crypto.PrivateKey(await (await io.openRead("../test/_xer0yfe2nn1xthc.private.unikey")).allBytes());
+    let key2 = new crypto.PrivateKey(await (await io.openRead("../test/test_network_whitekey.private.unikey")).allBytes());
 
+    let simpleContract = Contract.fromPrivateKey(key2);
+    await simpleContract.seal(true);
+    assert(await simpleContract.check());
+
+    let owner1 = new roles.SimpleRole("owner", KeyRecord(key.publicKey)); //todo
+    let owner2 = new roles.SimpleRole("owner", KeyRecord(key2.publicKey));
+
+    let ownerKeys = new roles.ListRole("owner", ListRole.Mode.ANY,Do.listOf(owner1, owner2)); //TODO
+
+    let simpleContract2 = Contract.fromPrivateKey(key2);
+    simpleContract2.registerRole(ownerKeys);
+    await simpleContract2.seal(true);
+    assert(await simpleContract2.check());
+
+    let callbackKey = tk.TestKeys.getKey();
+    let followerContract = FollowerContract.fromPrivateKey(key);
+    assert(followerContract instanceof FollowerContract);
+
+    followerContract.nodeInfoProvider = tt.createNodeInfoProvider();
+    followerContract.putTrackingOrigin(simpleContract.getOrigin(), "http://localhost:7777/follow.callback", callbackKey.publicKey);
+    await followerContract.seal(true);
+
+    // check canFollowContract
+    assert(followerContract.canFollowContract(simpleContract2));
+
+    // can not follow simpleContract (owner = key2) by followerContract (signed by key)
+    assert(!followerContract.canFollowContract(simpleContract));
+
+    let newR = Do.listOf(followerContract.getRole("owner").resolve()); ///
+
+    simpleContract.definition.data[FOLLOWER_ROLES_FIELD_NAME] =  newR;
+
+    await simpleContract.seal(true);
+    assert(await simpleContract.check());
+
+    assert(followerContract.canFollowContract(simpleContract));
+
+    data.remove(FOLLOWER_ROLES_FIELD_NAME);
+
+    await simpleContract.seal(true);
+    assert(await simpleContract.check());
+
+    assert(!followerContract.canFollowContract(simpleContract));
+
+    //state
+    simpleContract.state.data[FOLLOWER_ROLES_FIELD_NAME] =  newR;
+
+    await simpleContract.seal(true);
+    assert(await simpleContract.check());
+
+    assert(followerContract.canFollowContract(simpleContract));
+
+    simpleContract.getStateData().remove(FOLLOWER_ROLES_FIELD_NAME);
+
+    await simpleContract.seal(true);
+    assert(await simpleContract.check());
+
+    assert(!followerContract.canFollowContract(simpleContract));
+
+    //transactional
+    simpleContract.transactional.data[FOLLOWER_ROLES_FIELD_NAME] = newR;
+
+    await simpleContract.seal(true);
+    assert(await simpleContract.check());
+
+    assert(followerContract.canFollowContract(simpleContract));
+
+    simpleContract.getTransactionalData().remove(FOLLOWER_ROLES_FIELD_NAME);
+
+    await simpleContract.seal(true);
+    assert(await simpleContract.check());
+
+    assert(!followerContract.canFollowContract(simpleContract));*/
 });
 
 unit.test("follower_test: testAllCanFollowContract", async () => {
+    /*let key = new crypto.PrivateKey(await (await io.openRead("../test/_xer0yfe2nn1xthc.private.unikey")).allBytes());
+    let followerKey = tk.TestKeys.getKey();
 
+    let simpleContract = Contract.fromPrivateKey(key);
+    await simpleContract.seal(true);
+    assert(await simpleContract.check());
+
+    let callbackKey = tk.TestKeys.getKey();
+
+    let followerContract = FollowerContract.fromPrivateKey(followerKey);
+
+    followerContract.nodeInfoProvider = tt.createNodeInfoProvider();
+    followerContract.putTrackingOrigin(simpleContract.getOrigin(), "http://localhost:7777/follow.callback", callbackKey.publicKey);
+    await followerContract.seal(true);
+
+    // can not follow simpleContract (owner = key2) by smartContract (signed by key)
+    assert(!followerContract.canFollowContract(simpleContract));
+
+    //ListRole followerAllRole = new ListRole("all", 0, new ArrayList<>()); //TODO
+    //List<Role> followerAllRoles = Do.listOf(followerAllRole);
+
+    simpleContract.definition.data[FOLLOWER_ROLES_FIELD_NAME] =  followerAllRoles;
+
+    await simpleContract.seal(true);
+    assert(await simpleContract.check());
+
+    assert(followerContract.canFollowContract(simpleContract));
+
+    data.remove(FOLLOWER_ROLES_FIELD_NAME);
+
+    await simpleContract.seal(true);
+    assert(await simpleContract.check());
+
+    assert(!followerContract.canFollowContract(simpleContract));
+
+    //state
+    simpleContract.state.data[FOLLOWER_ROLES_FIELD_NAME] = followerAllRoles;
+
+    await simpleContract.seal(true);
+    assert(await simpleContract.check());
+
+    assert(followerContract.canFollowContract(simpleContract));
+
+    simpleContract.getStateData().remove(FOLLOWER_ROLES_FIELD_NAME);
+
+    await simpleContract.seal(true);
+    assert(await simpleContract.check());
+
+    assert(!followerContract.canFollowContract(simpleContract));
+
+    //transactional
+    simpleContract.transactional.data[FOLLOWER_ROLES_FIELD_NAME] =  followerAllRoles;
+
+    await simpleContract.seal(true);
+    assert(await simpleContract.check());
+
+    assert(followerContract.canFollowContract(simpleContract));
+
+    simpleContract.getTransactionalData().remove(FOLLOWER_ROLES_FIELD_NAME);
+
+    await simpleContract.seal(true);
+    assert(await simpleContract.check());
+
+    assert(!followerContract.canFollowContract(simpleContract));*/
 });
