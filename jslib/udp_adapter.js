@@ -132,16 +132,16 @@ network.HttpServer = class {
     constructor(host, port, poolSize, bufSize) {
         this.httpServer_ = new network.HttpServerImpl(host, port, poolSize, bufSize);
         this.endpoints_ = new Map();
-        this.httpServer_.__setBufferedCallback((reqArr) => {
-            for (let i = 0; i < reqArr.length; ++i) {
-                let req = reqArr[i];
-                let endpoint = req.getEndpoint();
+        this.httpServer_.__setBufferedCallback((reqBuf) => {
+            let length = reqBuf.getLength();
+            for (let i = 0; i < length; ++i) {
+                let endpoint = reqBuf.getEndpoint(i);
                 if (this.endpoints_.has(endpoint)) {
-                    this.endpoints_.get(endpoint)(req);
+                    this.endpoints_.get(endpoint)(i, reqBuf);
                 } else {
-                    req.setStatusCode(404);
-                    req.setAnswerBody(utf8Encode("404 page not found"));
-                    req.sendAnswer();
+                    reqBuf.setStatusCode(i, 404);
+                    reqBuf.setAnswerBody(i, utf8Encode("404 page not found"));
+                    reqBuf.sendAnswer(i);
                 }
             }
         });

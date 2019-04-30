@@ -16,7 +16,7 @@ static Persistent<FunctionTemplate> SocketAddressTpl;
 static Persistent<FunctionTemplate> NetConfigTpl;
 static Persistent<FunctionTemplate> UDPAdapterTpl;
 static Persistent<FunctionTemplate> HttpServerTpl;
-static Persistent<FunctionTemplate> HttpServerRequestTpl;
+static Persistent<FunctionTemplate> HttpServerRequestBufTpl;
 static Persistent<FunctionTemplate> HttpClientTpl;
 
 void nodeInfoGetPublicKey(const FunctionCallbackInfo<Value> &args) {
@@ -416,6 +416,34 @@ Local<FunctionTemplate> initUDPAdapter(Isolate *isolate) {
     return tpl;
 }
 
+class HttpServerRequestBuf {
+public:
+    void setStatusCode(int idx, int statusCode) {
+        buf_.at(idx)->setStatusCode(statusCode);
+    }
+    void setHeader(int idx, const std::string& key, const std::string& value) {
+        buf_.at(idx)->setHeader(key, value);
+    }
+    void setAnswerBody(int idx, const byte_vector& body) {
+        buf_.at(idx)->setAnswerBody(body);
+    }
+    void sendAnswer(int idx) {
+        buf_.at(idx)->sendAnswerFromAnotherThread();
+    }
+    std::string getEndpoint(int idx) {
+        return buf_.at(idx)->getEndpoint();
+    }
+    int getLength() {
+        return (int)buf_.size();
+    }
+public:
+    void addHttpServerRequest(HttpServerRequest* req) {
+        buf_.emplace_back(req);
+    }
+private:
+    std::vector<HttpServerRequest*> buf_;
+};
+
 class HttpServerBuffered {
 public:
     HttpServerBuffered(std::string host, int port, int poolSize, int bufSize)
@@ -461,13 +489,12 @@ private:
                 if (fn->IsNull()) {
                     se_->throwError("null callback in setBufferedCallback");
                 } else {
-                    Local<Array> arr = Array::New(se_->isolate(), bufCopy.size());
-                    for (int i = 0; i < bufCopy.size(); ++i) {
-                        HttpServerRequest* hsrp = bufCopy[i];
-                        arr->Set(i, wrap(HttpServerRequestTpl, se_->isolate(), hsrp));
-                    }
-                    Local<Value> result = arr;
-                    auto unused = fn->Call(context, fn, 1, &result);
+                    HttpServerRequestBuf* buf = new HttpServerRequestBuf();
+                    for (int i = 0; i < bufCopy.size(); ++i)
+                        buf->addHttpServerRequest(bufCopy[i]);
+                    Local<Value> res[1] = {wrap(HttpServerRequestBufTpl, se_->isolate(), buf)};
+                    auto unused = fn->Call(context, fn, 1, res);
+                    delete buf;
                 }
             });
         }
@@ -715,58 +742,69 @@ void JsInitNetwork(Isolate *isolate, const Local<ObjectTemplate> &global) {
     global->Set(isolate, "network", network);
 }
 
-void HttpServerRequest_setStatusCode(const FunctionCallbackInfo<Value> &args) {
-    Scripter::unwrapArgs(args, [](ArgsContext &ac) {
-        if (ac.args.Length() == 1) {
-            auto httpServerRequest = unwrap<HttpServerRequest>(ac.args.This());
-            httpServerRequest->setStatusCode(ac.asInt(0));
-            return;
-        }
-        ac.throwError("invalid arguments");
-    });
-}
-
-void HttpServerRequest_setHeader(const FunctionCallbackInfo<Value> &args) {
+void HttpServerRequestBuf_setStatusCode(const FunctionCallbackInfo<Value> &args) {
     Scripter::unwrapArgs(args, [](ArgsContext &ac) {
         if (ac.args.Length() == 2) {
-            auto httpServerRequest = unwrap<HttpServerRequest>(ac.args.This());
-            httpServerRequest->setHeader(ac.asString(0), ac.asString(1));
+            auto httpServerRequestBuf = unwrap<HttpServerRequestBuf>(ac.args.This());
+            httpServerRequestBuf->setStatusCode(ac.asInt(0), ac.asInt(1));
             return;
         }
         ac.throwError("invalid arguments");
     });
 }
 
-void HttpServerRequest_setAnswerBody(const FunctionCallbackInfo<Value> &args) {
+void HttpServerRequestBuf_setHeader(const FunctionCallbackInfo<Value> &args) {
     Scripter::unwrapArgs(args, [](ArgsContext &ac) {
-        if (ac.args.Length() == 1) {
-            auto httpServerRequest = unwrap<HttpServerRequest>(ac.args.This());
-            auto contents = ac.args[0].As<TypedArray>()->Buffer()->GetContents();
+        if (ac.args.Length() == 3) {
+            auto httpServerRequestBuf = unwrap<HttpServerRequestBuf>(ac.args.This());
+            httpServerRequestBuf->setHeader(ac.asInt(0), ac.asString(1), ac.asString(2));
+            return;
+        }
+        ac.throwError("invalid arguments");
+    });
+}
+
+void HttpServerRequestBuf_setAnswerBody(const FunctionCallbackInfo<Value> &args) {
+    Scripter::unwrapArgs(args, [](ArgsContext &ac) {
+        if (ac.args.Length() == 2) {
+            auto httpServerRequestBuf = unwrap<HttpServerRequestBuf>(ac.args.This());
+            auto contents = ac.args[1].As<TypedArray>()->Buffer()->GetContents();
             byte_vector bv(contents.ByteLength());
             memcpy(&bv[0], contents.Data(), contents.ByteLength());
-            httpServerRequest->setAnswerBody(std::move(bv));
+            httpServerRequestBuf->setAnswerBody(ac.asInt(0), std::move(bv));
             return;
         }
         ac.throwError("invalid arguments");
     });
 }
 
-void HttpServerRequest_sendAnswer(const FunctionCallbackInfo<Value> &args) {
+void HttpServerRequestBuf_sendAnswer(const FunctionCallbackInfo<Value> &args) {
     Scripter::unwrapArgs(args, [](ArgsContext &ac) {
-        if (ac.args.Length() == 0) {
-            auto httpServerRequest = unwrap<HttpServerRequest>(ac.args.This());
-            httpServerRequest->sendAnswerFromAnotherThread();
+        if (ac.args.Length() == 1) {
+            auto httpServerRequestBuf = unwrap<HttpServerRequestBuf>(ac.args.This());
+            httpServerRequestBuf->sendAnswer(ac.asInt(0));
             return;
         }
         ac.throwError("invalid arguments");
     });
 }
 
-void HttpServerRequest_getEndpoint(const FunctionCallbackInfo<Value> &args) {
+void HttpServerRequestBuf_getEndpoint(const FunctionCallbackInfo<Value> &args) {
+    Scripter::unwrapArgs(args, [](ArgsContext &ac) {
+        if (ac.args.Length() == 1) {
+            auto httpServerRequestBuf = unwrap<HttpServerRequestBuf>(ac.args.This());
+            ac.setReturnValue(ac.v8String(httpServerRequestBuf->getEndpoint(ac.asInt(0))));
+            return;
+        }
+        ac.throwError("invalid arguments");
+    });
+}
+
+void HttpServerRequestBuf_getLength(const FunctionCallbackInfo<Value> &args) {
     Scripter::unwrapArgs(args, [](ArgsContext &ac) {
         if (ac.args.Length() == 0) {
-            auto httpServerRequest = unwrap<HttpServerRequest>(ac.args.This());
-            ac.setReturnValue(ac.v8String(httpServerRequest->getEndpoint()));
+            auto httpServerRequestBuf = unwrap<HttpServerRequestBuf>(ac.args.This());
+            ac.setReturnValue(httpServerRequestBuf->getLength());
             return;
         }
         ac.throwError("invalid arguments");
@@ -775,18 +813,19 @@ void HttpServerRequest_getEndpoint(const FunctionCallbackInfo<Value> &args) {
 
 void JsInitHttpServerRequest(Isolate *isolate, const Local<ObjectTemplate> &global) {
     // Bind object with default constructor
-    Local<FunctionTemplate> tpl = bindCppClass<network::HttpServerRequest>(isolate, "HttpServerRequest");
+    Local<FunctionTemplate> tpl = bindCppClass<HttpServerRequestBuf>(isolate, "HttpServerRequestBuf");
 
     // instance methods
     auto prototype = tpl->PrototypeTemplate();
     prototype->Set(isolate, "version", String::NewFromUtf8(isolate, "0.0.1"));
-    prototype->Set(isolate, "setStatusCode", FunctionTemplate::New(isolate, HttpServerRequest_setStatusCode));
-    prototype->Set(isolate, "setHeader", FunctionTemplate::New(isolate, HttpServerRequest_setHeader));
-    prototype->Set(isolate, "setAnswerBody", FunctionTemplate::New(isolate, HttpServerRequest_setAnswerBody));
-    prototype->Set(isolate, "sendAnswer", FunctionTemplate::New(isolate, HttpServerRequest_sendAnswer));
-    prototype->Set(isolate, "getEndpoint", FunctionTemplate::New(isolate, HttpServerRequest_getEndpoint));
+    prototype->Set(isolate, "setStatusCode", FunctionTemplate::New(isolate, HttpServerRequestBuf_setStatusCode));
+    prototype->Set(isolate, "setHeader", FunctionTemplate::New(isolate, HttpServerRequestBuf_setHeader));
+    prototype->Set(isolate, "setAnswerBody", FunctionTemplate::New(isolate, HttpServerRequestBuf_setAnswerBody));
+    prototype->Set(isolate, "sendAnswer", FunctionTemplate::New(isolate, HttpServerRequestBuf_sendAnswer));
+    prototype->Set(isolate, "getEndpoint", FunctionTemplate::New(isolate, HttpServerRequestBuf_getEndpoint));
+    prototype->Set(isolate, "getLength", FunctionTemplate::New(isolate, HttpServerRequestBuf_getLength));
 
     // register it into global namespace
-    HttpServerRequestTpl.Reset(isolate, tpl);
-    global->Set(isolate, "HttpServerRequest", tpl);
+    HttpServerRequestBufTpl.Reset(isolate, tpl);
+    global->Set(isolate, "HttpServerRequestBuf", tpl);
 }

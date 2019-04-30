@@ -3,20 +3,20 @@ import {HttpServer} from 'udp_adapter'
 import * as tk from 'unit_tests/test_keys'
 
 unit.test("hello web", async () => {
-    let httpServer = new network.HttpServer("0.0.0.0", 8080, 4, 10);
+    let httpServer = new network.HttpServer("0.0.0.0", 8080, 1, 20);
     let counter = 0;
-    httpServer.addEndpoint("/testPage", (request) => {
+    httpServer.addEndpoint("/testPage", (reqIndex, request) => {
         ++counter;
-        request.setStatusCode(201);
-        request.setHeader("header1", "header_value_1");
-        request.setHeader("header2", "header_value_2");
-        request.setAnswerBody(utf8Encode("httpServer: on /testPage counter="+counter));
+        request.setAnswerBody(reqIndex, utf8Encode("httpServer: on /testPage counter="+counter));
         //typeof(plainText) == 'string' ? utf8Encode(plainText) : plainText
-        request.sendAnswer();
+        request.sendAnswer(reqIndex);
     });
-    httpServer.addEndpoint("/testPage2", (request) => {
-        request.setAnswerBody(utf8Encode("httpServer: on /testPage2 some text"));
-        request.sendAnswer();
+    httpServer.addEndpoint("/testPage2", (reqIndex, request) => {
+        request.setStatusCode(reqIndex, 201);
+        request.setHeader(reqIndex, "header1", "header_value_1");
+        request.setHeader(reqIndex, "header2", "header_value_2");
+        request.setAnswerBody(reqIndex, utf8Encode("httpServer: on /testPage2 some text"));
+        request.sendAnswer(reqIndex);
     });
     httpServer.startServer();
 
@@ -24,7 +24,8 @@ unit.test("hello web", async () => {
     let countToSend = 2000;
     let receiveCounter = 0;
 
-    let httpClient = new network.HttpClient(20, 20);
+    let httpClient = new network.HttpClient(30, 30);
+    let t00 = new Date().getTime();
     let t0 = new Date().getTime();
     let counter0 = 0;
     for (let i = 0; i < countToSend; ++i) {
@@ -46,6 +47,9 @@ unit.test("hello web", async () => {
     while (receiveCounter < countToSend) {
         await sleep(10);
     }
+    let dt = new Date().getTime() - t00;
+    let rps = (receiveCounter*1000/dt).toFixed(0);
+    console.logPut(" rps=" + rps + " ");
     assert(receiveCounter == countToSend);
 
     httpServer.stopServer();
