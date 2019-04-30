@@ -24,19 +24,21 @@ public:
     HttpClientWorker(int newId, HttpClient& parent);
     void sendGetRequest(const std::string& url, std::function<void(int,std::string&&)>&& callback);
     int getId() {return id_;}
+    void stop() {exitFlag_ = true;};
 private:
     int id_;
     HttpClient& parentRef_;
     ThreadPool worker_;
     std::shared_ptr<mg_mgr> mgr_;
-    bool exitFlag_ = false;
+    std::atomic<bool> exitFlag_ = false;
     std::function<void(int,std::string&&)> callback_;
 };
 
 class HttpClient {
 
 public:
-    HttpClient(int poolSize);
+    HttpClient(size_t poolSize);
+    virtual ~HttpClient();
 
     void sendGetRequest(const std::string& url, const std::function<void(int,std::string&&)>& callback);
     void sendGetRequest(const std::string& url, std::function<void(int,std::string&&)>&& callback);
@@ -47,6 +49,7 @@ private:
     friend HttpClientWorker;
 
 private:
+    size_t poolSize_;
     std::queue<std::shared_ptr<HttpClientWorker>> pool_;
     std::mutex poolMutex_;
     std::condition_variable poolCV_;

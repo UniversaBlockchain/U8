@@ -46,12 +46,21 @@ void HttpClientWorker::sendGetRequest(const std::string& url, std::function<void
     });
 }
 
-HttpClient::HttpClient(int poolSize)
+HttpClient::HttpClient(size_t poolSize)
   : poolControlThread_(1) {
-    for (int i = 0; i < poolSize; ++i) {
+    poolSize_ = poolSize;
+    for (int i = 0; i < poolSize_; ++i) {
         std::shared_ptr<HttpClientWorker> client = make_shared<HttpClientWorker>(i,*this);
         pool_.push(client);
     }
+}
+
+HttpClient::~HttpClient() {
+    std::unique_lock lock(poolMutex_);
+    for (auto &it: usedWorkers_)
+        it.second->stop();
+    while (pool_.size() < poolSize_)
+        poolCV_.wait(lock);
 }
 
 std::shared_ptr<HttpClientWorker> HttpClient::getUnusedWorker() {
