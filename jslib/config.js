@@ -7,6 +7,7 @@ class Config {
     static validUntilTailTime = 5*60; //5 minutes
     static maxItemCreationAge = 5*24*3600; //5 days
 
+    // SmartContract services
     static rate = {
         SLOT1: new BigDecimal(4),
         UNS1: new BigDecimal(0.25),
@@ -27,9 +28,12 @@ class Config {
     ];
     static authorizedNameServiceCenterKey = new crypto.PublicKey(atob("HggcAQABxAABg9ideX6A3Wk9CuwnZrakXdvhYDiIiO0HA+YWmLArcZvhhaGMrw1i1mA6S9L6NPAuhYcZzm8Mxtwr1RESyJqm+HFwU+49s0yXHhCJsXcvK23Yx7NEpIrpGkKt9OCCdBGhQkls0Yc1lBBmGYCrShMntPC9xY9DJZ4sbMuBPIUQzpnWLYgRAbZb+KuZFXAIr7hRO0rNTZ6hE5zp6oPwlQLh9hBy6CsvZD/73Cf2WtKDunHD1qKuQU/KqruqVMMv2fd6ZKo692esWsqqIAiQztg1+sArAhf0Cr8lhRf53G5rndiiQx7RDs1P9Pp1wWK9e93UL1KF4PpVx7e7SznrCHTEdw"));
 
-    static uTemplatePath = "../test/UTemplate.yml";                         //
-    static testUTemplatePath = "../test/TestUTemplate.yml";                 // TODO It is temporary
-    static uKeyPath = "../test/keys/u_key.private.unikey";                   //
+    // Follower callback service
+    static followerCallbackExpiration = 10*60; //10 minutes
+    static followerCallbackDelay = 10;
+    static followerCallbackStateStoreTime = 3*24*3600; // 3 days
+    static followerCallbackSynchronizationInterval = 12*3600; // 12 hours
+    static ratioNodesSendFollowerCallbackToComplete = new BigDecimal(0.3);
 }
 
 

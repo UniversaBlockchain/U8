@@ -20,6 +20,8 @@ const NNameRecord = require("services/NNameRecord").NNameRecord;
 const NNameRecordEntry = require("services/NNameRecordEntry").NNameRecordEntry;
 const NFollowerService = require("services/NFollowerService").NFollowerService;
 const NImmutableEnvironment = require("services/NImmutableEnvironment").NImmutableEnvironment;
+const NCallbackService = require("services/NCallbackService").NCallbackService;
+const CallbackRecord = require("services/callbackRecord").CallbackRecord;
 
 class LedgerException extends Error {
     constructor(message = undefined) {
@@ -1727,21 +1729,112 @@ class Ledger {
         });
     }
 
-    getFollowerCallbackStateById(id) { // TODO !!
-        /*return this.simpleQuery("SELECT state FROM follower_callbacks WHERE id = ?",
+    /**
+     * Get state of follower callback with the specified ID.
+     *
+     * @param {HashId} id - follower callback ID.
+     * @return {Promise<NCallbackService.FollowerCallbackState>} - set of environments IDs.
+     */
+    getFollowerCallbackStateById(id) {
+        return this.simpleQuery("SELECT state FROM follower_callbacks WHERE id = ?",
             x => {
                 if (x == null)
                     return NCallbackService.FollowerCallbackState.UNDEFINED;
                 else
-                    return NCallbackService.FollowerCallbackState.values()[x];
+                    return Object.values(NCallbackService.FollowerCallbackState)[x];
             },
-            id.digest);*/
+            id.digest);
     }
 
+    /**
+     * Get follower callbacks for resync from specified environment.
+     *
+     * @param {number} environmentId - environment ID.
+     * @return {Promise<[CallbackRecord]>} - array of {@link CallbackRecord} for resync.
+     */
     getFollowerCallbacksToResyncByEnvId(environmentId) {
+        return new Promise(async(resolve, reject) => {
+            this.dbPool_.withConnection(con => {
+                con.executeQuery(async(qr) => {
+                        let records = [];
+                        let count = qr.getRowsCount();
+                        while (count > 0) {
+                            let rows;
+                            if (count > 1024) {
+                                rows = qr.getRows(1024);
+                                count -= 1024;
+                            } else {
+                                rows = qr.getRows(count);
+                                count = 0;
+                            }
+                            for (let i = 0; i < rows.length; i++) {
+                                if (rows[i] != null)
+                                    records.push(new CallbackRecord(
+                                        crypto.HashId.withDigest(rows[i][0]),
+                                        environmentId,
+                                        Object.values(NCallbackService.FollowerCallbackState)[rows[i][1]]));
+                            }
+                        }
 
+                        con.release();
+                        resolve(records);
+                    }, e => {
+                        con.release();
+                        reject(e);
+                    },
+                    "SELECT id, state FROM follower_callbacks WHERE environment_id = ? AND expires_at < ? AND (state = ? OR state = ?)",
+                    environmentId,
+                    Math.floor(Date.now() / 1000),
+                    NCallbackService.FollowerCallbackState.STARTED.ordinal,
+                    NCallbackService.FollowerCallbackState.EXPIRED.ordinal
+                );
+            });
+        });
     }
-    getFollowerCallbacksToResync() {}
+
+    /**
+     * Get follower callbacks for resync from all environments.
+     *
+     * @return {Promise<[CallbackRecord]>} - array of {@link CallbackRecord} for resync.
+     */
+    getFollowerCallbacksToResync() {
+        return new Promise(async(resolve, reject) => {
+            this.dbPool_.withConnection(con => {
+                con.executeQuery(async(qr) => {
+                        let records = [];
+                        let count = qr.getRowsCount();
+                        while (count > 0) {
+                            let rows;
+                            if (count > 1024) {
+                                rows = qr.getRows(1024);
+                                count -= 1024;
+                            } else {
+                                rows = qr.getRows(count);
+                                count = 0;
+                            }
+                            for (let i = 0; i < rows.length; i++) {
+                                if (rows[i] != null)
+                                    records.push(new CallbackRecord(
+                                        crypto.HashId.withDigest(rows[i][0]),
+                                        rows[i][2],
+                                        Object.values(NCallbackService.FollowerCallbackState)[rows[i][1]]));
+                            }
+                        }
+
+                        con.release();
+                        resolve(records);
+                    }, e => {
+                        con.release();
+                        reject(e);
+                    },
+                    "SELECT id, state, environment_id FROM follower_callbacks WHERE expires_at < ? AND (state = ? OR state = ?)",
+                    Math.floor(Date.now() / 1000),
+                    NCallbackService.FollowerCallbackState.STARTED.ordinal,
+                    NCallbackService.FollowerCallbackState.EXPIRED.ordinal
+                );
+            });
+        });
+    }
 
     /**
      * Add to the repository an entry about the callback follower contract.
@@ -1755,7 +1848,7 @@ class Ledger {
     addFollowerCallback(id, environmentId, expiresAt, storedUntil) {
         return this.simpleUpdate("INSERT INTO follower_callbacks (id, state, environment_id, expires_at, stored_until) VALUES (?,?,?,?,?)",
             id.digest,
-            0, //NCallbackService.FollowerCallbackState.STARTED.ordinal() TODO !!
+            NCallbackService.FollowerCallbackState.STARTED.ordinal,
             environmentId,
             Math.floor(expiresAt.getTime() / 1000),
             Math.floor(storedUntil.getTime() / 1000));
@@ -1765,12 +1858,12 @@ class Ledger {
      * Update in the storage the callback record of the follower contract.
      *
      * @param {HashId} id - Callback ID.
-     * @param state - Callback state.
+     * @param {NCallbackService.FollowerCallbackState} state - Callback state.
      * @return {Promise<void>}
      */
     updateFollowerCallbackState(id, state) {
         return this.simpleUpdate("UPDATE follower_callbacks SET state = ? WHERE id = ?",
-            0, //state.ordinal() // TODO !!
+            state.ordinal,
             id.digest);
     }
 

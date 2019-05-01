@@ -8,6 +8,10 @@ const Config = require("config").Config;
 const KeyRecord = require("keyrecord").KeyRecord;
 const roles = require('roles');
 
+const uTemplatePath = "../test/UTemplate.yml";
+const testUTemplatePath = "../test/TestUTemplate.yml";
+const uKeyPath = "../test/keys/u_key.private.unikey";
+
 class TestNodeInfoProvider extends NodeInfoProvider {
 
     constructor() {
@@ -53,9 +57,9 @@ function createNodeInfoProvider() {
  * @return sealed U contract; should be registered in the Universa by simplified procedure.
  */
 async function createFreshU(amount, ownerKeys, withTestU = false) {
-    let manufacturePrivateKey = new crypto.PrivateKey(await (await io.openRead(Config.uKeyPath)).allBytes()); //TODO
+    let manufacturePrivateKey = new crypto.PrivateKey(await (await io.openRead(uKeyPath)).allBytes());
 
-    let u = await Contract.fromDslFile(withTestU ? Config.testUTemplatePath : Config.uTemplatePath);
+    let u = await Contract.fromDslFile(withTestU ? testUTemplatePath : uTemplatePath);
 
     let ownerRole = new roles.SimpleRole("owner", ownerKeys);
     u.registerRole(ownerRole);
