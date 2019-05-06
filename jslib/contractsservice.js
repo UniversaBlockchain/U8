@@ -224,3 +224,92 @@ async function createParcel(payload, payment, amount, keys, withTestPayment = fa
 
     return new Parcel(payloadPack, paymentDecreased.transactionPack);
 }
+
+/**
+ * Create paid transaction, which consist from prepared TransactionPack you want to register
+ * and payment contract that will be spend to process transaction.
+ * Included second payment.
+ * It is an extension to the parcel structure allowing include additional payment field that will not be
+ * registered if the transaction will fail.
+ * <br><br>
+ * Creates 2 U payment blocks:
+ * <ul>
+ * <li><i>first</i> (this is mandatory) is transaction payment, that will always be accepted, as it is now</li>
+ * <li><i>second</i> extra payment block for the same U that is accepted with the transaction inside it. </li>
+ * </ul>
+ * Technically it done by adding second payment to the new items of payload transaction.
+ * <br><br>
+ * Node processing logic logic is:
+ * <ul>
+ * <li>if the first payment fails, no further action is taking (no changes)</li>
+ * <li>if the first payments is OK, the transaction is evaluated and the second payment should be the part of it</li>
+ * <li>if the transaction including the second payment is OK, the transaction and the second payment are registered altogether.</li>
+ * <li>if any of the latest fail, the whole transaction is not accepted, e.g. the second payment is not accepted too</li>
+ * </ul>
+ * <br><br>
+ *
+ * @param {TransactionPack} payload - Is prepared TransactionPack you want to register in the Universa.
+ * @param {Contract} payment - Is approved contract with "U" belongs to you.
+ * @param {number} amount - Is number of "U" you want to spend to register payload contract.
+ * @param {number} amountSecond - Is number of "U" you want to spend from second payment.
+ * @param {Set<PrivateKey>} keys - Is own private keys, which are set as owner of payment contract
+ * @param {boolean} withTestPayment - If true {@link Parcel} will be created with test payment
+ * @return {Parcel} Parcel, it ready to send to the Universa.
+ */
+async function createPayingParcel(payload, payment, amount, amountSecond, keys, withTestPayment) {
+
+    let paymentDecreased = payment.createRevision(keys);
+
+    if (withTestPayment)
+        paymentDecreased.state.data.test_transaction_units = payment.state.data.test_transaction_units - amount;
+    else
+        paymentDecreased.state.data.transaction_units = payment.state.data.transaction_units - amount;
+
+    await paymentDecreased.seal(true);
+
+    let paymentDecreasedSecond = paymentDecreased.createRevision(keys);
+
+    if (withTestPayment)
+        paymentDecreasedSecond.state.data.test_transaction_units = paymentDecreased.state.data.test_transaction_units - amountSecond;
+    else
+        paymentDecreasedSecond.state.data.transaction_units = paymentDecreased.state.data.transaction_units - amountSecond;
+
+    await paymentDecreasedSecond.seal();
+
+    // we add new item to the contract, so we need to recreate transaction pack
+    let mainContract = payload.contract;
+    mainContract.newItems.add(paymentDecreasedSecond);
+    await mainContract.seal();
+    mainContract.transactionPack.extractAllSubItemsAndReferenced(mainContract);
+
+    return new Parcel(mainContract.transactionPack, paymentDecreased.transactionPack);
+}
+
+/**
+ * Create a batch contract, which registers all the included contracts, possibily referencing each other,
+ * in the single transaction, saving time and reducing U cost. Note that if any of the batched contracts
+ * fails, the whole batch is rejected.
+ *
+ * @param {[PrivateKey] | Set<PrivateKey>} keys - To sign batch with.
+ * @param {...Contract} contracts to register all in one batch. Shuld be prepared and sealed.
+ * @return {Contract} batch contract that includes all contracts as new items.
+ */
+async function createBatch(keys, ...contracts) {
+    let batch = new Contract();
+    batch.registerRole(new roles.SimpleRole("issuer", keys));
+    batch.registerRole(new roles.RoleLink("creator", "issuer"));
+    batch.registerRole(new roles.RoleLink("owner", "issuer"));
+
+    let expires = new Date();
+    expires.setDate(expires.getDate() + 3);
+    batch.setExpiresAt(expires);
+
+    for(let c of contracts)
+        batch.newItems.add(c);
+
+    for(let k of keys)
+        batch.keysToSignWith.add(k);
+
+    await batch.seal(true);
+    return batch;
+}

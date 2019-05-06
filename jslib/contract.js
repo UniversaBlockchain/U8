@@ -1804,6 +1804,16 @@ class Contract extends bs.BiSerializable {
     }
 
     /**
+     * Set expiration date of contract.
+     *
+     * @param {Date} dateTime - Expiration date to set.
+     */
+    setExpiresAt(dateTime) {
+        this.state.expiresAt = dateTime;
+        this.state.expiresAt.setMilliseconds(0);
+    }
+
+    /**
      * Creates a default empty new contract using a provided key as issuer and owner and sealer. Default expiration is
      * set to 90 days.
      * <p>
