@@ -2,9 +2,12 @@
  * @module network
  */
 const Contract = require("contract").Contract;
+const TransactionPack = require("transactionpack").TransactionPack;
+const Parcel = require("parcel").Parcel;
 const roles = require('roles');
-let BigDecimal  = require("big").Big;
+const BigDecimal  = require("big").Big;
 const Constraint = require('constraint').Constraint;
+const ex = require("exceptions");
 
 /**
  * Implementing revoking procedure.
@@ -185,4 +188,39 @@ async function createTwoSignedContract(baseContract, fromKeys, toKeys, createNew
     await twoSignContract.seal();
 
     return twoSignContract;
+}
+
+/**
+ * Create paid transaction, which consist from contract you want to register and payment contract that will be
+ * spend to process transaction.
+ *
+ * @param {Contract | TransactionPack} payload - Is prepared contract you want to register in the Universa.
+ * @param {Contract} payment - Is approved contract with "U" belongs to you.
+ * @param {number} amount - Is number of "U" you want to spend to register payload contract.
+ * @param {Set<crypto.PrivateKey>} keys - Is own private keys, which are set as owner of payment contract.
+ * @param {boolean} withTestPayment - If true {@link Parcel} will be created with test payment.
+ * @return {Parcel} Parcel, it ready to send to the Universa.
+ */
+async function createParcel(payload, payment, amount, keys, withTestPayment = false) {
+
+    let paymentDecreased = payment.createRevision(keys);
+    let payloadPack;
+    if (payload instanceof Contract) {
+        paymentDecreased.getTransactionalData()["id"] = payload.id.base64;
+
+        if (payload.transactionPack == null)
+            payloadPack = payload.transactionPack = new TransactionPack(this);
+    } else if (payload instanceof TransactionPack)
+        payloadPack = payload;
+    else
+        throw new ex.IllegalArgumentError("Illegal type of payload. Expected Contract or TransactionPack.");
+
+    if (withTestPayment)
+        paymentDecreased.state.data.test_transaction_units = payment.state.data.test_transaction_units - amount;
+    else
+        paymentDecreased.state.data.transaction_units = payment.state.data.transaction_units - amount;
+
+    await paymentDecreased.seal(true);
+
+    return new Parcel(payloadPack, paymentDecreased.transactionPack);
 }

@@ -27,7 +27,7 @@ function Context(base) {
     this.siblings = new Set();
 }
 
-class Transactional {
+class Transactional extends bs.BiSerializable {
     /**
      * Transactional is one of contract sections. It can be changed or even skipped freely across contract revisions
      *
@@ -35,6 +35,7 @@ class Transactional {
      * @constructor
      */
     constructor(contract) {
+        super();
         this.contract = contract;
         this.id = null;
         this.constraints = new Set();
@@ -1645,8 +1646,9 @@ class Contract extends bs.BiSerializable {
     }
 
     /**
+     * Create new revision of contract.
      *
-     * @param keys {Array<crypto.PrivateKey>} or {Set<crypto.PrivateKey>} - Creator keys for new revision.
+     * @param {Array<crypto.PrivateKey> | Set<crypto.PrivateKey>} keys - Creator keys for new revision.
      * @returns {Contract} new revision of a contract.
      */
     createRevision(keys) {
@@ -1788,6 +1790,17 @@ class Contract extends bs.BiSerializable {
     createTransactionalSection() {
         if (this.transactional == null)
             this.transactional = new Transactional(this);
+    }
+
+    /**
+     * Object to hold any data client might want to keep per one transaction.
+     *
+     * @return {Object} data from transactional section.
+     */
+    getTransactionalData() {
+        if (this.transactional == null)
+            this.createTransactionalSection();
+        return this.transactional.data;
     }
 
     /**
