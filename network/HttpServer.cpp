@@ -9,7 +9,8 @@ namespace network {
 
 HttpServerRequest::HttpServerRequest(mg_connection* con, http_message *hm, std::shared_ptr<mg_mgr> mgr, std::string endpoint) {
     con_ = con;
-    msg_ = hm;
+    queryString_ = std::string(hm->query_string.p, hm->query_string.len);
+    method_ = std::string(hm->method.p, hm->method.len);
     mgr_ = mgr;
     endpoint_ = endpoint;
     extHeaders_["Content-Type"] = "text/plain";
@@ -62,6 +63,14 @@ void HttpServerRequest::sendAnswer() {
     mg_send_head(con_, statusCode_, answerBody_.size(), extHeaders.c_str());
     mg_send(con_, &answerBody_[0], answerBody_.size());
     con_->flags |= MG_F_SEND_AND_CLOSE;
+}
+
+std::string HttpServerRequest::getQueryString() {
+    return queryString_;
+}
+
+std::string HttpServerRequest::getMethod() {
+    return method_;
 }
 
 HttpServer::HttpServer(std::string host, int port, int poolSize)

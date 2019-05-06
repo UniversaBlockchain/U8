@@ -5,18 +5,22 @@ import * as tk from 'unit_tests/test_keys'
 unit.test("hello web", async () => {
     let httpServer = new network.HttpServer("0.0.0.0", 8080, 1, 20);
     let counter = 0;
-    httpServer.addEndpoint("/testPage", (reqIndex, request) => {
+    httpServer.addEndpoint("/testPage", (request) => {
+        //console.log("getEndpoint: " + request.endpoint);
+        //console.log("method: " + request.method);
         ++counter;
-        request.setAnswerBody(reqIndex, utf8Encode("httpServer: on /testPage counter="+counter));
-        //typeof(plainText) == 'string' ? utf8Encode(plainText) : plainText
-        request.sendAnswer(reqIndex);
+        let a = request.queryParamsMap.get('a');
+        let b = request.queryParamsMap.get('b');
+        //console.log("queryString: " + request.queryString);
+        request.setAnswerBody("httpServer: on /testPage counter="+(a*b+counter));
+        request.sendAnswer();
     });
-    httpServer.addEndpoint("/testPage2", (reqIndex, request) => {
-        request.setStatusCode(reqIndex, 201);
-        request.setHeader(reqIndex, "header1", "header_value_1");
-        request.setHeader(reqIndex, "header2", "header_value_2");
-        request.setAnswerBody(reqIndex, utf8Encode("httpServer: on /testPage2 some text"));
-        request.sendAnswer(reqIndex);
+    httpServer.addEndpoint("/testPage2", (request) => {
+        request.setStatusCode(201);
+        request.setHeader("header1", "header_value_1");
+        request.setHeader("header2", "header_value_2");
+        request.setAnswerBody("httpServer: on /testPage2 some text");
+        request.sendAnswer();
     });
     httpServer.startServer();
 
@@ -29,7 +33,7 @@ unit.test("hello web", async () => {
     let t0 = new Date().getTime();
     let counter0 = 0;
     for (let i = 0; i < countToSend; ++i) {
-        httpClient.sendGetRequest("localhost:8080/testPage", (respCode, body) => {
+        httpClient.sendGetRequest("localhost:8080/testPage?a=73&b=1000000", (respCode, body) => {
             //console.log("[" + respCode + "]: " + body);
             ++receiveCounter;
             let dt = new Date().getTime() - t0;

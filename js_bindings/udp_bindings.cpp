@@ -433,8 +433,14 @@ public:
     std::string getEndpoint(int idx) {
         return buf_.at(idx)->getEndpoint();
     }
-    int getLength() {
+    int getBufLength() {
         return (int)buf_.size();
+    }
+    std::string getQueryString(int idx) {
+        return buf_.at(idx)->getQueryString();
+    }
+    std::string getMethod(int idx) {
+        return buf_.at(idx)->getMethod();
     }
 public:
     void addHttpServerRequest(HttpServerRequest* req) {
@@ -800,11 +806,33 @@ void HttpServerRequestBuf_getEndpoint(const FunctionCallbackInfo<Value> &args) {
     });
 }
 
-void HttpServerRequestBuf_getLength(const FunctionCallbackInfo<Value> &args) {
+void HttpServerRequestBuf_getBufLength(const FunctionCallbackInfo<Value> &args) {
     Scripter::unwrapArgs(args, [](ArgsContext &ac) {
         if (ac.args.Length() == 0) {
             auto httpServerRequestBuf = unwrap<HttpServerRequestBuf>(ac.args.This());
-            ac.setReturnValue(httpServerRequestBuf->getLength());
+            ac.setReturnValue(httpServerRequestBuf->getBufLength());
+            return;
+        }
+        ac.throwError("invalid arguments");
+    });
+}
+
+void HttpServerRequestBuf_getQueryString(const FunctionCallbackInfo<Value> &args) {
+    Scripter::unwrapArgs(args, [](ArgsContext &ac) {
+        if (ac.args.Length() == 1) {
+            auto httpServerRequestBuf = unwrap<HttpServerRequestBuf>(ac.args.This());
+            ac.setReturnValue(ac.v8String(httpServerRequestBuf->getQueryString(ac.asInt(0))));
+            return;
+        }
+        ac.throwError("invalid arguments");
+    });
+}
+
+void HttpServerRequestBuf_getMethod(const FunctionCallbackInfo<Value> &args) {
+    Scripter::unwrapArgs(args, [](ArgsContext &ac) {
+        if (ac.args.Length() == 1) {
+            auto httpServerRequestBuf = unwrap<HttpServerRequestBuf>(ac.args.This());
+            ac.setReturnValue(ac.v8String(httpServerRequestBuf->getMethod(ac.asInt(0))));
             return;
         }
         ac.throwError("invalid arguments");
@@ -823,7 +851,9 @@ void JsInitHttpServerRequest(Isolate *isolate, const Local<ObjectTemplate> &glob
     prototype->Set(isolate, "setAnswerBody", FunctionTemplate::New(isolate, HttpServerRequestBuf_setAnswerBody));
     prototype->Set(isolate, "sendAnswer", FunctionTemplate::New(isolate, HttpServerRequestBuf_sendAnswer));
     prototype->Set(isolate, "getEndpoint", FunctionTemplate::New(isolate, HttpServerRequestBuf_getEndpoint));
-    prototype->Set(isolate, "getLength", FunctionTemplate::New(isolate, HttpServerRequestBuf_getLength));
+    prototype->Set(isolate, "getBufLength", FunctionTemplate::New(isolate, HttpServerRequestBuf_getBufLength));
+    prototype->Set(isolate, "getQueryString", FunctionTemplate::New(isolate, HttpServerRequestBuf_getQueryString));
+    prototype->Set(isolate, "getMethod", FunctionTemplate::New(isolate, HttpServerRequestBuf_getMethod));
 
     // register it into global namespace
     HttpServerRequestBufTpl.Reset(isolate, tpl);

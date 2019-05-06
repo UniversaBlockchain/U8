@@ -128,20 +128,70 @@ class HttpServerError extends Error {
     }
 }
 
+network.HttpServerRequest = class {
+    constructor(reqBuf, indx) {
+        this.reqBuf_ = reqBuf;
+        this.indx_ = indx;
+    }
+
+    setStatusCode(code) {
+        this.reqBuf_.setStatusCode(this.indx_, code);
+    }
+
+    setHeader(key, value) {
+        this.reqBuf_.setHeader(this.indx_, key, value);
+    }
+
+    setAnswerBody(body) {
+        this.reqBuf_.setAnswerBody(this.indx_, typeof(body) == 'string' ? utf8Encode(body) : body);
+    }
+
+    sendAnswer() {
+        this.reqBuf_.sendAnswer(this.indx_);
+    }
+
+    get endpoint() {
+        return this.memoise('__getEndpoint', () => this.reqBuf_.getEndpoint(this.indx_));
+    }
+
+    get queryString() {
+        return this.memoise('__queryString', () => this.reqBuf_.getQueryString(this.indx_));
+    }
+
+    get queryParamsMap() {
+        if (!this.queryParamsMap_) {
+            this.queryParamsMap_ = new Map();
+            let s = this.queryString;
+            let pairs = s.split('&');
+            for (let i = 0; i < pairs.length; ++i) {
+                let p = pairs[i].split('=');
+                this.queryParamsMap_.set(decodeURIComponent(p[0]), decodeURIComponent(p[1]));
+            }
+        }
+        return this.queryParamsMap_;
+    }
+
+    get method() {
+        return this.memoise('__getMethod', () => this.reqBuf_.getMethod(this.indx_));
+    }
+};
+Object.assign(network.HttpServerRequest.prototype, MemoiseMixin);
+
 network.HttpServer = class {
     constructor(host, port, poolSize, bufSize) {
         this.httpServer_ = new network.HttpServerImpl(host, port, poolSize, bufSize);
         this.endpoints_ = new Map();
         this.httpServer_.__setBufferedCallback((reqBuf) => {
-            let length = reqBuf.getLength();
+            let length = reqBuf.getBufLength();
             for (let i = 0; i < length; ++i) {
-                let endpoint = reqBuf.getEndpoint(i);
+                let req = new network.HttpServerRequest(reqBuf, i);
+                let endpoint = req.endpoint;
                 if (this.endpoints_.has(endpoint)) {
-                    this.endpoints_.get(endpoint)(i, reqBuf);
+                    this.endpoints_.get(endpoint)(req);
                 } else {
-                    reqBuf.setStatusCode(i, 404);
-                    reqBuf.setAnswerBody(i, utf8Encode("404 page not found"));
-                    reqBuf.sendAnswer(i);
+                    req.setStatusCode(404);
+                    req.setAnswerBody("404 page not found");
+                    req.sendAnswer();
                 }
             }
         });

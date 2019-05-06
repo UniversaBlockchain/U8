@@ -29,9 +29,12 @@ public:
     void sendAnswerFromAnotherThread();
     void sendAnswer();
     std::string getEndpoint() {return endpoint_;}
+    std::string getQueryString();
+    std::string getMethod();
 protected:
     mg_connection* con_;
-    http_message* msg_;
+    std::string queryString_;
+    std::string method_;
     std::shared_ptr<mg_mgr> mgr_;
     int statusCode_ = 200;
     std::unordered_map<std::string, std::string> extHeaders_;
