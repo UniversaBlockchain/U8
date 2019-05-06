@@ -52,7 +52,7 @@ function createNodeInfoProvider() {
  * U contracts signs with special Universa keys and set as owner public keys from params.
  *
  * @param {number} amount - Initial number of U that will be have an owner.
- * @param ownerKeys is public keys that will became an owner of "U".
+ * @param {[crypto.PublicKey]} ownerKeys - Public keys that will became an owner of "U".
  * @param {boolean} withTestU - If true U will be created with test "U". Optional. False by default.
  * @return sealed U contract; should be registered in the Universa by simplified procedure.
  */

@@ -1646,8 +1646,8 @@ class Contract extends bs.BiSerializable {
 
     /**
      *
-     * @param keys {Array<crypto.PrivateKey>} or {Set<crypto.PrivateKey>} of creator keys for new revision
-     * @returns {Contract} new revision of a contract
+     * @param keys {Array<crypto.PrivateKey>} or {Set<crypto.PrivateKey>} - Creator keys for new revision.
+     * @returns {Contract} new revision of a contract.
      */
     createRevision(keys) {
         let newRevision = this.copy();
@@ -1686,10 +1686,10 @@ class Contract extends bs.BiSerializable {
     }
 
     /**
-     * Split contract into several branches
+     * Split contract into several branches.
      *
-     * @param count {number} of contracts to split from current.
-     * @returns {Array<Contract>} of contracts split
+     * @param count {number} - Count of contracts to split from current.
+     * @returns {Array<Contract>} of contracts split.
      */
     split(count) {
         // we can split only the new revision and only once this time

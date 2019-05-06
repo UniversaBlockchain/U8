@@ -509,13 +509,12 @@ class ListRole extends Role {
 
 class SimpleRole extends Role {
     /**
-     *  * Base class for any role combination, e.g. single key, any key from a set, all keys from a set, minimum number of key
+     * Base class for any role combination, e.g. single key, any key from a set, all keys from a set, minimum number of key
      * from a set and so on.
-     * <p>
      * IMPORTANT, This class express "all_of" logic, e.g. if all of the presented keys are listed, then the role is allowed.
 
      * @param name {string} name of the role
-     * @param param {(crypto.PublicKey|crypto.KeyAddress|iterable<crypto.PublicKey>|iterable<crypto.KeyAddress>)}
+     * @param param {crypto.PublicKey|crypto.PrivateKey|crypto.KeyAddress|iterable<crypto.PublicKey>|iterable<crypto.PrivateKey>|iterable<crypto.KeyAddress>}
      *
      * @constructor
      */
@@ -528,12 +527,16 @@ class SimpleRole extends Role {
             this.keyAddresses.add(param);
         } else if(param instanceof crypto.PublicKey) {
             this.keyRecords.set(param,new KeyRecord(param));
+        } else if(param instanceof crypto.PrivateKey) {
+            this.keyRecords.set(param.publicKey,new KeyRecord(param.publicKey));
         } else if(param instanceof Array || param instanceof Set) {
             for(let p of param) {
                 if(p instanceof crypto.KeyAddress) {
                     this.keyAddresses.add(p);
                 } else if(p instanceof crypto.PublicKey) {
                     this.keyRecords.set(p,new KeyRecord(p));
+                } else if(p instanceof crypto.PrivateKey) {
+                    this.keyRecords.set(p.publicKey,new KeyRecord(p.publicKey));
                 } else {
                     throw new ex.IllegalArgumentError("invalid param type")
                 }
