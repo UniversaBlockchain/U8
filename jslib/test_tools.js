@@ -1,5 +1,5 @@
 import * as io from 'io'
-import {assert} from 'test'
+import {assert, assertSilent} from 'test'
 
 const DefaultBiMapper = require("defaultbimapper").DefaultBiMapper;
 const BossBiMapper = require("bossbimapper").BossBiMapper;
@@ -77,48 +77,48 @@ async function createFreshU(amount, ownerKeys, withTestU = false) {
 
 function assertSameContracts(c1, c2) {
     // check issuer
-    assert(c1.roles.issuer != null);
-    assert(c2.roles.issuer != null);
-    assert(c1.roles.issuer.equals(c2.roles.issuer));
+    assertSilent(c1.roles.issuer != null);
+    assertSilent(c2.roles.issuer != null);
+    assertSilent(c1.roles.issuer.equals(c2.roles.issuer));
 
     // check creator
-    assert(c1.roles.creator != null);
-    assert(c2.roles.creator != null);
-    assert(c1.roles.creator.equals(c2.roles.creator));
+    assertSilent(c1.roles.creator != null);
+    assertSilent(c2.roles.creator != null);
+    assertSilent(c1.roles.creator.equals(c2.roles.creator));
 
     // check owner
-    assert(c1.roles.owner != null);
-    assert(c2.roles.owner != null);
-    assert(c1.roles.owner.equals(c2.roles.owner));
+    assertSilent(c1.roles.owner != null);
+    assertSilent(c2.roles.owner != null);
+    assertSilent(c1.roles.owner.equals(c2.roles.owner));
 
     // check times
-    assert(c1.definition.createdAt.getTime() === c2.definition.createdAt.getTime());
+    assertSilent(c1.definition.createdAt.getTime() === c2.definition.createdAt.getTime());
     if (c1.definition.expiresAt != null)
-        assert(c1.definition.expiresAt.getTime() === c2.definition.expiresAt.getTime());
+        assertSilent(c1.definition.expiresAt.getTime() === c2.definition.expiresAt.getTime());
     else
-        assert(c1.definition.expiresAt === c2.definition.expiresAt);
-    assert(c1.state.createdAt.getTime() === c2.state.createdAt.getTime());
+        assertSilent(c1.definition.expiresAt === c2.definition.expiresAt);
+    assertSilent(c1.state.createdAt.getTime() === c2.state.createdAt.getTime());
     if (c1.state.expiresAt != null)
-        assert(c1.state.expiresAt.getTime() === c2.state.expiresAt.getTime());
+        assertSilent(c1.state.expiresAt.getTime() === c2.state.expiresAt.getTime());
     else
-        assert(c1.state.expiresAt === c2.state.expiresAt);
+        assertSilent(c1.state.expiresAt === c2.state.expiresAt);
 
     // check definition
-    assert(c1.definition.extendedType === c2.definition.extendedType);
+    assertSilent(c1.definition.extendedType === c2.definition.extendedType);
 
-    assert(c1.definition.data.equals(c2.definition.data));
+    assertSilent(c1.definition.data.equals(c2.definition.data));
 
     // check state
-    assert(c1.state.revision === c2.state.revision);
-    assert(c1.state.branchId === c2.state.branchId);
-    assert(c1.state.getBranchRevision() === c2.state.getBranchRevision());
+    assertSilent(c1.state.revision === c2.state.revision);
+    assertSilent(c1.state.branchId === c2.state.branchId);
+    assertSilent(c1.state.getBranchRevision() === c2.state.getBranchRevision());
 
-    assert(c1.state.data.equals(c2.state.data) ||
+    assertSilent(c1.state.data.equals(c2.state.data) ||
         BossBiMapper.getInstance().serialize(c1.state.data).equals(BossBiMapper.getInstance().serialize(c2.state.data)) ||
         DefaultBiMapper.getInstance().serialize(c1.state.data).equals(DefaultBiMapper.getInstance().serialize(c2.state.data)));
 
     // check constraints
-    assert(Array.from(c1.constraints.values()).every(c => c.equals(c2.findConstraintByName(c.name))));
+    assertSilent(Array.from(c1.constraints.values()).every(c => c.equals(c2.findConstraintByName(c.name))));
 }
 
 module.exports = {createNodeInfoProvider, createFreshU, assertSameContracts};

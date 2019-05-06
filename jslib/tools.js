@@ -267,9 +267,11 @@ function convertToDate(data) {
         let res = new Date();
         res.setTime(data.seconds * 1000);
         return res;
-    } else if (data === "now()")
-        return new Date();
-    else
+    } else if (data === "now()") {
+        let res = new Date();
+        res.setMilliseconds(0);
+        return res;
+    } else
         throw "can't convert " + JSON.stringify(data) + "to Date";
 }
 
