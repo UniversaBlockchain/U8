@@ -42,7 +42,7 @@ file(GLOB LIBRARY_SRC
     crypto/*.h crypto/*.cpp
     js_bindings/*.h js_bindings/*.cpp
     network/*.h network/*.cpp
-    network/mongoose/*.h network/mongoose/*.c
+    network/mongoose/*.h network/mongoose/*.c network/mongoose/*.cpp
     serialization/*.h serialization/*.cpp
     tools/*.h tools/*.cpp
     types/*.h types/*.cpp

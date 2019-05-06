@@ -24,7 +24,7 @@ void HttpClientWorker::sendGetRequest(const std::string& url, std::function<void
         mg_connect_opts opts;
         memset(&opts, 0, sizeof(opts));
         opts.user_data = this;
-        mg_connect_http_opt(mgr_.get(), [](mg_connection *nc, int ev, void *ev_data){
+        mg_connect_http_opt1(mgr_.get(), [](mg_connection *nc, int ev, void *ev_data){
             HttpClientWorker* clientWorker = (HttpClientWorker*)nc->user_data;
             if (ev == MG_EV_HTTP_REPLY) {
                 http_message *hm = (http_message*)ev_data;
@@ -38,7 +38,7 @@ void HttpClientWorker::sendGetRequest(const std::string& url, std::function<void
             } else if (ev == MG_EV_CLOSE) {
                 clientWorker->exitFlag_ = true;
             }
-        }, opts, url.c_str(), nullptr, nullptr);
+        }, opts, url.c_str(), nullptr, nullptr, "GET");
         while (!exitFlag_) {
             mg_mgr_poll(mgr_.get(), 100);
         }

@@ -13,6 +13,7 @@
 #include <mutex>
 #include <queue>
 #include "../network/mongoose/mongoose.h"
+#include "../network/mongoose/mongooseExt.h"
 #include "../tools/ThreadPool.h"
 
 namespace network {
