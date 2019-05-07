@@ -346,15 +346,18 @@ const ListRoleMode = {
 class ListRole extends Role {
     /**
      * Role combining other roles (sub-roles) in the "and", "or" and "any N of" principle.
-     * @param name name of the link
-     * @param roleName name of the linked role
+     *
+     * @param {string} name - Name of the role.
+     * @param {[Role]} roles - Array of sub-roles. Empty by default.
+     * @param {ListRoleMode} mode - Mode of checking sub-roles. "ALL" ("and") by default.
+     * @param {number} quorumSize - N from "any N of" principle of quorum ListRole. 0 by default.
      * @constructor
      */
-    constructor(name) {
+    constructor(name, roles = [], mode = ListRoleMode.ALL, quorumSize = 0) {
         super(name);
-        this.mode = ListRoleMode.ALL;
-        this.roles = [];
-        this.quorumSize = 0;
+        this.mode = mode;
+        this.roles = roles;
+        this.quorumSize = quorumSize;
     }
 
     isValid() {

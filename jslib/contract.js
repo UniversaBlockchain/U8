@@ -1648,10 +1648,10 @@ class Contract extends bs.BiSerializable {
     /**
      * Create new revision of contract.
      *
-     * @param {Array<crypto.PrivateKey> | Set<crypto.PrivateKey>} keys - Creator keys for new revision.
+     * @param {Array<crypto.PrivateKey> | Set<crypto.PrivateKey> | null} keys - Creator keys for new revision.
      * @returns {Contract} new revision of a contract.
      */
-    createRevision(keys) {
+    createRevision(keys = null) {
         let newRevision = this.copy();
 
         newRevision.state.revision = this.state.revision + 1;
@@ -1662,25 +1662,25 @@ class Contract extends bs.BiSerializable {
         newRevision.transactional = null;
 
         if (newRevision.definition != null && newRevision.definition.constraints != null) {
-            for(let constr of newRevision.definition.constraints) {
+            for (let constr of newRevision.definition.constraints) {
                 constr.setContract(newRevision);
                 newRevision.constraints.set(constr.name, constr);
             }
         }
         if (newRevision.state != null && newRevision.state.constraints != null) {
-            for(let constr of newRevision.state.constraints) {
+            for (let constr of newRevision.state.constraints) {
                 constr.setContract(newRevision);
                 newRevision.constraints.set(constr.name, constr);
             }
         }
 
-        if(keys) {
+        if (keys != null) {
             let addresses = new Set();
-            for(let k of keys) {
+            for (let k of keys) {
                 addresses.add(k.publicKey.longAddress);
                 newRevision.keysToSignWith.add(k);
             }
-            let creator = new roles.SimpleRole("creator",addresses);
+            let creator = new roles.SimpleRole("creator", addresses);
             newRevision.registerRole(creator);
         }
 
@@ -1760,11 +1760,11 @@ class Contract extends bs.BiSerializable {
         if (typeof roleObject === "string")
             return this.registerRole(new roles.RoleLink(roleName, roleObject));
 
-        if (roleObject instanceof roles.Role)
-            if (roleObject.name != null && (roleObject.name === roleName))
+        if (roleObject instanceof roles.Role && roleObject.name != null)
+            if (roleObject.name === roleName)
                 return this.registerRole(roleObject);
             else
-                return this.registerRole(roleObject.linkAs(roleName));
+                return this.registerRole(new roles.RoleLink(roleName, roleObject.name));
 
         if (Object.getPrototypeOf(roleObject) === Object.prototype)
             return this.registerRole(roles.Role.fromDsl(roleName, roleObject));
