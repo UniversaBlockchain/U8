@@ -1,5 +1,5 @@
 /**
- * @module network
+ * @module contractsservice
  */
 import {HashId} from 'crypto'
 import {randomBytes} from 'tools'
@@ -67,11 +67,11 @@ async function createSplit(c, amount, fieldName, keys, andSetCreator = false) {
     let splitTo = splitFrom.splitValue(fieldName, new Decimal(amount));
 
     for (let key of keys) {
-        splitFrom.addSignerKey(key);
+        splitFrom.keysToSignWith.add(key);
     }
     if (andSetCreator) {
-        splitTo.createRole("creator", splitTo.role("owner"));
-        splitFrom.createRole("creator", splitFrom.role("owner"));
+        splitTo.registerRole(new roles.RoleLink("creator", splitTo.roles.owner));
+        splitFrom.registerRole(new roles.RoleLink("creator", splitTo.roles.owner));
     }
     await splitTo.seal(true);
     await splitFrom.seal(true);
@@ -187,12 +187,227 @@ async function createTwoSignedContract(baseContract, fromKeys, toKeys, createNew
     constraint.signed_by.push(ownerTo);
     twoSignContract.transactional().addConstraint(constraint);
 
-    twoSignContract.setOwnerKeys(toKeys);
+    //twoSignContract.setOwnerKeys(toKeys);
+    twoSignContract.registerRole(new roles.SimpleRole("owner", toKeys));
 
     await twoSignContract.seal();
 
     return twoSignContract;
 }
+
+/**
+ * Creates a token contract for given keys with given currency code,name,description.
+ * The service creates a simple token contract with issuer, creator and owner roles;
+ * with change_owner permission for owner, revoke permissions for owner and issuer and split_join permission for owner.
+ * Split_join permission has by default following params: "minValue" for min_value and min_unit, "amount" for field_name,
+ * "state.origin" for join_match_fields.
+ * By default expires at time is set to 60 months from now.
+ *
+ * @param {Set<crypto.PrivateKey>} issuerKeys - Issuer public keys.
+ * @param {Set<crypto.PublicKey>} ownerKeys - Owner public keys.
+ * @param amount    - Maximum token number.
+ * @param minValue  - Minimum token value.
+ * @param {String} currency - Currency code.
+ * @param {String} name - Currency name.
+ * @param {String} description  - Currency description.
+ * @return signed and sealed contract, ready for register.
+ */
+async function createTokenContract( issuerKeys, ownerKeys, amount, minValue, currency, name, description) {
+ /*   let tokenContract = new Contract();
+    tokenContract.apiLevel= 3;
+
+    tokenContract.definition.expiresAt = tokenContract.definition.createdAt;
+    tokenContract.definition.expiresAt.setDate(tokenContract.definition.expiresAt.getMonth() + 60);
+
+    /Binder data = new Binder();
+    data.set("currency", currency);
+    data.set("short_currency", currency);
+    data.set("name", name);
+    data.set("description", description);
+    cd.setData(data);
+
+    SimpleRole issuerRole = new SimpleRole("issuer");
+    for (PrivateKey k : issuerKeys) {
+        KeyRecord kr = new KeyRecord(k.getPublicKey());
+        issuerRole.addKeyRecord(kr);
+    }
+
+    SimpleRole ownerRole = new SimpleRole("owner");
+    for (PublicKey k : ownerKeys) {
+        KeyRecord kr = new KeyRecord(k);
+        ownerRole.addKeyRecord(kr);
+    }
+
+    tokenContract.registerRole(issuerRole);
+    tokenContract.createRole("issuer", issuerRole);
+    tokenContract.createRole("creator", issuerRole);
+
+    tokenContract.registerRole(ownerRole);
+    tokenContract.createRole("owner", ownerRole);
+
+    tokenContract.getStateData().set("amount", amount.toString());
+
+    RoleLink ownerLink = new RoleLink("@owner_link", "owner");
+    ownerLink.setContract(tokenContract);
+    ChangeOwnerPermission changeOwnerPerm = new ChangeOwnerPermission(ownerLink);
+    tokenContract.addPermission(changeOwnerPerm);
+
+    Binder params = new Binder();
+    params.set("min_value", minValue.toString());
+    params.set("min_unit", minValue.toString());
+    params.set("field_name", "amount");
+    List<String> listFields = new ArrayList<>();
+    listFields.add("state.origin");
+    params.set("join_match_fields", listFields);
+
+    SplitJoinPermission splitJoinPerm = new SplitJoinPermission(ownerLink, params);
+    tokenContract.addPermission(splitJoinPerm);
+
+    RevokePermission revokePerm1 = new RevokePermission(ownerLink);
+    tokenContract.addPermission(revokePerm1);
+
+    RevokePermission revokePerm2 = new RevokePermission(issuerRole);
+    tokenContract.addPermission(revokePerm2);
+
+    tokenContract.seal();
+    tokenContract.addSignatureToSeal(issuerKeys);
+
+    return tokenContract;*/
+}
+
+/**
+ * Creates a share contract for given keys.
+ * The service creates a simple share contract with issuer, creator and owner roles
+ * with change_owner permission for owner, revoke permissions for owner and issuer and split_join permission for owner.
+ * Split_join permission has by default following params: 1 for min_value, 1 for min_unit, "amount" for field_name,
+ * "state.origin" for join_match_fields.
+ * By default expires at time is set to 60 months from now.
+ *
+ * @param issuerKeys is issuer private keys.
+ * @param ownerKeys  is owner public keys.
+ * @param amount     is maximum shares number.
+ * @return signed and sealed contract, ready for register.
+ */
+/*public synchronized static Contract createShareContract(Set<PrivateKey> issuerKeys, Set<PublicKey> ownerKeys, BigDecimal amount) {
+    Contract shareContract = new Contract();
+    shareContract.setApiLevel(3);
+
+    Contract.Definition cd = shareContract.getDefinition();
+    cd.setExpiresAt(shareContract.getCreatedAt().plusMonths(60));
+
+    Binder data = new Binder();
+    data.set("name", "Default share name");
+    data.set("currency_code", "DSH");
+    data.set("currency_name", "Default share name");
+    data.set("description", "Default share description.");
+    cd.setData(data);
+
+    SimpleRole issuerRole = new SimpleRole("issuer");
+    for (PrivateKey k : issuerKeys) {
+        KeyRecord kr = new KeyRecord(k.getPublicKey());
+        issuerRole.addKeyRecord(kr);
+    }
+
+    SimpleRole ownerRole = new SimpleRole("owner");
+    for (PublicKey k : ownerKeys) {
+        KeyRecord kr = new KeyRecord(k);
+        ownerRole.addKeyRecord(kr);
+    }
+
+    shareContract.registerRole(issuerRole);
+    shareContract.createRole("issuer", issuerRole);
+    shareContract.createRole("creator", issuerRole);
+
+    shareContract.registerRole(ownerRole);
+    shareContract.createRole("owner", ownerRole);
+
+    shareContract.getStateData().set("amount", amount.toString());
+
+    ChangeOwnerPermission changeOwnerPerm = new ChangeOwnerPermission(ownerRole);
+    shareContract.addPermission(changeOwnerPerm);
+
+    Binder params = new Binder();
+    params.set("min_value", 1);
+    params.set("min_unit", 1);
+    params.set("field_name", "amount");
+    List<String> listFields = new ArrayList<>();
+    listFields.add("state.origin");
+    params.set("join_match_fields", listFields);
+
+    SplitJoinPermission splitJoinPerm = new SplitJoinPermission(ownerRole, params);
+    shareContract.addPermission(splitJoinPerm);
+
+    RevokePermission revokePerm1 = new RevokePermission(ownerRole);
+    shareContract.addPermission(revokePerm1);
+
+    RevokePermission revokePerm2 = new RevokePermission(issuerRole);
+    shareContract.addPermission(revokePerm2);
+
+    shareContract.seal();
+    shareContract.addSignatureToSeal(issuerKeys);
+
+    return shareContract;
+}*/
+
+/**
+ * Creates a simple notary contract for given keys.
+ * <br><br>
+ * The service creates a notary contract with issuer, creator and owner roles
+ * with change_owner permission for owner and revoke permissions for owner and issuer.
+ * By default expires at time is set to 60 months from now.
+ * <br><br>
+ *
+ * @param issuerKeys is issuer private keys.
+ * @param ownerKeys  is owner public keys.
+ * @return signed and sealed contract, ready for register.
+ */
+/*public synchronized static Contract createNotaryContract(Set<PrivateKey> issuerKeys, Set<PublicKey> ownerKeys) {
+    Contract notaryContract = new Contract();
+    notaryContract.setApiLevel(3);
+
+    Contract.Definition cd = notaryContract.getDefinition();
+    cd.setExpiresAt(notaryContract.getCreatedAt().plusMonths(60));
+
+    Binder data = new Binder();
+    data.set("name", "Default notary");
+    data.set("description", "Default notary description.");
+    data.set("template_name", "NOTARY_CONTRACT");
+    data.set("holder_identifier", "default holder identifier");
+    cd.setData(data);
+
+    SimpleRole issuerRole = new SimpleRole("issuer");
+    for (PrivateKey k : issuerKeys) {
+        KeyRecord kr = new KeyRecord(k.getPublicKey());
+        issuerRole.addKeyRecord(kr);
+    }
+
+    SimpleRole ownerRole = new SimpleRole("owner");
+    for (PublicKey k : ownerKeys) {
+        KeyRecord kr = new KeyRecord(k);
+        ownerRole.addKeyRecord(kr);
+    }
+
+    notaryContract.registerRole(issuerRole);
+    notaryContract.createRole("issuer", issuerRole);
+    notaryContract.createRole("creator", issuerRole);
+
+    notaryContract.registerRole(ownerRole);
+    notaryContract.createRole("owner", ownerRole);
+
+    ChangeOwnerPermission changeOwnerPerm = new ChangeOwnerPermission(ownerRole);
+    notaryContract.addPermission(changeOwnerPerm);
+
+    RevokePermission revokePerm1 = new RevokePermission(ownerRole);
+    notaryContract.addPermission(revokePerm1);
+
+    RevokePermission revokePerm2 = new RevokePermission(issuerRole);
+    notaryContract.addPermission(revokePerm2);
+
+    notaryContract.seal();
+    notaryContract.addSignatureToSeal(issuerKeys);
+
+    return notaryContract;
+}*/
 
 /**
  * Create paid transaction, which consist from contract you want to register and payment contract that will be
@@ -718,3 +933,5 @@ async function createRateLimitDisablingContract(key, payment, amount, keys) {
 
     return unlimitContract;
 }
+
+module.exports = {createRevocation, createParcel, createNotaryContract,checkAttachNotaryContract, createTokenContract};
