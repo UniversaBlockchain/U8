@@ -19,6 +19,7 @@ const ContractDelta = require("contractdelta").ContractDelta;
 const ExtendedSignature = require("extendedsignature").ExtendedSignature;
 const ex = require("exceptions");
 const yaml = require('yaml');
+const BigDecimal  = require("big").Big;
 
 const MAX_API_LEVEL = 4;
 
@@ -89,7 +90,7 @@ class State extends bs.BiSerializable {
         this.contract = contract;
         this.revision = 1;
         if(contract.definition) {
-            this.createdAt = contract.definition.createdAt;
+            this.createdAt = new Date(contract.definition.createdAt);
         } else {
             this.createdAt = null;
         }
@@ -234,7 +235,7 @@ class State extends bs.BiSerializable {
             if (this.revision !== 1)
                 throw new ex.IllegalArgumentError("state.created_at must be set for revisions > 1");
 
-            this.createdAt = this.contract.definition.createdAt;
+            this.createdAt = new Date(this.contract.definition.createdAt);
         }
 
         this.contract.createRole("owner", root.owner);
@@ -1719,6 +1720,30 @@ class Contract extends bs.BiSerializable {
             results.push(c);
         }
         return results;
+    }
+
+    /**
+     * Split this contract extracting specified value from a named field. The contract must have suitable
+     * {@link SplitJoinPermission} and be signed with proper keys to pass checks.
+     *
+     * Important. This contract must be a new revision: call {@link #createRevision} first.
+     *
+     * @param {string} fieldName - Name of field to extract from
+     * @param {number | string | BigDecimal} valueToExtract - How much to extract
+     *
+     * @return {Contract} new sibling contract with the extracted value.
+     */
+     splitValue(fieldName, valueToExtract)  {
+        let sibling = this.split(1)[0];
+
+        if (typeof this.state.data[fieldName] !== "string")
+            throw new ex.IllegalArgumentError("splitValue: illegal amount in field state.data." + fieldName);
+        let value = new BigDecimal(this.state.data[fieldName]);
+
+        this.state.data[fieldName] = value.sub(valueToExtract).toFixed();
+        sibling.state.data[fieldName] = new BigDecimal(valueToExtract).toFixed();
+
+        return sibling;
     }
 
     initializeWithDsl(root) {

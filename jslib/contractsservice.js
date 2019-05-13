@@ -19,7 +19,7 @@ const ex = require("exceptions");
  * That temp contract should be send to Universa and given contract will be revoked.
  *
  * @param {Contract} c - Contract should revoked be.
- * @param {[crypto.PrivateKey]} keys - keys from owner of c.
+ * @param {[crypto.PrivateKey]} keys - Keys from owner of revoking contract.
  * @return {Contract} working contract that should be register in the Universa to finish procedure.
  */
 async function createRevocation(c, ...keys) {
@@ -27,25 +27,17 @@ async function createRevocation(c, ...keys) {
     let tc = new Contract();
 
     // by default, transactions expire in 30 days
-    tc.definition.expiresAt = tc.definition.createdAt;
+    tc.definition.expiresAt = new Date(tc.definition.createdAt);
     tc.definition.expiresAt.setDate(tc.definition.expiresAt.getDate() + 30);
 
-    let issuerRole = new roles.SimpleRole("issuer", keys);
-    tc.registerRole(issuerRole);
-    tc.createRole("owner", issuerRole);
-    tc.createRole("creator", issuerRole);
+    tc.registerRole(new roles.SimpleRole("issuer", keys));
+    tc.registerRole(new roles.RoleLink("owner", "issuer"));
+    tc.registerRole(new roles.RoleLink("creator", "issuer"));
 
-    if (!tc.revokingItems.has(c)) {
-        let revocationAction = {action : "remove", id : c.id};
-        if (tc.definition.data.hasOwnProperty("actions"))
-            tc.definition.data.actions.push(revocationAction);
-        else
-            tc.definition.data.actions = [revocationAction];
+    tc.definition.data.actions = [{action : "remove", id : c.id}];
+    tc.revokingItems.add(c);
 
-        tc.revokingItems.add(c);
-    }
-
-    await tc.seal();
+    await tc.seal(true);
 
     return tc;
 }
@@ -56,23 +48,24 @@ async function createRevocation(c, ...keys) {
  * Given contract should have splitjoin permission for given keys.
  *
  * @param {Contract} c - Contract should split be.
- * @param {BigDecimal} amount - Value that should be split from given contract.
+ * @param {number | string | BigDecimal} amount - Value that should be split from given contract.
  * @param {String} fieldName - Name of field that should be split.
- * @param {Set<crypto.PrivateKey>} keys - Keys from owner of c.
- * @param {boolean} andSetCreator - If true set owners as creator in both contarcts.
+ * @param {Set<crypto.PrivateKey>} keys - Keys from owner of splitting contract.
+ * @param {boolean} andSetCreator - If true set owners as creator in both contracts.
  * @return {Contract} working contract that should be register in the Universa to finish procedure.
  */
 async function createSplit(c, amount, fieldName, keys, andSetCreator = false) {
-    let splitFrom = c.createRevision([]);
-    let splitTo = splitFrom.splitValue(fieldName, new Decimal(amount));
+    let splitFrom = c.createRevision();
+    let splitTo = splitFrom.splitValue(fieldName, amount);
 
-    for (let key of keys) {
+    for (let key of keys)
         splitFrom.keysToSignWith.add(key);
-    }
+
     if (andSetCreator) {
         splitTo.registerRole(new roles.RoleLink("creator", splitTo.roles.owner));
         splitFrom.registerRole(new roles.RoleLink("creator", splitTo.roles.owner));
     }
+
     await splitTo.seal(true);
     await splitFrom.seal(true);
 
@@ -92,18 +85,17 @@ async function createSplit(c, amount, fieldName, keys, andSetCreator = false) {
  * @return {Contract} working contract that should be register in the Universa to finish procedure.
  */
 async function createJoin(contract1, contract2, fieldName, keys) {
-    let joinTo = contract1.createRevision([]);
+    let joinTo = contract1.createRevision();
 
-    joinTo.getStateData().set(
-        fieldName,
-        //InnerContractsService.getDecimalField(contract1, fieldName).add(InnerContractsService.getDecimalField(contract2, fieldName))
-    );
+    if (contract1.state.data[fieldName] == null || contract2.state.data[fieldName] == null)
+        throw new ex.IllegalArgumentError("createJoin: not found field state.data." + fieldName);
 
-    for (let key of keys) {
-        joinTo.addSignerKey(key);
-    }
+    joinTo.state.data[fieldName] = new BigDecimal(contract1.state.data[fieldName]).add(new BigDecimal(contract2.state.data[fieldName]));
 
-    joinTo.addRevokingItems(contract2);
+    for (let key of keys)
+        joinTo.keysToSignWith.add(key);
+
+    joinTo.revokingItems.add(contract2);
 
     await joinTo.seal(true);
 
@@ -116,38 +108,42 @@ async function createJoin(contract1, contract2, fieldName, keys) {
  * and put second contract in revoking items of created new revision.
  * Given contract should have splitjoin permission for given keys.
  *
- * @param contractsToJoin one or more contracts to join into main contract
- * @param amountsToSplit  one or more amounts to split from main contract
- * @param addressesToSplit are addresses the ownership of splitted parts will be transferred to
- * @param fieldName is name of field that should be join by
- * @param ownerKeys owner keys of joined contracts
- * @return list of contracts containing main contract followed by splitted parts.
+ * @param {Iterable<Contract>} contractsToJoin - One or more contracts to join into main contract
+ * @param {[number | string | BigDecimal]} amountsToSplit - Array contains one or more amounts to split from main contract
+ * @param {[KeyAddress]} addressesToSplit - Array contains addresses the ownership of splitted parts will be transferred to
+ * @param {[crypto.PrivateKey] | Set<crypto.PrivateKey> | null} ownerKeys - Owner keys of joined contracts
+ * @param {string} fieldName - Name of field that should be join by
+ * @return {[Contract]} list of contracts containing main contract followed by splitted parts.
  */
-/*async function createSplitJoin(Collection<Contract> contractsToJoin, List<String> amountsToSplit, List<KeyAddress> addressesToSplit,Set<PrivateKey> ownerKeys, String fieldName) {
-    Iterator<Contract> it = contractsToJoin.iterator();
-    Contract contract = it.next();
-    contract = contract.createRevision(ownerKeys);
-    BigDecimal sum = new BigDecimal(contract.getStateData().getStringOrThrow(fieldName));
-    while (it.hasNext()) {
-        Contract c = it.next();
-        sum = sum.add(new BigDecimal(c.getStateData().getStringOrThrow(fieldName)));
-        contract.addRevokingItems(c);
+async function createSplitJoin(contractsToJoin, amountsToSplit, addressesToSplit, ownerKeys, fieldName) {
+    let contract = null;
+    let sum = new BigDecimal(0);
+    for (let c of contractsToJoin) {
+        if (contract == null) {
+            contract = c;
+            contract = contract.createRevision(ownerKeys);
+        } else
+            contract.revokingItems.add(c);
+
+        if (c.state.data[fieldName] == null)
+            throw new ex.IllegalArgumentError("createSplitJoin: not found field state.data." + fieldName);
+
+        sum = sum.add(new BigDecimal(c.state.data[fieldName]));
     }
-    Contract[] parts = contract.split(amountsToSplit.size());
-    for(int i = 0; i < parts.length;i++) {
-        sum = sum.subtract(new BigDecimal(amountsToSplit.get(i)));
-        parts[i].setOwnerKeys(addressesToSplit.get(i));
-        parts[i].getStateData().set(fieldName,amountsToSplit.get(i));
+
+    let parts = contract.split(amountsToSplit.length);
+    for (let i = 0; i < parts.length; i++) {
+        sum = sum.sub(new BigDecimal(amountsToSplit[i]));
+        parts[i].registerRole(new roles.SimpleRole("owner", addressesToSplit[i]));
+        parts[i].state.data[fieldName] = amountsToSplit[i];
 
         parts[i].seal();
     }
-    contract.getStateData().set(fieldName,sum.toString());
+    contract.state.data[fieldName] = sum.toFixed();
     contract.seal();
-    ArrayList<Contract> arrayList = new ArrayList<>();
-    arrayList.add(contract);
-    arrayList.addAll(Do.listOf(parts));
-    return arrayList;
-}*/
+
+    return [contract].concat(parts);
+}
 
 /**
  * Creates a contract with two signatures.
@@ -216,7 +212,7 @@ async function createTokenContract( issuerKeys, ownerKeys, amount, minValue, cur
  /*   let tokenContract = new Contract();
     tokenContract.apiLevel= 3;
 
-    tokenContract.definition.expiresAt = tokenContract.definition.createdAt;
+    tokenContract.definition.expiresAt = new Date(tokenContract.definition.createdAt);
     tokenContract.definition.expiresAt.setDate(tokenContract.definition.expiresAt.getMonth() + 60);
 
     /Binder data = new Binder();
@@ -625,7 +621,7 @@ async function createInternalEscrowContract(issuerKeys, customerKeys, executorKe
     // Create internal escrow contract
     let escrow = new Contract();
     escrow.apiLevel = 4;
-    escrow.definition.expiresAt = escrow.definition.createdAt;
+    escrow.definition.expiresAt = new Date(escrow.definition.createdAt);
     escrow.definition.expiresAt.setMonth(escrow.definition.expiresAt.getMonth() + 60);
     escrow.state.data.status = "opened";
 
@@ -690,7 +686,7 @@ async function createExternalEscrowContract(internalEscrow, issuerKeys) {
     // Create external escrow contract (escrow pack)
     let escrowPack = new Contract();
     escrowPack.apiLevel = 4;
-    escrowPack.definition.expiresAt = escrowPack.definition.createdAt;
+    escrowPack.definition.expiresAt = new Date(escrowPack.definition.createdAt);
     escrowPack.definition.expiresAt.setMonth(escrowPack.definition.expiresAt.getMonth() + 60);
     escrowPack.definition.data.EscrowOrigin = internalEscrow.getOrigin().base64;
 

@@ -27,8 +27,8 @@ class StateRecord {
         this.lockedByRecordId = record.lockedByRecordId;
         this.id = record.id;
         this.state = record.state;
-        this.createdAt = record.createdAt;
-        this.expiresAt = record.expiresAt;
+        this.createdAt = new Date(record.createdAt);
+        this.expiresAt = new Date(record.expiresAt);
     }
 
     static initFrom(ledger, row) {

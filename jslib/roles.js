@@ -517,7 +517,7 @@ class SimpleRole extends Role {
      * IMPORTANT, This class express "all_of" logic, e.g. if all of the presented keys are listed, then the role is allowed.
 
      * @param name {string} name of the role
-     * @param param {crypto.PublicKey|crypto.PrivateKey|crypto.KeyAddress|iterable<crypto.PublicKey>|iterable<crypto.PrivateKey>|iterable<crypto.KeyAddress>}
+     * @param param {crypto.PublicKey|crypto.PrivateKey|crypto.KeyAddress|Iterable<crypto.PublicKey>|Iterable<crypto.PrivateKey>|Iterable<crypto.KeyAddress>}
      *
      * @constructor
      */
