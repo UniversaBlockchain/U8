@@ -4,6 +4,7 @@
 import {HashId} from 'crypto'
 import {randomBytes} from 'tools'
 
+const BossBiMapper = require("bossbimapper").BossBiMapper;
 const Contract = require("contract").Contract;
 const TransactionPack = require("transactionpack").TransactionPack;
 const Parcel = require("parcel").Parcel;
@@ -12,6 +13,7 @@ const perms = require('permissions');
 const BigDecimal  = require("big").Big;
 const Constraint = require('constraint').Constraint;
 const ex = require("exceptions");
+const io = require("io");
 
 /**
  * Implementing revoking procedure.
@@ -110,8 +112,8 @@ async function createJoin(contract1, contract2, fieldName, keys) {
  *
  * @param {Iterable<Contract>} contractsToJoin - One or more contracts to join into main contract
  * @param {[number | string | BigDecimal]} amountsToSplit - Array contains one or more amounts to split from main contract
- * @param {[KeyAddress]} addressesToSplit - Array contains addresses the ownership of splitted parts will be transferred to
- * @param {[crypto.PrivateKey] | Set<crypto.PrivateKey> | null} ownerKeys - Owner keys of joined contracts
+ * @param {Iterable<crypto.KeyAddress>} addressesToSplit - Addresses the ownership of splitted parts will be transferred to
+ * @param {Iterable<crypto.PrivateKey> | null} ownerKeys - Owner keys of joined contracts
  * @param {string} fieldName - Name of field that should be join by
  * @return {[Contract]} list of contracts containing main contract followed by splitted parts.
  */
@@ -146,44 +148,145 @@ async function createSplitJoin(contractsToJoin, amountsToSplit, addressesToSplit
 }
 
 /**
+ * First step of swap procedure. Calls from swapper1 part.
+ *
+ * Get lists of contracts.
+ *
+ * Service create new revisions of existing contracts, change owners,
+ * added transactional sections with references to each other with asks two signs of swappers
+ * and sign contract that was own for calling part.
+ *
+ * Swap procedure consist from three steps:
+ * (1) prepare contracts with creating transactional section on the first swapper site;
+ * (2) sign main contract on the first swapper site;
+ * (3) sign main contract on the second swapper site;
+ *
+ * @param {Iterable<Contract>} contracts1 - List of own for calling part (swapper1 owned), existing or new revision of contract
+ * @param {Iterable<Contract>} contracts2 - List of foreign for calling part (swapper2 owned), existing or new revision contract
+ * @param {Iterable<crypto.PrivateKey>} fromKeys - Own for calling part (swapper1 keys) private keys
+ * @param {Iterable<crypto.PublicKey>} toKeys - Foreign for calling part (swapper2 keys) public keys
+ * @param {boolean} createNewRevision - If true - create new revision of given contracts. If false - use them as new revisions.
+ * @return {Contract} swap contract including new revisions of old contracts swapping between;
+ * should be send to partner (swapper2) and he should go to step (2) of the swap procedure.
+ */
+async function startSwap(contracts1, contracts2, fromKeys, toKeys, createNewRevision) {
+
+    // first of all we creating main swap contract which will include new revisions of contract for swap
+    // you can think about this contract as about transaction
+    let swapContract = new Contract();
+
+    // by default, transactions expire in 30 days
+    swapContract.definition.expiresAt = new Date(swapContract.definition.createdAt);
+    swapContract.definition.expiresAt.setDate(swapContract.definition.expiresAt.getDate() + 30);
+
+    swapContract.registerRole(new roles.SimpleRole("issuer", fromKeys));
+    swapContract.registerRole(new roles.RoleLink("owner", "issuer"));
+    swapContract.registerRole(new roles.RoleLink("creator", "issuer"));
+
+    // now we will prepare new revisions of contracts
+
+    // create new revisions of contracts and create transactional sections in it
+    let newContracts1 = [];
+    for (let c of contracts1) {
+        let nc = createNewRevision ? c.createRevision(fromKeys) : c;
+        nc.createTransactionalSection();
+        nc.transactional.id = HashId.of(randomBytes(64)).base64;
+
+        newContracts1.push(nc);
+    }
+
+    let newContracts2 = [];
+    for (let c of contracts2) {
+        let nc = createNewRevision ? c.createRevision() : c;
+        nc.createTransactionalSection();
+        nc.transactional.id = HashId.of(randomBytes(64)).base64;
+
+        newContracts2.push(nc);
+    }
+
+    // prepare roles for references
+    // it should new owners and old creators in new revisions of contracts
+    let ownerFrom = new roles.SimpleRole("owner", fromKeys);
+    let creatorFrom = new roles.SimpleRole("creator", fromKeys);
+
+    let ownerTo = new roles.SimpleRole("owner", toKeys);
+    let creatorTo = new roles.SimpleRole("creator", toKeys);
+
+    // create references for contracts that point to each other and asks correct signs
+    // and add this references to existing transactional section
+    newContracts1.forEach(nc1 => newContracts2.forEach(nc2 => {
+        let constr = new Constraint(nc1);
+        constr.transactional_id = nc2.transactional.id;
+        constr.type = Constraint.TYPE_TRANSACTIONAL;
+        constr.signed_by.push(ownerFrom);
+        constr.signed_by.push(creatorTo);
+        nc1.addConstraint(constr);
+    }));
+
+    newContracts2.forEach(nc2 => newContracts1.forEach(nc1 => {
+        let constr = new Constraint(nc2);
+        constr.transactional_id = nc1.transactional.id;
+        constr.type = Constraint.TYPE_TRANSACTIONAL;
+        constr.signed_by.push(ownerTo);
+        constr.signed_by.push(creatorFrom);
+        nc2.addConstraint(constr);
+    }));
+
+    // swap owners in this contracts and add created new revisions to main swap contract
+    await Promise.all(newContracts1.map(async(nc) => {
+        nc.registerRole(new roles.SimpleRole("owner", toKeys));
+        await nc.seal();
+        swapContract.newItems.add(nc);
+    }));
+
+    await Promise.all(newContracts2.map(async(nc) => {
+        nc.registerRole(new roles.SimpleRole("owner", fromKeys));
+        await nc.seal();
+        swapContract.newItems.add(nc);
+    }));
+
+    await swapContract.seal();
+
+    return swapContract;
+}
+
+/**
  * Creates a contract with two signatures.
+ *
  * The service creates a contract which asks two signatures.
  * It can not be registered without both parts of deal, so it is make sure both parts that they agreed with contract.
  * Service creates a contract that should be send to partner,
  * then partner should sign it and return back for final sign from calling part.
  *
  * @param {Contract} baseContract - Base contract.
- * @param {Set<crypto.PrivateKey>} fromKeys - Own private keys.
- * @param {Set<crypto.PublicKey>} toKeys - Foreign public keys.
+ * @param {Iterable<crypto.PrivateKey>} fromKeys - Own private keys.
+ * @param {Iterable<crypto.PublicKey>} toKeys - Foreign public keys.
  * @param {boolean} createNewRevision - Create new revision if true.
  * @return {Contract} contract with two signatures that should be send from first part to partner.
  */
 async function createTwoSignedContract(baseContract, fromKeys, toKeys, createNewRevision) {
 
-    let twoSignContract = baseContract;
+    let twoSignContract;
 
     if (createNewRevision) {
         twoSignContract = baseContract.createRevision(fromKeys);
         twoSignContract.keysToSignWith.clear();
-    }
+    } else
+        twoSignContract = baseContract.copy();
 
-    let creatorFrom = new roles.SimpleRole("creator", fromKeys); //TODO
-
+    let creatorFrom = new roles.SimpleRole("creator", fromKeys);
     let ownerTo = new roles.SimpleRole("owner", toKeys);
 
     twoSignContract.createTransactionalSection();
-    twoSignContract.transactional.id = (HashId.createRandom().toBase64String());
+    twoSignContract.transactional.id = HashId.of(randomBytes(64)).base64;
 
     let constraint = new Constraint(twoSignContract);
     constraint.transactional_id = twoSignContract.transactional.id;
     constraint.type = Constraint.TYPE_TRANSACTIONAL;
-    constraint.required = true;
-    constraint.signed_by = [];
     constraint.signed_by.push(creatorFrom);
     constraint.signed_by.push(ownerTo);
-    twoSignContract.transactional().addConstraint(constraint);
+    twoSignContract.addConstraint(constraint);
 
-    //twoSignContract.setOwnerKeys(toKeys);
     twoSignContract.registerRole(new roles.SimpleRole("owner", toKeys));
 
     await twoSignContract.seal();
@@ -199,76 +302,123 @@ async function createTwoSignedContract(baseContract, fromKeys, toKeys, createNew
  * "state.origin" for join_match_fields.
  * By default expires at time is set to 60 months from now.
  *
- * @param {Set<crypto.PrivateKey>} issuerKeys - Issuer public keys.
- * @param {Set<crypto.PublicKey>} ownerKeys - Owner public keys.
- * @param amount    - Maximum token number.
- * @param minValue  - Minimum token value.
- * @param {String} currency - Currency code.
- * @param {String} name - Currency name.
- * @param {String} description  - Currency description.
- * @return signed and sealed contract, ready for register.
+ * @param {Iterable<crypto.PrivateKey>} issuerKeys - Issuer public keys.
+ * @param {Iterable<crypto.PublicKey>} ownerKeys - Owner public keys.
+ * @param {number | string | BigDecimal} amount - Maximum token number.
+ * @param {number | string | BigDecimal} minValue - Minimum token value.
+ * @param {string} currency - Currency code.
+ * @param {string} name - Currency name.
+ * @param {string} description  - Currency description.
+ * @return {Contract} signed and sealed contract, ready for register.
  */
-async function createTokenContract( issuerKeys, ownerKeys, amount, minValue, currency, name, description) {
- /*   let tokenContract = new Contract();
-    tokenContract.apiLevel= 3;
+async function createTokenContract(issuerKeys, ownerKeys, amount, minValue = "0.01", currency = "DT",
+                                   name = "Default token name", description = "Default token description") {
+
+    let tokenContract = new Contract();
 
     tokenContract.definition.expiresAt = new Date(tokenContract.definition.createdAt);
     tokenContract.definition.expiresAt.setDate(tokenContract.definition.expiresAt.getMonth() + 60);
 
-    /Binder data = new Binder();
-    data.set("currency", currency);
-    data.set("short_currency", currency);
-    data.set("name", name);
-    data.set("description", description);
-    cd.setData(data);
+    tokenContract.definition.data = {
+        currency: currency,
+        short_currency: currency,
+        name: name,
+        description: description
+    };
 
-    SimpleRole issuerRole = new SimpleRole("issuer");
-    for (PrivateKey k : issuerKeys) {
-        KeyRecord kr = new KeyRecord(k.getPublicKey());
-        issuerRole.addKeyRecord(kr);
-    }
+    tokenContract.registerRole(new roles.SimpleRole("issuer", issuerKeys));
+    tokenContract.registerRole(new roles.SimpleRole("owner", ownerKeys));
+    tokenContract.registerRole(new roles.RoleLink("creator", "issuer"));
 
-    SimpleRole ownerRole = new SimpleRole("owner");
-    for (PublicKey k : ownerKeys) {
-        KeyRecord kr = new KeyRecord(k);
-        ownerRole.addKeyRecord(kr);
-    }
+    tokenContract.state.data.amount = new BigDecimal(amount).toFixed();
 
-    tokenContract.registerRole(issuerRole);
-    tokenContract.createRole("issuer", issuerRole);
-    tokenContract.createRole("creator", issuerRole);
+    let ownerLink = new roles.RoleLink("@owner_link", "owner");
+    ownerLink.contract = tokenContract;
+    let issuerLink = new roles.RoleLink("@issuer_link", "issuer");
+    issuerLink.contract = tokenContract;
 
-    tokenContract.registerRole(ownerRole);
-    tokenContract.createRole("owner", ownerRole);
+    tokenContract.definition.addPermission(new perms.ChangeOwnerPermission(ownerLink));
 
-    tokenContract.getStateData().set("amount", amount.toString());
+    let params = {
+        min_value: new BigDecimal(minValue).toFixed(),
+        min_unit: new BigDecimal(minValue).toFixed(),
+        field_name: "amount",
+        join_match_fields: ["state.origin"]
+    };
 
-    RoleLink ownerLink = new RoleLink("@owner_link", "owner");
-    ownerLink.setContract(tokenContract);
-    ChangeOwnerPermission changeOwnerPerm = new ChangeOwnerPermission(ownerLink);
-    tokenContract.addPermission(changeOwnerPerm);
+    tokenContract.definition.addPermission(new perms.SplitJoinPermission(ownerLink, params));
 
-    Binder params = new Binder();
-    params.set("min_value", minValue.toString());
-    params.set("min_unit", minValue.toString());
-    params.set("field_name", "amount");
-    List<String> listFields = new ArrayList<>();
-    listFields.add("state.origin");
-    params.set("join_match_fields", listFields);
+    tokenContract.definition.addPermission(new perms.RevokePermission(ownerLink));
+    tokenContract.definition.addPermission(new perms.RevokePermission(issuerLink));
 
-    SplitJoinPermission splitJoinPerm = new SplitJoinPermission(ownerLink, params);
-    tokenContract.addPermission(splitJoinPerm);
+    await tokenContract.seal(true);
+    await tokenContract.addSignatureToSeal(issuerKeys);
 
-    RevokePermission revokePerm1 = new RevokePermission(ownerLink);
-    tokenContract.addPermission(revokePerm1);
+    return tokenContract;
+}
 
-    RevokePermission revokePerm2 = new RevokePermission(issuerRole);
-    tokenContract.addPermission(revokePerm2);
+/**
+ * Creates a mintable token contract for given keys with given currency code,name,description.
+ *
+ * The service creates a mintable token contract with issuer, creator and owner roles;
+ * with change_owner permission for owner, revoke permissions for owner and issuer and split_join permission for owner.
+ * Split_join permission has  following params: "minValue" for min_value and min_unit, "amount" for field_name,
+ * ["definition.data.currency", "definition.issuer"] for join_match_fields.
+ * By default expires at time is set to 60 months from now.
+ *
+ * @param {Iterable<crypto.PrivateKey>} issuerKeys - Issuer public keys.
+ * @param {Iterable<crypto.PublicKey>} ownerKeys - Owner public keys.
+ * @param {number | string | BigDecimal} amount - Maximum token number.
+ * @param {number | string | BigDecimal} minValue - Minimum token value.
+ * @param {string} currency - Currency code.
+ * @param {string} name - Currency name.
+ * @param {string} description  - Currency description.
+ * @return {Contract} signed and sealed contract, ready for register.
+ */
+async function createMintableTokenContract(issuerKeys, ownerKeys, amount, minValue = "0.01", currency = "DT",
+                                           name = "Default token name", description = "Default token description") {
 
-    tokenContract.seal();
-    tokenContract.addSignatureToSeal(issuerKeys);
+    let tokenContract = new Contract();
 
-    return tokenContract;*/
+    tokenContract.definition.expiresAt = new Date(tokenContract.definition.createdAt);
+    tokenContract.definition.expiresAt.setDate(tokenContract.definition.expiresAt.getMonth() + 60);
+
+    tokenContract.definition.data = {
+        currency: currency,
+        short_currency: currency,
+        name: name,
+        description: description
+    };
+
+    tokenContract.registerRole(new roles.SimpleRole("issuer", issuerKeys));
+    tokenContract.registerRole(new roles.SimpleRole("owner", ownerKeys));
+    tokenContract.registerRole(new roles.RoleLink("creator", "issuer"));
+
+    tokenContract.state.data.amount = new BigDecimal(amount).toFixed();
+
+    let ownerLink = new roles.RoleLink("@owner_link", "owner");
+    ownerLink.contract = tokenContract;
+    let issuerLink = new roles.RoleLink("@issuer_link", "issuer");
+    issuerLink.contract = tokenContract;
+
+    tokenContract.definition.addPermission(new perms.ChangeOwnerPermission(ownerLink));
+
+    let params = {
+        min_value: new BigDecimal(minValue).toFixed(),
+        min_unit: new BigDecimal(minValue).toFixed(),
+        field_name: "amount",
+        join_match_fields: ["definition.data.currency", "definition.issuer"]
+    };
+
+    tokenContract.definition.addPermission(new perms.SplitJoinPermission(ownerLink, params));
+
+    tokenContract.definition.addPermission(new perms.RevokePermission(ownerLink));
+    tokenContract.definition.addPermission(new perms.RevokePermission(issuerLink));
+
+    await tokenContract.seal(true);
+    await tokenContract.addSignatureToSeal(issuerKeys);
+
+    return tokenContract;
 }
 
 /**
@@ -279,131 +429,131 @@ async function createTokenContract( issuerKeys, ownerKeys, amount, minValue, cur
  * "state.origin" for join_match_fields.
  * By default expires at time is set to 60 months from now.
  *
- * @param issuerKeys is issuer private keys.
- * @param ownerKeys  is owner public keys.
- * @param amount     is maximum shares number.
- * @return signed and sealed contract, ready for register.
+ * @param {Iterable<crypto.PrivateKey>} issuerKeys - Issuer public keys.
+ * @param {Iterable<crypto.PublicKey>} ownerKeys - Owner public keys.
+ * @param {number | string | BigDecimal} amount - Maximum shares number.
+ * @return {Contract} signed and sealed contract, ready for register.
  */
-/*public synchronized static Contract createShareContract(Set<PrivateKey> issuerKeys, Set<PublicKey> ownerKeys, BigDecimal amount) {
-    Contract shareContract = new Contract();
-    shareContract.setApiLevel(3);
+async function createShareContract(issuerKeys, ownerKeys, amount) {
 
-    Contract.Definition cd = shareContract.getDefinition();
-    cd.setExpiresAt(shareContract.getCreatedAt().plusMonths(60));
+    let shareContract = new Contract();
 
-    Binder data = new Binder();
-    data.set("name", "Default share name");
-    data.set("currency_code", "DSH");
-    data.set("currency_name", "Default share name");
-    data.set("description", "Default share description.");
-    cd.setData(data);
+    shareContract.definition.expiresAt = new Date(shareContract.definition.createdAt);
+    shareContract.definition.expiresAt.setDate(shareContract.definition.expiresAt.getMonth() + 60);
 
-    SimpleRole issuerRole = new SimpleRole("issuer");
-    for (PrivateKey k : issuerKeys) {
-        KeyRecord kr = new KeyRecord(k.getPublicKey());
-        issuerRole.addKeyRecord(kr);
-    }
+    shareContract.definition.data = {
+        name: "Default share name",
+        currency_code: "DSH",
+        currency_name: "Default share name",
+        description: "Default share description."
+    };
 
-    SimpleRole ownerRole = new SimpleRole("owner");
-    for (PublicKey k : ownerKeys) {
-        KeyRecord kr = new KeyRecord(k);
-        ownerRole.addKeyRecord(kr);
-    }
+    shareContract.registerRole(new roles.SimpleRole("issuer", issuerKeys));
+    shareContract.registerRole(new roles.SimpleRole("owner", ownerKeys));
+    shareContract.registerRole(new roles.RoleLink("creator", "issuer"));
 
-    shareContract.registerRole(issuerRole);
-    shareContract.createRole("issuer", issuerRole);
-    shareContract.createRole("creator", issuerRole);
+    shareContract.state.data.amount = new BigDecimal(amount).toFixed();
 
-    shareContract.registerRole(ownerRole);
-    shareContract.createRole("owner", ownerRole);
+    let ownerLink = new roles.RoleLink("@owner_link", "owner");
+    ownerLink.contract = shareContract;
+    let issuerLink = new roles.RoleLink("@issuer_link", "issuer");
+    issuerLink.contract = shareContract;
 
-    shareContract.getStateData().set("amount", amount.toString());
+    shareContract.definition.addPermission(new perms.ChangeOwnerPermission(ownerLink));
 
-    ChangeOwnerPermission changeOwnerPerm = new ChangeOwnerPermission(ownerRole);
-    shareContract.addPermission(changeOwnerPerm);
+    let params = {
+        min_value: 1,
+        min_unit: 1,
+        field_name: "amount",
+        join_match_fields: ["state.origin"]
+    };
 
-    Binder params = new Binder();
-    params.set("min_value", 1);
-    params.set("min_unit", 1);
-    params.set("field_name", "amount");
-    List<String> listFields = new ArrayList<>();
-    listFields.add("state.origin");
-    params.set("join_match_fields", listFields);
+    shareContract.definition.addPermission(new perms.SplitJoinPermission(ownerLink, params));
 
-    SplitJoinPermission splitJoinPerm = new SplitJoinPermission(ownerRole, params);
-    shareContract.addPermission(splitJoinPerm);
+    shareContract.definition.addPermission(new perms.RevokePermission(ownerLink));
+    shareContract.definition.addPermission(new perms.RevokePermission(issuerLink));
 
-    RevokePermission revokePerm1 = new RevokePermission(ownerRole);
-    shareContract.addPermission(revokePerm1);
-
-    RevokePermission revokePerm2 = new RevokePermission(issuerRole);
-    shareContract.addPermission(revokePerm2);
-
-    shareContract.seal();
-    shareContract.addSignatureToSeal(issuerKeys);
+    await shareContract.seal(true);
+    await shareContract.addSignatureToSeal(issuerKeys);
 
     return shareContract;
-}*/
+}
 
 /**
  * Creates a simple notary contract for given keys.
- * <br><br>
+ *
  * The service creates a notary contract with issuer, creator and owner roles
  * with change_owner permission for owner and revoke permissions for owner and issuer.
+ * Optionally, the service attach the data to notary contract and data file descriptions.
  * By default expires at time is set to 60 months from now.
- * <br><br>
  *
- * @param issuerKeys is issuer private keys.
- * @param ownerKeys  is owner public keys.
- * @return signed and sealed contract, ready for register.
+ * @param {Iterable<crypto.PrivateKey>} issuerKeys - Issuer public keys.
+ * @param {Iterable<crypto.PublicKey>} ownerKeys - Owner public keys.
+ * @param {[string] | null} filePaths - Array with paths to data files.
+ * @param {[string] | null} fileDescriptions - Array with data file descriptions.
+ * @return {Contract} signed and sealed contract, ready for register.
  */
-/*public synchronized static Contract createNotaryContract(Set<PrivateKey> issuerKeys, Set<PublicKey> ownerKeys) {
-    Contract notaryContract = new Contract();
-    notaryContract.setApiLevel(3);
+async function createNotaryContract(issuerKeys, ownerKeys, filePaths = null, fileDescriptions = null) {
 
-    Contract.Definition cd = notaryContract.getDefinition();
-    cd.setExpiresAt(notaryContract.getCreatedAt().plusMonths(60));
+    let notaryContract = new Contract();
 
-    Binder data = new Binder();
-    data.set("name", "Default notary");
-    data.set("description", "Default notary description.");
-    data.set("template_name", "NOTARY_CONTRACT");
-    data.set("holder_identifier", "default holder identifier");
-    cd.setData(data);
+    notaryContract.definition.expiresAt = new Date(notaryContract.definition.createdAt);
+    notaryContract.definition.expiresAt.setDate(notaryContract.definition.expiresAt.getMonth() + 60);
 
-    SimpleRole issuerRole = new SimpleRole("issuer");
-    for (PrivateKey k : issuerKeys) {
-        KeyRecord kr = new KeyRecord(k.getPublicKey());
-        issuerRole.addKeyRecord(kr);
+    notaryContract.definition.data = {
+        name: "Default notary",
+        description: "Default notary description.",
+        template_name: "NOTARY_CONTRACT",
+        holder_identifier: "default holder identifier"
+    };
+
+    notaryContract.registerRole(new roles.SimpleRole("issuer", issuerKeys));
+    notaryContract.registerRole(new roles.SimpleRole("owner", ownerKeys));
+    notaryContract.registerRole(new roles.RoleLink("creator", "issuer"));
+
+    let ownerLink = new roles.RoleLink("@owner_link", "owner");
+    ownerLink.contract = notaryContract;
+    let issuerLink = new roles.RoleLink("@issuer_link", "issuer");
+    issuerLink.contract = notaryContract;
+
+    notaryContract.definition.addPermission(new perms.ChangeOwnerPermission(ownerLink));
+
+    notaryContract.definition.addPermission(new perms.RevokePermission(ownerLink));
+    notaryContract.definition.addPermission(new perms.RevokePermission(issuerLink));
+
+    if (filePaths != null && filePaths.length > 0) {
+        // attache files
+        let data = notaryContract.definition.data;
+        let files = {};
+
+        for (let i = 0; i < filePaths.length; i++) {
+            let buffer = await (await io.openRead(filePaths[i])).allBytes();
+
+            let fileName = filePaths[i].replace(/^.*[\\\/]/, "");
+            let line = fileName.replace(/\W/g, "_");
+
+            let fileData = {
+                file_name: fileName,
+                __type: "file",
+                hash_id: BossBiMapper.serialize(HashId.of(buffer))
+            };
+
+            if (fileDescriptions != null && fileDescriptions[i] != null && typeof fileDescriptions[i] === "string")
+                fileData.file_description = fileDescriptions[i];
+            else
+                fileData.file_description = "";
+
+            files[line] = fileData;
+        }
+
+        data.files = files;
     }
 
-    SimpleRole ownerRole = new SimpleRole("owner");
-    for (PublicKey k : ownerKeys) {
-        KeyRecord kr = new KeyRecord(k);
-        ownerRole.addKeyRecord(kr);
-    }
-
-    notaryContract.registerRole(issuerRole);
-    notaryContract.createRole("issuer", issuerRole);
-    notaryContract.createRole("creator", issuerRole);
-
-    notaryContract.registerRole(ownerRole);
-    notaryContract.createRole("owner", ownerRole);
-
-    ChangeOwnerPermission changeOwnerPerm = new ChangeOwnerPermission(ownerRole);
-    notaryContract.addPermission(changeOwnerPerm);
-
-    RevokePermission revokePerm1 = new RevokePermission(ownerRole);
-    notaryContract.addPermission(revokePerm1);
-
-    RevokePermission revokePerm2 = new RevokePermission(issuerRole);
-    notaryContract.addPermission(revokePerm2);
-
-    notaryContract.seal();
-    notaryContract.addSignatureToSeal(issuerKeys);
+    await notaryContract.seal(true);
+    await notaryContract.addSignatureToSeal(issuerKeys);
 
     return notaryContract;
-}*/
+}
 
 /**
  * Create paid transaction, which consist from contract you want to register and payment contract that will be
@@ -620,7 +770,6 @@ async function createInternalEscrowContract(issuerKeys, customerKeys, executorKe
 
     // Create internal escrow contract
     let escrow = new Contract();
-    escrow.apiLevel = 4;
     escrow.definition.expiresAt = new Date(escrow.definition.createdAt);
     escrow.definition.expiresAt.setMonth(escrow.definition.expiresAt.getMonth() + 60);
     escrow.state.data.status = "opened";
@@ -685,7 +834,6 @@ async function createExternalEscrowContract(internalEscrow, issuerKeys) {
 
     // Create external escrow contract (escrow pack)
     let escrowPack = new Contract();
-    escrowPack.apiLevel = 4;
     escrowPack.definition.expiresAt = new Date(escrowPack.definition.createdAt);
     escrowPack.definition.expiresAt.setMonth(escrowPack.definition.expiresAt.getMonth() + 60);
     escrowPack.definition.data.EscrowOrigin = internalEscrow.getOrigin().base64;

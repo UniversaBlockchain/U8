@@ -1649,7 +1649,7 @@ class Contract extends bs.BiSerializable {
     /**
      * Create new revision of contract.
      *
-     * @param {Array<crypto.PrivateKey> | Set<crypto.PrivateKey> | null} keys - Creator keys for new revision.
+     * @param {Iterable<crypto.PrivateKey> | null} keys - Creator keys for new revision.
      * @returns {Contract} new revision of a contract.
      */
     createRevision(keys = null) {
