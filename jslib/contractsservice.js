@@ -535,7 +535,7 @@ async function createNotaryContract(issuerKeys, ownerKeys, filePaths = null, fil
             let fileData = {
                 file_name: fileName,
                 __type: "file",
-                hash_id: BossBiMapper.serialize(HashId.of(buffer))
+                hash_id: BossBiMapper.getInstance().serialize(HashId.of(buffer))
             };
 
             if (fileDescriptions != null && fileDescriptions[i] != null && typeof fileDescriptions[i] === "string")
@@ -553,6 +553,53 @@ async function createNotaryContract(issuerKeys, ownerKeys, filePaths = null, fil
     await notaryContract.addSignatureToSeal(issuerKeys);
 
     return notaryContract;
+}
+
+/**
+ * Check the data attached to the notary contract
+ *
+ * @param {Contract} notaryContract - Notary-type contract.
+ * @param {string} filePaths - Path to attached file or folder with files.
+ * @return {boolean} result of checking the data attached to the notary contract.
+ */
+async function checkAttachNotaryContract(notaryContract, filePaths) {
+    let files = notaryContract.definition.data.files;
+
+    if (!await io.isAccessible(filePaths))
+        throw new ex.IllegalArgumentError("Cannot access " + filePaths);
+
+    let isDir = await io.isDir(filePaths);
+    let isFile = await io.isFile(filePaths);
+    let normalPath = filePaths;
+
+    if (isDir && !filePaths.endsWith("/"))
+        normalPath = filePaths + "/";
+
+    let predicate = async(key) => {
+        let file = files[key];
+        try {
+            let filePath = normalPath;
+            if (filePath.endsWith("/"))
+                filePath += file.file_name;
+            else if (!filePath.endsWith(file.file_name))
+                return false;
+
+            let buffer = await (await io.openRead(filePath)).allBytes();
+            let fileHash = HashId.of(buffer);
+            let notaryHash = BossBiMapper.getInstance().deserialize(file.hash_id);
+
+            return fileHash.equals(notaryHash);
+        } catch (err) {
+            return false;
+        }
+    };
+
+    if (isFile)
+        return Object.keys(files).some(predicate);
+    else if (isDir)
+        return Object.keys(files).every(predicate);
+    else
+        throw new ex.IllegalArgumentError("Cannot access " + filePaths + ": need regular file or directory");
 }
 
 /**

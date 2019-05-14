@@ -26,6 +26,38 @@ void JsAsyncGetErrorText(const FunctionCallbackInfo<Value> &args) {
     });
 }
 
+void JsAsyncStatMode(const FunctionCallbackInfo<Value> &args) {
+    Scripter::unwrapArgs(args, [&](ArgsContext &ac) {
+
+        auto scripter = ac.scripter;
+
+        auto path = ac.asString(0);
+        Persistent<Function> *pcb = new Persistent<Function>(ac.isolate, ac.as<Function>(1));
+
+        asyncio::IOFile::stat(path.data(), [=](asyncio::ioStat stat, ssize_t result) {
+            // here we are in the async dispatcher thread we should not lock:
+            scripter->inPool([=](auto context) {
+                Isolate *isolate = context->GetIsolate();
+                auto fn = pcb->Get(isolate);
+                if (fn->IsNull())
+                    scripter->throwError("null callback in IOFile::stat");
+                else {
+                    Local<Value> res[2];
+                    if (result >= 0)
+                        res[0] = Integer::New(isolate, stat.st_mode);
+                    else
+                        res[0] = Undefined(isolate);
+
+                    res[1] = Integer::New(isolate, result);
+                    auto unused = fn->Call(context, fn, 2, res);
+                }
+                pcb->Reset();
+                delete pcb;
+            });
+        });
+    });
+}
+
 void JsAsyncFileOpen(const FunctionCallbackInfo<Value> &args) {
     Scripter::unwrap(args, [&](const shared_ptr<Scripter> &se, auto isolate, auto context) {
         auto file_name = se->getString(args[0]);
@@ -541,6 +573,7 @@ void JsInitIOFile(Isolate *isolate, const Local<ObjectTemplate> &global) {
 
     // class methods
     tpl->Set(isolate, "getErrorText", FunctionTemplate::New(isolate, JsAsyncGetErrorText));
+    tpl->Set(isolate, "stat_mode", FunctionTemplate::New(isolate, JsAsyncStatMode));
 
     // register it into global namespace
     FileTemplate.Reset(isolate, tpl);

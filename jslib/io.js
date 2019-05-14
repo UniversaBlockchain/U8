@@ -311,4 +311,36 @@ async function openWrite(url, mode = "w", {bufferLength = chunkSize, umask = 0o6
     return ap.promise
 }
 
-module.exports = {openRead, openWrite, InputStream, OutputStream, AsyncProcessor, IoError};
+async function stat(url) {
+    // normalize name: remove file:/ and file:/// protocols
+    let match = reSkipFile.exec(url);
+    if (match)
+        url = match[1];
+    // todo: more protcols
+    let ap = new AsyncProcessor();
+    IOFile.stat_mode(url, (mode, code) => ap.process(code, mode));
+    return ap.promise;
+}
+
+const S_IFREG = 0o100000;
+const S_IFDIR = 0o040000;
+
+async function isAccessible(url) {
+    try {
+        await stat(url);
+    } catch (err) {
+        return false;
+    }
+
+    return true;
+}
+
+async function isFile(url) {
+    return Boolean(await stat(url) & S_IFREG);
+}
+
+async function isDir(url) {
+    return Boolean(await stat(url) & S_IFDIR);
+}
+
+module.exports = {openRead, openWrite, InputStream, OutputStream, AsyncProcessor, IoError, isAccessible, isFile, isDir};
