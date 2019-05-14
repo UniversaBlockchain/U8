@@ -638,32 +638,34 @@ class SimpleRole extends Role {
     }
 
     isAllowedForKeys(keys) {
-        if(!Object.getPrototypeOf(SimpleRole.prototype).isAllowedForKeys.call(this,keys))
+        if (!Object.getPrototypeOf(SimpleRole.prototype).isAllowedForKeys.call(this,keys))
             return false;
 
 
-        for(let key of this.keyRecords.keys()) {
+        for (let key of this.keyRecords.keys()) {
             let found = false;
-            for(let k of keys) {
-                if(t.valuesEqual(k,key)) {
+            for (let k of keys) {
+                if (k instanceof crypto.PublicKey && t.valuesEqual(k, key) ||
+                    k instanceof crypto.PrivateKey && t.valuesEqual(k.publicKey, key)) {
                     found = true;
                     break;
                 }
             }
-            if(!found)
+            if (!found)
                 return false;
         }
 
 
-        for(let address of this.keyAddresses) {
+        for (let address of this.keyAddresses) {
             let found = false;
-            for(let k of keys) {
-                if(address.match(k)) {
+            for (let k of keys) {
+                if (k instanceof crypto.PublicKey && address.match(k) ||
+                    k instanceof crypto.PrivateKey && address.match(k.publicKey)) {
                     found = true;
                     break;
                 }
             }
-            if(!found)
+            if (!found)
                 return false;
         }
 
