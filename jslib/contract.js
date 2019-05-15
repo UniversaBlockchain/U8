@@ -1162,11 +1162,51 @@ class Contract extends bs.BiSerializable {
         return this.state.expiresAt != null ? this.state.expiresAt : this.definition.expiresAt;
     }
 
+    /**
+     * Quantize given permission (add cost for that permission).
+     * Use for permissions that will be applicated, but before checking.
+     *
+     * @param {Permission} permission - Permission that will be quantized
+     * @throws Quantiser.QuantiserException if processing cost limit is got
+     */
+    checkApplicablePermissionQuantized(permission) {
+        // Add check an applicable permission quanta
+        this.quantiser.addWorkCost(Quantiser.QuantiserProcesses.PRICE_APPLICABLE_PERM);
+
+        // Add check a splitjoin permission	in addition to the permission check quanta
+        if (permission instanceof permissions.SplitJoinPermission)
+            this.quantiser.addWorkCost(Quantiser.QuantiserProcesses.PRICE_SPLITJOIN_PERM);
+    }
+
     checkSubItemQuantized(subitem, prefix, neighbourContracts) {
         // Add checks from subItem quanta
         subitem.quantiser.reset(this.quantiser.quantasLeft());
         subitem.check(prefix, neighbourContracts);
         this.quantiser.addWorkCostFrom(subitem.quantiser);
+    }
+
+    /**
+     * Checks if permission of given type that is allowed for given keys exists.
+     * Optionally, quantise permissions checking.
+     *
+     * @param {string} permissionName - Type of permission to check for.
+     * @param {Iterable<crypto.PublicKey> | Iterable<crypto.PrivateKey>} keys - Collection of keys to check with.
+     * @param {boolean} quantise - Quantise permissions checking. Optional. False by default.
+     * @return {boolean} permission allowed for keys is found.
+     * @throws Quantiser.QuantiserException if quantas limit was reached during check (if quantise is true).
+     */
+    isPermitted(permissionName, keys, quantise = false) {
+        let cp = this.definition.permissions.get(permissionName);
+        if (cp != null)
+            for (let p of cp)
+                if (p.isAllowedForKeys(keys)) {
+                if (quantise)
+                    this.checkApplicablePermissionQuantized(p);
+
+                return true;
+            }
+
+        return false;
     }
 
     basicCheck(prefix) {

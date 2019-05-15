@@ -322,7 +322,7 @@ async function createTokenContract(issuerKeys, ownerKeys, amount, minValue = "0.
     let tokenContract = new Contract();
 
     tokenContract.definition.expiresAt = new Date(tokenContract.definition.createdAt);
-    tokenContract.definition.expiresAt.setDate(tokenContract.definition.expiresAt.getMonth() + 60);
+    tokenContract.definition.expiresAt.setMonth(tokenContract.definition.expiresAt.getMonth() + 60);
 
     tokenContract.definition.data = {
         currency: currency,
@@ -386,7 +386,7 @@ async function createMintableTokenContract(issuerKeys, ownerKeys, amount, minVal
     let tokenContract = new Contract();
 
     tokenContract.definition.expiresAt = new Date(tokenContract.definition.createdAt);
-    tokenContract.definition.expiresAt.setDate(tokenContract.definition.expiresAt.getMonth() + 60);
+    tokenContract.definition.expiresAt.setMonth(tokenContract.definition.expiresAt.getMonth() + 60);
 
     tokenContract.definition.data = {
         currency: currency,
@@ -444,7 +444,7 @@ async function createShareContract(issuerKeys, ownerKeys, amount) {
     let shareContract = new Contract();
 
     shareContract.definition.expiresAt = new Date(shareContract.definition.createdAt);
-    shareContract.definition.expiresAt.setDate(shareContract.definition.expiresAt.getMonth() + 60);
+    shareContract.definition.expiresAt.setMonth(shareContract.definition.expiresAt.getMonth() + 60);
 
     shareContract.definition.data = {
         name: "Default share name",
@@ -503,7 +503,7 @@ async function createNotaryContract(issuerKeys, ownerKeys, filePaths = null, fil
     let notaryContract = new Contract();
 
     notaryContract.definition.expiresAt = new Date(notaryContract.definition.createdAt);
-    notaryContract.definition.expiresAt.setDate(notaryContract.definition.expiresAt.getMonth() + 60);
+    notaryContract.definition.expiresAt.setMonth(notaryContract.definition.expiresAt.getMonth() + 60);
 
     notaryContract.definition.data = {
         name: "Default notary",
@@ -644,7 +644,7 @@ async function createSlotContract(issuerKeys, ownerKeys, nodeInfoProvider) {
     slotContract.nodeInfoProvider = nodeInfoProvider;
 
     slotContract.definition.expiresAt = new Date(slotContract.definition.createdAt);
-    slotContract.definition.expiresAt.setDate(slotContract.definition.expiresAt.getMonth() + 60);
+    slotContract.definition.expiresAt.setMonth(slotContract.definition.expiresAt.getMonth() + 60);
 
     slotContract.definition.data = {
         name: "Default slot",
@@ -679,7 +679,7 @@ function createSimpleUnsContract(issuerKeys, ownerKeys, nodeInfoProvider) {
     unsContract.nodeInfoProvider = nodeInfoProvider;
 
     unsContract.definition.expiresAt = new Date(unsContract.definition.createdAt);
-    unsContract.definition.expiresAt.setDate(unsContract.definition.expiresAt.getMonth() + 60);
+    unsContract.definition.expiresAt.setMonth(unsContract.definition.expiresAt.getMonth() + 60);
 
     unsContract.definition.data = {
         name: "Default UNS contract",
@@ -821,7 +821,7 @@ async function createFollowerContract(issuerKeys, ownerKeys, nodeInfoProvider) {
     followerContract.nodeInfoProvider = nodeInfoProvider;
 
     followerContract.definition.expiresAt = new Date(followerContract.definition.createdAt);
-    followerContract.definition.expiresAt.setDate(followerContract.definition.expiresAt.getMonth() + 60);
+    followerContract.definition.expiresAt.setMonth(followerContract.definition.expiresAt.getMonth() + 60);
 
     followerContract.definition.data = {
         name: "Default follower",
