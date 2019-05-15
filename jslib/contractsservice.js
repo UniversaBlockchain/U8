@@ -14,6 +14,11 @@ const BigDecimal  = require("big").Big;
 const Constraint = require('constraint').Constraint;
 const ex = require("exceptions");
 const io = require("io");
+const SlotContract = require("services/slotContract").SlotContract;
+const UnsContract = require("services/unsContract").UnsContract;
+const UnsName = require("services/unsName").UnsName;
+const UnsRecord = require("services/unsRecord").UnsRecord;
+const FollowerContract = require("services/followerContract").FollowerContract;
 
 /**
  * Implementing revoking procedure.
@@ -575,31 +580,328 @@ async function checkAttachNotaryContract(notaryContract, filePaths) {
     if (isDir && !filePaths.endsWith("/"))
         normalPath = filePaths + "/";
 
-    let predicate = async(key) => {
-        let file = files[key];
-        try {
-            let filePath = normalPath;
-            if (filePath.endsWith("/"))
-                filePath += file.file_name;
-            else if (!filePath.endsWith(file.file_name))
+    if (isFile) {
+        let buffer = await (await io.openRead(normalPath)).allBytes();
+        let fileHash = HashId.of(buffer);
+
+        return Object.keys(files).some(key => {
+            let file = files[key];
+            try {
+                if (!normalPath.endsWith(file.file_name))
+                    return false;
+
+                let notaryHash = BossBiMapper.getInstance().deserialize(file.hash_id);
+
+                return fileHash.equals(notaryHash);
+            } catch (err) {
                 return false;
+            }
+        });
 
-            let buffer = await (await io.openRead(filePath)).allBytes();
-            let fileHash = HashId.of(buffer);
-            let notaryHash = BossBiMapper.getInstance().deserialize(file.hash_id);
+    } else if (isDir) {
+        let results = await Promise.all(Object.keys(files).map(async(key) => {
+            let file = files[key];
+            try {
+                let filePath = normalPath;
+                if (filePath.endsWith("/"))
+                    filePath += file.file_name;
+                else if (!filePath.endsWith(file.file_name))
+                    return false;
 
-            return fileHash.equals(notaryHash);
-        } catch (err) {
-            return false;
-        }
+                let buffer = await (await io.openRead(filePath)).allBytes();
+                let fileHash = HashId.of(buffer);
+                let notaryHash = BossBiMapper.getInstance().deserialize(file.hash_id);
+
+                return fileHash.equals(notaryHash);
+            } catch (err) {
+                return false;
+            }
+        }));
+
+        return results.every(res => res);
+
+    } else
+        throw new ex.IllegalArgumentError("Cannot access " + filePaths + ": need regular file or directory");
+}
+
+/**
+ * Create and return ready {@link SlotContract} contract with need permissions and values. {@link SlotContract} is
+ * used for control and for payment for store some contracts in the distributed store.
+ * Default expiration is set to 5 years.
+ *
+ * Created {@link SlotContract} has <i>change_owner</i>, <i>revoke</i> and <i>modify_data</i> with special slot
+ * fields permissions. Sets issuerKeys as issuer, ownerKeys as owner. Use {@link SlotContract#putTrackingContract(Contract)}
+ * for putting contract should be add to storage.
+ *
+ * @param {Iterable<crypto.PrivateKey>} issuerKeys - Issuer public keys.
+ * @param {Iterable<crypto.PublicKey>} ownerKeys - Owner public keys.
+ * @param {NodeInfoProvider} nodeInfoProvider - Provider receiving information from node.
+ * @return {SlotContract} slot-contract, ready for register.
+ */
+async function createSlotContract(issuerKeys, ownerKeys, nodeInfoProvider) {
+
+    let slotContract = new SlotContract();
+    slotContract.nodeInfoProvider = nodeInfoProvider;
+
+    slotContract.definition.expiresAt = new Date(slotContract.definition.createdAt);
+    slotContract.definition.expiresAt.setDate(slotContract.definition.expiresAt.getMonth() + 60);
+
+    slotContract.definition.data = {
+        name: "Default slot",
+        description: "Default slot description."
     };
 
-    if (isFile)
-        return Object.keys(files).some(predicate);
-    else if (isDir)
-        return Object.keys(files).every(predicate);
-    else
-        throw new ex.IllegalArgumentError("Cannot access " + filePaths + ": need regular file or directory");
+    slotContract.registerRole(new roles.SimpleRole("issuer", issuerKeys));
+    slotContract.registerRole(new roles.SimpleRole("owner", ownerKeys));
+    slotContract.registerRole(new roles.RoleLink("creator", "issuer"));
+
+    let ownerLink = new roles.RoleLink("@owner_link", "owner");
+    ownerLink.contract = slotContract;
+    let issuerLink = new roles.RoleLink("@issuer_link", "issuer");
+    issuerLink.contract = slotContract;
+
+    slotContract.definition.addPermission(new perms.ChangeOwnerPermission(ownerLink));
+
+    slotContract.definition.addPermission(new perms.RevokePermission(ownerLink));
+    slotContract.definition.addPermission(new perms.RevokePermission(issuerLink));
+
+    slotContract.addSlotSpecific();
+
+    await slotContract.seal(true);
+    await slotContract.addSignatureToSeal(issuerKeys);
+
+    return slotContract;
+}
+
+function createSimpleUnsContract(issuerKeys, ownerKeys, nodeInfoProvider) {
+
+    let unsContract = new UnsContract();
+    unsContract.nodeInfoProvider = nodeInfoProvider;
+
+    unsContract.definition.expiresAt = new Date(unsContract.definition.createdAt);
+    unsContract.definition.expiresAt.setDate(unsContract.definition.expiresAt.getMonth() + 60);
+
+    unsContract.definition.data = {
+        name: "Default UNS contract",
+        description: "Default UNS contract description."
+    };
+
+    unsContract.registerRole(new roles.SimpleRole("issuer", issuerKeys));
+    unsContract.registerRole(new roles.SimpleRole("owner", ownerKeys));
+    unsContract.registerRole(new roles.RoleLink("creator", "issuer"));
+
+    let ownerLink = new roles.RoleLink("@owner_link", "owner");
+    ownerLink.contract = unsContract;
+    let issuerLink = new roles.RoleLink("@issuer_link", "issuer");
+    issuerLink.contract = unsContract;
+
+    unsContract.definition.addPermission(new perms.ChangeOwnerPermission(ownerLink));
+
+    unsContract.definition.addPermission(new perms.RevokePermission(ownerLink));
+    unsContract.definition.addPermission(new perms.RevokePermission(issuerLink));
+
+    unsContract.addUnsSpecific();
+
+    return unsContract;
+}
+
+/**
+ * Create and return ready {@link UnsContract} contract with need permissions and values. {@link UnsContract} is
+ * used for control and for payment for register some names in the distributed store.
+ * Default expiration is set to 5 years.
+ *
+ * Created {@link UnsContract} has <i>change_owner</i>, <i>revoke</i> and <i>modify_data</i> with special uns
+ * fields permissions. Sets issuerKeys as issuer, ownerKeys as owner. Use {@link UnsContract#addUnsName(UnsName)}
+ * for putting UNS name should be register.
+ *
+ * @param {Iterable<crypto.PrivateKey>} issuerKeys - Issuer public keys.
+ * @param {Iterable<crypto.PublicKey>} ownerKeys - Owner public keys.
+ * @param {NodeInfoProvider} nodeInfoProvider - Provider receiving information from node.
+ * @return {UnsContract} UNS-contract, ready for register.
+ */
+async function createUnsContract(issuerKeys, ownerKeys, nodeInfoProvider) {
+
+    let unsContract = createSimpleUnsContract(issuerKeys, ownerKeys, nodeInfoProvider);
+
+    await unsContract.seal(true);
+    await unsContract.addSignatureToSeal(issuerKeys);
+
+    return unsContract;
+}
+
+/**
+ * Create and return ready {@link UnsContract} contract with need permissions and values. {@link UnsContract} is
+ * used for control and for payment for register some names in the distributed store.
+ * Default expiration is set to 5 years.
+ *
+ * Created {@link UnsContract} has <i>change_owner</i>, <i>revoke</i> and <i>modify_data</i> with special uns
+ * fields permissions. Sets issuerKeys as issuer, ownerKeys as owner.
+ * Also added UNS name for registration associated with contract (by origin).
+ * Use {@link UnsContract#addUnsName(UnsName)} for putting additional UNS name should be register.
+ *
+ * @param {Iterable<crypto.PrivateKey>} issuerKeys - Issuer public keys.
+ * @param {Iterable<crypto.PublicKey>} ownerKeys - Owner public keys.
+ * @param {NodeInfoProvider} nodeInfoProvider - Provider receiving information from node.
+ * @param {string} name - Name for registration.
+ * @param {string} description - Description associated with name for registration.
+ * @param {string} URL - URL associated with name for registration.
+ * @param {Contract} namedContract - Named contract.
+ * @return {UnsContract} UNS-contract, ready for register.
+ */
+async function createUnsContractForRegisterContractName(issuerKeys, ownerKeys, nodeInfoProvider, name, description, URL, namedContract) {
+
+    let unsContract = createSimpleUnsContract(issuerKeys, ownerKeys, nodeInfoProvider);
+
+    if (namedContract.id == null)
+        throw new ex.IllegalArgumentError("createUnsContractForRegisterContractName: namedContract not sealed.");
+
+    let unsName = new UnsName(name, description, URL);
+    let unsRecord = UnsRecord.fromOrigin(namedContract.id);
+    unsName.addUnsRecord(unsRecord);
+    unsContract.addUnsName(unsName);
+    unsContract.addOriginContract(namedContract);
+
+    await unsContract.seal(true);
+    await unsContract.addSignatureToSeal(issuerKeys);
+
+    return unsContract;
+}
+
+/**
+ * Create and return ready {@link UnsContract} contract with need permissions and values. {@link UnsContract} is
+ * used for control and for payment for register some names in the distributed store.
+ * Default expiration is set to 5 years.
+ *
+ * Created {@link UnsContract} has <i>change_owner</i>, <i>revoke</i> and <i>modify_data</i> with special uns
+ * fields permissions. Sets issuerKeys as issuer, ownerKeys as owner.
+ * Also added uns name for registration associated with key (by addresses).
+ * Use {@link UnsContract#addUnsName(UnsName)} for putting additional uns name should be register.
+ *
+ * @param {Iterable<crypto.PrivateKey>} issuerKeys - Issuer public keys.
+ * @param {Iterable<crypto.PublicKey>} ownerKeys - Owner public keys.
+ * @param {NodeInfoProvider} nodeInfoProvider - Provider receiving information from node.
+ * @param {string} name - Name for registration.
+ * @param {string} description - Description associated with name for registration.
+ * @param {string} URL - URL associated with name for registration.
+ * @param {crypto.PrivateKey | crypto.PublicKey} namedKey - Named key.
+ * @return {UnsContract} UNS-contract, ready for register.
+ */
+async function createUnsContractForRegisterKeyName(issuerKeys, ownerKeys, nodeInfoProvider, name, description, URL, namedKey) {
+
+    let unsContract = createSimpleUnsContract(issuerKeys, ownerKeys, nodeInfoProvider);
+
+    let unsName = new UnsName(name, description, URL);
+    let unsRecord = UnsRecord.fromKey(namedKey instanceof crypto.PrivateKey ? namedKey.publicKey : namedKey);
+    unsName.addUnsRecord(unsRecord);
+    unsContract.addUnsName(unsName);
+
+    await unsContract.seal(true);
+    await unsContract.addSignatureToSeal(issuerKeys);
+
+    return unsContract;
+}
+
+/**
+ * Create and return ready {@link FollowerContract} contract with need permissions and values. {@link FollowerContract} is
+ * used for control and for payment for follow new revisions from some contract chains by origin.
+ * Default expiration is set to 5 years.
+ *
+ * Created {@link FollowerContract} has <i>change_owner</i>, <i>revoke</i> and <i>modify_data</i> with special follower
+ * fields permissions. Sets issuerKeys as issuer, ownerKeys as owner. Use {@link FollowerContract#putTrackingOrigin(HashId, String, PublicKey)}
+ * for putting follow chain by origin with callback URL and public key.
+ *
+ * @param {Iterable<crypto.PrivateKey>} issuerKeys - Issuer public keys.
+ * @param {Iterable<crypto.PublicKey>} ownerKeys - Owner public keys.
+ * @param {NodeInfoProvider} nodeInfoProvider - Provider receiving information from node.
+ * @return {FollowerContract} follower-contract, ready for register.
+ */
+async function createFollowerContract(issuerKeys, ownerKeys, nodeInfoProvider) {
+
+    let followerContract = new FollowerContract();
+    followerContract.nodeInfoProvider = nodeInfoProvider;
+
+    followerContract.definition.expiresAt = new Date(followerContract.definition.createdAt);
+    followerContract.definition.expiresAt.setDate(followerContract.definition.expiresAt.getMonth() + 60);
+
+    followerContract.definition.data = {
+        name: "Default follower",
+        description: "Default follower description."
+    };
+
+    followerContract.registerRole(new roles.SimpleRole("issuer", issuerKeys));
+    followerContract.registerRole(new roles.SimpleRole("owner", ownerKeys));
+    followerContract.registerRole(new roles.RoleLink("creator", "issuer"));
+
+    let ownerLink = new roles.RoleLink("@owner_link", "owner");
+    ownerLink.contract = followerContract;
+    let issuerLink = new roles.RoleLink("@issuer_link", "issuer");
+    issuerLink.contract = followerContract;
+
+    followerContract.definition.addPermission(new perms.ChangeOwnerPermission(ownerLink));
+
+    followerContract.definition.addPermission(new perms.RevokePermission(ownerLink));
+    followerContract.definition.addPermission(new perms.RevokePermission(issuerLink));
+
+    followerContract.addFollowerSpecific();
+
+    await followerContract.seal(true);
+    await followerContract.addSignatureToSeal(issuerKeys);
+
+    return followerContract;
+}
+
+/**
+ * Add to base {@link Contract} constraint and referenced contract.
+ * When the returned {@link Contract} is unpacking referenced contract verifies
+ * the compliance with the conditions of constraint in base contract.
+ *
+ * Also constraint to base contract may be added by {@link Contract#addConstraint(Constraint)}.
+ *
+ * @param {Contract} baseContract - Base contract for adding constraint.
+ * @param {Contract} refContract - Referenced contract (which must satisfy the conditions of the constraint).
+ * @param {string} constrName - Name of constraint.
+ * @param {number} constrType - Type of constraint (section, may be {@link Constraint#TYPE_TRANSACTIONAL},
+ *        {@link Constraint#TYPE_EXISTING_DEFINITION}, or {@link Constraint#TYPE_EXISTING_STATE}).
+ * @param {object} conditions - Conditions of the constraint.
+ * @return {Contract} contract with constraint.
+ */
+async function addConstraintWithConditionsToContract(baseContract, refContract, constrName, constrType, conditions) {
+
+    let constr = new Constraint(baseContract);
+    constr.name = constrName;
+    constr.type = constrType;
+
+    constr.setConditions(conditions);
+    constr.addMatchingItem(refContract);
+
+    baseContract.addConstraint(constr);
+    await baseContract.seal();
+
+    return baseContract;
+}
+
+/**
+ * Add to base {@link Contract} constraint and referenced contract.
+ * When the returned {@link Contract} is unpacking referenced contract verifies
+ * the compliance with the conditions of constraint in base contract.
+ *
+ * Also constraint to base contract may be added by {@link Contract#addConstraint(Constraint)}.
+ *
+ * @param {Contract} baseContract - Base contract for adding constraint.
+ * @param {Contract} refContract - Referenced contract (which must satisfy the conditions of the constraint).
+ * @param {string} constrName - Name of constraint.
+ * @param {number} constrType - Type of constraint (section, may be {@link Constraint#TYPE_TRANSACTIONAL},
+ *        {@link Constraint#TYPE_EXISTING_DEFINITION}, or {@link Constraint#TYPE_EXISTING_STATE}).
+ * @param {[string]} listConditions - Array of strings with conditions of the constraint.
+ * @param {boolean} isAllOfConditions - Flag used if all conditions in list must be fulfilled (else - any of conditions).
+ * @return {Contract} contract with constraint.
+ */
+async function addConstraintToContract(baseContract, refContract, constrName, constrType, listConditions, isAllOfConditions) {
+
+    let conditions = {};
+    conditions[isAllOfConditions ? "all_of" : "any_of"] = listConditions;
+
+    return await addConstraintWithConditionsToContract(baseContract, refContract, constrName, constrType, conditions);
 }
 
 /**
@@ -1125,4 +1427,10 @@ async function createRateLimitDisablingContract(key, payment, amount, keys) {
     return unlimitContract;
 }
 
-module.exports = {createRevocation, createParcel, createShareContract, createNotaryContract,checkAttachNotaryContract, createTokenContract};
+module.exports = {createRevocation, createSplit, createJoin, createSplitJoin, startSwap, createTwoSignedContract,
+    createTokenContract, createMintableTokenContract, createShareContract, createNotaryContract, checkAttachNotaryContract,
+    createSlotContract, createUnsContract, createUnsContractForRegisterContractName, createUnsContractForRegisterKeyName,
+    createFollowerContract, addConstraintWithConditionsToContract, addConstraintToContract, createParcel, createPayingParcel,
+    createBatch, addConsent, createEscrowContract, createInternalEscrowContract, createExternalEscrowContract,
+    modifyPaymentForEscrowContract, addPaymentToEscrowContract, completeEscrowContract, cancelEscrowContract,
+    takeEscrowPayment, createRateLimitDisablingContract};

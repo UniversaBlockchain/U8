@@ -232,13 +232,13 @@ unit.test("contractsservice_test: goodAttachDataToNotary", async () => {
 
     // checking by ContractsService.checkAttachNotaryContract
     assert(await cs.checkAttachNotaryContract(notaryContract, "../test/constraints/ReferencedConditions_contract1.yml"));
-    assert(await cs.checkAttachNotaryContract(notaryContract, "../test/constraints/ReferencedConditions_contract1.yml"));
+    assert(await cs.checkAttachNotaryContract(notaryContract, "../test/constraints/ReferencedConditions_contract2.yml"));
     assert(await cs.checkAttachNotaryContract(notaryContract, "../test/constraints"));
     assert(await cs.checkAttachNotaryContract(notaryContract, "../test/constraints/"));
-    /*assert(!await cs.checkAttachNotaryContract(notaryContract, "/constraints/subscriptionReference.yml"));
+    assert(!await cs.checkAttachNotaryContract(notaryContract, "../test/constraints/ReferencedConditions_contract1_v4.yml"));
     assert(!await cs.checkAttachNotaryContract(notaryContract, "../test/contractsservice/bad_contract_payload.yml"));
     assert(!await cs.checkAttachNotaryContract(notaryContract, "../test/contractsservice/"));
-    assert(!await cs.checkAttachNotaryContract(notaryContract, "../test/contractsservice"));*/
+    assert(!await cs.checkAttachNotaryContract(notaryContract, "../test/contractsservice"));
 });
 
 unit.test("contractsservice_test: goodToken", async () => {

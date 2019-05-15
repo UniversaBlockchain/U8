@@ -56,7 +56,7 @@ class UnsRecord extends bs.BiSerializable {
     /**
      * Initialize {@link UnsRecord} from {@link PublicKey}.
      *
-     * @param {PublicKey} key for generate {@link crypto.KeyAddress} of UNS record.
+     * @param {crypto.PublicKey} key for generate {@link crypto.KeyAddress} of UNS record.
      * @param {number} keyMark for generate {@link crypto.KeyAddress} of UNS record. Optional. 0 by default.
      *
      * @return {UnsRecord} initialized UNS record.
