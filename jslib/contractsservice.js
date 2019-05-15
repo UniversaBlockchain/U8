@@ -1125,4 +1125,4 @@ async function createRateLimitDisablingContract(key, payment, amount, keys) {
     return unlimitContract;
 }
 
-module.exports = {createRevocation, createParcel, createNotaryContract,checkAttachNotaryContract, createTokenContract};
+module.exports = {createRevocation, createParcel, createShareContract, createNotaryContract,checkAttachNotaryContract, createTokenContract};
