@@ -19,18 +19,18 @@ async function checkCreateParcel(contract_file_payload, contract_file_payment) {
 
     let privateKey = tk.TestKeys.getKey();
 
+    let payment = await Contract.fromDslFile(root_path + contract_file_payment);
+    payment.keysToSignWith.add(privateKey);
+    await payment.seal(true);
+
     let payload = await Contract.fromDslFile(root_path + contract_file_payload);
     payload.keysToSignWith.add(privateKey);
     await payload.seal(true);
 
-    let payment = await Contract.fromDslFile(root_path + contract_file_payment);
-    payload.keysToSignWith.add(privateKey);
-    await payment.seal(true);
-
     let parcel = await cs.createParcel(payload, payment, 20, [privateKey]);
 
-    //tt.assertSameContracts(parcel.getPayloadContract(), payload);
     //tt.assertSameContracts(parcel.getPaymentContract(), payment);
+    //tt.assertSameContracts(parcel.getPayloadContract(), payload);
 }
 
 async function checkCreateParcelFotTestNet(contract_file_payload) {
@@ -49,8 +49,8 @@ async function checkCreateParcelFotTestNet(contract_file_payload) {
     //tt.assertSameContracts(parcel.getPayloadContract(), payload);
     //tt.assertSameContracts(parcel.getPaymentContract(), payment);
 
-    //assert(100 === parcel.getPaymentContract().state.data.transaction_units);
-   // assert(10000 - 20 === parcel.getPaymentContract().state.data.test_transaction_units);
+    //assert(parcel.getPaymentContract().state.data.transaction_units === 100);
+   // assert(parcel.getPaymentContract().state.data.test_transaction_units === 10000 - 20);
 }
 
 
@@ -176,14 +176,16 @@ unit.test("contractsservice_test: goodNotary", async () => {
     assert(!notaryContract.roles.issuer.isAllowedForKeys([key2.publicKey]));
     assert(!notaryContract.roles.creator.isAllowedForKeys([key2.publicKey]));
 
-    /*assert(notaryContract.getExpiresAt().isAfter(ZonedDateTime.now().plusMonths(3)));
-    assert(notaryContract.getCreatedAt().isBefore(ZonedDateTime.now()));
+    let date = new Date();
+    date.setMonth(date.getMonth() + 3);
+    assert(notaryContract.getExpiresAt().getTime() > date.getTime());
+    assert(notaryContract.definition.createdAt.getTime() < Date.now());
 
     assert(notaryContract.isPermitted("revoke", [key2.publicKey]));
     assert(notaryContract.isPermitted("revoke", [key1.publicKey]));
 
-    assert(!notaryContract.isPermitted("change_owner", [key2.publicKey]));
-    assert(!notaryContract.isPermitted("change_owner", [key1.publicKey]));*/
+    assert(notaryContract.isPermitted("change_owner", [key2.publicKey]));
+    assert(!notaryContract.isPermitted("change_owner", [key1.publicKey]));
 });
 
 unit.test("contractsservice_test: goodAttachDataToNotary", async () => {
@@ -208,8 +210,10 @@ unit.test("contractsservice_test: goodAttachDataToNotary", async () => {
     assert(!notaryContract.roles.issuer.isAllowedForKeys([key2.publicKey]));
     assert(!notaryContract.roles.creator.isAllowedForKeys([key2.publicKey]));
 
-    /*assert(notaryContract.getExpiresAt().isAfter(ZonedDateTime.now().plusMonths(3)));
-    assert(notaryContract.getCreatedAt().isBefore(ZonedDateTime.now()));
+    let date = new Date();
+    date.setMonth(date.getMonth() + 3);
+    assert(notaryContract.getExpiresAt().getTime() > date.getTime());
+    assert(notaryContract.definition.createdAt.getTime() < Date.now());
 
     assert(notaryContract.isPermitted("revoke", [key2.publicKey]));
     assert(notaryContract.isPermitted("revoke", [key1.publicKey]));
@@ -217,18 +221,14 @@ unit.test("contractsservice_test: goodAttachDataToNotary", async () => {
     assert(notaryContract.isPermitted("change_owner", [key2.publicKey]));
     assert(!notaryContract.isPermitted("change_owner", [key1.publicKey]));
 
-    let files = notaryContract.getDefinition().getData().getBinder("files");
-    assertEquals(files.getBinder("ReferencedConditions_contract1_yml").getString("file_name"),
-        "ReferencedConditions_contract1.yml");
-    assertEquals(files.getBinder("ReferencedConditions_contract1_yml").getString("file_description"),
-        "ReferencedConditions_contract1.yml - description");
-    assertEquals(files.getBinder("ReferencedConditions_contract2_yml").getString("file_name"),
-        "ReferencedConditions_contract2.yml");
-    assertEquals(files.getBinder("ReferencedConditions_contract2_yml").getString("file_description"),
-        "ReferencedConditions_contract2.yml - description");
+    let files = notaryContract.definition.data.files;
+    assert(files["ReferencedConditions_contract1_yml"]["file_name"] === "ReferencedConditions_contract1.yml");
+    assert(files["ReferencedConditions_contract1_yml"]["file_description"] === "ReferencedConditions_contract1.yml - description");
+    assert(files["ReferencedConditions_contract2_yml"]["file_name"] === "ReferencedConditions_contract2.yml");
+    assert(files["ReferencedConditions_contract2_yml"]["file_description"] === "ReferencedConditions_contract2.yml - description");
 
-    let notaryDeserialized = DefaultBiMapper.deserialize(BossBiMapper.serialize(notaryContract));
-    assertTrue(notaryContract.getDefinition().getData().equals(notaryDeserialized.getDefinition().getData()));*/
+    let notaryDeserialized = DefaultBiMapper.getInstance().deserialize(BossBiMapper.getInstance().serialize(notaryContract));
+    assert(notaryContract.definition.data.equals(notaryDeserialized.definition.data));
 
     // checking by ContractsService.checkAttachNotaryContract
     assert(await cs.checkAttachNotaryContract(notaryContract, "../test/constraints/ReferencedConditions_contract1.yml"));
@@ -257,19 +257,20 @@ unit.test("contractsservice_test: goodToken", async () => {
     assert(!tokenContract.roles.issuer.isAllowedForKeys([key2.publicKey]));
     assert(!tokenContract.roles.creator.isAllowedForKeys([key2.publicKey]));
 
-    /* assert(tokenContract.getExpiresAt().isAfter(ZonedDateTime.now().plusMonths(3)));
-    assert(tokenContract.getCreatedAt().isBefore(ZonedDateTime.now()));
+    let date = new Date();
+    date.setMonth(date.getMonth() + 3);
+    assert(tokenContract.getExpiresAt().getTime() > date.getTime());
+    assert(tokenContract.definition.createdAt.getTime() < Date.now());
 
-    assert(new BigDecimal(tokenContract.state.data["amount"]) === new BigDecimal("100"));
-    assert(tokenContract.state.data["amount"] === 100);
-    assert(tokenContract.definition.permissions.get("split_join").size === 1);*/
+    assert(tokenContract.state.data["amount"] === "100");
+    assert(tokenContract.definition.permissions.get("split_join").length === 1);
 
-    assert(tokenContract.definition.permissions.get("split_join")[0].params.min_value === "0.01");
-    assert(tokenContract.definition.permissions.get("split_join")[0].params.min_unit === "0.01");
-    assert(tokenContract.definition.permissions.get("split_join")[0].params.field_name === "amount");
-
-    /*assert(splitJoinParams.get("join_match_fields") instanceof List);
-    assert((splitJoinParams.get("join_match_fields")).get(0) === "state.origin");
+    let splitJoinParams = tokenContract.definition.permissions.get("split_join")[0].params;
+    assert(splitJoinParams.min_value === "0.01");
+    assert(splitJoinParams.min_unit === "0.01");
+    assert(splitJoinParams.field_name === "amount");
+    assert(splitJoinParams.join_match_fields[0] === "state.origin");
+    assert(splitJoinParams.join_match_fields instanceof Array);
 
     assert(tokenContract.isPermitted("revoke", [key2.publicKey]));
     assert(tokenContract.isPermitted("revoke", [key1.publicKey]));
@@ -278,7 +279,7 @@ unit.test("contractsservice_test: goodToken", async () => {
     assert(!tokenContract.isPermitted("change_owner", [key1.publicKey]));
 
     assert(tokenContract.isPermitted("split_join", [key2.publicKey]));
-    assert(!tokenContract.isPermitted("split_join", [key1.publicKey]));*/
+    assert(!tokenContract.isPermitted("split_join", [key1.publicKey]));
 });
 
 unit.test("contractsservice_test: goodShare", async () => {
@@ -297,18 +298,20 @@ unit.test("contractsservice_test: goodShare", async () => {
     assert(!shareContract.roles.issuer.isAllowedForKeys([key2.publicKey]));
     assert(!shareContract.roles.creator.isAllowedForKeys([key2.publicKey]));
 
-    /*assert(shareContract.getExpiresAt().isAfter(ZonedDateTime.now().plusMonths(3)));
-    /assert(shareContract.getCreatedAt().isBefore(ZonedDateTime.now()));
+    let date = new Date();
+    date.setMonth(date.getMonth() + 3);
+    assert(shareContract.getExpiresAt().getTime() > date.getTime());
+    assert(shareContract.definition.createdAt.getTime() < Date.now());
 
-    assert(shareContract.state.data["amount"] == 100);
-    assert(shareContract.definition.permissions.get("split_join").size === 1);*/
+    assert(shareContract.state.data["amount"] === "100");
+    assert(shareContract.definition.permissions.get("split_join").length === 1);
 
-    assert(shareContract.definition.permissions.get("split_join")[0].params.min_value === 1);
-    assert(shareContract.definition.permissions.get("split_join")[0].params.min_unit === 1);
-    assert(shareContract.definition.permissions.get("split_join")[0].params.field_name === "amount");
-    /*assert(shareContract.definition.permissions.get("split_join")[0].params.join_match_fields === "state.origin");
-
-    assertTrue(splitJoinParams.get("join_match_fields") instanceof List);
+    let splitJoinParams = shareContract.definition.permissions.get("split_join")[0].params;
+    assert(splitJoinParams.min_value === 1);
+    assert(splitJoinParams.min_unit === 1);
+    assert(splitJoinParams.field_name === "amount");
+    assert(splitJoinParams.join_match_fields[0] === "state.origin");
+    assert(splitJoinParams.join_match_fields instanceof Array);
 
     assert(shareContract.isPermitted("revoke", [key2.publicKey]));
     assert(shareContract.isPermitted("revoke", [key1.publicKey]));
@@ -317,5 +320,5 @@ unit.test("contractsservice_test: goodShare", async () => {
     assert(!shareContract.isPermitted("change_owner", [key1.publicKey]));
 
     assert(shareContract.isPermitted("split_join", [key2.publicKey]));
-    assert(!shareContract.isPermitted("split_join", [key1.publicKey]));*/
+    assert(!shareContract.isPermitted("split_join", [key1.publicKey]));
 });
