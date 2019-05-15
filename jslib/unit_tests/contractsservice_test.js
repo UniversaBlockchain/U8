@@ -4,7 +4,6 @@ import * as tk from 'unit_tests/test_keys'
 
 const DefaultBiMapper = require("defaultbimapper").DefaultBiMapper;
 const BossBiMapper = require("bossbimapper").BossBiMapper;
-const KeyRecord = require("keyrecord").KeyRecord;
 const roles = require('roles');
 const cs = require("contractsservice");
 const e = require("errors");
@@ -14,9 +13,9 @@ const Constraint = require('constraint').Constraint;
 const TransactionPack = require("transactionpack").TransactionPack;
 const BigDecimal  = require("big").Big;
 
-async function checkCreateParcel(contract_file_payload, contract_file_payment) {
-    let root_path = "../test/contractsservice/";
+const root_path = "../test/contractsservice/";
 
+async function checkCreateParcel(contract_file_payload, contract_file_payment) {
     let privateKey = tk.TestKeys.getKey();
 
     let payment = await Contract.fromDslFile(root_path + contract_file_payment);
@@ -29,13 +28,13 @@ async function checkCreateParcel(contract_file_payload, contract_file_payment) {
 
     let parcel = await cs.createParcel(payload, payment, 20, [privateKey]);
 
-    //tt.assertSameContracts(parcel.getPaymentContract(), payment);
-    //tt.assertSameContracts(parcel.getPayloadContract(), payload);
+    tt.assertSameContracts(parcel.getPayloadContract(), payload);
+
+    assert(parcel.getPaymentContract().state.branchId === payment.state.branchId);
+    assert(parcel.getPaymentContract().definition.data.equals(payment.definition.data));
 }
 
 async function checkCreateParcelFotTestNet(contract_file_payload) {
-    let root_path = "../test/contractsservice/";
-
     let privateKey = tk.TestKeys.getKey();
 
     let payload = await Contract.fromDslFile(root_path + contract_file_payload);
@@ -46,11 +45,10 @@ async function checkCreateParcelFotTestNet(contract_file_payload) {
 
     let parcel = await cs.createParcel(payload, payment, 20, [privateKey], true);
 
-    //tt.assertSameContracts(parcel.getPayloadContract(), payload);
-    //tt.assertSameContracts(parcel.getPaymentContract(), payment);
+    tt.assertSameContracts(parcel.getPayloadContract(), payload);
 
-    //assert(parcel.getPaymentContract().state.data.transaction_units === 100);
-   // assert(parcel.getPaymentContract().state.data.test_transaction_units === 10000 - 20);
+    assert(parcel.getPaymentContract().state.data.transaction_units === 100);
+    assert(parcel.getPaymentContract().state.data.test_transaction_units === 10000 - 20);
 }
 
 
@@ -60,14 +58,14 @@ unit.test("contractsservice_test: badRevoke", async () => {
     let c = await Contract.fromDslFile("../test/simple_root_contract.yml");
     c.keysToSignWith.add(key);
     await c.seal(true);
+    assert(await c.check());
 
-    let issuer = tk.TestKeys.getKey();
-    let tc = await cs.createRevocation(c, issuer);
+    let tc = await cs.createRevocation(c, tk.TestKeys.getKey());
 
     // c can't be revoked with this key!
     assert(!await tc.check());
-    //assert(1 === tc.errors.length);
-    //assert(Errors.FORBIDDEN === tc.errors);
+    assert(1 === tc.errors.length);
+    assert(Errors.FORBIDDEN === tc.errors[0].error);
 });
 
 unit.test("contractsservice_test: goodRevoke", async () => {
@@ -82,32 +80,8 @@ unit.test("contractsservice_test: goodRevoke", async () => {
 
     let revokeContract = await cs.createRevocation(c, key);
 
-    //assert(await revokeContract.check());
+    assert(await revokeContract.check());
 });
-
-unit.test("contractsservice_test: checkTransactional", async () => {
-    let key = new crypto.PrivateKey(await (await io.openRead("../test/_xer0yfe2nn1xthc.private.unikey")).allBytes());
-
-    let delorean = await Contract.fromDslFile("../test/DeLoreanOwnership.yml");
-    delorean.keysToSignWith.add(key);
-    await delorean.seal(true);
-
-    assert(await delorean.check());
-
-    delorean.createTransactionalSection();
-
-    let constraint = new Constraint(delorean);
-
-    delorean.transactional.constraints.add(constraint);
-    /*let delorean2 = delorean.createRevision(delorean.transactional);
-
-    delorean2.keysToSignWith.add(key);
-    await delorean2.seal(true);
-
-    //delorean2.traceErrors();
-    assert(await delorean2.check());*/
-});
-
 
 unit.test("contractsservice_test: checkCreateGoodParcel", async () => {
     await checkCreateParcel("simple_root_contract.yml", "simple_root_contract.yml");
@@ -137,7 +111,7 @@ unit.test("contractsservice_test: createU", async () => {
     assert(u.roles.owner.isAllowedForKeys([privateKey.publicKey]));
     assert(100 === u.state.data.transaction_units);
 
-    let privateKey2 = new crypto.PrivateKey(await (await io.openRead("../test/keys/u_key.private.unikey")).allBytes());
+    let privateKey2 = tk.TestKeys.getKey();
 
     assert(!u.roles.owner.isAllowedForKeys([privateKey2.publicKey]));
 });
@@ -155,7 +129,7 @@ unit.test("contractsservice_test: createTestU", async () => {
     assert(100 === u.state.data.transaction_units);
     assert(10000 === u.state.data.test_transaction_units);
 
-    let privateKey2 = new crypto.PrivateKey(await (await io.openRead("../test/keys/u_key.private.unikey")).allBytes());
+    let privateKey2 = tk.TestKeys.getKey();
 
     assert(!u.roles.owner.isAllowedForKeys([privateKey2.publicKey]));
 });
@@ -269,8 +243,9 @@ unit.test("contractsservice_test: goodToken", async () => {
     assert(splitJoinParams.min_value === "0.01");
     assert(splitJoinParams.min_unit === "0.01");
     assert(splitJoinParams.field_name === "amount");
-    assert(splitJoinParams.join_match_fields[0] === "state.origin");
     assert(splitJoinParams.join_match_fields instanceof Array);
+    assert(splitJoinParams.join_match_fields.length === 1);
+    assert(splitJoinParams.join_match_fields[0] === "state.origin");
 
     assert(tokenContract.isPermitted("revoke", [key2.publicKey]));
     assert(tokenContract.isPermitted("revoke", [key1.publicKey]));
@@ -310,8 +285,9 @@ unit.test("contractsservice_test: goodShare", async () => {
     assert(splitJoinParams.min_value === 1);
     assert(splitJoinParams.min_unit === 1);
     assert(splitJoinParams.field_name === "amount");
-    assert(splitJoinParams.join_match_fields[0] === "state.origin");
     assert(splitJoinParams.join_match_fields instanceof Array);
+    assert(splitJoinParams.join_match_fields.length === 1);
+    assert(splitJoinParams.join_match_fields[0] === "state.origin");
 
     assert(shareContract.isPermitted("revoke", [key2.publicKey]));
     assert(shareContract.isPermitted("revoke", [key1.publicKey]));

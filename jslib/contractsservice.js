@@ -26,7 +26,7 @@ const FollowerContract = require("services/followerContract").FollowerContract;
  * That temp contract should be send to Universa and given contract will be revoked.
  *
  * @param {Contract} c - Contract should revoked be.
- * @param {[crypto.PrivateKey]} keys - Keys from owner of revoking contract.
+ * @param {crypto.PrivateKey} keys - Keys from owner of revoking contract.
  * @return {Contract} working contract that should be register in the Universa to finish procedure.
  */
 async function createRevocation(c, ...keys) {
@@ -43,6 +43,9 @@ async function createRevocation(c, ...keys) {
 
     tc.definition.data.actions = [{action : "remove", id : c.id}];
     tc.revokingItems.add(c);
+
+    for (let key of keys)
+        tc.keysToSignWith.add(key);
 
     await tc.seal(true);
 
@@ -923,7 +926,10 @@ async function createParcel(payload, payment, amount, keys, withTestPayment = fa
         paymentDecreased.getTransactionalData()["id"] = payload.id.base64;
 
         if (payload.transactionPack == null)
-            payloadPack = payload.transactionPack = new TransactionPack(this);
+            payloadPack = payload.transactionPack = new TransactionPack(payload);
+        else
+            payloadPack = payload.transactionPack;
+
     } else if (payload instanceof TransactionPack)
         payloadPack = payload;
     else

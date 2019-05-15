@@ -76,7 +76,7 @@ class Permission extends bs.BiSerializable {
     }
 
     checkChanges(contract, changed, stateChanges, revokingItems, keys) {
-        throw new ex.Exception("not implemented")
+        throw new Error("not implemented");
     }
 
     /**
@@ -309,10 +309,11 @@ class RevokePermission extends Permission {
     constructor(role) {
         super("revoke", role, {});
     }
+
+    checkChanges(contract, changed, stateChanges, revokingItems, keys) {
+        // this permission checks no changes, it's about the whole contract
+    }
 }
-
-
-
 
 
 ///////////////////////////

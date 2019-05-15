@@ -4,6 +4,7 @@ const Boss = require('boss.js');
 const BiAdapter = require("biserializable").BiAdapter;
 const BossBiMapper = require("bossbimapper").BossBiMapper;
 const TransactionPack = require("transactionpack").TransactionPack;
+const Quantiser = require("quantiser").Quantiser;
 
 class Parcel extends bs.BiSerializable {
 
