@@ -147,10 +147,11 @@ async function createSplitJoin(contractsToJoin, amountsToSplit, addressesToSplit
         parts[i].registerRole(new roles.SimpleRole("owner", addressesToSplit[i]));
         parts[i].state.data[fieldName] = amountsToSplit[i];
 
-        parts[i].seal();
+        await parts[i].seal();
     }
+
     contract.state.data[fieldName] = sum.toFixed();
-    contract.seal();
+    await contract.seal();
 
     return [contract].concat(parts);
 }
