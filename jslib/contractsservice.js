@@ -118,12 +118,12 @@ async function createJoin(contract1, contract2, fieldName, keys) {
  * and put second contract in revoking items of created new revision.
  * Given contract should have splitjoin permission for given keys.
  *
- * @param {Iterable<Contract>} contractsToJoin - One or more contracts to join into main contract
- * @param {[number | string | BigDecimal]} amountsToSplit - Array contains one or more amounts to split from main contract
- * @param {Iterable<crypto.KeyAddress>} addressesToSplit - Addresses the ownership of splitted parts will be transferred to
- * @param {Iterable<crypto.PrivateKey> | null} ownerKeys - Owner keys of joined contracts
- * @param {string} fieldName - Name of field that should be join by
- * @return {[Contract]} list of contracts containing main contract followed by splitted parts.
+ * @param {Iterable<Contract>} contractsToJoin - One or more contracts to join into main contract.
+ * @param {Array<number | string | BigDecimal>} amountsToSplit - Array contains one or more amounts to split from main contract.
+ * @param {Iterable<crypto.KeyAddress>} addressesToSplit - Addresses the ownership of splitted parts will be transferred to.
+ * @param {Iterable<crypto.PrivateKey> | null} ownerKeys - Owner keys of joined contracts.
+ * @param {string} fieldName - Name of field that should be join by.
+ * @return {Array<Contract>} list of contracts containing main contract followed by splitted parts.
  */
 async function createSplitJoin(contractsToJoin, amountsToSplit, addressesToSplit, ownerKeys, fieldName) {
     let contract = null;
@@ -167,12 +167,12 @@ async function createSplitJoin(contractsToJoin, amountsToSplit, addressesToSplit
  * Swap procedure consist from three steps:
  * (1) prepare contracts with creating transactional section on the first swapper site;
  * (2) sign main contract on the first swapper site;
- * (3) sign main contract on the second swapper site;
+ * (3) sign main contract on the second swapper site.
  *
- * @param {Iterable<Contract>} contracts1 - List of own for calling part (swapper1 owned), existing or new revision of contract
- * @param {Iterable<Contract>} contracts2 - List of foreign for calling part (swapper2 owned), existing or new revision contract
- * @param {Iterable<crypto.PrivateKey>} fromKeys - Own for calling part (swapper1 keys) private keys
- * @param {Iterable<crypto.PublicKey>} toKeys - Foreign for calling part (swapper2 keys) public keys
+ * @param {Iterable<Contract>} contracts1 - List of own for calling part (swapper1 owned), existing or new revision of contract.
+ * @param {Iterable<Contract>} contracts2 - List of foreign for calling part (swapper2 owned), existing or new revision contract.
+ * @param {Iterable<crypto.PrivateKey>} fromKeys - Own for calling part (swapper1 keys) private keys.
+ * @param {Iterable<crypto.PublicKey>} toKeys - Foreign for calling part (swapper2 keys) public keys.
  * @param {boolean} createNewRevision - If true - create new revision of given contracts. If false - use them as new revisions.
  * @return {Contract} swap contract including new revisions of old contracts swapping between;
  * should be send to partner (swapper2) and he should go to step (2) of the swap procedure.
@@ -497,8 +497,8 @@ async function createShareContract(issuerKeys, ownerKeys, amount) {
  *
  * @param {Iterable<crypto.PrivateKey>} issuerKeys - Issuer public keys.
  * @param {Iterable<crypto.PublicKey>} ownerKeys - Owner public keys.
- * @param {[string] | null} filePaths - Array with paths to data files.
- * @param {[string] | null} fileDescriptions - Array with data file descriptions.
+ * @param {Array<string> | null} filePaths - Array with paths to data files.
+ * @param {Array<string> | null} fileDescriptions - Array with data file descriptions.
  * @return {Contract} signed and sealed contract, ready for register.
  */
 async function createNotaryContract(issuerKeys, ownerKeys, filePaths = null, fileDescriptions = null) {
@@ -564,7 +564,7 @@ async function createNotaryContract(issuerKeys, ownerKeys, filePaths = null, fil
 }
 
 /**
- * Check the data attached to the notary contract
+ * Check the data attached to the notary contract.
  *
  * @param {Contract} notaryContract - Notary-type contract.
  * @param {string} filePaths - Path to attached file or folder with files.
@@ -895,7 +895,7 @@ async function addConstraintWithConditionsToContract(baseContract, refContract, 
  * @param {string} constrName - Name of constraint.
  * @param {number} constrType - Type of constraint (section, may be {@link Constraint#TYPE_TRANSACTIONAL},
  *        {@link Constraint#TYPE_EXISTING_DEFINITION}, or {@link Constraint#TYPE_EXISTING_STATE}).
- * @param {[string]} listConditions - Array of strings with conditions of the constraint.
+ * @param {Array<string>} listConditions - Array of strings with conditions of the constraint.
  * @param {boolean} isAllOfConditions - Flag used if all conditions in list must be fulfilled (else - any of conditions).
  * @return {Contract} contract with constraint.
  */
@@ -914,7 +914,7 @@ async function addConstraintToContract(baseContract, refContract, constrName, co
  * @param {Contract | TransactionPack} payload - Prepared contract you want to register in the Universa.
  * @param {Contract} payment - Approved contract with "U" belongs to you.
  * @param {number} amount - Number of "U" you want to spend to register payload contract.
- * @param {Set<crypto.PrivateKey> | [crypto.PrivateKey]} keys - Own private keys, which are set as owner of payment contract.
+ * @param {Set<crypto.PrivateKey> | Array<crypto.PrivateKey>} keys - Own private keys, which are set as owner of payment contract.
  * @param {boolean} withTestPayment - If true {@link Parcel} will be created with test payment.
  * @return {Parcel} Parcel, it ready to send to the Universa.
  */
@@ -961,10 +961,10 @@ async function createParcel(payload, payment, amount, keys, withTestPayment = fa
  * <br><br>
  * Node processing logic logic is:
  * <ul>
- * <li>if the first payment fails, no further action is taking (no changes)</li>
- * <li>if the first payments is OK, the transaction is evaluated and the second payment should be the part of it</li>
- * <li>if the transaction including the second payment is OK, the transaction and the second payment are registered altogether.</li>
- * <li>if any of the latest fail, the whole transaction is not accepted, e.g. the second payment is not accepted too</li>
+ * <li>if the first payment fails, no further action is taking (no changes);</li>
+ * <li>if the first payments is OK, the transaction is evaluated and the second payment should be the part of it;</li>
+ * <li>if the transaction including the second payment is OK, the transaction and the second payment are registered altogether;</li>
+ * <li>if any of the latest fail, the whole transaction is not accepted, e.g. the second payment is not accepted too.</li>
  * </ul>
  * <br><br>
  *
@@ -972,8 +972,8 @@ async function createParcel(payload, payment, amount, keys, withTestPayment = fa
  * @param {Contract} payment - Approved contract with "U" belongs to you.
  * @param {number} amount - Number of "U" you want to spend to register payload contract.
  * @param {number} amountSecond - Number of "U" you want to spend from second payment.
- * @param {Set<crypto.PrivateKey> | [crypto.PrivateKey]} keys - Own private keys, which are set as owner of payment contract
- * @param {boolean} withTestPayment - If true {@link Parcel} will be created with test payment
+ * @param {Set<crypto.PrivateKey> | Array<crypto.PrivateKey>} keys - Own private keys, which are set as owner of payment contract.
+ * @param {boolean} withTestPayment - If true {@link Parcel} will be created with test payment.
  * @return {Parcel} Parcel, it ready to send to the Universa.
  */
 async function createPayingParcel(payload, payment, amount, amountSecond, keys, withTestPayment) {
@@ -1010,7 +1010,7 @@ async function createPayingParcel(payload, payment, amount, amountSecond, keys, 
  * in the single transaction, saving time and reducing U cost. Note that if any of the batched contracts
  * fails, the whole batch is rejected.
  *
- * @param {[crypto.PrivateKey] | Set<crypto.PrivateKey>} keys - To sign batch with.
+ * @param {Array<crypto.PrivateKey> | Set<crypto.PrivateKey>} keys - To sign batch with.
  * @param {...Contract} contracts - To register all in one batch. Should be prepared and sealed.
  * @return {Contract} batch contract that includes all contracts as new items.
  */
@@ -1040,7 +1040,7 @@ async function createBatch(keys, ...contracts) {
  * are specified with the call, and register consent contract separately or in the same batch with the source
  * contract.
  *
- * @param {Contract} source - Contract to update. Must not be registered (new root or new revision)
+ * @param {Contract} source - Contract to update. Must not be registered (new root or new revision).
  * @param {...crypto.KeyAddress} consentKeyAddresses - Addresses that are required in the consent contract.
  * Consent contract should be then signed with corresponding keys.
  * @return {Contract} Consent contract.
@@ -1088,12 +1088,11 @@ async function addConsent(source, ...consentKeyAddresses) {
  * can be changed before sealing and registration. If internal escrow contract has changed, need re-create external
  * escrow contract by {@link ContractsService#createExternalEscrowContract(Contract, Collection)}.
  *
- * @param {[crypto.PrivateKey] | Set<crypto.PrivateKey>} issuerKeys - Issuer escrow contract private keys
- * @param {[crypto.PublicKey] | Set<crypto.PublicKey>} customerKeys - Customer public keys
- * @param {[crypto.PublicKey] | Set<crypto.PublicKey>} executorKeys - Executor public keys
- * @param {[crypto.PublicKey] | Set<crypto.PublicKey>} arbitratorKeys - Arbitrator public keys
- *
- * @return {Contract} external escrow contract
+ * @param {Array<crypto.PrivateKey> | Set<crypto.PrivateKey>} issuerKeys - Issuer escrow contract private keys.
+ * @param {Array<crypto.PublicKey> | Set<crypto.PublicKey>} customerKeys - Customer public keys.
+ * @param {Array<crypto.PublicKey> | Set<crypto.PublicKey>} executorKeys - Executor public keys.
+ * @param {Array<crypto.PublicKey> | Set<crypto.PublicKey>} arbitratorKeys - Arbitrator public keys.
+ * @return {Contract} external escrow contract.
  */
 async function createEscrowContract(issuerKeys, customerKeys, executorKeys, arbitratorKeys) {
 
@@ -1114,12 +1113,11 @@ async function createEscrowContract(issuerKeys, customerKeys, executorKeys, arbi
  * can be changed before sealing and registration. If internal escrow contract has changed, need re-create external
  * escrow contract (if used) by {@link ContractsService#createExternalEscrowContract(Contract, Collection)}.
  *
- * @param {[crypto.PrivateKey] | Set<crypto.PrivateKey>} issuerKeys - Issuer escrow contract private keys
- * @param {[crypto.PublicKey] | Set<crypto.PublicKey>} customerKeys - Customer public keys
- * @param {[crypto.PublicKey] | Set<crypto.PublicKey>} executorKeys - Executor public keys
- * @param {[crypto.PublicKey] | Set<crypto.PublicKey>} arbitratorKeys - Arbitrator public keys
- *
- * @return {Contract} internal escrow contract
+ * @param {Array<crypto.PrivateKey> | Set<crypto.PrivateKey>} issuerKeys - Issuer escrow contract private keys.
+ * @param {Array<crypto.PublicKey> | Set<crypto.PublicKey>} customerKeys - Customer public keys.
+ * @param {Array<crypto.PublicKey> | Set<crypto.PublicKey>} executorKeys - Executor public keys.
+ * @param {Array<crypto.PublicKey> | Set<crypto.PublicKey>} arbitratorKeys - Arbitrator public keys.
+ * @return {Contract} internal escrow contract.
  */
 async function createInternalEscrowContract(issuerKeys, customerKeys, executorKeys, arbitratorKeys) {
 
@@ -1180,10 +1178,9 @@ async function createInternalEscrowContract(issuerKeys, customerKeys, executorKe
  * can be changed before sealing and registration. If internal escrow contract has changed, need re-create external
  * escrow contract by {@link ContractsService#createExternalEscrowContract(Contract, Collection)}.
  *
- * @param {Contract} internalEscrow - Internal escrow contract
- * @param {[crypto.PrivateKey] | Set<crypto.PrivateKey>} issuerKeys - Issuer escrow contract private keys
- *
- * @return {Contract} external escrow contract
+ * @param {Contract} internalEscrow - Internal escrow contract.
+ * @param {Array<crypto.PrivateKey> | Set<crypto.PrivateKey>} issuerKeys - Issuer escrow contract private keys.
+ * @return {Contract} external escrow contract.
  */
 async function createExternalEscrowContract(internalEscrow, issuerKeys) {
 
@@ -1214,14 +1211,13 @@ async function createExternalEscrowContract(internalEscrow, issuerKeys) {
  * and executor role with send_payment_to_executor constraint. Any of these roles is sufficient to own a payment contract.
  *
  * @param {Contract | string} escrow - Internal escrow contract to use with payment (or his origin in base64).
- * Must be returned from {@link createInternalEscrowContract}
- * @param {Contract} payment - Payment contract to update. Must not be registered (new root or new revision)
- * @param {[crypto.PrivateKey] | Set<crypto.PrivateKey> | null} paymentOwnerKeys - Keys required for use payment contract
- * (usually, owner private keys). May be null, if payment will be signed later
- * @param {[crypto.PublicKey] | Set<crypto.PublicKey>} customerKeys - Customer public keys of escrow contract
- * @param {[crypto.PublicKey] | Set<crypto.PublicKey>} executorKeys - Executor public keys of escrow contract
- *
- * @return {Contract} payment contract ready for escrow
+ * Must be returned from {@link createInternalEscrowContract}.
+ * @param {Contract} payment - Payment contract to update. Must not be registered (new root or new revision).
+ * @param {Array<crypto.PrivateKey> | Set<crypto.PrivateKey> | null} paymentOwnerKeys - Keys required for use payment contract
+ * (usually, owner private keys). May be null, if payment will be signed later.
+ * @param {Array<crypto.PublicKey> | Set<crypto.PublicKey>} customerKeys - Customer public keys of escrow contract.
+ * @param {Array<crypto.PublicKey> | Set<crypto.PublicKey>} executorKeys - Executor public keys of escrow contract.
+ * @return {Contract} payment contract ready for escrow.
  */
 async function modifyPaymentForEscrowContract(escrow, payment, paymentOwnerKeys, customerKeys, executorKeys) {
 
@@ -1279,14 +1275,13 @@ async function modifyPaymentForEscrowContract(escrow, payment, paymentOwnerKeys,
  * The owner of payment contract is set to {@link ListRole} contains customer role with return_payment_to_customer constraint
  * and executor role with send_payment_to_executor constraint. Any of these roles is sufficient to own a payment contract.
  *
- * @param {Contract} escrow - Escrow contract (external) to use with payment. Must be returned from {@link createEscrowContract}
- * @param {Contract} payment - Payment contract to update. Must not be registered (new root or new revision)
- * @param {[crypto.PrivateKey] | Set<crypto.PrivateKey> | null} paymentOwnerKeys - Keys required for use payment contract
+ * @param {Contract} escrow - Escrow contract (external) to use with payment. Must be returned from {@link createEscrowContract}.
+ * @param {Contract} payment - Payment contract to update. Must not be registered (new root or new revision).
+ * @param {Array<crypto.PrivateKey> | Set<crypto.PrivateKey> | null} paymentOwnerKeys - Keys required for use payment contract
  * (usually, owner private keys). May be null, if payment will be signed later.
- * @param {[crypto.PublicKey] | Set<crypto.PublicKey>} customerKeys - Customer public keys of escrow contract
- * @param {[crypto.PublicKey] | Set<crypto.PublicKey>} executorKeys - Executor public keys of escrow contract
- *
- * @return {boolean} result of checking external escrow contract and adding payment to it
+ * @param {Array<crypto.PublicKey> | Set<crypto.PublicKey>} customerKeys - Customer public keys of escrow contract.
+ * @param {Array<crypto.PublicKey> | Set<crypto.PublicKey>} executorKeys - Executor public keys of escrow contract.
+ * @return {boolean} result of checking external escrow contract and adding payment to it.
  */
 async function addPaymentToEscrowContract(escrow, payment, paymentOwnerKeys, customerKeys, executorKeys) {
 
@@ -1311,9 +1306,8 @@ async function addPaymentToEscrowContract(escrow, payment, paymentOwnerKeys, cus
  * Completes escrow contract. All linked payments are made available to the executor.
  * For registration completed escrow contract require quorum of 2 of 3 roles: customer, executor and arbitrator.
  *
- * @param {Contract} escrow - Escrow contract (external or internal) to complete. Must be registered for creation new revision
- *
- * @return {Contract} completed internal escrow contract or null if error occurred
+ * @param {Contract} escrow - Escrow contract (external or internal) to complete. Must be registered for creation new revision.
+ * @return {Contract} completed internal escrow contract or null if error occurred.
  */
 async function completeEscrowContract(escrow) {
 
@@ -1347,9 +1341,8 @@ async function completeEscrowContract(escrow) {
  * Cancels escrow contract. All linked payments are made available to the customer.
  * For registration canceled escrow contract require quorum of 2 of 3 roles: customer, executor and arbitrator.
  *
- * @param {Contract} escrow - Escrow contract (external or internal) to cancel. Must be registered for creation new revision
- *
- * @return {Contract} canceled internal escrow contract or null if error occurred
+ * @param {Contract} escrow - Escrow contract (external or internal) to cancel. Must be registered for creation new revision.
+ * @return {Contract} canceled internal escrow contract or null if error occurred.
  */
 async function cancelEscrowContract(escrow) {
 
@@ -1388,10 +1381,9 @@ async function cancelEscrowContract(escrow) {
  * For registration payment contract (returned by this method) need to add result internal escrow contract to
  * {@link TransactionPack#referencedItems}.
  *
- * @param {[crypto.PrivateKey] | Set<crypto.PrivateKey>} newOwnerKeys - Private keys of new owner of payment
- * @param {Contract} payment - Payment contract to take by new owner. Must be registered for creation new revision
- *
- * @return {Contract} new revision of payment contract with new owner
+ * @param {Array<crypto.PrivateKey> | Set<crypto.PrivateKey>} newOwnerKeys - Private keys of new owner of payment.
+ * @param {Contract} payment - Payment contract to take by new owner. Must be registered for creation new revision.
+ * @return {Contract} new revision of payment contract with new owner.
  */
 async function takeEscrowPayment(newOwnerKeys, payment) {
     let revisionPayment = payment.createRevision(newOwnerKeys);
@@ -1413,11 +1405,11 @@ async function takeEscrowPayment(newOwnerKeys, payment) {
  * Unlimited requests for 5 minutes cost 5 U.
  * Register result contract.
  *
- * @param {crypto.PublicKey} key - Key for setting unlimited requests
- * @param {Contract} payment - Approved contract with "U" belongs to you
- * @param {number} amount - Number of "U" you want to spend to set unlimited requests for key; get by {@link Config#getRateLimitDisablingPayment()}
- * @param {[crypto.PrivateKey] | Set<crypto.PrivateKey>} keys - Own private keys, which are set as owner of payment contract
- * @return {Contract} contract for setting unlimited requests to key
+ * @param {crypto.PublicKey} key - Key for setting unlimited requests.
+ * @param {Contract} payment - Approved contract with "U" belongs to you.
+ * @param {number} amount - Number of "U" you want to spend to set unlimited requests for key; get by {@link Config#getRateLimitDisablingPayment()}.
+ * @param {Array<crypto.PrivateKey> | Set<crypto.PrivateKey>} keys - Own private keys, which are set as owner of payment contract.
+ * @return {Contract} contract for setting unlimited requests to key.
  */
 async function createRateLimitDisablingContract(key, payment, amount, keys) {
 

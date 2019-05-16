@@ -1750,7 +1750,7 @@ class Ledger {
      * Get follower callbacks for resync from specified environment.
      *
      * @param {number} environmentId - environment ID.
-     * @return {Promise<[CallbackRecord]>} - array of {@link CallbackRecord} for resync.
+     * @return {Promise<Array<CallbackRecord>>} - array of {@link CallbackRecord} for resync.
      */
     getFollowerCallbacksToResyncByEnvId(environmentId) {
         return new Promise(async(resolve, reject) => {
@@ -1795,7 +1795,7 @@ class Ledger {
     /**
      * Get follower callbacks for resync from all environments.
      *
-     * @return {Promise<[CallbackRecord]>} - array of {@link CallbackRecord} for resync.
+     * @return {Promise<Array<CallbackRecord>>} - array of {@link CallbackRecord} for resync.
      */
     getFollowerCallbacksToResync() {
         return new Promise(async(resolve, reject) => {

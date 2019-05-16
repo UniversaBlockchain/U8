@@ -348,7 +348,7 @@ class ListRole extends Role {
      * Role combining other roles (sub-roles) in the "and", "or" and "any N of" principle.
      *
      * @param {string} name - Name of the role.
-     * @param {[Role]} roles - Array of sub-roles. Empty by default.
+     * @param {Array<Role>} roles - Array of sub-roles. Empty by default.
      * @param {ListRoleMode} mode - Mode of checking sub-roles. "ALL" ("and") by default.
      * @param {number} quorumSize - N from "any N of" principle of quorum ListRole. 0 by default.
      * @constructor
