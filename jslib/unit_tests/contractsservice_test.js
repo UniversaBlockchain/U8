@@ -5,6 +5,7 @@ import * as tk from 'unit_tests/test_keys'
 const DefaultBiMapper = require("defaultbimapper").DefaultBiMapper;
 const BossBiMapper = require("bossbimapper").BossBiMapper;
 const roles = require('roles');
+const perms = require('permissions');
 const cs = require("contractsservice");
 const e = require("errors");
 const Errors = e.Errors;
@@ -318,6 +319,25 @@ unit.test("contractsservice_test: badSplit", async () => {
     assert(!await splitContract.check());
 });
 
+unit.test("contractsservice_test: badSplitHackAmount", async () => {
+    let key1 = tk.TestKeys.getKey();
+    let key2 = tk.TestKeys.getKey();
+
+    let tokenContract = await cs.createTokenContract([key1], [key2.publicKey], new BigDecimal("1000"));
+
+    assert(await tokenContract.check());
+
+    assert(tokenContract.state.data.amount === "1000");
+
+    let splitContract = await cs.createSplit(tokenContract, 256, "amount", [key2], true);
+
+    // hack amount
+    splitContract.state.data.amount = "750";
+    await splitContract.seal(true);
+
+    assert(!await splitContract.check());
+});
+
 unit.test("contractsservice_test: goodSplit", async () => {
     let key1 = tk.TestKeys.getKey();
     let key2 = tk.TestKeys.getKey();
@@ -331,9 +351,53 @@ unit.test("contractsservice_test: goodSplit", async () => {
     let splitContract = await cs.createSplit(tokenContract, 256, "amount", [key2], true);
 
     assert(await splitContract.check());
-    assert(await tokenContract.check());
 
     assert(splitContract.state.data.amount === "744");
     assert(Array.from(splitContract.newItems)[0].state.data.amount === "256");
     assert(Array.from(splitContract.revokingItems)[0].state.data.amount === "1000");
+});
+
+unit.test("contractsservice_test: badSplitJoinWithChangeJoinMatchingField", async () => {
+    let key1 = tk.TestKeys.getKey();
+    let key2 = tk.TestKeys.getKey();
+
+    let tokenContract = await cs.createMintableTokenContract([key1], [key2.publicKey], new BigDecimal("1000"));
+
+    tokenContract.definition.permissions.delete("split_join");
+
+    let ownerLink = new roles.RoleLink("@owner_link", "owner");
+    ownerLink.contract = tokenContract;
+
+    let params = {
+        min_value: "0.01",
+        min_unit: "0.01",
+        field_name: "amount",
+        join_match_fields: ["state.data.currency"]
+    };
+
+    tokenContract.definition.addPermission(new perms.SplitJoinPermission(ownerLink, params));
+    tokenContract.definition.addPermission(new perms.ModifyDataPermission(ownerLink, {fields : {currency : null}}));
+
+    tokenContract.state.data.currency = "CUR";
+
+    await tokenContract.seal(true);
+    assert(await tokenContract.check());
+
+    assert(tokenContract.state.data.amount === "1000");
+
+    let splitContracts = await cs.createSplitJoin([tokenContract], [256, 256],
+        [key2.longAddress, key2.shortAddress], [key2], "amount");
+
+    // change join_match_field
+    splitContracts[2].state.data.currency = "NOT";
+
+    // hack amount
+    splitContracts[0].state.data.amount = "300";
+    splitContracts[1].state.data.amount = "700";
+    splitContracts[2].state.data.amount = "1000";
+
+    await splitContracts[0].seal(true);
+
+    assert(!await splitContracts[0].check());
+    assert(Errors.FORBIDDEN === splitContracts[0].errors[0].error);
 });
