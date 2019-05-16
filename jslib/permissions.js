@@ -392,9 +392,9 @@ class SplitJoinPermission extends Permission {
 
         for (let s of changed.context.siblings) {
 
-            if (!this.isMergeable(s) || !this.validateMergeFields(changed, s) || !this.hasSimilarPermission(s, keys, false)) {
-                continue;
-            }
+            if (!this.isMergeable(s) || !this.validateMergeFields(changed, s) || !this.hasSimilarPermission(s, keys, false))
+                return false;
+
             splitJoinSum = splitJoinSum.add(new BigDecimal(s.state.data[this.fieldName]));
 
             for(let ri of s.revokingItems) {
@@ -405,7 +405,6 @@ class SplitJoinPermission extends Permission {
         let rSum = new BigDecimal("0");
 
         for (let c of allRevoking.values()) {
-
 
             if (!this.isMergeable(c) || !this.validateMergeFields(changed, c) || !this.hasSimilarPermission(c, keys, true)) {
                 continue;
@@ -419,27 +418,23 @@ class SplitJoinPermission extends Permission {
 
     checkSplit(changed, dataChanges, revokingItems, keys, oldValue, newValue) {
 
-
         // We need to find the splitted contracts
         let sum = new BigDecimal("0");
         let revokesToRemove = new Set();
 
-
         for (let s of changed.context.siblings) {
 
-            if (!this.isMergeable(s) || !this.validateMergeFields(changed, s) || !this.hasSimilarPermission(s, keys, false)) {
-                continue;
-            }
+            if (!this.isMergeable(s) || !this.validateMergeFields(changed, s) || !this.hasSimilarPermission(s, keys, false))
+                return;
+
             sum = sum.add(new BigDecimal(s.state.data[this.fieldName]));
         }
-
 
         // total value should not be changed or check split-join case
         let isValid = sum.cmp(oldValue) === 0;
 
         if (!isValid)
             isValid = this.checkSplitJoinCase(changed, revokesToRemove, keys);
-
 
         if (isValid && newValue.gte(this.minValue) && newValue.ulp().cmp(this.minUnit) >= 0) {
             delete dataChanges[this.fieldName];
@@ -463,7 +458,6 @@ class SplitJoinPermission extends Permission {
             revokesToRemove.add(c);
 
             sum = sum.add(new BigDecimal(c.state.data[this.fieldName]));
-
         }
 
         let isValid = sum.cmp(newValue) === 0;
