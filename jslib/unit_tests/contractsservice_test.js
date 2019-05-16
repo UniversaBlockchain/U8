@@ -135,8 +135,8 @@ unit.test("contractsservice_test: createTestU", async () => {
 });
 
 unit.test("contractsservice_test: goodNotary", async () => {
-    let key1 = new crypto.PrivateKey(await (await io.openRead("../test/keys/marty_mcfly.private.unikey")).allBytes());
-    let key2 = new crypto.PrivateKey(await (await io.openRead("../test/keys/test_payment_owner.private.unikey")).allBytes());
+    let key1 = tk.TestKeys.getKey();
+    let key2 = tk.TestKeys.getKey();
 
     let notaryContract = await cs.createNotaryContract([key1], [key2.publicKey]);
 
@@ -169,8 +169,8 @@ unit.test("contractsservice_test: goodAttachDataToNotary", async () => {
     let fileDesc = ["ReferencedConditions_contract1.yml - description",
         "ReferencedConditions_contract2.yml - description"];
 
-    let key1 = new crypto.PrivateKey(await (await io.openRead("../test/keys/marty_mcfly.private.unikey")).allBytes());
-    let key2 = new crypto.PrivateKey(await (await io.openRead("../test/keys/test_payment_owner.private.unikey")).allBytes());
+    let key1 = tk.TestKeys.getKey();
+    let key2 = tk.TestKeys.getKey();
 
     let notaryContract = await cs.createNotaryContract([key1], [key2.publicKey], fileName, fileDesc);
 
@@ -216,8 +216,8 @@ unit.test("contractsservice_test: goodAttachDataToNotary", async () => {
 });
 
 unit.test("contractsservice_test: goodToken", async () => {
-    let key1 = new crypto.PrivateKey(await (await io.openRead("../test/keys/marty_mcfly.private.unikey")).allBytes());
-    let key2 = new crypto.PrivateKey(await (await io.openRead("../test/keys/test_payment_owner.private.unikey")).allBytes());
+    let key1 = tk.TestKeys.getKey();
+    let key2 = tk.TestKeys.getKey();
 
     let tokenContract = await cs.createTokenContract([key1], [key2.publicKey], new BigDecimal("100"));
 
@@ -258,8 +258,8 @@ unit.test("contractsservice_test: goodToken", async () => {
 });
 
 unit.test("contractsservice_test: goodShare", async () => {
-    let key1 = new crypto.PrivateKey(await (await io.openRead("../test/keys/marty_mcfly.private.unikey")).allBytes());
-    let key2 = new crypto.PrivateKey(await (await io.openRead("../test/keys/test_payment_owner.private.unikey")).allBytes());
+    let key1 = tk.TestKeys.getKey();
+    let key2 = tk.TestKeys.getKey();
 
     let shareContract = await cs.createShareContract([key1], [key2.publicKey], new BigDecimal("100"));
 
@@ -297,4 +297,43 @@ unit.test("contractsservice_test: goodShare", async () => {
 
     assert(shareContract.isPermitted("split_join", [key2.publicKey]));
     assert(!shareContract.isPermitted("split_join", [key1.publicKey]));
+});
+
+unit.test("contractsservice_test: badSplit", async () => {
+    let key1 = tk.TestKeys.getKey();
+    let key2 = tk.TestKeys.getKey();
+
+    let tokenContract = await cs.createTokenContract([key1], [key2.publicKey], new BigDecimal("1000"));
+
+    assert(await tokenContract.check());
+
+    let splitContract = await cs.createSplit(tokenContract, 256, "amount", [key1]);
+
+    // not permitted split by owner (key2)
+    assert(!await splitContract.check());
+
+    splitContract = await cs.createSplit(tokenContract, 256, "amount", [key2]);
+
+    // not signed by creator (key1)
+    assert(!await splitContract.check());
+});
+
+unit.test("contractsservice_test: goodSplit", async () => {
+    let key1 = tk.TestKeys.getKey();
+    let key2 = tk.TestKeys.getKey();
+
+    let tokenContract = await cs.createTokenContract([key1], [key2.publicKey], new BigDecimal("1000"));
+
+    assert(await tokenContract.check());
+
+    assert(tokenContract.state.data.amount === "1000");
+
+    let splitContract = await cs.createSplit(tokenContract, 256, "amount", [key2], true);
+
+    assert(await splitContract.check());
+    assert(await tokenContract.check());
+
+    assert(splitContract.state.data.amount === "744");
+    assert(Array.from(splitContract.newItems)[0].state.data.amount === "256");
+    assert(Array.from(splitContract.revokingItems)[0].state.data.amount === "1000");
 });

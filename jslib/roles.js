@@ -17,7 +17,7 @@ const RequiredMode = {
 class Role extends bs.BiSerializable {
     /**
      * Base class for every role. Defines role name and constraints
-     * @param name {string} name of the role
+     * @param {string} name - Name of the role
      * @constructor
      */
     constructor(name) {
@@ -213,8 +213,8 @@ class RoleLink extends Role {
      * <p>
      * This is used to assign roles to roles, and to create special roles for permissions, etc.
      *
-     * @param name name of the link
-     * @param roleName name of the linked role
+     * @param {string} name - Name of the link
+     * @param {string} roleName - Name of the linked role
      * @constructor
      */
     constructor(name,roleName) {

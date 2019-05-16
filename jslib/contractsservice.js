@@ -60,7 +60,7 @@ async function createRevocation(c, ...keys) {
  * @param {Contract} c - Contract should split be.
  * @param {number | string | BigDecimal} amount - Value that should be split from given contract.
  * @param {String} fieldName - Name of field that should be split.
- * @param {Set<crypto.PrivateKey>} keys - Keys from owner of splitting contract.
+ * @param {Iterable<crypto.PrivateKey>} keys - Keys from owner of splitting contract.
  * @param {boolean} andSetCreator - If true set owners as creator in both contracts.
  * @return {Contract} working contract that should be register in the Universa to finish procedure.
  */
@@ -72,8 +72,8 @@ async function createSplit(c, amount, fieldName, keys, andSetCreator = false) {
         splitFrom.keysToSignWith.add(key);
 
     if (andSetCreator) {
-        splitTo.registerRole(new roles.RoleLink("creator", splitTo.roles.owner));
-        splitFrom.registerRole(new roles.RoleLink("creator", splitTo.roles.owner));
+        splitTo.registerRole(new roles.RoleLink("creator", "owner"));
+        splitFrom.registerRole(new roles.RoleLink("creator", "owner"));
     }
 
     await splitTo.seal(true);
@@ -91,7 +91,7 @@ async function createSplit(c, amount, fieldName, keys, andSetCreator = false) {
  * @param {Contract} contract1 - Contract should be join to.
  * @param {Contract} contract2 - Contract should be join.
  * @param {String} fieldName - Name of field that should be join by.
- * @param {Set<crypto.PrivateKey>} keys - Keys from owner of both contracts.
+ * @param {Iterable<crypto.PrivateKey>} keys - Keys from owner of both contracts.
  * @return {Contract} working contract that should be register in the Universa to finish procedure.
  */
 async function createJoin(contract1, contract2, fieldName, keys) {
