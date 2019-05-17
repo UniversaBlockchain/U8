@@ -1173,7 +1173,7 @@ class Constraint extends bs.BiSerializable {
      */
     parseConditions(conditions) {
 
-        if ((conditions == null) || (conditions === {}))
+        if (conditions == null || Object.entries(conditions).length === 0)
             return {};
 
         if (conditions.hasOwnProperty("operator"))
@@ -1239,7 +1239,7 @@ class Constraint extends bs.BiSerializable {
     checkConditions(conditions, ref, contracts, iteration) {
 
         let result;
-        if ((conditions == null) || (conditions === {}))
+        if (conditions == null || Object.entries(conditions).length === 0)
             return true;
 
         if (conditions.hasOwnProperty(Constraint.conditionsModeType.all_of)) {
@@ -1383,7 +1383,7 @@ class Constraint extends bs.BiSerializable {
      */
     isInheritedConditions(conditions, constr, constrContract, contracts, iteration) {
 
-        if ((conditions == null) || (conditions === {}))
+        if (conditions == null || Object.entries(conditions).length === 0)
             return false;
 
         let condList = null;
@@ -1575,7 +1575,7 @@ class Constraint extends bs.BiSerializable {
      */
     static assemblyCondition(condition) {
 
-        if ((condition == null) || (condition === {}))
+        if (condition == null || Object.entries(condition).length === 0)
             return null;
 
         let result = "";
@@ -1630,7 +1630,7 @@ class Constraint extends bs.BiSerializable {
      */
     assemblyConditions(conditions) {
 
-        if ((conditions == null) || (conditions === {}))
+        if (conditions == null || Object.entries(conditions).length === 0)
             return null;
 
         let all = conditions.hasOwnProperty(Constraint.conditionsModeType.all_of);

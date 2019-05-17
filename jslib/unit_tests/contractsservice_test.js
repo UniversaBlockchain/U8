@@ -258,6 +258,49 @@ unit.test("contractsservice_test: goodToken", async () => {
     assert(!tokenContract.isPermitted("split_join", [key1.publicKey]));
 });
 
+unit.test("contractsservice_test: goodMintableToken", async () => {
+    let key1 = tk.TestKeys.getKey();
+    let key2 = tk.TestKeys.getKey();
+
+    let tokenContract = await cs.createMintableTokenContract([key1], [key2.publicKey], new BigDecimal("100"));
+
+    assert(await tokenContract.check());
+
+    assert(tokenContract.roles.owner.isAllowedForKeys([key2.publicKey]));
+    assert(tokenContract.roles.issuer.isAllowedForKeys([key1]));
+    assert(tokenContract.roles.creator.isAllowedForKeys([key1]));
+
+    assert(!tokenContract.roles.owner.isAllowedForKeys([key1]));
+    assert(!tokenContract.roles.issuer.isAllowedForKeys([key2.publicKey]));
+    assert(!tokenContract.roles.creator.isAllowedForKeys([key2.publicKey]));
+
+    let date = new Date();
+    date.setMonth(date.getMonth() + 3);
+    assert(tokenContract.getExpiresAt().getTime() > date.getTime());
+    assert(tokenContract.definition.createdAt.getTime() < Date.now());
+
+    assert(tokenContract.state.data["amount"] === "100");
+    assert(tokenContract.definition.permissions.get("split_join").length === 1);
+
+    let splitJoinParams = tokenContract.definition.permissions.get("split_join")[0].params;
+    assert(splitJoinParams.min_value === "0.01");
+    assert(splitJoinParams.min_unit === "0.01");
+    assert(splitJoinParams.field_name === "amount");
+    assert(splitJoinParams.join_match_fields instanceof Array);
+    assert(splitJoinParams.join_match_fields.length === 2);
+    assert(splitJoinParams.join_match_fields[0] === "definition.data.currency");
+    assert(splitJoinParams.join_match_fields[1] === "definition.issuer");
+
+    assert(tokenContract.isPermitted("revoke", [key2.publicKey]));
+    assert(tokenContract.isPermitted("revoke", [key1.publicKey]));
+
+    assert(tokenContract.isPermitted("change_owner", [key2.publicKey]));
+    assert(!tokenContract.isPermitted("change_owner", [key1.publicKey]));
+
+    assert(tokenContract.isPermitted("split_join", [key2.publicKey]));
+    assert(!tokenContract.isPermitted("split_join", [key1.publicKey]));
+});
+
 unit.test("contractsservice_test: goodShare", async () => {
     let key1 = tk.TestKeys.getKey();
     let key2 = tk.TestKeys.getKey();
@@ -312,11 +355,13 @@ unit.test("contractsservice_test: badSplit", async () => {
 
     // not permitted split by owner (key2)
     assert(!await splitContract.check());
+    assert(Errors.FORBIDDEN === splitContract.errors[0].error);
 
     splitContract = await cs.createSplit(tokenContract, 256, "amount", [key2]);
 
     // not signed by creator (key1)
     assert(!await splitContract.check());
+    assert(Errors.NOT_SIGNED === splitContract.errors[0].error);
 });
 
 unit.test("contractsservice_test: badSplitHackAmount", async () => {
@@ -336,6 +381,7 @@ unit.test("contractsservice_test: badSplitHackAmount", async () => {
     await splitContract.seal(true);
 
     assert(!await splitContract.check());
+    assert(Errors.FORBIDDEN === splitContract.errors[0].error);
 });
 
 unit.test("contractsservice_test: goodSplit", async () => {
@@ -355,6 +401,66 @@ unit.test("contractsservice_test: goodSplit", async () => {
     assert(splitContract.state.data.amount === "744");
     assert(Array.from(splitContract.newItems)[0].state.data.amount === "256");
     assert(Array.from(splitContract.revokingItems)[0].state.data.amount === "1000");
+});
+
+unit.test("contractsservice_test: badJoin", async () => {
+    let key1 = tk.TestKeys.getKey();
+    let key2 = tk.TestKeys.getKey();
+
+    let tokenContract = await cs.createTokenContract([key1], [key2.publicKey], new BigDecimal("1000"));
+
+    assert(await tokenContract.check());
+
+    assert(tokenContract.state.data.amount === "1000");
+
+    let splitContract = await cs.createSplit(tokenContract, 256, "amount", [key2], true);
+
+    assert(await splitContract.check());
+
+    assert(splitContract.state.data.amount === "744");
+    assert(Array.from(splitContract.newItems)[0].state.data.amount === "256");
+    assert(Array.from(splitContract.revokingItems)[0].state.data.amount === "1000");
+
+    let joinContract = await cs.createJoin(splitContract, Array.from(splitContract.newItems)[0],"amount", [key1]);
+
+    // not permitted split by owner (key2)
+    assert(!await joinContract.check());
+    assert(Errors.NOT_SIGNED === joinContract.errors[0].error);
+
+    joinContract = await cs.createJoin(splitContract, Array.from(splitContract.newItems)[0],"amount", [key2]);
+
+    // hack amount
+    joinContract.state.data.amount = "1200";
+
+    await joinContract.seal(true);
+
+    assert(!await joinContract.check());
+    assert(Errors.FORBIDDEN === joinContract.errors[0].error);
+});
+
+unit.test("contractsservice_test: goodJoin", async () => {
+    let key1 = tk.TestKeys.getKey();
+    let key2 = tk.TestKeys.getKey();
+
+    let tokenContract = await cs.createTokenContract([key1], [key2.publicKey], new BigDecimal("1000"));
+
+    assert(await tokenContract.check());
+
+    assert(tokenContract.state.data.amount === "1000");
+
+    let splitContract = await cs.createSplit(tokenContract, 256, "amount", [key2], true);
+
+    assert(await splitContract.check());
+
+    assert(splitContract.state.data.amount === "744");
+    assert(Array.from(splitContract.newItems)[0].state.data.amount === "256");
+    assert(Array.from(splitContract.revokingItems)[0].state.data.amount === "1000");
+
+    let joinContract = await cs.createJoin(splitContract, Array.from(splitContract.newItems)[0],"amount", [key2]);
+
+    assert(await joinContract.check());
+
+    assert(joinContract.state.data.amount === "1000");
 });
 
 unit.test("contractsservice_test: badSplitJoinWithChangeJoinMatchingField", async () => {
@@ -400,4 +506,114 @@ unit.test("contractsservice_test: badSplitJoinWithChangeJoinMatchingField", asyn
 
     assert(!await splitContracts[0].check());
     assert(Errors.FORBIDDEN === splitContracts[0].errors[0].error);
+});
+
+unit.test("contractsservice_test: goodSplitJoin", async () => {
+    let key1 = tk.TestKeys.getKey();
+    let key2 = tk.TestKeys.getKey();
+
+    let tokenContract1 = await cs.createMintableTokenContract([key1], [key2.publicKey], new BigDecimal("1000"));
+    let tokenContract2 = await cs.createMintableTokenContract([key1], [key2.publicKey], new BigDecimal("500"));
+
+    assert(await tokenContract1.check());
+    assert(await tokenContract2.check());
+
+    assert(tokenContract1.state.data.amount === "1000");
+    assert(tokenContract2.state.data.amount === "500");
+
+    let splitContracts = await cs.createSplitJoin([tokenContract1, tokenContract2], [12, 256, 888],
+        [key2.longAddress, key2.shortAddress, key1.longAddress], [key2], "amount");
+
+    assert(await splitContracts[0].check());
+
+    assert(splitContracts[0].state.data.amount === "344");
+    assert(splitContracts[1].state.data.amount === "12");
+    assert(splitContracts[2].state.data.amount === "256");
+    assert(splitContracts[3].state.data.amount === "888");
+
+    assert(Array.from(splitContracts[0].roles.owner.keyRecords.keys())[0].equals(key2.publicKey));
+    assert(Array.from(splitContracts[1].roles.owner.keyAddresses)[0].equals(key2.longAddress));
+    assert(Array.from(splitContracts[2].roles.owner.keyAddresses)[0].equals(key2.shortAddress));
+    assert(Array.from(splitContracts[3].roles.owner.keyAddresses)[0].equals(key1.longAddress));
+});
+
+unit.test("contractsservice_test: goodSwap", async () => {
+    let key1 = tk.TestKeys.getKey();
+    let key2 = tk.TestKeys.getKey();
+    let key3 = tk.TestKeys.getKey();
+    let key4 = tk.TestKeys.getKey();
+
+    let tokenContract1 = await cs.createTokenContract([key1], [key2.publicKey], new BigDecimal("1000"));
+    let tokenContract2 = await cs.createTokenContract([key1], [key2.publicKey], new BigDecimal("2000"));
+    let tokenContract3 = await cs.createTokenContract([key3], [key4.publicKey], new BigDecimal("100"));
+    let tokenContract4 = await cs.createTokenContract([key3], [key4.publicKey], new BigDecimal("500"));
+
+    assert(await tokenContract1.check());
+    assert(await tokenContract2.check());
+    assert(await tokenContract3.check());
+    assert(await tokenContract4.check());
+
+    let swapContract = await cs.startSwap([tokenContract1, tokenContract2],
+        [tokenContract3, tokenContract4], [key2], [key4.publicKey], true);
+
+    // without signatures
+    assert(!await swapContract.check());
+
+    await swapContract.addSignatureToSeal(key2);
+
+    // signed by only first side
+    assert(!await swapContract.check());
+
+    await swapContract.addSignatureToSeal(key4);
+
+    // signed by all sides
+    assert(await swapContract.check());
+
+    // check swapped contracts
+    let swapped = Array.from(swapContract.newItems);
+    assert(swapped[0].state.data.amount === "1000" || swapped[0].state.data.amount === "2000");
+    assert(swapped[1].state.data.amount === "1000" || swapped[1].state.data.amount === "2000");
+    assert(swapped[2].state.data.amount === "100" || swapped[2].state.data.amount === "500");
+    assert(swapped[3].state.data.amount === "100" || swapped[3].state.data.amount === "500");
+
+    assert(swapped[0].roles.owner.isAllowedForKeys([key4]));
+    assert(swapped[1].roles.owner.isAllowedForKeys([key4]));
+    assert(swapped[2].roles.owner.isAllowedForKeys([key2]));
+    assert(swapped[3].roles.owner.isAllowedForKeys([key2]));
+    assert(!swapped[0].roles.owner.isAllowedForKeys([key2]));
+    assert(!swapped[1].roles.owner.isAllowedForKeys([key2]));
+    assert(!swapped[2].roles.owner.isAllowedForKeys([key4]));
+    assert(!swapped[3].roles.owner.isAllowedForKeys([key4]));
+});
+
+unit.test("contractsservice_test: goodTwoSignedContract", async () => {
+    let key1 = tk.TestKeys.getKey();
+    let key2 = tk.TestKeys.getKey();
+    let key3 = tk.TestKeys.getKey();
+
+    let tokenContract = await cs.createTokenContract([key1], [key2.publicKey], new BigDecimal("1000"));
+
+    assert(await tokenContract.check());
+
+    assert(tokenContract.state.data.amount === "1000");
+    assert(tokenContract.roles.owner.isAllowedForKeys([key2]));
+
+    let twoSignedContract = await cs.createTwoSignedContract(tokenContract, [key2], [key3.publicKey], true);
+
+    // without signatures
+    assert(!await twoSignedContract.check());
+
+    await twoSignedContract.addSignatureToSeal(key2);
+
+    // signed by only first side
+    assert(!await twoSignedContract.check());
+
+    await twoSignedContract.addSignatureToSeal(key3);
+
+    // signed by all sides
+    assert(await twoSignedContract.check());
+
+    // check two-signed contract
+    assert(twoSignedContract.state.data.amount === "1000");
+    assert(twoSignedContract.roles.owner.isAllowedForKeys([key3]));
 });

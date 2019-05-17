@@ -87,7 +87,7 @@ class Role extends bs.BiSerializable {
     /**
      * Check if role allowed for a set of keys.
      * Note that role constraints are also checked (in context of contract role is attached to)
-     * @param keys {iterable<crypto.PrivateKey>} keys to check allowance for
+     * @param {Iterable<crypto.PrivateKey> | Iterable<crypto.PublicKey>} keys - Keys to check allowance for
      * @returns {boolean} if role is allowed for a set of keys
      */
     isAllowedForKeys(keys) {

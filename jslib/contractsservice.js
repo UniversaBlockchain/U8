@@ -100,7 +100,8 @@ async function createJoin(contract1, contract2, fieldName, keys) {
     if (contract1.state.data[fieldName] == null || contract2.state.data[fieldName] == null)
         throw new ex.IllegalArgumentError("createJoin: not found field state.data." + fieldName);
 
-    joinTo.state.data[fieldName] = new BigDecimal(contract1.state.data[fieldName]).add(new BigDecimal(contract2.state.data[fieldName]));
+    let sum = new BigDecimal(contract1.state.data[fieldName]).add(new BigDecimal(contract2.state.data[fieldName]));
+    joinTo.state.data[fieldName] = sum.toFixed();
 
     for (let key of keys)
         joinTo.keysToSignWith.add(key);
@@ -145,13 +146,13 @@ async function createSplitJoin(contractsToJoin, amountsToSplit, addressesToSplit
     for (let i = 0; i < parts.length; i++) {
         sum = sum.sub(new BigDecimal(amountsToSplit[i]));
         parts[i].registerRole(new roles.SimpleRole("owner", addressesToSplit[i]));
-        parts[i].state.data[fieldName] = amountsToSplit[i];
+        parts[i].state.data[fieldName] = new BigDecimal(amountsToSplit[i]).toFixed();
 
         await parts[i].seal();
     }
 
     contract.state.data[fieldName] = sum.toFixed();
-    await contract.seal();
+    await contract.seal(true);
 
     return [contract].concat(parts);
 }
@@ -207,6 +208,12 @@ async function startSwap(contracts1, contracts2, fromKeys, toKeys, createNewRevi
     let newContracts2 = [];
     for (let c of contracts2) {
         let nc = createNewRevision ? c.createRevision() : c;
+        if (createNewRevision) {
+            // set new creator
+            let addresses = Array.from(toKeys).map(k => k.longAddress);
+            nc.registerRole(new roles.SimpleRole("creator", addresses));
+        }
+
         nc.createTransactionalSection();
         nc.transactional.id = HashId.of(randomBytes(64)).base64;
 
@@ -254,7 +261,7 @@ async function startSwap(contracts1, contracts2, fromKeys, toKeys, createNewRevi
         swapContract.newItems.add(nc);
     }));
 
-    await swapContract.seal();
+    await swapContract.seal(true);
 
     return swapContract;
 }
@@ -298,7 +305,7 @@ async function createTwoSignedContract(baseContract, fromKeys, toKeys, createNew
 
     twoSignContract.registerRole(new roles.SimpleRole("owner", toKeys));
 
-    await twoSignContract.seal();
+    await twoSignContract.seal(true);
 
     return twoSignContract;
 }

@@ -25,7 +25,7 @@ class Permission extends bs.BiSerializable {
 
     /**
      * Check if permission-associated role is allowed for set of keys.
-     * @param keys {Iterable<crypto.PrivateKey> | Iterable<crypto.PublicKey>} keys to check allowance for
+     * @param {Iterable<crypto.PrivateKey> | Iterable<crypto.PublicKey>} keys - Keys to check allowance for
      * @returns {boolean} indicates if permission is allowed for keys
      */
     isAllowedForKeys(keys) {
