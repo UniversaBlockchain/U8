@@ -9,6 +9,7 @@ const BossBiMapper = require("bossbimapper").BossBiMapper;
 const TransactionPack = require("transactionpack").TransactionPack;
 const Constraint = require('constraint').Constraint;
 const TestKeys = require('unit_tests/test_keys').TestKeys;
+const PrivateKey = require('crypto').PrivateKey;
 
 const ROOT_PATH = "../test/constraints/";
 
@@ -300,7 +301,7 @@ unit.test("constraint test: checkConstraints", async () => {
     let contract2 = await Contract.fromDslFile(ROOT_PATH + "ReferencedConditions_contract2.yml");
 
     let privateBytes = await (await io.openRead("../test/_xer0yfe2nn1xthc.private.unikey")).allBytes();
-    let key = new crypto.PrivateKey(privateBytes);
+    let key = new PrivateKey(privateBytes);
 
     let conditions = contract1.constraints.get("ref_roles").conditions;
     let condList = conditions["all_of"];
@@ -382,7 +383,7 @@ unit.test("constraint test: checkConstraintsAPILevel4", async () => {
     let contract2 = await Contract.fromDslFile(ROOT_PATH + "ReferencedConditions_contract2.yml");
 
     let privateBytes = await (await io.openRead("../test/_xer0yfe2nn1xthc.private.unikey")).allBytes();
-    let key = new crypto.PrivateKey(privateBytes);
+    let key = new PrivateKey(privateBytes);
 
     let conditions = contract1.constraints.get("ref_roles").conditions;
     let condList = conditions["all_of"];

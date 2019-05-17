@@ -10,12 +10,15 @@ crypto.Exception = class extends Error {
 
 import {MemoiseMixin, PackedEqMixin, DigestEqMixin} from 'tools'
 
+// alias for KeyAddress
+const KeyAddress = crypto.KeyAddress;
+
 /**
  * Universa private fast async key implementation (C++ bindings). Keys could be compared with `key.equals(anotherKey)`.
  *
  * @type {crypto.PrivateKey}
  */
-crypto.PrivateKey = class extends crypto.PrivateKeyImpl {
+const PrivateKey = crypto.PrivateKey = class extends crypto.PrivateKeyImpl {
 
     /**
      * Generate random key of a given strength.
@@ -59,7 +62,7 @@ crypto.PrivateKey = class extends crypto.PrivateKeyImpl {
     }
 
     /**
-     * Decrypt the cpiherText encrypted with {crypto.PublicKey#encrypt()}.
+     * Decrypt the cipherText encrypted with {crypto.PublicKey#encrypt()}.
      *
      * @param cipherText encrypted data
      * @returns {Promise<Uint8Array>} decrypted data
@@ -121,7 +124,7 @@ crypto.PrivateKey = class extends crypto.PrivateKeyImpl {
 Object.assign(crypto.PrivateKey.prototype, MemoiseMixin);
 Object.assign(crypto.PrivateKey.prototype, PackedEqMixin);
 
-crypto.PublicKey = class extends crypto.PublicKeyImpl {
+const PublicKey = crypto.PublicKey = class extends crypto.PublicKeyImpl {
 
     constructor(...args) {
         super(...args);
@@ -181,7 +184,7 @@ Object.defineProperty(crypto.KeyAddress.prototype, "packed", {
 Object.assign(crypto.KeyAddress.prototype, MemoiseMixin);
 Object.assign(crypto.KeyAddress.prototype, PackedEqMixin);
 
-crypto.SymmetricKey = class extends crypto.SymmetricKeyImpl {
+const SymmetricKey = crypto.SymmetricKey = class extends crypto.SymmetricKeyImpl {
 
     etaEncrypt(plainText) {
         return super.etaEncrypt(typeof(plainText) == 'string' ? utf8Encode(plainText) : plainText);
@@ -199,7 +202,7 @@ crypto.SymmetricKey = class extends crypto.SymmetricKeyImpl {
     get packed() {
         return this.memoise('__packed', () => this.getPacked());
     }
-}
+};
 
 Object.assign(crypto.SymmetricKey.prototype, MemoiseMixin);
 Object.assign(crypto.SymmetricKey.prototype, PackedEqMixin);
@@ -216,14 +219,14 @@ crypto.digest = (hashType, data) => {
     if (typeof (data) == 'string')
         data = utf8Encode(data);
     return crypto.__digest(hashType, data);
-}
+};
 
 /**
  * Universa HashId implementation.
  *
  * @type {crypto.HashId}
  */
-crypto.HashId = class extends crypto.HashIdImpl {
+const HashId = crypto.HashId = class extends crypto.HashIdImpl {
     /**
      * Construct HashId for a given data
      *
@@ -289,4 +292,4 @@ crypto.HashId = class extends crypto.HashIdImpl {
 Object.assign(crypto.HashId.prototype, MemoiseMixin);
 Object.assign(crypto.HashId.prototype, DigestEqMixin);
 
-module.exports = crypto;
+module.exports = {KeyAddress, HashId, PublicKey, PrivateKey, SymmetricKey};

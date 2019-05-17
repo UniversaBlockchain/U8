@@ -1,3 +1,5 @@
+import {KeyAddress, PublicKey, HashId} from 'crypto'
+
 const bs = require("biserializable");
 const DefaultBiMapper = require("defaultbimapper").DefaultBiMapper;
 const BossBiMapper = require("bossbimapper").BossBiMapper;
@@ -615,24 +617,24 @@ class Constraint extends bs.BiSerializable {
                                 ((indxOperator === NOT_EQUAL) && (leftBigDecimal.cmp(rightBigDecimal) !== 0)))
                                 ret = true;
 
-                        } else if (((left != null) && left instanceof crypto.HashId) ||
-                            ((right != null) && right instanceof crypto.HashId)) {
+                        } else if (((left != null) && left instanceof HashId) ||
+                            ((right != null) && right instanceof HashId)) {
                             let leftID;
                             let rightID;
 
-                            if ((left != null) && left instanceof crypto.HashId)
+                            if ((left != null) && left instanceof HashId)
                                 leftID = left;
                             else if ((left != null) && typeof left === "string")
-                                leftID = crypto.HashId.withBase64Digest(left);
+                                leftID = HashId.withBase64Digest(left);
                             else
-                                leftID = crypto.HashId.withBase64Digest(leftOperand);
+                                leftID = HashId.withBase64Digest(leftOperand);
 
-                            if ((right != null) && right instanceof crypto.HashId)
+                            if ((right != null) && right instanceof HashId)
                                 rightID = right;
                             else if ((right != null) && typeof right === "string")
-                                rightID = crypto.HashId.withBase64Digest(right);
+                                rightID = HashId.withBase64Digest(right);
                             else
-                                rightID = crypto.HashId.withBase64Digest(rightOperand);
+                                rightID = HashId.withBase64Digest(rightOperand);
 
                             ret = leftID.equals(rightID);
 
@@ -670,12 +672,12 @@ class Constraint extends bs.BiSerializable {
 
                                     if (compareOperand.length > 72) {
                                         // Key
-                                        let publicKey = new crypto.PublicKey(atob(compareOperand));
+                                        let publicKey = new PublicKey(atob(compareOperand));
                                         let simpleRole = new roles.SimpleRole(role.name, [publicKey]);
                                         ret = role.equalsForConstraint(simpleRole);
                                     } else {
                                         // Address
-                                        let ka = new crypto.KeyAddress(compareOperand);
+                                        let ka = new KeyAddress(compareOperand);
                                         let simpleRole = new roles.SimpleRole(role.name, [ka]);
                                         ret = role.equalsForConstraint(simpleRole);
                                     }
