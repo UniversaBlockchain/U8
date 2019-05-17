@@ -1,11 +1,12 @@
 import {expect, unit, assert, assertSilent} from 'test'
 import {HttpServer} from 'udp_adapter'
 import * as tk from 'unit_tests/test_keys'
+const Boss = require('boss.js');
 
 unit.test("hello web", async () => {
     let httpServer = new network.HttpServer("0.0.0.0", 8080, 1, 20);
     let counter = 0;
-    httpServer.addEndpoint("/testPage", (request) => {
+    httpServer.addRawEndpoint("/testPage", (request) => {
         //console.log("getEndpoint: " + request.endpoint);
         //console.log("method: " + request.method);
         ++counter;
@@ -15,12 +16,22 @@ unit.test("hello web", async () => {
         request.setAnswerBody("httpServer: on /testPage counter="+(a*b+counter));
         request.sendAnswer();
     });
-    httpServer.addEndpoint("/testPage2", (request) => {
+    httpServer.addRawEndpoint("/testPage2", (request) => {
         request.setStatusCode(201);
         request.setHeader("header1", "header_value_1");
         request.setHeader("header2", "header_value_2");
         request.setAnswerBody("httpServer: on /testPage2 some text");
         request.sendAnswer();
+    });
+    httpServer.addEndpoint("/ping", (request) => {
+        return {"ping": "pong", "val": some_undefined_var};
+        //return {"ping": "pong"};
+    });
+    httpServer.addRawEndpoint("/connect1", (request) => {
+        console.log("js /connect");
+        console.log("js /connect method: " + request.method);
+        console.log("js /connect requestBody: " + Boss.load(request.requestBody));
+        return {"ping": "pong"};
     });
     httpServer.startServer();
 

@@ -442,6 +442,9 @@ public:
     std::string getMethod(int idx) {
         return buf_.at(idx)->getMethod();
     }
+    byte_vector getRequestBody(int idx) {
+        return buf_.at(idx)->getRequestBody();
+    }
 public:
     void addHttpServerRequest(HttpServerRequest* req) {
         buf_.emplace_back(req);
@@ -839,6 +842,17 @@ void HttpServerRequestBuf_getMethod(const FunctionCallbackInfo<Value> &args) {
     });
 }
 
+void HttpServerRequestBuf_getRequestBody(const FunctionCallbackInfo<Value> &args) {
+    Scripter::unwrapArgs(args, [](ArgsContext &ac) {
+        if (ac.args.Length() == 1) {
+            auto httpServerRequestBuf = unwrap<HttpServerRequestBuf>(ac.args.This());
+            ac.setReturnValue(ac.toBinary(httpServerRequestBuf->getRequestBody(ac.asInt(0))));
+            return;
+        }
+        ac.throwError("invalid arguments");
+    });
+}
+
 void JsInitHttpServerRequest(Isolate *isolate, const Local<ObjectTemplate> &global) {
     // Bind object with default constructor
     Local<FunctionTemplate> tpl = bindCppClass<HttpServerRequestBuf>(isolate, "HttpServerRequestBuf");
@@ -854,6 +868,7 @@ void JsInitHttpServerRequest(Isolate *isolate, const Local<ObjectTemplate> &glob
     prototype->Set(isolate, "getBufLength", FunctionTemplate::New(isolate, HttpServerRequestBuf_getBufLength));
     prototype->Set(isolate, "getQueryString", FunctionTemplate::New(isolate, HttpServerRequestBuf_getQueryString));
     prototype->Set(isolate, "getMethod", FunctionTemplate::New(isolate, HttpServerRequestBuf_getMethod));
+    prototype->Set(isolate, "getRequestBody", FunctionTemplate::New(isolate, HttpServerRequestBuf_getRequestBody));
 
     // register it into global namespace
     HttpServerRequestBufTpl.Reset(isolate, tpl);

@@ -6,6 +6,7 @@
 #define UNITOOLS_PUBLICKEY_H
 
 #include <vector>
+#undef NORETURN // shut NORETURN redefinition warning in tomcrypt.h
 #include <tomcrypt.h>
 #include <gmp.h>
 #include <unordered_map>

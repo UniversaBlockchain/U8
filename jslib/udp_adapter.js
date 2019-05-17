@@ -1,4 +1,5 @@
 import {MemoiseMixin} from 'tools'
+const Boss = require('boss.js');
 
 network.NodeInfo = class {
     constructor() {
@@ -174,6 +175,10 @@ network.HttpServerRequest = class {
     get method() {
         return this.memoise('__getMethod', () => this.reqBuf_.getMethod(this.indx_));
     }
+
+    get requestBody() {
+        return this.memoise('__getRequestBody', () => this.reqBuf_.getRequestBody(this.indx_));
+    }
 };
 Object.assign(network.HttpServerRequest.prototype, MemoiseMixin);
 
@@ -205,9 +210,28 @@ network.HttpServer = class {
         this.httpServer_.__stopServer();
     }
 
-    addEndpoint(endpoint, block) {
+    addRawEndpoint(endpoint, block) {
         this.httpServer_.__addEndpoint(endpoint);
         this.endpoints_.set(endpoint, block);
+    }
+
+    addEndpoint(endpoint, block) {
+        this.httpServer_.__addEndpoint(endpoint);
+        this.endpoints_.set(endpoint, (request)=>{
+            try {
+                request.setAnswerBody(Boss.dump({
+                    "result": "ok",
+                    "response": block()
+                }));
+            } catch (e) {
+                request.setAnswerBody(Boss.dump({
+                    "result": "error",
+                    "error": e.message,
+                    "errorClass": e.constructor.name
+                }));
+            }
+            request.sendAnswer();
+        });
     }
 
     addSecureEndpoint(endpoint, block) {

@@ -5,6 +5,7 @@
 #ifndef U8_SYMMETRICKEY_H
 #define U8_SYMMETRICKEY_H
 
+#undef NORETURN // shut NORETURN redefinition warning in tomcrypt.h
 #include <tomcrypt.h>
 #include "../tools/tools.h"
 
