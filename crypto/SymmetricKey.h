@@ -60,6 +60,16 @@ namespace crypto {
          */
         byte_vector etaEncrypt(void *data, size_t size) const;
 
+        /**
+         * Encrypt data using AES256 CTR
+         */
+        byte_vector encrypt(const byte_vector &data) const;
+
+        /**
+         * Decrypt data using AES256 CTR
+         */
+        byte_vector decrypt(const byte_vector &data) const;
+
     private:
         byte_vector key;
 

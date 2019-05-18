@@ -101,4 +101,30 @@ namespace crypto {
         return output;
     }
 
+    byte_vector SymmetricKey::encrypt(const byte_vector &data) const {
+        CTRTransformerAES transformerAES(key);
+        byte_vector result;
+        byte_vector IV = transformerAES.getIV();
+        result.insert(result.end(), IV.begin(), IV.end());
+        for (int i = 0; i < data.size(); ++i)
+            result.push_back(transformerAES.transformByte(data[i]));
+        return result;
+    }
+
+    byte_vector SymmetricKey::decrypt(const byte_vector &data) const {
+        if (data.size() < aes_desc.block_length)
+            throw std::invalid_argument("SymmetricKey::decrypt error: input data too small");
+        byte_vector result;
+        byte_vector IV(aes_desc.block_length);
+        memcpy(&IV[0], &data[0], aes_desc.block_length);
+        CTRTransformerAES transformerAES(key, IV);
+        int size = data.size() - aes_desc.block_length;
+        for (int i = 0; i < size; ++i) {
+            unsigned char encrypted = data[aes_desc.block_length + i];
+            unsigned char decrypted = (i >= 0) ? transformerAES.transformByte(encrypted) : -1;
+            result.push_back(decrypted);
+        }
+        return result;
+    }
+
 };

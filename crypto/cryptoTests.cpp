@@ -394,10 +394,15 @@ void testKeysConcurrency() {
             vector<unsigned char> sig;
             privateKey.sign(body, SHA3_512, sig);
             checkResult("concurrency sign/verify", true, publicKey.verify(sig, body, SHA3_512));
-            auto symmEncrypted = symmetricKey.etaEncrypt(body);
-            auto symmDecrypted = symmetricKey.etaDecrypt(symmEncrypted);
+            auto symmEtaEncrypted = symmetricKey.etaEncrypt(body);
+            auto symmEtaDecrypted = symmetricKey.etaDecrypt(symmEtaEncrypted);
+            checkResult("concurrency symmetric etaEncrypt/etaDecrypt", string("cXdlcnR5MTIzNDU2"), base64_encode(symmEtaDecrypted));
+            auto symmEncrypted = symmetricKey.encrypt(body);
+            auto symmDecrypted = symmetricKey.decrypt(symmEncrypted);
             checkResult("concurrency symmetric encrypt/decrypt", string("cXdlcnR5MTIzNDU2"), base64_encode(symmDecrypted));
             ++counter;
+            if (counter % 10000 == 0)
+                printf("counter = %li\n", long(counter));
             cv.notify();
         });
     }
@@ -552,6 +557,22 @@ void testSymmetricKeys() {
     auto cppDecrypted = symmetricKeyCpp.etaDecrypt(cppEncrypted);
     //printf("cppDecrypted: %s\n", base64_encode(cppDecrypted).c_str());
     checkResult("cppDecrypted", body, cppDecrypted);
+
+    std::string plainFromCppStr = "hello world! hello world! hello world! hello world! hello world! hello world!1";
+    //std::string plainFromCppStr = "hello";
+    byte_vector plainFromCpp(plainFromCppStr.begin(), plainFromCppStr.end());
+    byte_vector encryptedFromCpp = symmetricKeyJava.encrypt(plainFromCpp);
+    printf("symmetricKeyJava.encrypt(from cpp): %s\n", base64_encode(encryptedFromCpp).c_str());
+    byte_vector decryptedFromCpp = symmetricKeyJava.decrypt(encryptedFromCpp);
+    string decryptedFromCppStr(decryptedFromCpp.begin(), decryptedFromCpp.end());
+    printf("symmetricKeyJava.decrypt(from cpp): %s\n", decryptedFromCppStr.c_str());
+    checkResult("symmetricKeyJava.decrypt(from cpp)", plainFromCppStr, decryptedFromCppStr);
+
+    std::string encryptedFromJava64 = "GYP7+qN8BG4hYACvlLU3fWBX9S+vtVrqHL3jCVWXRXUsAe8GJunUVthFIrfNsBKnyGXB+TMKDL/rEgnaDA==";
+    byte_vector decryptedFromJava = symmetricKeyJava.decrypt(base64_decodeToBytes(encryptedFromJava64));
+    std::string decryptedFromJavaStr(decryptedFromJava.begin(), decryptedFromJava.end());
+    printf("symmetricKeyJava.decrypt(from java): %s\n", decryptedFromJavaStr.c_str());
+    checkResult("symmetricKeyJava.decrypt(from java)", std::string("hello world123 hello world123 hello world123!"), decryptedFromJavaStr);
 
     cout << "testSymmetricKeys()... done!" << endl << endl;
 }
