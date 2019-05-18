@@ -298,8 +298,21 @@ void HttpServer::initSecureProtocol() {
             UObject paramsObj = binder.get("params");
             UBytes paramsBytes = UBytes::asInstance(paramsObj);
             byte_vector paramsBin = paramsBytes.get();
-            //session->sessionKey->decrypt(paramsBin);
-            //TODO: need sessionKey->decrypt
+            byte_vector paramsBinDecrypted = session->sessionKey->decrypt(paramsBin);
+            UObject paramsUnpackedObj = BossSerializer::deserialize(UBytes(std::move(paramsBinDecrypted)));
+            UBinder params = UBinder::asInstance(paramsUnpackedObj);
+            std::string command = params.getString("command");
+            if (command == "hello") {
+                UBinder reqAns = UBinder::of("result", UBinder::of("status", "OK", "message", "welcome to the Universa"));
+                byte_vector encryptedAns = session->sessionKey->encrypt(BossSerializer::serialize(reqAns).get());
+                UBinder result = UBinder::of("result", UBytes(std::move(encryptedAns)));
+                UBinder ans = UBinder::of("result", "ok","response", result);
+                req->setAnswerBody(BossSerializer::serialize(ans).get());
+                req->sendAnswerFromAnotherThread();
+            } else {
+                printf("unknown command %s\n", command.c_str());
+                //TODO: find command in secure endpoints
+            }
         } catch (const std::exception& e) {
             req->setStatusCode(500);
             UBinder ans = UBinder::of("result", "error","response", e.what());
