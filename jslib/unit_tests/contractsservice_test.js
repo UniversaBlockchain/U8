@@ -13,6 +13,9 @@ const tt = require("test_tools");
 const Constraint = require('constraint').Constraint;
 const TransactionPack = require("transactionpack").TransactionPack;
 const BigDecimal  = require("big").Big;
+const FollowerContract = require("services/followerContract").FollowerContract;
+const SlotContract = require("services/slotContract").SlotContract;
+const UnsContract = require("services/unsContract").UnsContract;
 
 const root_path = "../test/contractsservice/";
 
@@ -52,6 +55,28 @@ async function checkCreateParcelFotTestNet(contract_file_payload) {
     assert(parcel.getPaymentContract().state.data.test_transaction_units === 10000 - 20);
 }
 
+async function simpleCheckContract(contract, issuerKey, ownerKey) {
+    assert(await contract.check());
+
+    assert(contract.roles.owner.isAllowedForKeys([ownerKey.publicKey]));
+    assert(contract.roles.issuer.isAllowedForKeys([issuerKey]));
+    assert(contract.roles.creator.isAllowedForKeys([issuerKey]));
+
+    assert(!contract.roles.owner.isAllowedForKeys([issuerKey]));
+    assert(!contract.roles.issuer.isAllowedForKeys([ownerKey.publicKey]));
+    assert(!contract.roles.creator.isAllowedForKeys([ownerKey.publicKey]));
+
+    let date = new Date();
+    date.setMonth(date.getMonth() + 50);
+    assert(contract.getExpiresAt().getTime() > date.getTime());
+    assert(contract.definition.createdAt.getTime() < Date.now());
+
+    assert(contract.isPermitted("revoke", [ownerKey.publicKey]));
+    assert(contract.isPermitted("revoke", [issuerKey.publicKey]));
+
+    assert(contract.isPermitted("change_owner", [ownerKey.publicKey]));
+    assert(!contract.isPermitted("change_owner", [issuerKey.publicKey]));
+}
 
 unit.test("contractsservice_test: badRevoke", async () => {
     let key = new crypto.PrivateKey(await (await io.openRead("../test/_xer0yfe2nn1xthc.private.unikey")).allBytes());
@@ -143,24 +168,7 @@ unit.test("contractsservice_test: goodNotary", async () => {
 
     assert(await notaryContract.check());
 
-    assert(notaryContract.roles.owner.isAllowedForKeys([key2.publicKey]));
-    assert(notaryContract.roles.issuer.isAllowedForKeys([key1]));
-    assert(notaryContract.roles.creator.isAllowedForKeys([key1]));
-
-    assert(!notaryContract.roles.owner.isAllowedForKeys([key1]));
-    assert(!notaryContract.roles.issuer.isAllowedForKeys([key2.publicKey]));
-    assert(!notaryContract.roles.creator.isAllowedForKeys([key2.publicKey]));
-
-    let date = new Date();
-    date.setMonth(date.getMonth() + 3);
-    assert(notaryContract.getExpiresAt().getTime() > date.getTime());
-    assert(notaryContract.definition.createdAt.getTime() < Date.now());
-
-    assert(notaryContract.isPermitted("revoke", [key2.publicKey]));
-    assert(notaryContract.isPermitted("revoke", [key1.publicKey]));
-
-    assert(notaryContract.isPermitted("change_owner", [key2.publicKey]));
-    assert(!notaryContract.isPermitted("change_owner", [key1.publicKey]));
+    await simpleCheckContract(notaryContract, key1, key2);
 });
 
 unit.test("contractsservice_test: goodAttachDataToNotary", async () => {
@@ -175,26 +183,7 @@ unit.test("contractsservice_test: goodAttachDataToNotary", async () => {
 
     let notaryContract = await cs.createNotaryContract([key1], [key2.publicKey], fileName, fileDesc);
 
-    assert(await notaryContract.check());
-
-    assert(notaryContract.roles.owner.isAllowedForKeys([key2.publicKey]));
-    assert(notaryContract.roles.issuer.isAllowedForKeys([key1]));
-    assert(notaryContract.roles.creator.isAllowedForKeys([key1]));
-
-    assert(!notaryContract.roles.owner.isAllowedForKeys([key1]));
-    assert(!notaryContract.roles.issuer.isAllowedForKeys([key2.publicKey]));
-    assert(!notaryContract.roles.creator.isAllowedForKeys([key2.publicKey]));
-
-    let date = new Date();
-    date.setMonth(date.getMonth() + 3);
-    assert(notaryContract.getExpiresAt().getTime() > date.getTime());
-    assert(notaryContract.definition.createdAt.getTime() < Date.now());
-
-    assert(notaryContract.isPermitted("revoke", [key2.publicKey]));
-    assert(notaryContract.isPermitted("revoke", [key1.publicKey]));
-
-    assert(notaryContract.isPermitted("change_owner", [key2.publicKey]));
-    assert(!notaryContract.isPermitted("change_owner", [key1.publicKey]));
+    await simpleCheckContract(notaryContract, key1, key2);
 
     let files = notaryContract.definition.data.files;
     assert(files["ReferencedConditions_contract1_yml"]["file_name"] === "ReferencedConditions_contract1.yml");
@@ -222,20 +211,7 @@ unit.test("contractsservice_test: goodToken", async () => {
 
     let tokenContract = await cs.createTokenContract([key1], [key2.publicKey], new BigDecimal("100"));
 
-    assert(await tokenContract.check());
-
-    assert(tokenContract.roles.owner.isAllowedForKeys([key2.publicKey]));
-    assert(tokenContract.roles.issuer.isAllowedForKeys([key1]));
-    assert(tokenContract.roles.creator.isAllowedForKeys([key1]));
-
-    assert(!tokenContract.roles.owner.isAllowedForKeys([key1]));
-    assert(!tokenContract.roles.issuer.isAllowedForKeys([key2.publicKey]));
-    assert(!tokenContract.roles.creator.isAllowedForKeys([key2.publicKey]));
-
-    let date = new Date();
-    date.setMonth(date.getMonth() + 3);
-    assert(tokenContract.getExpiresAt().getTime() > date.getTime());
-    assert(tokenContract.definition.createdAt.getTime() < Date.now());
+    await simpleCheckContract(tokenContract, key1, key2);
 
     assert(tokenContract.state.data["amount"] === "100");
     assert(tokenContract.definition.permissions.get("split_join").length === 1);
@@ -248,12 +224,6 @@ unit.test("contractsservice_test: goodToken", async () => {
     assert(splitJoinParams.join_match_fields.length === 1);
     assert(splitJoinParams.join_match_fields[0] === "state.origin");
 
-    assert(tokenContract.isPermitted("revoke", [key2.publicKey]));
-    assert(tokenContract.isPermitted("revoke", [key1.publicKey]));
-
-    assert(tokenContract.isPermitted("change_owner", [key2.publicKey]));
-    assert(!tokenContract.isPermitted("change_owner", [key1.publicKey]));
-
     assert(tokenContract.isPermitted("split_join", [key2.publicKey]));
     assert(!tokenContract.isPermitted("split_join", [key1.publicKey]));
 });
@@ -264,20 +234,7 @@ unit.test("contractsservice_test: goodMintableToken", async () => {
 
     let tokenContract = await cs.createMintableTokenContract([key1], [key2.publicKey], new BigDecimal("100"));
 
-    assert(await tokenContract.check());
-
-    assert(tokenContract.roles.owner.isAllowedForKeys([key2.publicKey]));
-    assert(tokenContract.roles.issuer.isAllowedForKeys([key1]));
-    assert(tokenContract.roles.creator.isAllowedForKeys([key1]));
-
-    assert(!tokenContract.roles.owner.isAllowedForKeys([key1]));
-    assert(!tokenContract.roles.issuer.isAllowedForKeys([key2.publicKey]));
-    assert(!tokenContract.roles.creator.isAllowedForKeys([key2.publicKey]));
-
-    let date = new Date();
-    date.setMonth(date.getMonth() + 3);
-    assert(tokenContract.getExpiresAt().getTime() > date.getTime());
-    assert(tokenContract.definition.createdAt.getTime() < Date.now());
+    await simpleCheckContract(tokenContract, key1, key2);
 
     assert(tokenContract.state.data["amount"] === "100");
     assert(tokenContract.definition.permissions.get("split_join").length === 1);
@@ -291,12 +248,6 @@ unit.test("contractsservice_test: goodMintableToken", async () => {
     assert(splitJoinParams.join_match_fields[0] === "definition.data.currency");
     assert(splitJoinParams.join_match_fields[1] === "definition.issuer");
 
-    assert(tokenContract.isPermitted("revoke", [key2.publicKey]));
-    assert(tokenContract.isPermitted("revoke", [key1.publicKey]));
-
-    assert(tokenContract.isPermitted("change_owner", [key2.publicKey]));
-    assert(!tokenContract.isPermitted("change_owner", [key1.publicKey]));
-
     assert(tokenContract.isPermitted("split_join", [key2.publicKey]));
     assert(!tokenContract.isPermitted("split_join", [key1.publicKey]));
 });
@@ -307,20 +258,7 @@ unit.test("contractsservice_test: goodShare", async () => {
 
     let shareContract = await cs.createShareContract([key1], [key2.publicKey], new BigDecimal("100"));
 
-    assert(await shareContract.check());
-
-    assert(shareContract.roles.owner.isAllowedForKeys([key2.publicKey]));
-    assert(shareContract.roles.issuer.isAllowedForKeys([key1]));
-    assert(shareContract.roles.creator.isAllowedForKeys([key1]));
-
-    assert(!shareContract.roles.owner.isAllowedForKeys([key1]));
-    assert(!shareContract.roles.issuer.isAllowedForKeys([key2.publicKey]));
-    assert(!shareContract.roles.creator.isAllowedForKeys([key2.publicKey]));
-
-    let date = new Date();
-    date.setMonth(date.getMonth() + 3);
-    assert(shareContract.getExpiresAt().getTime() > date.getTime());
-    assert(shareContract.definition.createdAt.getTime() < Date.now());
+    await simpleCheckContract(shareContract, key1, key2);
 
     assert(shareContract.state.data["amount"] === "100");
     assert(shareContract.definition.permissions.get("split_join").length === 1);
@@ -332,12 +270,6 @@ unit.test("contractsservice_test: goodShare", async () => {
     assert(splitJoinParams.join_match_fields instanceof Array);
     assert(splitJoinParams.join_match_fields.length === 1);
     assert(splitJoinParams.join_match_fields[0] === "state.origin");
-
-    assert(shareContract.isPermitted("revoke", [key2.publicKey]));
-    assert(shareContract.isPermitted("revoke", [key1.publicKey]));
-
-    assert(shareContract.isPermitted("change_owner", [key2.publicKey]));
-    assert(!shareContract.isPermitted("change_owner", [key1.publicKey]));
 
     assert(shareContract.isPermitted("split_join", [key2.publicKey]));
     assert(!shareContract.isPermitted("split_join", [key1.publicKey]));
@@ -616,4 +548,110 @@ unit.test("contractsservice_test: goodTwoSignedContract", async () => {
     // check two-signed contract
     assert(twoSignedContract.state.data.amount === "1000");
     assert(twoSignedContract.roles.owner.isAllowedForKeys([key3]));
+});
+
+unit.test("contractsservice_test: createSlotContract", async () => {
+    let key1 = tk.TestKeys.getKey();
+    let key2 = tk.TestKeys.getKey();
+
+    let slotContract = await cs.createSlotContract([key1], [key2.publicKey], tt.createNodeInfoProvider());
+
+    await simpleCheckContract(slotContract, key1, key2);
+
+    let mdp = slotContract.definition.permissions.get("modify_data");
+    assert(mdp != null);
+    assert(mdp instanceof Array);
+    assert(mdp[0].fields.hasOwnProperty("action"));
+    assert(mdp[0].fields.hasOwnProperty("/expires_at"));
+    assert(mdp[0].fields.hasOwnProperty(SlotContract.KEEP_REVISIONS_FIELD_NAME));
+    assert(mdp[0].fields.hasOwnProperty(SlotContract.PAID_U_FIELD_NAME));
+    assert(mdp[0].fields.hasOwnProperty(SlotContract.PREPAID_KD_FIELD_NAME));
+    assert(mdp[0].fields.hasOwnProperty(SlotContract.PREPAID_FROM_TIME_FIELD_NAME));
+    assert(mdp[0].fields.hasOwnProperty(SlotContract.STORED_BYTES_FIELD_NAME));
+    assert(mdp[0].fields.hasOwnProperty(SlotContract.SPENT_KD_FIELD_NAME));
+    assert(mdp[0].fields.hasOwnProperty(SlotContract.SPENT_KD_TIME_FIELD_NAME));
+    assert(mdp[0].fields.hasOwnProperty(SlotContract.TRACKING_CONTRACT_FIELD_NAME));
+});
+
+unit.test("contractsservice_test: createUnsContract", async () => {
+    let key1 = tk.TestKeys.getKey();
+    let key2 = tk.TestKeys.getKey();
+
+    let unsContract = await cs.createUnsContract([key1], [key2.publicKey], tt.createNodeInfoProvider());
+
+    await simpleCheckContract(unsContract, key1, key2);
+
+    let mdp = unsContract.definition.permissions.get("modify_data");
+    assert(mdp !== null);
+    assert(mdp instanceof Array);
+    assert(mdp[0].fields.hasOwnProperty("action"));
+    assert(mdp[0].fields.hasOwnProperty("/expires_at"));
+    assert(mdp[0].fields.hasOwnProperty("/references"));
+    assert(mdp[0].fields.hasOwnProperty(UnsContract.NAMES_FIELD_NAME));
+    assert(mdp[0].fields.hasOwnProperty(UnsContract.PAID_U_FIELD_NAME));
+    assert(mdp[0].fields.hasOwnProperty(UnsContract.PREPAID_ND_FIELD_NAME));
+    assert(mdp[0].fields.hasOwnProperty(UnsContract.PREPAID_ND_FROM_TIME_FIELD_NAME));
+    assert(mdp[0].fields.hasOwnProperty(UnsContract.STORED_ENTRIES_FIELD_NAME));
+    assert(mdp[0].fields.hasOwnProperty(UnsContract.SPENT_ND_FIELD_NAME));
+    assert(mdp[0].fields.hasOwnProperty(UnsContract.SPENT_ND_TIME_FIELD_NAME));
+});
+
+unit.test("contractsservice_test: createUnsContractForRegisterContractName", async () => {
+    let namedContract = Contract.fromPrivateKey(tk.TestKeys.getKey());
+    await namedContract.seal(true);
+    assert(await namedContract.check());
+
+    let key1 = tk.TestKeys.getKey();
+    let key2 = tk.TestKeys.getKey();
+
+    let unsContract = await cs.createUnsContractForRegisterContractName([key1], [key2.publicKey],
+        tt.createNodeInfoProvider(), "testUnsContract", "test description", "http://test.com", namedContract);
+
+    await simpleCheckContract(unsContract, key1, key2);
+
+    assert(unsContract.getUnsName("testUnsContract").unsName === "testUnsContract");
+    assert(unsContract.getUnsName("testUnsContract").unsDescription === "test description");
+    assert(unsContract.getUnsName("testUnsContract").unsURL === "http://test.com");
+
+    assert(unsContract.getUnsName("testUnsContract").findUnsRecordByOrigin(namedContract.getOrigin()) !== -1);
+});
+
+unit.test("contractsservice_test: createUnsContractForRegisterKeyName", async () => {
+    let namedKey = tk.TestKeys.getKey();
+
+    let key1 = tk.TestKeys.getKey();
+    let key2 = tk.TestKeys.getKey();
+
+    let unsContract = await cs.createUnsContractForRegisterKeyName([key1], [key2.publicKey],
+        tt.createNodeInfoProvider(), "testUnsContract", "test description", "http://test.com", namedKey);
+
+    await simpleCheckContract(unsContract, key1, key2);
+
+    assert(unsContract.getUnsName("testUnsContract").findUnsRecordByKey(namedKey.publicKey) !== -1);
+    assert(unsContract.getUnsName("testUnsContract").findUnsRecordByAddress(new crypto.KeyAddress(namedKey.publicKey, 0, true)) !== -1);
+    assert(unsContract.getUnsName("testUnsContract").findUnsRecordByAddress(new crypto.KeyAddress(namedKey.publicKey, 0, false)) !== -1);
+});
+
+unit.test("contractsservice_test: createFollowerContract", async () => {
+    let key1 = tk.TestKeys.getKey();
+    let key2 = tk.TestKeys.getKey();
+
+    let followerContract = await cs.createFollowerContract([key1], [key2.publicKey], tt.createNodeInfoProvider());
+
+    await simpleCheckContract(followerContract, key1, key2);
+
+    let mdp = followerContract.definition.permissions.get("modify_data");
+    assert(mdp !== null);
+    assert(mdp instanceof Array);
+    assert(mdp[0].fields.hasOwnProperty("action"));
+    assert(mdp[0].fields.hasOwnProperty("/expires_at"));
+    assert(mdp[0].fields.hasOwnProperty(FollowerContract.PAID_U_FIELD_NAME));
+    assert(mdp[0].fields.hasOwnProperty(FollowerContract.PREPAID_OD_FIELD_NAME));
+    assert(mdp[0].fields.hasOwnProperty(FollowerContract.PREPAID_FROM_TIME_FIELD_NAME));
+    assert(mdp[0].fields.hasOwnProperty(FollowerContract.FOLLOWED_ORIGINS_FIELD_NAME));
+    assert(mdp[0].fields.hasOwnProperty(FollowerContract.SPENT_OD_FIELD_NAME));
+    assert(mdp[0].fields.hasOwnProperty(FollowerContract.SPENT_OD_TIME_FIELD_NAME));
+    assert(mdp[0].fields.hasOwnProperty(FollowerContract.CALLBACK_RATE_FIELD_NAME));
+    assert(mdp[0].fields.hasOwnProperty(FollowerContract.TRACKING_ORIGINS_FIELD_NAME));
+    assert(mdp[0].fields.hasOwnProperty(FollowerContract.CALLBACK_KEYS_FIELD_NAME));
 });

@@ -1,7 +1,3 @@
-/**
- * @module ledger
- */
-
 import * as db from 'pg_driver'
 import * as trs from 'timers'
 import {HashId, PrivateKey} from 'crypto'
