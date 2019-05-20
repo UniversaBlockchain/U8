@@ -27,6 +27,10 @@ TEST_CASE("http_hello") {
         request->setAnswerBody(answer + ", encrypted: " + base64_encode(publicKey.encrypt(bv)));
         request->sendAnswerFromAnotherThread();
     });
+    httpServer.addSecureEndpoint("setVerbose", [&counter,&publicKey](const UBinder& params){
+        printf("secureEndpoint: setVerbose\n");
+        return UBinder::of("result", UBinder::of("itemResult", "setVerbose not implemented in cpp tests"));
+    });
     httpServer.start();
 
     HttpClient httpClient(20);
