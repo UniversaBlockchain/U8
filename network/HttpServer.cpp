@@ -175,11 +175,13 @@ void HttpServer::addEndpoint(const std::string& endpoint, std::function<void(Htt
     service_.addEndpoint(endpoint, std::move(callback));
 }
 
-void HttpServer::addSecureCallback(const std::function<byte_vector(const byte_vector& params)>& callback) {
+void HttpServer::addSecureCallback(const std::function<void(const byte_vector& params,
+        std::function<void(const byte_vector& ansBin)>&&)>& callback) {
     secureCallback_ = callback;
 }
 
-void HttpServer::addSecureCallback(std::function<byte_vector(const byte_vector& params)>&& callback) {
+void HttpServer::addSecureCallback(std::function<void(const byte_vector& params,
+        std::function<void(const byte_vector& ansBin)>&&)>&& callback) {
     secureCallback_ = std::move(callback);
 }
 
@@ -297,13 +299,18 @@ void HttpServer::initSecureProtocol() {
         }
     });
     addEndpoint("/command", [this](HttpServerRequest *req) {
-        inSession(req, [this](byte_vector& params){
-            return secureCallback_(params);
+        inSession(req, [this](byte_vector& params, std::function<void(const byte_vector& ansBin)>&& sendAnswer){
+            secureCallback_(params, std::move(sendAnswer));
         });
     });
 }
 
-void HttpServer::inSession(HttpServerRequest *req, std::function<byte_vector(byte_vector& params)>&& processor) {
+void HttpServer::inSession(
+        HttpServerRequest *req,
+        std::function<void(
+                byte_vector& params,
+                std::function<void(const byte_vector& ansBin)>&& sendAnswer
+        )>&& processor) {
     try {
         auto res = req->parseMultipartData();
         UBinder binder = extractParams(res);
@@ -315,12 +322,13 @@ void HttpServer::inSession(HttpServerRequest *req, std::function<byte_vector(byt
         UBytes paramsBytes = UBytes::asInstance(paramsObj);
         byte_vector paramsBin = paramsBytes.get();
         byte_vector paramsBinDecrypted = session->sessionKey->decrypt(paramsBin);
-        byte_vector reqAnsBin = processor(paramsBinDecrypted);
-        byte_vector encryptedAns = session->sessionKey->encrypt(reqAnsBin);
-        UBinder result = UBinder::of("result", UBytes(std::move(encryptedAns)));
-        UBinder ans = UBinder::of("result", "ok","response", result);
-        req->setAnswerBody(BossSerializer::serialize(ans).get());
-        req->sendAnswerFromAnotherThread();
+        processor(paramsBinDecrypted, [session,req](const byte_vector& reqAnsBin){
+            byte_vector encryptedAns = session->sessionKey->encrypt(reqAnsBin);
+            UBinder result = UBinder::of("result", UBytes(std::move(encryptedAns)));
+            UBinder ans = UBinder::of("result", "ok","response", result);
+            req->setAnswerBody(BossSerializer::serialize(ans).get());
+            req->sendAnswerFromAnotherThread();
+        });
     } catch (const std::exception& e) {
         req->setStatusCode(500);
         UBinder ans = UBinder::of("result", "error","response", e.what());

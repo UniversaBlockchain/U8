@@ -478,8 +478,8 @@ public:
         });
     }
 
-    void addSecureEndpoint(const std::string &endpoint) {
-//        srv_.addSecureEndpoint(endpoint, [this](const UBinder& params) {
+    void addSecureCallback() {
+//        srv_.addSecureCallback([this](const byte_vector& paramsBin) {
 //            atomic<bool> needSend(false);
 //            {
 //                lock_guard lock(mutex_);
@@ -588,9 +588,9 @@ void httpServer_addEndpoint(const FunctionCallbackInfo<Value> &args) {
     });
 }
 
-void httpServer_addSecureEndpoint(const FunctionCallbackInfo<Value> &args) {
+void httpServer_addSecureCallback(const FunctionCallbackInfo<Value> &args) {
     Scripter::unwrapArgs(args, [](ArgsContext &ac) {
-        if (ac.args.Length() == 1) {
+        if (ac.args.Length() == 0) {
             auto httpServer = unwrap<HttpServerBuffered>(ac.args.This());
             std::shared_ptr<v8::Persistent<v8::Function>> jsCallback (
                     new v8::Persistent<v8::Function>(ac.isolate, ac.args[1].As<v8::Function>()), [](auto p){
@@ -599,7 +599,7 @@ void httpServer_addSecureEndpoint(const FunctionCallbackInfo<Value> &args) {
                     }
             );
             auto se = ac.scripter;
-            httpServer->addSecureEndpoint(ac.asString(0));
+            httpServer->addSecureCallback();
             return;
         }
         ac.throwError("invalid arguments");
@@ -635,7 +635,7 @@ Local<FunctionTemplate> initHttpServer(Isolate *isolate) {
     prototype->Set(isolate, "__startServer", FunctionTemplate::New(isolate, httpServer_startServer));
     prototype->Set(isolate, "__stopServer", FunctionTemplate::New(isolate, httpServer_stopServer));
     prototype->Set(isolate, "__addEndpoint", FunctionTemplate::New(isolate, httpServer_addEndpoint));
-    prototype->Set(isolate, "__addSecureEndpoint", FunctionTemplate::New(isolate, httpServer_addSecureEndpoint));
+    prototype->Set(isolate, "__addSecureCallback", FunctionTemplate::New(isolate, httpServer_addSecureCallback));
 
     HttpServerTpl.Reset(isolate, tpl);
     return tpl;

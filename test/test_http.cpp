@@ -30,6 +30,7 @@ TEST_CASE("http_hello") {
     });
     auto secureProcessor = [](UBinder& params){
         std::string command = params.getString("command");
+        printf("command: %s\n", command.c_str());
         if (command == "hello") {
             return UBinder::of("result", UBinder::of("status", "OK", "message", "welcome to the Universa"));
         } else if (command == "sping") {
@@ -44,12 +45,17 @@ TEST_CASE("http_hello") {
                 throw std::invalid_argument("unknown command: " + command);
         }
     };
-    httpServer.addSecureCallback([&secureProcessor](const byte_vector& paramsBin){
-        byte_vector paramsCopy(paramsBin);
-        UObject paramsUnpackedObj = BossSerializer::deserialize(UBytes(std::move(paramsCopy)));
-        UBinder params = UBinder::asInstance(paramsUnpackedObj);
-        UBinder reqAns = secureProcessor(params);
-        return BossSerializer::serialize(reqAns).get();
+    ThreadPool poolForSecureCallbacks(4);
+    httpServer.addSecureCallback([&secureProcessor,&poolForSecureCallbacks](
+            const byte_vector& paramsBin,
+            std::function<void(const byte_vector& ansBin)>&& sendAnswer){
+        poolForSecureCallbacks.execute([paramsBin,&secureProcessor,sendAnswer{std::move(sendAnswer)}](){
+            byte_vector paramsCopy(paramsBin);
+            UObject paramsUnpackedObj = BossSerializer::deserialize(UBytes(std::move(paramsCopy)));
+            UBinder params = UBinder::asInstance(paramsUnpackedObj);
+            UBinder reqAns = secureProcessor(params);
+            sendAnswer(BossSerializer::serialize(reqAns).get());
+        });
     });
     httpServer.start();
 
