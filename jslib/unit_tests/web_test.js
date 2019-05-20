@@ -12,6 +12,7 @@ unit.test("hello web", async () => {
         ++counter;
         let a = request.queryParamsMap.get('a');
         let b = request.queryParamsMap.get('b');
+        request.setHeader("Content-Type", "text/html");
         //console.log("queryString: " + request.queryString);
         request.setAnswerBody("httpServer: on /testPage counter="+(a*b+counter));
         request.sendAnswer();
@@ -24,10 +25,12 @@ unit.test("hello web", async () => {
         request.sendAnswer();
     });
     httpServer.addEndpoint("/ping", (request) => {
+        request.setHeader("Content-Type", "text/html");
         return {"ping": "pong", "val": some_undefined_var};
         //return {"ping": "pong"};
     });
-    httpServer.addRawEndpoint("/connect1", (request) => {
+    httpServer.addEndpoint("/connect1", (request) => {
+        request.setHeader("Content-Type", "text/html");
         console.log("js /connect");
         console.log("js /connect method: " + request.method);
         console.log("js /connect requestBody: " + Boss.load(request.requestBody));

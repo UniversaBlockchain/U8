@@ -17,6 +17,7 @@ static Persistent<FunctionTemplate> NetConfigTpl;
 static Persistent<FunctionTemplate> UDPAdapterTpl;
 static Persistent<FunctionTemplate> HttpServerTpl;
 static Persistent<FunctionTemplate> HttpServerRequestBufTpl;
+static Persistent<FunctionTemplate> HttpServerRequestSecureBufTpl;
 static Persistent<FunctionTemplate> HttpClientTpl;
 
 void nodeInfoGetPublicKey(const FunctionCallbackInfo<Value> &args) {
@@ -453,14 +454,61 @@ private:
     std::vector<HttpServerRequest*> buf_;
 };
 
+class HttpServerSecureRequestBuf {
+public:
+    void sendAnswer(int idx) {
+        //buf_.at(idx)->sendAnswerFromAnotherThread();
+    }
+    int getBufLength() {
+        return (int)buf_.size();
+    }
+    byte_vector getParamsBin(int idx) {
+        return buf_[idx];
+    }
+    void setAnswer(int idx, byte_vector&& ans) {
+        answers_[idx] = std::move(ans);
+    }
+public:
+    void addHttpServerSecureRequest(const byte_vector& paramsBin) {
+        buf_.emplace_back(paramsBin);
+    }
+    void resizeAnswersBuf() {
+        answers_.resize(buf_.size());
+    }
+    byte_vector getAnswer(int idx) {
+        return answers_[idx];
+    }
+private:
+    std::vector<byte_vector> buf_;
+    std::vector<byte_vector> answers_;
+};
+
 class HttpServerBuffered {
 public:
+
+    void initSecureEndpoint() {
+        srv_.addSecureCallback([this](const byte_vector& paramsBin, std::function<void(const byte_vector& ansBin)>&& sendAnswer){
+            atomic<bool> needSend(false);
+            {
+                lock_guard lock(mutex_);
+                bufSecure_.emplace_back(make_pair(paramsBin, std::move(sendAnswer)));
+                if (bufSecure_.size() >= bufSize_)
+                    needSend = true;
+            }
+            if (needSend) {
+                sendAllFromSecureBuf();
+            }
+        });
+    }
+
     HttpServerBuffered(std::string host, int port, int poolSize, int bufSize)
      : srv_(host, port, poolSize)
      , bufSize_(bufSize) {
         timer_.scheduleAtFixedRate([this](){
             sendAllFromBuf();
+            sendAllFromSecureBuf();
         }, 20, 20);
+        initSecureEndpoint();
     }
 
     void addEndpoint(const std::string &endpoint) {
@@ -478,21 +526,6 @@ public:
         });
     }
 
-    void addSecureCallback() {
-//        srv_.addSecureCallback([this](const byte_vector& paramsBin) {
-//            atomic<bool> needSend(false);
-//            {
-//                lock_guard lock(mutex_);
-//                buf_.emplace_back(req);
-//                if (buf_.size() >= bufSize_)
-//                    needSend = true;
-//            }
-//            if (needSend) {
-//                sendAllFromBuf();
-//            }
-//        });
-    }
-
     void setBufferedCallback(Persistent<Function>* pcb, shared_ptr<Scripter> se) {
         if (pcb_ != nullptr) {
             pcb_->Reset();
@@ -500,6 +533,15 @@ public:
         }
         pcb_ = pcb;
         se_ = se;
+    }
+
+    void setBufferedSecureCallback(Persistent<Function>* pcb, shared_ptr<Scripter> se) {
+        if (pcbSecure_ != nullptr) {
+            pcbSecure_->Reset();
+            delete pcbSecure_;
+        }
+        pcbSecure_ = pcb;
+        seSecure_ = se;
     }
 
 private:
@@ -511,7 +553,7 @@ private:
             se_->inPool([=](Local<Context> &context) {
                 auto fn = pcb_->Get(context->GetIsolate());
                 if (fn->IsNull()) {
-                    se_->throwError("null callback in setBufferedCallback");
+                    se_->throwError("null callback in sendAllFromBuf");
                 } else {
                     HttpServerRequestBuf* buf = new HttpServerRequestBuf();
                     for (int i = 0; i < bufCopy.size(); ++i)
@@ -523,16 +565,41 @@ private:
             });
         }
     }
+    void sendAllFromSecureBuf() {
+        lock_guard lock(mutex_);
+        if ((seSecure_ != nullptr) && (bufSecure_.size() > 0)) {
+            auto bufCopy = bufSecure_;
+            bufSecure_.clear();
+            seSecure_->inPool([=](Local<Context> &context) {
+                auto fn = pcbSecure_->Get(context->GetIsolate());
+                if (fn->IsNull()) {
+                    seSecure_->throwError("null callback in sendAllFromSecureBuf");
+                } else {
+                    HttpServerSecureRequestBuf* buf = new HttpServerSecureRequestBuf();
+                    for (int i = 0; i < bufCopy.size(); ++i)
+                        buf->addHttpServerSecureRequest(bufCopy[i].first);
+                    buf->resizeAnswersBuf();
+                    Local<Value> res[1] = {wrap(HttpServerRequestSecureBufTpl, seSecure_->isolate(), buf)};
+                    auto unused = fn->Call(context, fn, 1, res);
+                    for (int i = 0; i < bufCopy.size(); ++i)
+                        bufCopy[i].second(buf->getAnswer(i));
+                    delete buf;
+                }
+            });
+        }
+    }
 
 private:
     HttpServer srv_;
     std::vector<HttpServerRequest*> buf_;
-    std::vector<byte_vector> bufSecure_;
+    std::vector<pair<byte_vector, function<void(const byte_vector& ansBin)>>> bufSecure_;
     std::mutex mutex_;
     Persistent<Function>* pcb_ = nullptr;
     shared_ptr<Scripter> se_ = nullptr;
+    Persistent<Function>* pcbSecure_ = nullptr;
+    shared_ptr<Scripter> seSecure_ = nullptr;
     TimerThread timer_;
-    const int bufSize_ = 1;
+    const int bufSize_;
 };
 
 void httpServer_setBufferedCallback(const FunctionCallbackInfo<Value> &args) {
@@ -541,6 +608,18 @@ void httpServer_setBufferedCallback(const FunctionCallbackInfo<Value> &args) {
             auto httpServer = unwrap<HttpServerBuffered>(args.This());
             Persistent<Function> *pcb = new Persistent<Function>(isolate, args[0].As<Function>());
             httpServer->setBufferedCallback(pcb, se);
+            return;
+        }
+        se->throwError("invalid arguments");
+    });
+}
+
+void httpServer_setBufferedSecureCallback(const FunctionCallbackInfo<Value> &args) {
+    Scripter::unwrap(args, [&](const shared_ptr<Scripter> se, auto isolate, auto context) {
+        if (args.Length() == 1) {
+            auto httpServer = unwrap<HttpServerBuffered>(args.This());
+            Persistent<Function> *pcb = new Persistent<Function>(isolate, args[0].As<Function>());
+            httpServer->setBufferedSecureCallback(pcb, se);
             return;
         }
         se->throwError("invalid arguments");
@@ -574,32 +653,7 @@ void httpServer_addEndpoint(const FunctionCallbackInfo<Value> &args) {
     Scripter::unwrapArgs(args, [](ArgsContext &ac) {
         if (ac.args.Length() == 1) {
             auto httpServer = unwrap<HttpServerBuffered>(ac.args.This());
-            std::shared_ptr<v8::Persistent<v8::Function>> jsCallback (
-                    new v8::Persistent<v8::Function>(ac.isolate, ac.args[1].As<v8::Function>()), [](auto p){
-                        p->Reset();
-                        delete p;
-                    }
-            );
-            auto se = ac.scripter;
             httpServer->addEndpoint(ac.asString(0));
-            return;
-        }
-        ac.throwError("invalid arguments");
-    });
-}
-
-void httpServer_addSecureCallback(const FunctionCallbackInfo<Value> &args) {
-    Scripter::unwrapArgs(args, [](ArgsContext &ac) {
-        if (ac.args.Length() == 0) {
-            auto httpServer = unwrap<HttpServerBuffered>(ac.args.This());
-            std::shared_ptr<v8::Persistent<v8::Function>> jsCallback (
-                    new v8::Persistent<v8::Function>(ac.isolate, ac.args[1].As<v8::Function>()), [](auto p){
-                        p->Reset();
-                        delete p;
-                    }
-            );
-            auto se = ac.scripter;
-            httpServer->addSecureCallback();
             return;
         }
         ac.throwError("invalid arguments");
@@ -632,10 +686,10 @@ Local<FunctionTemplate> initHttpServer(Isolate *isolate) {
             });
     auto prototype = tpl->PrototypeTemplate();
     prototype->Set(isolate, "__setBufferedCallback", FunctionTemplate::New(isolate, httpServer_setBufferedCallback));
+    prototype->Set(isolate, "__setBufferedSecureCallback", FunctionTemplate::New(isolate, httpServer_setBufferedSecureCallback));
     prototype->Set(isolate, "__startServer", FunctionTemplate::New(isolate, httpServer_startServer));
     prototype->Set(isolate, "__stopServer", FunctionTemplate::New(isolate, httpServer_stopServer));
     prototype->Set(isolate, "__addEndpoint", FunctionTemplate::New(isolate, httpServer_addEndpoint));
-    prototype->Set(isolate, "__addSecureCallback", FunctionTemplate::New(isolate, httpServer_addSecureCallback));
 
     HttpServerTpl.Reset(isolate, tpl);
     return tpl;
@@ -773,6 +827,7 @@ Local<FunctionTemplate> initHttpClient(Isolate *isolate) {
 void JsInitNetwork(Isolate *isolate, const Local<ObjectTemplate> &global) {
 
     JsInitHttpServerRequest(isolate, global);
+    JsInitHttpServerSecureRequest(isolate, global);
 
     auto network = ObjectTemplate::New(isolate);
 
@@ -908,4 +963,56 @@ void JsInitHttpServerRequest(Isolate *isolate, const Local<ObjectTemplate> &glob
     // register it into global namespace
     HttpServerRequestBufTpl.Reset(isolate, tpl);
     global->Set(isolate, "HttpServerRequestBuf", tpl);
+}
+
+void HttpServerSecureRequestBuf_getBufLength(const FunctionCallbackInfo<Value> &args) {
+    Scripter::unwrapArgs(args, [](ArgsContext &ac) {
+        if (ac.args.Length() == 0) {
+            auto httpServerSecureRequestBuf = unwrap<HttpServerSecureRequestBuf>(ac.args.This());
+            ac.setReturnValue(httpServerSecureRequestBuf->getBufLength());
+            return;
+        }
+        ac.throwError("invalid arguments");
+    });
+}
+
+void HttpServerSecureRequestBuf_getParamsBin(const FunctionCallbackInfo<Value> &args) {
+    Scripter::unwrapArgs(args, [](ArgsContext &ac) {
+        if (ac.args.Length() == 1) {
+            auto httpServerSecureRequestBuf = unwrap<HttpServerSecureRequestBuf>(ac.args.This());
+            ac.setReturnValue(ac.toBinary(httpServerSecureRequestBuf->getParamsBin(ac.asInt(0))));
+            return;
+        }
+        ac.throwError("invalid arguments");
+    });
+}
+
+void HttpServerSecureRequestBuf_setAnswer(const FunctionCallbackInfo<Value> &args) {
+    Scripter::unwrapArgs(args, [](ArgsContext &ac) {
+        if (ac.args.Length() == 2) {
+            auto httpServerSecureRequestBuf = unwrap<HttpServerSecureRequestBuf>(ac.args.This());
+            auto contents = ac.args[1].As<TypedArray>()->Buffer()->GetContents();
+            byte_vector bv(contents.ByteLength());
+            memcpy(&bv[0], contents.Data(), contents.ByteLength());
+            httpServerSecureRequestBuf->setAnswer(ac.asInt(0), std::move(bv));
+            return;
+        }
+        ac.throwError("invalid arguments");
+    });
+}
+
+void JsInitHttpServerSecureRequest(Isolate *isolate, const Local<ObjectTemplate> &global) {
+    // Bind object with default constructor
+    Local<FunctionTemplate> tpl = bindCppClass<HttpServerSecureRequestBuf>(isolate, "HttpServerSecureRequestBuf");
+
+    // instance methods
+    auto prototype = tpl->PrototypeTemplate();
+    prototype->Set(isolate, "version", String::NewFromUtf8(isolate, "0.0.1"));
+    prototype->Set(isolate, "getBufLength", FunctionTemplate::New(isolate, HttpServerSecureRequestBuf_getBufLength));
+    prototype->Set(isolate, "getParamsBin", FunctionTemplate::New(isolate, HttpServerSecureRequestBuf_getParamsBin));
+    prototype->Set(isolate, "setAnswer", FunctionTemplate::New(isolate, HttpServerSecureRequestBuf_setAnswer));
+
+    // register it into global namespace
+    HttpServerRequestSecureBufTpl.Reset(isolate, tpl);
+    global->Set(isolate, "HttpServerSecureRequestBuf", tpl);
 }

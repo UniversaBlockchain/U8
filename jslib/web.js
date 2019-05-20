@@ -200,6 +200,26 @@ network.HttpServer = class {
                 }
             }
         });
+        this.httpServer_.__setBufferedSecureCallback((reqBuf) => {
+            let length = reqBuf.getBufLength();
+            for (let i = 0; i < length; ++i) {
+                let params = Boss.load(reqBuf.getParamsBin(i));
+                switch (params.command) {
+                    case "hello":
+                        reqBuf.setAnswer(0, Boss.dump({result: {status: "OK", message: "welcome to the Universa"}}));
+                        break;
+                    case "sping":
+                        reqBuf.setAnswer(0, Boss.dump({result: {sping: "spong"}}));
+                        break;
+                    case "test_error":
+                        throw new Error("sample error");
+                        break;
+                    case "setVerbose":
+                        reqBuf.setAnswer(0, Boss.dump({result: {itemResult: "setVerbose not implemented"}}));
+                        break;
+                }
+            }
+        });
     }
 
     startServer() {
@@ -221,7 +241,7 @@ network.HttpServer = class {
             try {
                 request.setAnswerBody(Boss.dump({
                     "result": "ok",
-                    "response": block()
+                    "response": block(request)
                 }));
             } catch (e) {
                 request.setAnswerBody(Boss.dump({
