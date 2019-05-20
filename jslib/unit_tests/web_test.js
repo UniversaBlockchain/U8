@@ -1,5 +1,5 @@
 import {expect, unit, assert, assertSilent} from 'test'
-import {HttpServer} from 'udp_adapter'
+import {HttpServer} from 'web'
 import * as tk from 'unit_tests/test_keys'
 const Boss = require('boss.js');
 

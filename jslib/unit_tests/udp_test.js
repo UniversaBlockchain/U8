@@ -1,5 +1,5 @@
 import {expect, unit, assert, assertSilent} from 'test'
-import {NodeInfo} from 'udp_adapter'
+import {NodeInfo} from 'web'
 import * as tk from 'unit_tests/test_keys'
 
 unit.test("hello network", async () => {

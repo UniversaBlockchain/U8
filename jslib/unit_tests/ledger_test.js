@@ -3,7 +3,7 @@ import {Ledger} from 'ledger'
 import {HashId} from 'crypto'
 import {randomBytes} from 'tools'
 import * as tk from 'unit_tests/test_keys'
-import {NodeInfo, NetConfig} from 'udp_adapter'
+import {NodeInfo, NetConfig} from 'web'
 
 const ItemState = require("itemstate").ItemState;
 const ex = require("exceptions");

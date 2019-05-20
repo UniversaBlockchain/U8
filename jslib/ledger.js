@@ -1,7 +1,7 @@
 import * as db from 'pg_driver'
 import * as trs from 'timers'
 import {HashId, PrivateKey} from 'crypto'
-import {NodeInfo, NetConfig} from 'udp_adapter'
+import {NodeInfo, NetConfig} from 'web'
 
 const StateRecord = require("staterecord").StateRecord;
 const ItemState = require("itemstate").ItemState;
