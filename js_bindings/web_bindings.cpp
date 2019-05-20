@@ -2,7 +2,7 @@
 // Created by Leonid Novikov on 4/8/19.
 //
 
-#include "udp_bindings.h"
+#include "web_bindings.h"
 #include "binding_tools.h"
 #include "../network/HttpServer.h"
 #include "../network/HttpClient.h"

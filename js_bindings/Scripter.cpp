@@ -12,7 +12,7 @@
 #include "basic_builtins.h"
 #include "async_io_bindings.h"
 #include "pg_bindings.h"
-#include "udp_bindings.h"
+#include "web_bindings.h"
 
 static const char *ARGV0 = nullptr;
 
