@@ -13,13 +13,14 @@ const tt = require("test_tools");
 const Constraint = require('constraint').Constraint;
 const TransactionPack = require("transactionpack").TransactionPack;
 const BigDecimal  = require("big").Big;
+const NSmartContract = require("services/NSmartContract").NSmartContract;
 const FollowerContract = require("services/followerContract").FollowerContract;
 const SlotContract = require("services/slotContract").SlotContract;
 const UnsContract = require("services/unsContract").UnsContract;
 
 const root_path = "../test/contractsservice/";
 
-async function checkCreateParcel(contract_file_payload, contract_file_payment) {
+async function checkCreateParcel(contract_file_payload, contract_file_payment, checkGood = false) {
     let privateKey = tk.TestKeys.getKey();
 
     let payment = await Contract.fromDslFile(root_path + contract_file_payment);
@@ -36,6 +37,9 @@ async function checkCreateParcel(contract_file_payload, contract_file_payment) {
 
     assert(parcel.getPaymentContract().state.branchId === payment.state.branchId);
     assert(parcel.getPaymentContract().definition.data.equals(payment.definition.data));
+
+    if (checkGood)
+        assert(parcel.getPaymentContract().state.data.transaction_units === 100 - 20);
 }
 
 async function checkCreateParcelFotTestNet(contract_file_payload) {
@@ -53,6 +57,48 @@ async function checkCreateParcelFotTestNet(contract_file_payload) {
 
     assert(parcel.getPaymentContract().state.data.transaction_units === 100);
     assert(parcel.getPaymentContract().state.data.test_transaction_units === 10000 - 20);
+}
+
+async function checkCreatePayingParcel(contract_file_payload, contract_file_payment, checkGood = false) {
+    let privateKey = tk.TestKeys.getKey();
+
+    let payment = await Contract.fromDslFile(root_path + contract_file_payment);
+    payment.keysToSignWith.add(privateKey);
+    await payment.seal(true);
+
+    let payload = await Contract.fromDslFile(root_path + contract_file_payload);
+    payload.keysToSignWith.add(privateKey);
+    await payload.seal(true);
+
+    let parcel = await cs.createPayingParcel(payload.transactionPack, payment, 20, 30, [privateKey]);
+
+    tt.assertSameContracts(parcel.getPayloadContract(), payload);
+
+    assert(parcel.getPaymentContract().state.branchId === payment.state.branchId);
+    assert(parcel.getPaymentContract().definition.data.equals(payment.definition.data));
+
+    if (checkGood) {
+        assert(parcel.getPaymentContract().state.data.transaction_units === 100 - 20);
+        assert(Array.from(parcel.getPayloadContract().newItems)[0].state.data.transaction_units === 100 - 20 - 30);
+    }
+}
+
+async function checkCreatePayingParcelFotTestNet(contract_file_payload) {
+    let privateKey = tk.TestKeys.getKey();
+
+    let payload = await Contract.fromDslFile(root_path + contract_file_payload);
+    payload.keysToSignWith.add(privateKey);
+    await payload.seal(true);
+
+    let payment = await tt.createFreshU(100, [privateKey.publicKey], true);
+
+    let parcel = await cs.createPayingParcel(payload.transactionPack, payment, 20, 30, [privateKey], true);
+
+    tt.assertSameContracts(parcel.getPayloadContract(), payload);
+
+    assert(parcel.getPaymentContract().state.data.transaction_units === 100);
+    assert(parcel.getPaymentContract().state.data.test_transaction_units === 10000 - 20);
+    assert(Array.from(parcel.getPayloadContract().newItems)[0].state.data.test_transaction_units === 10000 - 20 - 30);
 }
 
 async function simpleCheckContract(contract, issuerKey, ownerKey) {
@@ -110,7 +156,7 @@ unit.test("contractsservice_test: goodRevoke", async () => {
 });
 
 unit.test("contractsservice_test: checkCreateGoodParcel", async () => {
-    await checkCreateParcel("simple_root_contract.yml", "simple_root_contract.yml");
+    await checkCreateParcel("simple_root_contract.yml", "simple_root_contract.yml", true);
 });
 
 unit.test("contractsservice_test: checkCreateParcelBadPayload", async () => {
@@ -123,6 +169,22 @@ unit.test("contractsservice_test: checkCreateParcelBadPayment", async () => {
 
 unit.test("contractsservice_test: checkCreateGoodParcelForTestNet", async () => {
     await checkCreateParcelFotTestNet("simple_root_contract.yml");
+});
+
+unit.test("contractsservice_test: checkCreateGoodPayingParcel", async () => {
+    await checkCreatePayingParcel("simple_root_contract.yml", "simple_root_contract.yml", true);
+});
+
+unit.test("contractsservice_test: checkCreatePayingParcelBadPayload", async () => {
+    await checkCreatePayingParcel("bad_contract_payload.yml", "simple_root_contract.yml");
+});
+
+unit.test("contractsservice_test: checkCreatePayingParcelBadPayment", async () => {
+    await checkCreatePayingParcel("simple_root_contract.yml","bad_contract_payment.yml");
+});
+
+unit.test("contractsservice_test: checkCreateGoodPayingParcelForTestNet", async () => {
+    await checkCreatePayingParcelFotTestNet("simple_root_contract.yml");
 });
 
 unit.test("contractsservice_test: createU", async () => {
@@ -558,6 +620,8 @@ unit.test("contractsservice_test: createSlotContract", async () => {
 
     await simpleCheckContract(slotContract, key1, key2);
 
+    assert(slotContract.definition.extendedType === NSmartContract.SmartContractType.SLOT1);
+
     let mdp = slotContract.definition.permissions.get("modify_data");
     assert(mdp != null);
     assert(mdp instanceof Array);
@@ -580,6 +644,8 @@ unit.test("contractsservice_test: createUnsContract", async () => {
     let unsContract = await cs.createUnsContract([key1], [key2.publicKey], tt.createNodeInfoProvider());
 
     await simpleCheckContract(unsContract, key1, key2);
+
+    assert(unsContract.definition.extendedType === NSmartContract.SmartContractType.UNS1);
 
     let mdp = unsContract.definition.permissions.get("modify_data");
     assert(mdp !== null);
@@ -609,6 +675,22 @@ unit.test("contractsservice_test: createUnsContractForRegisterContractName", asy
 
     await simpleCheckContract(unsContract, key1, key2);
 
+    assert(unsContract.definition.extendedType === NSmartContract.SmartContractType.UNS1);
+
+    let mdp = unsContract.definition.permissions.get("modify_data");
+    assert(mdp !== null);
+    assert(mdp instanceof Array);
+    assert(mdp[0].fields.hasOwnProperty("action"));
+    assert(mdp[0].fields.hasOwnProperty("/expires_at"));
+    assert(mdp[0].fields.hasOwnProperty("/references"));
+    assert(mdp[0].fields.hasOwnProperty(UnsContract.NAMES_FIELD_NAME));
+    assert(mdp[0].fields.hasOwnProperty(UnsContract.PAID_U_FIELD_NAME));
+    assert(mdp[0].fields.hasOwnProperty(UnsContract.PREPAID_ND_FIELD_NAME));
+    assert(mdp[0].fields.hasOwnProperty(UnsContract.PREPAID_ND_FROM_TIME_FIELD_NAME));
+    assert(mdp[0].fields.hasOwnProperty(UnsContract.STORED_ENTRIES_FIELD_NAME));
+    assert(mdp[0].fields.hasOwnProperty(UnsContract.SPENT_ND_FIELD_NAME));
+    assert(mdp[0].fields.hasOwnProperty(UnsContract.SPENT_ND_TIME_FIELD_NAME));
+
     assert(unsContract.getUnsName("testUnsContract").unsName === "testUnsContract");
     assert(unsContract.getUnsName("testUnsContract").unsDescription === "test description");
     assert(unsContract.getUnsName("testUnsContract").unsURL === "http://test.com");
@@ -627,6 +709,22 @@ unit.test("contractsservice_test: createUnsContractForRegisterKeyName", async ()
 
     await simpleCheckContract(unsContract, key1, key2);
 
+    assert(unsContract.definition.extendedType === NSmartContract.SmartContractType.UNS1);
+
+    let mdp = unsContract.definition.permissions.get("modify_data");
+    assert(mdp !== null);
+    assert(mdp instanceof Array);
+    assert(mdp[0].fields.hasOwnProperty("action"));
+    assert(mdp[0].fields.hasOwnProperty("/expires_at"));
+    assert(mdp[0].fields.hasOwnProperty("/references"));
+    assert(mdp[0].fields.hasOwnProperty(UnsContract.NAMES_FIELD_NAME));
+    assert(mdp[0].fields.hasOwnProperty(UnsContract.PAID_U_FIELD_NAME));
+    assert(mdp[0].fields.hasOwnProperty(UnsContract.PREPAID_ND_FIELD_NAME));
+    assert(mdp[0].fields.hasOwnProperty(UnsContract.PREPAID_ND_FROM_TIME_FIELD_NAME));
+    assert(mdp[0].fields.hasOwnProperty(UnsContract.STORED_ENTRIES_FIELD_NAME));
+    assert(mdp[0].fields.hasOwnProperty(UnsContract.SPENT_ND_FIELD_NAME));
+    assert(mdp[0].fields.hasOwnProperty(UnsContract.SPENT_ND_TIME_FIELD_NAME));
+
     assert(unsContract.getUnsName("testUnsContract").findUnsRecordByKey(namedKey.publicKey) !== -1);
     assert(unsContract.getUnsName("testUnsContract").findUnsRecordByAddress(new crypto.KeyAddress(namedKey.publicKey, 0, true)) !== -1);
     assert(unsContract.getUnsName("testUnsContract").findUnsRecordByAddress(new crypto.KeyAddress(namedKey.publicKey, 0, false)) !== -1);
@@ -639,6 +737,8 @@ unit.test("contractsservice_test: createFollowerContract", async () => {
     let followerContract = await cs.createFollowerContract([key1], [key2.publicKey], tt.createNodeInfoProvider());
 
     await simpleCheckContract(followerContract, key1, key2);
+
+    assert(followerContract.definition.extendedType === NSmartContract.SmartContractType.FOLLOWER1);
 
     let mdp = followerContract.definition.permissions.get("modify_data");
     assert(mdp !== null);
@@ -654,4 +754,133 @@ unit.test("contractsservice_test: createFollowerContract", async () => {
     assert(mdp[0].fields.hasOwnProperty(FollowerContract.CALLBACK_RATE_FIELD_NAME));
     assert(mdp[0].fields.hasOwnProperty(FollowerContract.TRACKING_ORIGINS_FIELD_NAME));
     assert(mdp[0].fields.hasOwnProperty(FollowerContract.CALLBACK_KEYS_FIELD_NAME));
+});
+
+unit.test("contractsservice_test: addConstraintToContract", async () => {
+    let key = new crypto.PrivateKey(await (await io.openRead("../test/_xer0yfe2nn1xthc.private.unikey")).allBytes());
+
+    let c = await Contract.fromDslFile("../test/simple_root_contract.yml");
+    c.definition.data.const = "qwerty";
+    c.keysToSignWith.add(key);
+    await c.seal(true);
+    assert(await c.check());
+
+    let ref = Contract.fromPrivateKey(key);
+    await ref.seal(true);
+    assert(await ref.check());
+
+    await cs.addConstraintToContract(c, ref, "testConstraint", Constraint.TYPE_EXISTING_STATE,
+        ["this.definition.data.const == ref.state.data.value"], true);
+
+    let c1 = c.findConstraintByName("testConstraint");
+    let c2 = c.findConstraintByNameInSection("testConstraint", "state");
+    let c3 = c.constraints.get("testConstraint");
+
+    assert(c1.equals(c2));
+    assert(c2.equals(c3));
+    assert(c.findConstraintByNameInSection("testConstraint", "definition") == null);
+    assert(c.findConstraintByNameInSection("testConstraint", "transactional") == null);
+    assert(c.state.constraints.has(c1));
+    assert(!c.definition.constraints.has(c1));
+
+    c1.matchingItems.clear();
+
+    assert(!await c.check());
+
+    ref.state.data.value = "qwerty";
+    assert(await c.check());
+});
+
+unit.test("contractsservice_test: createBatch", async () => {
+    let key1 = tk.TestKeys.getKey();
+    let key2 = tk.TestKeys.getKey();
+    let key3 = tk.TestKeys.getKey();
+
+    let c1 = Contract.fromPrivateKey(key1);
+    await c1.seal(true);
+    assert(await c1.check());
+
+    let c2 = Contract.fromPrivateKey(key2);
+    await c2.seal(true);
+    assert(await c2.check());
+
+    let batch = await cs.createBatch([key1, key2], c1, c2);
+
+    assert(await batch.check());
+
+    assert(batch.newItems.has(c1));
+    assert(batch.newItems.has(c2));
+    assert(batch.keysToSignWith.has(key1));
+    assert(batch.keysToSignWith.has(key2));
+
+    assert(batch.roles.owner.isAllowedForKeys([key1, key2]));
+    assert(batch.roles.issuer.isAllowedForKeys([key1, key2]));
+    assert(batch.roles.creator.isAllowedForKeys([key1, key2]));
+
+    assert(!batch.roles.owner.isAllowedForKeys([key3]));
+    assert(!batch.roles.issuer.isAllowedForKeys([key3]));
+    assert(!batch.roles.creator.isAllowedForKeys([key3]));
+
+    let date = new Date();
+    date.setDate(date.getDate() + 2);
+    assert(batch.getExpiresAt().getTime() > date.getTime());
+    assert(batch.definition.createdAt.getTime() < Date.now());
+});
+
+unit.test("contractsservice_test: addConsent", async () => {
+    let key1 = tk.TestKeys.getKey();
+    let key2 = tk.TestKeys.getKey();
+
+    let contract = Contract.fromPrivateKey(key1);
+    await contract.seal(true);
+    assert(await contract.check());
+
+    let consent = await cs.addConsent(contract, key2.shortAddress);
+
+    assert(!await consent.check());
+
+    await contract.seal(true);
+    assert(!await contract.check());
+
+    await consent.addSignatureToSeal(key2);
+
+    assert(await consent.check());
+
+    contract.newItems.add(consent);
+
+    await contract.seal(true);
+    assert(await contract.check());
+
+    assert(consent.roles.owner.isAllowedForKeys([key2]));
+    assert(consent.roles.issuer.isAllowedForKeys([key2]));
+    assert(consent.roles.creator.isAllowedForKeys([key2]));
+
+    assert(!consent.roles.owner.isAllowedForKeys([key1]));
+    assert(!consent.roles.issuer.isAllowedForKeys([key1]));
+    assert(!consent.roles.creator.isAllowedForKeys([key1]));
+
+    let date = new Date();
+    date.setDate(date.getDate() + 9);
+    assert(consent.getExpiresAt().getTime() > date.getTime());
+    assert(consent.definition.createdAt.getTime() < Date.now());
+
+    assert(consent.isPermitted("revoke", [key2]));
+    assert(!consent.isPermitted("revoke", [key1]));
+
+    assert(consent.isPermitted("change_owner", [key2]));
+    assert(!consent.isPermitted("change_owner", [key1]));
+});
+
+unit.test("contractsservice_test: createRateLimitDisablingContract", async () => {
+    let privateKey = tk.TestKeys.getKey();
+    let unlimitKey = tk.TestKeys.getKey();
+
+    let payment = await tt.createFreshU(100, [privateKey.publicKey], false);
+
+    let rateLimitDisabling = await cs.createRateLimitDisablingContract(unlimitKey.publicKey, payment, 80, [privateKey]);
+
+    assert(await rateLimitDisabling.check());
+
+    assert(rateLimitDisabling.transactional.data.unlimited_key.equals(unlimitKey.publicKey.packed));
+    assert(rateLimitDisabling.state.data.transaction_units === 20);
 });

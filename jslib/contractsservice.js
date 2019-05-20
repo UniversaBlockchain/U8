@@ -886,7 +886,7 @@ async function addConstraintWithConditionsToContract(baseContract, refContract, 
     constr.addMatchingItem(refContract);
 
     baseContract.addConstraint(constr);
-    await baseContract.seal();
+    await baseContract.seal(true);
 
     return baseContract;
 }
@@ -984,7 +984,7 @@ async function createParcel(payload, payment, amount, keys, withTestPayment = fa
  * @param {boolean} withTestPayment - If true {@link Parcel} will be created with test payment.
  * @return {Parcel} Parcel, it ready to send to the Universa.
  */
-async function createPayingParcel(payload, payment, amount, amountSecond, keys, withTestPayment) {
+async function createPayingParcel(payload, payment, amount, amountSecond, keys, withTestPayment = false) {
 
     let paymentDecreased = payment.createRevision(keys);
 
@@ -994,6 +994,7 @@ async function createPayingParcel(payload, payment, amount, amountSecond, keys, 
         paymentDecreased.state.data.transaction_units = payment.state.data.transaction_units - amount;
 
     await paymentDecreased.seal(true);
+    let paymentPack = paymentDecreased.transactionPack;
 
     let paymentDecreasedSecond = paymentDecreased.createRevision(keys);
 
@@ -1007,10 +1008,10 @@ async function createPayingParcel(payload, payment, amount, amountSecond, keys, 
     // we add new item to the contract, so we need to recreate transaction pack
     let mainContract = payload.contract;
     mainContract.newItems.add(paymentDecreasedSecond);
-    await mainContract.seal();
+    await mainContract.seal(true);
     mainContract.transactionPack.extractAllSubItemsAndReferenced(mainContract);
 
-    return new Parcel(mainContract.transactionPack, paymentDecreased.transactionPack);
+    return new Parcel(mainContract.transactionPack, paymentPack);
 }
 
 /**
@@ -1045,8 +1046,7 @@ async function createBatch(keys, ...contracts) {
 /**
  * Update source contract so it can not be registered without valid Consent contract, created in this call.
  * To register the source contract therefore it is needed to sign the consent with all keys which addresses
- * are specified with the call, and register consent contract separately or in the same batch with the source
- * contract.
+ * are specified with the call, and register consent contract separately or in the same batch with the source contract.
  *
  * @param {Contract} source - Contract to update. Must not be registered (new root or new revision).
  * @param {...crypto.KeyAddress} consentKeyAddresses - Addresses that are required in the consent contract.
@@ -1064,8 +1064,8 @@ async function addConsent(source, ...consentKeyAddresses) {
 
     let ownerLink = new roles.RoleLink("@owner_link","owner");
     consent.registerRole(ownerLink);
-    consent.addPermission(new perms.RevokePermission(ownerLink));
-    consent.addPermission(new perms.ChangeOwnerPermission(ownerLink));
+    consent.definition.addPermission(new perms.RevokePermission(ownerLink));
+    consent.definition.addPermission(new perms.ChangeOwnerPermission(ownerLink));
     consent.createTransactionalSection();
     consent.transactional.id = HashId.of(randomBytes(64)).base64;
 

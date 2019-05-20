@@ -578,7 +578,7 @@ class Contract extends bs.BiSerializable {
      * Get contract constraint with given name.
      *
      * @param {string} name - Name of the constraint.
-     * @return {string|null} found constraint or null.
+     * @return {Constraint | null} found constraint or null.
      */
     findConstraintByName(name) {
         return this.constraints.get(name);
@@ -589,7 +589,7 @@ class Contract extends bs.BiSerializable {
      *
      * @param {string} name - Name of the constraint.
      * @param {string} section - Section to search in.
-     * @return found constraint or null.
+     * @return {Constraint | null} found constraint or null.
      */
     findConstraintByNameInSection(name, section) {
         if (section === "definition") {
@@ -1499,7 +1499,8 @@ class Contract extends bs.BiSerializable {
             let c_check = false;
             if (c.type === Constraint.TYPE_TRANSACTIONAL) {
                 for (let neighbour of neighbours)
-                    if ((((c.transactional_id != null && neighbour.transactional != null && c.transactional_id.equals(neighbour.transactional.id)) ||
+                    if ((((c.transactional_id != null && neighbour.transactional != null && neighbour.transactional.id != null &&
+                        c.transactional_id.equals(neighbour.transactional.id)) ||
                         (c.contract_id != null && c.contract_id.equals(neighbour.id))) && this.checkOneConstraint(c, neighbour)) ||
                         (c.conditions.length > 0))    // new format of constraint with conditions, transactional_id - optional
                         if (c.isMatchingWith(neighbour, neighbours)) {
