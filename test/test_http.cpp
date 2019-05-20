@@ -11,6 +11,7 @@
 #include "../crypto/PrivateKey.h"
 #include "../crypto/PublicKey.h"
 #include "../crypto/base64.h"
+#include "../serialization/BossSerializer.h"
 
 using namespace std;
 using namespace network;
@@ -27,9 +28,28 @@ TEST_CASE("http_hello") {
         request->setAnswerBody(answer + ", encrypted: " + base64_encode(publicKey.encrypt(bv)));
         request->sendAnswerFromAnotherThread();
     });
-    httpServer.addSecureEndpoint("setVerbose", [&counter,&publicKey](const UBinder& params){
-        printf("secureEndpoint: setVerbose\n");
-        return UBinder::of("result", UBinder::of("itemResult", "setVerbose not implemented in cpp tests"));
+    auto secureProcessor = [](UBinder& params){
+        std::string command = params.getString("command");
+        if (command == "hello") {
+            return UBinder::of("result", UBinder::of("status", "OK", "message", "welcome to the Universa"));
+        } else if (command == "sping") {
+            return UBinder::of("result", UBinder::of("sping", "spong"));
+        } else if (command == "test_error") {
+            throw std::invalid_argument("sample error");
+        } else {
+            if (command == "setVerbose") {
+                printf("secureEndpoint: setVerbose\n");
+                return UBinder::of("result", UBinder::of("itemResult", "setVerbose not implemented in cpp tests"));
+            } else
+                throw std::invalid_argument("unknown command: " + command);
+        }
+    };
+    httpServer.addSecureCallback([&secureProcessor](const byte_vector& paramsBin){
+        byte_vector paramsCopy(paramsBin);
+        UObject paramsUnpackedObj = BossSerializer::deserialize(UBytes(std::move(paramsCopy)));
+        UBinder params = UBinder::asInstance(paramsUnpackedObj);
+        UBinder reqAns = secureProcessor(params);
+        return BossSerializer::serialize(reqAns).get();
     });
     httpServer.start();
 

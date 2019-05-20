@@ -478,6 +478,21 @@ public:
         });
     }
 
+    void addSecureEndpoint(const std::string &endpoint) {
+//        srv_.addSecureEndpoint(endpoint, [this](const UBinder& params) {
+//            atomic<bool> needSend(false);
+//            {
+//                lock_guard lock(mutex_);
+//                buf_.emplace_back(req);
+//                if (buf_.size() >= bufSize_)
+//                    needSend = true;
+//            }
+//            if (needSend) {
+//                sendAllFromBuf();
+//            }
+//        });
+    }
+
     void setBufferedCallback(Persistent<Function>* pcb, shared_ptr<Scripter> se) {
         if (pcb_ != nullptr) {
             pcb_->Reset();
@@ -512,6 +527,7 @@ private:
 private:
     HttpServer srv_;
     std::vector<HttpServerRequest*> buf_;
+    std::vector<byte_vector> bufSecure_;
     std::mutex mutex_;
     Persistent<Function>* pcb_ = nullptr;
     shared_ptr<Scripter> se_ = nullptr;
@@ -572,6 +588,24 @@ void httpServer_addEndpoint(const FunctionCallbackInfo<Value> &args) {
     });
 }
 
+void httpServer_addSecureEndpoint(const FunctionCallbackInfo<Value> &args) {
+    Scripter::unwrapArgs(args, [](ArgsContext &ac) {
+        if (ac.args.Length() == 1) {
+            auto httpServer = unwrap<HttpServerBuffered>(ac.args.This());
+            std::shared_ptr<v8::Persistent<v8::Function>> jsCallback (
+                    new v8::Persistent<v8::Function>(ac.isolate, ac.args[1].As<v8::Function>()), [](auto p){
+                        p->Reset();
+                        delete p;
+                    }
+            );
+            auto se = ac.scripter;
+            httpServer->addSecureEndpoint(ac.asString(0));
+            return;
+        }
+        ac.throwError("invalid arguments");
+    });
+}
+
 Local<FunctionTemplate> initHttpServer(Isolate *isolate) {
     Local<FunctionTemplate> tpl = bindCppClass<HttpServerBuffered>(
             isolate,
@@ -601,6 +635,7 @@ Local<FunctionTemplate> initHttpServer(Isolate *isolate) {
     prototype->Set(isolate, "__startServer", FunctionTemplate::New(isolate, httpServer_startServer));
     prototype->Set(isolate, "__stopServer", FunctionTemplate::New(isolate, httpServer_stopServer));
     prototype->Set(isolate, "__addEndpoint", FunctionTemplate::New(isolate, httpServer_addEndpoint));
+    prototype->Set(isolate, "__addSecureEndpoint", FunctionTemplate::New(isolate, httpServer_addSecureEndpoint));
 
     HttpServerTpl.Reset(isolate, tpl);
     return tpl;

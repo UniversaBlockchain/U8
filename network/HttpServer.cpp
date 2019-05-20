@@ -175,12 +175,12 @@ void HttpServer::addEndpoint(const std::string& endpoint, std::function<void(Htt
     service_.addEndpoint(endpoint, std::move(callback));
 }
 
-void HttpServer::addSecureEndpoint(const std::string& endpoint, const std::function<UBinder(const UBinder& params)>& callback) {
-    secureEndpoints_[endpoint] = callback;
+void HttpServer::addSecureCallback(const std::function<byte_vector(const byte_vector& params)>& callback) {
+    secureCallback_ = callback;
 }
 
-void HttpServer::addSecureEndpoint(const std::string& endpoint, std::function<UBinder(const UBinder& params)>&& callback) {
-    secureEndpoints_[endpoint] = std::move(callback);
+void HttpServer::addSecureCallback(std::function<byte_vector(const byte_vector& params)>&& callback) {
+    secureCallback_ = std::move(callback);
 }
 
 UBinder HttpServer::extractParams(std::unordered_map<std::string, byte_vector>& reqParams) {
@@ -297,25 +297,13 @@ void HttpServer::initSecureProtocol() {
         }
     });
     addEndpoint("/command", [this](HttpServerRequest *req) {
-            inSession(req, [this](UBinder& params){
-                std::string command = params.getString("command");
-                if (command == "hello") {
-                    return UBinder::of("result", UBinder::of("status", "OK", "message", "welcome to the Universa"));
-                } else if (command == "sping") {
-                    return UBinder::of("result", UBinder::of("sping", "spong"));
-                } else if (command == "test_error") {
-                    throw std::invalid_argument("sample error");
-                } else {
-                    if (secureEndpoints_.find(command) != secureEndpoints_.end())
-                        return secureEndpoints_[command](params);
-                    else
-                        throw std::invalid_argument("unknown command: " + command);
-                }
-            });
+        inSession(req, [this](byte_vector& params){
+            return secureCallback_(params);
+        });
     });
 }
 
-void HttpServer::inSession(HttpServerRequest *req, std::function<UBinder(UBinder& params)>&& processor) {
+void HttpServer::inSession(HttpServerRequest *req, std::function<byte_vector(byte_vector& params)>&& processor) {
     try {
         auto res = req->parseMultipartData();
         UBinder binder = extractParams(res);
@@ -327,10 +315,8 @@ void HttpServer::inSession(HttpServerRequest *req, std::function<UBinder(UBinder
         UBytes paramsBytes = UBytes::asInstance(paramsObj);
         byte_vector paramsBin = paramsBytes.get();
         byte_vector paramsBinDecrypted = session->sessionKey->decrypt(paramsBin);
-        UObject paramsUnpackedObj = BossSerializer::deserialize(UBytes(std::move(paramsBinDecrypted)));
-        UBinder params = UBinder::asInstance(paramsUnpackedObj);
-        UBinder reqAns = processor(params);
-        byte_vector encryptedAns = session->sessionKey->encrypt(BossSerializer::serialize(reqAns).get());
+        byte_vector reqAnsBin = processor(paramsBinDecrypted);
+        byte_vector encryptedAns = session->sessionKey->encrypt(reqAnsBin);
         UBinder result = UBinder::of("result", UBytes(std::move(encryptedAns)));
         UBinder ans = UBinder::of("result", "ok","response", result);
         req->setAnswerBody(BossSerializer::serialize(ans).get());
