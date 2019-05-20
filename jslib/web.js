@@ -186,6 +186,7 @@ network.HttpServer = class {
     constructor(host, port, poolSize, bufSize) {
         this.httpServer_ = new network.HttpServerImpl(host, port, poolSize, bufSize);
         this.endpoints_ = new Map();
+        this.secureEndpoints_ = new Map();
         this.httpServer_.__setBufferedCallback((reqBuf) => {
             let length = reqBuf.getBufLength();
             for (let i = 0; i < length; ++i) {
@@ -202,21 +203,24 @@ network.HttpServer = class {
         });
         this.httpServer_.__setBufferedSecureCallback((reqBuf) => {
             let length = reqBuf.getBufLength();
+            //console.log("length = " + length);
             for (let i = 0; i < length; ++i) {
                 let params = Boss.load(reqBuf.getParamsBin(i));
                 switch (params.command) {
                     case "hello":
-                        reqBuf.setAnswer(0, Boss.dump({result: {status: "OK", message: "welcome to the Universa"}}));
+                        reqBuf.setAnswer(i, Boss.dump({result: {status: "OK", message: "welcome to the Universa"}}));
                         break;
                     case "sping":
-                        reqBuf.setAnswer(0, Boss.dump({result: {sping: "spong"}}));
+                        reqBuf.setAnswer(i, Boss.dump({result: {sping: "spong"}}));
                         break;
                     case "test_error":
                         throw new Error("sample error");
                         break;
-                    case "setVerbose":
-                        reqBuf.setAnswer(0, Boss.dump({result: {itemResult: "setVerbose not implemented"}}));
-                        break;
+                    default:
+                        if (this.secureEndpoints_.has(params.command))
+                            reqBuf.setAnswer(i, Boss.dump({result: this.secureEndpoints_.get(params.command)(params)}));
+                        else
+                            throw new Error("unknown command: " + params.command);
                 }
             }
         });
@@ -254,8 +258,8 @@ network.HttpServer = class {
         });
     }
 
-    addSecureEndpoint(endpoint, block) {
-        throw new HttpServerError("not implemented");
+    addSecureEndpoint(commandName, block) {
+        this.secureEndpoints_.set(commandName, block);
     }
 };
 

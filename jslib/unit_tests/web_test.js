@@ -2,6 +2,7 @@ import {expect, unit, assert, assertSilent} from 'test'
 import {HttpServer} from 'web'
 import * as tk from 'unit_tests/test_keys'
 const Boss = require('boss.js');
+const ItemResult = require('itemresult.js');
 
 unit.test("hello web", async () => {
     let httpServer = new network.HttpServer("0.0.0.0", 8080, 1, 20);
@@ -26,7 +27,7 @@ unit.test("hello web", async () => {
     });
     httpServer.addEndpoint("/ping", (request) => {
         request.setHeader("Content-Type", "text/html");
-        return {"ping": "pong", "val": some_undefined_var};
+        return {"ping": "pong", "val": some_undefined_var_for_exception_throwing};
         //return {"ping": "pong"};
     });
     httpServer.addEndpoint("/connect1", (request) => {
@@ -35,6 +36,12 @@ unit.test("hello web", async () => {
         console.log("js /connect method: " + request.method);
         console.log("js /connect requestBody: " + Boss.load(request.requestBody));
         return {"ping": "pong"};
+    });
+    let unsRateDbg = 333;
+    httpServer.addSecureEndpoint("unsRate", (reqParams) => {
+        //console.log(JSON.stringify(reqParams));
+        unsRateDbg += 1;
+        return {U: unsRateDbg};
     });
     httpServer.startServer();
 
