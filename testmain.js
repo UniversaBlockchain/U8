@@ -139,6 +139,7 @@ require('unit_tests/services/uns_test')
 require('unit_tests/web_test')
 require('unit_tests/parcel_test')
 require('unit_tests/contractsservice_test')
+require('unit_tests/main_test')
 
 async function main() {
 
