@@ -60,9 +60,6 @@ class ContractDelta {
         this.revokingItems = new Set(this.changed.revokingItems);
         delete this.stateChanges.created_by;
 
-        // todo: check siblings have different and proper branch ids
-        delete this.stateChanges.branch_id;
-
         // todo: these changes should be already checked
         delete this.stateChanges.parent;
         delete this.stateChanges.origin;

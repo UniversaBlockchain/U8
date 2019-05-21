@@ -416,7 +416,7 @@ class SplitJoinPermission extends Permission {
         return rSum.cmp(splitJoinSum) === 0;
     }
 
-    checkSplit(changed, dataChanges, revokingItems, keys, oldValue, newValue) {
+    checkSplit(changed, dataChanges, stateChanges, revokingItems, keys, oldValue, newValue) {
 
         // We need to find the splitted contracts
         let sum = new BigDecimal("0");
@@ -438,6 +438,7 @@ class SplitJoinPermission extends Permission {
 
         if (isValid && newValue.gte(this.minValue) && newValue.ulp().cmp(this.minUnit) >= 0) {
             delete dataChanges[this.fieldName];
+            delete stateChanges["branch_id"];
 
             for(let ri of revokesToRemove) {
                 revokingItems.delete(ri);
@@ -445,7 +446,7 @@ class SplitJoinPermission extends Permission {
         }
     }
 
-    checkMerge(changed, dataChanges, revokingItems, keys, newValue) {
+    checkMerge(changed, dataChanges, stateChanges, revokingItems, keys, newValue) {
 
         // merge means there are mergeable contracts in the revoking items
         let sum = new BigDecimal("0");
@@ -469,10 +470,11 @@ class SplitJoinPermission extends Permission {
 
         if (isValid) {
             delete dataChanges[this.fieldName];
+            delete stateChanges["branch_id"];
+
             for(let ri of revokesToRemove) {
                 revokingItems.delete(ri);
             }
-
         }
     }
 
@@ -497,9 +499,9 @@ class SplitJoinPermission extends Permission {
 
                 let cmp = oldValue.cmp(newValue);
                 if (cmp > 0)
-                    this.checkSplit(changed, dataChanges, revokingItems, keys, oldValue, newValue);
+                    this.checkSplit(changed, dataChanges, stateChanges, revokingItems, keys, oldValue, newValue);
                 else if (cmp < 0)
-                    this.checkMerge(changed, dataChanges, revokingItems, keys, newValue);
+                    this.checkMerge(changed, dataChanges, stateChanges, revokingItems, keys, newValue);
             } catch (err) {
                 if(t.THROW_EXCEPTIONS)
                     throw err;
