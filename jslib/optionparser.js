@@ -6,11 +6,12 @@ class OptionParser {
         this.values = new Map();
     }
 
-    option(opts, description, withValue = false) {
+    option(opts, description, withValue = false, valueName = undefined) {
         this.rules.push({
             opts: opts,
             description: description,
-            withValue: withValue
+            withValue: withValue,
+            valueName: valueName
         });
 
         opts.forEach(opt => this.rulesMap.set(opt, this.rules.length - 1));
@@ -52,6 +53,37 @@ class OptionParser {
                 i++;
             }
         }
+    }
+
+    help() {
+        let rules = [];
+        let descriptions = [];
+        let max = 3;
+
+        this.rules.forEach(rule => {
+            let ruleString = "";
+            rule.opts.forEach((opt, i) => ruleString += "-" + opt + (i !== rule.opts.length - 1 ? ", " : " "));
+
+            if (rule.withValue)
+                ruleString += "<" + rule.valueName + ">";
+
+            if (ruleString.length > max)
+                max = ruleString.length;
+
+            rules.push(ruleString);
+            descriptions.push(rule.description);
+        });
+
+        max++;
+        if (max > 40)
+            max = 40;
+
+        let help = "Option" + " ".repeat(max - 6) + "Description\n";
+        help += "------" + " ".repeat(max - 6) + "-----------\n";
+
+        rules.forEach((rule, i) => help += rule + " ".repeat(max - rule.length) + descriptions[i] + "\n");
+
+        return help;
     }
 }
 
