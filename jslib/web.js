@@ -46,6 +46,23 @@ network.NodeInfo = class {
     get publicHost() {
         return this.memoise('__getPublicHost', () => this.nodeInfo_.__getPublicHost());
     }
+
+    publicUrlString() {
+        return this.publicHost === "localhost" ? "http://localhost:" + this.clientAddress.port : "http://" + this.publicHost + ":8080";
+    }
+
+    serverUrlString() {
+        return this.publicHost === "localhost" ? "http://localhost:"+ this.clientAddress.port : "http://" + (this.hostV6 != null ? "["+this.hostV6+"]" : this.host) + ":8080";
+    }
+
+    domainUrlStringV4() {
+        return this.publicHost === "localhost" ? "https://localhost:"+ this.clientAddress.port : "https://" + this.publicHost + ":8080";
+    }
+
+    directUrlStringV4() {
+        return this.publicHost === "localhost" ? "http://localhost:"+ this.clientAddress.port : "http://" + this.host + ":8080";
+    }
+
 };
 Object.assign(network.NodeInfo.prototype, MemoiseMixin);
 
@@ -281,7 +298,7 @@ network.HttpClient = class {
 
     sendGetRequest(url, block) {
         let reqId = this.getReqId();
-        this.callbacks_.set(reqId, block)
+        this.callbacks_.set(reqId, block);
         this.httpClient_.__sendGetRequest(reqId, url);
     }
 
