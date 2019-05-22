@@ -52,8 +52,8 @@ unit.test("main_test: checkOptionParsing", () => {
     assert(parser.values.get("udp-verbose") === "nothing");
 });
 
-unit.test("main_test: checkVersionAndHelp", () => {
-    let m = new Main("--version");
+unit.test("main_test: checkVersionAndHelp", async () => {
+    let m = await new Main("--version").run();
 
     //m = new Main("-?");
     let help = m.parser.help();

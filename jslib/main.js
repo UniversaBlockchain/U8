@@ -1,8 +1,17 @@
+import * as io from 'io'
+import {PrivateKey, KeyAddress} from 'crypto'
+import {NodeInfo, NetConfig} from 'web'
+import * as t from 'tools'
+
 const NODE_VERSION = VERSION;
+const DefaultBiMapper = require("defaultbimapper").DefaultBiMapper;
 const OptionParser = require("optionparser").OptionParser;
+const Config = require("config").Config;
+const Ledger = require("ledger").Ledger;
+const yaml = require('yaml');
 
 async function main(...args) {
-    new Main(...args);
+    await new Main(...args).run();
 }
 
 class Main {
@@ -10,27 +19,37 @@ class Main {
     static NAME_STRING = "Universa node server v" + NODE_VERSION + "\n";
 
     constructor(...args) {
+        this.nodeKey = null;
+        this.configRoot = null;
+        this.netConfig = null;
+        this.network = null;
+        this.myInfo = null;
+        this.clientHTTPServer = null;
+        this.node = null;
+        this.config = new Config();
+
         this.parser = Main.initOptionParser();
-
         this.parser.parse(args);
+    }
 
+    async run() {
         if (this.parser.options.has("version")) {
             console.log("Version " + NODE_VERSION);
-            return;
+            return this;
         }
 
         if (this.parser.options.has("?")) {
             console.log("usage called\n");
             console.log(Main.NAME_STRING);
             console.log(this.parser.help());
-            return;
+            return this;
         }
 
         if (this.parser.values.has("config")) {
-            this.loadNodeConfig();
-            this.loadNetConfig();
+            await this.loadNodeConfig();
+            await this.loadNetConfig();
 
-            //await this.ledger.saveConfig(this.myInfo, this.netConfig, this.nodeKey);
+            await this.ledger.saveConfig(this.myInfo, this.netConfig, this.nodeKey);
 
         } else if (this.parser.values.has("database")) {
 
@@ -56,6 +75,8 @@ class Main {
         //startClientHttpServer();
 
         //startNode();
+
+        return this;
     }
 
     static initOptionParser() {
@@ -76,13 +97,57 @@ class Main {
         return parser;
     }
 
-    loadNodeConfig() {
+    async loadNodeConfig() {
         this.configRoot = this.parser.values.get("config");
 
+        let settings = yaml.load(await (await io.openRead(this.configRoot + "/config/config.yaml")).allAsString());
 
+        let settingsShared;
+        if (await io.isAccessible(this.configRoot + "/config/shared.yaml"))
+            settingsShared = yaml.load(await (await io.openRead(this.configRoot + "/config/shared.yaml")).allAsString());
+        else
+            settingsShared = settings;
+
+        console.log("node settings: " + JSON.stringify(settings, null, 2));
+
+        let nodeKeyFileName = this.configRoot + "/tmp/" + settings.node_name + ".private.unikey";
+        console.log(nodeKeyFileName);
+
+        this.nodeKey = new PrivateKey(await (await io.openRead(nodeKeyFileName)).allBytes());
+
+        this.myInfo = NodeInfo.withParameters(this.nodeKey.publicKey,
+            settings.node_number,
+            settings.node_name,
+            settings.ip[0],
+            //TODO: settings.hasOwnProperty("ipv6") ? settings.ipv6[0] : null,
+            settings.public_host,
+            settings.udp_server_port,
+            settings.http_client_port,
+            settings.http_server_port);
+
+        this.config.isFreeRegistrationsAllowedFromYaml = t.getOrDefault(settingsShared, "allow_free_registrations", false);
+        this.config.permanetMode = t.getOrDefault(settingsShared, "permanet_mode", false);
+
+        if (settingsShared.hasOwnProperty("whitelist")) {
+            for(let value of settingsShared.whitelist) {
+                try {
+                    this.config.addressesWhiteList.push(new KeyAddress(value));
+                } catch (err) {
+                    console.error(err.message);
+                }
+            }
+        }
+
+        this.ledger = new Ledger(settings.database);
+        console.log("ledger constructed");
+
+        console.log("key loaded: " + this.nodeKey.toString());
+        console.log("node local URL: " + this.myInfo.serverUrlString());
+        console.log("node public URL: " + this.myInfo.publicUrlString());
+        console.log("node info: " + JSON.stringify(DefaultBiMapper.getInstance().serialize(this.myInfo), null, 2));
     }
 
-    loadNetConfig() {
+    async loadNetConfig() {
 
     }
 
@@ -98,4 +163,4 @@ class Main {
 ///////////////////////////
 //EXPORTS
 ///////////////////////////
-module.exports = {Main};
+module.exports = {Main, NODE_VERSION};
