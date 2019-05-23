@@ -73,7 +73,7 @@ network.NodeInfo = class {
             console.log("expected key file path: <" + keyPath + ">");
 
             let key = new PublicKey(await (await io.openRead(keyPath)).allBytes());
-            return NodeInfo.withParameters(key,
+            return network.NodeInfo.withParameters(key,
                 t.getOrThrow(data, "node_number"),
                 nodeName,
                 t.getOrThrow(data, "ip")[0],
@@ -116,7 +116,6 @@ network.NodeInfo = class {
             "http://" + this.host + ":8080";
     }
 };
-
 Object.assign(network.NodeInfo.prototype, MemoiseMixin);
 
 network.SocketAddress = class {
@@ -170,20 +169,22 @@ network.NetConfig = class {
     }
 
     static async loadByPath(path) {
-        let netConfig = new NetConfig();
+        let netConfig = new network.NetConfig();
 
-        if (!io.isDir(path))
+        if (!await io.isDir(path))
             throw new Error("Incorrect path to nodes directory: " + path);
 
         let files = await io.getFilesFromDir(path);
-        files.forEach(file => {
+        let basePath = path.endsWith("/") ? path : path + "/";
+
+        for (let file of files)
             if (file.endsWith(".yaml"))
-                netConfig.addNode(NodeInfo.loadYaml(file));
-        });
+                netConfig.addNode(await network.NodeInfo.loadYaml(basePath + file));
 
         return netConfig;
     }
 };
+Object.assign(network.NetConfig.prototype, MemoiseMixin);
 
 network.UDPAdapter = class {
     constructor(ownPrivateKey, ownNodeNumber, netConfig) {

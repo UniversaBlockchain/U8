@@ -1,6 +1,6 @@
 import * as network from "web";
 
-const Main = require("main").Main;
+const NODE_VERSION = VERSION;
 const Boss = require("boss");
 const ExtendedSignature = require("extendedsignature").ExtendedSignature;
 const Config = require("config").Config;

@@ -6,7 +6,7 @@ import * as t from 'tools'
 const NODE_VERSION = VERSION;
 const DefaultBiMapper = require("defaultbimapper").DefaultBiMapper;
 const OptionParser = require("optionparser").OptionParser;
-//const ClientHTTPServer = require("client_http_server").ClientHTTPServer;
+const ClientHTTPServer = require("client_http_server").ClientHTTPServer;
 const Config = require("config").Config;
 const Ledger = require("ledger").Ledger;
 const yaml = require('yaml');
@@ -148,7 +148,7 @@ class Main {
     }
 
     async loadNetConfig() {
-        this.netConfig = NetConfig.loadByPath(this.configRoot + "/config/nodes");
+        this.netConfig = await NetConfig.loadByPath(this.configRoot + "/config/nodes");
         console.log("Network configuration is loaded from " + this.configRoot + ", " + this.netConfig.size + " nodes.");
     }
 
