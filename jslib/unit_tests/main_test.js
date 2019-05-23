@@ -53,10 +53,10 @@ unit.test("main_test: checkOptionParsing", () => {
 });
 
 unit.test("main_test: checkVersionAndHelp", async () => {
-    let m = await new Main("--version").run();
+    let main = await new Main("--version").run();
 
-    //m = new Main("-?");
-    let help = m.parser.help();
+    //main = new Main("-?");
+    let help = main.parser.help();
 
     //console.log(help);
     assert(help.includes("-?, -h, -help             show help"));
@@ -69,4 +69,10 @@ unit.test("main_test: checkVersionAndHelp", async () => {
     assert(help.includes("-restart-socket           restarts UDPAdapter: shutdown it and create new"));
     assert(help.includes("-shutdown                 delicate shutdown with rollback current processing contracts"));
     assert(help.includes("-version                  show version"));
+});
+
+unit.test("main_test: startNode", async () => {
+    let main = await new Main("--test", "--config", "../test/config/test_node_config_v2/node1", "--nolog").run();
+
+    await main.shutdown();
 });

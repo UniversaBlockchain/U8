@@ -55,7 +55,7 @@ class Main {
             this.restartUDPAdapter();
 
         } else if (this.parser.values.has("shutdown")) {
-            this.shutdown();
+            await this.shutdown();
 
         } else {
             console.error("Neither config no database option passed, leaving");
@@ -138,7 +138,7 @@ class Main {
             }
         }
 
-        this.ledger = new Ledger(settings.database);
+        this.ledger = new Ledger(t.getOrThrow(settings, "database"));
         console.log("ledger constructed");
 
         console.log("key loaded: " + this.nodeKey.toString());
@@ -155,8 +155,8 @@ class Main {
 
     }
 
-    shutdown() {
-
+    async shutdown() {
+        await this.ledger.close();
     }
 }
 
