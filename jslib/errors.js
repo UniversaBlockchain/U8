@@ -69,7 +69,7 @@ ErrorRecord.prototype.serialize = function(serializer) {
 
 ErrorRecord.prototype.toString = function() {
         return JSON.stringify(this);
-}
+};
 
 dbm.DefaultBiMapper.registerAdapter(new bs.BiAdapter("error",ErrorRecord));
 
