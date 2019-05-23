@@ -11,12 +11,14 @@ namespace network {
         ,port(newPort) {
     }
 
-    NodeInfo::NodeInfo(const crypto::PublicKey& publicKey, int number, const std::string& nodeName, const std::string& host,
+    NodeInfo::NodeInfo(const crypto::PublicKey& publicKey, int number, const std::string& nodeName, const std::string& host, const std::string& hostV6,
                        const std::string& publicHost, unsigned int datagramPort, unsigned int clientHttpPort, unsigned int serverHttpPort)
         :publicKey_(publicKey)
         ,number_(number)
         ,nodeName_(nodeName)
         ,publicHost_(publicHost)
+        ,host_(host)
+        ,hostV6_(hostV6)
         ,nodeAddress_(host, datagramPort)
         ,clientAddress_(publicHost, clientHttpPort)
         ,serverAddress_(host, serverHttpPort) {
@@ -57,4 +59,11 @@ namespace network {
         return publicHost_;
     }
 
+    const std::string& NodeInfo::getHost() const {
+        return host_;
+    }
+
+    const std::string& NodeInfo::getHostV6() const {
+        return hostV6_;
+    }
 };

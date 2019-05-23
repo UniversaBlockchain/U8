@@ -136,6 +136,7 @@ void Scripter::initialize() {
     global->Set(v8String("$0"), v8String(ARGV0));
 
     JsInitIOFile(pIsolate, global);
+    JsInitIODir(pIsolate, global);
     JsInitIOTCP(pIsolate, global);
     JsInitIOTLS(pIsolate, global);
     JsInitIOUDP(pIsolate, global);

@@ -1,5 +1,9 @@
 import {MemoiseMixin} from 'tools'
+import * as io from "io";
+import * as t from "tools";
+import {PublicKey} from "crypto";
 const Boss = require('boss.js');
+const yaml = require('yaml');
 
 network.NodeInfo = class {
     constructor() {
@@ -12,10 +16,10 @@ network.NodeInfo = class {
         return res;
     }
 
-    static withParameters(publicKey, number, nodeName, host, publicHost, datagramPort, clientHttpPort, serverHttpPort) {
+    static withParameters(publicKey, number, nodeName, host, hostV6, publicHost, datagramPort, clientHttpPort, serverHttpPort) {
         let res = new network.NodeInfo();
         res.nodeInfo_ = new network.NodeInfoImpl(
-            publicKey.packed, number, nodeName, host, publicHost, datagramPort, clientHttpPort, serverHttpPort);
+            publicKey.packed, number, nodeName, host, hostV6, publicHost, datagramPort, clientHttpPort, serverHttpPort);
         return res;
     }
 
@@ -47,23 +51,72 @@ network.NodeInfo = class {
         return this.memoise('__getPublicHost', () => this.nodeInfo_.__getPublicHost());
     }
 
+    get host() {
+        return this.memoise('__getHost', () => this.nodeInfo_.__getHost());
+    }
+
+    get hostV6() {
+        return this.memoise('__getHostV6', () => this.nodeInfo_.__getHostV6());
+    }
+
+    static async loadYaml(fileName) {
+        try {
+            let data = yaml.load(await (await io.openRead(fileName)).allAsString());
+
+            let nodeName = t.getOrThrow(data, "node_name");
+
+            let nodePathEnd = "/nodes/" + nodeName + ".yaml";
+            if (!fileName.endsWith(nodePathEnd))
+                throw new Error("Incorrect path to node " + nodeName);
+
+            let keyPath = fileName.substring(0, fileName.length - nodePathEnd.length) + "/keys/" + nodeName + ".public.unikey";
+            console.log("expected key file path: <" + keyPath + ">");
+
+            let key = new PublicKey(await (await io.openRead(keyPath)).allBytes());
+            return NodeInfo.withParameters(key,
+                t.getOrThrow(data, "node_number"),
+                nodeName,
+                t.getOrThrow(data, "ip")[0],
+                data.hasOwnProperty("ipv6") ? data.ipv6[0] : null,
+                t.getOrThrow(data, "public_host"),
+                t.getOrThrow(data, "udp_server_port"),
+                t.getOrThrow(data, "http_client_port"),
+                t.getOrThrow(data, "http_server_port"));
+
+        } catch (err) {
+            console.error("failed to load node: " + fileName + ": " + err.message);
+            if (err.stack != null)
+                console.error(err.stack);
+        }
+
+        return null;
+    }
+
     publicUrlString() {
-        return this.publicHost === "localhost" ? "http://localhost:" + this.clientAddress.port : "http://" + this.publicHost + ":8080";
+        return this.publicHost === "localhost" ?
+            "http://localhost:" + this.clientAddress.port :
+            "http://" + this.publicHost + ":8080";
     }
 
     serverUrlString() {
-        return this.publicHost === "localhost" ? "http://localhost:"+ this.clientAddress.port : "http://" + (this.hostV6 != null ? "["+this.hostV6+"]" : this.host) + ":8080";
+        return this.publicHost === "localhost" ?
+            "http://localhost:" + this.clientAddress.port :
+            "http://" + (this.hostV6 != null ? "[" + this.hostV6 + "]" : this.host) + ":8080";
     }
 
     domainUrlStringV4() {
-        return this.publicHost === "localhost" ? "https://localhost:"+ this.clientAddress.port : "https://" + this.publicHost + ":8080";
+        return this.publicHost === "localhost" ?
+            "https://localhost:" + this.clientAddress.port :
+            "https://" + this.publicHost + ":8080";
     }
 
     directUrlStringV4() {
-        return this.publicHost === "localhost" ? "http://localhost:"+ this.clientAddress.port : "http://" + this.host + ":8080";
+        return this.publicHost === "localhost" ?
+            "http://localhost:" + this.clientAddress.port :
+            "http://" + this.host + ":8080";
     }
-
 };
+
 Object.assign(network.NodeInfo.prototype, MemoiseMixin);
 
 network.SocketAddress = class {
@@ -110,6 +163,25 @@ network.NetConfig = class {
         for (let i = 0; i < implList.length; ++i)
             res.push(network.NodeInfo.copyImpl(implList[i]))
         return res;
+    }
+
+    get size() {
+        return this.memoise('__getSize', () => this.netConfig_.__getSize());
+    }
+
+    static async loadByPath(path) {
+        let netConfig = new NetConfig();
+
+        if (!io.isDir(path))
+            throw new Error("Incorrect path to nodes directory: " + path);
+
+        let files = await io.getFilesFromDir(path);
+        files.forEach(file => {
+            if (file.endsWith(".yaml"))
+                netConfig.addNode(NodeInfo.loadYaml(file));
+        });
+
+        return netConfig;
     }
 };
 

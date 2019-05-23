@@ -49,8 +49,6 @@ class Main {
             await this.loadNodeConfig();
             await this.loadNetConfig();
 
-            await this.ledger.saveConfig(this.myInfo, this.netConfig, this.nodeKey);
-
         } else if (this.parser.values.has("database")) {
 
         } else if (this.parser.values.has("restart-socket")) {
@@ -116,14 +114,14 @@ class Main {
         this.nodeKey = new PrivateKey(await (await io.openRead(nodeKeyFileName)).allBytes());
 
         this.myInfo = NodeInfo.withParameters(this.nodeKey.publicKey,
-            settings.node_number,
-            settings.node_name,
-            settings.ip[0],
-            //TODO: settings.hasOwnProperty("ipv6") ? settings.ipv6[0] : null,
-            settings.public_host,
-            settings.udp_server_port,
-            settings.http_client_port,
-            settings.http_server_port);
+            t.getOrThrow(settings, "node_number"),
+            t.getOrThrow(settings, "node_name"),
+            t.getOrThrow(settings, "ip")[0],
+            settings.hasOwnProperty("ipv6") ? settings.ipv6[0] : null,
+            t.getOrThrow(settings, "public_host"),
+            t.getOrThrow(settings, "udp_server_port"),
+            t.getOrThrow(settings, "http_client_port"),
+            t.getOrThrow(settings, "http_server_port"));
 
         this.config.isFreeRegistrationsAllowedFromYaml = t.getOrDefault(settingsShared, "allow_free_registrations", false);
         this.config.permanetMode = t.getOrDefault(settingsShared, "permanet_mode", false);
@@ -134,6 +132,8 @@ class Main {
                     this.config.addressesWhiteList.push(new KeyAddress(value));
                 } catch (err) {
                     console.error(err.message);
+                    if (err.stack != null)
+                        console.error(err.stack);
                 }
             }
         }
@@ -144,11 +144,11 @@ class Main {
         console.log("key loaded: " + this.nodeKey.toString());
         console.log("node local URL: " + this.myInfo.serverUrlString());
         console.log("node public URL: " + this.myInfo.publicUrlString());
-        console.log("node info: " + JSON.stringify(DefaultBiMapper.getInstance().serialize(this.myInfo), null, 2));
     }
 
     async loadNetConfig() {
-
+        this.netConfig = NetConfig.loadByPath(this.configRoot + "/config/nodes");
+        console.log("Network configuration is loaded from " + this.configRoot + ", " + this.netConfig.size + " nodes.");
     }
 
     restartUDPAdapter() {

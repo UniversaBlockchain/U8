@@ -103,12 +103,34 @@ void nodeInfoGetPublicHost(const FunctionCallbackInfo<Value> &args) {
     });
 }
 
+void nodeInfoGetHost(const FunctionCallbackInfo<Value> &args) {
+    Scripter::unwrapArgs(args, [](ArgsContext &ac) {
+        if (ac.args.Length() == 0) {
+            auto nodeInfo = unwrap<NodeInfo>(ac.args.This());
+            ac.setReturnValue(ac.v8String(nodeInfo->getHost()));
+            return;
+        }
+        ac.throwError("invalid arguments");
+    });
+}
+
+void nodeInfoGetHostV6(const FunctionCallbackInfo<Value> &args) {
+    Scripter::unwrapArgs(args, [](ArgsContext &ac) {
+        if (ac.args.Length() == 0) {
+            auto nodeInfo = unwrap<NodeInfo>(ac.args.This());
+            ac.setReturnValue(ac.v8String(nodeInfo->getHostV6()));
+            return;
+        }
+        ac.throwError("invalid arguments");
+    });
+}
+
 Local<FunctionTemplate> initNodeInfo(Isolate *isolate) {
     Local<FunctionTemplate> tpl = bindCppClass<NodeInfo>(
             isolate,
             "NodeInfoImpl",
             [=](const FunctionCallbackInfo<Value> &args) -> NodeInfo* {
-                if (args.Length() == 8) {
+                if (args.Length() == 9) {
                     if (!args[0]->IsTypedArray()) {
                         isolate->ThrowException(
                                 Exception::TypeError(String::NewFromUtf8(isolate, "bad constructor argument #0")));
@@ -122,10 +144,11 @@ Local<FunctionTemplate> initNodeInfo(Isolate *isolate) {
                         args[1]->Int32Value(isolate->GetCurrentContext()).FromJust(),     // number
                         string(*String::Utf8Value(isolate, args[2])),                     // nodeName
                         string(*String::Utf8Value(isolate, args[3])),                     // host
-                        string(*String::Utf8Value(isolate, args[4])),                     // publicHost
-                        args[5]->Int32Value(isolate->GetCurrentContext()).FromJust(),     // datagramPort
-                        args[6]->Int32Value(isolate->GetCurrentContext()).FromJust(),     // clientHttpPort
-                        args[7]->Int32Value(isolate->GetCurrentContext()).FromJust()      // serverHttpPort
+                        string(*String::Utf8Value(isolate, args[4])),                     // hostV6
+                        string(*String::Utf8Value(isolate, args[5])),                     // publicHost
+                        args[6]->Int32Value(isolate->GetCurrentContext()).FromJust(),     // datagramPort
+                        args[7]->Int32Value(isolate->GetCurrentContext()).FromJust(),     // clientHttpPort
+                        args[8]->Int32Value(isolate->GetCurrentContext()).FromJust()      // serverHttpPort
                     );
                 }
                 isolate->ThrowException(
@@ -140,6 +163,8 @@ Local<FunctionTemplate> initNodeInfo(Isolate *isolate) {
     prototype->Set(isolate, "__getNumber", FunctionTemplate::New(isolate, nodeInfoGetNumber));
     prototype->Set(isolate, "__getName", FunctionTemplate::New(isolate, nodeInfoGetName));
     prototype->Set(isolate, "__getPublicHost", FunctionTemplate::New(isolate, nodeInfoGetPublicHost));
+    prototype->Set(isolate, "__getHost", FunctionTemplate::New(isolate, nodeInfoGetHost));
+    prototype->Set(isolate, "__getHostV6", FunctionTemplate::New(isolate, nodeInfoGetHostV6));
 
     NodeInfoTpl.Reset(isolate, tpl);
     return tpl;
@@ -255,6 +280,18 @@ void netConfig_toList(const FunctionCallbackInfo<Value> &args) {
     });
 }
 
+void netConfig_getSize(const FunctionCallbackInfo<Value> &args) {
+    Scripter::unwrapArgs(args, [](ArgsContext &ac) {
+        if (ac.args.Length() == 0) {
+            auto netConfig = unwrap<NetConfig>(ac.args.This());
+            unsigned int size = netConfig->getSize();
+            ac.setReturnValue(size);
+            return;
+        }
+        ac.throwError("invalid arguments");
+    });
+}
+
 Local<FunctionTemplate> initNetConfig(Isolate *isolate) {
     Local<FunctionTemplate> tpl = bindCppClass<NetConfig>(isolate, "NetConfigImpl");
 
@@ -263,6 +300,7 @@ Local<FunctionTemplate> initNetConfig(Isolate *isolate) {
     prototype->Set(isolate, "__getInfo", FunctionTemplate::New(isolate, netConfig_getInfo));
     prototype->Set(isolate, "__find", FunctionTemplate::New(isolate, netConfig_find));
     prototype->Set(isolate, "__toList", FunctionTemplate::New(isolate, netConfig_toList));
+    prototype->Set(isolate, "__getSize", FunctionTemplate::New(isolate, netConfig_getSize));
 
     NetConfigTpl.Reset(isolate, tpl);
     return tpl;

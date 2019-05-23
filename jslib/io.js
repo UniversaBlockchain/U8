@@ -343,4 +343,49 @@ async function isDir(url) {
     return Boolean(await stat(url) & S_IFDIR);
 }
 
-module.exports = {openRead, openWrite, InputStream, OutputStream, AsyncProcessor, IoError, isAccessible, isFile, isDir};
+async function openDir(url) {
+    // normalize name: remove file:/ and file:/// protocols
+    let match = reSkipFile.exec(url);
+    if (match)
+        url = match[1];
+    // todo: more protcols
+    let handle = new IODir();
+    let ap = new AsyncProcessor();
+    handle.open(url, code => ap.process(code, handle));
+    return ap.promise;
+}
+
+const EntryType = {
+    fileEntry: 0,
+    dirEntry: 1
+};
+
+async function getEntriesFromDir(url) {
+    let handle = await openDir(url);
+
+    let result = [];
+    let entry = handle.next();
+    while (entry) {
+        result.push(entry);
+        entry = handle.next();
+    }
+
+    return result;
+}
+
+async function getFilesFromDir(url) {
+    let handle = await openDir(url);
+
+    let result = [];
+    let entry = handle.next();
+    while (entry) {
+        if (entry[1] === EntryType.fileEntry)
+            result.push(entry[0]);
+        entry = handle.next();
+    }
+
+    return result;
+}
+
+module.exports = {openRead, openWrite, InputStream, OutputStream, AsyncProcessor, IoError, isAccessible, isFile, isDir,
+    EntryType, getEntriesFromDir, getFilesFromDir};

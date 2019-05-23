@@ -29,4 +29,7 @@ namespace network {
         return res;
     }
 
+    unsigned int NetConfig::getSize() const {
+        return (unsigned int) byNumber.size();
+    }
 };

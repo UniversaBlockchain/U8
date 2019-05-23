@@ -1094,7 +1094,7 @@ class Ledger {
         });
     }
 
-    /**
+    /*/**
      * Save configuration to database.
      *
      * @param {NodeInfo} myInfo - Node information.
@@ -1102,7 +1102,7 @@ class Ledger {
      * @param {PrivateKey} nodeKey - Private key node.
      * @return {Promise<void>}
      */
-    async saveConfig(myInfo, netConfig, nodeKey) {
+    /*async saveConfig(myInfo, netConfig, nodeKey) {
         await this.simpleUpdate("delete from config;");
 
         for (let nodeInfo of netConfig.toList()) {
@@ -1124,14 +1124,14 @@ class Ledger {
 
             await this.simpleUpdate(sqlText, ...params);
         }
-    }
+    }*/
 
-    /**
+    /*/**
      * Load configuration from storage.
      *
      * @return {Promise<{myInfo: NodeInfo, netConfig: NetConfig, nodeKey: PrivateKey}>} which stores configuration information.
      */
-    loadConfig() {
+    /*loadConfig() {
         return new Promise(async(resolve, reject) => {
             this.dbPool_.withConnection(con => {
                 con.executeQuery(qr => {
@@ -1195,15 +1195,15 @@ class Ledger {
                 );
             });
         });
-    }
+    }*/
 
-    /**
+    /*/**
      * Add information about node in configuration in database.
      *
      * @param {NodeInfo} nodeInfo - Node information.
      * @return {Promise<void>}
      */
-    addNode(nodeInfo) {
+    /*addNode(nodeInfo) {
         return this.simpleUpdate("insert into config(http_client_port,http_server_port,udp_server_port, node_number, node_name, public_host,host,public_key) values(?,?,?,?,?,?,?,?);",
             nodeInfo.clientAddress.port,
             nodeInfo.serverAddress.port,
@@ -1213,18 +1213,18 @@ class Ledger {
             nodeInfo.publicHost,
             nodeInfo.serverAddress.host,
             nodeInfo.publicKey.packed);
-    }
+    }*/
 
-    /**
+    /*/**
      * Remove node from config.
      *
      * @param {NodeInfo} nodeInfo - Node information.
      * @return {Promise<void>}
      */
-    removeNode(nodeInfo) {
+    /*removeNode(nodeInfo) {
         return this.simpleUpdate("delete from config where node_number = ?;",
             nodeInfo.number);
-    }
+    }*/
 
     /**
      * Search for unfinished items in Ledger.

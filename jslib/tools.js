@@ -272,7 +272,7 @@ function convertToDate(data) {
         res.setMilliseconds(0);
         return res;
     } else
-        throw "can't convert " + JSON.stringify(data) + "to Date";
+        throw "can't convert " + JSON.stringify(data) + " to Date";
 }
 
 function randomBytes(count) {
@@ -290,5 +290,12 @@ function getOrDefault(obj, key, def) {
     return def;
 }
 
+function getOrThrow(obj, key) {
+    if (obj.hasOwnProperty(key))
+        return obj[key];
+
+    throw new Error("can't get " + key);
+}
+
 module.exports = {arraysEqual, valuesEqual, randomString, MemoiseMixin, PackedEqMixin, DigestEqMixin, GenericMap, equals,
-    THROW_EXCEPTIONS, convertToDate, randomBytes, getOrDefault};
+    THROW_EXCEPTIONS, convertToDate, randomBytes, getOrDefault, getOrThrow};

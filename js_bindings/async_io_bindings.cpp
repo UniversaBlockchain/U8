@@ -8,6 +8,7 @@
 #include "binding_tools.h"
 #include "../tools/tools.h"
 #include "../AsyncIO/IOFile.h"
+#include "../AsyncIO/IODir.h"
 #include "../AsyncIO/IOTCP.h"
 #include "../AsyncIO/IOTLS.h"
 
@@ -15,7 +16,7 @@ static Persistent<FunctionTemplate> FileTemplate;
 static Persistent<FunctionTemplate> TCPTemplate;
 static Persistent<FunctionTemplate> TLSTemplate;
 static Persistent<FunctionTemplate> UDPTemplate;
-
+static Persistent<FunctionTemplate> DirTemplate;
 
 void JsAsyncGetErrorText(const FunctionCallbackInfo<Value> &args) {
     Scripter::unwrap(args, [&](const shared_ptr<Scripter> &se, auto isolate, auto context) {
@@ -643,4 +644,70 @@ void JsInitIOUDP(Isolate *isolate, const Local<ObjectTemplate> &global) {
     // register it into global namespace
     UDPTemplate.Reset(isolate, tpl);
     global->Set(isolate, "IOUDP", tpl);
+}
+
+void JsAsyncDirOpen(const FunctionCallbackInfo<Value> &args) {
+    Scripter::unwrap(args, [&](const shared_ptr<Scripter> &se, auto isolate, auto context) {
+        auto dir_path = se->getString(args[0]);
+        auto h = unwrap<asyncio::IODir>(args.This());
+        Persistent<Function> *pcb = new Persistent<Function>(isolate, args[1].As<Function>());
+
+        h->open(dir_path.data(), [=](auto result) {
+            se->inPool([=](Local<Context> &context) {
+                auto fn = pcb->Get(context->GetIsolate());
+                if (fn->IsNull())
+                    se->throwError("null callback in IODir::open");
+                else {
+                    Local<Value> res = Integer::New(isolate, result);
+                    auto unused = fn->Call(context, fn, 1, &res);
+                }
+                pcb->Reset();
+                delete pcb;
+            });
+        });
+
+        args.GetReturnValue().SetNull();
+    });
+}
+
+void JsAsyncDirNext(const FunctionCallbackInfo<Value> &args) {
+    Scripter::unwrap(args, [&](const shared_ptr<Scripter> &se, auto isolate, auto context) {
+        auto h = unwrap<asyncio::IODir>(args.This());
+
+        asyncio::ioDirEntry entry;
+        if (h->next(&entry)) {
+            v8::Local<v8::Array> result = v8::Array::New(isolate);
+
+            result->Set(result->Length(), se->v8String(entry.name));
+
+            unsigned int type = 2;
+            if (asyncio::isFile(entry))
+                type = 0;
+            else if (asyncio::isDir(entry))
+                type = 1;
+
+            result->Set(result->Length(), Integer::New(isolate, type));
+
+            args.GetReturnValue().Set(result);
+        } else
+            args.GetReturnValue().SetNull();
+    });
+}
+
+void JsInitIODir(Isolate *isolate, const Local<ObjectTemplate> &global) {
+    // Bind object with default constructor
+    Local<FunctionTemplate> tpl = bindCppClass<asyncio::IODir>(isolate, "IODir");
+
+    // instance methods
+    auto prototype = tpl->PrototypeTemplate();
+    prototype->Set(isolate, "version", String::NewFromUtf8(isolate, "0.0.1"));
+    prototype->Set(isolate, "open", FunctionTemplate::New(isolate, JsAsyncDirOpen));
+    prototype->Set(isolate, "next", FunctionTemplate::New(isolate, JsAsyncDirNext));
+
+    // class methods
+    tpl->Set(isolate, "getErrorText", FunctionTemplate::New(isolate, JsAsyncGetErrorText));
+
+    // register it into global namespace
+    DirTemplate.Reset(isolate, tpl);
+    global->Set(isolate, "IODir", tpl);
 }

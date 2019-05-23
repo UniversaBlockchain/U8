@@ -16,6 +16,7 @@ namespace network {
         const NodeInfo& getInfo(int nodeId) const;
         bool find(int nodeId) const;
         std::vector<NodeInfo*> toList();
+        unsigned int getSize() const;
 
     private:
         std::unordered_map<int, NodeInfo> byNumber;

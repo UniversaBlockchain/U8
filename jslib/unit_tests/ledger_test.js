@@ -782,7 +782,7 @@ unit.test("ledger_test: findBadReferencesOfTest", async () => {
     await ledger.close();
 });
 
-unit.test("ledger_test: configTest", async () => {
+/*unit.test("ledger_test: configTest", async () => {
     let ledger = await createTestLedger();
 
     let nc = new NetConfig();
@@ -844,4 +844,4 @@ unit.test("ledger_test: configTest", async () => {
     });
 
     await ledger.close();
-});
+});*/
