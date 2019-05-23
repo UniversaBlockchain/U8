@@ -81,7 +81,7 @@ public:
     std::shared_ptr<crypto::SymmetricKey> sessionKey;
     byte_vector serverNonce;
     byte_vector encryptedAnswer;
-    long sessionId;
+    int64_t sessionId;
     std::mutex connectMutex;
 };
 
