@@ -1,4 +1,4 @@
-import * as network from "./web";
+import * as network from "web";
 
 const Main = require("main").Main;
 const Boss = require("boss");
