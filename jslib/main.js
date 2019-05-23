@@ -6,6 +6,7 @@ import * as t from 'tools'
 const NODE_VERSION = VERSION;
 const DefaultBiMapper = require("defaultbimapper").DefaultBiMapper;
 const OptionParser = require("optionparser").OptionParser;
+const ClientHTTPServer = require("client_http_server").ClientHTTPServer;
 const Config = require("config").Config;
 const Ledger = require("ledger").Ledger;
 const yaml = require('yaml');
@@ -149,6 +150,16 @@ class Main {
     async loadNetConfig() {
         this.netConfig = NetConfig.loadByPath(this.configRoot + "/config/nodes");
         console.log("Network configuration is loaded from " + this.configRoot + ", " + this.netConfig.size + " nodes.");
+    }
+
+    startClientHttpServer() {
+        console.log("prepare to start client HTTP server on " + this.myInfo.clientAddress.port);
+
+        this.clientHTTPServer = new ClientHTTPServer(this.nodeKey, this.myInfo.clientAddress.port, this.logger);
+        this.clientHTTPServer.cache = cache;
+        this.clientHTTPServer.parcelCache = parcelCache;
+        this.clientHTTPServer.netConfig = netConfig;
+//        node = new Node()
     }
 
     restartUDPAdapter() {
