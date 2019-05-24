@@ -109,20 +109,21 @@ class Main {
 
         console.log("node settings: " + JSON.stringify(settings, null, 2));
 
-        let nodeKeyFileName = this.configRoot + "/tmp/" + settings.node_name + ".private.unikey";
+        let nodeName = t.getOrThrow(settings, "node_name");
+        let nodeKeyFileName = this.configRoot + "/tmp/" + nodeName + ".private.unikey";
         console.log(nodeKeyFileName);
 
         this.nodeKey = new PrivateKey(await (await io.openRead(nodeKeyFileName)).allBytes());
 
         this.myInfo = NodeInfo.withParameters(this.nodeKey.publicKey,
             t.getOrThrow(settings, "node_number"),
-            t.getOrThrow(settings, "node_name"),
+            nodeName,
             t.getOrThrow(settings, "ip")[0],
             settings.hasOwnProperty("ipv6") ? settings.ipv6[0] : null,
             t.getOrThrow(settings, "public_host"),
             t.getOrThrow(settings, "udp_server_port"),
             t.getOrThrow(settings, "http_client_port"),
-            t.getOrThrow(settings, "http_server_port"));
+            t.getOrThrow(settings, "http_public_port"));
 
         this.config.isFreeRegistrationsAllowedFromYaml = t.getOrDefault(settingsShared, "allow_free_registrations", false);
         this.config.permanetMode = t.getOrDefault(settingsShared, "permanet_mode", false);
@@ -167,7 +168,8 @@ class Main {
     }
 
     async shutdown() {
-        await this.ledger.close();
+        if (this.ledger != null)
+            await this.ledger.close();
     }
 }
 

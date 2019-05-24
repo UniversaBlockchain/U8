@@ -69,6 +69,8 @@ unit.test("main_test: checkVersionAndHelp", async () => {
     assert(help.includes("-restart-socket           restarts UDPAdapter: shutdown it and create new"));
     assert(help.includes("-shutdown                 delicate shutdown with rollback current processing contracts"));
     assert(help.includes("-version                  show version"));
+
+    await main.shutdown();
 });
 
 unit.test("main_test: startNode", async () => {

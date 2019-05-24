@@ -57,19 +57,6 @@ void nodeInfoGetClientAddress(const FunctionCallbackInfo<Value> &args) {
     });
 }
 
-void nodeInfoGetServerAddress(const FunctionCallbackInfo<Value> &args) {
-    Scripter::unwrapArgs(args, [](ArgsContext &ac) {
-        if (ac.args.Length() == 0) {
-            auto nodeInfo = unwrap<NodeInfo>(ac.args.This());
-            SocketAddress* saPtr = const_cast<SocketAddress*>(&(nodeInfo->getServerAddress()));
-            Local<Value> res[1] {wrap(SocketAddressTpl, ac.isolate, saPtr)};
-            ac.setReturnValue(res[0]);
-            return;
-        }
-        ac.throwError("invalid arguments");
-    });
-}
-
 void nodeInfoGetNumber(const FunctionCallbackInfo<Value> &args) {
     Scripter::unwrapArgs(args, [](ArgsContext &ac) {
         if (ac.args.Length() == 0) {
@@ -125,6 +112,17 @@ void nodeInfoGetHostV6(const FunctionCallbackInfo<Value> &args) {
     });
 }
 
+void nodeInfoGetPublicPort(const FunctionCallbackInfo<Value> &args) {
+    Scripter::unwrapArgs(args, [](ArgsContext &ac) {
+        if (ac.args.Length() == 0) {
+            auto nodeInfo = unwrap<NodeInfo>(ac.args.This());
+            ac.setReturnValue(nodeInfo->getPublicPort());
+            return;
+        }
+        ac.throwError("invalid arguments");
+    });
+}
+
 Local<FunctionTemplate> initNodeInfo(Isolate *isolate) {
     Local<FunctionTemplate> tpl = bindCppClass<NodeInfo>(
             isolate,
@@ -148,7 +146,7 @@ Local<FunctionTemplate> initNodeInfo(Isolate *isolate) {
                         string(*String::Utf8Value(isolate, args[5])),                     // publicHost
                         args[6]->Int32Value(isolate->GetCurrentContext()).FromJust(),     // datagramPort
                         args[7]->Int32Value(isolate->GetCurrentContext()).FromJust(),     // clientHttpPort
-                        args[8]->Int32Value(isolate->GetCurrentContext()).FromJust()      // serverHttpPort
+                        args[8]->Int32Value(isolate->GetCurrentContext()).FromJust()      // publicHttpPort
                     );
                 }
                 isolate->ThrowException(
@@ -159,12 +157,12 @@ Local<FunctionTemplate> initNodeInfo(Isolate *isolate) {
     prototype->Set(isolate, "__getPublicKey", FunctionTemplate::New(isolate, nodeInfoGetPublicKey));
     prototype->Set(isolate, "__getNodeAddress", FunctionTemplate::New(isolate, nodeInfoGetNodeAddress));
     prototype->Set(isolate, "__getClientAddress", FunctionTemplate::New(isolate, nodeInfoGetClientAddress));
-    prototype->Set(isolate, "__getServerAddress", FunctionTemplate::New(isolate, nodeInfoGetServerAddress));
     prototype->Set(isolate, "__getNumber", FunctionTemplate::New(isolate, nodeInfoGetNumber));
     prototype->Set(isolate, "__getName", FunctionTemplate::New(isolate, nodeInfoGetName));
     prototype->Set(isolate, "__getPublicHost", FunctionTemplate::New(isolate, nodeInfoGetPublicHost));
     prototype->Set(isolate, "__getHost", FunctionTemplate::New(isolate, nodeInfoGetHost));
     prototype->Set(isolate, "__getHostV6", FunctionTemplate::New(isolate, nodeInfoGetHostV6));
+    prototype->Set(isolate, "__getPublicPort", FunctionTemplate::New(isolate, nodeInfoGetPublicPort));
 
     NodeInfoTpl.Reset(isolate, tpl);
     return tpl;

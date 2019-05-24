@@ -16,10 +16,10 @@ network.NodeInfo = class {
         return res;
     }
 
-    static withParameters(publicKey, number, nodeName, host, hostV6, publicHost, datagramPort, clientHttpPort, serverHttpPort) {
+    static withParameters(publicKey, number, nodeName, host, hostV6, publicHost, datagramPort, clientHttpPort, publicHttpPort) {
         let res = new network.NodeInfo();
         res.nodeInfo_ = new network.NodeInfoImpl(
-            publicKey.packed, number, nodeName, host, hostV6, publicHost, datagramPort, clientHttpPort, serverHttpPort);
+            publicKey.packed, number, nodeName, host, hostV6, publicHost, datagramPort, clientHttpPort, publicHttpPort);
         return res;
     }
 
@@ -33,10 +33,6 @@ network.NodeInfo = class {
 
     get clientAddress() {
         return this.memoise('__getClientAddress', () => network.SocketAddress.copyImpl(this.nodeInfo_.__getClientAddress()));
-    }
-
-    get serverAddress() {
-        return this.memoise('__getServerAddress', () => network.SocketAddress.copyImpl(this.nodeInfo_.__getServerAddress()));
     }
 
     get number() {
@@ -57,6 +53,10 @@ network.NodeInfo = class {
 
     get hostV6() {
         return this.memoise('__getHostV6', () => this.nodeInfo_.__getHostV6());
+    }
+
+    get publicPort() {
+        return this.memoise('__getPublicPort', () => this.nodeInfo_.__getPublicPort());
     }
 
     static async loadYaml(fileName) {
@@ -81,7 +81,7 @@ network.NodeInfo = class {
                 t.getOrThrow(data, "public_host"),
                 t.getOrThrow(data, "udp_server_port"),
                 t.getOrThrow(data, "http_client_port"),
-                t.getOrThrow(data, "http_server_port"));
+                t.getOrThrow(data, "http_public_port"));
 
         } catch (err) {
             console.error("failed to load node: " + fileName + ": " + err.message);
@@ -95,25 +95,25 @@ network.NodeInfo = class {
     publicUrlString() {
         return this.publicHost === "localhost" ?
             "http://localhost:" + this.clientAddress.port :
-            "http://" + this.publicHost + ":8080";
+            "http://" + this.publicHost + ":" + this.publicPort;
     }
 
     serverUrlString() {
         return this.publicHost === "localhost" ?
             "http://localhost:" + this.clientAddress.port :
-            "http://" + (this.hostV6 != null ? "[" + this.hostV6 + "]" : this.host) + ":8080";
+            "http://" + (this.hostV6 != null ? "[" + this.hostV6 + "]" : this.host) + ":" + this.publicPort;
     }
 
     domainUrlStringV4() {
         return this.publicHost === "localhost" ?
             "https://localhost:" + this.clientAddress.port :
-            "https://" + this.publicHost + ":8080";
+            "https://" + this.publicHost + ":" + this.publicPort;
     }
 
     directUrlStringV4() {
         return this.publicHost === "localhost" ?
             "http://localhost:" + this.clientAddress.port :
-            "http://" + this.host + ":8080";
+            "http://" + this.host + ":" + this.publicPort;
     }
 };
 Object.assign(network.NodeInfo.prototype, MemoiseMixin);

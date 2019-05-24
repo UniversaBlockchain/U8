@@ -66,8 +66,7 @@ unit.test("network.NodeInfo", async () => {
     assert(n.nodeAddress.port === 7007);
     assert(n.clientAddress.host === "192.168.1.101");
     assert(n.clientAddress.port === 8008);
-    assert(n.serverAddress.host === "127.0.0.1");
-    assert(n.serverAddress.port === 9009);
+    assert(n.publicPort === 9009);
 });
 
 unit.test("network.NetConfig", async () => {
@@ -96,18 +95,17 @@ unit.test("network.NetConfig", async () => {
     assert(n2.nodeAddress.port === n2c.nodeAddress.port);
     assert(n2.clientAddress.host === n2c.clientAddress.host);
     assert(n2.clientAddress.port === n2c.clientAddress.port);
-    assert(n2.serverAddress.host === n2c.serverAddress.host);
-    assert(n2.serverAddress.port === n2c.serverAddress.port);
+    assert(n2.publicPort === n2c.publicPort);
     let list = nc.toList();
     assert(list.length === 3);
     let numbers = [1,2,3];
-    let ports = [n1.serverAddress.port, n2.serverAddress.port, n3.serverAddress.port];
+    let ports = [n1.publicPort, n2.publicPort, n3.publicPort];
     assert(numbers.includes(list[0].number));
     assert(numbers.includes(list[1].number));
     assert(numbers.includes(list[2].number));
-    assert(ports.includes(list[0].serverAddress.port));
-    assert(ports.includes(list[1].serverAddress.port));
-    assert(ports.includes(list[2].serverAddress.port));
+    assert(ports.includes(list[0].publicPort));
+    assert(ports.includes(list[1].publicPort));
+    assert(ports.includes(list[2].publicPort));
 });
 
 unit.test("network.UDPAdapter", async () => {

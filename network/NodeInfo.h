@@ -34,7 +34,7 @@ namespace network {
     public:
 
         NodeInfo(const crypto::PublicKey& publicKey, int number, const std::string& nodeName, const std::string& host, const std::string& hostV6,
-                 const std::string& publicHost, unsigned int datagramPort, unsigned int clientHttpPort, unsigned int serverHttpPort);
+                 const std::string& publicHost, unsigned int datagramPort, unsigned int clientHttpPort, unsigned int publicHttpPort);
 
         NodeInfo(const NodeInfo&) = default;
         NodeInfo(NodeInfo&&) = default;
@@ -44,7 +44,6 @@ namespace network {
         const crypto::PublicKey& getPublicKey() const;
         const SocketAddress& getNodeAddress() const;
         const SocketAddress& getClientAddress() const;
-        const SocketAddress& getServerAddress() const;
 
         /** Integer node is the preferred way to identify nodes */
         int getNumber() const;
@@ -56,16 +55,18 @@ namespace network {
         const std::string& getHost() const;
         const std::string& getHostV6() const;
 
+        unsigned int getPublicPort() const;
+
     private:
         crypto::PublicKey publicKey_;
         SocketAddress nodeAddress_;
         SocketAddress clientAddress_;
-        SocketAddress serverAddress_;
         int number_;
         std::string nodeName_;
         std::string publicHost_;
         std::string host_;
         std::string hostV6_;
+        unsigned int publicPort_;
     };
 
 };
