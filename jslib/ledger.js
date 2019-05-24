@@ -659,19 +659,19 @@ class Ledger {
     /**
      * Releases all connections to database.
      */
-    close() {
+    async close() {
         this.dbPool_.close();
         for (let i = 0; i < this.timers_.length; ++i)
             trs.clearTimeout(this.timers_[i]);
 
-        // //wait for delayed timer callbacks
-        // let delay = 50;
-        // Object.keys(this.bufParams).forEach(key => {
-        //     if ("delayMillis" in this.bufParams[key])
-        //         if (delay < this.bufParams[key].delayMillis)
-        //             delay = this.bufParams[key].delayMillis;
-        // });
-        // await sleep(200+delay*1.5);
+        //wait for delayed timer callbacks
+        let delay = 50;
+        Object.keys(this.bufParams).forEach(key => {
+            if ("delayMillis" in this.bufParams[key])
+                if (delay < this.bufParams[key].delayMillis)
+                    delay = this.bufParams[key].delayMillis;
+        });
+        await sleep(200+delay*1.5);
     }
 
     /**
