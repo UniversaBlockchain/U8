@@ -77,4 +77,10 @@ unit.test("main_test: startNode", async () => {
     let main = await new Main("--test", "--config", "../test/config/test_node_config_v2/node1", "--nolog").run();
 
     await main.shutdown();
+
+    assert(main.logger.buffer.includes("ledger constructed"));
+    assert(main.logger.buffer.includes("key loaded: " + main.nodeKey.toString()));
+    assert(main.logger.buffer.includes("node local URL: " + main.myInfo.serverUrlString()));
+    assert(main.logger.buffer.includes("node public URL: " + main.myInfo.publicUrlString()));
+    assert(main.logger.buffer.includes("Network configuration is loaded from " + main.configRoot + ", " + main.netConfig.size + " nodes."));
 });

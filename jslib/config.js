@@ -32,6 +32,7 @@ class Config {
         this.isFreeRegistrationsAllowedFromYaml = false;
         this.keysWhiteList = [];
         this.addressesWhiteList = [];
+        this.permanetMode = false;
 
         // Follower callback service
         this.followerCallbackExpiration = 10*60; //10 minutes

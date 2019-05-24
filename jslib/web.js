@@ -70,7 +70,7 @@ network.NodeInfo = class {
                 throw new Error("Incorrect path to node " + nodeName);
 
             let keyPath = fileName.substring(0, fileName.length - nodePathEnd.length) + "/keys/" + nodeName + ".public.unikey";
-            console.log("expected key file path: <" + keyPath + ">");
+            //console.log("expected key file path: <" + keyPath + ">");
 
             let key = new PublicKey(await (await io.openRead(keyPath)).allBytes());
             return network.NodeInfo.withParameters(key,

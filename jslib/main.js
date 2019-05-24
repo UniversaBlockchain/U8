@@ -6,6 +6,7 @@ import * as t from 'tools'
 const NODE_VERSION = VERSION;
 const DefaultBiMapper = require("defaultbimapper").DefaultBiMapper;
 const OptionParser = require("optionparser").OptionParser;
+const Logger = require("logger").Logger;
 const ClientHTTPServer = require("client_http_server").ClientHTTPServer;
 const Config = require("config").Config;
 const Ledger = require("ledger").Ledger;
@@ -28,6 +29,7 @@ class Main {
         this.clientHTTPServer = null;
         this.node = null;
         this.config = new Config();
+        this.logger = new Logger(4096);
 
         this.parser = Main.initOptionParser();
         this.parser.parse(args);
@@ -46,6 +48,17 @@ class Main {
             return this;
         }
 
+        if (this.parser.options.has("nolog"))
+            this.logger.nolog = true;
+
+        if (this.parser.values.has("verbose")) {
+
+        }
+
+        if (this.parser.values.has("udp-verbose")) {
+
+        }
+
         if (this.parser.values.has("config")) {
             await this.loadNodeConfig();
             await this.loadNetConfig();
@@ -61,14 +74,6 @@ class Main {
         } else {
             console.error("Neither config no database option passed, leaving");
             return;
-        }
-
-        if (this.parser.values.has("verbose")) {
-
-        }
-
-        if (this.parser.values.has("udp-verbose")) {
-
         }
 
         //startClientHttpServer();
@@ -107,11 +112,11 @@ class Main {
         else
             settingsShared = settings;
 
-        console.log("node settings: " + JSON.stringify(settings, null, 2));
+        this.logger.log("node settings: " + JSON.stringify(settings, null, 2));
 
         let nodeName = t.getOrThrow(settings, "node_name");
         let nodeKeyFileName = this.configRoot + "/tmp/" + nodeName + ".private.unikey";
-        console.log(nodeKeyFileName);
+        this.logger.log(nodeKeyFileName);
 
         this.nodeKey = new PrivateKey(await (await io.openRead(nodeKeyFileName)).allBytes());
 
@@ -141,16 +146,16 @@ class Main {
         }
 
         this.ledger = new Ledger(t.getOrThrow(settings, "database"));
-        console.log("ledger constructed");
+        this.logger.log("ledger constructed");
 
-        console.log("key loaded: " + this.nodeKey.toString());
-        console.log("node local URL: " + this.myInfo.serverUrlString());
-        console.log("node public URL: " + this.myInfo.publicUrlString());
+        this.logger.log("key loaded: " + this.nodeKey.toString());
+        this.logger.log("node local URL: " + this.myInfo.serverUrlString());
+        this.logger.log("node public URL: " + this.myInfo.publicUrlString());
     }
 
     async loadNetConfig() {
         this.netConfig = await NetConfig.loadByPath(this.configRoot + "/config/nodes");
-        console.log("Network configuration is loaded from " + this.configRoot + ", " + this.netConfig.size + " nodes.");
+        this.logger.log("Network configuration is loaded from " + this.configRoot + ", " + this.netConfig.size + " nodes.");
     }
 
     startClientHttpServer() {

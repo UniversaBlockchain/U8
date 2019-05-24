@@ -14,6 +14,7 @@ class ClientHTTPServer extends network.HttpServer {
 
     constructor(privateKey, port, logger) {
         super();
+        this.node = null;
         this.log = logger;
         this.nodeKey = privateKey;
         this.cache = null;
@@ -21,30 +22,32 @@ class ClientHTTPServer extends network.HttpServer {
         this.envCache = null;
         this.config = new Config();
 
-        on("/contracts", (request, response) => {
-            let encodedString = request.getPath().substring(11); //TODO
+        this.on("/contracts", (request, response) => {
+            let encodedString = request.queryString.substring(11);
 
             // this is a bug - path has '+' decoded as ' '
-            encodedString = encodedString.replace(' ', '+');  // TODO
+            encodedString = encodedString.replace(/ /g, "+");
 
-            let data = [];
-            if (encodedString.equals("cache_test")) {
-                data = "the cache test data".getBytes();
-            } else {
+            let data = null;
+            if (encodedString === "cache_test")
+                data = utf8Encode("the cache test data");
+            else {
                 let id = crypto.HashId.withDigest(encodedString);
-                if (this.cache !== null) {
+                if (this.cache != null) {
                     let c = this.cache.get(id);
                     if (c != null) {
                         data = c.getPackedTransaction();
                     }
                 }
-                if (data === null) {
+
+                if (data == null)
                     data = this.node.ledger.getContractInStorage(id);
-                }
-                if ((data == null) && this.node.config.isPermanetMode())
+
+                if (data == null && this.node.config.permanetMode)
                     data = this.node.ledger.getKeepingItem(id);
             }
 
+            //TODO: response
             if (data !== null) {
                 // contracts are immutable: cache forever
                 let hh = response.headers;
@@ -132,7 +135,7 @@ class ClientHTTPServer extends network.HttpServer {
                     });
                 }
 
-                result.version = Main.NODE_VERSION;
+                result.version = NODE_VERSION;
                 result.number = this.node.number;
                 result.nodes = nodes;
 
@@ -522,7 +525,7 @@ class ClientHTTPServer extends network.HttpServer {
 
     on(path, handler) {
         super.on(path, (request, response) => {
-            if (localCors) {
+            if (this.localCors) {
                 let hh = response.headers;
                 hh["Access-Control-Allow-Origin"] =  "*";
                 hh["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS";
