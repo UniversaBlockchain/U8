@@ -18,6 +18,7 @@ const NFollowerService = require("services/NFollowerService").NFollowerService;
 const NImmutableEnvironment = require("services/NImmutableEnvironment").NImmutableEnvironment;
 const NCallbackService = require("services/NCallbackService").NCallbackService;
 const CallbackRecord = require("services/callbackRecord").CallbackRecord;
+const Contract = require("contract").Contract;
 
 class LedgerException extends Error {
     constructor(message = undefined) {

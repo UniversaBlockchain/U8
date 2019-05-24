@@ -9,6 +9,8 @@ const NNameRecord = require("services/NNameRecord").NNameRecord;
 const e = require("errors");
 const Errors = e.Errors;
 const ex = require("exceptions");
+const t = require("tools");
+const Contract = require("contract").Contract;
 
 class ClientHTTPServer extends network.HttpServer {
 
@@ -58,25 +60,25 @@ class ClientHTTPServer extends network.HttpServer {
                 response.responseCode = "404";
         });
 
-        on("/parcels", (request, response) => {
-            let encodedString = request.getPath().substring(9);
+        this.on("/parcels", (request, response) => {
+            let encodedString = request.queryString.substring(9);
 
             // this is a bug - path has '+' decoded as ' '
-            encodedString = encodedString.replace(' ', '+');
+            encodedString = encodedString.replace(/ /g, "+");
 
-            let data = [];
-            if (encodedString.equals("cache_test")) {
-                data = "the cache test data".getBytes();
-            } else {
+            let data = null;
+            if (encodedString === "cache_test")
+                data = utf8Encode("the cache test data");
+            else {
                 let id = crypto.HashId.withDigest(encodedString);
-                /*if (this.parcelCache !== null) {              // TODO
+                /*if (this.parcelCache != null) {              // TODO
                     let p = this.parcelCache.id;
                     if (p != null) {
                         data = p.pack();
                     }
                 }*/
             }
-            if (data !== null) {
+            if (data != null) {
                 // contracts are immutable: cache forever
                 let hh = response.headers;
                 hh["Expires"] = "Thu, 31 Dec 2037 23:55:55 GMT";
@@ -86,17 +88,17 @@ class ClientHTTPServer extends network.HttpServer {
                 response.responseCode = "404";
         });
 
-        on("/environments", (request, response) => {
-            let encodedString = request.getPath().substring(14);
+        this.on("/environments", (request, response) => {
+            let encodedString = request.queryString.substring(14);
 
             // this is a bug - path has '+' decoded as ' '
-            encodedString = encodedString.replace(' ', '+');
+            encodedString = encodedString.replace(/ /g, "+");
 
             console.log("/environments " + encodedString);
 
             let id = crypto.HashId.withDigest(encodedString);
 
-            let data = [];
+            let data = null;
             //TODO: implement envCache
             /*if (envCache != null) {
                 NImmutableEnvironment nie =  envCache.get(id);
@@ -107,7 +109,7 @@ class ClientHTTPServer extends network.HttpServer {
 
             let nie =  this.node.ledger.getEnvironment(id);
 
-            if (nie !== null) {
+            if (nie != null) {
                 data = Boss.pack(nie);
             }
 
@@ -164,7 +166,7 @@ class ClientHTTPServer extends network.HttpServer {
                     });
                 }
 
-                result.version = Main.NODE_VERSION;
+                result.version = NODE_VERSION;
                 result.number = this.node.getNumber();
                 result.nodesPacked = Boss.dump(nodes);
                 result.signature = ExtendedSignature.sign(this.nodeKey, Boss.dump(nodes));
@@ -176,11 +178,10 @@ class ClientHTTPServer extends network.HttpServer {
             if (this.networkData == null) {
                 let res = [];
                 let nodes = [];
-                res.putAll(
-                    "version", Main.NODE_VERSION,
-                    "number", node.getNumber(),
-                    "nodes", nodes
-                );
+
+                res.version = NODE_VERSION;
+                res.number = this.node.number;
+                res.nodes = nodes;
 
                 if (this.netConfig != null) {
                     this.netConfig.toList().forEach(node => {
@@ -200,7 +201,7 @@ class ClientHTTPServer extends network.HttpServer {
                 }
 
                 let packedData = Boss.dump(res);
-                let signature = ExtendedSignature.sign(nodeKey,packedData);
+                let signature = ExtendedSignature.sign(this.nodeKey,packedData);
                 result.packed_data = packedData;
                 result.signature = signature;
             }
@@ -245,11 +246,11 @@ class ClientHTTPServer extends network.HttpServer {
 
         let b = {};
         let loadedNameRecord = new NNameRecord();
-        let address = params.getString("address",null);
-        let origin = params.getBinary("origin");
+        let address = params.address;
+        let origin = params.origin;
 
         if (((address === null) && (origin === null)) || ((address !== null) && (origin !== null)))
-            throw new Error("invalid arguments"); //TODO
+            throw new Error("invalid arguments");
 
         if (address != null)
             loadedNameRecord = this.node.ledger.getNameByAddress(address);
@@ -268,10 +269,10 @@ class ClientHTTPServer extends network.HttpServer {
         this.checkNode(session, true);
 
         let b = {};
-        let nameContract = params.getStringOrThrow("name");
+        let nameContract  = t.getOrThrow(params, "name");
         let nr = this.node.ledger.getNameRecord(nameContract);
         if (nr !== null) {
-            let env = node.ledger.getEnvironment(nr.getEnvironmentId());
+            let env = this.node.ledger.getEnvironment(nr.getEnvironmentId());
             if (env !== null) {
                 let packedContract = env.getContract().getPackedTransaction();
                 b["packedContract"] =  packedContract;
@@ -285,7 +286,7 @@ class ClientHTTPServer extends network.HttpServer {
 
         let res = {};
 
-        if (!this.node.config.isPermanetMode())
+        if (!this.node.config.permanetMode)
             return res;
 
         let itemId = params.itemId;
@@ -299,10 +300,10 @@ class ClientHTTPServer extends network.HttpServer {
         this.node.resync(itemId);
         let itemResult = this.node.checkItem(itemId);
 
-        if (itemResult.state == ItemState.UNDEFINED)
+        if (itemResult.state === ItemState.UNDEFINED)
             return res;
 
-        let item = this.node.getKeepingItemFromNetwork(itemId);
+        let item = this.node.getKeepingItemFromNetwork(itemId); //TODO
         if (item == null)
             return res;
 
@@ -323,7 +324,7 @@ class ClientHTTPServer extends network.HttpServer {
 
         let res = {};
 
-        if (!this.node.config.isPermanetMode())
+        if (!this.node.config.permanetMode)
             return res;
 
         if(params.has("origin") && params.has("parent") || !params.has("origin") && !params.has("parent")) { //TODO
@@ -363,7 +364,7 @@ class ClientHTTPServer extends network.HttpServer {
             return res;
         res.putAll(keeping); //TODO
 
-        if(getBy !== null) {
+        if(getBy != null) {
             if(getBy.equals("state.origin")) {
                 res.put("origin",id);
             } else if(getBy.equals("state.parent")) {
@@ -392,7 +393,52 @@ class ClientHTTPServer extends network.HttpServer {
     }
 
     approve(params, session) {
+        this.checkNode(session);
+        let contract = new Contract();
 
+        /*if (this.config.limitFreeRegistrations() &&
+            (!(
+                this.config.networkAdminKeyAddress.isMatchingKey(session.publicKey) ||
+                this.config.keysWhiteList.contains(session.publicKey) ||
+                this.config.addressesWhiteList.stream().anyMatch(addr => addr.isMatchingKey(session.publicKey))
+            ))) {
+
+            try {
+                contract = Contract.fromPackedTransaction(params.getBinaryOrThrow("packedItem"));
+            } catch (Exception e) {
+                System.out.println("approve ERROR: " + e.getMessage());
+
+                return Binder.of(
+                    "itemResult", itemResultOfError(Errors.COMMAND_FAILED, "approve", e.getMessage()));
+            }
+
+            if ((contract == null) || !contract.isUnlimitKeyContract(config)) {
+                if (!contract.isOk()) {
+                    contract.traceErrors();
+
+                    return Binder.of(
+                        "itemResult", itemResultOfError(Errors.FAILED_CHECK, "approve",
+                            contract.getErrors().get(contract.getErrors().size() - 1).getMessage()));
+                } else {
+                    System.out.println("approve ERROR: command needs client key from whitelist");
+
+                    return Binder.of(
+                        "itemResult", itemResultOfError(Errors.BAD_CLIENT_KEY, "approve", "command needs client key from whitelist"));
+                }
+            }
+        }
+
+        try {
+            return Binder.of(
+                "itemResult",
+                node.registerItem(Contract.fromPackedTransaction(params.getBinaryOrThrow("packedItem")))
+            );
+        } catch (Exception e) {
+            System.out.println("approve ERROR: " + e.getMessage());
+
+            return Binder.of(
+                "itemResult", itemResultOfError(Errors.COMMAND_FAILED,"approve", e.getMessage()));
+        }*/
     }
 
     approveParcel(params, session) {
@@ -417,7 +463,7 @@ class ClientHTTPServer extends network.HttpServer {
                 try {
                     checkNode(session);
                     System.out.println("Request to start registration #"+n+":"+k.incrementAndGet());
-                    node.registerItem(Contract.fromPackedTransaction(((Bytes)item).toArray()));
+                    this.node.registerItem(Contract.fromPackedTransaction(((Bytes)item).toArray()));
                 } catch (Exception e) {
                     e.printStackTrace();
                 }
@@ -433,7 +479,7 @@ class ClientHTTPServer extends network.HttpServer {
 
         /*try {
             return Binder.of("itemResult",
-                node.checkItem((HashId) params.get("itemId")));
+                this.node.checkItem((HashId) params.get("itemId")));
         } catch (Exception e) {
             e.printStackTrace();
             System.out.println("getState ERROR: " + e.getMessage());
@@ -469,8 +515,8 @@ class ClientHTTPServer extends network.HttpServer {
 
         try {
             Binder result = Binder.of("itemResult",
-                node.checkItem((HashId) params.get("itemId")));
-            node.resync((HashId) params.get("itemId"));
+                this.node.checkItem((HashId) params.get("itemId")));
+            this.node.resync((HashId) params.get("itemId"));
             return result;
         } catch (Exception e) {
             System.out.println("getState ERROR: " + e.getMessage());
@@ -560,15 +606,15 @@ class ClientHTTPServer extends network.HttpServer {
 
         let res = {};
         res[contract] = null;
-        let slot_id = params.getBinary("slot_id");
-        let origin_id = params.getBinary("origin_id");
-        let contract_id = params.getBinary("contract_id");
+        let slot_id = params.slot_id;
+        let origin_id = params.origin_id;
+        let contract_id = params.contract_id;
 
         if ((origin_id === null) && (contract_id === null))
             throw new Error("invalid arguments (both origin_id and contract_id are null)");
         if ((origin_id !== null) && (contract_id !== null))
             throw new Error("invalid arguments (only one origin_id or contract_id is allowed)");
-        let slotBin = node.getLedger().getSmartContractById(HashId.withDigest(slot_id));
+        let slotBin = this.node.ledger.getSmartContractById(crypto.HashId.withDigest(slot_id));
         if (slotBin != null) {
             let slotContract = Contract.fromPackedTransaction(slotBin);
             if (contract_id !== null) {
@@ -611,7 +657,7 @@ class ClientHTTPServer extends network.HttpServer {
     queryFollowerInfo(params, session) {
         this.checkNode(session, true);
 
-        let follower_id = params.getBinary("follower_id");
+        let follower_id = params.follower_id;
         let followerBin = this.node.ledger.getSmartContractById(crypto.HashId.withDigest(follower_id));
 
         if (followerBin !== null) {
