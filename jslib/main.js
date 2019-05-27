@@ -4,7 +4,6 @@ import {NodeInfo, NetConfig} from 'web'
 import * as t from 'tools'
 
 const NODE_VERSION = VERSION;
-const DefaultBiMapper = require("defaultbimapper").DefaultBiMapper;
 const OptionParser = require("optionparser").OptionParser;
 const Logger = require("logger").Logger;
 const ClientHTTPServer = require("client_http_server").ClientHTTPServer;
@@ -30,6 +29,7 @@ class Main {
         this.node = null;
         this.config = new Config();
         this.logger = new Logger(4096);
+        this.node = null;
 
         this.parser = Main.initOptionParser();
         this.parser.parse(args);
@@ -55,8 +55,6 @@ class Main {
             await this.loadNodeConfig();
             await this.loadNetConfig();
 
-        } else if (this.parser.values.has("database")) {
-
         } else if (this.parser.values.has("restart-socket")) {
             this.restartUDPAdapter();
 
@@ -68,17 +66,17 @@ class Main {
             return;
         }
 
+        this.logger.log("Starting the client HTTP server...");
         this.startClientHttpServer();
 
-        //startNode();
+        this.logger.log("Starting the Universa node service...");
+        this.startNode();
 
-        if (this.parser.values.has("verbose")) {
+        if (this.parser.values.has("verbose"))
+            this.setVerboseLevel(this.parser.values.get("verbose"));
 
-        }
-
-        if (this.parser.values.has("udp-verbose")) {
-
-        }
+        if (this.parser.values.has("udp-verbose"))
+            this.setUDPVerboseLevel(this.parser.values.get("udp-verbose"));
 
         return this;
     }
@@ -89,7 +87,7 @@ class Main {
         parser
             .option(["?", "h", "help"], 'show help')
             .option(["c", "config"], "configuration file for the network", true, "config_file")
-            .option(["d", "database"], "database connection url", true, "db_url")
+            //.option(["d", "database"], "database connection url", true, "db_url")
             .option(["test"], "intended to be used in integration tests")
             .option(["nolog"], "do not buffer log messages (good for testing)")
             .option(["verbose"], "sets verbose level to nothing, base or detail", true, "level")
@@ -132,6 +130,7 @@ class Main {
 
         this.config.isFreeRegistrationsAllowedFromYaml = t.getOrDefault(settingsShared, "allow_free_registrations", false);
         this.config.permanetMode = t.getOrDefault(settingsShared, "permanet_mode", false);
+        this.config.main = this;
 
         if (settingsShared.hasOwnProperty("whitelist")) {
             for(let value of settingsShared.whitelist) {
@@ -163,13 +162,32 @@ class Main {
 
         this.clientHTTPServer = new ClientHTTPServer(this.nodeKey, this.myInfo.clientAddress.port, this.logger);
         this.clientHTTPServer.netConfig = this.netConfig;
-        //TODO: caches
-        //this.clientHTTPServer.cache = this.cache;
-        //this.clientHTTPServer.parcelCache = this.parcelCache;
+    }
+
+    startNode() {
+        //this.network = new Network(this.netConfig, this.myInfo, this.nodeKey);
+        //this.node = new Node(this.config, this.myInfo, this.ledger, this.network, this.nodeKey);
+        //this.cache = this.node.cache;
+        //this.parcelCache = this.node.parcelCache;
+
+        this.clientHTTPServer.config = this.config;
+        this.clientHTTPServer.node = this.node;
+        this.clientHTTPServer.cache = this.cache;
+        this.clientHTTPServer.parcelCache = this.parcelCache;
+        this.clientHTTPServer.localCors = this.myInfo.publicHost === "localhost";
+    }
+
+    setVerboseLevel(level) {
+        this.network.setVerboseLevel(level);
+        this.node.setVerboseLevel(level);
+    }
+
+    setUDPVerboseLevel(level) {
+        this.network.setUDPVerboseLevel(level);
     }
 
     restartUDPAdapter() {
-
+        this.network.restartUDPAdapter();
     }
 
     async shutdown() {

@@ -64,7 +64,6 @@ unit.test("main_test: checkVersionAndHelp", async () => {
     //console.log(help);
     assert(help.includes("-?, -h, -help             show help"));
     assert(help.includes("-c, -config <config_file> configuration file for the network"));
-    assert(help.includes("-d, -database <db_url>    database connection url"));
     assert(help.includes("-test                     intended to be used in integration tests"));
     assert(help.includes("-nolog                    do not buffer log messages (good for testing)"));
     assert(help.includes("-verbose <level>          sets verbose level to nothing, base or detail"));

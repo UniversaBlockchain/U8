@@ -33,6 +33,7 @@ class Config {
         this.keysWhiteList = [];
         this.addressesWhiteList = [];
         this.permanetMode = false;
+        this.main = null;
 
         // Follower callback service
         this.followerCallbackExpiration = 10*60; //10 minutes
@@ -40,6 +41,29 @@ class Config {
         this.followerCallbackStateStoreTime = 3*24*3600; // 3 days
         this.followerCallbackSynchronizationInterval = 12*3600; // 12 hours
         this.ratioNodesSendFollowerCallbackToComplete = new BigDecimal(0.3);
+    }
+
+    /**
+     * Update network consensus.
+     *
+     * @param {number} n - Number of nodes in network.
+     */
+    updateConsensus(n) {
+        this.negativeConsensus = Math.ceil(n * 0.11);
+        if (this.negativeConsensus < 1)
+            this.negativeConsensus = 1;
+        this.positiveConsensus = Math.floor(n * 0.90);
+        if (this.negativeConsensus + this.positiveConsensus === n)
+            this.negativeConsensus += 1;
+        this.resyncBreakConsensus = Math.ceil(n * 0.2);
+        if (this.resyncBreakConsensus < 1)
+            this.resyncBreakConsensus = 1;
+        if (this.resyncBreakConsensus + this.positiveConsensus === n)
+            this.resyncBreakConsensus += 1;
+
+        if (this.main != null)
+            this.main.logger.log(this.main.myInfo.number + ": Network consensus is set to (negative/positive/resyncBreak): " +
+                this.negativeConsensus + " / " + this.positiveConsensus + " / " + this.resyncBreakConsensus);
     }
 }
 
