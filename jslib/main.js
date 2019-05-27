@@ -51,14 +51,6 @@ class Main {
         if (this.parser.options.has("nolog"))
             this.logger.nolog = true;
 
-        if (this.parser.values.has("verbose")) {
-
-        }
-
-        if (this.parser.values.has("udp-verbose")) {
-
-        }
-
         if (this.parser.values.has("config")) {
             await this.loadNodeConfig();
             await this.loadNetConfig();
@@ -76,9 +68,17 @@ class Main {
             return;
         }
 
-        //startClientHttpServer();
+        this.startClientHttpServer();
 
         //startNode();
+
+        if (this.parser.values.has("verbose")) {
+
+        }
+
+        if (this.parser.values.has("udp-verbose")) {
+
+        }
 
         return this;
     }
@@ -159,13 +159,13 @@ class Main {
     }
 
     startClientHttpServer() {
-        /*console.log("prepare to start client HTTP server on " + this.myInfo.clientAddress.port);
+        this.logger.log("prepare to start client HTTP server on " + this.myInfo.clientAddress.port);
 
         this.clientHTTPServer = new ClientHTTPServer(this.nodeKey, this.myInfo.clientAddress.port, this.logger);
-        this.clientHTTPServer.cache = cache;
-        this.clientHTTPServer.parcelCache = parcelCache;
-        this.clientHTTPServer.netConfig = netConfig;*/
-//        node = new Node()
+        this.clientHTTPServer.netConfig = this.netConfig;
+        //TODO: caches
+        //this.clientHTTPServer.cache = this.cache;
+        //this.clientHTTPServer.parcelCache = this.parcelCache;
     }
 
     restartUDPAdapter() {
@@ -175,6 +175,9 @@ class Main {
     async shutdown() {
         if (this.ledger != null)
             await this.ledger.close();
+
+        if (this.clientHTTPServer != null)
+            this.clientHTTPServer.shutdown();
     }
 }
 

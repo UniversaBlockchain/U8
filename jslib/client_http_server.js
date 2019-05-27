@@ -15,7 +15,7 @@ const Contract = require("contract").Contract;
 class ClientHTTPServer extends network.HttpServer {
 
     constructor(privateKey, port, logger) {
-        super();
+        super("0.0.0.0", port, 32, 4096);
         this.node = null;
         this.log = logger;
         this.nodeKey = privateKey;
@@ -23,8 +23,12 @@ class ClientHTTPServer extends network.HttpServer {
         this.parcelCache = null;
         this.envCache = null;
         this.config = new Config();
+        this.localCors = false;
 
-        this.on("/contracts", (request, response) => {
+        this.on("/contracts", async (request) => {
+
+            console.log("!!!!!!!" + request.queryString);
+
             let encodedString = request.queryString.substring(11);
 
             // this is a bug - path has '+' decoded as ' '
@@ -43,24 +47,22 @@ class ClientHTTPServer extends network.HttpServer {
                 }
 
                 if (data == null)
-                    data = this.node.ledger.getContractInStorage(id);
+                    data = await this.node.ledger.getContractInStorage(id);
 
                 if (data == null && this.node.config.permanetMode)
-                    data = this.node.ledger.getKeepingItem(id);
+                    data = await this.node.ledger.getKeepingItem(id);
             }
 
-            //TODO: response
             if (data !== null) {
                 // contracts are immutable: cache forever
-                let hh = response.headers;
-                hh["Expires"] =  "Thu, 31 Dec 2037 23:55:55 GMT";
-                hh["Cache-Control"] = "max-age=315360000";
-                response.setBody(data);
+                request.setHeader("Expires", "Thu, 31 Dec 2037 23:55:55 GMT");
+                request.setHeader("Cache-Control", "max-age=315360000");
+                request.setAnswerBody(data);
             } else
-                response.responseCode = "404";
+                request.setStatusCode(404);
         });
 
-        this.on("/parcels", (request, response) => {
+        /*this.on("/parcels", (request, response) => {
             let encodedString = request.queryString.substring(9);
 
             // this is a bug - path has '+' decoded as ' '
@@ -71,12 +73,12 @@ class ClientHTTPServer extends network.HttpServer {
                 data = utf8Encode("the cache test data");
             else {
                 let id = crypto.HashId.withDigest(encodedString);
-                /*if (this.parcelCache != null) {              // TODO
-                    let p = this.parcelCache.id;
-                    if (p != null) {
-                        data = p.pack();
-                    }
-                }*/
+                //if (this.parcelCache != null) {              // TODO
+                //    let p = this.parcelCache.id;
+                //    if (p != null) {
+                //        data = p.pack();
+                //    }
+                //}
             }
             if (data != null) {
                 // contracts are immutable: cache forever
@@ -100,12 +102,12 @@ class ClientHTTPServer extends network.HttpServer {
 
             let data = null;
             //TODO: implement envCache
-            /*if (envCache != null) {
-                NImmutableEnvironment nie =  envCache.get(id);
-                if (nie != null) {
-                    data = Boss.pack(nie);
-                }
-            }*/
+            //if (envCache != null) {
+            //    NImmutableEnvironment nie =  envCache.get(id);
+            //    if (nie != null) {
+            //        data = Boss.pack(nie);
+            //    }
+            //}
 
             let nie =  this.node.ledger.getEnvironment(id);
 
@@ -225,14 +227,15 @@ class ClientHTTPServer extends network.HttpServer {
         this.addSecureEndpoint("getContract", this.getContract);
 
         this.addSecureEndpoint("followerGetRate", this.followerGetRate);
-        this.addSecureEndpoint("queryFollowerInfo", this.queryFollowerInfo);
+        this.addSecureEndpoint("queryFollowerInfo", this.queryFollowerInfo);*/
 
+        super.startServer();
     }
 
     shutdown() {
-        this.es.shutdown();
-        this.node.shutdown();
-        super.shutdown();
+        //this.es.shutdown();
+        //this.node.shutdown();
+        super.stopServer();
     }
 
     unsRate(params, session) {
@@ -570,15 +573,16 @@ class ClientHTTPServer extends network.HttpServer {
     }
 
     on(path, handler) {
-        super.on(path, (request, response) => {
+        super.addRawEndpoint(path, async (request) => {
             if (this.localCors) {
-                let hh = response.headers;
-                hh["Access-Control-Allow-Origin"] =  "*";
-                hh["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS";
-                hh["Access-Control-Allow-Headers"] = "DNT,X-CustomHeader,Keep-Alive,User-Age  nt,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Content-Range,Range";
-                hh["Access-Control-Expose-Headers"] = "DNT,X-CustomHeader,Keep-Alive,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Content-Range,Range";
+                request.setHeader("Access-Control-Allow-Origin", "*");
+                request.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+                request.setHeader("Access-Control-Allow-Headers", "DNT,X-CustomHeader,Keep-Alive,User-Age  nt,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Content-Range,Range");
+                request.setHeader("Access-Control-Expose-Headers", "DNT,X-CustomHeader,Keep-Alive,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Content-Range,Range");
             }
-            handler.handle(request, response);
+
+            await handler(request);
+            request.sendAnswer();
         });
     }
 

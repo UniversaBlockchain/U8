@@ -1,4 +1,7 @@
 import {expect, assert, unit} from 'test'
+import {HashId} from 'crypto'
+import {randomBytes} from 'tools'
+import * as tk from 'unit_tests/test_keys'
 
 const Main = require("main").Main;
 
@@ -83,4 +86,37 @@ unit.test("main_test: startNode", async () => {
     assert(main.logger.buffer.includes("node local URL: " + main.myInfo.serverUrlString()));
     assert(main.logger.buffer.includes("node public URL: " + main.myInfo.publicUrlString()));
     assert(main.logger.buffer.includes("Network configuration is loaded from " + main.configRoot + ", " + main.netConfig.size + " nodes."));
+});
+
+unit.test("main_test: sendHttpRequest", async () => {
+    let main = await new Main("--test", "--config", "../test/config/test_node_config_v2/node1", "--nolog").run();
+
+    //main.clientHTTPServer.node = {ledger: main.ledger};
+
+    let httpClient = new network.HttpClient(32, 4096);
+
+    let answer = false;
+    httpClient.sendGetRequest("localhost:" + main.myInfo.clientAddress.port + "/contracts/" + HashId.of(randomBytes(64)).base64, (respCode, body) => {
+        assert(respCode === 404);
+        answer = true;
+    });
+
+    while (!answer)
+        await sleep(1);
+
+    let contract = Contract.fromPrivateKey(tk.TestKeys.getKey());
+    await contract.seal();
+
+    await main.ledger.saveContractInStorage(contract.id, contract.getPackedTransaction(), contract.getExpiresAt(), contract.getOrigin(), 0);
+
+    answer = false;
+    httpClient.sendGetRequest("localhost:" + main.myInfo.clientAddress.port + "/contracts/" + contract.id.base64, (respCode, body) => {
+        console.log("[" + respCode + "]: " + body);
+        answer = true;
+    });
+
+    while (!answer)
+        await sleep(1);
+
+    await main.shutdown();
 });

@@ -1,7 +1,6 @@
 import * as db from 'pg_driver'
 import * as trs from 'timers'
-import {HashId, PrivateKey} from 'crypto'
-import {NodeInfo, NetConfig} from 'web'
+import {HashId} from 'crypto'
 
 const StateRecord = require("staterecord").StateRecord;
 const ItemState = require("itemstate").ItemState;
@@ -1289,7 +1288,7 @@ class Ledger {
      * @param {StateRecord} record - Record in storage.
      * @param {Contract} item - Contract.
      * @param {Date} keepTill - Time keep till.
-     * @return {Promise<void>}
+     * @return {Promise<void> | void}
      */
     putItem(record, item, keepTill) {
         if (!item instanceof Contract)
@@ -1305,10 +1304,10 @@ class Ledger {
      * Get stored item on his contract ID.
      *
      * @param {HashId} itemId - Contract ID.
-     * @return {Promise<number[]>} packed Contract
+     * @return {Promise<Uint8Array>} packed Contract
      */
     getKeepingItem(itemId) {
-        return this.simpleQuery("select packed from keeping_items where hash = ? limit 1",
+        return this.simpleQuery("select * from kept_items, ledger where ledger.hash = ? and ledger.id = kept_items.ledger_id limit 1",
             null,
             itemId.digest);
     }
@@ -1318,20 +1317,18 @@ class Ledger {
      *
      * @param {StateRecord} record - State record.
      * @param {Contract} item - Contract.
-     * @return {Promise<void>}
+     * @return {Promise<void> | void}
      */
     putKeepingItem(record, item) {
         if (!item instanceof Contract)
             return;
 
-        return this.simpleUpdate("insert into keeping_items (id,hash,origin,parent,packed) values(?,?,?,?,?);",
-            record != null ? record.recordId : null,
-            item.id.digest,
-            item.origin.digest,
+        return this.simpleUpdate("insert into kept_items (ledger_id,origin,parent,packed) values(?,?,?,?);",
+            record.recordId,
+            item.getOrigin().digest,
             item.parent != null ? item.parent.digest : null,
             item.getPackedTransaction()
         );
-
     }
 
     /**
