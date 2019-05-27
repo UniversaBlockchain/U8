@@ -28,9 +28,6 @@ class ClientHTTPServer extends network.HttpServer {
         this.localCors = false;
 
         this.on("/contracts", async (request) => {
-
-            console.log("!!!!!!!" + request.queryString);
-
             let encodedString = request.path.substring(11);
 
             // this is a bug - path has '+' decoded as ' '
@@ -43,9 +40,8 @@ class ClientHTTPServer extends network.HttpServer {
                 let id = crypto.HashId.withBase64Digest(encodedString);
                 if (this.cache != null) {
                     let c = this.cache.get(id);
-                    if (c != null) {
+                    if (c != null)
                         data = c.getPackedTransaction();
-                    }
                 }
 
                 if (data == null)
@@ -75,13 +71,13 @@ class ClientHTTPServer extends network.HttpServer {
                 data = utf8Encode("the cache test data");
             else {
                 let id = crypto.HashId.withBase64Digest(encodedString);
-                //if (this.parcelCache != null) {              // TODO
-                //    let p = this.parcelCache.id;
-                //    if (p != null) {
-                //        data = p.pack();
-                //    }
-                //}
+                if (this.parcelCache != null) {
+                    let p = this.parcelCache.get(id);
+                    if (p != null)
+                        data = p.pack();
+                }
             }
+
             if (data != null) {
                 // contracts are immutable: cache forever
                 request.setHeader("Expires", "Thu, 31 Dec 2037 23:55:55 GMT");
@@ -103,18 +99,15 @@ class ClientHTTPServer extends network.HttpServer {
 
             let data = null;
             //TODO: implement envCache
-            //if (envCache != null) {
-            //    NImmutableEnvironment nie =  envCache.get(id);
-            //    if (nie != null) {
-            //        data = Boss.pack(nie);
-            //    }
-            //}
+            if (this.envCache != null) {
+                let nie = this.envCache.get(id);
+                if (nie != null)
+                    data = Boss.dump(nie);
+            }
 
             let nie = await this.node.ledger.getEnvironment(id);
-
-            if (nie != null) {
-                data = Boss.pack(nie);
-            }
+            if (nie != null)
+                data = Boss.dump(nie);
 
             if (data != null) {
                 // contracts are immutable: cache forever
@@ -125,88 +118,63 @@ class ClientHTTPServer extends network.HttpServer {
                 request.setStatusCode(404);
         });
 
-        /*this.addEndpoint("/network", (params, result) => {
-            if (this.networkData == null) {
-                let nodes = [];
+        this.addEndpoint("/network", async (request) => {
+            let nodes = [];
 
-                if (this.netConfig != null) {
-                    this.netConfig.toList().forEach(node => {
-                        nodes.push({
-                            url: node.publicUrlString(),
-                            key: node.publicKey.packed,
-                            number: node.number
-                        });
+            if (this.netConfig != null)
+                this.netConfig.toList().forEach(node => {
+                    nodes.push({
+                        url: node.publicUrlString(),
+                        key: node.publicKey.packed,
+                        number: node.number
                     });
-                }
+                });
 
-                result.version = NODE_VERSION;
-                result.number = this.node.number;
-                result.nodes = nodes;
+            let result = {
+                version: NODE_VERSION,
+                number: this.node.number,
+                nodes: nodes
+            };
 
-                if (params.sign === true) {
-                    result.nodesPacked = Boss.dump(nodes);
-                    result.signature = ExtendedSignature.sign(this.nodeKey, Boss.dump(nodes));
-                    delete result.nodes;
-                }
-            }
-        });
-
-        //TODO: to be removed in near future
-        this.addEndpoint("netsigned", (params, result) => {
-            if (this.networkData == null) {
-                let nodes = [];
-
-                if (this.netConfig != null) {
-                    this.netConfig.toList().forEach(node => {
-                        nodes.push({
-                            url: node.publicUrlString(),
-                            key: node.publicKey.packed,
-                            number: node.number,
-                            IP: node.serverHost,
-                            ipurl: node.publicUrlString()
-                        });
-                    });
-                }
-
-                result.version = NODE_VERSION;
-                result.number = this.node.number;
+            if (request.queryParamsMap.get("sign")) {
                 result.nodesPacked = Boss.dump(nodes);
-                result.signature = ExtendedSignature.sign(this.nodeKey, Boss.dump(nodes));
+                result.signature = await ExtendedSignature.sign(this.nodeKey, Boss.dump(nodes));
                 delete result.nodes;
             }
+
+            return result;
         });
 
-        this.addEndpoint("/topology", (params, result) => {
-            if (this.networkData == null) {
-                let res = [];
-                let nodes = [];
+        this.addEndpoint("/topology", async (request) => {
+            let nodes = [];
 
-                res.version = NODE_VERSION;
-                res.number = this.node.number;
-                res.nodes = nodes;
+            if (this.netConfig != null)
+                this.netConfig.toList().forEach(node => {
+                    let directUrls = [];
+                    let domainUrls = [];
+                    directUrls.push(node.directUrlStringV4());
+                    domainUrls.push(node.domainUrlStringV4());
 
-                if (this.netConfig != null) {
-                    this.netConfig.toList().forEach(node => {
-                        let directUrls = [];
-                        let domainUrls = [];
-                        directUrls.push(node.directUrlStringV4());
-                        domainUrls.push(node.domainUrlStringV4());
-
-                        nodes.push({
-                            number: node.number,
-                            key: node.publicKey.packed,
-                            name: node.name,
-                            direct_urls: directUrls,
-                            domain_urls: domainUrls
-                        });
+                    nodes.push({
+                        number: node.number,
+                        key: node.publicKey.packed,
+                        name: node.name,
+                        direct_urls: directUrls,
+                        domain_urls: domainUrls
                     });
-                }
+                });
 
-                let packedData = Boss.dump(res);
-                let signature = ExtendedSignature.sign(this.nodeKey,packedData);
-                result.packed_data = packedData;
-                result.signature = signature;
-            }
+            let packedData = Boss.dump({
+                version: NODE_VERSION,
+                number: this.node.number,
+                nodes: nodes
+            });
+            let signature = await ExtendedSignature.sign(this.nodeKey, packedData);
+
+            return {
+                packed_data: packedData,
+                signature: signature
+            };
         });
 
         this.addSecureEndpoint("getStats", this.getStats);
@@ -225,9 +193,8 @@ class ClientHTTPServer extends network.HttpServer {
         this.addSecureEndpoint("queryNameContract", this.queryNameContract);
         this.addSecureEndpoint("getBody", this.getBody);
         this.addSecureEndpoint("getContract", this.getContract);
-
         this.addSecureEndpoint("followerGetRate", this.followerGetRate);
-        this.addSecureEndpoint("queryFollowerInfo", this.queryFollowerInfo);*/
+        this.addSecureEndpoint("queryFollowerInfo", this.queryFollowerInfo);
 
         super.startServer();
     }

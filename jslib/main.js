@@ -162,6 +162,8 @@ class Main {
 
         this.clientHTTPServer = new ClientHTTPServer(this.nodeKey, this.myInfo.clientAddress.port, this.logger);
         this.clientHTTPServer.netConfig = this.netConfig;
+        this.clientHTTPServer.config = this.config;
+        this.clientHTTPServer.localCors = this.myInfo.publicHost === "localhost";
     }
 
     startNode() {
@@ -170,11 +172,9 @@ class Main {
         //this.cache = this.node.cache;
         //this.parcelCache = this.node.parcelCache;
 
-        this.clientHTTPServer.config = this.config;
         this.clientHTTPServer.node = this.node;
         this.clientHTTPServer.cache = this.cache;
         this.clientHTTPServer.parcelCache = this.parcelCache;
-        this.clientHTTPServer.localCors = this.myInfo.publicHost === "localhost";
     }
 
     setVerboseLevel(level) {

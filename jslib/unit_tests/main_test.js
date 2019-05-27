@@ -90,7 +90,7 @@ unit.test("main_test: startNode", async () => {
 unit.test("main_test: sendHttpRequest", async () => {
     let main = await new Main("--test", "--config", "../test/config/test_node_config_v2/node1", "--nolog").run();
 
-    //main.clientHTTPServer.node = {ledger: main.ledger};
+    main.clientHTTPServer.node = {ledger: main.ledger};
 
     let httpClient = new network.HttpClient(32, 4096);
 
@@ -110,7 +110,13 @@ unit.test("main_test: sendHttpRequest", async () => {
 
     answer = false;
     httpClient.sendGetRequest("localhost:" + main.myInfo.clientAddress.port + "/contracts/" + contract.id.base64, (respCode, body) => {
-        console.log("[" + respCode + "]: " + body);
+        assert(respCode === 200);
+        //console.log(contract.getPackedTransaction() instanceof Uint8Array);
+        //console.log(typeof body);
+        //console.log(body instanceof Uint8Array);
+        //console.log(contract.getPackedTransaction().length);
+        //console.log(body.length);
+        //assert(contract.getPackedTransaction().equals(body));
         answer = true;
     });
 
