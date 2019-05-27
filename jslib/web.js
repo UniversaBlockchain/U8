@@ -245,6 +245,10 @@ network.HttpServerRequest = class {
         return this.memoise('__getEndpoint', () => this.reqBuf_.getEndpoint(this.indx_));
     }
 
+    get path() {
+        return this.memoise('__getPath', () => this.reqBuf_.getPath(this.indx_));
+    }
+
     get queryString() {
         return this.memoise('__queryString', () => this.reqBuf_.getQueryString(this.indx_));
     }

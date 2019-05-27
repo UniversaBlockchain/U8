@@ -12,7 +12,7 @@
 
 namespace network {
 
-HttpServerRequest::HttpServerRequest(mg_connection* con, http_message *hm, std::shared_ptr<mg_mgr> mgr, std::string endpoint) {
+HttpServerRequest::HttpServerRequest(mg_connection* con, http_message *hm, std::shared_ptr<mg_mgr> mgr, const std::string& endpoint, const std::string& path) {
     con_ = con;
     queryString_ = std::string(hm->query_string.p, hm->query_string.len);
     method_ = std::string(hm->method.p, hm->method.len);
@@ -20,6 +20,7 @@ HttpServerRequest::HttpServerRequest(mg_connection* con, http_message *hm, std::
     memcpy(&body_[0], hm->body.p, hm->body.len);
     mgr_ = mgr;
     endpoint_ = endpoint;
+    path_ = path;
     extHeaders_["Content-Type"] = "application/octet-stream";
     extHeaders_["Connection"] = "close";
 }
@@ -112,13 +113,23 @@ HttpService::HttpService(std::string host, int port, int poolSize)
             HttpService* server = (HttpService*)nc->mgr->user_data;
             http_message* hm = (http_message*)ev_data;
             std::string strUri = std::string(hm->uri.p, hm->uri.len);
-            if (server->routes_.find(strUri) != server->routes_.end()) {
-                HttpServerRequest* request = new HttpServerRequest(nc, hm, server->mgr_, strUri);
-                server->receivePool_.execute([server,strUri,request](){
-                    server->routes_[strUri](request);
-                });
-            } else {
-                printf("404 for: %s\n", strUri.c_str());
+            std::string s = strUri;
+            size_t indx = s.size();
+            bool show404 = true;
+            while (indx != std::string::npos) {
+                s = strUri.substr(0, indx);
+                if (server->routes_.find(s) != server->routes_.end()) {
+                    show404 = false;
+                    HttpServerRequest* request = new HttpServerRequest(nc, hm, server->mgr_, s, strUri);
+                    server->receivePool_.execute([server,s,request](){
+                        server->routes_[s](request);
+                    });
+                    break;
+                }
+                indx = s.find_last_of("/", string::npos);
+            }
+            if (show404) {
+                //printf("404 for: %s\n", strUri.c_str());
                 mg_http_send_error(nc, 404, nullptr);
             }
         }

@@ -23,7 +23,7 @@ namespace network {
 class HttpServerRequest {
 public:
     HttpServerRequest() {}
-    HttpServerRequest(mg_connection* con, http_message *hm, std::shared_ptr<mg_mgr> mgr, std::string endpoint);
+    HttpServerRequest(mg_connection* con, http_message *hm, std::shared_ptr<mg_mgr> mgr, const std::string& endpoint, const std::string& path);
 public:
     void setStatusCode(int code);
     void setHeader(const std::string& key, const std::string& value);
@@ -33,6 +33,7 @@ public:
     void sendAnswerFromAnotherThread();
     void sendAnswer();
     std::string getEndpoint() {return endpoint_;}
+    std::string getPath() {return path_;}
     std::string getQueryString();
     std::string getMethod();
     byte_vector getRequestBody();
@@ -47,6 +48,7 @@ protected:
     std::unordered_map<std::string, std::string> extHeaders_;
     byte_vector answerBody_;
     std::string endpoint_;
+    std::string path_;
 };
 
 // encapsulates mongoose web server

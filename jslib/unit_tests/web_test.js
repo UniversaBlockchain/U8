@@ -27,6 +27,7 @@ unit.test("hello web", async () => {
         request.sendAnswer();
     });
     httpServer.addEndpoint("/ping", async (request) => {
+        console.log("path: " + request.path);
         request.setHeader("Content-Type", "text/html");
         await sleep(1000);
         //return {"ping": "pong", "val": some_undefined_var_for_exception_throwing};

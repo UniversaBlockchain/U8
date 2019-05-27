@@ -473,6 +473,9 @@ public:
     std::string getEndpoint(int idx) {
         return buf_.at(idx)->getEndpoint();
     }
+    std::string getPath(int idx) {
+        return buf_.at(idx)->getPath();
+    }
     int getBufLength() {
         return (int)buf_.size();
     }
@@ -949,6 +952,17 @@ void HttpServerRequestBuf_getEndpoint(const FunctionCallbackInfo<Value> &args) {
     });
 }
 
+void HttpServerRequestBuf_getPath(const FunctionCallbackInfo<Value> &args) {
+    Scripter::unwrapArgs(args, [](ArgsContext &ac) {
+        if (ac.args.Length() == 1) {
+            auto httpServerRequestBuf = unwrap<HttpServerRequestBuf>(ac.args.This());
+            ac.setReturnValue(ac.v8String(httpServerRequestBuf->getPath(ac.asInt(0))));
+            return;
+        }
+        ac.throwError("invalid arguments");
+    });
+}
+
 void HttpServerRequestBuf_getBufLength(const FunctionCallbackInfo<Value> &args) {
     Scripter::unwrapArgs(args, [](ArgsContext &ac) {
         if (ac.args.Length() == 0) {
@@ -1005,6 +1019,7 @@ void JsInitHttpServerRequest(Isolate *isolate, const Local<ObjectTemplate> &glob
     prototype->Set(isolate, "setAnswerBody", FunctionTemplate::New(isolate, HttpServerRequestBuf_setAnswerBody));
     prototype->Set(isolate, "sendAnswer", FunctionTemplate::New(isolate, HttpServerRequestBuf_sendAnswer));
     prototype->Set(isolate, "getEndpoint", FunctionTemplate::New(isolate, HttpServerRequestBuf_getEndpoint));
+    prototype->Set(isolate, "getPath", FunctionTemplate::New(isolate, HttpServerRequestBuf_getPath));
     prototype->Set(isolate, "getBufLength", FunctionTemplate::New(isolate, HttpServerRequestBuf_getBufLength));
     prototype->Set(isolate, "getQueryString", FunctionTemplate::New(isolate, HttpServerRequestBuf_getQueryString));
     prototype->Set(isolate, "getMethod", FunctionTemplate::New(isolate, HttpServerRequestBuf_getMethod));
