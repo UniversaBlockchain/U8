@@ -7,12 +7,13 @@ const ItemResult = require('itemresult.js');
 unit.test("hello web", async () => {
     let httpServer = new network.HttpServer("0.0.0.0", 8080, 1, 20);
     let counter = 0;
-    httpServer.addRawEndpoint("/testPage", (request) => {
+    httpServer.addRawEndpoint("/testPage", async (request) => {
         //console.log("getEndpoint: " + request.endpoint);
         //console.log("method: " + request.method);
         ++counter;
         let a = request.queryParamsMap.get('a');
         let b = request.queryParamsMap.get('b');
+        await sleep(1);
         request.setHeader("Content-Type", "text/html");
         //console.log("queryString: " + request.queryString);
         request.setAnswerBody("httpServer: on /testPage counter="+(a*b+counter));
@@ -25,10 +26,11 @@ unit.test("hello web", async () => {
         request.setAnswerBody("httpServer: on /testPage2 some text");
         request.sendAnswer();
     });
-    httpServer.addEndpoint("/ping", (request) => {
+    httpServer.addEndpoint("/ping", async (request) => {
         request.setHeader("Content-Type", "text/html");
-        return {"ping": "pong", "val": some_undefined_var_for_exception_throwing};
-        //return {"ping": "pong"};
+        await sleep(1000);
+        //return {"ping": "pong", "val": some_undefined_var_for_exception_throwing};
+        return {"ping": "pong"};
     });
     httpServer.addEndpoint("/connect1", (request) => {
         request.setHeader("Content-Type", "text/html");
@@ -38,9 +40,10 @@ unit.test("hello web", async () => {
         return {"ping": "pong"};
     });
     let unsRateDbg = 333;
-    httpServer.addSecureEndpoint("unsRate", (reqParams) => {
+    httpServer.addSecureEndpoint("unsRate", async (reqParams) => {
         //console.log(JSON.stringify(reqParams));
         unsRateDbg += 1;
+        await sleep(1);
         return {U: unsRateDbg};
     });
     httpServer.startServer();

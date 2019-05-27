@@ -466,6 +466,9 @@ public:
     }
     void sendAnswer(int idx) {
         buf_.at(idx)->sendAnswerFromAnotherThread();
+        ++sendAnswerCounter;
+        if (sendAnswerCounter >= buf_.size())
+            delete this;
     }
     std::string getEndpoint(int idx) {
         return buf_.at(idx)->getEndpoint();
@@ -488,10 +491,14 @@ public:
     }
 private:
     std::vector<HttpServerRequest*> buf_;
+    size_t sendAnswerCounter = 0;
 };
 
 class HttpServerSecureRequestBuf {
 public:
+    void setAnswersReadyCallback(std::function<void()>&& onAnswersReady) {
+        onAnswersReady_ = std::move(onAnswersReady);
+    }
     void sendAnswer(int idx) {
         //buf_.at(idx)->sendAnswerFromAnotherThread();
     }
@@ -503,6 +510,9 @@ public:
     }
     void setAnswer(int idx, byte_vector&& ans) {
         answers_[idx] = std::move(ans);
+        ++answersCount_;
+        if (answersCount_ >= buf_.size())
+            onAnswersReady_();
     }
 public:
     void addHttpServerSecureRequest(const byte_vector& paramsBin) {
@@ -517,6 +527,8 @@ public:
 private:
     std::vector<byte_vector> buf_;
     std::vector<byte_vector> answers_;
+    size_t answersCount_ = 0;
+    std::function<void()> onAnswersReady_;
 };
 
 class HttpServerBuffered {
@@ -596,7 +608,7 @@ private:
                         buf->addHttpServerRequest(bufCopy[i]);
                     Local<Value> res[1] = {wrap(HttpServerRequestBufTpl, se_->isolate(), buf)};
                     auto unused = fn->Call(context, fn, 1, res);
-                    delete buf;
+                    // delete buf from HttpServerRequestBuf::sendAnswer
                 }
             });
         }
@@ -615,11 +627,13 @@ private:
                     for (int i = 0; i < bufCopy.size(); ++i)
                         buf->addHttpServerSecureRequest(bufCopy[i].first);
                     buf->resizeAnswersBuf();
+                    buf->setAnswersReadyCallback([bufCopy,buf](){
+                        for (int i = 0; i < bufCopy.size(); ++i)
+                            bufCopy[i].second(buf->getAnswer(i));
+                        delete buf;
+                    });
                     Local<Value> res[1] = {wrap(HttpServerRequestSecureBufTpl, seSecure_->isolate(), buf)};
                     auto unused = fn->Call(context, fn, 1, res);
-                    for (int i = 0; i < bufCopy.size(); ++i)
-                        bufCopy[i].second(buf->getAnswer(i));
-                    delete buf;
                 }
             });
         }

@@ -277,41 +277,51 @@ network.HttpServer = class {
         this.httpServer_ = new network.HttpServerImpl(host, port, poolSize, bufSize);
         this.endpoints_ = new Map();
         this.secureEndpoints_ = new Map();
-        this.httpServer_.__setBufferedCallback((reqBuf) => {
+        this.httpServer_.__setBufferedCallback(async (reqBuf) => {
             let length = reqBuf.getBufLength();
+            let promises = [];
             for (let i = 0; i < length; ++i) {
                 let req = new network.HttpServerRequest(reqBuf, i);
                 let endpoint = req.endpoint;
                 if (this.endpoints_.has(endpoint)) {
-                    this.endpoints_.get(endpoint)(req);
+                    promises.push(this.endpoints_.get(endpoint)(req));
                 } else {
                     req.setStatusCode(404);
                     req.setAnswerBody("404 page not found");
                     req.sendAnswer();
                 }
             }
+            await Promise.all(promises);
         });
-        this.httpServer_.__setBufferedSecureCallback((reqBuf) => {
+        this.httpServer_.__setBufferedSecureCallback(async (reqBuf) => {
             let length = reqBuf.getBufLength();
             //console.log("length = " + length);
+            let promises = [];
             for (let i = 0; i < length; ++i) {
                 let params = Boss.load(reqBuf.getParamsBin(i));
                 switch (params.command) {
                     case "hello":
-                        reqBuf.setAnswer(i, Boss.dump({result: {status: "OK", message: "welcome to the Universa"}}));
+                        //reqBuf.setAnswer(i, Boss.dump({result: {status: "OK", message: "welcome to the Universa"}}));
+                        promises.push({status: "OK", message: "welcome to the Universa"});
                         break;
                     case "sping":
-                        reqBuf.setAnswer(i, Boss.dump({result: {sping: "spong"}}));
+                        //reqBuf.setAnswer(i, Boss.dump({result: {sping: "spong"}}));
+                        promises.push({sping: "spong"});
                         break;
                     case "test_error":
                         throw new Error("sample error");
                         break;
                     default:
                         if (this.secureEndpoints_.has(params.command))
-                            reqBuf.setAnswer(i, Boss.dump({result: this.secureEndpoints_.get(params.command)(params)}));
+                            promises.push(this.secureEndpoints_.get(params.command)(params));
+                            //reqBuf.setAnswer(i, Boss.dump({result: await this.secureEndpoints_.get(params.command)(params)}));
                         else
                             throw new Error("unknown command: " + params.command);
                 }
+            }
+            let results = await Promise.all(promises);
+            for (let i = 0; i < length; ++i) {
+                reqBuf.setAnswer(i, Boss.dump({result: results[i]}));
             }
         });
     }
@@ -331,11 +341,11 @@ network.HttpServer = class {
 
     addEndpoint(endpoint, block) {
         this.httpServer_.__addEndpoint(endpoint);
-        this.endpoints_.set(endpoint, (request)=>{
+        this.endpoints_.set(endpoint, async (request)=>{
             try {
                 request.setAnswerBody(Boss.dump({
                     "result": "ok",
-                    "response": block(request)
+                    "response": await block(request)
                 }));
             } catch (e) {
                 request.setAnswerBody(Boss.dump({
