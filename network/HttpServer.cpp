@@ -132,6 +132,7 @@ void HttpService::start() {
     serverThread_ = std::make_shared<std::thread>([this]() {
         while (!exitFlag_)
             mg_mgr_poll(mgr_.get(), 100);
+        mgr_.reset();
     });
 }
 
