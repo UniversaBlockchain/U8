@@ -1906,7 +1906,7 @@ class Ledger {
     /**
      * Get smart contract by ID.
      *
-     * @param {HashId} smartContractId - Contract ID.
+     * @param {crypto.HashId} smartContractId - Contract ID.
      * @return {Promise<number[]>} - packed smart contract.
      */
     getSmartContractById(smartContractId) {
@@ -1918,7 +1918,7 @@ class Ledger {
     /**
      * Get a contract from storage.
      *
-     * @param {HashId} contractId - Contract ID.
+     * @param {crypto.HashId} contractId - Contract ID.
      * @return {Promise<number[]>} - packed contract.
      */
     getContractInStorage(contractId) {
@@ -1930,8 +1930,8 @@ class Ledger {
     /**
      * Get a list of packed contracts from the repository by origin.
      *
-     * @param {HashId} slotId - Slot contract ID.
-     * @param {HashId} originId - Contracts chain origin.
+     * @param {crypto.HashId} slotId - Slot contract ID.
+     * @param {crypto.HashId} originId - Contracts chain origin.
      * @return {Promise<number[][]>} - list of packed contracts.
      */
     getContractsInStorageByOrigin(slotId, originId) {

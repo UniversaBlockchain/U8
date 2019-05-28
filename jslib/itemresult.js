@@ -1,9 +1,13 @@
 const bs = require("biserializable");
 const dbm = require("defaultbimapper");
 const t = require("tools");
+const ItemState = require("itemstate").ItemState;
 
 
 class ItemResult {
+    static DISCARDED = new ItemResult(ItemState.DISCARDED, false, null, null);
+    static UNDEFINED = new ItemResult(ItemState.UNDEFINED, false, null, null);
+
     constructor() {
         this.state = null;
         this.haveCopy = null;

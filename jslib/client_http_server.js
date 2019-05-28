@@ -238,7 +238,7 @@ class ClientHTTPServer extends network.HttpServer {
     unsRate(params, sessionKey) {
         this.checkNode(sessionKey, true);
 
-        return {U: Config.rate[NSmartContract.SmartContractType.UNS1].toFixed()}
+        return {U: Config.rate[NSmartContract.SmartContractType.UNS1].toFixed()};
     }
 
     async queryNameRecord(params, sessionKey) {
@@ -388,7 +388,7 @@ class ClientHTTPServer extends network.HttpServer {
                 contract = Contract.fromPackedTransaction(t.getOrThrow(params, "packedItem"));
             } catch (err) {
                 console.log("approve ERROR: " + err.message);
-                return {itemResult : this.itemResultOfError(Errors.COMMAND_FAILED,"approve", err.message)}
+                return {itemResult : this.itemResultOfError(Errors.COMMAND_FAILED,"approve", err.message)};
             }
 
             if (contract == null || !contract.isUnlimitKeyContract(config)) {
@@ -421,28 +421,28 @@ class ClientHTTPServer extends network.HttpServer {
         }
     }
 
-    startApproval(params, session) {
-        /*if (this.config === null || this.config.limitFreeRegistrations())
-            if(this.config === null || (
-                !this.config.keysWhiteList.contains(session.publicKey) &&
-                !this.config.addressesWhiteList.stream().anyMatch()addr => addr.isMatchingKey(session.publicKey))) {
+    startApproval(params, sessionKey) {
+        if (this.config == null || this.config.limitFreeRegistrations())
+            if(this.config == null || (
+                !this.config.keysWhiteList.some(key => key.equals(sessionKey)) &&
+                !this.config.addressesWhiteList.some(addr => addr.match(sessionKey)))) {
 
                 console.log("startApproval ERROR: session key shoild be in the white list");
 
                 return {itemResult : this.itemResultOfError(Errors.BAD_CLIENT_KEY,"startApproval", "command needs client key from whitelist")};
             }
 
-        let n = asyncStarts.incrementAndGet();
+        /*let n = asyncStarts.incrementAndGet();
         let k = new AtomicInteger();
         params.getListOrThrow("packedItems").forEach((item) ->
             es.execute(() -> {
                 try {
-                    checkNode(session);
+                    checkNode(sessionKey);
                     console.log("Request to start registration #"+n+":"+k.incrementAndGet());
 
                     this.node.registerItem(Contract.fromPackedTransaction(((Bytes)item).toArray())); //TODO
                 } catch (err) {
-                    e.printStackTrace();
+                    console.log(err.stack);
                 }
             })
         );*/
@@ -451,11 +451,11 @@ class ClientHTTPServer extends network.HttpServer {
         return {};
     }
 
-    getState(params, session) {
-        this.checkNode(session, true);
+    getState(params, sessionKey) {
+        this.checkNode(sessionKey, true);
 
         try {
-            return {itemResult : this.node.checkItem(params.itemId)}; //TODO
+            return {itemResult : this.node.checkItem(params.itemId)}; //TODO node
         } catch (err) {
             console.log(err.stack);
             console.log("getState ERROR: " + err.message);
@@ -465,8 +465,8 @@ class ClientHTTPServer extends network.HttpServer {
 
     }
 
-    resyncItem(params, session) {
-        this.checkNode(session, true);
+    async resyncItem(params, sessionKey) {
+        this.checkNode(sessionKey, true);
 
         let tmpAddress = null;
         try {
@@ -478,10 +478,10 @@ class ClientHTTPServer extends network.HttpServer {
         if (this.config.limitFreeRegistrations)
 
             if(!(
-                tmpAddress.isMatchingKey(session.publicKey) ||
-                this.config.networkAdminKeyAddress.isMatchingKey(session.publicKey) ||
-                this.config.keysWhiteList.contains(session.publicKey) ||
-                this.config.addressesWhiteList().stream().anyMatch(addr => addr.isMatchingKey(session.publicKey))
+                tmpAddress.match(sessionKey) ||
+                Config.networkAdminKeyAddress.match(sessionKey) ||
+                this.config.keysWhiteList.some(key => key.equals(sessionKey)) ||
+                this.config.addressesWhiteList.some(addr => addr.match(sessionKey))
             )) {
                 console.log("approve ERROR: command needs client key from whitelist");
 
@@ -490,7 +490,7 @@ class ClientHTTPServer extends network.HttpServer {
 
         try {
             let result = {itemResult : this.node.checkItem(params.itemId)}; //TODO
-            this.node.resync(params.itemId);
+            await this.node.resync(params.itemId); //TODO: node
             return result;
         } catch (err) {
             console.log("getState ERROR: " + err.message);
@@ -498,8 +498,8 @@ class ClientHTTPServer extends network.HttpServer {
         }
     }
 
-    setVerbose(params, session) {
-        this.checkNode(session, true);
+    setVerbose(params, sessionKey) {
+        this.checkNode(sessionKey, true);
 
         let tmpAddress = null;
         try {
@@ -508,12 +508,11 @@ class ClientHTTPServer extends network.HttpServer {
             console.log(err.stack);
         }
 
-
         if (this.config.limitFreeRegistrations)
-            if(!(tmpAddress.isMatchingKey(session.publicKey) ||
-                this.config.networkAdminKeyAddress.isMatchingKey(session.publicKey) ||
-                this.config.keysWhiteList.contains(session.publicKey) ||
-                this.config.addressesWhiteList.stream().anyMatch(addr => addr.isMatchingKey(session.publicKey))
+            if(!(tmpAddress.match(sessionKey) ||
+                Config.networkAdminKeyAddress.match(sessionKey) ||
+                this.config.keysWhiteList.some(key => key.equals(sessionKey)) ||
+                this.config.addressesWhiteList.some(addr => addr.match(sessionKey))
             )) {
                 console.log("approve ERROR: command needs client key from whitelist");
 
@@ -553,7 +552,7 @@ class ClientHTTPServer extends network.HttpServer {
                     this.node.UDPVerboseLevel = DatagramAdapter.VerboseLevel.DETAILED;
                 }
             }
-            return Binder.of("itemResult",ItemResult.UNDEFINED);
+            return {itemResult : ItemResult.UNDEFINED};
         } catch (err) {
             console.log("getState ERROR: " + err.message);
 
@@ -561,26 +560,26 @@ class ClientHTTPServer extends network.HttpServer {
         }
     }
 
-    getStats(params, session) {
-        this.checkNode(session, true);
+    getStats(params, sessionKey) {
+        this.checkNode(sessionKey, true);
 
-        if (this.config === null || this.node === null || !( //TODO
-            this.config.networkAdminKeyAddress.isMatchingKey(session.publicKey) ||
-            this.node.myInfo.publicKey.equals(session.publicKey) ||
-            this.config.keysWhiteList.contains(session.publicKey) || //TODO
-            this.config.addressesWhiteList().stream().anyMatch(addr => addr.isMatchingKey(session.publicKey))
+        if (this.config == null || this.node == null || !(
+            Config.networkAdminKeyAddress.match(sessionKey) ||
+            this.node.myInfo.publicKey.equals(sessionKey) || //TODO
+            this.config.keysWhiteList.some(key => key.equals(sessionKey)) ||
+            this.config.addressesWhiteList.some(addr => addr.match(sessionKey))
         )) {
             console.log("command needs admin key");
             return {itemResult : this.itemResultOfError(Errors.BAD_CLIENT_KEY,"getStats", "command needs admin key")};
         }
-        return this.node.provideStats(t.getOrDefault(params, "showDays", null));
+        return this.node.provideStats(t.getOrDefault(params, "showDays", null)); //TODO: node
     }
 
-    getParcelProcessingState(params, session) {
-        this.checkNode(session, true);
+    getParcelProcessingState(params, sessionKey) {
+        this.checkNode(sessionKey, true);
 
         try {
-            return {processingState : this.node.checkParcelProcessingState(params.parcelId)} //TODO
+            return {processingState : this.node.checkParcelProcessingState(params.parcelId)}; //TODO: node
         } catch (err) {
             console.log("getParcelProcessingState ERROR: " + err.message);
 
@@ -589,27 +588,27 @@ class ClientHTTPServer extends network.HttpServer {
         }
     }
 
-    storageGetRate(params, session) {
-        this.checkNode(session, true);
+    storageGetRate(params, sessionKey) {
+        this.checkNode(sessionKey, true);
 
-        return {U: Config.rate[NSmartContract.SmartContractType.SLOT1].toFixed()}
+        return {U: Config.rate[NSmartContract.SmartContractType.SLOT1].toFixed()};
     }
 
-    querySlotInfo(params, session) {
-        this.checkNode(session, true);
+    querySlotInfo(params, sessionKey) {
+        this.checkNode(sessionKey, true);
 
         let slot_id = params.slot_id;
         let slotBin = this.node.ledger.getSmartContractById(crypto.HashId.withBase64Digest(slot_id)); //TODO
 
-        if (slotBin !== null) {
+        if (slotBin != null) {
             let slotContract =  Contract.fromPackedTransaction(slotBin);
             return {slot_state: slotContract.state.data};
         }
         return {slot_state: null};
     }
 
-    queryContract(params, session) {
-        this.checkNode(session, true);
+    queryContract(params, sessionKey) {
+        this.checkNode(sessionKey, true);
 
         let res = {};
         res[contract] = null;
@@ -617,14 +616,14 @@ class ClientHTTPServer extends network.HttpServer {
         let origin_id = params.origin_id;
         let contract_id = params.contract_id;
 
-        if ((origin_id === null) && (contract_id === null))
+        if ((origin_id == null) && (contract_id == null))
             throw new Error("invalid arguments (both origin_id and contract_id are null)");
-        if ((origin_id !== null) && (contract_id !== null))
+        if ((origin_id != null) && (contract_id != null))
             throw new Error("invalid arguments (only one origin_id or contract_id is allowed)");
         let slotBin = this.node.ledger.getSmartContractById(crypto.HashId.withBase64Digest(slot_id)); //TODO
         if (slotBin != null) {
             let slotContract = Contract.fromPackedTransaction(slotBin);
-            if (contract_id !== null) {
+            if (contract_id != null) {
                 let contractHashId = crypto.HashId.withBase64Digest(contract_id);
                 res[contract] = this.node.ledger.getContractInStorage(contractHashId);
             } else if (origin_id != null) {
@@ -649,8 +648,8 @@ class ClientHTTPServer extends network.HttpServer {
         return res;
     }
 
-    followerGetRate(params, session) {
-        this.checkNode(session, true);
+    followerGetRate(params, sessionKey) {
+        this.checkNode(sessionKey, true);
 
         let rateOriginDays = Config.rate[NSmartContract.SmartContractType.FOLLOWER1].toFixed();
         let rateCallback = Config.rate[NSmartContract.SmartContractType.FOLLOWER1 + ":callback"].div.toFixed();
@@ -661,13 +660,13 @@ class ClientHTTPServer extends network.HttpServer {
         };
     }
 
-    queryFollowerInfo(params, session) {
-        this.checkNode(session, true);
+    queryFollowerInfo(params, sessionKey) {
+        this.checkNode(sessionKey, true);
 
         let follower_id = params.follower_id;
-        let followerBin = this.node.ledger.getSmartContractById(crypto.HashId.withBase64Digest(follower_id)); //TODO
+        let followerBin = this.node.ledger.getSmartContractById(crypto.HashId.withBase64Digest(follower_id));
 
-        if (followerBin !== null) {
+        if (followerBin != null) {
             let followerContract =  Contract.fromPackedTransaction(followerBin);
             return {follower_state: followerContract.state.data};
         }
