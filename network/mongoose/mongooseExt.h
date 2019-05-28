@@ -16,6 +16,6 @@ struct mg_connection *mg_connect_http_base(
 struct mg_connection *mg_connect_http_opt1(
     struct mg_mgr *mgr, MG_CB(mg_event_handler_t ev_handler, void *user_data),
     struct mg_connect_opts opts, const char *url, const char *extra_headers,
-    const char *post_data, const char *method);
+    const char *post_data, int post_data_len, const char *method);
 
 #endif //U8_MONGOOSEEXT_H

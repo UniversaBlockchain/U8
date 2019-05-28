@@ -80,7 +80,7 @@ struct mg_connection *mg_connect_http_base(
 struct mg_connection *mg_connect_http_opt1(
     struct mg_mgr *mgr, MG_CB(mg_event_handler_t ev_handler, void *user_data),
     struct mg_connect_opts opts, const char *url, const char *extra_headers,
-    const char *post_data, const char *method) {
+    const char *post_data, int post_data_len, const char *method) {
     struct mg_str user = MG_NULL_STR, null_str = MG_NULL_STR;
     struct mg_str host = MG_NULL_STR, path = MG_NULL_STR;
     struct mbuf auth;
@@ -97,16 +97,20 @@ struct mg_connection *mg_connect_http_opt1(
         mg_basic_auth_header(user, null_str, &auth);
     }
 
-    if (post_data == NULL) post_data = "";
+    if (post_data == NULL) {
+        post_data_len = 0;
+    }
     if (extra_headers == NULL) extra_headers = "";
     if (path.len == 0) path = mg_mk_str("/");
     if (host.len == 0) host = mg_mk_str("");
 
     mg_printf(nc, "%s %.*s HTTP/1.1\r\nHost: %.*s\r\nContent-Length: %" SIZE_T_FMT
-                  "\r\n%.*s%s\r\n%s",
+                  "\r\n%.*s%s\r\n",
               method, (int) path.len, path.p,
-              (int) (path.p - host.p), host.p, strlen(post_data), (int) auth.len,
-              (auth.buf == NULL ? "" : auth.buf), extra_headers, post_data);
+              (int) (path.p - host.p), host.p, (size_t)post_data_len, (int) auth.len,
+              (auth.buf == NULL ? "" : auth.buf), extra_headers);
+    if (post_data_len > 0)
+        mg_send(nc, post_data, post_data_len);
 
     mbuf_free(&auth);
     return nc;

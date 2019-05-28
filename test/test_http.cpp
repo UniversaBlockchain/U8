@@ -16,12 +16,28 @@
 using namespace std;
 using namespace network;
 
+TEST_CASE("serialize_public_key") {
+    crypto::PrivateKey privateKey(2048);
+    crypto::PublicKey publicKey(privateKey);
+    cout << base64_encode(publicKey.pack()) << endl;
+    byte_vector se = BossSerializer::serialize(UBinder::of("client_keyclient_keyclient_key", UBytes(crypto::PublicKey(publicKey).pack()))).get();
+    byte_vector de = UBytes::asInstance(UBinder::asInstance(BossSerializer::deserialize(UBytes(std::move(se)))).get("client_keyclient_keyclient_key")).get();
+    crypto::PublicKey publicKey1(de);
+    cout << base64_encode(publicKey1.pack()) << endl;
+    REQUIRE(publicKey.pack() == publicKey1.pack());
+}
+
 TEST_CASE("http_hello") {
+    crypto::PrivateKey nodePrivateKey(base64_decodeToBytes("JgAcAQABvIDhlmN5xUJsTxP6sFA4fSKHYKB0e7Sh4m/X+siqL7/uP8f6ZAqWr5GpzGW9NSYZP64KeU7pXiTSOUy2/4ONKjqrQ+UWtww2vElpQFyUqlJGh9JKqA2VwZtwEPJxbL/zTJqyW9nXoR8G0Np2/poYtKEydGJlL8QimYTk4WtpI64y7byAuwpRoTxc6LbWoCl6Mz0eaLKMn5JgEuKHn3TJ/Hi62nmhfi9NYluAweMjXYgxaxdNKl5N4IOeL8b0vO/fAVVIfmKKJkq9kAMiRHmOSc4LS15Y1WrTkCSz20wKQMbPFsRzddm9Ml4XD0zCxJi5Bzz2AO1Slo3y2+fkA8CkSjZ3wEs="));
+    crypto::PublicKey nodePublicKey(nodePrivateKey);
     HttpServer httpServer("0.0.0.0", 8080, 4);
     atomic<int> counter(0);
     crypto::PrivateKey privateKey(4096);
     crypto::PublicKey publicKey(privateKey);
     httpServer.addEndpoint("/testPage", [&counter,&publicKey](HttpServerRequest* request){
+//        byte_vector bv0 = request->getRequestBody();
+//        string sbody(bv0.begin(), bv0.end());
+//        cout << sbody << endl;
         request->setHeader("Server", "Universa node");
         string answer("testPage answer #"+to_string(++counter));
         byte_vector bv(answer.begin(), answer.end());
@@ -41,7 +57,9 @@ TEST_CASE("http_hello") {
             if (command == "setVerbose") {
                 printf("secureEndpoint: setVerbose\n");
                 return UBinder::of("result", UBinder::of("itemResult", "setVerbose not implemented in cpp tests"));
-            } else
+            } else if (command == "unsRate") {
+                return UBinder::of("result", UBinder::of("U", 777));
+            }else
                 throw std::invalid_argument("unknown command: " + command);
         }
     };
@@ -60,7 +78,8 @@ TEST_CASE("http_hello") {
     });
     httpServer.start();
 
-    HttpClient httpClient(20);
+    HttpClient httpClient("http://localhost:8080", 20);
+    httpClient.start(crypto::PrivateKey(2048), nodePublicKey);
 
     Semaphore sem;
     atomic<int> readyCounter(0);

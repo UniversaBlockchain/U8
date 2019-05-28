@@ -34,11 +34,11 @@ namespace crypto {
 		std::vector<unsigned char> pack() const;
 
 		// Signature is created using RSA-PSS as described in PKCS# 1 v 2.1.
-		void sign(const std::vector<unsigned char> &input, HashType hashType, std::vector<unsigned char> &output);
+		void sign(const std::vector<unsigned char> &input, HashType hashType, std::vector<unsigned char> &output) const;
 
-		std::vector<unsigned char> sign(const std::vector<unsigned char> &input, HashType hashType);
+		std::vector<unsigned char> sign(const std::vector<unsigned char> &input, HashType hashType) const;
 
-		std::vector<unsigned char> sign(void *data, size_t size, HashType hashType);
+		std::vector<unsigned char> sign(void *data, size_t size, HashType hashType) const;
 
 		void decrypt(const std::vector<unsigned char> &encrypted, std::vector<unsigned char> &output);
 

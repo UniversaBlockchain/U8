@@ -204,17 +204,17 @@ namespace crypto {
 	}
 
 	void
-	PrivateKey::sign(const std::vector<unsigned char> &input, HashType hashType, std::vector<unsigned char> &output) {
+	PrivateKey::sign(const std::vector<unsigned char> &input, HashType hashType, std::vector<unsigned char> &output) const {
 		output.resize(0);
 		auto a = sign(input, hashType);
 		output.insert(output.begin(), a.begin(), a.end());
 	}
 
-	std::vector<unsigned char> PrivateKey::sign(const std::vector<unsigned char> &input, HashType hashType) {
+	std::vector<unsigned char> PrivateKey::sign(const std::vector<unsigned char> &input, HashType hashType) const {
 		return sign((void *) &input[0], input.size(), hashType);
 	}
 
-	std::vector<unsigned char> PrivateKey::sign(void *data, size_t size, HashType hashType) {
+	std::vector<unsigned char> PrivateKey::sign(void *data, size_t size, HashType hashType) const {
 		int mgf1hash_idx = getHashIndex(SHA1);
 		int hash_idx = getHashIndex(hashType);
 		auto desc = getHashDescriptor(hashType);

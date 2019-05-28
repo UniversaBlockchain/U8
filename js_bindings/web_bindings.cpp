@@ -769,7 +769,7 @@ struct HttpClientAnswer {
 
 class HttpClientBuffered {
 public:
-    HttpClientBuffered(int poolSize, int bufSize): httpClient_(poolSize), bufSize_(bufSize) {
+    HttpClientBuffered(int poolSize, int bufSize): httpClient_("localhost:8080", poolSize), bufSize_(bufSize) {
         timer_.scheduleAtFixedRate([this](){
             sendAllFromBuf();
         }, 20, 20);

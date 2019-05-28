@@ -15,6 +15,9 @@
 #include "../network/mongoose/mongoose.h"
 #include "../network/mongoose/mongooseExt.h"
 #include "../tools/ThreadPool.h"
+#include "../crypto/PublicKey.h"
+#include "../crypto/PrivateKey.h"
+#include "../crypto/SymmetricKey.h"
 
 namespace network {
 
@@ -24,6 +27,7 @@ class HttpClientWorker {
 public:
     HttpClientWorker(int newId, HttpClient& parent);
     void sendGetRequest(const std::string& url, std::function<void(int,byte_vector&&)>&& callback);
+    void sendRawRequest(const std::string& url, const std::string& method, const byte_vector& reqBody, std::function<void(int,byte_vector&&)>&& callback);
     int getId() {return id_;}
     void stop() {exitFlag_ = true;};
 private:
@@ -35,14 +39,31 @@ private:
     std::function<void(int,byte_vector&&)> callback_;
 };
 
+struct HttpClientSession {
+    std::string connectMessage;
+    shared_ptr<crypto::PrivateKey> clientPrivateKey;
+    shared_ptr<crypto::SymmetricKey> sessionKey;
+    long sessionId;
+    shared_ptr<crypto::PublicKey> nodePublicKey;
+};
+
 class HttpClient {
 
 public:
-    HttpClient(size_t poolSize);
+    HttpClient(const std::string& rootUrl, size_t poolSize);
     virtual ~HttpClient();
 
     void sendGetRequest(const std::string& url, const std::function<void(int,byte_vector&&)>& callback);
     void sendGetRequest(const std::string& url, std::function<void(int,byte_vector&&)>&& callback);
+
+    void sendRawRequest(const std::string& url, const std::string& method, const byte_vector& reqBody, const std::function<void(int,byte_vector&&)>& callback);
+    void sendRawRequest(const std::string& url, const std::string& method, const byte_vector& reqBody, std::function<void(int,byte_vector&&)>&& callback);
+
+    /**
+     * Authenticate self to the remote party. Blocks until the handshake is done. It is important to start() connection
+     * before any use.
+     */
+    void start(const crypto::PrivateKey& clientKey, const crypto::PublicKey& nodeKey);
 
 private:
     std::shared_ptr<HttpClientWorker> getUnusedWorker();
@@ -56,6 +77,8 @@ private:
     std::condition_variable poolCV_;
     ThreadPool poolControlThread_;
     std::unordered_map<int, std::shared_ptr<HttpClientWorker>> usedWorkers_;
+    std::shared_ptr<HttpClientSession> session_;
+    std::string rootUrl_;
 
 };
 
