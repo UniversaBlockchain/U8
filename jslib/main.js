@@ -178,12 +178,13 @@ class Main {
     }
 
     setVerboseLevel(level) {
-        this.network.setVerboseLevel(level);
-        this.node.setVerboseLevel(level);
+        this.network.verboseLevel = level;
+        this.node.verboseLevel = level;
     }
 
     setUDPVerboseLevel(level) {
-        this.network.setUDPVerboseLevel(level);
+        if (this.network.adapter != null)
+            this.network.adapter.verboseLevel = level;
     }
 
     restartUDPAdapter() {

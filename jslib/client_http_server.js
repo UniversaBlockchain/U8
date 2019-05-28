@@ -19,12 +19,13 @@ class ClientHTTPServer extends network.HttpServer {
     constructor(privateKey, port, logger) {
         super("0.0.0.0", port, 32, 4096);
         this.node = null;
-        this.log = logger;
+        this.logger = logger;
         this.nodeKey = privateKey;
         this.cache = null;
         this.parcelCache = null;
         this.envCache = null;
         this.config = null;
+        this.netConfig = null;
         this.localCors = false;
 
         this.on("/contracts", async (request) => {
@@ -92,8 +93,6 @@ class ClientHTTPServer extends network.HttpServer {
 
             // this is a bug - path has '+' decoded as ' '
             encodedString = encodedString.replace(/ /g, "+");
-
-            console.log("/environments " + encodedString);
 
             let id = crypto.HashId.withBase64Digest(encodedString);
 
@@ -182,6 +181,7 @@ class ClientHTTPServer extends network.HttpServer {
         this.addSecureEndpoint("getParcelProcessingState", this.getParcelProcessingState);
         this.addSecureEndpoint("approve", this.approve);
         this.addSecureEndpoint("resyncItem", this.resyncItem);
+        this.addSecureEndpoint("pingNode", this.pingNode);
         this.addSecureEndpoint("setVerbose", this.setVerbose);
         this.addSecureEndpoint("approveParcel", this.approveParcel);
         this.addSecureEndpoint("startApproval", this.startApproval);
@@ -195,6 +195,7 @@ class ClientHTTPServer extends network.HttpServer {
         this.addSecureEndpoint("getContract", this.getContract);
         this.addSecureEndpoint("followerGetRate", this.followerGetRate);
         this.addSecureEndpoint("queryFollowerInfo", this.queryFollowerInfo);
+        this.addSecureEndpoint("proxy", this.proxy);
 
         super.startServer();
     }
@@ -373,96 +374,90 @@ class ClientHTTPServer extends network.HttpServer {
         return itemResult;
     }
 
-    approve(params, sessionKey) {
+    async approve(params, sessionKey) {
         this.checkNode(sessionKey);
 
-        if (this.config.limitFreeRegistrations() &&
-            (!(
-                Config.networkAdminKeyAddress.match(sessionKey) ||
-                this.config.keysWhiteList.some(key => key.equals(sessionKey)) ||
-                this.config.addressesWhiteList.some(addr => addr.match(sessionKey))
-            ))) {
-
+        if (this.config.limitFreeRegistrations() && !(
+            Config.networkAdminKeyAddress.match(sessionKey) ||
+            this.config.keysWhiteList.some(key => key.equals(sessionKey)) ||
+            this.config.addressesWhiteList.some(addr => addr.match(sessionKey))))
+        {
             let contract = null;
             try {
                 contract = Contract.fromPackedTransaction(t.getOrThrow(params, "packedItem"));
             } catch (err) {
-                console.log("approve ERROR: " + err.message);
+                this.logger.log("approve ERROR: " + err.message);
                 return {itemResult : this.itemResultOfError(Errors.COMMAND_FAILED,"approve", err.message)};
             }
 
             if (contract == null || !contract.isUnlimitKeyContract(config)) {
                 if (contract.errors.length > 0) {
-                    contract.errors.forEach(err => console.log(err.message));
-                    return {itemResult : this.itemResultOfError(Errors.FAILED_CHECK,"approve", contract.errors[contract.errors.length - 1].message)};
+                    contract.errors.forEach(err => this.logger.log(err.message));
+                    return {itemResult : this.itemResultOfError(Errors.FAILED_CHECK, "approve", contract.errors[contract.errors.length - 1].message)};
                 } else {
-                    console.log("approve ERROR: command needs client key from whitelist");
-                    return {itemResult : this.itemResultOfError(Errors.BAD_CLIENT_KEY,"approve", "command needs client key from whitelist")};
+                    this.logger.log("approve ERROR: command needs client key from whitelist");
+                    return {itemResult : this.itemResultOfError(Errors.BAD_CLIENT_KEY, "approve", "command needs client key from whitelist")};
                 }
             }
         }
 
         try {
-            return {itemResult : this.node.registerItem(Contract.fromPackedTransaction(t.getOrThrow(params, "packedItem")))}; //TODO: node
+            return {itemResult : await this.node.registerItem(Contract.fromPackedTransaction(t.getOrThrow(params, "packedItem")))}; //TODO: node
         } catch (err) {
-            console.log("approve ERROR: " + err.message);
+            this.logger.log("approve ERROR: " + err.message);
             return {itemResult : this.itemResultOfError(Errors.COMMAND_FAILED,"approve", err.message)};
         }
     }
 
-    approveParcel(params, sessionKey) {
+    async approveParcel(params, sessionKey) {
         this.checkNode(sessionKey);
 
         try {
-            return {result : this.node.registerParcel(Parcel.unpack(t.getOrThrow(params, "packedItem")))}; //TODO: node
+            return {result : await this.node.registerParcel(Parcel.unpack(t.getOrThrow(params, "packedItem")))}; //TODO: node
         } catch (err) {
-            console.log("approveParcel ERROR: " + err.message);
+            this.logger.log("approveParcel ERROR: " + err.message);
             return {itemResult : this.itemResultOfError(Errors.COMMAND_FAILED,"approveParcel", err.message)};
         }
     }
 
-    startApproval(params, sessionKey) {
-        if (this.config == null || this.config.limitFreeRegistrations())
-            if(this.config == null || (
-                !this.config.keysWhiteList.some(key => key.equals(sessionKey)) &&
-                !this.config.addressesWhiteList.some(addr => addr.match(sessionKey)))) {
+    async startApproval(params, sessionKey) {
+        if (this.config == null || (this.config.limitFreeRegistrations() &&
+            (!this.config.keysWhiteList.some(key => key.equals(sessionKey)) &&
+             !this.config.addressesWhiteList.some(addr => addr.match(sessionKey)))))
+        {
+            this.logger.log("startApproval ERROR: session key should be in the white list");
+            return {itemResult : this.itemResultOfError(Errors.BAD_CLIENT_KEY, "startApproval", "command needs client key from whitelist")};
+        }
 
-                console.log("startApproval ERROR: session key shoild be in the white list");
+        let k = 0;
+        let results = [];
+        await Promise.all(t.getOrThrow(params, "packedItems").map(async(item) => {
+            try {
+                this.checkNode(sessionKey);
+                k++;
+                this.logger.log("Request to start registration:" + k);
 
-                return {itemResult : this.itemResultOfError(Errors.BAD_CLIENT_KEY,"startApproval", "command needs client key from whitelist")};
+                results.push(await this.node.registerItem(Contract.fromPackedTransaction(item)));  //TODO: node
+            } catch (err) {
+                this.logger.log(err.stack);
+                this.logger.log("startApproval ERROR: " + err.message);
             }
+        }));
 
-        /*let n = asyncStarts.incrementAndGet();
-        let k = new AtomicInteger();
-        params.getListOrThrow("packedItems").forEach((item) ->
-            es.execute(() -> {
-                try {
-                    checkNode(sessionKey);
-                    console.log("Request to start registration #"+n+":"+k.incrementAndGet());
-
-                    this.node.registerItem(Contract.fromPackedTransaction(((Bytes)item).toArray())); //TODO
-                } catch (err) {
-                    console.log(err.stack);
-                }
-            })
-        );*/
-
-        //TODO: return ItemResult
-        return {};
+        return {itemResults: results};
     }
 
-    getState(params, sessionKey) {
+    async getState(params, sessionKey) {
         this.checkNode(sessionKey, true);
 
         try {
-            return {itemResult : this.node.checkItem(params.itemId)}; //TODO node
+            return {itemResult : await this.node.checkItem(params.itemId)}; //TODO: node
         } catch (err) {
-            console.log(err.stack);
-            console.log("getState ERROR: " + err.message);
+            this.logger.log(err.stack);
+            this.logger.log("getState ERROR: " + err.message);
 
-            return {itemResult : this.itemResultOfError(Errors.COMMAND_FAILED,"approveParcel", err.message)};
+            return {itemResult : this.itemResultOfError(Errors.COMMAND_FAILED, "approveParcel", err.message)};
         }
-
     }
 
     async resyncItem(params, sessionKey) {
@@ -472,30 +467,64 @@ class ClientHTTPServer extends network.HttpServer {
         try {
             tmpAddress = new crypto.KeyAddress("JKEgDs9CoCCymD9TgmjG8UBLxuJwT5GZ3PaZyG6o2DQVGRQPjXHCG8JouC8eZw5Nd1w9krCS");
         } catch (err) {
-            console.log(err.stack);
+            this.logger.log(err.stack);
+            this.logger.log("resyncItem ERROR: " + err.message);
         }
 
-        if (this.config.limitFreeRegistrations)
-
-            if(!(
-                tmpAddress.match(sessionKey) ||
-                Config.networkAdminKeyAddress.match(sessionKey) ||
-                this.config.keysWhiteList.some(key => key.equals(sessionKey)) ||
-                this.config.addressesWhiteList.some(addr => addr.match(sessionKey))
-            )) {
-                console.log("approve ERROR: command needs client key from whitelist");
-
-                return {itemResult : this.itemResultOfError(Errors.BAD_CLIENT_KEY,"resyncItem", "command needs client key from whitelist")};
-            }
+        if (this.config.limitFreeRegistrations && !(
+            tmpAddress.match(sessionKey) ||
+            Config.networkAdminKeyAddress.match(sessionKey) ||
+            this.config.keysWhiteList.some(key => key.equals(sessionKey)) ||
+            this.config.addressesWhiteList.some(addr => addr.match(sessionKey))))
+        {
+            this.logger.log("resyncItem ERROR: command needs client key from whitelist");
+            return {itemResult : this.itemResultOfError(Errors.BAD_CLIENT_KEY, "resyncItem", "command needs client key from whitelist")};
+        }
 
         try {
-            let result = {itemResult : this.node.checkItem(params.itemId)}; //TODO
+            let result = {itemResult : await this.node.checkItem(params.itemId)}; //TODO: node
             await this.node.resync(params.itemId); //TODO: node
             return result;
         } catch (err) {
-            console.log("getState ERROR: " + err.message);
+            this.logger.log(err.stack);
+            this.logger.log("resyncItem ERROR: " + err.message);
+
             return {itemResult : this.itemResultOfError(Errors.COMMAND_FAILED,"resyncItem", err.message)};
         }
+    }
+
+    async pingNode(params, sessionKey) {
+        // checking node
+        if (this.node == null)
+            throw new ex.CommandFailedError(Errors.NOT_READY, "please call again after a while");
+
+        let tmpAddress = null;
+        try {
+            tmpAddress = new crypto.KeyAddress("JKEgDs9CoCCymD9TgmjG8UBLxuJwT5GZ3PaZyG6o2DQVGRQPjXHCG8JouC8eZw5Nd1w9krCS");
+        } catch (err) {
+            this.logger.log(err.stack);
+            this.logger.log("pingNode ERROR: " + err.message);
+        }
+
+        if (!(tmpAddress.match(sessionKey) ||
+            Config.networkAdminKeyAddress.match(sessionKey) ||
+            this.config.keysWhiteList.some(key => key.equals(sessionKey)) ||
+            this.config.addressesWhiteList.some(addr => addr.match(sessionKey))))
+                throw new ex.IllegalArgumentError("command needs client key from whitelist");
+
+        let nodeNumber = t.getOrThrow(params, "nodeNumber");
+        let timeoutMillis = t.getOrDefault(params, "timeoutMillis", 15000);
+
+        if (this.netConfig.getInfo(nodeNumber) == null)
+            throw new ex.IllegalArgumentError("Unknown node " + nodeNumber);
+
+        let responseMillisUDP = await this.node.pingNodeUDP(nodeNumber, timeoutMillis); //TODO: node
+        let responseMillisTCP = await this.node.pingNodeTCP(nodeNumber, timeoutMillis); //TODO: node
+
+        return {
+            UDP: responseMillisUDP,
+            TCP: responseMillisTCP
+        };
     }
 
     setVerbose(params, sessionKey) {
@@ -505,58 +534,35 @@ class ClientHTTPServer extends network.HttpServer {
         try {
             tmpAddress = new crypto.KeyAddress("JKEgDs9CoCCymD9TgmjG8UBLxuJwT5GZ3PaZyG6o2DQVGRQPjXHCG8JouC8eZw5Nd1w9krCS");
         } catch (err) {
-            console.log(err.stack);
+            this.logger.log(err.stack);
+            this.logger.log("setVerbose ERROR: " + err.message);
         }
 
-        if (this.config.limitFreeRegistrations)
-            if(!(tmpAddress.match(sessionKey) ||
-                Config.networkAdminKeyAddress.match(sessionKey) ||
-                this.config.keysWhiteList.some(key => key.equals(sessionKey)) ||
-                this.config.addressesWhiteList.some(addr => addr.match(sessionKey))
-            )) {
-                console.log("approve ERROR: command needs client key from whitelist");
-
-                return {itemResult : this.itemResultOfError(Errors.BAD_CLIENT_KEY,"setVerbose", "command needs client key from whitelist")};
-            }
+        if (this.config.limitFreeRegistrations && !(
+            tmpAddress.match(sessionKey) ||
+            Config.networkAdminKeyAddress.match(sessionKey) ||
+            this.config.keysWhiteList.some(key => key.equals(sessionKey)) ||
+            this.config.addressesWhiteList.some(addr => addr.match(sessionKey))))
+        {
+            this.logger.log("setVerbose ERROR: command needs client key from whitelist");
+            return {itemResult : this.itemResultOfError(Errors.BAD_CLIENT_KEY, "setVerbose", "command needs client key from whitelist")};
+        }
 
         try {
-            let nodeLevel = params.node;
-            if(nodeLevel != null) {
-                if("nothing".equals(nodeLevel)) {
-                    this.node.verboseLevel = DatagramAdapter.VerboseLevel.NOTHING;
-                } else if("base".equals(nodeLevel)) {
-                    this.node.verboseLevel = DatagramAdapter.VerboseLevel.BASE;
-                } else if("detail".equals(nodeLevel)) {
-                    this.node.verboseLevel = DatagramAdapter.VerboseLevel.DETAILED;
-                }
-            }
+            if (params.node != null)
+                this.node.verboseLevel = params.node;
 
-            let networkLevel = params.network;
-            if(networkLevel != null) {
-                if("nothing".equals(networkLevel)) {
-                    this.node.neworkVerboseLevel = DatagramAdapter.VerboseLevel.NOTHING;
-                } else if("base".equals(networkLevel)) {
-                    this.node.neworkVerboseLevel = DatagramAdapter.VerboseLevel.BASE;
-                } else if("detail".equals(networkLevel)) {
-                    this.node.neworkVerboseLevel = DatagramAdapter.VerboseLevel.DETAILED;
-                }
-            }
+            if (params.network != null)
+                this.network.verboseLevel = params.network;
 
-            let udpLevel = params.udp;
-            if(udpLevel != null) {
-                if("nothing".equals(udpLevel)) {
-                    this.node.UDPVerboseLevel = DatagramAdapter.VerboseLevel.NOTHING;
-                } else if("base".equals(udpLevel)) {
-                    this.node.UDPVerboseLevel = DatagramAdapter.VerboseLevel.BASE;
-                } else if("detail".equals(udpLevel)) {
-                    this.node.UDPVerboseLevel = DatagramAdapter.VerboseLevel.DETAILED;
-                }
-            }
+            if (params.udp != null && this.node.network.adapter != null)
+                this.node.network.adapter.verboseLevel = params.udp;
+
             return {itemResult : ItemResult.UNDEFINED};
         } catch (err) {
-            console.log("getState ERROR: " + err.message);
+            this.logger.log("setVerbose ERROR: " + err.message);
 
-            return {itemResult : this.itemResultOfError(Errors.COMMAND_FAILED,"resyncItem", err.message)};
+            return {itemResult : this.itemResultOfError(Errors.COMMAND_FAILED, "setVerbose", err.message)};
         }
     }
 
@@ -565,13 +571,14 @@ class ClientHTTPServer extends network.HttpServer {
 
         if (this.config == null || this.node == null || !(
             Config.networkAdminKeyAddress.match(sessionKey) ||
-            this.node.myInfo.publicKey.equals(sessionKey) || //TODO
+            this.node.myInfo.publicKey.equals(sessionKey) ||
             this.config.keysWhiteList.some(key => key.equals(sessionKey)) ||
-            this.config.addressesWhiteList.some(addr => addr.match(sessionKey))
-        )) {
-            console.log("command needs admin key");
-            return {itemResult : this.itemResultOfError(Errors.BAD_CLIENT_KEY,"getStats", "command needs admin key")};
+            this.config.addressesWhiteList.some(addr => addr.match(sessionKey))))
+        {
+            this.logger.log("command needs admin key");
+            return {itemResult : this.itemResultOfError(Errors.BAD_CLIENT_KEY, "getStats", "command needs admin key")};
         }
+
         return this.node.provideStats(t.getOrDefault(params, "showDays", null)); //TODO: node
     }
 
@@ -581,7 +588,7 @@ class ClientHTTPServer extends network.HttpServer {
         try {
             return {processingState : this.node.checkParcelProcessingState(params.parcelId)}; //TODO: node
         } catch (err) {
-            console.log("getParcelProcessingState ERROR: " + err.message);
+            this.logger.log("getParcelProcessingState ERROR: " + err.message);
 
             //TODO: return processing state not String
             return {processingState : "getParcelProcessingState ERROR: " + err.message};
@@ -594,85 +601,133 @@ class ClientHTTPServer extends network.HttpServer {
         return {U: Config.rate[NSmartContract.SmartContractType.SLOT1].toFixed()};
     }
 
-    querySlotInfo(params, sessionKey) {
+    async querySlotInfo(params, sessionKey) {
         this.checkNode(sessionKey, true);
 
-        let slot_id = params.slot_id;
-        let slotBin = this.node.ledger.getSmartContractById(crypto.HashId.withBase64Digest(slot_id)); //TODO
+        let slot_id = t.getOrThrow(params, "slot_id");
+        let slotBin = await this.node.ledger.getSmartContractById(crypto.HashId.withDigest(slot_id));
 
         if (slotBin != null) {
-            let slotContract =  Contract.fromPackedTransaction(slotBin);
+            let slotContract = Contract.fromPackedTransaction(slotBin);
             return {slot_state: slotContract.state.data};
         }
+
         return {slot_state: null};
     }
 
-    queryContract(params, sessionKey) {
+    async queryContract(params, sessionKey) {
         this.checkNode(sessionKey, true);
 
-        let res = {};
-        res[contract] = null;
+        let contract = null;
         let slot_id = params.slot_id;
         let origin_id = params.origin_id;
         let contract_id = params.contract_id;
 
-        if ((origin_id == null) && (contract_id == null))
+        if (origin_id == null && contract_id == null)
             throw new Error("invalid arguments (both origin_id and contract_id are null)");
-        if ((origin_id != null) && (contract_id != null))
+
+        if (origin_id != null && contract_id != null)
             throw new Error("invalid arguments (only one origin_id or contract_id is allowed)");
-        let slotBin = this.node.ledger.getSmartContractById(crypto.HashId.withBase64Digest(slot_id)); //TODO
+
+        let slotBin = await this.node.ledger.getSmartContractById(crypto.HashId.withDigest(slot_id));
         if (slotBin != null) {
             let slotContract = Contract.fromPackedTransaction(slotBin);
             if (contract_id != null) {
-                let contractHashId = crypto.HashId.withBase64Digest(contract_id);
-                res[contract] = this.node.ledger.getContractInStorage(contractHashId);
+                let contractHashId = crypto.HashId.withDigest(contract_id);
+                contract = await this.node.ledger.getContractInStorage(contractHashId);
+
             } else if (origin_id != null) {
-                let originHashId = crypto.HashId.withBase64Digest(origin_id);
-                let storedRevisions = this.node.ledger.getContractsInStorageByOrigin(slotContract.id, originHashId);
-                if (storedRevisions.length === 1) {
-                    res[contract] = storedRevisions.get(0);
-                } else if (storedRevisions.length > 1) {
-                    let latestContract = [];
+                let originHashId = crypto.HashId.withDigest(origin_id);
+                let storedRevisions = await this.node.ledger.getContractsInStorageByOrigin(slotContract.id, originHashId);
+
+                if (storedRevisions.length === 1)
+                    contract = storedRevisions[0];
+                else if (storedRevisions.length > 1) {
                     let latestRevision = 0;
                     for (let bin of storedRevisions) {
                         let c = Contract.fromPackedTransaction(bin);
-                        if (latestRevision < c.revision) {
-                            latestRevision = c.revision;
-                            latestContract = bin;
+                        if (latestRevision < c.state.revision) {
+                            latestRevision = c.state.revision;
+                            contract = bin;
                         }
                     }
-                    res[contract] = latestContract;
                 }
             }
         }
-        return res;
+
+        return {contract: contract};
     }
 
     followerGetRate(params, sessionKey) {
         this.checkNode(sessionKey, true);
 
-        let rateOriginDays = Config.rate[NSmartContract.SmartContractType.FOLLOWER1].toFixed();
-        let rateCallback = Config.rate[NSmartContract.SmartContractType.FOLLOWER1 + ":callback"].div.toFixed();
+        let rateOriginDays = Config.rate[NSmartContract.SmartContractType.FOLLOWER1];
+        let rateCallback = Config.rate[NSmartContract.SmartContractType.FOLLOWER1 + ":callback"].div(rateOriginDays);
 
         return {
-            rateOriginDays: rateOriginDays,
-            rateCallback: rateCallback
+            rateOriginDays: rateOriginDays.toFixed(),
+            rateCallback: rateCallback.toFixed()
         };
     }
 
-    queryFollowerInfo(params, sessionKey) {
+    async queryFollowerInfo(params, sessionKey) {
         this.checkNode(sessionKey, true);
 
-        let follower_id = params.follower_id;
-        let followerBin = this.node.ledger.getSmartContractById(crypto.HashId.withBase64Digest(follower_id));
+        let follower_id = t.getOrThrow(params, "follower_id");
+        let followerBin = await this.node.ledger.getSmartContractById(crypto.HashId.withDigest(follower_id));
 
         if (followerBin != null) {
-            let followerContract =  Contract.fromPackedTransaction(followerBin);
+            let followerContract = Contract.fromPackedTransaction(followerBin);
             return {follower_state: followerContract.state.data};
         }
+
         return {follower_state: null};
     }
 
+    getValidUrlsForProxy() {
+        let res = new Set();
+        if (this.netConfig != null)
+            this.netConfig.toList().forEach(node => {
+                res.add(node.directUrlStringV4());
+                res.add(node.domainUrlStringV4());
+            });
+
+        return res;
+    }
+
+    proxy(params, sessionKey) {
+        this.checkNode(sessionKey, true);
+
+        let url = t.getOrThrow(params, "url");
+
+        if (this.getValidUrlsForProxy().has(url)) {
+            let command = t.getOrThrow(params, "command");
+            let commandParams = t.getOrThrow(params, "params");
+
+            if (command === "command") {
+                let err = {response: "Access denied. Command 'command' is not allowed with 'proxy', use 'proxyCommand' instead."};
+                return {
+                    responseCode: 403,
+                    result: Boss.dump({result: "error", response: err})
+                };
+            } else {
+                //TODO: BasicHttpClient.requestRaw
+                let basicHttpClient = new BasicHttpClient(url);
+                let answerRaw = basicHttpClient.requestRaw(command, commandParams);
+
+                return {
+                    responseCode: answerRaw.code,
+                    result: answerRaw.body
+                };
+            }
+        } else {
+            let err = {response: "Access denied. Url '" + url + "' is not found in network topology."};
+            return {
+                responseCode: 403,
+                result: Boss.dump({result: "error", response: err})
+            };
+        }
+    }
 }
 
 module.exports = {ClientHTTPServer};
