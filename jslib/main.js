@@ -133,7 +133,7 @@ class Main {
         this.config.main = this;
 
         if (settingsShared.hasOwnProperty("whitelist")) {
-            for(let value of settingsShared.whitelist) {
+            for (let value of settingsShared.whitelist) {
                 try {
                     this.config.addressesWhiteList.push(new KeyAddress(value));
                 } catch (err) {
@@ -193,6 +193,9 @@ class Main {
     async shutdown() {
         if (this.ledger != null)
             await this.ledger.close();
+
+        if (this.node != null)
+            this.node.shutdown();
 
         if (this.clientHTTPServer != null)
             this.clientHTTPServer.shutdown();

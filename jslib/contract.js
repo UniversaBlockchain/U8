@@ -2050,6 +2050,78 @@ class Contract extends bs.BiSerializable {
             this.transactionPack = new TransactionPack(this);
         return this.transactionPack.pack();
     }
+
+    /**
+     * Checks contract is set unlimited requests for a key.
+     * Errors found can be accessed with {@link #errors}.
+     *
+     * @param {Config} config - Current node configuration
+     * @return {boolean} true if contract set unlimited requests for a key
+     */
+    isUnlimitKeyContract(config) {
+        try {
+            // check transactional
+            if (this.transactional == null || this.transactional.data == null || Object.entries(this.transactional.data).length !== 1)
+                return false;
+
+            // check revoking contract
+            if (this.newItems.size !== 0 || this.revokingItems.size !== 1)
+                return false;
+
+            if (!Array.from(this.revokingItems)[0].id.equals(this.state.parent))
+                return false;
+
+            // check U contracts
+            if (!this.isU(Config.uIssuerKeys, Config.uIssuerName))
+                return false;
+
+            if (!Array.from(this.revokingItems)[0].isU(Config.uIssuerKeys, Config.uIssuerName))
+                return false;
+
+            // check unlimited key
+            if (!this.transactional.data.hasOwnProperty("unlimited_key"))
+                return false;
+        }
+        catch (err) {
+            return false;
+        }
+
+        try {
+            // get unlimited key
+            let packedKey = this.transactional.data.unlimited_key;
+            if (packedKey == null) {
+                this.errors.push(new ErrorRecord(Errors.FAILED_CHECK, "", "Invalid format of key for unlimited requests"));
+                return false;
+            }
+
+            let key = new crypto.PublicKey(packedKey);
+            if (key == null) {
+                this.errors.push(new ErrorRecord(Errors.FAILED_CHECK, "", "Invalid format of key for unlimited requests"));
+                return false;
+            }
+        }
+        catch (err) {
+            this.errors.push(new ErrorRecord(Errors.FAILED_CHECK, "", "Invalid format of key for unlimited requests: " + err.message));
+            return false;
+        }
+
+        try {
+            // check payment
+            let calculatedPayment = Array.from(this.revokingItems)[0].state.data.transaction_units - this.state.data.transaction_units;
+
+            if (calculatedPayment !== Config.rateLimitDisablingPayment) {
+                this.errors.push(new ErrorRecord(Errors.FAILED_CHECK, "",
+                    "Payment for setting unlimited requests must be " + Config.rateLimitDisablingPayment + "U"));
+                return false;
+            }
+        }
+        catch (err) {
+            this.errors.push(new ErrorRecord(Errors.FAILED_CHECK, "", "Error checking payment for setting unlimited requests: " + err.message));
+            return false;
+        }
+
+        return true;
+    }
 }
 
 

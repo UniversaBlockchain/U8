@@ -12,7 +12,7 @@ const ErrorRecord = e.ErrorRecord;
 const ex = require("exceptions");
 const t = require("tools");
 const Contract = require("contract").Contract;
-const ItemResult = require('itemresult.js');
+const ItemResult = require('itemresult').ItemResult;
 
 class ClientHTTPServer extends network.HttpServer {
 
@@ -48,7 +48,7 @@ class ClientHTTPServer extends network.HttpServer {
                     data = await this.node.ledger.getContractInStorage(id);
 
                 if (data == null && this.config.permanetMode)
-                    data = await this.node.ledger.getKeepingItem(id);
+                    data = await this.node.ledger.getKeptItem(id);
             }
 
             if (data !== null) {
@@ -200,118 +200,138 @@ class ClientHTTPServer extends network.HttpServer {
     }
 
     shutdown() {
-        //this.es.shutdown();
-        //this.node.shutdown();
         super.stopServer();
     }
 
-    unsRate(params, session) {
-        this.checkNode(session, true);
+    checkNode(sessionKey, checkKeyLimit = false) {
+        // checking node
+        if (this.node == null)
+            throw new ex.CommandFailedError(Errors.NOT_READY, "please call again after a while");
+
+        if (this.node.isSanitating) {   //TODO: node
+            //WHILE NODE IS SANITATING IT COMMUNICATES WITH THE OTHER NODES ONLY
+            if (this.netConfig.toList().some(nodeInfo => nodeInfo.publicKey.equals(sessionKey)))
+                return;
+
+            throw new ex.CommandFailedError(Errors.NOT_READY, "please call again after a while");
+        }
+
+        // checking key limit
+        if (checkKeyLimit && !this.node.checkKeyLimit(sessionKey))   //TODO: node
+            throw new ex.CommandFailedError(Errors.COMMAND_FAILED, "exceeded the limit of requests for key per minute, please call again after a while");
+    }
+
+    on(path, handler) {
+        super.addRawEndpoint(path, async (request) => {
+            if (this.localCors) {
+                request.setHeader("Access-Control-Allow-Origin", "*");
+                request.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+                request.setHeader("Access-Control-Allow-Headers", "DNT,X-CustomHeader,Keep-Alive,User-Age  nt,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Content-Range,Range");
+                request.setHeader("Access-Control-Expose-Headers", "DNT,X-CustomHeader,Keep-Alive,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Content-Range,Range");
+            }
+
+            await handler(request);
+            request.sendAnswer();
+        });
+    }
+
+    unsRate(params, sessionKey) {
+        this.checkNode(sessionKey, true);
 
         return {U: Config.rate[NSmartContract.SmartContractType.UNS1].toFixed()}
     }
 
-    queryNameRecord(params, session) {
-        this.checkNode(session, true);
+    async queryNameRecord(params, sessionKey) {
+        this.checkNode(sessionKey, true);
 
-        let b = {};
-        let loadedNameRecord = new NNameRecord();
+        let loadedNameRecord = null;
         let address = params.address;
         let origin = params.origin;
 
-        if (((address === null) && (origin === null)) || ((address !== null) && (origin !== null)))
+        if ((address == null && origin == null) || (address != null && origin != null))
             throw new Error("invalid arguments");
 
         if (address != null)
-            loadedNameRecord = this.node.ledger.getNameByAddress(address);
+            loadedNameRecord = await this.node.ledger.getNameByAddress(address);
         else
-            loadedNameRecord = this.node.ledger.getNameByOrigin(origin);
+            loadedNameRecord = await this.node.ledger.getNameByOrigin(origin);
 
-        if (loadedNameRecord !== null) {
-            b["name"] = loadedNameRecord.name;
-            b["description"] = loadedNameRecord.description;
-            b["url"] = loadedNameRecord.url;
-        }
-        return b;
+        if (loadedNameRecord == null)
+            return {};
+
+        return {
+            name: loadedNameRecord.name,
+            description: loadedNameRecord.description,
+            url: loadedNameRecord.url
+        };
     }
 
-    queryNameContract(params, session) {
-        this.checkNode(session, true);
+    async queryNameContract(params, sessionKey) {
+        this.checkNode(sessionKey, true);
 
-        let b = {};
-        let nameContract  = t.getOrThrow(params, "name");
-        let nr = this.node.ledger.getNameRecord(nameContract);
-        if (nr !== null) {
-            let env = this.node.ledger.getEnvironment(nr.getEnvironmentId());
-            if (env !== null) {
-                let packedContract = env.getContract().getPackedTransaction();
-                b["packedContract"] =  packedContract;
-            }
+        let nr = await this.node.ledger.getNameRecord(t.getOrThrow(params, "name"));
+        if (nr != null) {
+            let env = await this.node.ledger.getEnvironment(nr.environmentId);
+            if (env != null)
+                return {packedContract: env.contract.getPackedTransaction()};
         }
-        return b;
+
+        return {};
     }
 
-    getBody(params, session) {
-        this.checkNode(session, true);
-
-        let res = {};
+    async getBody(params, sessionKey) {
+        this.checkNode(sessionKey, true);
 
         if (!this.config.permanetMode)
-            return res;
+            return {};
 
         let itemId = params.itemId;
 
-        let body = this.node.ledger.getKeepingItem(itemId);
-        if (body !== null) {
-            res["packedContract"] = body;
-            return res;
-        }
+        let body = await this.node.ledger.getKeptItem(itemId);
+        if (body != null)
+            return {packedContract: body};
 
-        this.node.resync(itemId);
-        let itemResult = this.node.checkItem(itemId);
+        await this.node.resync(itemId);                       //TODO: node
+        let itemResult = await this.node.checkItem(itemId);   //TODO: node
 
         if (itemResult.state === ItemState.UNDEFINED)
-            return res;
+            return {};
 
-        let item = this.node.getKeepingItemFromNetwork(itemId); //TODO
+        let item = await this.node.getKeptItemFromNetwork(itemId); //TODO: node
         if (item == null)
-            return res;
+            return {};
 
-        if ((item instanceof Contract) &&
-            (item.id.equals(itemId)) &&
-            (HashId.of(item.getLastSealedBinary()).equals(itemId))) {//TODO
-            let record = node.ledger.getRecord(itemId);
-            this.node.ledger.putKeepingItem(record, item);
+        if (item instanceof Contract && item.id.equals(itemId) && HashId.of(item.sealedBinary).equals(itemId)) {
+            let record = await this.node.ledger.getRecord(itemId);
+            await this.node.ledger.putKeptItem(record, item);
 
-            res["packedContract"] = item.getPackedTransaction();
+            return {packedContract: item.getPackedTransaction()};
         }
 
-        return res;
+        return {};
     }
 
-    getContract(params, session) {
-        this.checkNode(session, true);
+    async getContract(params, sessionKey) {
+        this.checkNode(sessionKey, true);
 
         let res = {};
 
         if (!this.config.permanetMode)
             return res;
 
-        if(params.has("origin") && params.has("parent") || !params.has("origin") && !params.has("parent")) { //TODO
+        if (params.hasOwnProperty("origin") && params.hasOwnProperty("parent") ||
+            !params.hasOwnProperty("origin") && !params.hasOwnProperty("parent"))
             throw new ex.IllegalArgumentError("Invalid params. Should contain ether origin or parent");
-        }
 
-        let id = new crypto.HashId();
-        let getBy = "";
-        if(params.has("origin")) {
+        let id = null;
+        let getBy = null;
+        if (params.hasOwnProperty("origin")) {
             id = params.origin;
-            if(id != null)
+            if (id != null)
                 getBy = "state.origin";
-        }
-
-        if(params.has("parent")) {
+        } else if (params.hasOwnProperty("parent")) {
             id = params.parent;
-            if(id != null)
+            if (id != null)
                 getBy = "state.parent";
         }
 
@@ -323,87 +343,78 @@ class ClientHTTPServer extends network.HttpServer {
             limit = 1;
 
         let offset = t.getOrDefault(params, "offset", 0);
-
         let sortBy = t.getOrDefault(params,"sortBy", "");
         let sortOrder = t.getOrDefault(params,"sortOrder", "DESC");
+        let tags = t.getOrDefault(params,"tags", {});
 
-        let tags = params.tags;
-
-        let keeping = this.node.ledger.getKeepingBy(getBy,id, tags, limit, offset,sortBy,sortOrder); //TODO
-        if (keeping === null)
+        let kept = await this.node.ledger.getKeptBy(getBy, id, tags, limit, offset, sortBy, sortOrder); //TODO: ledger.getKeptBy
+        if (kept == null)
             return res;
-        res.putAll(keeping); //TODO
+        Object.keys(kept).forEach(key => res[key] = kept[key]);
 
-        if(getBy != null) {
-            if(getBy.equals("state.origin")) {
-                res["origin"] = id;
-            } else if(getBy.equals("state.parent")) {
-                res["parent"] = id;
-            }
+        if (getBy != null) {
+            if (getBy === "state.origin")
+                res.origin = id;
+            else if (getBy === "state.parent")
+                res.parent = id;
         }
 
-        res["limit"] = limit;
-        res["offset"] = offset;
-        res["sortBy"] = sortBy;
-        res["sortOrder"] = sortOrder;
+        res.limit = limit;
+        res.offset = offset;
+        res.sortBy = sortBy;
+        res.sortOrder = sortOrder;
 
         return res;
     }
 
     itemResultOfError(error, object, message) {
-        let itemResult = new ItemResult.from(ItemState.UNDEFINED, false, Date.now(), Date.now());
+        let itemResult = ItemResult.from(ItemState.UNDEFINED, false, Date.now(), Date.now());
         itemResult.errors = [new ErrorRecord(error, object, message)];
         return itemResult;
     }
 
-    approve(params, session) {
-        this.checkNode(session);
-        let contract = new Contract();
+    approve(params, sessionKey) {
+        this.checkNode(sessionKey);
 
         if (this.config.limitFreeRegistrations() &&
             (!(
-                this.config.networkAdminKeyAddress.isMatchingKey(session.publicKey) ||
-                this.config.keysWhiteList.contains(session.publicKey) ||
-                this.config.addressesWhiteList.stream().anyMatch(addr => addr.isMatchingKey(session.publicKey))
+                Config.networkAdminKeyAddress.match(sessionKey) ||
+                this.config.keysWhiteList.some(key => key.equals(sessionKey)) ||
+                this.config.addressesWhiteList.some(addr => addr.match(sessionKey))
             ))) {
 
+            let contract = null;
             try {
                 contract = Contract.fromPackedTransaction(t.getOrThrow(params, "packedItem"));
             } catch (err) {
                 console.log("approve ERROR: " + err.message);
-
-                 return {itemResult : this.itemResultOfError(Errors.COMMAND_FAILED,"approve", err.message)}
+                return {itemResult : this.itemResultOfError(Errors.COMMAND_FAILED,"approve", err.message)}
             }
 
-            /*if ((contract == null) || !contract.isUnlimitKeyContract(config)) {
-                if (!contract.isOk()) {
-                    contract.traceErrors();
-
-                    return {itemResult : this.itemResultOfError(Errors.FAILED_CHECK,"approve", contract.getErrors().get(contract.getErrors().size() - 1).message)}
-
+            if (contract == null || !contract.isUnlimitKeyContract(config)) {
+                if (contract.errors.length > 0) {
+                    contract.errors.forEach(err => console.log(err.message));
+                    return {itemResult : this.itemResultOfError(Errors.FAILED_CHECK,"approve", contract.errors[contract.errors.length - 1].message)};
                 } else {
                     console.log("approve ERROR: command needs client key from whitelist");
-
                     return {itemResult : this.itemResultOfError(Errors.BAD_CLIENT_KEY,"approve", "command needs client key from whitelist")};
                 }
-            }*/
+            }
         }
 
         try {
-            return {itemResult : this.node.registerItem(Contract.fromPackedTransaction(t.getOrThrow(params, "packedItem")))}; //TODO
-
+            return {itemResult : this.node.registerItem(Contract.fromPackedTransaction(t.getOrThrow(params, "packedItem")))}; //TODO: node
         } catch (err) {
             console.log("approve ERROR: " + err.message);
-
             return {itemResult : this.itemResultOfError(Errors.COMMAND_FAILED,"approve", err.message)};
         }
     }
 
-    approveParcel(params, session) {
-        this.checkNode(session);
+    approveParcel(params, sessionKey) {
+        this.checkNode(sessionKey);
 
         try {
-            return {result : this.node.registerParcel(Parcel.unpack(t.getOrThrow(params, "packedItem")))}; //TODO
+            return {result : this.node.registerParcel(Parcel.unpack(t.getOrThrow(params, "packedItem")))}; //TODO: node
         } catch (err) {
             console.log("approveParcel ERROR: " + err.message);
             return {itemResult : this.itemResultOfError(Errors.COMMAND_FAILED,"approveParcel", err.message)};
@@ -576,40 +587,6 @@ class ClientHTTPServer extends network.HttpServer {
             //TODO: return processing state not String
             return {processingState : "getParcelProcessingState ERROR: " + err.message};
         }
-    }
-
-    checkNode(session, checkKeyLimit = false) {
-        // checking node
-        if (!this.node) { //TODO
-            throw new Error(Errors.NOT_READY + "please call again after a while");
-        }
-
-        if(this.node.isSanitating()) {
-            //WHILE NODE IS SANITATING IT COMMUNICATES WITH THE OTHER NODES ONLY
-            if(netConfig.toList().stream().anyMatch(nodeInfo => nodeInfo.publicKey.equals(session.publicKey)))
-                return;
-
-            throw new Error(Errors.NOT_READY + "please call again after a while");
-        }
-
-        // checking key limit
-        if (checkKeyLimit)
-            if (!this.node.checkKeyLimit(session.publicKey))
-                throw new Error(Errors.COMMAND_FAILED +  "exceeded the limit of requests for key per minute, please call again after a while");
-    }
-
-    on(path, handler) {
-        super.addRawEndpoint(path, async (request) => {
-            if (this.localCors) {
-                request.setHeader("Access-Control-Allow-Origin", "*");
-                request.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
-                request.setHeader("Access-Control-Allow-Headers", "DNT,X-CustomHeader,Keep-Alive,User-Age  nt,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Content-Range,Range");
-                request.setHeader("Access-Control-Expose-Headers", "DNT,X-CustomHeader,Keep-Alive,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Content-Range,Range");
-            }
-
-            await handler(request);
-            request.sendAnswer();
-        });
     }
 
     storageGetRate(params, session) {

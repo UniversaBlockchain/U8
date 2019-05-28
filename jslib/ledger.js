@@ -1306,10 +1306,14 @@ class Ledger {
      * @param {HashId} itemId - Contract ID.
      * @return {Promise<Uint8Array>} packed Contract
      */
-    getKeepingItem(itemId) {
+    getKeptItem(itemId) {
         return this.simpleQuery("select * from kept_items, ledger where ledger.hash = ? and ledger.id = kept_items.ledger_id limit 1",
             null,
             itemId.digest);
+    }
+
+    getKeptBy(field, id, tags, limit, offset, sortBy, sortOrder) {
+        return null;
     }
 
     /**
@@ -1319,7 +1323,7 @@ class Ledger {
      * @param {Contract} item - Contract.
      * @return {Promise<void> | void}
      */
-    putKeepingItem(record, item) {
+    putKeptItem(record, item) {
         if (!item instanceof Contract)
             return;
 

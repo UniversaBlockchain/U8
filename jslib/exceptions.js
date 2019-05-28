@@ -15,4 +15,14 @@ class IllegalArgumentError extends Error {
     }
 }
 
-module.exports = {IllegalStateError,IllegalArgumentError}
+class CommandFailedError extends Error {
+    constructor(error = undefined, message = undefined) {
+        super();
+        if (error !== undefined)
+            this.error = error;
+        if (message !== undefined)
+            this.message = message;
+    }
+}
+
+module.exports = {IllegalStateError, IllegalArgumentError, CommandFailedError}

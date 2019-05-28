@@ -141,5 +141,6 @@ class ItemResult {
     }
 }
 
+dbm.DefaultBiMapper.registerAdapter(new bs.BiAdapter("ItemResult", ItemResult));
 
-dbm.DefaultBiMapper.registerAdapter(new bs.BiAdapter("ItemResult",ItemResult));
+module.exports = {ItemResult};

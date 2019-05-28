@@ -7,6 +7,8 @@ class Config {
     static validUntilTailTime = 5*60; //5 minutes
     static maxItemCreationAge = 5*24*3600; //5 days
 
+    static rateLimitDisablingPayment = 5;
+
     // SmartContract services
     static rate = {
         SLOT1: new BigDecimal(4),
@@ -27,13 +29,18 @@ class Config {
         new crypto.KeyAddress("J3uaVvHE7JqhvVb1c26RyDhfJw9eP2KR1KRhm2VdmYx7NwHpzdHTyEPjcmKpgkJAtzWLSPUw")
     ];
     static authorizedNameServiceCenterKey = new crypto.PublicKey(atob("HggcAQABxAABg9ideX6A3Wk9CuwnZrakXdvhYDiIiO0HA+YWmLArcZvhhaGMrw1i1mA6S9L6NPAuhYcZzm8Mxtwr1RESyJqm+HFwU+49s0yXHhCJsXcvK23Yx7NEpIrpGkKt9OCCdBGhQkls0Yc1lBBmGYCrShMntPC9xY9DJZ4sbMuBPIUQzpnWLYgRAbZb+KuZFXAIr7hRO0rNTZ6hE5zp6oPwlQLh9hBy6CsvZD/73Cf2WtKDunHD1qKuQU/KqruqVMMv2fd6ZKo692esWsqqIAiQztg1+sArAhf0Cr8lhRf53G5rndiiQx7RDs1P9Pp1wWK9e93UL1KF4PpVx7e7SznrCHTEdw"));
+    static networkAdminKeyAddress = new crypto.KeyAddress("bVmSQXWM7WvUtgcitUtjRd42WRbLycvsfPaRimpSNY3yZMUrVvEHV6mwb8A2DrKnzi795kJB");
 
     constructor() {
         this.isFreeRegistrationsAllowedFromYaml = false;
+        this.isFreeRegistrationsLimited = null;
         this.keysWhiteList = [];
         this.addressesWhiteList = [];
-        this.permanetMode = false;
         this.main = null;
+
+        // Permanet mode
+        this.permanetMode = false;
+        this.queryContractsLimit = 100;
 
         // Follower callback service
         this.followerCallbackExpiration = 10*60; //10 minutes
@@ -64,6 +71,18 @@ class Config {
         if (this.main != null)
             this.main.logger.log(this.main.myInfo.number + ": Network consensus is set to (negative/positive/resyncBreak): " +
                 this.negativeConsensus + " / " + this.positiveConsensus + " / " + this.resyncBreakConsensus);
+    }
+
+    /**
+     * Сhecks whether free registration is limited.
+     *
+     * @return {boolean} true if free registration is limited.
+     */
+    limitFreeRegistrations() {
+        if (this.isFreeRegistrationsLimited === null)
+            this.isFreeRegistrationsLimited = !(~VERSION.indexOf("private") || isFreeRegistrationsAllowedFromYaml);
+
+        return this.isFreeRegistrationsLimited;
     }
 }
 

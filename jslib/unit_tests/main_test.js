@@ -111,12 +111,7 @@ unit.test("main_test: sendHttpRequest", async () => {
     answer = false;
     httpClient.sendGetRequest("localhost:" + main.myInfo.clientAddress.port + "/contracts/" + contract.id.base64, (respCode, body) => {
         assert(respCode === 200);
-        //console.log(contract.getPackedTransaction() instanceof Uint8Array);
-        //console.log(typeof body);
-        //console.log(body instanceof Uint8Array);
-        //console.log(contract.getPackedTransaction().length);
-        //console.log(body.length);
-        //assert(contract.getPackedTransaction().equals(body));
+        assert(contract.getPackedTransaction().equals(body));
         answer = true;
     });
 
