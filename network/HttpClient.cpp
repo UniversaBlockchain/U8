@@ -6,7 +6,7 @@
 
 namespace network {
 
-std::function<void(int,std::string&&)> stub = [](int a,std::string&& b){};
+std::function<void(int,byte_vector&&)> stub = [](int a,byte_vector&& b){};
 
 HttpClientWorker::HttpClientWorker(int newId, HttpClient& parent)
   : id_(newId)
@@ -17,7 +17,7 @@ HttpClientWorker::HttpClientWorker(int newId, HttpClient& parent)
     mg_mgr_init(mgr_.get(), this);
 };
 
-void HttpClientWorker::sendGetRequest(const std::string& url, std::function<void(int,std::string&&)>&& callback) {
+void HttpClientWorker::sendGetRequest(const std::string& url, std::function<void(int,byte_vector&&)>&& callback) {
     callback_ = std::move(callback);
     worker_([this,url](){
         exitFlag_ = false;
@@ -28,7 +28,9 @@ void HttpClientWorker::sendGetRequest(const std::string& url, std::function<void
             HttpClientWorker* clientWorker = (HttpClientWorker*)nc->user_data;
             if (ev == MG_EV_HTTP_REPLY) {
                 http_message *hm = (http_message*)ev_data;
-                clientWorker->callback_(hm->resp_code, std::string(hm->body.p, hm->body.len));
+                byte_vector bv(hm->body.len);
+                memcpy(&bv[0], hm->body.p, hm->body.len);
+                clientWorker->callback_(hm->resp_code, std::move(bv));
                 clientWorker->callback_ = stub;
                 nc->flags |= MG_F_CLOSE_IMMEDIATELY;
             } else if (ev == MG_EV_CONNECT) {
@@ -80,12 +82,12 @@ void HttpClient::releaseWorker(int workerId) {
     poolCV_.notify_one();
 }
 
-void HttpClient::sendGetRequest(const std::string& url, const std::function<void(int,std::string&&)>& callback) {
-    std::function<void(int,std::string&&)> callbackCopy = callback;
+void HttpClient::sendGetRequest(const std::string& url, const std::function<void(int,byte_vector&&)>& callback) {
+    std::function<void(int,byte_vector&&)> callbackCopy = callback;
     sendGetRequest(url, std::move(callbackCopy));
 }
 
-void HttpClient::sendGetRequest(const std::string& url, std::function<void(int,std::string&&)>&& callback) {
+void HttpClient::sendGetRequest(const std::string& url, std::function<void(int,byte_vector&&)>&& callback) {
     poolControlThread_.execute([callback{std::move(callback)}, url, this]() mutable {
         auto client = getUnusedWorker();
         client->sendGetRequest(url, std::move(callback));

@@ -23,7 +23,7 @@ class HttpClient;
 class HttpClientWorker {
 public:
     HttpClientWorker(int newId, HttpClient& parent);
-    void sendGetRequest(const std::string& url, std::function<void(int,std::string&&)>&& callback);
+    void sendGetRequest(const std::string& url, std::function<void(int,byte_vector&&)>&& callback);
     int getId() {return id_;}
     void stop() {exitFlag_ = true;};
 private:
@@ -32,7 +32,7 @@ private:
     ThreadPool worker_;
     std::shared_ptr<mg_mgr> mgr_;
     std::atomic<bool> exitFlag_ = false;
-    std::function<void(int,std::string&&)> callback_;
+    std::function<void(int,byte_vector&&)> callback_;
 };
 
 class HttpClient {
@@ -41,8 +41,8 @@ public:
     HttpClient(size_t poolSize);
     virtual ~HttpClient();
 
-    void sendGetRequest(const std::string& url, const std::function<void(int,std::string&&)>& callback);
-    void sendGetRequest(const std::string& url, std::function<void(int,std::string&&)>&& callback);
+    void sendGetRequest(const std::string& url, const std::function<void(int,byte_vector&&)>& callback);
+    void sendGetRequest(const std::string& url, std::function<void(int,byte_vector&&)>&& callback);
 
 private:
     std::shared_ptr<HttpClientWorker> getUnusedWorker();

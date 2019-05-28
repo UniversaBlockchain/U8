@@ -60,7 +60,7 @@ unit.test("hello web", async () => {
     let counter0 = 0;
     for (let i = 0; i < countToSend; ++i) {
         httpClient.sendGetRequest("localhost:8080/testPage?a=73&b=1000000", (respCode, body) => {
-            //console.log("[" + respCode + "]: " + body);
+            //console.log("[" + respCode + "]: " + utf8Decode(body));
             ++receiveCounter;
             let dt = new Date().getTime() - t0;
             if (dt >= 1000) {

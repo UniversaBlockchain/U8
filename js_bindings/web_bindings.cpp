@@ -764,7 +764,7 @@ Local<FunctionTemplate> initHttpServer(Isolate *isolate) {
 struct HttpClientAnswer {
     int reqId;
     int respStatus;
-    std::string body;
+    byte_vector body;
 };
 
 class HttpClientBuffered {
@@ -776,7 +776,7 @@ public:
     }
 
     void sendGetRequest(int reqId, const std::string& url) {
-        httpClient_.sendGetRequest(url, [this,reqId](int respStatus, std::string&& body) {
+        httpClient_.sendGetRequest(url, [this,reqId](int respStatus, byte_vector&& body) {
             atomic<bool> needSend(false);
             {
                 lock_guard lock(mutex_);
@@ -816,9 +816,11 @@ private:
                 } else {
                     Local<Array> arr = Array::New(se_->isolate(), bufCopy.size()*3);
                     for (int i = 0; i < bufCopy.size(); ++i) {
+                        auto ab = ArrayBuffer::New(se_->isolate(), bufCopy[i].body.size());
+                        memcpy(ab->GetContents().Data(), &bufCopy[i].body[0], bufCopy[i].body.size());
                         arr->Set(i * 3 + 0, Integer::New(se_->isolate(), bufCopy[i].reqId));
                         arr->Set(i * 3 + 1, Integer::New(se_->isolate(), bufCopy[i].respStatus));
-                        arr->Set(i * 3 + 2, String::NewFromUtf8(se_->isolate(), bufCopy[i].body.c_str()));
+                        arr->Set(i * 3 + 2, Uint8Array::New(ab, 0, bufCopy[i].body.size()));
                     }
                     Local<Value> result = arr;
                     auto unused = fn->Call(context, fn, 1, &result);
