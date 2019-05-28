@@ -303,6 +303,7 @@ network.HttpServer = class {
             let promises = [];
             for (let i = 0; i < length; ++i) {
                 let params = Boss.load(reqBuf.getParamsBin(i));
+                let sessionKey = new crypto.SymmetricKey(reqBuf.getSessionKeyBin(i));
                 switch (params.command) {
                     case "hello":
                         //reqBuf.setAnswer(i, Boss.dump({result: {status: "OK", message: "welcome to the Universa"}}));
@@ -317,7 +318,7 @@ network.HttpServer = class {
                         break;
                     default:
                         if (this.secureEndpoints_.has(params.command))
-                            promises.push(this.secureEndpoints_.get(params.command)(params));
+                            promises.push(this.secureEndpoints_.get(params.command)(params, sessionKey));
                             //reqBuf.setAnswer(i, Boss.dump({result: await this.secureEndpoints_.get(params.command)(params)}));
                         else
                             throw new Error("unknown command: " + params.command);

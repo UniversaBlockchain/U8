@@ -497,6 +497,12 @@ private:
     size_t sendAnswerCounter = 0;
 };
 
+struct SecureEndpointParams {
+    byte_vector paramsBin;
+    shared_ptr<HttpServerSession> session;
+    function<void(const byte_vector& ansBin)> ansCallback;
+};
+
 class HttpServerSecureRequestBuf {
 public:
     void setAnswersReadyCallback(std::function<void()>&& onAnswersReady) {
@@ -509,7 +515,10 @@ public:
         return (int)buf_.size();
     }
     byte_vector getParamsBin(int idx) {
-        return buf_[idx];
+        return buf_[idx].first;
+    }
+    byte_vector getSessionKeyBin(int idx) {
+        return buf_[idx].second->sessionKey->pack();
     }
     void setAnswer(int idx, byte_vector&& ans) {
         answers_[idx] = std::move(ans);
@@ -518,8 +527,8 @@ public:
             onAnswersReady_();
     }
 public:
-    void addHttpServerSecureRequest(const byte_vector& paramsBin) {
-        buf_.emplace_back(paramsBin);
+    void addHttpServerSecureRequest(const byte_vector& paramsBin, shared_ptr<HttpServerSession> session) {
+        buf_.emplace_back(make_pair(paramsBin, session));
     }
     void resizeAnswersBuf() {
         answers_.resize(buf_.size());
@@ -528,7 +537,7 @@ public:
         return answers_[idx];
     }
 private:
-    std::vector<byte_vector> buf_;
+    std::vector<pair<byte_vector,shared_ptr<HttpServerSession>>> buf_;
     std::vector<byte_vector> answers_;
     size_t answersCount_ = 0;
     std::function<void()> onAnswersReady_;
@@ -538,11 +547,15 @@ class HttpServerBuffered {
 public:
 
     void initSecureEndpoint() {
-        srv_.addSecureCallback([this](const byte_vector& paramsBin, std::function<void(const byte_vector& ansBin)>&& sendAnswer){
+        srv_.addSecureCallback([this](const byte_vector& paramsBin, std::shared_ptr<HttpServerSession> session, std::function<void(const byte_vector& ansBin)>&& sendAnswer){
             atomic<bool> needSend(false);
             {
                 lock_guard lock(mutex_);
-                bufSecure_.emplace_back(make_pair(paramsBin, std::move(sendAnswer)));
+                SecureEndpointParams sep;
+                sep.paramsBin = paramsBin;
+                sep.ansCallback = std::move(sendAnswer);
+                sep.session = session;
+                bufSecure_.emplace_back(sep);
                 if (bufSecure_.size() >= bufSize_)
                     needSend = true;
             }
@@ -628,11 +641,11 @@ private:
                 } else {
                     HttpServerSecureRequestBuf* buf = new HttpServerSecureRequestBuf();
                     for (int i = 0; i < bufCopy.size(); ++i)
-                        buf->addHttpServerSecureRequest(bufCopy[i].first);
+                        buf->addHttpServerSecureRequest(bufCopy[i].paramsBin, bufCopy[i].session);
                     buf->resizeAnswersBuf();
                     buf->setAnswersReadyCallback([bufCopy,buf](){
                         for (int i = 0; i < bufCopy.size(); ++i)
-                            bufCopy[i].second(buf->getAnswer(i));
+                            bufCopy[i].ansCallback(buf->getAnswer(i));
                         delete buf;
                     });
                     Local<Value> res[1] = {wrap(HttpServerRequestSecureBufTpl, seSecure_->isolate(), buf)};
@@ -645,7 +658,7 @@ private:
 private:
     HttpServer srv_;
     std::vector<HttpServerRequest*> buf_;
-    std::vector<pair<byte_vector, function<void(const byte_vector& ansBin)>>> bufSecure_;
+    std::vector<SecureEndpointParams> bufSecure_;
     std::mutex mutex_;
     Persistent<Function>* pcb_ = nullptr;
     shared_ptr<Scripter> se_ = nullptr;
@@ -1052,6 +1065,17 @@ void HttpServerSecureRequestBuf_getParamsBin(const FunctionCallbackInfo<Value> &
     });
 }
 
+void HttpServerSecureRequestBuf_getSessionKeyBin(const FunctionCallbackInfo<Value> &args) {
+    Scripter::unwrapArgs(args, [](ArgsContext &ac) {
+        if (ac.args.Length() == 1) {
+            auto httpServerSecureRequestBuf = unwrap<HttpServerSecureRequestBuf>(ac.args.This());
+            ac.setReturnValue(ac.toBinary(httpServerSecureRequestBuf->getSessionKeyBin(ac.asInt(0))));
+            return;
+        }
+        ac.throwError("invalid arguments");
+    });
+}
+
 void HttpServerSecureRequestBuf_setAnswer(const FunctionCallbackInfo<Value> &args) {
     Scripter::unwrapArgs(args, [](ArgsContext &ac) {
         if (ac.args.Length() == 2) {
@@ -1075,6 +1099,7 @@ void JsInitHttpServerSecureRequest(Isolate *isolate, const Local<ObjectTemplate>
     prototype->Set(isolate, "version", String::NewFromUtf8(isolate, "0.0.1"));
     prototype->Set(isolate, "getBufLength", FunctionTemplate::New(isolate, HttpServerSecureRequestBuf_getBufLength));
     prototype->Set(isolate, "getParamsBin", FunctionTemplate::New(isolate, HttpServerSecureRequestBuf_getParamsBin));
+    prototype->Set(isolate, "getSessionKeyBin", FunctionTemplate::New(isolate, HttpServerSecureRequestBuf_getSessionKeyBin));
     prototype->Set(isolate, "setAnswer", FunctionTemplate::New(isolate, HttpServerSecureRequestBuf_setAnswer));
 
     // register it into global namespace

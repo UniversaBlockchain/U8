@@ -187,12 +187,12 @@ void HttpServer::addEndpoint(const std::string& endpoint, std::function<void(Htt
     service_.addEndpoint(endpoint, std::move(callback));
 }
 
-void HttpServer::addSecureCallback(const std::function<void(const byte_vector& params,
+void HttpServer::addSecureCallback(const std::function<void(const byte_vector& params, std::shared_ptr<HttpServerSession> session,
         std::function<void(const byte_vector& ansBin)>&&)>& callback) {
     secureCallback_ = callback;
 }
 
-void HttpServer::addSecureCallback(std::function<void(const byte_vector& params,
+void HttpServer::addSecureCallback(std::function<void(const byte_vector& params, std::shared_ptr<HttpServerSession> session,
         std::function<void(const byte_vector& ansBin)>&&)>&& callback) {
     secureCallback_ = std::move(callback);
 }
@@ -311,8 +311,8 @@ void HttpServer::initSecureProtocol() {
         }
     });
     addEndpoint("/command", [this](HttpServerRequest *req) {
-        inSession(req, [this](byte_vector& params, std::function<void(const byte_vector& ansBin)>&& sendAnswer){
-            secureCallback_(params, std::move(sendAnswer));
+        inSession(req, [this](byte_vector& params, std::shared_ptr<HttpServerSession> session, std::function<void(const byte_vector& ansBin)>&& sendAnswer){
+            secureCallback_(params, session, std::move(sendAnswer));
         });
     });
 }
@@ -320,7 +320,7 @@ void HttpServer::initSecureProtocol() {
 void HttpServer::inSession(
         HttpServerRequest *req,
         std::function<void(
-                byte_vector& params,
+                byte_vector& params, std::shared_ptr<HttpServerSession> session,
                 std::function<void(const byte_vector& ansBin)>&& sendAnswer
         )>&& processor) {
     try {
@@ -334,7 +334,7 @@ void HttpServer::inSession(
         UBytes paramsBytes = UBytes::asInstance(paramsObj);
         byte_vector paramsBin = paramsBytes.get();
         byte_vector paramsBinDecrypted = session->sessionKey->decrypt(paramsBin);
-        processor(paramsBinDecrypted, [session,req](const byte_vector& reqAnsBin){
+        processor(paramsBinDecrypted, session, [session,req](const byte_vector& reqAnsBin){
             byte_vector encryptedAns = session->sessionKey->encrypt(reqAnsBin);
             UBinder result = UBinder::of("result", UBytes(std::move(encryptedAns)));
             UBinder ans = UBinder::of("result", "ok","response", result);

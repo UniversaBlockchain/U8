@@ -41,8 +41,9 @@ unit.test("hello web", async () => {
         return {"ping": "pong"};
     });
     let unsRateDbg = 333;
-    httpServer.addSecureEndpoint("unsRate", async (reqParams) => {
+    httpServer.addSecureEndpoint("unsRate", async (reqParams, sessionKey) => {
         //console.log(JSON.stringify(reqParams));
+        console.log(btoa(sessionKey.packed));
         unsRateDbg += 1;
         await sleep(1);
         return {U: unsRateDbg};

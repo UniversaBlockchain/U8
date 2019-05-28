@@ -98,15 +98,15 @@ public:
 
     void addEndpoint(const std::string& endpoint, const std::function<void(HttpServerRequest*)>& callback);
     void addEndpoint(const std::string& endpoint, std::function<void(HttpServerRequest*)>&& callback);
-    void addSecureCallback(const std::function<void(const byte_vector& params,
+    void addSecureCallback(const std::function<void(const byte_vector& params, std::shared_ptr<HttpServerSession> session,
             std::function<void(const byte_vector& ansBin)>&&)>& callback);
-    void addSecureCallback(std::function<void(const byte_vector& params,
+    void addSecureCallback(std::function<void(const byte_vector& params, std::shared_ptr<HttpServerSession> session,
             std::function<void(const byte_vector& ansBin)>&&)>&& callback);
 
 private:
     UBinder extractParams(std::unordered_map<std::string, byte_vector>& reqParams);
     void initSecureProtocol();
-    void inSession(HttpServerRequest *req, std::function<void(byte_vector& params,
+    void inSession(HttpServerRequest *req, std::function<void(byte_vector& params, std::shared_ptr<HttpServerSession> session,
             std::function<void(const byte_vector& ansBin)>&& sendAnswer)>&& processor);
     std::shared_ptr<HttpServerSession> getSession(crypto::PublicKey& key);
     std::shared_ptr<HttpServerSession> getSession(long sessionId);
@@ -119,7 +119,7 @@ private:
     std::unordered_map<long, std::shared_ptr<HttpServerSession>> sessionsById_;
     std::minstd_rand minstdRand_;
     long nextSessionId_;
-    std::function<void(const byte_vector& params, std::function<void(const byte_vector& ansBin)>&&)> secureCallback_;
+    std::function<void(const byte_vector& params, std::shared_ptr<HttpServerSession> session, std::function<void(const byte_vector& ansBin)>&&)> secureCallback_;
 
 };
 

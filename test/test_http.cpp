@@ -48,6 +48,7 @@ TEST_CASE("http_hello") {
     ThreadPool poolForSecureCallbacks(4);
     httpServer.addSecureCallback([&secureProcessor,&poolForSecureCallbacks](
             const byte_vector& paramsBin,
+            std::shared_ptr<HttpServerSession> session,
             std::function<void(const byte_vector& ansBin)>&& sendAnswer){
         poolForSecureCallbacks.execute([paramsBin,&secureProcessor,sendAnswer{std::move(sendAnswer)}](){
             byte_vector paramsCopy(paramsBin);
