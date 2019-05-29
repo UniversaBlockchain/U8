@@ -164,7 +164,8 @@ unsigned int BossSerializer::Writer::sizeInBytes(unsigned long value) {
 }
 
 void BossSerializer::Writer::writeHeader(unsigned int code, unsigned long value) {
-    assert(code >= 0 && code <= 7);
+    if (code < 0 || code > 7)
+        throw std::invalid_argument(std::string("BOSS serialize error: invalid code"));
 
     if (value < 23)
         buf.push_back((unsigned char) (code | ((int) value << 3)));
@@ -289,6 +290,9 @@ UObject BossSerializer::Reader::get() {
             return h.getInt(true);
 
         case TYPE_BIN: {
+            if (pos + h.value > size)
+                throw std::invalid_argument(std::string("BOSS deserialize error: overflow reading binary data"));
+
             UBytes bb = h.value > 0 ? UBytes(&bin[pos], (unsigned int) h.value) : UBytes(nullptr, 0);
             cacheObject(bb);
             pos += h.value;
@@ -296,6 +300,9 @@ UObject BossSerializer::Reader::get() {
         }
 
         case TYPE_TEXT: {
+            if (pos + h.value > size)
+                throw std::invalid_argument(std::string("BOSS deserialize error: overflow reading string"));
+
             std::string s(&bin[pos], &bin[pos] + h.value);
             UString str(s);
             cacheObject(str);
@@ -316,8 +323,12 @@ UObject BossSerializer::Reader::get() {
         case TYPE_DICT:
             return readBinder(h);
 
-        case TYPE_CREF:
+        case TYPE_CREF: {
+            if (h.value != 0 && h.value > cache.size())
+                throw std::invalid_argument(std::string("BOSS deserialize error: overflow cache"));
+
             return h.value == 0 ? nullObject : cache[h.value - 1];
+        }
 
         case TYPE_EXTRA:
             return parseExtra((int) h.value);
@@ -358,6 +369,9 @@ BossSerializer::Header BossSerializer::Reader::readHeader() {
 }
 
 unsigned char BossSerializer::Reader::readByte() {
+    if (pos + 1 > size)
+        throw std::invalid_argument(std::string("BOSS deserialize error: overflow parsing header"));
+
     return bin[pos++];
 }
 
@@ -375,7 +389,8 @@ unsigned long BossSerializer::Reader::readEncodedLong() {
 }
 
 unsigned long BossSerializer::Reader::readLong(unsigned long length) {
-    assert(length <= 8);
+    if (length > 8)
+        throw std::invalid_argument(std::string("BOSS deserialize error: invalid long length"));
 
     unsigned long res = 0;
     int n = 0;
@@ -414,6 +429,9 @@ UObject BossSerializer::Reader::parseExtra(int code) {
             return get();
 
         case XT_DOUBLE:
+            if (pos + 8 > size)
+                throw std::invalid_argument(std::string("BOSS deserialize error: overflow reading double"));
+
             double d;
             memcpy(&d, &bin[pos], 8);
             pos += 8;
