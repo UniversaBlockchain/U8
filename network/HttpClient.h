@@ -18,6 +18,7 @@
 #include "../crypto/PublicKey.h"
 #include "../crypto/PrivateKey.h"
 #include "../crypto/SymmetricKey.h"
+#include "../types/UBinder.h"
 
 namespace network {
 
@@ -65,9 +66,23 @@ public:
      */
     void start(const crypto::PrivateKey& clientKey, const crypto::PublicKey& nodeKey);
 
+    /**
+     * Execute a command over the authenticated and encrypted connection. In the case of network errors, restarts the
+     * command.
+     */
+    void command(const std::string& name, const UBinder& params, std::function<void(UBinder&&)>&& onComplete);
+
+    /**
+     * Execute a command over the authenticated and encrypted connection. In the case of network errors, restarts the
+     * command.
+     */
+    void command(const std::string& name, const UBinder& params, const std::function<void(UBinder&&)>& onComplete);
+
 private:
     std::shared_ptr<HttpClientWorker> getUnusedWorker();
     void releaseWorker(int workerId);
+    void execCommand(const std::string& name, const UBinder& params, std::function<void(UBinder&&)>&& onComplete);
+
     friend HttpClientWorker;
 
 private:

@@ -219,10 +219,45 @@ void HttpClient::start(const crypto::PrivateKey& clientKey, const crypto::Public
             throw std::runtime_error("client nonce mismatch");
         }
         byte_vector encrypted_token = UBytes::asInstance(paramsRcv.get("encrypted_token")).get();
-        byte_vector key = session_->clientPrivateKey->decrypt(encrypted_token);
+        byte_vector key = UBytes::asInstance(UBinder::asInstance(BossSerializer::deserialize(session_->clientPrivateKey->decrypt(encrypted_token))).get("sk")).get();
         session_->sessionKey = make_shared<crypto::SymmetricKey>(key);
+        execCommand("hello", UBinder(), [](UBinder&& res){
+            cout << "hello ans" << endl << res.getString("message") << endl;
+        });
     }
 
+}
+
+void HttpClient::command(const std::string& name, const UBinder& params, std::function<void(UBinder&&)>&& onComplete) {
+    execCommand(name, params, std::move(onComplete));
+}
+
+void HttpClient::command(const std::string& name, const UBinder& params, const std::function<void(UBinder&&)>& onComplete) {
+    auto onCompleteCopy = onComplete;
+    execCommand(name, params, std::move(onCompleteCopy));
+}
+
+void HttpClient::execCommand(const std::string& name, const UBinder& params, std::function<void(UBinder&&)>&& onComplete) {
+    if (!session_ || !session_->sessionKey)
+        throw std::runtime_error("Session does not created or session key is not got yet.");
+    UBinder call = UBinder::of("command", name, "params", params);
+    byte_vector callBin = BossSerializer::serialize(call).get();
+    UBinder cmdParams = UBinder::of(
+            "command", "command",
+            "params", UBytes(session_->sessionKey->encrypt(callBin)),
+            "session_id", session_->sessionId);
+    Semaphore sem;
+    UBinder result;
+    sendRawRequest("command", "POST", BossSerializer::serialize(cmdParams).get(), [this,&result,&sem](int respCode, byte_vector&& respBody){
+        UBinder ansBinder = UBinder::asInstance(BossSerializer::deserialize(UBytes(std::move(respBody))));
+        UBinder responseBinder = ansBinder.getBinder("response");
+        byte_vector decrypted = session_->sessionKey->decrypt(UBytes::asInstance(responseBinder.get("result")).get());
+        UBinder decryptedBinder = UBinder::asInstance(BossSerializer::deserialize(UBytes(std::move(decrypted))));
+        result = decryptedBinder.getBinder("result");
+        sem.notify();
+    });
+    sem.wait();
+    onComplete(std::move(result));
 }
 
 }

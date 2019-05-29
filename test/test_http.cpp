@@ -122,3 +122,83 @@ TEST_CASE("http_hello") {
     httpServer.join();
     printf("all done, stop server and client... ok\n");
 }
+
+TEST_CASE("http_secure_endpoints") {
+    crypto::PrivateKey nodePrivateKey(base64_decodeToBytes("JgAcAQABvIDhlmN5xUJsTxP6sFA4fSKHYKB0e7Sh4m/X+siqL7/uP8f6ZAqWr5GpzGW9NSYZP64KeU7pXiTSOUy2/4ONKjqrQ+UWtww2vElpQFyUqlJGh9JKqA2VwZtwEPJxbL/zTJqyW9nXoR8G0Np2/poYtKEydGJlL8QimYTk4WtpI64y7byAuwpRoTxc6LbWoCl6Mz0eaLKMn5JgEuKHn3TJ/Hi62nmhfi9NYluAweMjXYgxaxdNKl5N4IOeL8b0vO/fAVVIfmKKJkq9kAMiRHmOSc4LS15Y1WrTkCSz20wKQMbPFsRzddm9Ml4XD0zCxJi5Bzz2AO1Slo3y2+fkA8CkSjZ3wEs="));
+    crypto::PublicKey nodePublicKey(nodePrivateKey);
+    HttpServer httpServer("0.0.0.0", 8080, 4);
+    auto secureProcessor = [](UBinder& params){
+        std::string command = params.getString("command");
+        if (command == "hello") {
+            return UBinder::of("result", UBinder::of("status", "OK", "message", "welcome to the Universa"));
+        } else if (command == "sping") {
+            return UBinder::of("result", UBinder::of("sping", "spong"));
+        } else if (command == "test_error") {
+            throw std::invalid_argument("sample error");
+        } else {
+            if (command == "unsRate") {
+                return UBinder::of("result", UBinder::of("U", 777));
+            }else
+                throw std::invalid_argument("unknown command: " + command);
+        }
+    };
+    ThreadPool poolForSecureCallbacks(4);
+    httpServer.addSecureCallback([&secureProcessor,&poolForSecureCallbacks](
+            const byte_vector& paramsBin,
+            std::shared_ptr<HttpServerSession> session,
+            std::function<void(const byte_vector& ansBin)>&& sendAnswer){
+        poolForSecureCallbacks.execute([paramsBin,&secureProcessor,sendAnswer{std::move(sendAnswer)}](){
+            byte_vector paramsCopy(paramsBin);
+            UObject paramsUnpackedObj = BossSerializer::deserialize(UBytes(std::move(paramsCopy)));
+            UBinder params = UBinder::asInstance(paramsUnpackedObj);
+            UBinder reqAns = secureProcessor(params);
+            sendAnswer(BossSerializer::serialize(reqAns).get());
+        });
+    });
+    httpServer.start();
+
+    vector<shared_ptr<HttpClient>> clients;
+    for (int i = 0; i < 10; ++i) {
+        shared_ptr<HttpClient> httpClient = make_shared<HttpClient>("http://localhost:8080", 4);
+        //shared_ptr<HttpClient> httpClient = make_shared<HttpClient>("http://192.168.1.146:8080", 4);
+        httpClient->start(crypto::PrivateKey(2048), nodePublicKey);
+        clients.emplace_back(httpClient);
+    }
+
+    Semaphore sem;
+    atomic<int> readyCounter(0);
+    //int countToSend = 200000000;
+    int countToSend = 2000;
+
+    atomic<long> ts0 = getCurrentTimeMillis();
+    atomic<int> counter0 = 0;
+
+    auto onComplete = [&sem,&readyCounter,countToSend,&ts0,&counter0](UBinder&& resp){
+//        long U = resp.getInt("U");
+//        printf("resp: U=%li\n", U);
+        if (++readyCounter >= countToSend)
+            sem.notify();
+        long dts = getCurrentTimeMillis() - ts0;
+        if (dts >= 1000) {
+            printf("readyCounter=%i, rps=%li\n", int(readyCounter), (readyCounter-counter0)*1000/dts);
+            counter0 = int(readyCounter);
+            ts0 = getCurrentTimeMillis();
+        }
+    };
+
+    long t0 = getCurrentTimeMillis();
+    for (int i = 0; i < countToSend; ++i) {
+        auto c = clients[i % clients.size()];
+        c->command("unsRate", UBinder(), onComplete);
+        if (i-readyCounter > 1000)
+            this_thread::sleep_for(10ms);
+    }
+
+    sem.wait();
+    long dt = getCurrentTimeMillis() - t0;
+    printf("total time = %li ms, rps = %li\n", dt, readyCounter*1000/dt);
+
+    httpServer.stop();
+    httpServer.join();
+    printf("all done, stop server and client... ok\n");
+}
