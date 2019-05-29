@@ -416,7 +416,7 @@ class ClientHTTPServer extends network.HttpServer {
             return {result : await this.node.registerParcel(Parcel.unpack(t.getOrThrow(params, "packedItem")))}; //TODO: node
         } catch (err) {
             this.logger.log("approveParcel ERROR: " + err.message);
-            return {itemResult : this.itemResultOfError(Errors.COMMAND_FAILED,"approveParcel", err.message)};
+            return {result : this.itemResultOfError(Errors.COMMAND_FAILED,"approveParcel", err.message)};
         }
     }
 

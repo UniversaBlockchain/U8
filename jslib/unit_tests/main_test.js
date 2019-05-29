@@ -4,6 +4,8 @@ import {randomBytes} from 'tools'
 import * as tk from 'unit_tests/test_keys'
 
 const Main = require("main").Main;
+const Boss = require('boss.js');
+const ExtendedSignature = require("extendedsignature").ExtendedSignature;
 
 unit.test("main_test: checkOptionParsing", () => {
     let parser = Main.initOptionParser();
@@ -87,7 +89,7 @@ unit.test("main_test: startNode", async () => {
     assert(main.logger.buffer.includes("Network configuration is loaded from " + main.configRoot + ", " + main.netConfig.size + " nodes."));
 });
 
-unit.test("main_test: sendHttpRequest", async () => {
+unit.test("main_test: sendHttpRequests", async () => {
     let main = await new Main("--test", "--config", "../test/config/test_node_config_v2/node1", "--nolog").run();
 
     main.clientHTTPServer.node = {ledger: main.ledger};
@@ -112,6 +114,43 @@ unit.test("main_test: sendHttpRequest", async () => {
     httpClient.sendGetRequest("localhost:" + main.myInfo.clientAddress.port + "/contracts/" + contract.id.base64, (respCode, body) => {
         assert(respCode === 200);
         assert(contract.getPackedTransaction().equals(body));
+        answer = true;
+    });
+
+    while (!answer)
+        await sleep(1);
+
+    answer = false;
+    httpClient.sendGetRequest("localhost:" + main.myInfo.clientAddress.port + "/network", (respCode, body) => {
+        assert(respCode === 200);
+        let result = Boss.load(body);
+        assert(result.result === "ok");
+
+        assert(result.response.version === VERSION);
+        assert(result.response.hasOwnProperty("number"));
+        assert(result.response.hasOwnProperty("nodes"));
+
+        answer = true;
+    });
+
+    while (!answer)
+        await sleep(1);
+
+    answer = false;
+    httpClient.sendGetRequest("localhost:" + main.myInfo.clientAddress.port + "/topology", async (respCode, body) => {
+        assert(respCode === 200);
+        let result = Boss.load(body);
+        assert(result.result === "ok");
+
+        let data = Boss.load(result.response.packed_data);
+        assert(data.version === VERSION);
+        assert(data.hasOwnProperty("number"));
+        assert(data.hasOwnProperty("nodes"));
+
+        let key = ExtendedSignature.extractPublicKey(result.response.signature);
+        assert(key != null);
+        assert(await ExtendedSignature.verify(key, result.response.signature, result.response.packed_data) != null);
+
         answer = true;
     });
 
