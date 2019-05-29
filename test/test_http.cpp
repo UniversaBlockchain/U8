@@ -16,15 +16,22 @@
 using namespace std;
 using namespace network;
 
-TEST_CASE("serialize_public_key") {
+TEST_CASE("BossSerializer_exceptions") {
     crypto::PrivateKey privateKey(2048);
     crypto::PublicKey publicKey(privateKey);
-    cout << base64_encode(publicKey.pack()) << endl;
-    byte_vector se = BossSerializer::serialize(UBinder::of("client_keyclient_keyclient_key", UBytes(crypto::PublicKey(publicKey).pack()))).get();
-    byte_vector de = UBytes::asInstance(UBinder::asInstance(BossSerializer::deserialize(UBytes(std::move(se)))).get("client_keyclient_keyclient_key")).get();
-    crypto::PublicKey publicKey1(de);
-    cout << base64_encode(publicKey1.pack()) << endl;
-    REQUIRE(publicKey.pack() == publicKey1.pack());
+    for (int i = 0; i < 1000; ++i) {
+        try {
+            //cout << "i=" << i << endl;
+            byte_vector se = BossSerializer::serialize(
+                    UBinder::of("client_keyclient_keyclient_key", UBytes(crypto::PublicKey(publicKey).pack()))).get();
+            sprng_read(&se[0], se.size(), NULL);
+            byte_vector de = UBytes::asInstance(
+                    UBinder::asInstance(BossSerializer::deserialize(UBytes(std::move(se)))).get(
+                            "client_keyclient_keyclient_key")).get();
+        } catch (const std::exception &e) {
+            // do nothing, wait for sigsegv
+        }
+    }
 }
 
 TEST_CASE("http_hello") {
