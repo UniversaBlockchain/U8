@@ -167,6 +167,7 @@ public:
         const unsigned char* bin;
         const unsigned int size;
         unsigned int pos = 0;
+        std::vector<unsigned long> recursive;
 
         bool treeMode;
 

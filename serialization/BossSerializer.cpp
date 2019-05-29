@@ -164,7 +164,7 @@ unsigned int BossSerializer::Writer::sizeInBytes(unsigned long value) {
 }
 
 void BossSerializer::Writer::writeHeader(unsigned int code, unsigned long value) {
-    if (code < 0 || code > 7)
+    if (code > 7)
         throw std::invalid_argument(std::string("BOSS serialize error: invalid code"));
 
     if (value < 23)
@@ -314,8 +314,12 @@ UObject BossSerializer::Reader::get() {
             UArray array;
             cacheObject(array);
 
+            recursive.push_back(cache.size());
+
             for (int i = 0; i < h.value; i++)
                 array.push_back(get());
+
+            recursive.pop_back();
 
             return array;
         }
@@ -326,6 +330,10 @@ UObject BossSerializer::Reader::get() {
         case TYPE_CREF: {
             if (h.value != 0 && h.value > cache.size())
                 throw std::invalid_argument(std::string("BOSS deserialize error: overflow cache"));
+
+            for (auto i: recursive)
+                if (i == h.value)
+                    throw std::invalid_argument(std::string("BOSS deserialize error: recursive reference"));
 
             return h.value == 0 ? nullObject : cache[h.value - 1];
         }
@@ -341,6 +349,8 @@ UObject BossSerializer::Reader::readBinder(Header h) {
     UBinder binder;
     cacheObject(binder);
 
+    recursive.push_back(cache.size());
+
     for (int i = 0; i < h.value; i++) {
         UObject key = get();
         if (!UString::isInstance(key))
@@ -348,6 +358,8 @@ UObject BossSerializer::Reader::readBinder(Header h) {
 
         binder.set(UString::asInstance(key).get(), get());
     }
+
+    recursive.pop_back();
 
     return binder;
 }
