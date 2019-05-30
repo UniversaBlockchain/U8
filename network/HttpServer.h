@@ -91,6 +91,7 @@ class HttpServer {
 
 public:
     HttpServer(std::string host, int port, int poolSize);
+    void initSecureProtocol(const crypto::PrivateKey& nodePrivateKey);
 
     void start();
     void stop();
@@ -105,14 +106,13 @@ public:
 
 private:
     UBinder extractParams(std::unordered_map<std::string, byte_vector>& reqParams);
-    void initSecureProtocol();
     void inSession(HttpServerRequest *req, std::function<void(byte_vector& params, std::shared_ptr<HttpServerSession> session,
             std::function<void(const byte_vector& ansBin)>&& sendAnswer)>&& processor);
     std::shared_ptr<HttpServerSession> getSession(crypto::PublicKey& key);
     std::shared_ptr<HttpServerSession> getSession(long sessionId);
 
 private:
-    crypto::PrivateKey myKey_;
+    std::shared_ptr<crypto::PrivateKey> myKey_;
     HttpService service_;
     std::mutex mutexSessions_;
     std::unordered_map<std::string, std::shared_ptr<HttpServerSession>> sessionsByKey_;

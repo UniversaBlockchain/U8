@@ -331,6 +331,10 @@ network.HttpServer = class {
         });
     }
 
+    initSecureProtocol(ownNodePrivateKey) {
+        this.httpServer_.__initSecureProtocol(ownNodePrivateKey.packed);
+    }
+
     startServer() {
         this.httpServer_.__startServer();
     }

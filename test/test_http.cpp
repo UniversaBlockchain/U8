@@ -127,6 +127,7 @@ TEST_CASE("http_secure_endpoints") {
     crypto::PrivateKey nodePrivateKey(base64_decodeToBytes("JgAcAQABvID6D5ZdM9EKrZSztm/R/RcywM4K8Z4VBtX+NZp2eLCWtfAgGcBCQLtNz4scH7dPBerkkxckW6+9CLlnu/tgOxvzS6Z1Ec51++fVP9gaWbBQe9/dSg7xVPg5p9ibhfTB+iRXyevCkNj0hrlLyXl1BkPjN9+lZfXJsp9OnGIJ/AaAb7yA99E65gvZnbb3/oA3rG0pM45af6ppZKe2HeiAK+fcXm5KTQzfTce45f/mJ0jsDmFf1HFosS4waXSAz0ZfcssjPeoF3PuXfJLtM8czJ55+Nz6NMCbzrSk6zkKssGBieYFOb4eG2AdtfjTrpcSSHBgJpsbcmRx4bZNfBAZPqT+Sd20="));
     crypto::PublicKey nodePublicKey(nodePrivateKey);
     HttpServer httpServer("0.0.0.0", 8080, 4);
+    httpServer.initSecureProtocol(nodePrivateKey);
     auto secureProcessor = [](UBinder& params){
         std::string command = params.getString("command");
         if (command == "hello") {

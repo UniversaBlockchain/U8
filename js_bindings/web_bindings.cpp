@@ -608,6 +608,11 @@ public:
         seSecure_ = se;
     }
 
+    void initSecureProtocol(byte_vector nodePrivateKeyPacked) {
+        crypto::PrivateKey nodePrivateKey(nodePrivateKeyPacked);
+        srv_.initSecureProtocol(nodePrivateKey);
+    }
+
 private:
     void sendAllFromBuf() {
         lock_guard lock(mutex_);
@@ -726,6 +731,20 @@ void httpServer_addEndpoint(const FunctionCallbackInfo<Value> &args) {
     });
 }
 
+void httpServer_initSecureProtocol(const FunctionCallbackInfo<Value> &args) {
+    Scripter::unwrapArgs(args, [](ArgsContext &ac) {
+        if (ac.args.Length() == 1) {
+            auto httpServer = unwrap<HttpServerBuffered>(ac.args.This());
+            auto contents = ac.args[0].As<TypedArray>()->Buffer()->GetContents();
+            byte_vector bv(contents.ByteLength());
+            memcpy(&bv[0], contents.Data(), contents.ByteLength());
+            httpServer->initSecureProtocol(bv);
+            return;
+        }
+        ac.throwError("invalid arguments");
+    });
+}
+
 Local<FunctionTemplate> initHttpServer(Isolate *isolate) {
     Local<FunctionTemplate> tpl = bindCppClass<HttpServerBuffered>(
             isolate,
@@ -756,6 +775,7 @@ Local<FunctionTemplate> initHttpServer(Isolate *isolate) {
     prototype->Set(isolate, "__startServer", FunctionTemplate::New(isolate, httpServer_startServer));
     prototype->Set(isolate, "__stopServer", FunctionTemplate::New(isolate, httpServer_stopServer));
     prototype->Set(isolate, "__addEndpoint", FunctionTemplate::New(isolate, httpServer_addEndpoint));
+    prototype->Set(isolate, "__initSecureProtocol", FunctionTemplate::New(isolate, httpServer_initSecureProtocol));
 
     HttpServerTpl.Reset(isolate, tpl);
     return tpl;

@@ -161,10 +161,8 @@ void HttpService::addEndpoint(const std::string& endpoint, const std::function<v
 
 HttpServer::HttpServer(std::string host, int port, int poolSize)
  : service_(host, port, poolSize)
- , minstdRand_(std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now().time_since_epoch()).count())
- , myKey_(base64_decodeToBytes("JgAcAQABvID6D5ZdM9EKrZSztm/R/RcywM4K8Z4VBtX+NZp2eLCWtfAgGcBCQLtNz4scH7dPBerkkxckW6+9CLlnu/tgOxvzS6Z1Ec51++fVP9gaWbBQe9/dSg7xVPg5p9ibhfTB+iRXyevCkNj0hrlLyXl1BkPjN9+lZfXJsp9OnGIJ/AaAb7yA99E65gvZnbb3/oA3rG0pM45af6ppZKe2HeiAK+fcXm5KTQzfTce45f/mJ0jsDmFf1HFosS4waXSAz0ZfcssjPeoF3PuXfJLtM8czJ55+Nz6NMCbzrSk6zkKssGBieYFOb4eG2AdtfjTrpcSSHBgJpsbcmRx4bZNfBAZPqT+Sd20=")) {
+ , minstdRand_(std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now().time_since_epoch()).count()) {
     nextSessionId_ = getCurrentTimeMillis()/1000 + minstdRand_();
-    initSecureProtocol();
 }
 
 void HttpServer::start() {
@@ -220,7 +218,8 @@ UBinder HttpServer::extractParams(std::unordered_map<std::string, byte_vector>& 
     return UBinder();
 }
 
-void HttpServer::initSecureProtocol() {
+void HttpServer::initSecureProtocol(const crypto::PrivateKey& nodePrivateKey) {
+    myKey_ = make_shared<crypto::PrivateKey>(nodePrivateKey.pack());
     addEndpoint("/connect", [this](HttpServerRequest *req){
         try {
             auto res = req->parseMultipartData();
@@ -291,7 +290,7 @@ void HttpServer::initSecureProtocol() {
                     byte_vector encryptedAnswer = session->encryptedAnswer;
                     UBinder result = UBinder::of("client_nonce", UBytes(std::move(clientNonce)), "encrypted_token", UBytes(std::move(encryptedAnswer)));
                     byte_vector packed = BossSerializer::serialize(result).get();
-                    byte_vector sign = myKey_.sign(packed, crypto::HashType::SHA512);
+                    byte_vector sign = myKey_->sign(packed, crypto::HashType::SHA512);
                     UBinder reqAns = UBinder::of("data", UBytes(std::move(packed)), "signature", UBytes(std::move(sign)));
                     UBinder ans = UBinder::of("result", "ok","response", reqAns);
                     req->setAnswerBody(BossSerializer::serialize(ans).get());
