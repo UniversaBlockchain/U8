@@ -153,7 +153,8 @@ void HttpClient::sendGetRequest(const std::string& url, const std::function<void
 void HttpClient::sendGetRequest(const std::string& url, std::function<void(int,byte_vector&&)>&& callback) {
     poolControlThread_.execute([callback{std::move(callback)}, url, this]() mutable {
         auto client = getUnusedWorker();
-        client->sendGetRequest(url, std::move(callback));
+        std::string fullUrl = makeFullUrl(url);
+        client->sendGetRequest(fullUrl, std::move(callback));
     });
 }
 
@@ -163,17 +164,16 @@ void HttpClient::sendRawRequest(const std::string& url, const std::string& metho
 }
 
 void HttpClient::sendRawRequest(const std::string& url, const std::string& method, const byte_vector& reqBody, std::function<void(int,byte_vector&&)>&& callback) {
-    std::string fullUrl = rootUrl_ + "/" + url;
     poolControlThread_.execute([callback{std::move(callback)}, url, method, reqBody, this]() mutable {
         auto client = getUnusedWorker();
-        std::string fullUrl = rootUrl_ + "/" + url;
+        std::string fullUrl = makeFullUrl(url);
         client->sendRawRequest(fullUrl, method, reqBody, std::move(callback));
     });
 }
 
 void HttpClient::start(const crypto::PrivateKey& clientKey, const crypto::PublicKey& nodeKey) {
     if (session_) {
-        printf("use existing session\n");
+        printf("TODO: restore session\n");
         //TODO: restore session
     } else {
         Semaphore sem;
@@ -183,7 +183,7 @@ void HttpClient::start(const crypto::PrivateKey& clientKey, const crypto::Public
         UBinder params = UBinder::of("client_key", UBytes(crypto::PublicKey(clientKey).pack()));
         byte_vector paramsBin = BossSerializer::serialize(params).get();
         byte_vector server_nonce;
-        sendRawRequest("connect", "POST", paramsBin, [this,&sem,&server_nonce](int respCode, byte_vector&& respBody){
+        sendRawRequest("/connect", "POST", paramsBin, [this,&sem,&server_nonce](int respCode, byte_vector&& respBody){
             UBytes ub(std::move(respBody));
             UObject uObject = BossSerializer::deserialize(ub);
             UBinder binderWrap = UBinder::asInstance(uObject);
@@ -206,7 +206,7 @@ void HttpClient::start(const crypto::PrivateKey& clientKey, const crypto::Public
                 "session_id", session_->sessionId)).get();
         byte_vector dataRcv;
         byte_vector sigRcv;
-        sendRawRequest("get_token", "POST", paramsBin, [&sem,&dataRcv,&sigRcv](int respCode, byte_vector&& respBody) {
+        sendRawRequest("/get_token", "POST", paramsBin, [&sem,&dataRcv,&sigRcv](int respCode, byte_vector&& respBody) {
             UBinder binder = UBinder::asInstance(BossSerializer::deserialize(UBytes(std::move(respBody)))).getBinder("response");
             dataRcv = UBytes::asInstance(binder.get("data")).get();
             sigRcv = UBytes::asInstance(binder.get("signature")).get();
@@ -258,7 +258,7 @@ void HttpClient::execCommand(const std::string& name, const UBinder& params, std
                 "session_id", session_->sessionId);
         Semaphore sem;
         UBinder result;
-        sendRawRequest("command", "POST", BossSerializer::serialize(cmdParams).get(), [this,&result,&sem](int respCode, byte_vector&& respBody){
+        sendRawRequest("/command", "POST", BossSerializer::serialize(cmdParams).get(), [this,&result,&sem](int respCode, byte_vector&& respBody){
             UBinder ansBinder = UBinder::asInstance(BossSerializer::deserialize(UBytes(std::move(respBody))));
             UBinder responseBinder = ansBinder.getBinder("response");
             byte_vector decrypted = session_->sessionKey->decrypt(UBytes::asInstance(responseBinder.get("result")).get());
@@ -269,6 +269,10 @@ void HttpClient::execCommand(const std::string& name, const UBinder& params, std
         sem.wait();
         onComplete(std::move(result));
     });
+}
+
+std::string HttpClient::makeFullUrl(const std::string& path) {
+    return rootUrl_ + path;
 }
 
 }

@@ -789,7 +789,7 @@ struct HttpClientAnswer {
 
 class HttpClientBuffered {
 public:
-    HttpClientBuffered(int poolSize, int bufSize): httpClient_("localhost:8080", poolSize), bufSize_(bufSize), startPool_(1) {
+    HttpClientBuffered(const std::string& rootUrl, int poolSize, int bufSize): httpClient_(rootUrl, poolSize), bufSize_(bufSize), startPool_(1) {
         timer_.scheduleAtFixedRate([this](){
             sendAllFromBuf();
         }, 20, 20);
@@ -931,11 +931,12 @@ Local<FunctionTemplate> initHttpClient(Isolate *isolate) {
             isolate,
             "HttpClientTpl",
             [=](const FunctionCallbackInfo<Value> &args) -> HttpClientBuffered* {
-                if (args.Length() == 2) {
+                if (args.Length() == 3) {
                     try {
                         auto res = new HttpClientBuffered(
-                            args[0]->Int32Value(isolate->GetCurrentContext()).FromJust(),          // poolSize
-                            args[1]->Int32Value(isolate->GetCurrentContext()).FromJust()           // bufSize
+                            string(*String::Utf8Value(isolate, args[0])),                          // rootUrl
+                            args[1]->Int32Value(isolate->GetCurrentContext()).FromJust(),          // poolSize
+                            args[2]->Int32Value(isolate->GetCurrentContext()).FromJust()           // bufSize
                         );
                         return res;
                     } catch (const std::exception& e) {

@@ -82,6 +82,7 @@ private:
     std::shared_ptr<HttpClientWorker> getUnusedWorker();
     void releaseWorker(int workerId);
     void execCommand(const std::string& name, const UBinder& params, std::function<void(UBinder&&)>&& onComplete);
+    std::string makeFullUrl(const std::string& path);
 
     friend HttpClientWorker;
 

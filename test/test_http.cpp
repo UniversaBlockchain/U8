@@ -84,6 +84,7 @@ TEST_CASE("http_hello") {
         });
     });
     httpServer.start();
+    httpServer.initSecureProtocol(nodePrivateKey);
 
     HttpClient httpClient("http://localhost:8080", 20);
     httpClient.start(crypto::PrivateKey(2048), nodePublicKey);
@@ -98,7 +99,7 @@ TEST_CASE("http_hello") {
 
     long t0 = getCurrentTimeMillis();
     for (int i = 0; i < countToSend; ++i) {
-        httpClient.sendGetRequest("localhost:8080/testPage", [&sem,&readyCounter,countToSend,&ts0,&counter0](int respCode, byte_vector&& body){
+        httpClient.sendGetRequest("/testPage", [&sem,&readyCounter,countToSend,&ts0,&counter0](int respCode, byte_vector&& body){
 //            string bodyStr(body.begin(), body.end());
 //            printf("resp(%i): %s\n", respCode, bodyStr.c_str());
             if (++readyCounter >= countToSend)

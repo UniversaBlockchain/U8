@@ -94,14 +94,14 @@ unit.test("main_test: sendHttpRequests", async () => {
 
     main.clientHTTPServer.node = {ledger: main.ledger};
 
-    let httpClient = new network.HttpClient(32, 4096);
+    let httpClient = new network.HttpClient("localhost:" + main.myInfo.clientAddress.port, 32, 4096);
 
     let fire = [];
     let events = [];
     for (let i = 0; i < 4; i++)
         events.push(new Promise((resolve) => {fire.push(resolve)}));
 
-    httpClient.sendGetRequest("localhost:" + main.myInfo.clientAddress.port + "/contracts/" + HashId.of(randomBytes(64)).base64, (respCode, body) => {
+    httpClient.sendGetRequest("/contracts/" + HashId.of(randomBytes(64)).base64, (respCode, body) => {
         assert(respCode === 404);
 
         fire[0]();
@@ -112,14 +112,14 @@ unit.test("main_test: sendHttpRequests", async () => {
 
     await main.ledger.saveContractInStorage(contract.id, contract.getPackedTransaction(), contract.getExpiresAt(), contract.getOrigin(), 0);
 
-    httpClient.sendGetRequest("localhost:" + main.myInfo.clientAddress.port + "/contracts/" + contract.id.base64, (respCode, body) => {
+    httpClient.sendGetRequest("/contracts/" + contract.id.base64, (respCode, body) => {
         assert(respCode === 200);
         assert(contract.getPackedTransaction().equals(body));
 
         fire[1]();
     });
 
-    httpClient.sendGetRequest("localhost:" + main.myInfo.clientAddress.port + "/network", (respCode, body) => {
+    httpClient.sendGetRequest("/network", (respCode, body) => {
         assert(respCode === 200);
         let result = Boss.load(body);
         assert(result.result === "ok");
@@ -131,7 +131,7 @@ unit.test("main_test: sendHttpRequests", async () => {
         fire[2]();
     });
 
-    httpClient.sendGetRequest("localhost:" + main.myInfo.clientAddress.port + "/topology", async (respCode, body) => {
+    httpClient.sendGetRequest("/topology", async (respCode, body) => {
         assert(respCode === 200);
         let result = Boss.load(body);
         assert(result.result === "ok");

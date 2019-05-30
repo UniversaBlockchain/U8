@@ -373,8 +373,8 @@ network.HttpServer = class {
 };
 
 network.HttpClient = class {
-    constructor(poolSize, bufSize) {
-        this.httpClient_ = new network.HttpClientImpl(poolSize, bufSize);
+    constructor(rootUrl, poolSize, bufSize) {
+        this.httpClient_ = new network.HttpClientImpl(rootUrl, poolSize, bufSize);
         this.callbacks_ = new Map();
         this.nextReqId_ = 1;
         this.httpClient_.__setBufferedCallback((ansArr) => {
