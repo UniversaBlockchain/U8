@@ -110,7 +110,8 @@ void HttpClientWorker::sendRawRequest(const std::string& url, const std::string&
 }
 
 HttpClient::HttpClient(const std::string& rootUrl, size_t poolSize)
-  : poolControlThread_(1) {
+  : poolControlThread_(1)
+  , commandPool_(poolSize) {
     poolSize_ = poolSize;
     rootUrl_ = rootUrl;
     for (int i = 0; i < poolSize_; ++i) {
@@ -186,7 +187,8 @@ void HttpClient::start(const crypto::PrivateKey& clientKey, const crypto::Public
             UObject uObject = BossSerializer::deserialize(ub);
             UBinder binderWrap = UBinder::asInstance(uObject);
             UBinder binder = binderWrap.getBinder("response");
-            session_->sessionId = binder.getInt("session_id");;
+            std::string strSessionId = binder.getString("session_id");
+            session_->sessionId = std::stol(strSessionId);
             UBytes serverNonceUb = UBytes::asInstance(binder.get("server_nonce"));
             server_nonce = serverNonceUb.get();
             sem.notify();
@@ -238,26 +240,28 @@ void HttpClient::command(const std::string& name, const UBinder& params, const s
 }
 
 void HttpClient::execCommand(const std::string& name, const UBinder& params, std::function<void(UBinder&&)>&& onComplete) {
-    if (!session_ || !session_->sessionKey)
-        throw std::runtime_error("Session does not created or session key is not got yet.");
-    UBinder call = UBinder::of("command", name, "params", params);
-    byte_vector callBin = BossSerializer::serialize(call).get();
-    UBinder cmdParams = UBinder::of(
-            "command", "command",
-            "params", UBytes(session_->sessionKey->encrypt(callBin)),
-            "session_id", session_->sessionId);
-    Semaphore sem;
-    UBinder result;
-    sendRawRequest("command", "POST", BossSerializer::serialize(cmdParams).get(), [this,&result,&sem](int respCode, byte_vector&& respBody){
-        UBinder ansBinder = UBinder::asInstance(BossSerializer::deserialize(UBytes(std::move(respBody))));
-        UBinder responseBinder = ansBinder.getBinder("response");
-        byte_vector decrypted = session_->sessionKey->decrypt(UBytes::asInstance(responseBinder.get("result")).get());
-        UBinder decryptedBinder = UBinder::asInstance(BossSerializer::deserialize(UBytes(std::move(decrypted))));
-        result = decryptedBinder.getBinder("result");
-        sem.notify();
+    commandPool_.execute([this, name, params, onComplete{std::move(onComplete)}](){
+        if (!session_ || !session_->sessionKey)
+            throw std::runtime_error("Session does not created or session key is not got yet.");
+        UBinder call = UBinder::of("command", name, "params", params);
+        byte_vector callBin = BossSerializer::serialize(call).get();
+        UBinder cmdParams = UBinder::of(
+                "command", "command",
+                "params", UBytes(session_->sessionKey->encrypt(callBin)),
+                "session_id", session_->sessionId);
+        Semaphore sem;
+        UBinder result;
+        sendRawRequest("command", "POST", BossSerializer::serialize(cmdParams).get(), [this,&result,&sem](int respCode, byte_vector&& respBody){
+            UBinder ansBinder = UBinder::asInstance(BossSerializer::deserialize(UBytes(std::move(respBody))));
+            UBinder responseBinder = ansBinder.getBinder("response");
+            byte_vector decrypted = session_->sessionKey->decrypt(UBytes::asInstance(responseBinder.get("result")).get());
+            UBinder decryptedBinder = UBinder::asInstance(BossSerializer::deserialize(UBytes(std::move(decrypted))));
+            result = decryptedBinder.getBinder("result");
+            sem.notify();
+        });
+        sem.wait();
+        onComplete(std::move(result));
     });
-    sem.wait();
-    onComplete(std::move(result));
 }
 
 }

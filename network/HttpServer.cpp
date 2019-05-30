@@ -162,7 +162,7 @@ void HttpService::addEndpoint(const std::string& endpoint, const std::function<v
 HttpServer::HttpServer(std::string host, int port, int poolSize)
  : service_(host, port, poolSize)
  , minstdRand_(std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now().time_since_epoch()).count())
- , myKey_(base64_decodeToBytes("JgAcAQABvIDhlmN5xUJsTxP6sFA4fSKHYKB0e7Sh4m/X+siqL7/uP8f6ZAqWr5GpzGW9NSYZP64KeU7pXiTSOUy2/4ONKjqrQ+UWtww2vElpQFyUqlJGh9JKqA2VwZtwEPJxbL/zTJqyW9nXoR8G0Np2/poYtKEydGJlL8QimYTk4WtpI64y7byAuwpRoTxc6LbWoCl6Mz0eaLKMn5JgEuKHn3TJ/Hi62nmhfi9NYluAweMjXYgxaxdNKl5N4IOeL8b0vO/fAVVIfmKKJkq9kAMiRHmOSc4LS15Y1WrTkCSz20wKQMbPFsRzddm9Ml4XD0zCxJi5Bzz2AO1Slo3y2+fkA8CkSjZ3wEs=")) {
+ , myKey_(base64_decodeToBytes("JgAcAQABvID6D5ZdM9EKrZSztm/R/RcywM4K8Z4VBtX+NZp2eLCWtfAgGcBCQLtNz4scH7dPBerkkxckW6+9CLlnu/tgOxvzS6Z1Ec51++fVP9gaWbBQe9/dSg7xVPg5p9ibhfTB+iRXyevCkNj0hrlLyXl1BkPjN9+lZfXJsp9OnGIJ/AaAb7yA99E65gvZnbb3/oA3rG0pM45af6ppZKe2HeiAK+fcXm5KTQzfTce45f/mJ0jsDmFf1HFosS4waXSAz0ZfcssjPeoF3PuXfJLtM8czJ55+Nz6NMCbzrSk6zkKssGBieYFOb4eG2AdtfjTrpcSSHBgJpsbcmRx4bZNfBAZPqT+Sd20=")) {
     nextSessionId_ = getCurrentTimeMillis()/1000 + minstdRand_();
     initSecureProtocol();
 }
@@ -239,7 +239,7 @@ void HttpServer::initSecureProtocol() {
                 "result", "ok",
                 "response", UBinder::of(
                     "server_nonce", UBytes(std::move(serverNonceCopy)),
-                    "session_id", session->sessionId
+                    "session_id", std::to_string(session->sessionId)
                 )
             );
             req->setAnswerBody(BossSerializer::serialize(ans).get());
