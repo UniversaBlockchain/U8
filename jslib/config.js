@@ -7,6 +7,7 @@ class Config {
     static validUntilTailTime = 5*60; //5 minutes
     static maxItemCreationAge = 5*24*3600; //5 days
     static maxElectionsTime = 15*60; //15 minutes
+    static maxResyncTime = 5*60; //5 minutes
 
     static rateLimitDisablingPayment = 5;
 
