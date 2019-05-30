@@ -96,31 +96,29 @@ unit.test("main_test: sendHttpRequests", async () => {
 
     let httpClient = new network.HttpClient(32, 4096);
 
-    let answer = false;
+    let fire = [];
+    let events = [];
+    for (let i = 0; i < 4; i++)
+        events.push(new Promise((resolve) => {fire.push(resolve)}));
+
     httpClient.sendGetRequest("localhost:" + main.myInfo.clientAddress.port + "/contracts/" + HashId.of(randomBytes(64)).base64, (respCode, body) => {
         assert(respCode === 404);
-        answer = true;
-    });
 
-    while (!answer)
-        await sleep(1);
+        fire[0]();
+    });
 
     let contract = Contract.fromPrivateKey(tk.TestKeys.getKey());
     await contract.seal();
 
     await main.ledger.saveContractInStorage(contract.id, contract.getPackedTransaction(), contract.getExpiresAt(), contract.getOrigin(), 0);
 
-    answer = false;
     httpClient.sendGetRequest("localhost:" + main.myInfo.clientAddress.port + "/contracts/" + contract.id.base64, (respCode, body) => {
         assert(respCode === 200);
         assert(contract.getPackedTransaction().equals(body));
-        answer = true;
+
+        fire[1]();
     });
 
-    while (!answer)
-        await sleep(1);
-
-    answer = false;
     httpClient.sendGetRequest("localhost:" + main.myInfo.clientAddress.port + "/network", (respCode, body) => {
         assert(respCode === 200);
         let result = Boss.load(body);
@@ -130,13 +128,9 @@ unit.test("main_test: sendHttpRequests", async () => {
         assert(result.response.hasOwnProperty("number"));
         assert(result.response.hasOwnProperty("nodes"));
 
-        answer = true;
+        fire[2]();
     });
 
-    while (!answer)
-        await sleep(1);
-
-    answer = false;
     httpClient.sendGetRequest("localhost:" + main.myInfo.clientAddress.port + "/topology", async (respCode, body) => {
         assert(respCode === 200);
         let result = Boss.load(body);
@@ -151,11 +145,10 @@ unit.test("main_test: sendHttpRequests", async () => {
         assert(key != null);
         assert(await ExtendedSignature.verify(key, result.response.signature, result.response.packed_data) != null);
 
-        answer = true;
+        fire[3]();
     });
 
-    while (!answer)
-        await sleep(1);
+    await Promise.all(events);
 
     await main.shutdown();
 });
