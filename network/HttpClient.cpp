@@ -174,6 +174,7 @@ void HttpClient::sendRawRequest(const std::string& url, const std::string& metho
 void HttpClient::start(const crypto::PrivateKey& clientKey, const crypto::PublicKey& nodeKey) {
     if (session_) {
         printf("use existing session\n");
+        //TODO: restore session
     } else {
         Semaphore sem;
         session_ = std::make_shared<HttpClientSession>();
@@ -223,9 +224,15 @@ void HttpClient::start(const crypto::PrivateKey& clientKey, const crypto::Public
         byte_vector encrypted_token = UBytes::asInstance(paramsRcv.get("encrypted_token")).get();
         byte_vector key = UBytes::asInstance(UBinder::asInstance(BossSerializer::deserialize(session_->clientPrivateKey->decrypt(encrypted_token))).get("sk")).get();
         session_->sessionKey = make_shared<crypto::SymmetricKey>(key);
-        execCommand("hello", UBinder(), [](UBinder&& res){
-            cout << "hello ans" << endl << res.getString("message") << endl;
+        std::string status = "error";
+        execCommand("hello", UBinder(), [this,&sem,&status](UBinder&& res){
+            session_->connectMessage = res.getString("message");
+            status = res.getString("status");
+            sem.notify();
         });
+        sem.wait();
+        if (status != "OK")
+            throw std::runtime_error("connection failed: " + session_->connectMessage);
     }
 
 }

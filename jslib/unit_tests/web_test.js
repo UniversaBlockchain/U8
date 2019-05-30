@@ -7,6 +7,7 @@ const ItemResult = require('itemresult.js');
 unit.test("hello web", async () => {
     let httpServer = new network.HttpServer("0.0.0.0", 8080, 1, 20);
     let nodeKey = new crypto.PrivateKey(atob("JgAcAQABvID6D5ZdM9EKrZSztm/R/RcywM4K8Z4VBtX+NZp2eLCWtfAgGcBCQLtNz4scH7dPBerkkxckW6+9CLlnu/tgOxvzS6Z1Ec51++fVP9gaWbBQe9/dSg7xVPg5p9ibhfTB+iRXyevCkNj0hrlLyXl1BkPjN9+lZfXJsp9OnGIJ/AaAb7yA99E65gvZnbb3/oA3rG0pM45af6ppZKe2HeiAK+fcXm5KTQzfTce45f/mJ0jsDmFf1HFosS4waXSAz0ZfcssjPeoF3PuXfJLtM8czJ55+Nz6NMCbzrSk6zkKssGBieYFOb4eG2AdtfjTrpcSSHBgJpsbcmRx4bZNfBAZPqT+Sd20="));
+    let clientKey = await crypto.PrivateKey.generate(2048);
     httpServer.initSecureProtocol(nodeKey);
     let counter = 0;
     httpServer.addRawEndpoint("/testPage", async (request) => {
@@ -57,6 +58,8 @@ unit.test("hello web", async () => {
     let receiveCounter = 0;
 
     let httpClient = new network.HttpClient(30, 30);
+    await httpClient.start(clientKey, new crypto.PublicKey(nodeKey));
+
     let t00 = new Date().getTime();
     let t0 = new Date().getTime();
     let counter0 = 0;

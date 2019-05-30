@@ -388,6 +388,14 @@ network.HttpClient = class {
         });
     }
 
+    start(clientPrivateKey, nodePublickey, session) {
+        return new Promise((resolve, reject) => {
+            this.httpClient_.__start(clientPrivateKey.packed, nodePublickey.packed, ()=>{
+                resolve();
+            });
+        });
+    }
+
     sendGetRequest(url, block) {
         let reqId = this.getReqId();
         this.callbacks_.set(reqId, block);

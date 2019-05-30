@@ -789,7 +789,7 @@ struct HttpClientAnswer {
 
 class HttpClientBuffered {
 public:
-    HttpClientBuffered(int poolSize, int bufSize): httpClient_("localhost:8080", poolSize), bufSize_(bufSize) {
+    HttpClientBuffered(int poolSize, int bufSize): httpClient_("localhost:8080", poolSize), bufSize_(bufSize), startPool_(1) {
         timer_.scheduleAtFixedRate([this](){
             sendAllFromBuf();
         }, 20, 20);
@@ -821,6 +821,13 @@ public:
         }
         pcb_ = pcb;
         se_ = se;
+    }
+
+    void start(const byte_vector& clientPrivateKeyPacked, const byte_vector& nodePublicKeyPacked, const std::function<void()>& onComplete) {
+        startPool_.execute([this,clientPrivateKeyPacked,nodePublicKeyPacked,onComplete](){
+            httpClient_.start(crypto::PrivateKey(clientPrivateKeyPacked), crypto::PublicKey(nodePublicKeyPacked));
+            onComplete();
+        });
     }
 
 private:
@@ -857,6 +864,7 @@ private:
     std::mutex mutex_;
     const int bufSize_ = 1;
     TimerThread timer_;
+    ThreadPool startPool_;
 };
 
 void httpClient_sendGetRequest(const FunctionCallbackInfo<Value> &args) {
@@ -876,6 +884,42 @@ void httpClient_setBufferedCallback(const FunctionCallbackInfo<Value> &args) {
             auto httpServer = unwrap<HttpClientBuffered>(args.This());
             Persistent<Function> *pcb = new Persistent<Function>(isolate, args[0].As<Function>());
             httpServer->setBufferedCallback(pcb, se);
+            return;
+        }
+        se->throwError("invalid arguments");
+    });
+}
+
+void httpClient_start(const FunctionCallbackInfo<Value> &args) {
+    Scripter::unwrap(args, [&](const shared_ptr<Scripter> se, auto isolate, auto context) {
+        if (args.Length() == 3) {
+            auto httpClient = unwrap<HttpClientBuffered>(args.This());
+
+            auto contents0 = args[0].As<TypedArray>()->Buffer()->GetContents();
+            byte_vector bv0(contents0.ByteLength());
+            memcpy(&bv0[0], contents0.Data(), contents0.ByteLength());
+
+            auto contents1 = args[1].As<TypedArray>()->Buffer()->GetContents();
+            byte_vector bv1(contents1.ByteLength());
+            memcpy(&bv1[0], contents1.Data(), contents1.ByteLength());
+
+            auto fn = args[2].As<Function>();
+            if (fn->IsNull() || fn->IsUndefined()) {
+                se->throwError("null callback in HttpClient.start");
+                return;
+            }
+            Persistent<Function> *pcb = new Persistent<Function>(se->isolate(), fn);
+
+            httpClient->start(bv0, bv1, [=](){
+                se->inPool([=](auto context) {
+                    Isolate *isolate = context->GetIsolate();
+                    auto fn = pcb->Get(isolate);
+                    auto unused = fn->Call(context, fn, 0, nullptr);
+                    pcb->Reset();
+                    delete pcb;
+                });
+            });
+
             return;
         }
         se->throwError("invalid arguments");
@@ -907,6 +951,7 @@ Local<FunctionTemplate> initHttpClient(Isolate *isolate) {
     auto prototype = tpl->PrototypeTemplate();
     prototype->Set(isolate, "__sendGetRequest", FunctionTemplate::New(isolate, httpClient_sendGetRequest));
     prototype->Set(isolate, "__setBufferedCallback", FunctionTemplate::New(isolate, httpClient_setBufferedCallback));
+    prototype->Set(isolate, "__start", FunctionTemplate::New(isolate, httpClient_start));
 
     HttpClientTpl.Reset(isolate, tpl);
     return tpl;
