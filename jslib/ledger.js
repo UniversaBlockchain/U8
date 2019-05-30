@@ -7,6 +7,7 @@ const ItemState = require("itemstate").ItemState;
 const t = require("tools");
 const ex = require("exceptions");
 const Boss = require("boss");
+const Config = require("config").Config;
 
 const NSmartContract = require("services/NSmartContract").NSmartContract;
 const NContractSubscription = require("services/NContractSubscription").NContractSubscription;
@@ -209,22 +210,28 @@ class Ledger {
     }
 
     /**
-     * Create new record for a given id and set it to the PENDING state. Normally, it is used to create new root
-     * documents. If the record exists, it returns it. If the record does not exists, it creates new one with {@link
-     * ItemState#PENDING} state. The operation must be implemented as atomic.
+     * Create new record for a given id and set it to the <b>newState</b> state. Normally, it is used to create new root
+     * documents. If the record exists, it returns it. If the record does not exists, it creates new one with
+     * <b>newState</b> state. The operation must be implemented as atomic.
      *
      * @param {HashId} itemId - HashId to register, or null if it is already in use.
+     * @param {ItemState} newState - new item will be created with this state.
+     *        Only PENDING and LOCKED_FOR_CREATION states are allowed
+     * @param {Number} locked_by_id - use it with LOCKED_FOR_CREATION state
      * @return {StateRecord} found or created {@link StateRecord}.
      */
-    findOrCreate(itemId) {
-        return this.findOrCreate_buffered_insert(itemId).then(() => {
+    findOrCreate(itemId, newState = ItemState.PENDING, locked_by_id = 0) {
+        return this.findOrCreate_buffered_insert(itemId, newState, locked_by_id).then(() => {
             return this.findOrCreate_buffered_select(itemId);
         }).catch(reason => {
             console.error(reason);
         });
     }
 
-    findOrCreate_buffered_insert(itemId) {
+    findOrCreate_buffered_insert(itemId, newState, locked_by_id) {
+        if ((newState != ItemState.PENDING) && (newState != ItemState.LOCKED_FOR_CREATION))
+            throw new ex.IllegalStateError("can't create new item with state " + newState.val);
+
         if (this.bufParams.findOrCreate_insert.enabled) {
             let buf = this.bufParams.findOrCreate_insert.buf;
             if (this.bufParams.findOrCreate_insert.bufInProc.has(itemId.base64))
@@ -238,7 +245,7 @@ class Ledger {
                 item[1].push(resolver);
                 item[2].push(rejecter);
             } else {
-                buf.set(itemId.base64, [itemId, [resolver], [rejecter]]);
+                buf.set(itemId.base64, [itemId, [resolver], [rejecter], newState, locked_by_id]);
             }
 
             this.findOrCreate_buffered_insert_processBuf();
@@ -253,8 +260,12 @@ class Ledger {
                             con.release();
                             reject(e);
                         },
-                        "INSERT INTO ledger(hash, state, created_at, expires_at, locked_by_id) VALUES (?, 1, extract(epoch from timezone('GMT', now())), extract(epoch from timezone('GMT', now() + interval '5 minute')), NULL) ON CONFLICT (hash) DO NOTHING;",
-                        itemId.digest
+                        "INSERT INTO ledger(hash, state, created_at, expires_at, locked_by_id) VALUES (?,?,?,?,?) ON CONFLICT (hash) DO NOTHING;",
+                        itemId.digest,
+                        newState.ordinal,
+                        Math.floor(new Date().getTime()/1000),
+                        Math.floor(new Date().getTime()/1000) + Config.maxElectionsTime + Math.floor(Math.random()*10),
+                        locked_by_id
                     );
                 });
             });
@@ -286,10 +297,12 @@ class Ledger {
                     let params = [];
                     for (let [k,item] of map) {
                         // queryValues.push("(?, 1, extract(epoch from timezone('GMT', now())), extract(epoch from timezone('GMT', now() + interval '5 minute')), NULL)");
-                        queryValues.push("(?,1,?,?,NULL)");
+                        queryValues.push("(?,?,?,?,?)");
                         params.push(item[0].digest);
+                        params.push(item[3].ordinal);
                         params.push(Math.floor(new Date().getTime()/1000));
-                        params.push(Math.floor(new Date().getTime()/1000) + 5*60 + Math.floor(Math.random()*10));
+                        params.push(Math.floor(new Date().getTime()/1000) + Config.maxElectionsTime + Math.floor(Math.random()*10));
+                        params.push(item[4]);
                     }
                     let queryString = "INSERT INTO ledger(hash, state, created_at, expires_at, locked_by_id) VALUES "+queryValues.join(",")+" ON CONFLICT (hash) DO NOTHING;";
                     con.executeUpdate(affectedRows => {
@@ -337,8 +350,9 @@ class Ledger {
                 this.dbPool_.withConnection(con => {
                     con.executeQuery(qr => {
                             let row = qr.getRows(1)[0];
+                            let record = StateRecord.initFrom(this, row);
                             con.release();
-                            resolve(row);
+                            resolve(record);
                         }, e => {
                             con.release();
                             reject(e);
@@ -383,7 +397,7 @@ class Ledger {
                         for (let j = 0; j < rows.length; ++j) {
                             let resolversArr = map.get(crypto.HashId.withDigest(rows[j][names["hash"]]).base64)[1];
                             for (let k = 0; k < resolversArr.length; ++k)
-                                resolversArr[k](rows[j]); // call resolver
+                                resolversArr[k](StateRecord.initFrom(this, rows[j])); // call resolver
                         }
                     }, e => {
                         con.release();

@@ -33,8 +33,12 @@ function assertAlmostSame(time1, time2) {
 
 unit.test("ledger_test: hello", async () => {
     let ledger = await createTestLedger();
-    console.log(jsonStringify(await ledger.findOrCreate(HashId.of(randomBytes(64)))));
+    let hashId = HashId.of(randomBytes(64));
+    console.log(jsonStringify(await ledger.findOrCreate(hashId, ItemState.LOCKED_FOR_CREATION, 3)));
     console.log(jsonStringify(await ledger.getLedgerSize()));
+    let findRecord = await ledger.findOrCreate(hashId);
+    assert(findRecord.lockedByRecordId === 3);
+    assert(findRecord.state === ItemState.LOCKED_FOR_CREATION);
     await ledger.close();
 });
 
@@ -53,8 +57,8 @@ unit.test("ledger_test: ledgerBenchmark", async () => {
         let rnd = Math.floor(Math.random()*nIds);
         //promises.push(ledger.findOrCreate(hashes[rnd]));
         promises.push(new Promise(async (resolve, reject) => {
-            let row = await ledger.findOrCreate(hashes[rnd]);
-            if (!hashes[rnd].equals(crypto.HashId.withDigest(row[1])))
+            let stateRecord = await ledger.findOrCreate(hashes[rnd]);
+            if (!hashes[rnd].equals(stateRecord.id))
                 reject(new Error("findOrCreate returns wrong hashId"));
             resolve();
         }));
@@ -78,18 +82,18 @@ unit.test("ledger_test: getRecord", async () => {
 
     //create and get
     let hash = HashId.of(randomBytes(64));
-    let row = await ledger.findOrCreate(hash);
+    let sr = await ledger.findOrCreate(hash);
     let record = await ledger.getRecord(hash);
 
     assert(await ledger.countRecords() === records + 1);
 
-    assert(record.recordId === row[0]);
+    assert(record.recordId === sr.recordId);
     assert(record.id.equals(hash));
-    assert(record.id.equals(crypto.HashId.withDigest(row[1])));
+    assert(record.id.equals(sr.id));
     assert(record.state === ItemState.PENDING);
     assert(record.lockedByRecordId === 0);
-    assert(record.createdAt.getTime() / 1000 === row[4]);
-    assert(record.expiresAt.getTime() / 1000 === Number(row[5]));
+    assert(record.createdAt.getTime() / 1000 === sr.createdAt.getTime() / 1000);
+    assert(record.expiresAt.getTime() / 1000 === sr.expiresAt.getTime() / 1000);
     await ledger.close();
 });
 
