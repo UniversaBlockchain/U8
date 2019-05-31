@@ -78,9 +78,16 @@ public:
      */
     void command(const std::string& name, const UBinder& params, const std::function<void(UBinder&&)>& onComplete);
 
+    /** for js bindings */
+    void command(const byte_vector& callBin, std::function<void(byte_vector&&)>&& onComplete);
+
+    /** for js bindings */
+    void command(const byte_vector& callBin, const std::function<void(byte_vector&&)>& onComplete);
+
 private:
     std::shared_ptr<HttpClientWorker> getUnusedWorker();
     void releaseWorker(int workerId);
+    void execCommand(const byte_vector& callBin, std::function<void(byte_vector&&)>&& onComplete);
     void execCommand(const std::string& name, const UBinder& params, std::function<void(UBinder&&)>&& onComplete);
     std::string makeFullUrl(const std::string& path);
 

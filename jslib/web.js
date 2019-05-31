@@ -386,6 +386,15 @@ network.HttpClient = class {
                 }
             }
         });
+        this.httpClient_.__setBufferedCommandCallback((ansArr) => {
+            for (let i = 0; i < Math.floor(ansArr.length/2); ++i) {
+                let reqId = ansArr[i*2 + 0];
+                if (this.callbacks_.has(reqId)) {
+                    this.callbacks_.get(reqId)(ansArr[i*2 + 1]);
+                    this.callbacks_.delete(reqId);
+                }
+            }
+        });
     }
 
     start(clientPrivateKey, nodePublickey, session) {
@@ -400,6 +409,15 @@ network.HttpClient = class {
         let reqId = this.getReqId();
         this.callbacks_.set(reqId, block);
         this.httpClient_.__sendGetRequest(reqId, url);
+    }
+
+    command(name, params, onComplete) {
+        let paramsBin = Boss.dump({"command": name, "params": params});
+        let reqId = this.getReqId();
+        this.callbacks_.set(reqId, (decrypted) => {
+            onComplete(Boss.load(decrypted).result);
+        });
+        this.httpClient_.__command(reqId, paramsBin);
     }
 
     getReqId() {

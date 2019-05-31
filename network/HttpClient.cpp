@@ -238,35 +238,56 @@ void HttpClient::start(const crypto::PrivateKey& clientKey, const crypto::Public
 }
 
 void HttpClient::command(const std::string& name, const UBinder& params, std::function<void(UBinder&&)>&& onComplete) {
-    execCommand(name, params, std::move(onComplete));
+    UBinder call = UBinder::of("command", name, "params", params);
+    byte_vector callBin = BossSerializer::serialize(call).get();
+    execCommand(callBin, [onComplete{std::move(onComplete)}](byte_vector&& decrypted){
+        UBinder decryptedBinder = UBinder::asInstance(BossSerializer::deserialize(UBytes(std::move(decrypted))));
+        UBinder result = decryptedBinder.getBinder("result");
+        onComplete(std::move(result));
+    });
 }
 
 void HttpClient::command(const std::string& name, const UBinder& params, const std::function<void(UBinder&&)>& onComplete) {
     auto onCompleteCopy = onComplete;
-    execCommand(name, params, std::move(onCompleteCopy));
+    command(name, params, std::move(onCompleteCopy));
 }
 
-void HttpClient::execCommand(const std::string& name, const UBinder& params, std::function<void(UBinder&&)>&& onComplete) {
-    commandPool_.execute([this, name, params, onComplete{std::move(onComplete)}](){
+void HttpClient::command(const byte_vector& callBin, std::function<void(byte_vector&&)>&& onComplete) {
+    execCommand(callBin, std::move(onComplete));
+}
+
+void HttpClient::command(const byte_vector& callBin, const std::function<void(byte_vector&&)>& onComplete) {
+    auto onCompleteCopy = onComplete;
+    execCommand(callBin, std::move(onCompleteCopy));
+}
+
+void HttpClient::execCommand(const byte_vector& callBin, std::function<void(byte_vector&&)>&& onComplete) {
+    commandPool_.execute([this, callBin, onComplete{std::move(onComplete)}](){
         if (!session_ || !session_->sessionKey)
             throw std::runtime_error("Session does not created or session key is not got yet.");
-        UBinder call = UBinder::of("command", name, "params", params);
-        byte_vector callBin = BossSerializer::serialize(call).get();
         UBinder cmdParams = UBinder::of(
                 "command", "command",
                 "params", UBytes(session_->sessionKey->encrypt(callBin)),
                 "session_id", session_->sessionId);
         Semaphore sem;
-        UBinder result;
-        sendRawRequest("/command", "POST", BossSerializer::serialize(cmdParams).get(), [this,&result,&sem](int respCode, byte_vector&& respBody){
+        byte_vector decrypted;
+        sendRawRequest("/command", "POST", BossSerializer::serialize(cmdParams).get(), [this,&decrypted,&sem](int respCode, byte_vector&& respBody){
             UBinder ansBinder = UBinder::asInstance(BossSerializer::deserialize(UBytes(std::move(respBody))));
             UBinder responseBinder = ansBinder.getBinder("response");
-            byte_vector decrypted = session_->sessionKey->decrypt(UBytes::asInstance(responseBinder.get("result")).get());
-            UBinder decryptedBinder = UBinder::asInstance(BossSerializer::deserialize(UBytes(std::move(decrypted))));
-            result = decryptedBinder.getBinder("result");
+            decrypted = session_->sessionKey->decrypt(UBytes::asInstance(responseBinder.get("result")).get());
             sem.notify();
         });
         sem.wait();
+        onComplete(std::move(decrypted));
+    });
+}
+
+void HttpClient::execCommand(const std::string& name, const UBinder& params, std::function<void(UBinder&&)>&& onComplete) {
+    UBinder call = UBinder::of("command", name, "params", params);
+    byte_vector callBin = BossSerializer::serialize(call).get();
+    execCommand(callBin, [onComplete{std::move(onComplete)}](byte_vector&& decrypted){
+        UBinder decryptedBinder = UBinder::asInstance(BossSerializer::deserialize(UBytes(std::move(decrypted))));
+        UBinder result = decryptedBinder.getBinder("result");
         onComplete(std::move(result));
     });
 }

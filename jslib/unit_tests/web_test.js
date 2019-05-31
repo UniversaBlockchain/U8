@@ -45,16 +45,16 @@ unit.test("hello web", async () => {
     });
     let unsRateDbg = 333;
     httpServer.addSecureEndpoint("unsRate", async (reqParams, sessionKey) => {
-        //console.log(JSON.stringify(reqParams));
-        //console.log(btoa(sessionKey.packed));
+        // console.log(JSON.stringify(reqParams));
+        // console.log(btoa(sessionKey.packed));
         unsRateDbg += 1;
         await sleep(1);
         return {U: unsRateDbg};
     });
     httpServer.startServer();
 
-    //let countToSend = 200000000;
     let countToSend = 2000;
+    //countToSend = 200000000;
     let receiveCounter = 0;
 
     let httpClient = new network.HttpClient("http://localhost:8080", 64, 64);
@@ -67,6 +67,60 @@ unit.test("hello web", async () => {
         httpClient.sendGetRequest("/testPage?a=73&b=1000000", (respCode, body) => {
             //console.log("[" + respCode + "]: " + utf8Decode(body));
             ++receiveCounter;
+            let dt = new Date().getTime() - t0;
+            if (dt >= 1000) {
+                let rps = ((receiveCounter - counter0)*1000/dt).toFixed(0);
+                t0 = new Date().getTime();
+                counter0 = receiveCounter;
+                console.log("receiveCounter=" + receiveCounter + ", rps=" + rps);
+            }
+        });
+        if (receiveCounter+1000 < i)
+            await sleep(10);
+    }
+
+    while (receiveCounter < countToSend) {
+        await sleep(10);
+    }
+    let dt = new Date().getTime() - t00;
+    let rps = (receiveCounter*1000/dt).toFixed(0);
+    console.logPut(" rps=" + rps + " ");
+    assert(receiveCounter == countToSend);
+
+    httpServer.stopServer();
+});
+
+unit.test("http secure endpoints", async () => {
+    let httpServer = new network.HttpServer("0.0.0.0", 8080, 1, 20);
+    let nodeKey = new crypto.PrivateKey(atob("JgAcAQABvID6D5ZdM9EKrZSztm/R/RcywM4K8Z4VBtX+NZp2eLCWtfAgGcBCQLtNz4scH7dPBerkkxckW6+9CLlnu/tgOxvzS6Z1Ec51++fVP9gaWbBQe9/dSg7xVPg5p9ibhfTB+iRXyevCkNj0hrlLyXl1BkPjN9+lZfXJsp9OnGIJ/AaAb7yA99E65gvZnbb3/oA3rG0pM45af6ppZKe2HeiAK+fcXm5KTQzfTce45f/mJ0jsDmFf1HFosS4waXSAz0ZfcssjPeoF3PuXfJLtM8czJ55+Nz6NMCbzrSk6zkKssGBieYFOb4eG2AdtfjTrpcSSHBgJpsbcmRx4bZNfBAZPqT+Sd20="));
+    let clientKey = await crypto.PrivateKey.generate(2048);
+    httpServer.initSecureProtocol(nodeKey);
+    let counter = 0;
+    let unsRateDbg = 333;
+    httpServer.addSecureEndpoint("unsRate", async (reqParams, sessionKey) => {
+        // console.log(JSON.stringify(reqParams));
+        // console.log(btoa(sessionKey.packed));
+        unsRateDbg += 1;
+        await sleep(1);
+        return {U: unsRateDbg};
+    });
+    httpServer.startServer();
+
+    let countToSend = 2000;
+    //countToSend = 200000000;
+    let receiveCounter = 0;
+
+    let httpClient = new network.HttpClient("http://localhost:8080", 64, 64);
+    await httpClient.start(clientKey, new crypto.PublicKey(nodeKey));
+
+    let t00 = new Date().getTime();
+    let t0 = new Date().getTime();
+    let counter0 = 0;
+    for (let i = 0; i < countToSend; ++i) {
+        httpClient.command("unsRate", {}, async (resp) => {
+            //console.log(JSON.stringify(resp));
+            ++receiveCounter;
+            await sleep(1);
             let dt = new Date().getTime() - t0;
             if (dt >= 1000) {
                 let rps = ((receiveCounter - counter0)*1000/dt).toFixed(0);
