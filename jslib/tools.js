@@ -158,6 +158,12 @@ class GenericMap extends Map {
 
         return false;
     }
+
+    set(key, value) {
+        this.delete(key);
+
+        return super.set(key, value);
+    }
 }
 
 

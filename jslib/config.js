@@ -8,6 +8,8 @@ class Config {
     static maxItemCreationAge = 5*24*3600; //5 days
     static maxElectionsTime = 15*60; //15 minutes
     static maxResyncTime = 5*60; //5 minutes
+    static revokedItemExpiration = Config.maxItemCreationAge + 10*24*3600; //maxItemCreationAge + 10 days
+    static declinedItemExpiration = 10*24*3600; //10 days
 
     static rateLimitDisablingPayment = 5;
 

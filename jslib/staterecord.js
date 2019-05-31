@@ -1,4 +1,4 @@
-//const Ledger = require("ledger").Ledger;
+const Config = require("config").Config;
 const ex = require("exceptions");
 const ItemState = require("itemstate").ItemState;
 
@@ -19,6 +19,9 @@ class StateRecord {
 
         this.id = null;
         this.state = ItemState.UNDEFINED;
+
+        this.saveNotification = null;
+        this.destroyNotification = null;
     }
 
     copy(record) {
@@ -100,6 +103,18 @@ class StateRecord {
         return lockedRecord;
     }
 
+    async lockForCreate(idToCreate) {
+        if (this.recordId === 0)
+            throw new ex.IllegalStateError("the record must be created");
+        if (this.state !== ItemState.PENDING)
+            throw new ex.IllegalStateError("wrong state to lockForCreate: " + this.state.val);
+
+        if (await this.ledger.getRecord(idToCreate) != null)
+            return null;
+
+        return await this.ledger.findOrCreate(idToCreate, ItemState.LOCKED_FOR_CREATION, this.recordId);
+    }
+
     async unlock() {
         switch (this.state) {
             case ItemState.LOCKED:
@@ -117,32 +132,64 @@ class StateRecord {
         return this;
     }
 
-    async revoke() {
-        if (this.state === ItemState.LOCKED) {
+    async revoke(force = false) {
+        if (this.state === ItemState.LOCKED || this.state === ItemState.LOCKED_FOR_CREATION_REVOKED ||
+            (force && (this.state.isPending || this.state === ItemState.UNDEFINED || this.state === ItemState.APPROVED))) {
+
             this.state = ItemState.REVOKED;
+            this.expiresAt = new Date();
+            this.expiresAt.setSeconds(this.expiresAt.getSeconds() + Config.revokedItemExpiration);
             await this.save();
         } else
-            throw new ex.IllegalStateError("can't archive record that is not in the locked state");
+            throw new ex.IllegalStateError("attempt to revoke record from wrong state: " + this.state.val);
     }
 
-    async approve() {
-        if (this.state.isPending) {
+    async approve(newExpiresAt = undefined, force = false) {
+        if (this.state.isPending || this.state === ItemState.LOCKED_FOR_CREATION ||
+            (force && (this.state === ItemState.UNDEFINED || this.state === ItemState.LOCKED || this.state === ItemState.APPROVED))) {
+
             this.state = ItemState.APPROVED;
+            if (newExpiresAt !== undefined)
+                this.expiresAt = newExpiresAt;
             await this.save();
         } else
-            throw new ex.IllegalStateError("attempt to approve record that is not pending: " + this.state.val);
+            throw new ex.IllegalStateError("attempt to approve record from wrong state: " + this.state.val);
     }
 
-    async createOutputLockRecord(idToCreate) {
-        if (this.recordId === 0)
-            throw new ex.IllegalStateError("the record must be created");
-        if (this.state !== ItemState.PENDING)
-            throw new ex.IllegalStateError("wrong state to createOutputLockRecord: " + this.state.val);
+    async decline(force = false) {
+        if (this.state.isPending || (force && this.state === ItemState.UNDEFINED)) {
+            this.state = ItemState.DECLINED;
+            this.expiresAt = new Date();
+            this.expiresAt.setSeconds(this.expiresAt.getSeconds() + Config.declinedItemExpiration);
+            await this.save();
+        } else
+            throw new ex.IllegalStateError("attempt to decline record from wrong state: " + this.state.val);
+    }
 
-        if (await this.ledger.getRecord(idToCreate) != null)
-            return null;
+    async setUndefined(force = false) {
+        if (this.state.isPending || this.isExpired() ||
+            (force && (this.state === ItemState.DECLINED || this.state === ItemState.REVOKED || this.state === ItemState.APPROVED))) {
 
-        return this.ledger.createOutputLockRecord(this.recordId, idToCreate);
+            this.state = ItemState.UNDEFINED;
+            await this.save();
+        } else
+            throw new ex.IllegalStateError("attempt setUndefined record from wrong state: " + this.state.val);
+    }
+
+    async setPendingPositive() {
+        if (this.state === ItemState.PENDING) {
+            this.state = ItemState.PENDING_POSITIVE;
+            await this.save();
+        } else
+            throw new ex.IllegalStateError("attempt setPendingPositive record from wrong state: " + this.state.val);
+    }
+
+    async setPendingNegative() {
+        if (this.state === ItemState.PENDING) {
+            this.state = ItemState.PENDING_NEGATIVE;
+            await this.save();
+        } else
+            throw new ex.IllegalStateError("attempt setPendingNegative record from wrong state: " + this.state.val);
     }
 
     markTestRecord() {
@@ -163,10 +210,14 @@ class StateRecord {
     }
 
     save(con) {
+        if (this.saveNotification != null)
+            this.saveNotification(this);
         return this.ledger.save(this, con);
     }
 
     destroy(con) {
+        if (this.destroyNotification != null)
+            this.destroyNotification(this);
         return this.ledger.destroy(this, con);
     }
 }

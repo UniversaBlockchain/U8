@@ -101,12 +101,8 @@ unit.test("ledger_test: save", async () => {
     let ledger = await createTestLedger();
 
     //create and get
-    let hash = HashId.of(randomBytes(64));
-    await ledger.findOrCreate(hash);
-    let r1 = await ledger.getRecord(hash);
-    hash = HashId.of(randomBytes(64));
-    await ledger.findOrCreate(hash);
-    let r2 = await ledger.getRecord(hash);
+    let r1 = await ledger.findOrCreate(HashId.of(randomBytes(64)));
+    let r2 = await ledger.findOrCreate(HashId.of(randomBytes(64)));
 
     r1.state = ItemState.APPROVED;
     r2.state = ItemState.DECLINED;
@@ -130,9 +126,7 @@ unit.test("ledger_test: destroy", async () => {
     let ledger = await createTestLedger();
 
     //create and get
-    let hash = HashId.of(randomBytes(64));
-    await ledger.findOrCreate(hash);
-    let record = await ledger.getRecord(hash);
+    let record = await ledger.findOrCreate(HashId.of(randomBytes(64)));
 
     await record.destroy();
 
@@ -142,41 +136,27 @@ unit.test("ledger_test: destroy", async () => {
     await ledger.close();
 });
 
-unit.test("ledger_test: createOutputLockRecord", async () => {
+unit.test("ledger_test: lockForCreate", async () => {
     let ledger = await createTestLedger();
 
-    let hash1 = HashId.of(randomBytes(64));
-    await ledger.findOrCreate(hash1);
-    let owner = await ledger.getRecord(hash1);
-
-    let hash2 = HashId.of(randomBytes(64));
-    await ledger.findOrCreate(hash2);
-    let other = await ledger.getRecord(hash2);
+    let owner = await ledger.findOrCreate(HashId.of(randomBytes(64)));
+    let other = await ledger.findOrCreate(HashId.of(randomBytes(64)));
 
     let id = HashId.of(randomBytes(64));
 
-    let r1 = await owner.createOutputLockRecord(id);
+    let r1 = await owner.lockForCreate(id);
     await r1.reload();
     assert(id.equals(r1.id));
     assert(ItemState.LOCKED_FOR_CREATION === r1.state);
     assert(owner.recordId === r1.lockedByRecordId);
 
-    let r2 = await other.createOutputLockRecord(id);
+    let r2 = await other.lockForCreate(id);
     assert(r2 == null);
 
-    let r3 = await owner.createOutputLockRecord(id);
+    let r3 = await owner.lockForCreate(id);
     assert(r3 == null);
 
-    assert(await owner.createOutputLockRecord(other.id) == null);
-
-    let r4 = null;
-    try
-    {
-        // And hacked low level operation must fail too
-        r4 = await ledger.createOutputLockRecord(owner.recordId, other.id);
-    } catch (e) {}
-
-    assert(r4 == null);
+    assert(await owner.lockForCreate(other.id) == null);
 
     await ledger.close();
 });
@@ -197,8 +177,7 @@ unit.test("ledger_test: moveToTestnet", async () => {
     let ledger = await createTestLedger();
 
     let hashId = HashId.of(randomBytes(64));
-    await ledger.findOrCreate(hashId);
-    let r = await ledger.getRecord(hashId);
+    let r = await ledger.findOrCreate(hashId);
 
     await r.save();
 
@@ -254,15 +233,11 @@ unit.test("ledger_test: cache test", async () => {
 unit.test("ledger_test: checkLockOwner", async () => {
     let ledger = await createTestLedger();
 
-    let hash1 = HashId.of(randomBytes(64));
-    await ledger.findOrCreate(hash1);
-    let existing = await ledger.getRecord(hash1);
+    let existing = await ledger.findOrCreate(HashId.of(randomBytes(64)));
 
     await existing.approve();
 
-    let hash2 = HashId.of(randomBytes(64));
-    await ledger.findOrCreate(hash2);
-    let r = await ledger.getRecord(hash2);
+    let r = await ledger.findOrCreate(HashId.of(randomBytes(64)));
 
     let r1 = await r.lockToRevoke(existing.id);
 
@@ -284,21 +259,15 @@ unit.test("ledger_test: checkLockOwner", async () => {
 unit.test("ledger_test: lockForRevoking", async () => {
     let ledger = await createTestLedger();
 
-    let hash1 = HashId.of(randomBytes(64));
-    await ledger.findOrCreate(hash1);
-    let existing = await ledger.getRecord(hash1);
+    let existing = await ledger.findOrCreate(HashId.of(randomBytes(64)));
 
     await existing.approve();
 
-    let hash2 = HashId.of(randomBytes(64));
-    await ledger.findOrCreate(hash2);
-    let existing2 = await ledger.getRecord(hash2);
+    let existing2 = await ledger.findOrCreate(HashId.of(randomBytes(64)));
 
     await existing2.approve();
 
-    let hash3 = HashId.of(randomBytes(64));
-    await ledger.findOrCreate(hash3);
-    let r = await ledger.getRecord(hash3);
+    let r =await ledger.findOrCreate(HashId.of(randomBytes(64)));
 
     let r1 = await r.lockToRevoke(existing.id);
 
@@ -331,11 +300,9 @@ unit.test("ledger_test: lockForRevoking", async () => {
 unit.test("ledger_test: lockForCreationRevoked", async () => {
     let ledger = await createTestLedger();
 
-    let hash1 = HashId.of(randomBytes(64));
-    await ledger.findOrCreate(hash1);
-    let r = await ledger.getRecord(hash1);
+    let r = await ledger.findOrCreate(HashId.of(randomBytes(64)));
 
-    let r1 = await r.createOutputLockRecord(HashId.of(randomBytes(64)));
+    let r1 = await r.lockForCreate(HashId.of(randomBytes(64)));
 
     assert(ItemState.LOCKED_FOR_CREATION === r1.state);
     assert(r.recordId === r1.lockedByRecordId);
@@ -355,18 +322,10 @@ unit.test("ledger_test: lockForCreationRevoked", async () => {
 unit.test("ledger_test: transaction", async () => {
     let ledger = await createTestLedger();
 
-    let hash0 = HashId.of(randomBytes(64));
-    let hash1 = HashId.of(randomBytes(64));
-    let hash2 = HashId.of(randomBytes(64));
-    let hash3 = HashId.of(randomBytes(64));
-    await ledger.findOrCreate(hash0);
-    await ledger.findOrCreate(hash1);
-    await ledger.findOrCreate(hash2);
-    await ledger.findOrCreate(hash3);
-    let r0 = await ledger.getRecord(hash0);
-    let r1 = await ledger.getRecord(hash1);
-    let r2 = await ledger.getRecord(hash2);
-    let r3 = await ledger.getRecord(hash3);
+    let r0 = await ledger.findOrCreate(HashId.of(randomBytes(64)));
+    let r1 = await ledger.findOrCreate(HashId.of(randomBytes(64)));
+    let r2 = await ledger.findOrCreate(HashId.of(randomBytes(64)));
+    let r3 = await ledger.findOrCreate(HashId.of(randomBytes(64)));
 
     let x = await ledger.transaction(async(con) => {
         await r0.destroy(con);
@@ -381,7 +340,7 @@ unit.test("ledger_test: transaction", async () => {
 
     assert(x === 55);
 
-    r0 = await ledger.getRecord(hash0);
+    r0 = await ledger.getRecord(r0.id);
     assert(r0 == null);
     await r1.reload();
     await r2.reload();
@@ -396,18 +355,10 @@ unit.test("ledger_test: transaction", async () => {
 unit.test("ledger_test: rollback transaction", async () => {
     let ledger = await createTestLedger();
 
-    let hash0 = HashId.of(randomBytes(64));
-    let hash1 = HashId.of(randomBytes(64));
-    let hash2 = HashId.of(randomBytes(64));
-    let hash3 = HashId.of(randomBytes(64));
-    await ledger.findOrCreate(hash0);
-    await ledger.findOrCreate(hash1);
-    await ledger.findOrCreate(hash2);
-    await ledger.findOrCreate(hash3);
-    let r0 = await ledger.getRecord(hash0);
-    let r1 = await ledger.getRecord(hash1);
-    let r2 = await ledger.getRecord(hash2);
-    let r3 = await ledger.getRecord(hash3);
+    let r0 = await ledger.findOrCreate(HashId.of(randomBytes(64)));
+    let r1 = await ledger.findOrCreate(HashId.of(randomBytes(64)));
+    let r2 = await ledger.findOrCreate(HashId.of(randomBytes(64)));
+    let r3 = await ledger.findOrCreate(HashId.of(randomBytes(64)));
 
     try {
         await ledger.transaction(async(con) => {
@@ -439,18 +390,10 @@ unit.test("ledger_test: rollback transaction", async () => {
 unit.test("ledger_test: multi-threading transactions", async () => {
     let ledger = await createTestLedger();
 
-    let hash0 = HashId.of(randomBytes(64));
-    let hash1 = HashId.of(randomBytes(64));
-    let hash2 = HashId.of(randomBytes(64));
-    let hash3 = HashId.of(randomBytes(64));
-    await ledger.findOrCreate(hash0);
-    await ledger.findOrCreate(hash1);
-    await ledger.findOrCreate(hash2);
-    await ledger.findOrCreate(hash3);
-    let r0 = await ledger.getRecord(hash0);
-    let r1 = await ledger.getRecord(hash1);
-    let r2 = await ledger.getRecord(hash2);
-    let r3 = await ledger.getRecord(hash3);
+    let r0 = await ledger.findOrCreate(HashId.of(randomBytes(64)));
+    let r1 = await ledger.findOrCreate(HashId.of(randomBytes(64)));
+    let r2 = await ledger.findOrCreate(HashId.of(randomBytes(64)));
+    let r3 = await ledger.findOrCreate(HashId.of(randomBytes(64)));
 
     let promises = [];
 
@@ -484,7 +427,7 @@ unit.test("ledger_test: multi-threading transactions", async () => {
     assert(results[2] === 22);
     assert(results[3] === 33);
 
-    r0 = await ledger.getRecord(hash0);
+    r0 = await ledger.getRecord(r0.id);
     assert(r0 == null);
     await r1.reload();
     await r2.reload();
@@ -500,8 +443,7 @@ unit.test("ledger_test: recordExpiration", async () => {
     let ledger = await createTestLedger();
 
     let hashId = HashId.of(randomBytes(64));
-    await ledger.findOrCreate(hashId);
-    let r = await ledger.getRecord(hashId);
+    let r = await ledger.findOrCreate(hashId);
 
     assert(r.expiresAt != null);
     assert(r.expiresAt.getTime() > Date.now());
@@ -533,8 +475,7 @@ unit.test("ledger_test: findOrCreateAndGet", async () => {
     let ledger = await createTestLedger();
 
     let id = HashId.of(randomBytes(64));
-    await ledger.findOrCreate(id);
-    let r = await ledger.getRecord(id);
+    let r = await ledger.findOrCreate(id);
 
     assert(r !== null);
     assert(id.equals(r.id));
@@ -557,9 +498,7 @@ unit.test("ledger_test: findOrCreateAndGet", async () => {
 unit.test("ledger_test: approve", async () => {
     let ledger = await createTestLedger();
 
-    let id = HashId.of(randomBytes(64));
-    await ledger.findOrCreate(id);
-    let r1 = await ledger.getRecord(id);
+    let r1 = await ledger.findOrCreate(HashId.of(randomBytes(64)));
 
     assert(!r1.state.isApproved);
 
@@ -576,7 +515,7 @@ unit.test("ledger_test: approve", async () => {
     try {
         await r1.approve();
     } catch (e) {
-        assert(e.message === "attempt to approve record that is not pending: " + r1.state.val);
+        assert(e.message === "attempt to approve record from wrong state: " + r1.state.val);
         except = true;
     }
 
@@ -588,9 +527,7 @@ unit.test("ledger_test: approve", async () => {
 unit.test("ledger_test: revoke", async () => {
     let ledger = await createTestLedger();
 
-    let id = HashId.of(randomBytes(64));
-    await ledger.findOrCreate(id);
-    let r1 = await ledger.getRecord(id);
+    let r1 = await ledger.findOrCreate(HashId.of(randomBytes(64)));
 
     assert(!r1.state.isApproved);
     assert(r1.state.isPending);
@@ -610,19 +547,132 @@ unit.test("ledger_test: revoke", async () => {
     assert(!r1.state.isApproved);
     assert(ItemState.REVOKED === r1.state);
 
+    let except = false;
+    try {
+        await r1.revoke();
+    } catch (e) {
+        assert(e.message === "attempt to revoke record from wrong state: " + r1.state.val);
+        except = true;
+    }
+
+    assert(except);
+
+    await ledger.close();
+});
+
+unit.test("ledger_test: decline", async () => {
+    let ledger = await createTestLedger();
+
+    let r1 = await ledger.findOrCreate(HashId.of(randomBytes(64)));
+
+    assert(ItemState.DECLINED !== r1.state);
+
+    await r1.decline();
+
+    assert(ItemState.DECLINED === r1.state);
+
+    let r2 = await ledger.findOrCreate(HashId.of(randomBytes(64)));
+    await r2.approve();
+
+    let except = false;
+    try {
+        await r2.decline();
+    } catch (e) {
+        assert(e.message === "attempt to decline record from wrong state: " + r2.state.val);
+        except = true;
+    }
+
+    assert(except);
+
+    await ledger.close();
+});
+
+unit.test("ledger_test: setUndefined", async () => {
+    let ledger = await createTestLedger();
+
+    let r1 = await ledger.findOrCreate(HashId.of(randomBytes(64)));
+
+    assert(ItemState.UNDEFINED !== r1.state);
+
+    await r1.setUndefined();
+
+    assert(ItemState.UNDEFINED === r1.state);
+
+    let r2 = await ledger.findOrCreate(HashId.of(randomBytes(64)));
+    await r2.approve();
+
+    let except = false;
+    try {
+        await r2.setUndefined();
+    } catch (e) {
+        assert(e.message === "attempt setUndefined record from wrong state: " + r2.state.val);
+        except = true;
+    }
+
+    assert(except);
+
+    await ledger.close();
+});
+
+unit.test("ledger_test: setPendingPositive", async () => {
+    let ledger = await createTestLedger();
+
+    let r1 = await ledger.findOrCreate(HashId.of(randomBytes(64)));
+
+    assert(ItemState.PENDING_POSITIVE !== r1.state);
+
+    await r1.setPendingPositive();
+
+    assert(ItemState.PENDING_POSITIVE === r1.state);
+
+    let r2 = await ledger.findOrCreate(HashId.of(randomBytes(64)));
+    await r2.decline();
+
+    let except = false;
+    try {
+        await r2.setPendingPositive();
+    } catch (e) {
+        assert(e.message === "attempt setPendingPositive record from wrong state: " + r2.state.val);
+        except = true;
+    }
+
+    assert(except);
+
+    await ledger.close();
+});
+
+unit.test("ledger_test: setPendingNegative", async () => {
+    let ledger = await createTestLedger();
+
+    let r1 = await ledger.findOrCreate(HashId.of(randomBytes(64)));
+
+    assert(ItemState.PENDING_NEGATIVE !== r1.state);
+
+    await r1.setPendingNegative();
+
+    assert(ItemState.PENDING_NEGATIVE === r1.state);
+
+    let r2 = await ledger.findOrCreate(HashId.of(randomBytes(64)));
+    await r2.decline();
+
+    let except = false;
+    try {
+        await r2.setPendingNegative();
+    } catch (e) {
+        assert(e.message === "attempt setPendingNegative record from wrong state: " + r2.state.val);
+        except = true;
+    }
+
+    assert(except);
+
     await ledger.close();
 });
 
 unit.test("ledger_test: saveAndTransaction", async () => {
     let ledger = await createTestLedger();
 
-    let hash = HashId.of(randomBytes(64));
-    await ledger.findOrCreate(hash);
-    let r1 = await ledger.getRecord(hash);
-
-    let hash1 = HashId.of(randomBytes(64));
-    await ledger.findOrCreate(hash1);
-    let r2 = await ledger.getRecord(hash1);
+    let r1 = await ledger.findOrCreate(HashId.of(randomBytes(64)));
+    let r2 = await ledger.findOrCreate(HashId.of(randomBytes(64)));
 
     await ledger.transaction(async(con) => {
         r1.state = ItemState.APPROVED;
@@ -669,8 +719,7 @@ unit.test("ledger_test: getItemTest", async () => {
     let contract = Contract.fromPrivateKey(tk.TestKeys.getKey());
     await contract.seal();
 
-    await ledger.findOrCreate(contract.id);
-    let r = await ledger.getRecord(contract.id);
+    let r = await ledger.findOrCreate(contract.id);
 
     await ledger.putItem(r, contract, new Date((Date.now() / 1000 + 300) * 1000));
     let gottenContract = await ledger.getItem(r);
@@ -687,8 +736,7 @@ unit.test("ledger_test: ledgerCleanupTest", async () => {
     let contract1 = Contract.fromPrivateKey(privateKey);
     await contract1.seal();
 
-    await ledger.findOrCreate(contract1.id);
-    let r1 = await ledger.getRecord(contract1.id);
+    let r1 = await ledger.findOrCreate(contract1.id);
 
     r1.expiresAt.setTime((Math.floor(Date.now() / 1000) - 1) * 1000);
 
@@ -699,8 +747,7 @@ unit.test("ledger_test: ledgerCleanupTest", async () => {
     let contract2 = Contract.fromPrivateKey(privateKey);
     await contract2.seal();
 
-    await ledger.findOrCreate(contract2.id);
-    let r2 = await ledger.getRecord(contract2.id);
+    let r2 = await ledger.findOrCreate(contract2.id);
 
     r2.expiresAt.setTime((Math.floor(Date.now() / 1000) + 300) * 1000);
 
@@ -763,13 +810,8 @@ unit.test("ledger_test: paymentSaveGetTest", async () => {
 unit.test("ledger_test: findBadReferencesOfTest", async () => {
     let ledger = await createTestLedger();
 
-    let hash1 = HashId.of(randomBytes(64));
-    await ledger.findOrCreate(hash1);
-    let r1 = await ledger.getRecord(hash1);
-
-    let hash2 = HashId.of(randomBytes(64));
-    await ledger.findOrCreate(hash2);
-    let r2 = await ledger.getRecord(hash2);
+    let r1 = await ledger.findOrCreate(HashId.of(randomBytes(64)));
+    let r2 = await ledger.findOrCreate(HashId.of(randomBytes(64)));
 
     await ledger.transaction(async(con) => {
         r1.state = ItemState.APPROVED;
@@ -778,10 +820,10 @@ unit.test("ledger_test: findBadReferencesOfTest", async () => {
         await r2.save(con);
     });
 
-    let ids = await ledger.findBadReferencesOf(new Set([hash1, hash2]));
+    let ids = await ledger.findBadReferencesOf(new Set([r1.id, r2.id]));
 
     assert(ids.size === 1);
-    assert(ids.has(hash2));
+    assert(ids.has(r2.id));
 
     await ledger.close();
 });

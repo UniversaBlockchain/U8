@@ -187,7 +187,7 @@ class Ledger {
         });
     }
 
-    /**
+    /*/**
      * Create a record in {@see ItemState#LOCKED_FOR_CREATION} state locked by creatorRecordId. Does not check
      * anything, the business logic of it is in the {@see StateRecord}. Still, if a database logic prevents creation of
      * a lock record (e.g. hash is already in use), it must return null.
@@ -196,7 +196,9 @@ class Ledger {
      * @param {HashId} newItemHashId - New item hash.
      * @return {Promise<StateRecord|null>} ready saved instance or null if it can not be created (e.g. already exists).
      */
-    createOutputLockRecord(creatorRecordId, newItemHashId) {
+    /*createOutputLockRecord(creatorRecordId, newItemHashId) {
+
+        //findOrCreate
         let r = new StateRecord(this);
         r.state = ItemState.LOCKED_FOR_CREATION;
         r.lockedByRecordId = creatorRecordId;
@@ -207,7 +209,7 @@ class Ledger {
         r.id = newItemHashId;
 
         return r.save();
-    }
+    }*/
 
     /**
      * Create new record for a given id and set it to the <b>newState</b> state. Normally, it is used to create new root
@@ -557,7 +559,9 @@ class Ledger {
             return this.transactionSave(record, connection);
 
         if (record.recordId === 0)
-            return new Promise((resolve, reject) => {
+            throw new ex.IllegalStateError("can't save record with id equals 0");
+
+            /*return new Promise((resolve, reject) => {
                 this.dbPool_.withConnection(con => {
                     con.executeQuery(qr => {
                             let row = qr.getRows(1)[0];
@@ -582,12 +586,15 @@ class Ledger {
                     );
                 });
             });
-        else
-            return this.simpleUpdate("update ledger set state=?, expires_at=?, locked_by_id=? where id=?",
-                record.state.ordinal,
-                Math.floor(record.expiresAt.getTime() / 1000),
-                record.lockedByRecordId,
-                record.recordId);
+        else*/
+
+        this.putToCache(record);
+
+        return this.simpleUpdate("update ledger set state=?, expires_at=?, locked_by_id=? where id=?",
+            record.state.ordinal,
+            Math.floor(record.expiresAt.getTime() / 1000),
+            record.lockedByRecordId,
+            record.recordId);
     }
 
     /**
@@ -599,7 +606,9 @@ class Ledger {
      */
     transactionSave(record, connection) {
         if (record.recordId === 0)
-            return new Promise((resolve, reject) => {
+            throw new ex.IllegalStateError("can't save record with id equals 0");
+
+            /*return new Promise((resolve, reject) => {
                 connection.executeQuery(qr => {
                         let row = qr.getRows(1)[0];
 
@@ -620,20 +629,22 @@ class Ledger {
                     record.lockedByRecordId
                 );
             });
-        else
-            return new Promise((resolve, reject) => {
-                connection.executeUpdate(qr => {
-                        resolve(record);
-                    }, e => {
-                        reject(e);
-                    },
-                    "update ledger set state=?, expires_at=?, locked_by_id=? where id=?",
-                    record.state.ordinal,
-                    Math.floor(record.expiresAt.getTime() / 1000),
-                    record.lockedByRecordId,
-                    record.recordId
-                );
-            });
+        else*/
+
+        return new Promise((resolve, reject) => {
+            connection.executeUpdate(qr => {
+                    this.putToCache(record);
+                    resolve(record);
+                }, e => {
+                    reject(e);
+                },
+                "update ledger set state=?, expires_at=?, locked_by_id=? where id=?",
+                record.state.ordinal,
+                Math.floor(record.expiresAt.getTime() / 1000),
+                record.lockedByRecordId,
+                record.recordId
+            );
+        });
     }
 
     /**
