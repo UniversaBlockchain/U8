@@ -68,9 +68,49 @@ ErrorRecord.prototype.serialize = function(serializer) {
 };
 
 ErrorRecord.prototype.toString = function() {
-        return JSON.stringify(this);
+        let s = this.error.toString();
+        if (this.objectName != null && !"".equals(this.objectName))
+                s += " [" + this.objectName + "]";
+        if (this.message)
+                s += " " + this.message;
+        return s;
 };
 
 dbm.DefaultBiMapper.registerAdapter(new bs.BiAdapter("error",ErrorRecord));
 
-module.exports = {Errors,ErrorRecord};
+class ClientError extends Error {
+        constructor(message = undefined) {
+                super();
+                this.message = message;
+                this.errorRecord = new ErrorRecord(Errors.FAILURE, "", message);
+        }
+
+        static initFromErrorRecord(errorRecord) {
+                let res = new ClientError(errorRecord.toString());
+                res.errorRecord = errorRecord;
+                return res;
+        }
+
+        static init(code, object, message) {
+                let res = new ClientError(message);
+                res.errorRecord = new ErrorRecord(code, object, message);
+                return res;
+        }
+
+        static initFromError(error) {
+                let res = new ClientError(error.toString());
+                res.errorRecord = new ErrorRecord(Errors.FAILURE, "", error.toString());
+                return res;
+        }
+
+        toString() {
+                return "ClientError: " + this.errorRecord;
+        }
+
+        getErrorRecord() {
+                return this.errorRecord;
+        }
+
+};
+
+module.exports = {Errors,ErrorRecord,ClientError};

@@ -4,6 +4,12 @@ import * as t from "tools";
 import {PublicKey} from "crypto";
 const Boss = require('boss.js');
 const yaml = require('yaml');
+const e = require("errors");
+const Errors = e.Errors;
+const ErrorRecord = e.ErrorRecord;
+const ClientError = e.ClientError;
+const DefaultBiMapper = require("defaultbimapper").DefaultBiMapper;
+//const BossBiMapper = require("bossbimapper").BossBiMapper;
 
 network.NodeInfo = class {
     constructor() {
@@ -306,29 +312,37 @@ network.HttpServer = class {
                 let sessionKey = new crypto.SymmetricKey(reqBuf.getSessionKeyBin(i));
                 switch (params.command) {
                     case "hello":
-                        //reqBuf.setAnswer(i, Boss.dump({result: {status: "OK", message: "welcome to the Universa"}}));
-                        promises.push({status: "OK", message: "welcome to the Universa"});
+                        promises.push({result: {status: "OK", message: "welcome to the Universa"}});
                         break;
                     case "sping":
-                        //reqBuf.setAnswer(i, Boss.dump({result: {sping: "spong"}}));
-                        promises.push({sping: "spong"});
+                        promises.push({result: {sping: "spong"}});
                         break;
                     case "test_error":
                         throw new Error("sample error");
                         break;
                     default:
-                        if (this.secureEndpoints_.has(params.command))
-                            promises.push(this.secureEndpoints_.get(params.command)(params, sessionKey));
-                            //reqBuf.setAnswer(i, Boss.dump({result: await this.secureEndpoints_.get(params.command)(params)}));
-                        else
-                            throw new Error("unknown command: " + params.command);
+                        promises.push(this.processSecureCommand(params, sessionKey));
                 }
             }
             let results = await Promise.all(promises);
             for (let i = 0; i < length; ++i) {
-                reqBuf.setAnswer(i, Boss.dump({result: results[i]}));
+                reqBuf.setAnswer(i, Boss.dump(results[i]));
             }
         });
+    }
+
+    processSecureCommand(params, sessionKey) {
+        try {
+            if (this.secureEndpoints_.has(params.command))
+                return new Promise(async resolve=>{
+                    resolve({result: await this.secureEndpoints_.get(params.command)(params, sessionKey)});
+                });
+            else {
+                throw new ErrorRecord(Errors.UNKNOWN_COMMAND, "command", "unknown: " + params.command);
+            }
+        } catch (e) {
+            return {error: DefaultBiMapper.getInstance().serialize(e)};
+        }
     }
 
     initSecureProtocol(ownNodePrivateKey) {
@@ -411,11 +425,21 @@ network.HttpClient = class {
         this.httpClient_.__sendGetRequest(reqId, url);
     }
 
-    command(name, params, onComplete) {
+    command(name, params, onComplete, onError) {
         let paramsBin = Boss.dump({"command": name, "params": params});
         let reqId = this.getReqId();
         this.callbacks_.set(reqId, (decrypted) => {
-            onComplete(Boss.load(decrypted).result);
+            let binder = Boss.load(decrypted);
+            let result = binder.result;
+            if (result) {
+                onComplete(result);
+            } else {
+                let errorRecord = new ErrorRecord(Errors.FAILURE, "", "unprocessablereply");
+                if (binder.error)
+                    errorRecord = DefaultBiMapper.getInstance().deserialize(binder.error);
+                let clientError = ClientError.initFromErrorRecord(errorRecord);
+                onError(clientError);
+            }
         });
         this.httpClient_.__command(reqId, paramsBin);
     }

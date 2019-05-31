@@ -102,7 +102,7 @@ unit.test("http secure endpoints", async () => {
         // console.log(btoa(sessionKey.packed));
         unsRateDbg += 1;
         await sleep(1);
-        return {U: unsRateDbg};
+        return {U: ""+unsRateDbg};
     });
     httpServer.startServer();
 
@@ -111,6 +111,7 @@ unit.test("http secure endpoints", async () => {
     let receiveCounter = 0;
 
     let httpClient = new network.HttpClient("http://localhost:8080", 64, 64);
+    //let httpClient = new network.HttpClient("http://192.168.1.146:8080", 64, 64);
     await httpClient.start(clientKey, new crypto.PublicKey(nodeKey));
 
     let t00 = new Date().getTime();
@@ -128,6 +129,8 @@ unit.test("http secure endpoints", async () => {
                 counter0 = receiveCounter;
                 console.log("receiveCounter=" + receiveCounter + ", rps=" + rps);
             }
+        }, error => {
+            console.log("exception: " + error);
         });
         if (receiveCounter+1000 < i)
             await sleep(10);
