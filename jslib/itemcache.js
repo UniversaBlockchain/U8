@@ -56,9 +56,11 @@ class ItemCache {
         stateRecord.saveNotification = (record) => {
             let itemResult = this.getResult(record.id);
 
-            itemResult.state = record.state;
-            itemResult.expiresAt = record.expiresAt;
-            itemResult.lockedById = record.lockedByRecordId;
+            if (itemResult != null) {
+                itemResult.state = record.state;
+                itemResult.expiresAt = record.expiresAt;
+                itemResult.lockedById = record.lockedByRecordId;
+            }
         };
 
         stateRecord.destroyNotification = (record) => {

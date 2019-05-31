@@ -1,9 +1,14 @@
+import * as trs from "timers";
+
 const ItemResult = require('itemresult').ItemResult;
+const VerboseLevel = require("node").VerboseLevel;
 const Config = require("config").Config;
 
 class ResyncProcessor {
-    constructor(itemId, onComplete) {
+
+    constructor(itemId, node, onComplete) {
         this.itemId = itemId;
+        this.node = node;
         this.resyncingItem = null;
         this.resyncExpiresAt = null;
         this.resyncer = null;
@@ -11,44 +16,51 @@ class ResyncProcessor {
         this.resyncingSubTreeItems = new Map(); //assume it is ConcurrentHashSet
         this.resyncingSubTreeItemsResults = new Map();
         this.obtainedAnswersFromNodes = new Map(); //assume it is ConcurrentHashSet
+        this.resyncExpirationTimer = null;
 
+        this.finishEvent = new Promise(resolve => this.finishFire = resolve);
         if (onComplete != null)
-            this.finishEvent.addConsumer(onComplete);
+            this.finishEvent.then(onComplete);
     }
 
-   /* getResult() {
-        let result = new ItemResult(ItemState.PENDING, false, Date.now(), Date.now().plusMinutes(5));
+    getResult() {
+        let expires = new Date();
+        expires.setMinutes(expires.getMinutes() + 5);
+        let result = ItemResult.from(ItemState.PENDING, false, new Date(), expires);
         result.extraDataBinder = {};
         result.errors = [];
         return result;
     }
 
     startResync() {
-        //report(getLabel(), ()->"ResyncProcessor.startResync(itemId="+itemId+")", DatagramAdapter.VerboseLevel.BASE); //TODO
+        this.node.report("ResyncProcessor.startResync(itemId=" + this.itemId + ")", VerboseLevel.BASE); //TODO: node.report
+
         this.resyncExpiresAt = Math.floor(Date.now() / 1000) + Config.maxResyncTime;
-        this.resyncExpirationCallback = executorService.schedule(()=>resyncEnded(), config.getMaxResyncTime().getSeconds(), TimeUnit.SECONDS);
-        this.resyncingItem = new ResyncingItem(itemId, ledger.getRecord(itemId));
-        this.resyncingItem.finishEvent.addConsumer((ri)->onFinishResync(ri));
-        List<Integer> periodsMillis = config.getResyncTime();
-        obtainedAnswersFromNodes.clear();
-        voteItself();
-        resyncer = new RunnableWithDynamicPeriod(() => pulseResync(), periodsMillis, executorService);
-        resyncer.run();
+        this.resyncExpirationTimer = trs.timeout(Config.maxResyncTime * 1000, this.resyncEnded);
+
+        this.resyncingItem = new ResyncingItem(this.itemId, this.node.ledger.getRecord(this.itemId));
+        this.resyncingItem.finishEvent.then((ri) => this.onFinishResync(ri));
+
+        this.obtainedAnswersFromNodes.clear();
+        this.voteItself();
+
+        this.resyncer = new RunnableWithDynamicPeriod(this.pulseResync, Config.resyncTime);
+        this.resyncer.run();
     }
 
     voteItself() {
-        if (resyncingItem.getItemState().isConsensusFound())
-            resyncingItem.resyncVote(myInfo, resyncingItem.getItemState());
+        if (this.resyncingItem.getItemState().isConsensusFound())
+            this.resyncingItem.resyncVote(this.node.myInfo, this.resyncingItem.getItemState());
         else
-            resyncingItem.resyncVote(myInfo, ItemState.UNDEFINED);
+            this.resyncingItem.resyncVote(this.node.myInfo, ItemState.UNDEFINED);
     }
 
     restartResync() {
-        obtainedAnswersFromNodes.clear();
-        resyncer.restart();
+        this.obtainedAnswersFromNodes.clear();
+        this.resyncer.restart();
     }
 
-    startResyncSubTree() {
+    /*startResyncSubTree() {
         resyncingSubTreeItems.forEach((k, v) -> resync(k, ri->onResyncSubTreeItemFinish(ri)));
     }
 
@@ -129,7 +141,7 @@ class ResyncProcessor {
 
     stopResync() {
         resyncer.cancel(true);
-        resyncExpirationCallback.cancel(true);
+        resyncExpirationTimer.cancel();
         resyncProcessors.remove(itemId);
     }
 
