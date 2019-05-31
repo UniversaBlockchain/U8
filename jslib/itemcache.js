@@ -1,11 +1,9 @@
 import * as trs from "timers";
 
-const ex = require("exceptions");
-
 class ItemCache {
 
     constructor(maxAge) {
-        this.records = new Map();
+        this.records = new t.GenericMap();
         this.maxAge = maxAge;
         this.cleanerTimerCallback = () => {
             this.cleanUp();
@@ -26,48 +24,66 @@ class ItemCache {
     }
 
     get(itemId) {
-        let i = this.records.get(itemId);
-        if(i != null && i.item == null)
+        let r = this.records.get(itemId);
+        if (r != null && r.item == null)
             throw new Error("cache: record with empty item");
-        return i != null ? i.item : null;
+        return r != null ? r.item : null;
     }
 
     getResult(itemId) {
         let r = this.records.get(itemId);
-        if(r != null && r.item == null)
+        if (r != null && r.item == null)
             throw new Error("cache: record with empty item");
         return r != null ? r.result : null;
     }
 
     put(item, result) {
         // this will plainly override current if any
-        let r = new Record(item, result); //TODO
+        new Record(item, result, this);
     }
 
     update(itemId, result) {
         let r = this.records.get(itemId);
-        if((r != null) && (r.item == null))
-            throw new Error("cache: record with empty item");
-        if(r != null) {
+        if (r != null) {
+            if (r.item == null)
+                throw new Error("cache: record with empty item");
+
             r.result = result;
         }
+    }
+
+    subscribeStateRecord(stateRecord) {
+        stateRecord.saveNotification = (record) => {
+            let itemResult = this.getResult(record.id);
+
+            itemResult.state = record.state;
+            itemResult.expiresAt = record.expiresAt;
+            itemResult.lockedById = record.lockedByRecordId;
+        };
+
+        stateRecord.destroyNotification = (record) => {
+            this.records.delete(record.id);
+        };
+    }
+
+    get size() {
+        return this.records.size;
     }
 }
 
 class Record {
     constructor(item, result, itemCache) {
         this.itemCache = itemCache;
-        this.expiresAt = Math.floor(Date.now() / 1000) + ItemCache.maxAge;
+        this.expiresAt = Math.floor(Date.now() / 1000) + this.itemCache.maxAge;
         this.item = item;
         this.result = result;
-        ItemCache.records.set(this.item.id, this);
+        this.itemCache.records.set(this.item.id, this);
     }
 
     checkExpiration(now) {
-        if( this.expiresAt < now) { //TODO
+        if (this.expiresAt < now)
             this.itemCache.records.delete(this.item.id);
-        }
     }
 }
 
-//module.exports = {ItemCache};
+module.exports = {ItemCache};

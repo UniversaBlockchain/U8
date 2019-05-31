@@ -119,23 +119,30 @@ class ItemResult {
     }
 
     static from(state, haveCopy, createdAt, expiresAt) {
-        this.state = state;
-        this.haveCopy = haveCopy;
-        this.createdAt = createdAt;
-        this.expiresAt = expiresAt;
+        let result = new ItemResult();
+
+        result.state = state;
+        result.haveCopy = haveCopy;
+        result.createdAt = createdAt;
+        result.expiresAt = expiresAt;
+
+        return result;
     }
 
-    static fromStateRecord(record, haveCopy) {
-        if(typeof haveCopy === "undefined") {
-            haveCopy = false;
-        }
+    static fromStateRecord(record, haveCopy = false) {
+        let result = new ItemResult();
 
-        return new ItemResult(record.state,haveCopy,record.createdAt,record.updatedAt);
+        result.state = record.state;
+        result.haveCopy = haveCopy;
+        result.createdAt = record.createdAt;
+        result.expiresAt = record.expiresAt;
+
+        return result;
     }
 
     static fromReader(reader) {
         let ir = new ItemResult();
-        ir.state = ItemState.byOrdinal.get(reader.read())
+        ir.state = ItemState.byOrdinal.get(reader.read());
 
         ir.createdAt = new Date(reader.read());//ZonedDateTime.ofInstant(Instant.ofEpochSecond(br.readLong()), ZoneId.systemDefault());
         ir.expiresAt = new Date(reader.read());//ZonedDateTime.ofInstant(Instant.ofEpochSecond(br.readLong()), ZoneId.systemDefault());
