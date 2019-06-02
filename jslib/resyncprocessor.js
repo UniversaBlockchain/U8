@@ -1,4 +1,5 @@
 import * as trs from "timers";
+import {ScheduleExecutor, ExecutorWithFixedPeriod, ExecutorWithDynamicPeriod} from "executorservice";
 
 const ItemResult = require('itemresult').ItemResult;
 const VerboseLevel = require("node").VerboseLevel;
@@ -39,7 +40,7 @@ class ResyncProcessor {
         this.node.report("ResyncProcessor.startResync(itemId=" + this.itemId + ")", VerboseLevel.BASE); //TODO: node.report
 
         this.resyncExpiresAt = Math.floor(Date.now() / 1000) + Config.maxResyncTime;
-        this.resyncExpirationTimer = trs.timeout(Config.maxResyncTime * 1000, this.resyncEnded);
+        this.resyncExpirationTimer = new ScheduleExecutor(() => this.resyncEnded(), Config.maxResyncTime * 1000, this.node.executorService).run();
 
         this.resyncingItem = new ResyncingItem(this.itemId, this.node.ledger.getRecord(this.itemId));
         this.resyncingItem.finishEvent.then((ri) => this.onFinishResync(ri));
@@ -47,8 +48,7 @@ class ResyncProcessor {
         this.obtainedAnswersFromNodes.clear();
         this.voteItself();
 
-        this.resyncer = new RunnableWithDynamicPeriod(this.pulseResync, Config.resyncTime);
-        this.resyncer.run();
+        this.resyncer = new ExecutorWithDynamicPeriod(() => this.pulseResync(), Config.resyncTime, this.node.executorService).run();
     }
 
     voteItself() {
@@ -146,7 +146,7 @@ class ResyncProcessor {
     }
 
     stopResync() {
-        this.resyncer.cancel(true);
+        this.resyncer.cancel();
         this.resyncExpirationTimer.cancel();
         resyncProcessors.remove(this.itemId);//TODO
     }

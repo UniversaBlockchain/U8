@@ -1,4 +1,4 @@
-import * as trs from "timers";
+const ExecutorWithFixedPeriod = require("executorservice").ExecutorWithFixedPeriod;
 
 /**
  * Class-helper for concurrency work with UNS1 ledger functions.
@@ -10,11 +10,7 @@ class NameCache {
 
     constructor(maxAge) {
         this.maxAge = maxAge;
-        this.cleanerTimerCallback = () => {
-            this.cleanUp();
-            this.cleanerTimer = trs.timeout(5000, this.cleanerTimerCallback);
-        };
-        this.cleanerTimer = trs.timeout(5000, this.cleanerTimerCallback);
+        this.cleanerExecutor = new ExecutorWithFixedPeriod(() => this.cleanUp(), 5000).run();
         this.records = new Map();
     }
 
@@ -25,7 +21,7 @@ class NameCache {
     }
 
     shutdown() {
-        this.cleanerTimer.cancel();
+        this.cleanerExecutor.cancel();
     }
 
     lockStringValue(name_reduced) {

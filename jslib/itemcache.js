@@ -1,15 +1,11 @@
-import * as trs from "timers";
+const ExecutorWithFixedPeriod = require("executorservice").ExecutorWithFixedPeriod;
 
 class ItemCache {
 
     constructor(maxAge) {
         this.records = new t.GenericMap();
         this.maxAge = maxAge;
-        this.cleanerTimerCallback = () => {
-            this.cleanUp();
-            this.cleanerTimer = trs.timeout(5000, this.cleanerTimerCallback);
-        };
-        this.cleanerTimer = trs.timeout(5000, this.cleanerTimerCallback);
+        this.cleanerExecutor = new ExecutorWithFixedPeriod(() => this.cleanUp(), 5000).run();
     }
 
     cleanUp() {
@@ -20,7 +16,7 @@ class ItemCache {
     }
 
     shutdown() {
-        this.cleanerTimer.cancel();
+        this.cleanerExecutor.cancel();
     }
 
     get(itemId) {
