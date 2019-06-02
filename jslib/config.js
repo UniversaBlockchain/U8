@@ -12,6 +12,7 @@ class Config {
     static revokedItemExpiration = Config.maxItemCreationAge + 10*24*3600; //maxItemCreationAge + 10 days
     static declinedItemExpiration = 10*24*3600; //10 days
 
+    static maxGetItemTime = 30; //30 seconds
     static rateLimitDisablingPayment = 5;
 
     // SmartContract services

@@ -3,6 +3,9 @@ import * as trs from "timers";
 const ItemResult = require('itemresult').ItemResult;
 const VerboseLevel = require("node").VerboseLevel;
 const Config = require("config").Config;
+const ResyncingItemProcessingState = require("node").ResyncingItemProcessingState;
+const Ledger = require("ledger").Ledger;
+
 
 class ResyncProcessor {
 
@@ -60,128 +63,348 @@ class ResyncProcessor {
         this.resyncer.restart();
     }
 
-    /*startResyncSubTree() {
-        resyncingSubTreeItems.forEach((k, v) -> resync(k, ri->onResyncSubTreeItemFinish(ri)));
+    startResyncSubTree() {
+        this.resyncingSubTreeItems.forEach((k, v) => resync(k, ri=>this.onResyncSubTreeItemFinish(ri)));
     }
 
     pulseResync() {
-        report(getLabel(), ()->"ResyncProcessor.pulseResync(itemId="+itemId+
-            "), time="+Duration.between(resyncExpiresAt.minus(config.getMaxResyncTime()),
-                Instant.now()).toMillis()+"ms", DatagramAdapter.VerboseLevel.BASE);
-        if (resyncExpiresAt.isBefore(Instant.now())) {
-            report(getLabel(), ()->"ResyncProcessor.pulseResync(itemId="+itemId+") expired, cancel", DatagramAdapter.VerboseLevel.BASE);
-            resyncer.cancel(true);
+        this.node.report("ResyncProcessor.pulseResync(itemId=" + this.itemId + "),time=" + Math.floor(this.resyncExpiresAt / 1000) - Config.maxResyncTime,
+            Date.now() + "ms", VerboseLevel.BASE);
+
+        if (this.resyncExpiresAt < Date.now()) {
+            this.node.report("ResyncProcessor.pulseResync(itemId=" + this.itemId + ") expired, cancel", VerboseLevel.BASE);
+            this.resyncer.cancel(true);
         } else {
             try {
-                ResyncNotification notification = new ResyncNotification(myInfo, itemId, true);
-                network.eachNode(node -> {
-                    if (!obtainedAnswersFromNodes.contains(node))
+                let notification = new ResyncNotification(myInfo, this.itemId, true);
+                network.eachNode(node => {  //TODO
+                    if (!this.obtainedAnswersFromNodes.contains(node))
                         network.deliver(node, notification);
                 });
-            } catch (IOException e) {
-                report(getLabel(), ()->"error: unable to send ResyncNotification, exception: " + e, DatagramAdapter.VerboseLevel.BASE);
+            } catch (e) {
+                this.node.report("error: unable to send ResyncNotification, exception: " + e, VerboseLevel.BASE);
+
             }
         }
     }
 
     obtainAnswer(answer) {
-    if (obtainedAnswersFromNodes.putIfAbsent(answer.getFrom(), 0) == null) {
-        report(getLabel(), () -> "ResyncProcessor.obtainAnswer(itemId=" + itemId + "), state: " + answer.getItemState(), DatagramAdapter.VerboseLevel.BASE);
-        resyncingItem.resyncVote(answer.getFrom(), answer.getItemState());
-        if (answer.getHasEnvironment())
-            envSources.put(answer.getFrom(), 0);
-        if (resyncingItem.isResyncPollingFinished() && resyncingItem.isCommitFinished()) {
-            report(getLabel(), () -> "ResyncProcessor.obtainAnswer... resync done", DatagramAdapter.VerboseLevel.BASE);
-            resyncer.cancel(true);
+        if (this.obtainedAnswersFromNodes.putIfAbsent(answer.getFrom(), 0) == null) {
+            this.node.report("ResyncProcessor.obtainAnswer(itemId=" + this.itemId + "), state: " + answer.getItemState(), VerboseLevel.BASE);
+            this.resyncingItem.resyncVote(answer.getFrom(), answer.getItemState());
+            if (answer.getHasEnvironment())
+                this.envSources.set(answer.getFrom(), 0);
+            if (this.resyncingItem.isResyncPollingFinished() && this.resyncingItem.isCommitFinished()) {
+                this.node.report("ResyncProcessor.obtainAnswer... resync done" + e, VerboseLevel.BASE);
+                this.resyncer.cancel(true);
+            }
         }
     }
-    }
 
-    onFinishResync( ri) {
-        report(getLabel(), ()->"ResyncProcessor.onFinishResync(itemId=" + itemId + ")", DatagramAdapter.VerboseLevel.BASE);
-
+    onFinishResync(ri) {
+        this.node.report("ResyncProcessor.onFinishResync(itemId=" + this.itemId + ")", VerboseLevel.BASE);
         //DELETE ENVIRONMENTS FOR REVOKED ITEMS
-        if (resyncingItem.getResyncingState() == ResyncingItemProcessingState.COMMIT_SUCCESSFUL) {
-            if (resyncingItem.getItemState() == ItemState.REVOKED) {
-                removeEnvironment(itemId);
+        if (this.resyncingItem.resyncingState === ResyncingItemProcessingState.COMMIT_SUCCESSFUL) {
+            if (this.resyncingItem.getItemState() === ItemState.REVOKED) {
+                removeEnvironment(this.itemId); //TODO
             }
         }
         //SAVE ENVIRONMENTS FOR APPROVED ITEMS
-        if (saveResyncedEnvironents()) {
-            resyncEnded();
+        if (this.saveResyncedEnvironents()) {
+            this.resyncEnded();
         } else {
-            resyncer.cancel(true);
+            this.resyncer.cancel(true);
         }
     }
 
     onResyncSubTreeItemFinish(ri) {
-        resyncingSubTreeItemsResults.put(ri.hashId, ri.getItemState());
-        if (resyncingSubTreeItemsResults.size() >= resyncingSubTreeItems.size()) {
-            resyncEnded();
+        this.resyncingSubTreeItemsResults.set(ri.hashId, ri.getItemState());
+        if (this.resyncingSubTreeItemsResults.size >= this.resyncingSubTreeItems.size) {
+            this.resyncEnded();
         }
     }
 
     resyncEnded() {
-        if (resyncingItem.getResyncingState() == ResyncingItemProcessingState.PENDING_TO_COMMIT
-            || resyncingItem.getResyncingState() == ResyncingItemProcessingState.IS_COMMITTING) {
+        if (this.resyncingItem.resyncingState() === ResyncingItemProcessingState.PENDING_TO_COMMIT
+            || this.resyncingItem.resyncingState() === ResyncingItemProcessingState.IS_COMMITTING) {
 
-            executorService.schedule(() -> resyncEnded(), 1, TimeUnit.SECONDS);
+            trs.timeout(1, this.resyncEnded); //TODO
             return;
 
-        } else if (resyncingItem.getResyncingState() == ResyncingItemProcessingState.WAIT_FOR_VOTES) {
-            executorService.schedule(() -> itemSanitationTimeout(resyncingItem.record), 0, TimeUnit.SECONDS);
-        } else if (resyncingItem.getResyncingState() == ResyncingItemProcessingState.COMMIT_FAILED) {
-            executorService.schedule(() -> itemSanitationFailed(resyncingItem.record), 0, TimeUnit.SECONDS);
+        } else if (this.resyncingItem.resyncingState() === ResyncingItemProcessingState.WAIT_FOR_VOTES) {
+            trs.timeout(this.resyncingItem.record, this.itemSanitationTimeout()); //TODO
+            //executorService.schedule(() -> itemSanitationTimeout(resyncingItem.record), 0, TimeUnit.SECONDS);
+        } else if (this.resyncingItem.resyncingState() === ResyncingItemProcessingState.COMMIT_FAILED) {
+            //executorService.schedule(() -> itemSanitationFailed(resyncingItem.record), 0, TimeUnit.SECONDS);
+            trs.timeout(this.resyncingItem.record, this.itemSanitationFailed()); //TODO
         } else {
-            executorService.schedule(() -> itemSanitationDone(resyncingItem.record), 0, TimeUnit.SECONDS);
+            //executorService.schedule(() -> itemSanitationDone(resyncingItem.record), 0, TimeUnit.SECONDS);
+            trs.timeout(this.resyncingItem.record, this.itemSanitationDone()); //TODO
         }
-        finishEvent.fire(resyncingItem);
-        stopResync();
+        this.finishEvent.fire(this.resyncingItem);
+        this.stopResync();
     }
 
     stopResync() {
-        resyncer.cancel(true);
-        resyncExpirationTimer.cancel();
-        resyncProcessors.remove(itemId);
+        this.resyncer.cancel(true);
+        this.resyncExpirationTimer.cancel();
+        resyncProcessors.remove(this.itemId);//TODO
     }
 
-    saveResyncedEnvironents() {
-        if(!envSources.isEmpty()) {
-            HashSet<HashId> itemsToReResync = new HashSet<>();
-            HashId id = itemId;
-            Random random = new Random(Instant.now().toEpochMilli() * myInfo.getNumber());
-            Object[] array = envSources.keySet().toArray();
-            NodeInfo from = (NodeInfo) array[(int) (array.length * random.nextFloat())];
+    async saveResyncedEnvironents() {
+        if(!this.envSources.isEmpty()) {
+            let itemsToReResync = new Set();
+            let id = this.itemId;
+            let random = new Random(Instant.now().toEpochMilli() * myInfo.getNumber());
+            let array = this.envSources.keySet().toArray();
+            let from =  array.length * random.nextFloat();
             try {
-                NImmutableEnvironment environment = network.getEnvironment(id, from, config.getMaxGetItemTime());
+                let environment = network.getEnvironment(id, from, Config.maxGetItemTime); //TODO
                 if (environment != null) {
-                    Set<HashId> conflicts = ledger.saveEnvironment(environment);
-                    if (conflicts.size() > 0) {
+                    let conflicts = await Ledger.saveEnvironment(environment);
+                    if (conflicts.size > 0) { //TODO
                         //TODO: remove in release
-                        boolean resyncConflicts = true;
+                        let resyncConflicts = true;
                         if (resyncConflicts) {
                             itemsToReResync.addAll(conflicts);
                         } else {
-                            conflicts.forEach(conflict -> removeEnvironment(conflict));
-                            assert ledger.saveEnvironment(environment).isEmpty();
+                            conflicts.forEach(conflict => removeEnvironment(conflict));
+                            if (await Ledger.saveEnvironment(environment).size != 0) {
+                                throw new Error("error");
+                            }
                         }
                     }
                 }
-            } catch (InterruptedException e) {
+            } catch (e) {
                 return true;
             }
 
-            if (itemsToReResync.size() > 0) {
-                resyncingSubTreeItems.clear();
-                itemsToReResync.forEach(item -> {
+            if (itemsToReResync.size > 0) {
+                this.resyncingSubTreeItems.clear();
+                itemsToReResync.forEach(item => {
                     //TODO: OPTIMIZE GETTING STATE RECORD
-                    resyncingSubTreeItems.put(item, 0);
+                    this.resyncingSubTreeItems.set(item, 0);
                 });
-                startResyncSubTree();
+                this.startResyncSubTree();
                 return false;
             }
         }
         return true;
-    }*/
+    }
 
+}
+
+class ResyncingItem {
+
+    constructor(hid, record) {
+        this.hashId = hid;
+        this.record = record;
+
+        this.resyncingState = ResyncingItemProcessingState.WAIT_FOR_VOTES;
+
+        this.finishEvent = new Promise(resolve => this.finishFire = resolve);
+
+        this.recordWas = Ledger.getRecord(hid);
+        this.stateWas = undefined;
+        if (this.recordWas != null) {
+            this.stateWas = this.recordWas.getState();
+        } else {
+            this.stateWas = ItemState.UNDEFINED;
+        }
+
+        this.resyncNodes = new Map();
+        this.resyncNodes.set(ItemState.APPROVED, new Set());
+        this.resyncNodes.set(ItemState.REVOKED, new Set());
+        this.resyncNodes.set(ItemState.DECLINED, new Set());
+        this.resyncNodes.set(ItemState.UNDEFINED, new Set());
+    }
+
+    resyncVote(node, state) {
+        //TODO: move to resyncNodes.get(ItemState.APPROVED).size() >= config.getPositiveConsensus()
+        if (state === ItemState.LOCKED)
+            state = ItemState.APPROVED;
+
+        //ItemState finalState = state;
+        //report(getLabel(), () -> concatReportMessage("resyncVote at " + myInfo.getNumber() + " from " +node.getNumber() + " item " + hashId + " state " + finalState),
+        //        DatagramAdapter.VerboseLevel.DETAILED);
+
+        let approvedConsenus = false;
+        let revokedConsenus = false;
+        let declinedConsenus = false;
+        let undefinedConsenus = false;
+
+        // TODO synchronized
+        for (let is of this.resyncNodes.keySet()) {
+            this.resyncNodes.get(is).remove(node);
+        }
+
+        if (!this.resyncNodes.has(state)) {
+            this.resyncNodes.set(state, new Set());
+        }
+        this.resyncNodes.get(state).add(node);
+
+        if (this.isResyncPollingFinished()) {
+            return;
+        }
+
+        if (this.resyncNodes.get(ItemState.REVOKED).size() >= this.node.config.positiveConsensus) {
+            revokedConsenus = true;
+            this.resyncingState = ResyncingItemProcessingState.PENDING_TO_COMMIT;
+        } else if (this.resyncNodes.get(ItemState.DECLINED).size >= this.node.config.positiveConsensus) {
+            declinedConsenus = true;
+            this.resyncingState = ResyncingItemProcessingState.PENDING_TO_COMMIT;
+        } else if (this.resyncNodes.get(ItemState.APPROVED).size >= this.node.config.positiveConsensus) {
+            approvedConsenus = true;
+            this.resyncingState = ResyncingItemProcessingState.PENDING_TO_COMMIT;
+        } else if (this.resyncNodes.get(ItemState.UNDEFINED).size >= this.node.config.resyncBreakConsensus) {
+            undefinedConsenus = true;
+            this.resyncingState = ResyncingItemProcessingState.PENDING_TO_COMMIT;
+        }
+        if (!this.isResyncPollingFinished())
+            return;
+
+        //TODO synchronized
+        if (revokedConsenus) {
+            executorService.submit(() => resyncAndCommit(ItemState.REVOKED),
+                Node.this.toString() + " > item " + hashId + " :: resyncVote -> resyncAndCommit");
+        } else if (declinedConsenus) {
+            executorService.submit(() => resyncAndCommit(ItemState.DECLINED),
+                Node.this.toString() + " > item " + hashId + " :: resyncVote -> resyncAndCommit");
+        } else if (approvedConsenus) {
+            executorService.submit(() => resyncAndCommit(ItemState.APPROVED),
+                Node.this.toString() + " > item " + hashId + " :: resyncVote -> resyncAndCommit");
+        } else if (undefinedConsenus) {
+            executorService.submit(() => resyncAndCommit(ItemState.UNDEFINED),
+                Node.this.toString() + " > item " + hashId + " :: resyncVote -> resyncAndCommit");
+        } else
+            throw new Error("error: resync consensus reported without consensus");
+    }
+
+    //there should be no consensus checks here as it was already done in resyncVote
+    resyncAndCommit(committingState) {
+        this.resyncingState = ResyncingItemProcessingState.IS_COMMITTING;
+
+       /* executorService.submit(()->{
+            if(committingState.isConsensusFound()) {
+                Set<NodeInfo> rNodes = new HashSet<>();
+                Set<NodeInfo> nowNodes = resyncNodes.get(committingState);
+
+                Map<Long,Set<ItemResult>> createdAtClusters = new HashMap<>();
+                Map<Long,Set<ItemResult>> expiresAtClusters = new HashMap<>();
+
+                // make local set of nodes to prevent changing set of nodes while commiting
+                synchronized (resyncNodes) {
+                    for (NodeInfo ni : nowNodes) {
+                        rNodes.add(ni);
+                    }
+                }
+                for (NodeInfo ni : rNodes) {
+                    if (ni != null) {
+                        try {
+                            ItemResult r = network.getItemState(ni, hashId);
+                            if (r != null) {
+                                List<Long> list = createdAtClusters.keySet().stream()
+                                    .filter(ts -> Math.abs(ts - r.createdAt.toEpochSecond()) < config.getMaxElectionsTime().getSeconds()).collect(Collectors.toList());
+
+                                if(list.isEmpty()) {
+                                    Set<ItemResult> itemSet = new HashSet<>();
+                                    itemSet.add(r);
+                                    createdAtClusters.put(r.createdAt.toEpochSecond(),itemSet);
+                                } else {
+                                    Set<ItemResult> itemSet = createdAtClusters.remove(list.get(0));
+                                    for(int i = 1; i < list.size();++i) {
+                                        itemSet.addAll(createdAtClusters.remove(list.get(1)));
+                                    }
+                                    itemSet.add(r);
+                                    Average avg = new Average();
+                                    itemSet.forEach(item -> avg.update(item.createdAt.toEpochSecond()));
+                                    createdAtClusters.put((long) avg.average(),itemSet);
+                                }
+
+                                list = expiresAtClusters.keySet().stream()
+                                    .filter(ts -> Math.abs(ts - r.expiresAt.toEpochSecond()) < config.getMaxElectionsTime().getSeconds()).collect(Collectors.toList());
+
+                                if(list.isEmpty()) {
+                                    Set<ItemResult> itemSet = new HashSet<>();
+                                    itemSet.add(r);
+                                    expiresAtClusters.put(r.expiresAt.toEpochSecond(),itemSet);
+                                } else {
+                                    Set<ItemResult> itemSet = expiresAtClusters.remove(list.get(0));
+                                    for(int i = 1; i < list.size();++i) {
+                                        itemSet.addAll(expiresAtClusters.remove(list.get(1)));
+                                    }
+                                    itemSet.add(r);
+                                    Average avg = new Average();
+                                    itemSet.forEach(item -> avg.update(item.expiresAt.toEpochSecond()));
+                                    expiresAtClusters.put((long) avg.average(),itemSet);
+                                }
+
+                            }
+                        } catch (e) {
+                        } catch (e) {
+                            Console.log(e.stack);
+                        }
+                    }
+                }
+
+                long createdTs = createdAtClusters.keySet().stream().max(Comparator.comparingInt(i -> createdAtClusters.get(i).size())).get();
+
+                long expiresTs = expiresAtClusters.keySet().stream().max(Comparator.comparingInt(i -> expiresAtClusters.get(i).size())).get();
+
+                ZonedDateTime createdAt = ZonedDateTime.ofInstant(
+                    Instant.ofEpochSecond(createdTs), ZoneId.systemDefault());
+                ZonedDateTime expiresAt = ZonedDateTime.ofInstant(
+                    Instant.ofEpochSecond(expiresTs), ZoneId.systemDefault());
+
+                try {
+                    itemLock.synchronize(hashId, lock -> {
+                        StateRecord newRecord = ledger.findOrCreate(hashId);
+                        newRecord.setState(committingState)
+                            .setCreatedAt(createdAt)
+                            .setExpiresAt(expiresAt)
+                            .save();
+                        this.record = newRecord;
+                        synchronized (cache) {
+                            cache.update(newRecord.id, new ItemResult(newRecord));
+                        }
+                        return null;
+                    });
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+                resyncingState = ResyncingItemProcessingState.COMMIT_SUCCESSFUL;
+            } else {
+                resyncingState = ResyncingItemProcessingState.COMMIT_FAILED;
+            }
+            finishEvent.fire(this);
+        }, Node.this.toString() + " > item " + hashId + " :: resyncAndCommit -> body");*/
+    }
+
+    closeByTimeout() {
+        this.resyncingState = ResyncingItemProcessingState.COMMIT_FAILED;
+        this.finishEvent.fire(this); //TODO
+    }
+
+    /**
+     * true if number of needed answers is got (for consensus or for break resyncing)
+     * @return
+     */
+    isResyncPollingFinished() {
+        return this.resyncingState !== ResyncingItemProcessingState.WAIT_FOR_VOTES;
+    }
+
+    /**
+     * true if item resynced and commit finished (with successful or fail).
+     * @return
+     */
+     isCommitFinished() {
+        return this.resyncingState === ResyncingItemProcessingState.COMMIT_SUCCESSFUL || this.resyncingState === ResyncingItemProcessingState.COMMIT_FAILED;
+    }
+
+    getItemState() {
+        if(this.record != null)
+            return this.record.state;
+
+        return ItemState.UNDEFINED;
+    }
 }
