@@ -6,11 +6,11 @@ const VerboseLevel = {
 };
 
 const ResyncingItemProcessingState = {
-    WAIT_FOR_VOTES,
-    PENDING_TO_COMMIT,
-    IS_COMMITTING,
-    COMMIT_SUCCESSFUL,
-    COMMIT_FAILED
+    WAIT_FOR_VOTES: 0,
+    PENDING_TO_COMMIT: 1,
+    IS_COMMITTING: 2,
+    COMMIT_SUCCESSFUL: 3,
+    COMMIT_FAILED: 4
 };
 
-module.exports = {VerboseLevel};
+module.exports = {VerboseLevel, ResyncingItemProcessingState};

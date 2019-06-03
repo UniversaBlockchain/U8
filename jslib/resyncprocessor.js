@@ -1,12 +1,8 @@
-import * as trs from "timers";
 import {ScheduleExecutor, ExecutorWithFixedPeriod, ExecutorWithDynamicPeriod} from "executorservice";
+import {VerboseLevel, ResyncingItemProcessingState} from "node";
 
 const ItemResult = require('itemresult').ItemResult;
-const VerboseLevel = require("node").VerboseLevel;
 const Config = require("config").Config;
-const ResyncingItemProcessingState = require("node").ResyncingItemProcessingState;
-const Ledger = require("ledger").Ledger;
-
 
 class ResyncProcessor {
 
@@ -16,10 +12,10 @@ class ResyncProcessor {
         this.resyncingItem = null;
         this.resyncExpiresAt = null;
         this.resyncer = null;
-        this.envSources = new Map(); //assume it is ConcurrentHashSet
-        this.resyncingSubTreeItems = new Map(); //assume it is ConcurrentHashSet
+        this.envSources = new Set();
+        this.resyncingSubTreeItems = new Set();
         this.resyncingSubTreeItemsResults = new Map();
-        this.obtainedAnswersFromNodes = new Map(); //assume it is ConcurrentHashSet
+        this.obtainedAnswersFromNodes = new Set();
         this.resyncExpirationTimer = null;
 
         this.finishEvent = new Promise(resolve => this.finishFire = resolve);
@@ -43,7 +39,7 @@ class ResyncProcessor {
         this.resyncExpirationTimer = new ScheduleExecutor(() => this.resyncEnded(), Config.maxResyncTime * 1000, this.node.executorService).run();
 
         this.resyncingItem = new ResyncingItem(this.itemId, this.node.ledger.getRecord(this.itemId));
-        this.resyncingItem.finishEvent.then((ri) => this.onFinishResync(ri));
+        this.resyncingItem.finishEvent.then(() => this.onFinishResync());
 
         this.obtainedAnswersFromNodes.clear();
         this.voteItself();
@@ -52,7 +48,7 @@ class ResyncProcessor {
     }
 
     voteItself() {
-        if (this.resyncingItem.getItemState().isConsensusFound())
+        if (this.resyncingItem.getItemState().isConsensusFound)
             this.resyncingItem.resyncVote(this.node.myInfo, this.resyncingItem.getItemState());
         else
             this.resyncingItem.resyncVote(this.node.myInfo, ItemState.UNDEFINED);
@@ -64,153 +60,125 @@ class ResyncProcessor {
     }
 
     startResyncSubTree() {
-        this.resyncingSubTreeItems.forEach((k, v) => resync(k, ri=>this.onResyncSubTreeItemFinish(ri)));
+        this.resyncingSubTreeItems.forEach(k => this.node.resync(k, ri => this.onResyncSubTreeItemFinish(ri)));
     }
 
     pulseResync() {
-        this.node.report("ResyncProcessor.pulseResync(itemId=" + this.itemId + "),time=" + Math.floor(this.resyncExpiresAt / 1000) - Config.maxResyncTime,
-            Date.now() + "ms", VerboseLevel.BASE);
+        this.node.report("ResyncProcessor.pulseResync(itemId=" + this.itemId + "),time=" +
+            Math.floor(Date.now() / 1000) - this.resyncExpiresAt + Config.maxResyncTime + "ms", VerboseLevel.BASE);
 
         if (this.resyncExpiresAt < Date.now()) {
             this.node.report("ResyncProcessor.pulseResync(itemId=" + this.itemId + ") expired, cancel", VerboseLevel.BASE);
-            this.resyncer.cancel(true);
+            this.resyncer.cancel();
         } else {
             try {
-                let notification = new ResyncNotification(myInfo, this.itemId, true);
-                network.eachNode(node => {  //TODO
-                    if (!this.obtainedAnswersFromNodes.contains(node))
-                        network.deliver(node, notification);
+                let notification = new ResyncNotification(this.node.myInfo, this.itemId, true); //TODO: ResyncNotification
+                this.node.network.eachNode(node => {  //TODO: node.network
+                    if (!this.obtainedAnswersFromNodes.has(node))
+                        this.node.network.deliver(node, notification);
                 });
-            } catch (e) {
-                this.node.report("error: unable to send ResyncNotification, exception: " + e, VerboseLevel.BASE);
-
+            } catch (err) {
+                this.node.report("error: unable to send ResyncNotification, exception: " + err.message, VerboseLevel.BASE);
             }
         }
     }
 
     obtainAnswer(answer) {
-        if (this.obtainedAnswersFromNodes.putIfAbsent(answer.getFrom(), 0) == null) {
-            this.node.report("ResyncProcessor.obtainAnswer(itemId=" + this.itemId + "), state: " + answer.getItemState(), VerboseLevel.BASE);
-            this.resyncingItem.resyncVote(answer.getFrom(), answer.getItemState());
-            if (answer.getHasEnvironment())
-                this.envSources.set(answer.getFrom(), 0);
+        if (!this.obtainedAnswersFromNodes.has(answer.from)) {
+            this.obtainedAnswersFromNodes.add(answer.from);
+            this.node.report("ResyncProcessor.obtainAnswer(itemId=" + this.itemId + "), state: " + answer.itemState, VerboseLevel.BASE);
+
+            this.resyncingItem.resyncVote(answer.from, answer.itemState);
+
+            if (answer.hasEnvironment)
+                this.envSources.add(answer.from);
+
             if (this.resyncingItem.isResyncPollingFinished() && this.resyncingItem.isCommitFinished()) {
-                this.node.report("ResyncProcessor.obtainAnswer... resync done" + e, VerboseLevel.BASE);
-                this.resyncer.cancel(true);
+                this.node.report("ResyncProcessor.obtainAnswer... resync done", VerboseLevel.BASE);
+                this.resyncer.cancel();
             }
         }
     }
 
-    onFinishResync(ri) {
+    onFinishResync() {
         this.node.report("ResyncProcessor.onFinishResync(itemId=" + this.itemId + ")", VerboseLevel.BASE);
+
         //DELETE ENVIRONMENTS FOR REVOKED ITEMS
-        if (this.resyncingItem.resyncingState === ResyncingItemProcessingState.COMMIT_SUCCESSFUL) {
-            if (this.resyncingItem.getItemState() === ItemState.REVOKED) {
-                removeEnvironment(this.itemId); //TODO
-            }
-        }
+        if (this.resyncingItem.resyncingState === ResyncingItemProcessingState.COMMIT_SUCCESSFUL)
+            if (this.resyncingItem.getItemState() === ItemState.REVOKED)
+                this.node.removeEnvironment(this.itemId);   //TODO: node.removeEnvironment
+
         //SAVE ENVIRONMENTS FOR APPROVED ITEMS
-        if (this.saveResyncedEnvironents()) {
+        if (this.saveResyncedEnvironments())
             this.resyncEnded();
-        } else {
-            this.resyncer.cancel(true);
-        }
+        else
+            this.resyncer.cancel();
     }
 
     onResyncSubTreeItemFinish(ri) {
         this.resyncingSubTreeItemsResults.set(ri.hashId, ri.getItemState());
-        if (this.resyncingSubTreeItemsResults.size >= this.resyncingSubTreeItems.size) {
+        if (this.resyncingSubTreeItemsResults.size >= this.resyncingSubTreeItems.size)
             this.resyncEnded();
-        }
     }
 
     resyncEnded() {
-        if (this.resyncingItem.resyncingState() === ResyncingItemProcessingState.PENDING_TO_COMMIT
-            || this.resyncingItem.resyncingState() === ResyncingItemProcessingState.IS_COMMITTING) {
+        if (this.resyncingItem.resyncingState === ResyncingItemProcessingState.PENDING_TO_COMMIT
+            || this.resyncingItem.resyncingState === ResyncingItemProcessingState.IS_COMMITTING) {
 
-            trs.timeout(1, this.resyncEnded); //TODO
+            new ScheduleExecutor(() => this.resyncEnded(), 1000, this.node.executorService).run();
             return;
 
-        } else if (this.resyncingItem.resyncingState() === ResyncingItemProcessingState.WAIT_FOR_VOTES) {
-            trs.timeout(this.resyncingItem.record, this.itemSanitationTimeout()); //TODO
-            //executorService.schedule(() -> itemSanitationTimeout(resyncingItem.record), 0, TimeUnit.SECONDS);
-        } else if (this.resyncingItem.resyncingState() === ResyncingItemProcessingState.COMMIT_FAILED) {
-            //executorService.schedule(() -> itemSanitationFailed(resyncingItem.record), 0, TimeUnit.SECONDS);
-            trs.timeout(this.resyncingItem.record, this.itemSanitationFailed()); //TODO
-        } else {
-            //executorService.schedule(() -> itemSanitationDone(resyncingItem.record), 0, TimeUnit.SECONDS);
-            trs.timeout(this.resyncingItem.record, this.itemSanitationDone()); //TODO
-        }
-        this.finishEvent.fire(this.resyncingItem);
+        } else if (this.resyncingItem.resyncingState() === ResyncingItemProcessingState.WAIT_FOR_VOTES) //TODO: node.itemSanitation...
+            new ScheduleExecutor(() => this.node.itemSanitationTimeout(this.resyncingItem.record), 0, this.node.executorService).run();
+        else if (this.resyncingItem.resyncingState() === ResyncingItemProcessingState.COMMIT_FAILED)
+            new ScheduleExecutor(() => this.node.itemSanitationFailed(this.resyncingItem.record), 0, this.node.executorService).run();
+        else
+            new ScheduleExecutor(() => this.node.itemSanitationDone(this.resyncingItem.record), 0, this.node.executorService).run();
+
+        this.finishFire(this.resyncingItem);
         this.stopResync();
     }
 
     stopResync() {
         this.resyncer.cancel();
         this.resyncExpirationTimer.cancel();
-        resyncProcessors.remove(this.itemId);//TODO
+        this.node.resyncProcessors.delete(this.itemId); //TODO: node.resyncProcessors
     }
 
-    async saveResyncedEnvironents() {
-        if(!this.envSources.isEmpty()) {
+    async saveResyncedEnvironments() {
+        if (this.envSources.size > 0) {
             let itemsToReResync = new Set();
-            let id = this.itemId;
-            let random = new Random(Instant.now().toEpochMilli() * myInfo.getNumber());
-            let array = this.envSources.keySet().toArray();
-            let from =  array.length * random.nextFloat();
-            try {
-                let environment = network.getEnvironment(id, from, Config.maxGetItemTime); //TODO
-                if (environment != null) {
-                    let conflicts = await Ledger.saveEnvironment(environment);
-                    if (conflicts.size > 0) { //TODO
-                        //TODO: remove in release
-                        let resyncConflicts = true;
-                        if (resyncConflicts) {
-                            itemsToReResync.addAll(conflicts);
-                        } else {
-                            conflicts.forEach(conflict => removeEnvironment(conflict));
-                            if (await Ledger.saveEnvironment(environment).size != 0) {
-                                throw new Error("error");
-                            }
-                        }
-                    }
-                }
-            } catch (e) {
-                return true;
+            let array = Array.from(this.envSources);
+            let from = array[array.length * Math.random()];
+
+            let environment = this.node.network.getEnvironment(this.itemId, from, Config.maxGetItemTime);
+            if (environment != null) {
+                let conflicts = await this.node.ledger.saveEnvironment(environment);
+                if (conflicts.size > 0)
+                    conflicts.forEach(conflict => itemsToReResync.add(conflict));
             }
 
             if (itemsToReResync.size > 0) {
                 this.resyncingSubTreeItems.clear();
-                itemsToReResync.forEach(item => {
-                    //TODO: OPTIMIZE GETTING STATE RECORD
-                    this.resyncingSubTreeItems.set(item, 0);
-                });
+                itemsToReResync.forEach(item => this.resyncingSubTreeItems.add(item)); //TODO: OPTIMIZE GETTING STATE RECORD
+
                 this.startResyncSubTree();
                 return false;
             }
         }
         return true;
     }
-
 }
 
 class ResyncingItem {
 
-    constructor(hid, record) {
+    constructor(hid, record, node) {
         this.hashId = hid;
         this.record = record;
-
+        this.node = node;
         this.resyncingState = ResyncingItemProcessingState.WAIT_FOR_VOTES;
 
         this.finishEvent = new Promise(resolve => this.finishFire = resolve);
-
-        this.recordWas = Ledger.getRecord(hid);
-        this.stateWas = undefined;
-        if (this.recordWas != null) {
-            this.stateWas = this.recordWas.getState();
-        } else {
-            this.stateWas = ItemState.UNDEFINED;
-        }
 
         this.resyncNodes = new Map();
         this.resyncNodes.set(ItemState.APPROVED, new Set());
@@ -220,32 +188,25 @@ class ResyncingItem {
     }
 
     resyncVote(node, state) {
-        //TODO: move to resyncNodes.get(ItemState.APPROVED).size() >= config.getPositiveConsensus()
         if (state === ItemState.LOCKED)
             state = ItemState.APPROVED;
-
-        //ItemState finalState = state;
-        //report(getLabel(), () -> concatReportMessage("resyncVote at " + myInfo.getNumber() + " from " +node.getNumber() + " item " + hashId + " state " + finalState),
-        //        DatagramAdapter.VerboseLevel.DETAILED);
 
         let approvedConsenus = false;
         let revokedConsenus = false;
         let declinedConsenus = false;
         let undefinedConsenus = false;
 
-        // TODO synchronized
-        for (let is of this.resyncNodes.keySet()) {
-            this.resyncNodes.get(is).remove(node);
-        }
+        for (let is of this.resyncNodes.keys())
+            if (is !== state)
+                this.resyncNodes.get(is).delete(node);
 
-        if (!this.resyncNodes.has(state)) {
+        if (!this.resyncNodes.has(state))
             this.resyncNodes.set(state, new Set());
-        }
+
         this.resyncNodes.get(state).add(node);
 
-        if (this.isResyncPollingFinished()) {
+        if (this.isResyncPollingFinished())
             return;
-        }
 
         if (this.resyncNodes.get(ItemState.REVOKED).size() >= this.node.config.positiveConsensus) {
             revokedConsenus = true;
@@ -263,20 +224,15 @@ class ResyncingItem {
         if (!this.isResyncPollingFinished())
             return;
 
-        //TODO synchronized
-        if (revokedConsenus) {
-            executorService.submit(() => resyncAndCommit(ItemState.REVOKED),
-                Node.this.toString() + " > item " + hashId + " :: resyncVote -> resyncAndCommit");
-        } else if (declinedConsenus) {
-            executorService.submit(() => resyncAndCommit(ItemState.DECLINED),
-                Node.this.toString() + " > item " + hashId + " :: resyncVote -> resyncAndCommit");
-        } else if (approvedConsenus) {
-            executorService.submit(() => resyncAndCommit(ItemState.APPROVED),
-                Node.this.toString() + " > item " + hashId + " :: resyncVote -> resyncAndCommit");
-        } else if (undefinedConsenus) {
-            executorService.submit(() => resyncAndCommit(ItemState.UNDEFINED),
-                Node.this.toString() + " > item " + hashId + " :: resyncVote -> resyncAndCommit");
-        } else
+        if (revokedConsenus)
+            new ScheduleExecutor(() => this.resyncAndCommit(ItemState.REVOKED), 0, this.node.executorService).run();
+        else if (declinedConsenus)
+            new ScheduleExecutor(() => this.resyncAndCommit(ItemState.DECLINED), 0, this.node.executorService).run();
+        else if (approvedConsenus)
+            new ScheduleExecutor(() => this.resyncAndCommit(ItemState.APPROVED), 0, this.node.executorService).run();
+        else if (undefinedConsenus)
+            new ScheduleExecutor(() => this.resyncAndCommit(ItemState.UNDEFINED), 0, this.node.executorService).run();
+        else
             throw new Error("error: resync consensus reported without consensus");
     }
 
@@ -284,21 +240,15 @@ class ResyncingItem {
     resyncAndCommit(committingState) {
         this.resyncingState = ResyncingItemProcessingState.IS_COMMITTING;
 
-       /* executorService.submit(()->{
-            if(committingState.isConsensusFound()) {
-                Set<NodeInfo> rNodes = new HashSet<>();
-                Set<NodeInfo> nowNodes = resyncNodes.get(committingState);
+        new ScheduleExecutor(() => {
+            if (committingState.isConsensusFound) {
+                // make local set of nodes to prevent changing set of nodes while committing
+                let rNodes = new Set(this.resyncNodes.get(committingState));
 
-                Map<Long,Set<ItemResult>> createdAtClusters = new HashMap<>();
-                Map<Long,Set<ItemResult>> expiresAtClusters = new HashMap<>();
+                let createdAtClusters = new Map();
+                let expiresAtClusters = new Map();
 
-                // make local set of nodes to prevent changing set of nodes while commiting
-                synchronized (resyncNodes) {
-                    for (NodeInfo ni : nowNodes) {
-                        rNodes.add(ni);
-                    }
-                }
-                for (NodeInfo ni : rNodes) {
+                /*for (NodeInfo ni : rNodes) {
                     if (ni != null) {
                         try {
                             ItemResult r = network.getItemState(ni, hashId);
@@ -348,7 +298,6 @@ class ResyncingItem {
                 }
 
                 long createdTs = createdAtClusters.keySet().stream().max(Comparator.comparingInt(i -> createdAtClusters.get(i).size())).get();
-
                 long expiresTs = expiresAtClusters.keySet().stream().max(Comparator.comparingInt(i -> expiresAtClusters.get(i).size())).get();
 
                 ZonedDateTime createdAt = ZonedDateTime.ofInstant(
@@ -371,23 +320,25 @@ class ResyncingItem {
                     });
                 } catch (Exception e) {
                     e.printStackTrace();
-                }
-                resyncingState = ResyncingItemProcessingState.COMMIT_SUCCESSFUL;
-            } else {
-                resyncingState = ResyncingItemProcessingState.COMMIT_FAILED;
-            }
-            finishEvent.fire(this);
-        }, Node.this.toString() + " > item " + hashId + " :: resyncAndCommit -> body");*/
+                }*/
+                this.resyncingState = ResyncingItemProcessingState.COMMIT_SUCCESSFUL;
+
+            } else
+                this.resyncingState = ResyncingItemProcessingState.COMMIT_FAILED;
+
+            this.finishFire(this);
+
+        }, 0, this.node.executorService).run();
     }
 
     closeByTimeout() {
         this.resyncingState = ResyncingItemProcessingState.COMMIT_FAILED;
-        this.finishEvent.fire(this); //TODO
+        this.finishFire(this);
     }
 
     /**
      * true if number of needed answers is got (for consensus or for break resyncing)
-     * @return
+     * @return {boolean}
      */
     isResyncPollingFinished() {
         return this.resyncingState !== ResyncingItemProcessingState.WAIT_FOR_VOTES;
@@ -395,16 +346,18 @@ class ResyncingItem {
 
     /**
      * true if item resynced and commit finished (with successful or fail).
-     * @return
+     * @return {boolean}
      */
-     isCommitFinished() {
+    isCommitFinished() {
         return this.resyncingState === ResyncingItemProcessingState.COMMIT_SUCCESSFUL || this.resyncingState === ResyncingItemProcessingState.COMMIT_FAILED;
     }
 
     getItemState() {
-        if(this.record != null)
+        if (this.record != null)
             return this.record.state;
 
         return ItemState.UNDEFINED;
     }
 }
+
+module.exports = {ResyncProcessor, ResyncingItem};
