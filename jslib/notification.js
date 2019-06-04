@@ -104,8 +104,6 @@ class ItemNotification extends Notification {
     /**
      * If true, sending node asks receiving node to sent its status of this item back to sender. This overrides default
      * logic of sending only one broadcast about item status.
-     *
-     * @return
      */
     static CODE_ITEM_NOTIFICATION = 0;
 
@@ -172,7 +170,6 @@ class ResyncNotification extends ItemNotification {
 
         this.itemState = itemState;
         this.hasEnvironment = hasEnvironment;
-        this.requestResult = requestResult;
 
         /**
          * Code the class had registered self with using {@link #registerClass(int, Class)} in the static
@@ -203,3 +200,5 @@ class ResyncNotification extends ItemNotification {
     }
 
 }
+
+module.exports = {Notification, ItemNotification, ResyncNotification};
