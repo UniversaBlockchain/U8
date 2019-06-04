@@ -1,4 +1,4 @@
-import {ScheduleExecutor, ExecutorWithFixedPeriod, ExecutorWithDynamicPeriod} from "executorservice";
+import {ScheduleExecutor, ExecutorWithDynamicPeriod} from "executorservice";
 import {VerboseLevel, ResyncingItemProcessingState} from "node_consts";
 
 const ItemResult = require('itemresult').ItemResult;
@@ -7,7 +7,7 @@ const Config = require("config").Config;
 
 class ResyncProcessor {
 
-    constructor(itemId, node, onComplete) {
+    constructor(itemId, node, onComplete = undefined) {
         this.itemId = itemId;
         this.node = node;
         this.resyncingItem = null;

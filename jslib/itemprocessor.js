@@ -1,3 +1,5 @@
+import {ScheduleExecutor} from "executorservice";
+
 const ItemProcessingState = {
     NOT_EXIST : {val: "NOT_EXIST", isProcessedToConsensus : false, isDone : false},
     INIT : {val: "INIT", isProcessedToConsensus : false, isDone : false},
@@ -16,39 +18,38 @@ const ItemProcessingState = {
 
 class ItemProcessor {
 
-    constructor(itemId, parcelId, item, isCheckingForce, cache, ledger, config) {
+    constructor(itemId, parcelId, item, isCheckingForce, node) {
         this.itemId = itemId;
         this.parcelId = parcelId;
         this.item = item;
         this.isCheckingForce = isCheckingForce;
         this.processingState = ItemProcessingState.INIT;
-        this.cache = cache;
-        this.ledger = ledger;
-        this.config = config;
-        if (this.item == null) {
-            this.item = cache.get(itemId);
-        }
-
-        let recordWas = ledger.getRecord(itemId);
-        if (recordWas != null) {
-            this.stateWas = recordWas.state;
-        } else {
-            this.stateWas = ItemState.UNDEFINED;
-        }
-
-        this.record = ledger.findOrCreate(itemId);
+        this.node = node;
+        if (this.item == null)
+            this.item = this.node.cache.get(itemId);
 
         this.pollingExpiresAt = new Date();
-        this.pollingExpiresAt.setTime(this.pollingExpiresAt.getTime() + config.maxElectionsTime);
+        this.pollingExpiresAt.setTime(this.pollingExpiresAt.getTime() + Config.maxElectionsTime);
 
         this.consensusReceivedExpiresAt = new Date();
-        this.consensusReceivedExpiresAt.setTime(this.consensusReceivedExpiresAt.getTime() + config.maxConsensusReceivedCheckTime);
+        this.consensusReceivedExpiresAt.setTime(this.consensusReceivedExpiresAt.getTime() + Config.maxConsensusReceivedCheckTime);
 
         this.alreadyChecked = false;
+    }
 
-        if (this.item != null) {
-            this.itemDownloaded();
-        }
+    async run() {
+        let recordWas = await this.node.ledger.getRecord(this.itemId);
+        if (recordWas != null)
+            this.stateWas = recordWas.state;
+        else
+            this.stateWas = ItemState.UNDEFINED;
+
+        this.record = await this.node.ledger.findOrCreate(this.itemId);
+
+        if (this.item != null)
+            new ScheduleExecutor(() => this.itemDownloaded(), 0, this.node.executorService).run();
+
+        return this;
     }
 
     itemDownloaded() {

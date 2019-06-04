@@ -1156,6 +1156,15 @@ class Contract extends bs.BiSerializable {
         return Math.ceil( this.quantiser.quantaSum_ / Quantiser.quantaPerU);
     }
 
+
+    /**
+     * Get contract creation time
+     * @return {Date} contract creation time
+     */
+    getCreatedAt() {
+        return this.state.origin != null ? this.state.createdAt : this.definition.createdAt;
+    }
+
     /**
      * Get contract expiration time
      * @returns {Date} contract expiration time
