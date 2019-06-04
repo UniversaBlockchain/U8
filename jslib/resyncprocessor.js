@@ -1,5 +1,5 @@
 import {ScheduleExecutor, ExecutorWithFixedPeriod, ExecutorWithDynamicPeriod} from "executorservice";
-import {VerboseLevel, ResyncingItemProcessingState} from "node";
+import {VerboseLevel, ResyncingItemProcessingState} from "node_consts";
 
 const ItemResult = require('itemresult').ItemResult;
 const ItemState = require('itemstate').ItemState;
@@ -34,7 +34,7 @@ class ResyncProcessor {
     }
 
     startResync() {
-        this.node.report("ResyncProcessor.startResync(itemId=" + this.itemId + ")", VerboseLevel.BASE); //TODO: node.report
+        this.node.report("ResyncProcessor.startResync(itemId=" + this.itemId + ")", VerboseLevel.BASE);
 
         this.resyncExpiresAt = Math.floor(Date.now() / 1000) + Config.maxResyncTime;
         this.resyncExpirationTimer = new ScheduleExecutor(() => this.resyncEnded(), Config.maxResyncTime * 1000, this.node.executorService).run();
@@ -46,6 +46,8 @@ class ResyncProcessor {
         this.voteItself();
 
         this.resyncer = new ExecutorWithDynamicPeriod(() => this.pulseResync(), Config.resyncTime, this.node.executorService).run();
+
+        return this;
     }
 
     voteItself() {
@@ -101,13 +103,13 @@ class ResyncProcessor {
         }
     }
 
-    onFinishResync() {
+    async onFinishResync() {
         this.node.report("ResyncProcessor.onFinishResync(itemId=" + this.itemId + ")", VerboseLevel.BASE);
 
         //DELETE ENVIRONMENTS FOR REVOKED ITEMS
         if (this.resyncingItem.resyncingState === ResyncingItemProcessingState.COMMIT_SUCCESSFUL)
             if (this.resyncingItem.getItemState() === ItemState.REVOKED)
-                this.node.removeEnvironment(this.itemId);   //TODO: node.removeEnvironment
+                await this.node.removeEnvironment(this.itemId);
 
         //SAVE ENVIRONMENTS FOR APPROVED ITEMS
         if (this.saveResyncedEnvironments())

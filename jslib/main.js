@@ -9,6 +9,7 @@ const Logger = require("logger").Logger;
 const ClientHTTPServer = require("client_http_server").ClientHTTPServer;
 const Config = require("config").Config;
 const Ledger = require("ledger").Ledger;
+const Node = require("node").Node;
 const yaml = require('yaml');
 
 async function main(...args) {
@@ -70,7 +71,7 @@ class Main {
         this.startClientHttpServer();
 
         this.logger.log("Starting the Universa node service...");
-        this.startNode();
+        await this.startNode();
 
         if (this.parser.values.has("verbose"))
             this.setVerboseLevel(this.parser.values.get("verbose"));
@@ -166,10 +167,10 @@ class Main {
         this.clientHTTPServer.localCors = this.myInfo.publicHost === "localhost";
     }
 
-    startNode() {
+    async startNode() {
         //this.network = new Network(this.netConfig, this.myInfo, this.nodeKey);
-        //this.node = new Node(this.config, this.myInfo, this.ledger, this.network, this.nodeKey);
-        //this.cache = this.node.cache;
+        this.node = await new Node(this.config, this.myInfo, this.ledger, this.network, this.nodeKey, this.logger).run();
+        this.cache = this.node.cache;
         //this.parcelCache = this.node.parcelCache;
 
         this.clientHTTPServer.node = this.node;

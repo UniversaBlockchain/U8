@@ -92,8 +92,6 @@ unit.test("main_test: startNode", async () => {
 unit.test("main_test: sendHttpRequests", async () => {
     let main = await new Main("--test", "--config", "../test/config/test_node_config_v2/node1", "--nolog").run();
 
-    main.clientHTTPServer.node = {ledger: main.ledger};
-
     let httpClient = new network.HttpClient("localhost:" + main.myInfo.clientAddress.port, 32, 4096);
 
     let fire = [];
