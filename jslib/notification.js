@@ -42,7 +42,7 @@ class Notification {
     }
 
     pack(notifications) {
-        let writer = new Boss.Writer();
+        let writer = new Boss.Writer;
         try {
             for (let n of notifications) {
                 this.write(writer, n);
@@ -56,7 +56,7 @@ class Notification {
     }
 
     write(writer, n) {
-        writer.write(n.getTypeCode());
+        writer.write(n.typeCode);
         n.writeTo(writer);
     }
 
@@ -144,15 +144,6 @@ class ItemNotification extends Notification {
             return false;
 
         return this.itemResult.equals(that.itemResult);
-    }
-
-    hashCode() {
-        let from = this.from;
-        let result = from.hashCode(); // TODO
-        result = 31 * result + this.itemId.hashCode();
-        result = 31 * result + this.itemResult.hashCode();
-        result = 31 * result + (this.requestResult ? 1 : 0);
-        return result;
     }
 
     toString() {
