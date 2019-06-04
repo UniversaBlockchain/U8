@@ -138,7 +138,7 @@ class ItemResult {
     }
 
     toString() {
-        return "ItemResult<" + this.state.val + " " + createdAt + " (" + (this.haveCopy ? "copy" : "") + ")" + this.errors +
+        return "ItemResult<" + this.state.val + " " + this.createdAt + " (" + (this.haveCopy ? "copy" : "") + ")" + this.errors +
             ">";
     }
 

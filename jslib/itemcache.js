@@ -46,6 +46,8 @@ class ItemCache {
 
             r.result = result;
         }
+
+        return r;
     }
 
     subscribeStateRecord(stateRecord) {

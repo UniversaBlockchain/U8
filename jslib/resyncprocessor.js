@@ -2,6 +2,7 @@ import {ScheduleExecutor, ExecutorWithFixedPeriod, ExecutorWithDynamicPeriod} fr
 import {VerboseLevel, ResyncingItemProcessingState} from "node";
 
 const ItemResult = require('itemresult').ItemResult;
+const ItemState = require('itemstate').ItemState;
 const Config = require("config").Config;
 
 class ResyncProcessor {
@@ -240,7 +241,7 @@ class ResyncingItem {
     resyncAndCommit(committingState) {
         this.resyncingState = ResyncingItemProcessingState.IS_COMMITTING;
 
-        new ScheduleExecutor(() => {
+        new ScheduleExecutor(async () => {
             if (committingState.isConsensusFound) {
                 // make local set of nodes to prevent changing set of nodes while committing
                 let rNodes = new Set(this.resyncNodes.get(committingState));
@@ -248,79 +249,95 @@ class ResyncingItem {
                 let createdAtClusters = new Map();
                 let expiresAtClusters = new Map();
 
-                /*for (NodeInfo ni : rNodes) {
+                for (let ni of rNodes) {
                     if (ni != null) {
                         try {
-                            ItemResult r = network.getItemState(ni, hashId);
+                            let r = await this.node.network.getItemState(ni, this.hashId);
                             if (r != null) {
-                                List<Long> list = createdAtClusters.keySet().stream()
-                                    .filter(ts -> Math.abs(ts - r.createdAt.toEpochSecond()) < config.getMaxElectionsTime().getSeconds()).collect(Collectors.toList());
+                                let tsCreated = Math.floor(r.createdAt.getTime() / 1000);
+                                let list = Array.from(createdAtClusters.keys()).filter(ts =>
+                                    Math.abs(ts - tsCreated) < Config.maxElectionsTime);
 
-                                if(list.isEmpty()) {
-                                    Set<ItemResult> itemSet = new HashSet<>();
-                                    itemSet.add(r);
-                                    createdAtClusters.put(r.createdAt.toEpochSecond(),itemSet);
-                                } else {
-                                    Set<ItemResult> itemSet = createdAtClusters.remove(list.get(0));
-                                    for(int i = 1; i < list.size();++i) {
-                                        itemSet.addAll(createdAtClusters.remove(list.get(1)));
-                                    }
-                                    itemSet.add(r);
-                                    Average avg = new Average();
-                                    itemSet.forEach(item -> avg.update(item.createdAt.toEpochSecond()));
-                                    createdAtClusters.put((long) avg.average(),itemSet);
+                                if (list.length === 0)
+                                    createdAtClusters.set(tsCreated, 1);
+                                else {
+                                    let items = 1;
+                                    let summ = tsCreated;
+                                    list.forEach(ts => {
+                                        items += createdAtClusters.get(ts);
+                                        summ += ts * items;
+                                        createdAtClusters.delete(ts);
+                                    });
+
+                                    createdAtClusters.set(summ / items, items);
                                 }
 
-                                list = expiresAtClusters.keySet().stream()
-                                    .filter(ts -> Math.abs(ts - r.expiresAt.toEpochSecond()) < config.getMaxElectionsTime().getSeconds()).collect(Collectors.toList());
+                                let tsExpires = Math.floor(r.expiresAt.getTime() / 1000);
+                                list = Array.from(expiresAtClusters.keys()).filter(ts =>
+                                    Math.abs(ts - tsExpires) < Config.maxElectionsTime);
 
-                                if(list.isEmpty()) {
-                                    Set<ItemResult> itemSet = new HashSet<>();
-                                    itemSet.add(r);
-                                    expiresAtClusters.put(r.expiresAt.toEpochSecond(),itemSet);
-                                } else {
-                                    Set<ItemResult> itemSet = expiresAtClusters.remove(list.get(0));
-                                    for(int i = 1; i < list.size();++i) {
-                                        itemSet.addAll(expiresAtClusters.remove(list.get(1)));
-                                    }
-                                    itemSet.add(r);
-                                    Average avg = new Average();
-                                    itemSet.forEach(item -> avg.update(item.expiresAt.toEpochSecond()));
-                                    expiresAtClusters.put((long) avg.average(),itemSet);
+                                if (list.length === 0)
+                                    expiresAtClusters.set(tsExpires, 1);
+                                else {
+                                    let items = 1;
+                                    let summ = tsExpires;
+                                    list.forEach(ts => {
+                                        items += expiresAtClusters.get(ts);
+                                        summ += ts * items;
+                                        expiresAtClusters.delete(ts);
+                                    });
+
+                                    expiresAtClusters.set(summ / items, items);
                                 }
-
                             }
-                        } catch (e) {
-                        } catch (e) {
-                            Console.log(e.stack);
+                        } catch (err) {
+                            console.log(err.message);
+                            console.log(err.stack);
                         }
                     }
                 }
 
-                long createdTs = createdAtClusters.keySet().stream().max(Comparator.comparingInt(i -> createdAtClusters.get(i).size())).get();
-                long expiresTs = expiresAtClusters.keySet().stream().max(Comparator.comparingInt(i -> expiresAtClusters.get(i).size())).get();
+                let max = 0;
+                let createdTs = 0;
+                for (let [ts, items] of createdAtClusters)
+                    if (items > max) {
+                        max = items;
+                        createdTs = ts;
+                    }
 
-                ZonedDateTime createdAt = ZonedDateTime.ofInstant(
-                    Instant.ofEpochSecond(createdTs), ZoneId.systemDefault());
-                ZonedDateTime expiresAt = ZonedDateTime.ofInstant(
-                    Instant.ofEpochSecond(expiresTs), ZoneId.systemDefault());
+                max = 0;
+                let expiresTs = 0;
+                for (let [ts, items] of expiresAtClusters)
+                    if (items > max) {
+                        max = items;
+                        expiresTs = ts;
+                    }
+
+                let createdAt = new Date(createdTs * 1000);
+                let expiresAt = new Date(expiresTs * 1000);
 
                 try {
-                    itemLock.synchronize(hashId, lock -> {
-                        StateRecord newRecord = ledger.findOrCreate(hashId);
-                        newRecord.setState(committingState)
-                            .setCreatedAt(createdAt)
-                            .setExpiresAt(expiresAt)
-                            .save();
-                        this.record = newRecord;
-                        synchronized (cache) {
-                            cache.update(newRecord.id, new ItemResult(newRecord));
-                        }
-                        return null;
-                    });
-                } catch (Exception e) {
-                    e.printStackTrace();
-                }*/
+                    this.record = await this.node.ledger.findOrCreate(this.hashId);
+
+                    this.record.createdAt = createdAt;
+                    this.record.expiresAt = expiresAt;
+                    if (committingState === ItemState.APPROVED)
+                        await this.record.approve(createdAt, true);
+                    else if (committingState === ItemState.DECLINED)
+                        await this.record.decline(true);
+                    else if (committingState === ItemState.REVOKED)
+                        await this.record.revoke(true);
+                    else if (committingState === ItemState.UNDEFINED)
+                        await this.record.setUndefined(true);
+
+                    if (this.node.cache.update(this.record.id, ItemResult.fromStateRecord(this.record)) != null)
+                        this.node.cache.subscribeStateRecord(this.record);
+
+                } catch (err) {
+                    console.log(err.message);
+                    console.log(err.stack);
+                }
+
                 this.resyncingState = ResyncingItemProcessingState.COMMIT_SUCCESSFUL;
 
             } else
