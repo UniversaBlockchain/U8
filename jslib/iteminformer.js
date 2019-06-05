@@ -29,36 +29,40 @@ class ItemInformer {
     }
 
     takeFor(id) {
-        return this.records.remove(id);
+        let r = this.records.get(id);
+        this.records.delete(id);
+        return r;
     }
 }
 
 class Record {
 
     constructor(id, itemInformer) {
-        this.iteminformer = itemInformer;
+        this.itemInformer = itemInformer;
         this.hashId = id;
-        this.expiresAt = new Date((Date.now() / 1000 + 300) * 1000);
+        this.expiresAt = Date.now() + 300 * 1000;
         this.errorRecords = [];
         this.messages = [];
     }
 
     checkExpiration(now) {
         if (this.expiresAt < now)
-            this.iteminformer.records.delete(this);
+            this.itemInformer.records.delete(this);
     }
 
     resetExpiration() {
-        this.expiresAt = new Date((Date.now() / 1000 + 300) * 1000);
+        this.expiresAt = Date.now() + 300 * 1000;
     }
 
-    addError(er) {
+    addError(err) {
         this.resetExpiration();
-        this.errorRecords.push(er);
+        this.errorRecords.push(err);
     }
 
-    addMessage(er) {
+    addMessage(err) {
         this.resetExpiration();
-        this.errorRecords.push(er);
+        this.messages.push(err);
     }
 }
+
+module.exports = {ItemInformer};

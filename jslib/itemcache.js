@@ -1,4 +1,5 @@
 const ExecutorWithFixedPeriod = require("executorservice").ExecutorWithFixedPeriod;
+const ItemState = require('itemstate').ItemState;
 
 class ItemCache {
 
@@ -62,7 +63,13 @@ class ItemCache {
         };
 
         stateRecord.destroyNotification = (record) => {
-            this.records.delete(record.id);
+            let itemResult = this.getResult(record.id);
+
+            if (itemResult != null) {
+                itemResult.state = ItemState.UNDEFINED;
+                itemResult.expiresAt = record.expiresAt;
+                itemResult.lockedById = record.lockedByRecordId;
+            }
         };
     }
 

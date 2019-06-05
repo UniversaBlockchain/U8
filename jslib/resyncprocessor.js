@@ -131,7 +131,7 @@ class ResyncProcessor {
             new ScheduleExecutor(() => this.resyncEnded(), 1000, this.node.executorService).run();
             return;
 
-        } else if (this.resyncingItem.resyncingState() === ResyncingItemProcessingState.WAIT_FOR_VOTES) //TODO: node.itemSanitation...
+        } else if (this.resyncingItem.resyncingState() === ResyncingItemProcessingState.WAIT_FOR_VOTES)
             new ScheduleExecutor(() => this.node.itemSanitationTimeout(this.resyncingItem.record), 0, this.node.executorService).run();
         else if (this.resyncingItem.resyncingState() === ResyncingItemProcessingState.COMMIT_FAILED)
             new ScheduleExecutor(() => this.node.itemSanitationFailed(this.resyncingItem.record), 0, this.node.executorService).run();
@@ -145,7 +145,7 @@ class ResyncProcessor {
     stopResync() {
         this.resyncer.cancel();
         this.resyncExpirationTimer.cancel();
-        this.node.resyncProcessors.delete(this.itemId); //TODO: node.resyncProcessors
+        this.node.resyncProcessors.delete(this.itemId);
     }
 
     async saveResyncedEnvironments() {

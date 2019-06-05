@@ -9,6 +9,7 @@ const ItemState = require('itemstate').ItemState;
 const ItemCache = require("itemcache").ItemCache;
 const Config = require("config").Config;
 const ResyncProcessor = require("resyncprocessor").ResyncProcessor;
+const ItemInformer = require("iteminformer").ItemInformer;
 
 class Node {
 
@@ -18,7 +19,7 @@ class Node {
         this.ledger = ledger;
         this.network = network;
         this.logger = logger;
-        //this.informer = new ItemInformer(); //TODO: ItemInformer
+        this.informer = new ItemInformer();
 
         this.cache = new ItemCache(Config.maxCacheAge);
         // TODO: other caches
@@ -313,6 +314,29 @@ class Node {
             this.recordsToSanitate.delete(record.id);
             await this.removeLocks(record);
             this.report("itemSanitationDone " + record.id + " " + this.recordsToSanitate.size, VerboseLevel.BASE);
+        }
+    }
+
+    async itemSanitationFailed(record) {
+        if (this.recordsToSanitate.has(record.id)) {
+            this.recordsToSanitate.delete(record.id);
+
+            record.state = ItemState.UNDEFINED;
+            await this.removeLocks(record);
+
+            //item unknown to network we must restart voting
+            let contract = await this.ledger.getItem(record);
+
+            await record.destroy();
+
+            this.report("itemSanitationFailed " + record.id + " " + this.recordsToSanitate.size, VerboseLevel.BASE);
+
+            if (contract != null) {
+                this.report("restart vote after sanitation fail: " + record.id, VerboseLevel.BASE);
+
+                //Item found in disk cache. Restart voting.
+                this.checkItemInternal(contract.id, null, contract, true, true, false);
+            }
         }
     }
 }
