@@ -189,7 +189,10 @@ class ResyncNotification extends ItemNotification {
         return "[ResyncNotification from: " + this.from + " for item: " + this.itemId + ", is answer requested: " +
             this.requestResult + "]";
     }
+}
+
+class ParcelNotification extends ItemNotification {
 
 }
 
-module.exports = {Notification, ItemNotification, ResyncNotification};
+module.exports = {Notification, ItemNotification, ResyncNotification, ParcelNotification};

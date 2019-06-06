@@ -10,6 +10,7 @@ const ClientHTTPServer = require("client_http_server").ClientHTTPServer;
 const Config = require("config").Config;
 const Ledger = require("ledger").Ledger;
 const Node = require("node").Node;
+const NetworkV2 = require("net").NetworkV2;
 const yaml = require('yaml');
 
 async function main(...args) {
@@ -168,7 +169,7 @@ class Main {
     }
 
     async startNode() {
-        //this.network = new Network(this.netConfig, this.myInfo, this.nodeKey);
+        this.network = new NetworkV2(this.netConfig, this.myInfo, this.nodeKey, this.logger);
         this.node = await new Node(this.config, this.myInfo, this.ledger, this.network, this.nodeKey, this.logger).run();
         this.cache = this.node.cache;
         //this.parcelCache = this.node.parcelCache;
@@ -195,6 +196,9 @@ class Main {
     async shutdown() {
         if (this.ledger != null)
             await this.ledger.close();
+
+        if (this.network != null)
+            this.network.shutdown();
 
         if (this.node != null)
             this.node.shutdown();

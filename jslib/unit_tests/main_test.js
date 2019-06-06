@@ -87,6 +87,10 @@ unit.test("main_test: startNode", async () => {
     assert(main.logger.buffer.includes("node local URL: " + main.myInfo.serverUrlString()));
     assert(main.logger.buffer.includes("node public URL: " + main.myInfo.publicUrlString()));
     assert(main.logger.buffer.includes("Network configuration is loaded from " + main.configRoot + ", " + main.netConfig.size + " nodes."));
+    assert(main.logger.buffer.includes("Starting the client HTTP server..."));
+    assert(main.logger.buffer.includes("prepare to start client HTTP server on 8080"));
+    assert(main.logger.buffer.includes("Starting the Universa node service..."));
+    assert(main.logger.buffer.includes("1: Network consensus is set to (negative/positive/resyncBreak): 2 / 3 / 2"));
 });
 
 unit.test("main_test: sendHttpRequests", async () => {

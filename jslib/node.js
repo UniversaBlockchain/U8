@@ -1,5 +1,5 @@
 import {ExecutorService, ScheduleExecutor, ExecutorWithFixedPeriod, ExecutorWithDynamicPeriod} from "executorservice";
-import {Notification, ItemNotification, ResyncNotification} from "notification";
+import {Notification, ItemNotification, ResyncNotification, ParcelNotification} from "notification";
 import {ItemProcessor, ItemProcessingState} from "itemprocessor"
 import {VerboseLevel} from "node_consts";
 import {Errors, ErrorRecord} from "errors"
@@ -36,7 +36,7 @@ class Node {
         this.keysUnlimited = new t.GenericMap();
         this.executorService = new ExecutorService();
 
-        //this.config.updateConsensus(this.network.getNodesCount());
+        this.config.updateConsensus(this.network.getNodesCount());
         //this.network.subscribe(this.myInfo, notification => new ScheduleExecutor(() => this.onNotification(notification), 0, this.executorService).run());
 
         // TODO: callbackService
@@ -45,7 +45,7 @@ class Node {
 
     async run() {
         this.recordsToSanitate = await this.ledger.findUnfinished();
-        this.logger.log(this.label + this.recordsToSanitate.size);
+        this.logger.log(this.label + "records to sanitation: " + this.recordsToSanitate.size);
 
         // TODO: sanitation
 
