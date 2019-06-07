@@ -1,5 +1,13 @@
+import {HashId} from 'crypto'
+
 const ItemResult = require('itemresult').ItemResult;
 const StateRecord = require('staterecord').StateRecord;
+const t = require("tools");
+
+const CODE_ITEM_NOTIFICATION = 0;
+const CODE_PARCEL_NOTIFICATION = 2;
+const CODE_RESYNC_NOTIFICATION = 3;
+const CODE_CALLBACK_NOTIFICATION = 4;
 
 /**
  * Notifications are binary-effective packable units to transfer between nodes with v2 UDP protocols.
@@ -11,20 +19,22 @@ const StateRecord = require('staterecord').StateRecord;
  */
 class Notification {
 
+    static classes = new Map();
+
     constructor(from) {
         this.from = from;
-        this.classes = new Map();
+        this.typeCode = null;
     }
 
     /**
-     * Register class with a type code (same as its instace must return with typeCode to use with UDP
+     * Register class with a type code (same as its instance must return with typeCode to use with UDP
      * notifications.
      *
      * @param {number} code - Unique type code (per class).
-     * @param {} klass - Inherited Notification class.
+     * @param {class} klass - Inherited Notification class.
      */
-    registerClass(code, klass) {
-        this.classes.set(code, klass);
+    static registerClass(code, klass) {
+        Notification.classes.set(code, klass);
     }
 
     /**
@@ -41,50 +51,45 @@ class Notification {
         throw new Error("not implemented");
     }
 
-    pack(notifications) {
-        let writer = new Boss.Writer;
+    static pack(notifications) {
+        let writer = new Boss.Writer();
         try {
-            for (let n of notifications) {
-                this.write(writer, n);
-            }
-
-            return writer.toByteArray();
-
-        } catch (e) {
-            throw new Error("failed to pack notification");
+            notifications.forEach(n => Notification.write(writer, n));
+            return writer.get();
+        } catch (err) {
+            throw new Error("failed to pack notification: " + err.message);
         }
     }
 
-    write(writer, n) {
+    static write(writer, n) {
         writer.write(n.typeCode);
         n.writeTo(writer);
     }
 
-    unpack(from, packed) {
+    static unpack(from, packed) {
         let notifications = [];
         let r = new Boss.Reader(packed);
         try {
             while (true) {
                 // boss reader throws EOFException
-                let n = read(from, r);
-                if( n != null )
-                    notifications.push(n);
+                let n = Notification.read(from, r);
+                if (n == null)
+                    break;
+
+                notifications.push(n);
             }
-        } catch (x) { //TODO
-            // normal, all data decoded
-        //} catch (e) {
-        //    throw new Error("Failed to decoded notification");
+        } catch (err) {
+            throw new Error("Failed to decoded notification: " + err.message);
         }
+
         return notifications;
     }
 
-    read(from, r) {
-        let code = r.readInt();
-        let nclass = classes.get(code);
-        if( nclass != null ) {
-            let c = nclass.getDeclaredConstructor();
-            c.setAccessible(true);
-            let n =  c.newInstance();
+    static read(from, r) {
+        let code = r.read();
+        let nclass = Notification.classes.get(code);
+        if (nclass != null) {
+            let n =  new nclass();
             n.readFrom(r);
             n.from = from;
             return n;
@@ -105,74 +110,67 @@ class ItemNotification extends Notification {
      * If true, sending node asks receiving node to sent its status of this item back to sender. This overrides default
      * logic of sending only one broadcast about item status.
      */
-    static CODE_ITEM_NOTIFICATION = 0;
-
     constructor(from, itemId, itemResult, requestResult) {
         super(from);
         this.itemId = itemId;
         this.itemResult = itemResult;
         this.requestResult = requestResult;
+        this.typeCode = CODE_ITEM_NOTIFICATION;
     }
 
     writeTo(bw) {
-        bw.writeObject(this.itemId.digest);
+        bw.write(this.itemId.digest);
         this.itemResult.writeTo(bw);
-        bw.writeObject(this.requestResult);
+        bw.write(this.requestResult);
     }
 
     readFrom(br) {
-        this.itemId = HashId.withDigest(br.readBinary());
-        this.itemResult = new ItemResult(br);
+        this.itemId = HashId.withDigest(br.read());
+        this.itemResult = ItemResult.fromReader(br);
         this.requestResult = br.read();
     }
 
     equals(o) {
-        if (this === o)
+        if(this === o)
             return true;
-        if (o == null || getClass() !== o.getClass()) //TODO
+
+        if(Object.getPrototypeOf(this) !== Object.getPrototypeOf(o))
             return false;
 
-        let that = o;
-
-        let from = this.from;
-
-        if (this.requestResult !== that.requestResult)
-            return false;
-        if (!from.equals(that.from))
-            return false;
-        if (!this.itemId.equals(that.itemId))
+        if (this.requestResult !== o.requestResult)
             return false;
 
-        return this.itemResult.equals(that.itemResult);
+        if (!t.valuesEqual(this.from, o.from))
+            return false;
+
+        if (!t.valuesEqual(this.itemId, o.itemId))
+            return false;
+
+        return t.valuesEqual(this.itemResult, o.itemResult);
     }
 
     toString() {
-        return "[ItemNotification from " + this.from + " for item: " + this.itemId +  ", item result: " + this.itemResult +
+        return "[ItemNotification from node: " + this.from.number +
+            " for item: " + this.itemId.toString() +
+            ", item result: " + this.itemResult.toString() +
             ", is answer requested: " + this.requestResult + "]";
     }
 }
 
 class ResyncNotification extends ItemNotification {
 
-    static CODE_RESYNC_NOTIFICATION = 3;
-
     constructor(from, itemId, itemState, hasEnvironment, requestResult) {
         super(from, itemId,  ItemResult(new StateRecord(itemId)), requestResult);
 
         this.itemState = itemState;
         this.hasEnvironment = hasEnvironment;
-
-        /**
-         * Code the class had registered self with using {@link #registerClass(int, Class)} in the static
-         * constructor. Note that the class that did not register self can't be used by the Universa system.
-         */
-        this.typeCode = ResyncNotification.CODE_RESYNC_NOTIFICATION;
+        this.typeCode = CODE_RESYNC_NOTIFICATION;
     }
 
     writeTo(bw) {
         super.writeTo(bw);
         if (!this.requestResult) {
-            bw.write(this.itemState.ordinal());
+            bw.write(this.itemState.ordinal);
             bw.write(this.hasEnvironment);
         }
     }
@@ -180,19 +178,23 @@ class ResyncNotification extends ItemNotification {
     readFrom(br) {
         super.readFrom(br);
         if (!this.requestResult) {
-            this.itemState = ItemState.values()[br];
-            this.hasEnvironment = br;
+            this.itemState = ItemState.byOrdinal.get(br.read());
+            this.hasEnvironment = br.read();
         }
     }
 
     toString() {
-        return "[ResyncNotification from: " + this.from + " for item: " + this.itemId + ", is answer requested: " +
-            this.requestResult + "]";
+        return "[ResyncNotification from node: " + this.from.number
+            + " for item: " + this.itemId.toString() +
+            ", is answer requested: " + this.requestResult + "]";
     }
 }
 
 class ParcelNotification extends ItemNotification {
 
 }
+
+Notification.registerClass(CODE_ITEM_NOTIFICATION, ItemNotification);
+Notification.registerClass(CODE_RESYNC_NOTIFICATION, ResyncNotification);
 
 module.exports = {Notification, ItemNotification, ResyncNotification, ParcelNotification};

@@ -92,12 +92,12 @@ class ItemResult {
     writeTo(writer) {
         writer.write(this.state.ordinal);
         if(this.createdAt != null)
-            writer.write(this.createdAt);
+            writer.write(Math.floor(this.createdAt.getTime() / 1000));
         else
             writer.write(0);
 
         if(this.expiresAt != null)
-            writer.write(this.expiresAt);
+            writer.write(Math.floor(this.expiresAt.getTime() / 1000));
         else
             writer.write(0);
 
@@ -113,33 +113,33 @@ class ItemResult {
      * @return {boolean} true if instances represent the same state with datetimes fields equal to seconds.
      */
     equals(to) {
-        if(this === to)
+        if (this === to)
             return true;
 
-        if(Object.getPrototypeOf(this) !== Object.getPrototypeOf(to))
+        if (Object.getPrototypeOf(this) !== Object.getPrototypeOf(to))
             return false;
 
-        if(!t.valuesEqual(this.state,to.state))
+        if (!t.valuesEqual(this.state, to.state))
             return false;
 
-        if(!t.valuesEqual(this.haveCopy,to.haveCopy))
+        if (!t.valuesEqual(this.haveCopy, to.haveCopy))
             return false;
 
-        if(!t.valuesEqual(this.isTestnet,to.isTestnet))
+        if (!t.valuesEqual(this.isTestnet, to.isTestnet))
             return false;
 
-        if(!t.valuesEqual(this.createdAt,to.createdAt))
+        if (!t.valuesEqual(Math.floor(this.createdAt.getTime() / 1000), Math.floor(to.createdAt.getTime() / 1000)))
             return false;
 
-        if(!t.valuesEqual(this.expiresAt,to.expiresAt))
+        if (!t.valuesEqual(Math.floor(this.expiresAt.getTime() / 1000), Math.floor(to.expiresAt.getTime() / 1000)))
             return false;
 
         return true;
     }
 
     toString() {
-        return "ItemResult<" + this.state.val + " " + this.createdAt + " (" + (this.haveCopy ? "copy" : "") + ")" + this.errors +
-            ">";
+        return "ItemResult<" + this.state.val + " " + this.createdAt + " (" + (this.haveCopy ? "copy" : "") + ")" +
+            this.errors + ">";
     }
 
     /**
@@ -180,16 +180,16 @@ class ItemResult {
         return result;
     }
 
-    /*static fromReader(reader) {
+    static fromReader(reader) {
         let ir = new ItemResult();
         ir.state = ItemState.byOrdinal.get(reader.read());
 
-        ir.createdAt = new Date(reader.read());//ZonedDateTime.ofInstant(Instant.ofEpochSecond(br.readLong()), ZoneId.systemDefault());
-        ir.expiresAt = new Date(reader.read());//ZonedDateTime.ofInstant(Instant.ofEpochSecond(br.readLong()), ZoneId.systemDefault());
+        ir.createdAt = new Date(reader.read() * 1000);
+        ir.expiresAt = new Date(reader.read() * 1000);
 
         ir.haveCopy = reader.read();
         return ir;
-    }*/
+    }
 }
 
 dbm.DefaultBiMapper.registerAdapter(new bs.BiAdapter("ItemResult", ItemResult));

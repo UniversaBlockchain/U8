@@ -1,6 +1,7 @@
 import {VerboseLevel} from "node_consts";
 import {Notification, ItemNotification, ResyncNotification, ParcelNotification} from "notification";
 
+const Boss = require('boss.js');
 const UDPAdapter = require('web').UDPAdapter;
 
 class Network {
@@ -242,24 +243,24 @@ class NetworkV2 extends Network {
 
         try {
             // packet type code
-            /*Boss.Reader r = new Boss.Reader(packedNotifications);
-            if (r.readInt() != 1)
-                throw new IOException("invalid packed notification type code");
+            let r = new Boss.Reader(packet);
+            if (r.read() !== 1)
+                throw new Error("invalid packed notification type code");
 
             // from node number
-            int number = r.readInt();
-            NodeInfo from = getInfo(number);
+            let number = r.read();
+            let from = this.getInfo(number);
             if (from == null)
-                throw new IOException(myInfo.getNumber()+": unknown node number: " + number);
+                throw new Error(this.myInfo.number + ": unknown node number: " + number);
 
             // number of notifications in the packet
-            int count = r.readInt();
+            let count = r.read();
             if (count < 0 || count > 1000)
-                throw new IOException("unvalid packed notifications count: " + count);
+                throw new Error("invalid packed notifications count: " + count);
 
-            for (int i = 0; i < count; i++) {
-                nn.add(Notification.read(from, r));
-            }*/
+            for (let i = 0; i < count; i++)
+                notifications.push(Notification.read(from, r));
+
             return notifications;
 
         } catch (err) {
@@ -267,6 +268,30 @@ class NetworkV2 extends Network {
             throw new Error("failed to unpack notifications" + err.message);
         }
     }
+
+    packNotifications(from, notifications) {
+        let w = new Boss.Writer();
+        try {
+            w.write(1);                         // packet type code
+            w.write(from.number);               // from number
+            w.write(notifications.length);      // count notifications
+
+            notifications.forEach(n => {
+                try {
+                    Notification.write(w, n);
+                } catch (err) {
+                    throw new Error("notification pack failure" + err.message);
+                }
+            });
+
+            return w.get();
+
+        } catch (err) {
+            throw new Error("notification pack failure" + err.message);
+        }
+    }
+
+
 }
 
 module.exports = {Network, NetworkV2};
