@@ -1,7 +1,7 @@
 import {HashId} from 'crypto'
 
 const ItemResult = require('itemresult').ItemResult;
-const StateRecord = require('staterecord').StateRecord;
+const ItemState = require('itemstate').ItemState;
 const t = require("tools");
 
 const CODE_ITEM_NOTIFICATION = 0;
@@ -160,7 +160,9 @@ class ItemNotification extends Notification {
 class ResyncNotification extends ItemNotification {
 
     constructor(from, itemId, itemState, hasEnvironment, requestResult) {
-        super(from, itemId,  ItemResult(new StateRecord(itemId)), requestResult);
+        let expires = new Date();
+        expires.setMinutes(expires.getMinutes() + 5);
+        super(from, itemId, ItemResult.from(itemState, false, new Date(), expires), requestResult);
 
         this.itemState = itemState;
         this.hasEnvironment = hasEnvironment;

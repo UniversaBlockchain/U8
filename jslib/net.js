@@ -1,14 +1,14 @@
 import {VerboseLevel} from "node_consts";
+import {UDPAdapter, HttpClient} from 'web'
 import {Notification, ItemNotification, ResyncNotification, ParcelNotification} from "notification";
 
 const Boss = require('boss.js');
-const UDPAdapter = require('web').UDPAdapter;
 
 class Network {
     /**
      * Initialize network of nodes by specified {@link NetConfig}.
      *
-     * @param {NetConfig} netConfig - Network configuration.
+     * @param {network.NetConfig} netConfig - Network configuration.
      * @constructor
      */
     constructor(netConfig) {
@@ -18,7 +18,7 @@ class Network {
     /**
      * Put the notification to the delivery queue. Must not block the calling thread.
      *
-     * @param {NodeInfo} toNode - {@link NodeInfo} of node for sending.
+     * @param {network.NodeInfo} toNode - {@link NodeInfo} of node for sending.
      * @param {Notification} notification - Sending {@link Notification}.
      */
     deliver(toNode, notification) {
@@ -29,8 +29,8 @@ class Network {
      * Subscribe ot incoming norifications. Old subscriber must be discarded. New consumer should receive notifications
      * received from the moment it is registered. The method must not block.
      *
-     * @param {NodeInfo} forNode - Node to which receive notifications.
-     * @param {function(NodeInfo)} notificationConsumer - The consumer that process incoming notifications in non-blocking manner, e.g.
+     * @param {network.NodeInfo} forNode - Node to which receive notifications.
+     * @param {function(network.NodeInfo)} notificationConsumer - The consumer that process incoming notifications in non-blocking manner, e.g.
      *                             it should return without waiting.
      */
     subscribe(forNode, notificationConsumer) {
@@ -40,8 +40,8 @@ class Network {
     /**
      * Block until the item will be available from a specified node, not exceeding the specified timeout.
      *
-     * @param {HashId} itemId - ID of item do load.
-     * @param {NodeInfo} node - Node where the item should be loaded from.
+     * @param {crypto.HashId} itemId - ID of item do load.
+     * @param {network.NodeInfo} node - Node where the item should be loaded from.
      * @param {number} maxTimeout - Maximum timeout in milliseconds.
      * @return {Contract} the downloaded item, null if the node can't provide it or network error has occurred.
      */
@@ -52,8 +52,8 @@ class Network {
     /**
      * Block until the environment will be available from a specified node, not exceeding the specified timeout.
      *
-     * @param {HashId} itemId - ID of environment do load.
-     * @param {NodeInfo} node - Node where the environment should be loaded from.
+     * @param {crypto.HashId} itemId - ID of environment do load.
+     * @param {network.NodeInfo} node - Node where the environment should be loaded from.
      * @param {number} maxTimeout - Maximum timeout in milliseconds.
      * @return {NImmutableEnvironment} the downloaded environment, null if the node can't provide it or network error has occurred.
      */
@@ -64,8 +64,8 @@ class Network {
     /**
      * Block until the parcel will be available from a specified node, not exceeding the specified timeout.
      *
-     * @param {HashId} itemId - ID of parcel do load.
-     * @param {NodeInfo} node - Node where the parcel should be loaded from.
+     * @param {crypto.HashId} itemId - ID of parcel do load.
+     * @param {network.NodeInfo} node - Node where the parcel should be loaded from.
      * @param {number} maxTimeout - Maximum timeout in milliseconds.
      * @return {Parcel} the downloaded parcel, null if the node can't provide it or network error has occurred.
      */
@@ -83,8 +83,8 @@ class Network {
     /**
      * Get item state from a specified node.
      *
-     * @param {NodeInfo} nodeInfo - Node where the item state should be loaded from.
-     * @param {HashId} id - ID of item.
+     * @param {network.NodeInfo} nodeInfo - Node where the item state should be loaded from.
+     * @param {crypto.HashId} id - ID of item.
      * @return {ItemResult} the downloaded {@link ItemResult}.
      */
     getItemState(nodeInfo, id) {
@@ -117,7 +117,7 @@ class Network {
      * Get {@link NodeInfo} of node by his network number.
      *
      * @param {number} number - Number of node in network.
-     * @return {NodeInfo} node information.
+     * @return {network.NodeInfo} node information.
      */
     getInfo(number) {
         return this.netConfig.getInfo(number);
@@ -126,7 +126,7 @@ class Network {
     /**
      * Deliver notification to all nodes except one.
      *
-     * @param {NodeInfo} exceptNode - If not null, do not deliver to it.
+     * @param {network.NodeInfo} exceptNode - If not null, do not deliver to it.
      * @param {Notification} notification - Notification fo deliver.
      */
     broadcast(exceptNode, notification) {
@@ -139,7 +139,7 @@ class Network {
     /**
      * Enumerate all nodes passing them to the consumer.
      *
-     * @param {function(NodeInfo)} consumer - Function with {@link NodeInfo} parameter.
+     * @param {function(network.NodeInfo)} consumer - Function with {@link NodeInfo} parameter.
      */
     eachNode(consumer) {
         this.netConfig.toList().forEach(n => consumer(n));
@@ -166,7 +166,7 @@ class Network {
     /**
      * Add {@link NodeInfo} to network configuration.
      *
-     * @param {NodeInfo} nodeInfo - {@link NodeInfo} for add.
+     * @param {network.NodeInfo} nodeInfo - {@link NodeInfo} for add.
      */
     addNode(nodeInfo) {
         this.netConfig.addNode(nodeInfo);
@@ -178,9 +178,9 @@ class NetworkV2 extends Network {
     /**
      * Initialize network of nodes.
      *
-     * @param {NetConfig} netConfig - Network configuration.
-     * @param {NodeInfo} myInfo - {@link NodeInfo} of current node.
-     * @param {PrivateKey} myKey - Private key of current node.
+     * @param {network.NetConfig} netConfig - Network configuration.
+     * @param {network.NodeInfo} myInfo - {@link NodeInfo} of current node.
+     * @param {crypto.PrivateKey} myKey - Private key of current node.
      * @param {Logger} logger - Current node logger.
      * @constructor
      */
@@ -193,6 +193,7 @@ class NetworkV2 extends Network {
         this.verboseLevel = VerboseLevel.NOTHING;
         this.label = "Network Node " + this.myInfo.number + ": ";
         this.consumer = null;
+        this.cachedClients = new t.GenericMap();
 
         this.adapter = new UDPAdapter(this.myKey, this.myInfo.number, this.netConfig);
         this.adapter.setReceiveCallback(this.onReceived);
@@ -203,6 +204,12 @@ class NetworkV2 extends Network {
             this.adapter.close();
     }
 
+    /**
+     * Callback to receive notifications.
+     *
+     * @param {Uint8Array} packet - Packed notifications.
+     * @param {network.NodeInfo} fromNode - {@link NodeInfo} of distant node.
+     */
     onReceived(packet, fromNode) {
         try {
             if (this.consumer != null) {
@@ -291,7 +298,64 @@ class NetworkV2 extends Network {
         }
     }
 
+    /**
+     * Deliver notification to network node.
+     *
+     * @param {network.NodeInfo} toNode - {@link NodeInfo} of destination node.
+     * @param {Notification} notification - Delivered notification.
+     */
+    deliver(toNode, notification) {
+        try {
+            let data = this.packNotifications(this.myInfo, [notification]);
+            this.logNotification(notification, toNode);
 
+            if (this.adapter != null)
+                this.adapter.send(toNode.number, data);
+            else
+                this.report("UDPAdapter is null", VerboseLevel.DETAILED);
+
+        } catch (err) {
+            this.report("deliver exception: " + err.message, VerboseLevel.DETAILED);
+        }
+    }
+
+    subscribe(info, notificationConsumer) {
+        this.consumer = notificationConsumer;
+    }
+
+    /**
+     * Get item from network node.
+     *
+     * @param {crypto.HashId} itemId - delivered notification.
+     * @param {network.NodeInfo} nodeInfo - {@link NodeInfo} of distant node.
+     * @param {number} maxTimeout - Connection timeout in milliseconds.
+     * @return {Contract} received item.
+     */
+    async getItem(itemId, nodeInfo, maxTimeout) {
+        try {
+            let URL = "/contracts/" + itemId.base64;
+            let httpClient = new HttpClient(nodeInfo.serverUrlString(), 32, 4096);
+
+            let fire = null;
+            let event = new Promise((resolve) => {fire = resolve});
+
+            //connection.setRequestProperty("User-Agent", "Universa JAVA API Client");
+            //connection.setRequestProperty("Connection", "close");
+            //connection.setConnectTimeout(4000);
+            //connection.setReadTimeout((int) (maxTimeout.getSeconds()*1000));
+            httpClient.sendGetRequest(URL, (respCode, body) => {
+                let item = (respCode === 200) ? TransactionPack.unpack(body, true).contract : null;
+                fire(item);
+            });
+
+            return await event;
+
+        } catch (err) {
+            this.report("download failure. from: " + nodeInfo.number + " by: " + this.myInfo.number +
+                " reason: " + err.message, VerboseLevel.BASE);
+            return null;
+        }
+    }
 }
 
 module.exports = {Network, NetworkV2};

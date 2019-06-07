@@ -25,3 +25,17 @@ unit.test("notification_test: ItemNotification pack", () => {
     assert(nn.equals(n));
 });
 
+unit.test("notification_test: ResyncNotification pack", () => {
+    let ni = NodeInfo.withParameters(tk.TestKeys.getKey().publicKey, 1, "node-1", "127.0.0.1", "0:0:0:0:0:0:0:1", "192.168.1.101", 7001, 8001, 9001);
+    let id = HashId.of(randomBytes(64));
+    let n = new ResyncNotification(ni, id, ItemState.DECLINED, true, false);
+
+    let w = new Boss.Writer();
+    Notification.write(w, n);
+    let pack = w.get();
+
+    let r = new Boss.Reader(pack);
+    let nn = Notification.read(ni, r);
+
+    assert(nn.equals(n));
+});

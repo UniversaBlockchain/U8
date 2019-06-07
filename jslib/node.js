@@ -37,7 +37,7 @@ class Node {
         this.executorService = new ExecutorService();
 
         this.config.updateConsensus(this.network.getNodesCount());
-        //this.network.subscribe(this.myInfo, notification => new ScheduleExecutor(() => this.onNotification(notification), 0, this.executorService).run());
+        this.network.subscribe(this.myInfo, notification => new ScheduleExecutor(() => this.onNotification(notification), 0, this.executorService).run());
 
         // TODO: callbackService
         // TODO: pulseCleanUp

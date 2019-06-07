@@ -1,6 +1,7 @@
 import {expect, assert, unit} from 'test'
 import {HashId} from 'crypto'
 import {randomBytes} from 'tools'
+import {HttpClient} from 'web'
 import * as tk from 'unit_tests/test_keys'
 
 const Main = require("main").Main;
@@ -96,7 +97,7 @@ unit.test("main_test: startNode", async () => {
 unit.test("main_test: sendHttpRequests", async () => {
     let main = await new Main("--test", "--config", "../test/config/test_node_config_v2/node1", "--nolog").run();
 
-    let httpClient = new network.HttpClient("localhost:" + main.myInfo.clientAddress.port, 32, 4096);
+    let httpClient = new HttpClient("localhost:" + main.myInfo.clientAddress.port, 32, 4096);
 
     let fire = [];
     let events = [];
