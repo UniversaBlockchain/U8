@@ -31,10 +31,17 @@ const CAN_PLAY = 13;
 
 //Operations
 const operations = ["+", "-", "*", "/"];
+const roundOperations = ["round(", "floor(", "ceil("];
+
 const PLUS = 0;
 const MINUS = 1;
 const MULT = 2;
 const DIV = 3;
+
+const ROUND_OPERATIONS = 100;
+const ROUND = 100;
+const FLOOR = 101;
+const CEIL = 102;
 
 //Conversions
 const NO_CONVERSION = 0;
@@ -340,7 +347,18 @@ class Constraint extends bs.BiSerializable {
                 return null;
 
             // evaluate expression
-            if (expression.leftConversion === CONVERSION_BIG_DECIMAL || expression.rightConversion === CONVERSION_BIG_DECIMAL ||
+
+            if (expression.operation === ROUND)
+                result = Constraint.objectCastToBigDecimal(left, null, compareOperandType.FIELD).round(
+                    Number(right), 1);// 1 - ROUND_HALF_UP
+            else if (expression.operation === FLOOR)
+                result = Constraint.objectCastToBigDecimal(left, null, compareOperandType.FIELD).round(
+                    Number(right), 0);// 0 - ROUND_DOWN
+            else if (expression.operation === CEIL)
+                result = Constraint.objectCastToBigDecimal(left, null, compareOperandType.FIELD).round(
+                    Number(right), 3); // 3 - ROUND_UP
+
+            else if (expression.leftConversion === CONVERSION_BIG_DECIMAL || expression.rightConversion === CONVERSION_BIG_DECIMAL ||
                 left instanceof BigDecimal || right instanceof BigDecimal) {
                 // BigDecimals
                 if (expression.operation === PLUS)
@@ -825,7 +843,8 @@ class Constraint extends bs.BiSerializable {
             console.log("WARNING: Need base contract to check API level. Capabilities API level 4 and above disabled.");
 
         return this.baseContract != null && this.baseContract.apiLevel >= 4 &&
-            operations.some((op, i) => operand.includes(op) && (i !== MINUS || operand.lastIndexOf(op) > 0));
+            operations.some((op, i) => operand.includes(op) && (i !== MINUS || operand.lastIndexOf(op) > 0)) ||
+            roundOperations.some(op => operand.startsWith(op));
     }
 
     static countCommonParentheses(expression) {
@@ -900,13 +919,30 @@ class Constraint extends bs.BiSerializable {
 
         let opPos = -1;
         let i = -1;
+        let opLen = 1;
         do {
             i++;
             while ((opPos = expression.indexOf(operations[i], opPos + 1)) > 0 && !Constraint.isTopLevelOperation(expression, opPos));
         } while (opPos <= 0 && i < DIV);
 
-        if (opPos <= 0)
-            throw new ex.IllegalArgumentError("Invalid format of expression: " + expression + ". Not found top-level operation.");
+        if (opPos <= 0) {
+            // parse round operations
+            for (i = ROUND; i <= CEIL; i++)
+                if (expression.startsWith(roundOperations[i - ROUND_OPERATIONS])) {
+                    if (!expression.endsWith(")"))
+                        throw new ex.IllegalArgumentError("Invalid format of expression: " + expression + ". Not expected ')' after rounding operation.");
+                    expression = expression.substring(roundOperations[i - ROUND_OPERATIONS].length, expression.length - 1);
+                    while ((opPos = expression.indexOf(",", opPos + 1)) > 0 && !Constraint.isTopLevelOperation(expression, opPos));
+                    if (opPos <= 0)
+                        throw new ex.IllegalArgumentError("Invalid format of expression: " + expression + ". Not expected ',' after rounding operation.");
+                    break;
+                }
+            if (i > CEIL)
+                throw new ex.IllegalArgumentError("Invalid format of expression: " + expression + ". Not found top-level operation.");
+        }
+        else
+            opLen = operations[i].length;
+
 
         let leftOperand = expression.substring(0, opPos);
         if (leftOperand.length === 0)
@@ -927,7 +963,7 @@ class Constraint extends bs.BiSerializable {
         } else if (Constraint.isFieldOperand(leftOperand))
             typeLeftOperand = compareOperandType.FIELD;
 
-        let rightOperand = expression.substring(opPos + operations[i].length);
+        let rightOperand = expression.substring(opPos + opLen);
         if (rightOperand.length === 0)
             throw new ex.IllegalArgumentError("Invalid format of expression: " + expression + ". Missing right operand.");
 
@@ -1531,6 +1567,9 @@ class Constraint extends bs.BiSerializable {
         if (expression.leftParentheses)
             result += "(";
 
+        if (expression.operation >= ROUND_OPERATIONS)
+            result += roundOperations[expression.operation - ROUND_OPERATIONS];
+
         if (expression.leftOperand != null) {
             if (typeof expression.leftOperand === "object")
                 result += Constraint.assemblyExpression(expression.leftOperand);
@@ -1546,7 +1585,10 @@ class Constraint extends bs.BiSerializable {
         if (expression.leftParentheses)
             result += ")";
 
-        result += operations[expression.operation];
+        if (expression.operation >= ROUND_OPERATIONS)
+            result += ",";
+        else
+            result += operations[expression.operation];
 
         if (expression.rightParentheses)
             result += "(";
@@ -1562,6 +1604,9 @@ class Constraint extends bs.BiSerializable {
                     result += "::number";
             }
         }
+
+        if (expression.operation >= ROUND_OPERATIONS)
+            result += ")";
 
         if (expression.rightParentheses)
             result += ")";
