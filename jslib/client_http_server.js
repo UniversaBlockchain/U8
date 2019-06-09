@@ -202,8 +202,8 @@ class ClientHTTPServer extends network.HttpServer {
         super.startServer();
     }
 
-    shutdown() {
-        super.stopServer();
+    async shutdown() {
+        await super.stopServer();
     }
 
     checkNode(sessionKey, checkKeyLimit = false) {

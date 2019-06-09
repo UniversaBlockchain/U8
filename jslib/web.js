@@ -1,6 +1,7 @@
 import {MemoiseMixin} from 'tools'
 import * as io from "io";
 import * as t from "tools";
+import * as trs from 'timers'
 import {PublicKey} from "crypto";
 const Boss = require('boss.js');
 const yaml = require('yaml');
@@ -287,7 +288,39 @@ network.HttpServer = class {
         this.httpServer_ = new network.HttpServerImpl(host, port, poolSize, bufSize);
         this.endpoints_ = new Map();
         this.secureEndpoints_ = new Map();
+
+        this.timers_ = [];
+        this.reqBufs = [];
+        this.secureReqBufs = [];
+
         this.httpServer_.__setBufferedCallback(async (reqBuf) => {
+            this.reqBufs.push(reqBuf);
+        });
+        this.httpServer_.__setBufferedSecureCallback(async (reqBuf) => {
+            this.secureReqBufs.push(reqBuf);
+        });
+
+        this.addTimer(10, async () => {
+            await this.processReqBufs();
+            await this.processSecureReqBufs();
+        });
+
+    }
+
+    addTimer(delay, block) {
+        let i = this.timers_.length;
+        let f = () => {
+            block();
+            this.timers_[i] = trs.timeout(delay, f);
+        };
+        this.timers_[i] = trs.timeout(delay, f);
+    }
+
+    async processReqBufs() {
+        let reqBufs = this.reqBufs;
+        this.reqBufs = [];
+        for (let k = 0; k < reqBufs.length; ++k) {
+            let reqBuf = reqBufs[k];
             let length = reqBuf.getBufLength();
             let promises = [];
             for (let i = 0; i < length; ++i) {
@@ -302,10 +335,15 @@ network.HttpServer = class {
                 }
             }
             await Promise.all(promises);
-        });
-        this.httpServer_.__setBufferedSecureCallback(async (reqBuf) => {
+        }
+    }
+
+    async processSecureReqBufs() {
+        let secureReqBufs = this.secureReqBufs;
+        this.secureReqBufs = [];
+        for (let k = 0; k < secureReqBufs.length; ++k) {
+            let reqBuf = secureReqBufs[k];
             let length = reqBuf.getBufLength();
-            //console.log("length = " + length);
             let promises = [];
             for (let i = 0; i < length; ++i) {
                 let params = Boss.load(reqBuf.getParamsBin(i));
@@ -328,7 +366,7 @@ network.HttpServer = class {
             for (let i = 0; i < length; ++i) {
                 reqBuf.setAnswer(i, Boss.dump(results[i]));
             }
-        });
+        }
     }
 
     processSecureCommand(params, sessionKey) {
@@ -353,8 +391,13 @@ network.HttpServer = class {
         this.httpServer_.__startServer();
     }
 
-    stopServer() {
+    async stopServer() {
         this.httpServer_.__stopServer();
+        for (let i = 0; i < this.timers_.length; ++i)
+            trs.clearTimeout(this.timers_[i]);
+
+        //wait for delayed timer callbacks
+        await sleep(300);
     }
 
     addRawEndpoint(endpoint, block) {

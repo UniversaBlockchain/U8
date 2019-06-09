@@ -204,7 +204,7 @@ class Main {
             this.node.shutdown();
 
         if (this.clientHTTPServer != null)
-            this.clientHTTPServer.shutdown();
+            await this.clientHTTPServer.shutdown();
     }
 }
 
