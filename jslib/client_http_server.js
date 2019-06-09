@@ -28,6 +28,8 @@ class ClientHTTPServer extends network.HttpServer {
         this.netConfig = null;
         this.localCors = false;
 
+        this.initSecureProtocol(this.nodeKey);
+
         this.on("/contracts", async (request) => {
             let encodedString = request.path.substring(11);
 
