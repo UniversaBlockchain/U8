@@ -1,12 +1,57 @@
 import {expect, assert, unit} from 'test'
-import {HashId} from 'crypto'
+import {PrivateKey, KeyAddress, HashId} from 'crypto'
 import {randomBytes} from 'tools'
 import {HttpClient} from 'web'
+import * as io from 'io'
 import * as tk from 'unit_tests/test_keys'
 
 const Main = require("main").Main;
 const Boss = require('boss.js');
 const ExtendedSignature = require("extendedsignature").ExtendedSignature;
+const Ledger = require("ledger").Ledger;
+
+async function createMain(name, nolog, postfix = "") {
+
+    let args = ["--test", "--config", "../test/config/test_node_config_v2" + postfix + "/" + name];
+    if (nolog)
+        args.push("--nolog");
+
+    let main = await new Main(...args).run();
+
+    main.config.uIssuerKeys.push(new KeyAddress("Zau3tT8YtDkj3UDBSznrWHAjbhhU4SXsfQLWDFsv5vw24TLn6s"));
+
+    let key = new PrivateKey(await (await io.openRead("../test/keys/u_key.private.unikey")).allBytes());
+    main.config.addressesWhiteList.push(key.publicKey.longAddress);
+
+    return main;
+}
+
+class TestSpace {
+    constructor(key) {
+        this.myKey = key;
+    }
+
+    async create() {
+        this.nodes = [];
+        for (let i = 0; i < 4; i++)
+            this.nodes.push(await createMain("node" + (i + 1), false));
+
+        this.node = this.nodes[0];
+        this.client = new HttpClient(this.node.myInfo.publicUrlString(), 64, 4096);
+        this.client.start(this.myKey, this.node.myInfo.publicKey, null);
+
+        this.clients = [];
+        for (let i = 0; i < 4; i++) {
+            let client = new HttpClient(this.nodes[i].myInfo.publicUrlString(), 64, 4096);
+            client.start(this.myKey, this.nodes[i].myInfo.publicKey, null);
+            this.clients.push(client);
+        }
+    };
+
+    async shutdown() {
+        await Promise.all(this.nodes.map(n => n.shutdown()));
+    }
+}
 
 unit.test("main_test: checkOptionParsing", () => {
     let parser = Main.initOptionParser();
@@ -97,7 +142,7 @@ unit.test("main_test: startNode", async () => {
 unit.test("main_test: sendHttpRequests", async () => {
     let main = await new Main("--test", "--config", "../test/config/test_node_config_v2/node1", "--nolog").run();
 
-    let httpClient = new HttpClient("localhost:" + main.myInfo.clientAddress.port, 32, 4096);
+    let httpClient = new HttpClient("localhost:" + main.myInfo.clientAddress.port, 4, 4096);
 
     let fire = [];
     let events = [];
@@ -154,4 +199,17 @@ unit.test("main_test: sendHttpRequests", async () => {
     await Promise.all(events);
 
     await main.shutdown();
+});
+
+unit.test("main_test: createTestSpace", async () => {
+    //let key = new PrivateKey(await (await io.openRead("../test/keys/reconfig_key.private.unikey")).allBytes());
+    //let ts = await new TestSpace(key).create();
+
+    //await ts.shutdown();
+
+    let l1 = new Ledger("host=localhost port=5432 dbname=universa_node_t1");
+    let l2 = new Ledger("host=localhost port=5432 dbname=universa_node_t2");
+
+    await l1.close();
+    await l2.close();
 });

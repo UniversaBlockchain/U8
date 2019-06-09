@@ -483,7 +483,7 @@ class ClientHTTPServer extends network.HttpServer {
 
         try {
             let result = {itemResult : await this.node.checkItem(params.itemId)}; //TODO: node
-            await this.node.resync(params.itemId); //TODO: node
+            await this.node.resync(params.itemId);
             return result;
         } catch (err) {
             this.logger.log(err.stack);

@@ -159,7 +159,7 @@ class ItemNotification extends Notification {
 
 class ResyncNotification extends ItemNotification {
 
-    constructor(from, itemId, itemState, hasEnvironment, requestResult) {
+    constructor(from, itemId, requestResult, itemState = ItemState.UNDEFINED, hasEnvironment = false) {
         let expires = new Date();
         expires.setMinutes(expires.getMinutes() + 5);
         super(from, itemId, ItemResult.from(itemState, false, new Date(), expires), requestResult);

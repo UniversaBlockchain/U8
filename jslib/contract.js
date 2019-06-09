@@ -2081,10 +2081,10 @@ class Contract extends bs.BiSerializable {
                 return false;
 
             // check U contracts
-            if (!this.isU(Config.uIssuerKeys, Config.uIssuerName))
+            if (!this.isU(config.uIssuerKeys, Config.uIssuerName))
                 return false;
 
-            if (!Array.from(this.revokingItems)[0].isU(Config.uIssuerKeys, Config.uIssuerName))
+            if (!Array.from(this.revokingItems)[0].isU(config.uIssuerKeys, Config.uIssuerName))
                 return false;
 
             // check unlimited key

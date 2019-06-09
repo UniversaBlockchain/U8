@@ -351,13 +351,14 @@ class Constraint extends bs.BiSerializable {
             if (expression.operation === ROUND)
                 result = Constraint.objectCastToBigDecimal(left, null, compareOperandType.FIELD).round(
                     Number(right), 1);// 1 - ROUND_HALF_UP
-            else if (expression.operation === FLOOR)
-                result = Constraint.objectCastToBigDecimal(left, null, compareOperandType.FIELD).round(
-                    Number(right), 0);// 0 - ROUND_DOWN
-            else if (expression.operation === CEIL)
-                result = Constraint.objectCastToBigDecimal(left, null, compareOperandType.FIELD).round(
-                    Number(right), 3); // 3 - ROUND_UP
+            else if (expression.operation === FLOOR || expression.operation === CEIL) {
+                let value = Constraint.objectCastToBigDecimal(left, null, compareOperandType.FIELD);
 
+                if ((expression.operation === FLOOR && value.cmp(0) !== -1) || (expression.operation === CEIL && value.cmp(0) === -1))
+                    result = value.round(Number(right), 0);// 0 - ROUND_DOWN
+                else if ((expression.operation === CEIL && value.cmp(0) !== -1) || (expression.operation === FLOOR && value.cmp(0) === -1))
+                    result = value.round(Number(right), 3); // 3 - ROUND_UP
+            }
             else if (expression.leftConversion === CONVERSION_BIG_DECIMAL || expression.rightConversion === CONVERSION_BIG_DECIMAL ||
                 left instanceof BigDecimal || right instanceof BigDecimal) {
                 // BigDecimals

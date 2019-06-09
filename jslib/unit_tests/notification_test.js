@@ -28,7 +28,7 @@ unit.test("notification_test: ItemNotification pack", () => {
 unit.test("notification_test: ResyncNotification pack", () => {
     let ni = NodeInfo.withParameters(tk.TestKeys.getKey().publicKey, 1, "node-1", "127.0.0.1", "0:0:0:0:0:0:0:1", "192.168.1.101", 7001, 8001, 9001);
     let id = HashId.of(randomBytes(64));
-    let n = new ResyncNotification(ni, id, ItemState.DECLINED, true, false);
+    let n = new ResyncNotification(ni, id, false, ItemState.DECLINED, true);
 
     let w = new Boss.Writer();
     Notification.write(w, n);
@@ -38,4 +38,15 @@ unit.test("notification_test: ResyncNotification pack", () => {
     let nn = Notification.read(ni, r);
 
     assert(nn.equals(n));
+
+    n = new ResyncNotification(ni, id, true);
+
+    w = new Boss.Writer();
+    Notification.write(w, n);
+    pack = w.get();
+
+    r = new Boss.Reader(pack);
+    nn = Notification.read(ni, r);
+
+    assert(n.equals(nn));
 });

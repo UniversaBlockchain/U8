@@ -16,10 +16,11 @@ class TestNodeInfoProvider extends NodeInfoProvider {
 
     constructor() {
         super();
+        this.config = new Config();
     }
 
     getUIssuerKeys() {
-        return Config.uIssuerKeys;
+        return this.config.uIssuerKeys;
     }
 
     getUIssuerName() {

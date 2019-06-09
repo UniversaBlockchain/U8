@@ -3,6 +3,7 @@ import {UDPAdapter, HttpClient} from 'web'
 import {Notification, ItemNotification, ResyncNotification, ParcelNotification} from "notification";
 
 const Boss = require('boss.js');
+const ItemResult = require('itemresult').ItemResult;
 
 class Network {
     /**
@@ -326,23 +327,24 @@ class NetworkV2 extends Network {
     /**
      * Get item from network node.
      *
-     * @param {crypto.HashId} itemId - delivered notification.
+     * @param {crypto.HashId} itemId - ID of the requested item.
      * @param {network.NodeInfo} nodeInfo - {@link NodeInfo} of distant node.
      * @param {number} maxTimeout - Connection timeout in milliseconds.
-     * @return {Contract} received item.
+     * @return {Contract} requested item.
      */
     async getItem(itemId, nodeInfo, maxTimeout) {
         try {
             let URL = "/contracts/" + itemId.base64;
-            let httpClient = new HttpClient(nodeInfo.serverUrlString(), 32, 4096);
+            let httpClient = new HttpClient(nodeInfo.serverUrlString(), 1, 4096);
 
             let fire = null;
             let event = new Promise((resolve) => {fire = resolve});
 
+            //TODO: httpClient setRequestProperty/setTimeout
             //connection.setRequestProperty("User-Agent", "Universa JAVA API Client");
             //connection.setRequestProperty("Connection", "close");
             //connection.setConnectTimeout(4000);
-            //connection.setReadTimeout((int) (maxTimeout.getSeconds()*1000));
+            //connection.setReadTimeout(maxTimeout);
             httpClient.sendGetRequest(URL, (respCode, body) => {
                 let item = (respCode === 200) ? TransactionPack.unpack(body, true).contract : null;
                 fire(item);
@@ -356,6 +358,124 @@ class NetworkV2 extends Network {
             return null;
         }
     }
+
+    /**
+     * Get environment from network node.
+     *
+     * @param {crypto.HashId} itemId - ID of the requested environment.
+     * @param {network.NodeInfo} nodeInfo - {@link NodeInfo} of distant node.
+     * @param {number} maxTimeout - Connection timeout in milliseconds.
+     * @return {NImmutableEnvironment} requested environment.
+     */
+    async getEnvironment(itemId, nodeInfo, maxTimeout) {
+        try {
+            let URL = "/environments/" + itemId.base64;
+            let httpClient = new HttpClient(nodeInfo.serverUrlString(), 1, 4096);
+
+            let fire = null;
+            let event = new Promise((resolve) => {fire = resolve});
+
+            //TODO: httpClient setRequestProperty/setTimeout
+            //connection.setRequestProperty("User-Agent", "Universa JAVA API Client");
+            //connection.setRequestProperty("Connection", "close");
+            //connection.setConnectTimeout(4000);
+            //connection.setReadTimeout(maxTimeout);
+            httpClient.sendGetRequest(URL, (respCode, body) => {
+                let env = (respCode === 200) ? Boss.load(body) : null;
+                fire(env);
+            });
+
+            return await event;
+
+        } catch (err) {
+            this.report("download failure. from: " + nodeInfo.number + " by: " + this.myInfo.number +
+                " reason: " + err.message, VerboseLevel.BASE);
+            return null;
+        }
+    }
+
+    /**
+     * Get parcel from network node.
+     *
+     * @param {crypto.HashId} itemId - ID of the requested parcel.
+     * @param {network.NodeInfo} nodeInfo - {@link NodeInfo} of distant node.
+     * @param {number} maxTimeout - Connection timeout in milliseconds.
+     * @return {Parcel} requested parcel.
+     */
+    async getParcel(itemId, nodeInfo, maxTimeout) {
+        try {
+            let URL = "/parcels/" + itemId.base64;
+            let httpClient = new HttpClient(nodeInfo.serverUrlString(), 1, 4096);
+
+            let fire = null;
+            let event = new Promise((resolve) => {fire = resolve});
+
+            //TODO: httpClient setRequestProperty/setTimeout
+            //connection.setRequestProperty("User-Agent", "Universa JAVA API Client");
+            //connection.setRequestProperty("Connection", "close");
+            //connection.setConnectTimeout(4000);
+            //connection.setReadTimeout(maxTimeout);
+            httpClient.sendGetRequest(URL, (respCode, body) => {
+                let parcel = (respCode === 200) ? Parcel.unpack(body) : null;
+                fire(parcel);
+            });
+
+            return await event;
+
+        } catch (err) {
+            this.report("download failure. from: " + nodeInfo.number + " by: " + this.myInfo.number +
+                " reason: " + err.message, VerboseLevel.BASE);
+            return null;
+        }
+    }
+
+    /**
+     * Get item state from network node.
+     *
+     * @param {network.NodeInfo} nodeInfo - {@link NodeInfo} of distant node.
+     * @param {crypto.HashId} id - ID of the requested item.
+     * @return {ItemResult} result containing state of the requested item.
+     */
+    async getItemState(nodeInfo, id) {
+        let client = this.cachedClients.get(nodeInfo);
+        if (client == null) {
+            client = new HttpClient(nodeInfo.publicUrlString(), 64, 256);
+            client.start(this.myKey, nodeInfo.publicKey, null);
+
+            this.cachedClients.put(nodeInfo, client);
+        }
+
+        //TODO: replace to Client
+        //return client.getState(id);
+
+        let fire = null;
+        let event = new Promise((resolve) => {fire = resolve});
+
+        client.command("getState", {itemId: id}, (result) => fire(result), () => fire(null));
+
+        let result = await event;
+        if (result == null || result.itemResult == null)
+            this.report("getItemState failure. from: " + nodeInfo.number + " command error occurred", VerboseLevel.BASE);
+        else if (result.itemResult instanceof ItemResult)
+            return result.itemResult;
+        else if (typeof result.itemResult === "string")
+            this.report("getItemState failure. from: " + nodeInfo.number + " result: " + result.itemResult, VerboseLevel.BASE);
+        else
+            this.report("getItemState failure. from: " + nodeInfo.number + " unknown result type", VerboseLevel.BASE);
+
+        return ItemResult.UNDEFINED;
+    }
+
+    restartUDPAdapter() {
+        if (this.adapter != null)
+            this.adapter.close();
+
+        this.adapter = new UDPAdapter(this.myKey, this.myInfo.number, this.netConfig);
+        this.adapter.setReceiveCallback(this.onReceived);
+    }
+
+    //TODO: pingNodeUDP
+    //TODO: pingNodeTCP
 }
 
 module.exports = {Network, NetworkV2};

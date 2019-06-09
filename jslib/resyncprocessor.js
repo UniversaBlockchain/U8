@@ -1,5 +1,6 @@
 import {ScheduleExecutor, ExecutorWithDynamicPeriod} from "executorservice";
 import {VerboseLevel, ResyncingItemProcessingState} from "node_consts";
+import {ResyncNotification} from "notification";
 
 const ItemResult = require('itemresult').ItemResult;
 const ItemState = require('itemstate').ItemState;
@@ -75,8 +76,8 @@ class ResyncProcessor {
             this.resyncer.cancel();
         } else {
             try {
-                let notification = new ResyncNotification(this.node.myInfo, this.itemId, true); //TODO: ResyncNotification
-                this.node.network.eachNode(node => {  //TODO: node.network
+                let notification = new ResyncNotification(this.node.myInfo, this.itemId, true);
+                this.node.network.eachNode(node => {
                     if (!this.obtainedAnswersFromNodes.has(node))
                         this.node.network.deliver(node, notification);
                 });
