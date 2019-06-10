@@ -58,6 +58,13 @@ class Executor {
     restart() {
         throw new Error("not implemented");
     }
+
+    /**
+     * Equals executors.
+     */
+    equals(to) {
+        return this === to;
+    }
 }
 
 class ScheduleExecutor extends Executor {

@@ -2,13 +2,13 @@ import {expect, assert, unit} from 'test'
 import {PrivateKey, KeyAddress, HashId} from 'crypto'
 import {randomBytes} from 'tools'
 import {HttpClient} from 'web'
+import {VerboseLevel} from "node_consts";
 import * as io from 'io'
 import * as tk from 'unit_tests/test_keys'
 
 const Main = require("main").Main;
 const Boss = require('boss.js');
 const ExtendedSignature = require("extendedsignature").ExtendedSignature;
-const Ledger = require("ledger").Ledger;
 
 async function createMain(name, nolog, postfix = "") {
 
@@ -40,7 +40,7 @@ class TestSpace {
 
         this.clients = [];
         for (let i = 0; i < 4; i++) {
-            let client = new HttpClient(this.nodes[i].myInfo.publicUrlString(), 64, 4096);
+            let client = new HttpClient(this.nodes[i].myInfo.publicUrlString(), 4, 256);
             await client.start(this.myKey, this.nodes[i].myInfo.publicKey);
             this.clients.push(client);
         }
@@ -217,6 +217,33 @@ unit.test("main_test: createTestSpace", async () => {
         assert(ts.nodes[i].logger.buffer.includes("Starting the Universa node service..."));
         assert(ts.nodes[i].logger.buffer.includes(ts.nodes[i].myInfo.number + ": Network consensus is set to (negative/positive/resyncBreak): 2 / 3 / 2"));
     }
+
+    await ts.shutdown();
+});
+
+unit.test("main_test: resync", async () => {
+    let key = new PrivateKey(await (await io.openRead("../test/keys/reconfig_key.private.unikey")).allBytes());
+    let ts = await new TestSpace(key).create(/*false*/);
+
+    for (let i = 0; i < 4; i++) {
+        ts.nodes[i].setVerboseLevel(VerboseLevel.DETAILED);
+        ts.nodes[i].setUDPVerboseLevel(VerboseLevel.DETAILED);
+    }
+
+    let id = HashId.of(randomBytes(64));
+
+    for (let i = 0; i < 4; i++)
+        if (i !== 1) {
+            let record = await ts.nodes[i].ledger.findOrCreate(id);
+            await record.approve();
+        }
+
+    let fire = null;
+    let event = new Promise((resolve) => {fire = resolve});
+
+    //await ts.nodes[1].node.resync(id, () => fire());
+
+    //await event;
 
     await ts.shutdown();
 });

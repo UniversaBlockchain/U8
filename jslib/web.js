@@ -30,6 +30,16 @@ network.NodeInfo = class {
         return res;
     }
 
+    equals(to) {
+        if (this === to)
+            return true;
+
+        if (Object.getPrototypeOf(this) !== Object.getPrototypeOf(to))
+            return false;
+
+        return this.number === to.number;
+    }
+
     get publicKey() {
         return this.memoise('__getPublicKey', () => new crypto.PublicKey(this.nodeInfo_.__getPublicKey()));
     }

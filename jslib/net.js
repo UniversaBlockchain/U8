@@ -197,7 +197,7 @@ class NetworkV2 extends Network {
         this.cachedClients = new t.GenericMap();
 
         this.adapter = new UDPAdapter(this.myKey, this.myInfo.number, this.netConfig);
-        this.adapter.setReceiveCallback(this.onReceived);
+        this.adapter.setReceiveCallback((packet, fromNode) => this.onReceived(packet, fromNode));
     }
 
     shutdown() {
@@ -238,10 +238,10 @@ class NetworkV2 extends Network {
         if (notification instanceof ParcelNotification && notification.parcelId != null)
             this.report(from.number + "->" + to.number + " PN " + notification.parcelId.toString() + " " +
                 notification.type == null ? "NULL" : notification.type, VerboseLevel.DETAILED);
-        else if (notification instanceof ItemNotification)
-            this.report(from.number + "->" + to.number + " IN " + notification.itemId.toString(), VerboseLevel.DETAILED);
         else if (notification instanceof ResyncNotification)
             this.report(from.number + "->" + to.number + " RN " + notification.itemState.val, VerboseLevel.DETAILED);
+        else if (notification instanceof ItemNotification)
+            this.report(from.number + "->" + to.number + " IN " + notification.itemId.toString(), VerboseLevel.DETAILED);
         else
             this.report("unknown notification", VerboseLevel.DETAILED);
     }
@@ -308,7 +308,7 @@ class NetworkV2 extends Network {
     deliver(toNode, notification) {
         try {
             let data = this.packNotifications(this.myInfo, [notification]);
-            this.logNotification(notification, toNode);
+            this.logNotification(notification, toNode, this.myInfo);
 
             if (this.adapter != null)
                 this.adapter.send(toNode.number, data);
@@ -442,7 +442,7 @@ class NetworkV2 extends Network {
             client = new HttpClient(nodeInfo.publicUrlString(), 64, 256);
             client.start(this.myKey, nodeInfo.publicKey, null);
 
-            this.cachedClients.put(nodeInfo, client);
+            this.cachedClients.set(nodeInfo, client);
         }
 
         //TODO: replace to Client

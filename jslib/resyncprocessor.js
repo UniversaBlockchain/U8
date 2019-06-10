@@ -25,7 +25,7 @@ class ResyncProcessor {
             this.finishEvent.then(onComplete);
     }
 
-    getResult() {
+    static getResult() {
         let expires = new Date();
         expires.setMinutes(expires.getMinutes() + 5);
         let result = ItemResult.from(ItemState.PENDING, false, new Date(), expires);
@@ -34,13 +34,13 @@ class ResyncProcessor {
         return result;
     }
 
-    startResync() {
+    async startResync() {
         this.node.report("ResyncProcessor.startResync(itemId=" + this.itemId + ")", VerboseLevel.BASE);
 
         this.resyncExpiresAt = Math.floor(Date.now() / 1000) + Config.maxResyncTime;
         this.resyncExpirationTimer = new ScheduleExecutor(() => this.resyncEnded(), Config.maxResyncTime * 1000, this.node.executorService).run();
 
-        this.resyncingItem = new ResyncingItem(this.itemId, this.node.ledger.getRecord(this.itemId));
+        this.resyncingItem = new ResyncingItem(this.itemId, await this.node.ledger.getRecord(this.itemId), this.node);
         this.resyncingItem.finishEvent.then(() => this.onFinishResync());
 
         this.obtainedAnswersFromNodes.clear();
@@ -63,22 +63,23 @@ class ResyncProcessor {
         this.resyncer.restart();
     }
 
-    startResyncSubTree() {
-        this.resyncingSubTreeItems.forEach(k => this.node.resync(k, ri => this.onResyncSubTreeItemFinish(ri)));
+    async startResyncSubTree() {
+        await Promise.all(this.resyncingSubTreeItems.map(
+            async (k) => await this.node.resync(k, ri => this.onResyncSubTreeItemFinish(ri))));
     }
 
     pulseResync() {
         this.node.report("ResyncProcessor.pulseResync(itemId=" + this.itemId + "),time=" +
-            Math.floor(Date.now() / 1000) - this.resyncExpiresAt + Config.maxResyncTime + "ms", VerboseLevel.BASE);
+            (Date.now() + (Config.maxResyncTime - this.resyncExpiresAt) * 1000) + "ms", VerboseLevel.BASE);
 
-        if (this.resyncExpiresAt < Date.now()) {
+        if (this.resyncExpiresAt < Math.floor(Date.now() / 1000)) {
             this.node.report("ResyncProcessor.pulseResync(itemId=" + this.itemId + ") expired, cancel", VerboseLevel.BASE);
             this.resyncer.cancel();
         } else {
             try {
                 let notification = new ResyncNotification(this.node.myInfo, this.itemId, true);
                 this.node.network.eachNode(node => {
-                    if (!this.obtainedAnswersFromNodes.has(node))
+                    if (!this.obtainedAnswersFromNodes.has(node.number))
                         this.node.network.deliver(node, notification);
                 });
             } catch (err) {
@@ -88,9 +89,9 @@ class ResyncProcessor {
     }
 
     obtainAnswer(answer) {
-        if (!this.obtainedAnswersFromNodes.has(answer.from)) {
-            this.obtainedAnswersFromNodes.add(answer.from);
-            this.node.report("ResyncProcessor.obtainAnswer(itemId=" + this.itemId + "), state: " + answer.itemState, VerboseLevel.BASE);
+        if (!this.obtainedAnswersFromNodes.has(answer.from.number)) {
+            this.obtainedAnswersFromNodes.add(answer.from.number);
+            this.node.report("ResyncProcessor.obtainAnswer(itemId=" + this.itemId + "), state: " + answer.itemState.val, VerboseLevel.BASE);
 
             this.resyncingItem.resyncVote(answer.from, answer.itemState);
 
@@ -132,9 +133,9 @@ class ResyncProcessor {
             new ScheduleExecutor(() => this.resyncEnded(), 1000, this.node.executorService).run();
             return;
 
-        } else if (this.resyncingItem.resyncingState() === ResyncingItemProcessingState.WAIT_FOR_VOTES)
+        } else if (this.resyncingItem.resyncingState === ResyncingItemProcessingState.WAIT_FOR_VOTES)
             new ScheduleExecutor(() => this.node.itemSanitationTimeout(this.resyncingItem.record), 0, this.node.executorService).run();
-        else if (this.resyncingItem.resyncingState() === ResyncingItemProcessingState.COMMIT_FAILED)
+        else if (this.resyncingItem.resyncingState === ResyncingItemProcessingState.COMMIT_FAILED)
             new ScheduleExecutor(() => this.node.itemSanitationFailed(this.resyncingItem.record), 0, this.node.executorService).run();
         else
             new ScheduleExecutor(() => this.node.itemSanitationDone(this.resyncingItem.record), 0, this.node.executorService).run();
@@ -166,7 +167,7 @@ class ResyncProcessor {
                 this.resyncingSubTreeItems.clear();
                 itemsToReResync.forEach(item => this.resyncingSubTreeItems.add(item)); //TODO: OPTIMIZE GETTING STATE RECORD
 
-                this.startResyncSubTree();
+                await this.startResyncSubTree();
                 return false;
             }
         }
@@ -212,7 +213,7 @@ class ResyncingItem {
         if (this.isResyncPollingFinished())
             return;
 
-        if (this.resyncNodes.get(ItemState.REVOKED).size() >= this.node.config.positiveConsensus) {
+        if (this.resyncNodes.get(ItemState.REVOKED).size >= this.node.config.positiveConsensus) {
             revokedConsenus = true;
             this.resyncingState = ResyncingItemProcessingState.PENDING_TO_COMMIT;
         } else if (this.resyncNodes.get(ItemState.DECLINED).size >= this.node.config.positiveConsensus) {

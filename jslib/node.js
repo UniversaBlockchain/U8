@@ -109,10 +109,12 @@ class Node {
             if (itemResult != null && itemResult.state.isConsensusFound)
                 itemState = itemResult.state;
 
-            let hasEnvironment = itemState === ItemState.APPROVED && await this.getEnvironment(notification.itemId) != null;
+            let hasEnvironment = itemState === ItemState.APPROVED &&
+                await this.getEnvironmentByContractID(notification.itemId) != null;
+
             try {
-                this.network.deliver(notification.from, new ResyncNotification(this.myInfo, notification.itemId,
-                    itemState, hasEnvironment, false));
+                this.network.deliver(notification.from,
+                    new ResyncNotification(this.myInfo, notification.itemId, false, itemState, hasEnvironment));
             } catch (err) {
                 this.report("error: unable to send ResyncNotification answer, exception: " + err.message,
                     VerboseLevel.BASE);
@@ -154,7 +156,7 @@ class Node {
 
             // if we want to get already processed result for item
             if (!ommitItemResult) {
-                let r = this.ledger.getRecord(itemId);
+                let r = await this.ledger.getRecord(itemId);
                 // if it is not pending, it means it is already processed:
                 if (r != null && !r.state.isPending) {
                     // it is, and we may still have it cached - we do not put it again:
@@ -164,7 +166,7 @@ class Node {
                     let cachedItem = this.cache.get(itemId);
                     let result = this.cache.getResult(itemId);
                     if (result == null)
-                        result = new ItemResult(r, cachedItem != null);
+                        result = ItemResult.fromStateRecord(r, cachedItem != null);
 
                     return result;
                 }
@@ -213,18 +215,18 @@ class Node {
      * @param {HashId} id - Item to resync.
      * @param {function} onComplete - callback for resync finish. Optional.
      */
-    resync(id, onComplete = undefined) {
+    async resync(id, onComplete = undefined) {
         let resyncProcessor = this.resyncProcessors.get(id);
         if (resyncProcessor == null)
-            this.resyncProcessors.set(id, new ResyncProcessor(id, this, onComplete).startResync());
+            this.resyncProcessors.set(id, await new ResyncProcessor(id, this, onComplete).startResync());
         else
             resyncProcessor.restartResync();
     }
 
-    async getEnvironment(id) {
+    async getEnvironmentByContractID(id) {
         //let result = this.envCache.get(id);
         //if (result == null) {
-        let result = await this.ledger.getEnvironment(id);
+        let result = await this.ledger.getEnvironmentByContractID(id);
         //    if (result != null)
         //        envCache.put(result);
         //}
@@ -236,11 +238,11 @@ class Node {
         return this.ledger.removeEnvironment(id);
     }
 
-    sanitateRecord(r) {
+    async sanitateRecord(r) {
         try {
             if (this.isShuttingDown)
                 return;
-            this.resync(r.id);
+            await this.resync(r.id);
         } catch (err) {
             this.logger.log(err.message);
             this.logger.log(err.stack);
