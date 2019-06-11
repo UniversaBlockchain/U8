@@ -223,7 +223,7 @@ unit.test("main_test: createTestSpace", async () => {
 
 unit.test("main_test: resync", async () => {
     let key = new PrivateKey(await (await io.openRead("../test/keys/reconfig_key.private.unikey")).allBytes());
-    let ts = await new TestSpace(key).create(/*false*/);
+    let ts = await new TestSpace(key).create(false);
 
     for (let i = 0; i < 4; i++) {
         ts.nodes[i].setVerboseLevel(VerboseLevel.DETAILED);
@@ -241,9 +241,9 @@ unit.test("main_test: resync", async () => {
     let fire = null;
     let event = new Promise((resolve) => {fire = resolve});
 
-    //await ts.nodes[1].node.resync(id, () => fire());
+    await ts.nodes[1].node.resync(id, () => fire());
 
-    //await event;
+    await event;
 
     await ts.shutdown();
 });
