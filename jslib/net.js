@@ -7,7 +7,7 @@ const ItemResult = require('itemresult').ItemResult;
 
 class Network {
     /**
-     * Initialize network of nodes by specified {@link NetConfig}.
+     * Initialize the network of nodes with the specified {@link NetConfig}.
      *
      * @param {network.NetConfig} netConfig - Network configuration.
      * @constructor
@@ -27,10 +27,10 @@ class Network {
     }
 
     /**
-     * Subscribe ot incoming norifications. Old subscriber must be discarded. New consumer should receive notifications
+     * Subscribe to incoming notifications. Old subscriber must be discarded. New subscriber should receive notifications
      * received from the moment it is registered. The method must not block.
      *
-     * @param {network.NodeInfo} forNode - Node to which receive notifications.
+     * @param {network.NodeInfo} forNode - The node that receives the notification.
      * @param {function(network.NodeInfo)} notificationConsumer - The consumer that process incoming notifications in non-blocking manner, e.g.
      *                             it should return without waiting.
      */
@@ -39,6 +39,7 @@ class Network {
     }
 
     /**
+     * Get the item from the specified node.
      * Block until the item will be available from a specified node, not exceeding the specified timeout.
      *
      * @param {crypto.HashId} itemId - ID of item do load.
@@ -51,6 +52,7 @@ class Network {
     }
 
     /**
+     * Get the environment from the specified node.
      * Block until the environment will be available from a specified node, not exceeding the specified timeout.
      *
      * @param {crypto.HashId} itemId - ID of environment do load.
@@ -63,6 +65,7 @@ class Network {
     }
 
     /**
+     * Get the parcel from the specified node.
      * Block until the parcel will be available from a specified node, not exceeding the specified timeout.
      *
      * @param {crypto.HashId} itemId - ID of parcel do load.

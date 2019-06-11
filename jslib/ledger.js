@@ -1071,7 +1071,7 @@ class Ledger {
     /**
      * Find bad (not approved) items in ledger by set of IDs.
      *
-     * @param {Set<HashId>} ids - set of HashId`s.
+     * @param {Set<HashId>} ids - Set of HashId`s.
      * @return {Promise<Set<HashId>>} set of IDs not approved items.
      */
     findBadReferencesOf(ids) {

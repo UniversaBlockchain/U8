@@ -1374,8 +1374,9 @@ class Contract extends bs.BiSerializable {
     }
 
     /**
-     * Collects references items across the contract
-     * @returns {Set<Contract>} references items
+     * Collects references items across the contract.
+     *
+     * @returns {Set<Contract>} references items.
      */
     getReferencedItems() {
 
