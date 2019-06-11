@@ -356,7 +356,7 @@ network.HttpServer = class {
             let length = reqBuf.getBufLength();
             let promises = [];
             for (let i = 0; i < length; ++i) {
-                let params = Boss.load(reqBuf.getParamsBin(i));
+                let params = DefaultBiMapper.getInstance().deserialize(Boss.load(reqBuf.getParamsBin(i)));
                 let sessionKey = new crypto.SymmetricKey(reqBuf.getSessionKeyBin(i));
                 switch (params.command) {
                     case "hello":
@@ -479,7 +479,7 @@ network.HttpClient = class {
     }
 
     command(name, params, onComplete, onError) {
-        let paramsBin = Boss.dump({"command": name, "params": params});
+        let paramsBin = Boss.dump(DefaultBiMapper.getInstance().serialize({"command": name, "params": params}));
         let reqId = this.getReqId();
         this.callbacks_.set(reqId, (decrypted) => {
             let binder = Boss.load(decrypted);

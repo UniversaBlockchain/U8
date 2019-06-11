@@ -440,7 +440,7 @@ class NetworkV2 extends Network {
         let client = this.cachedClients.get(nodeInfo);
         if (client == null) {
             client = new HttpClient(nodeInfo.publicUrlString(), 64, 256);
-            client.start(this.myKey, nodeInfo.publicKey, null);
+            await client.start(this.myKey, nodeInfo.publicKey, null);
 
             this.cachedClients.set(nodeInfo, client);
         }
