@@ -590,8 +590,9 @@ class Ledger {
 
         this.putToCache(record);
 
-        return this.simpleUpdate("update ledger set state=?, expires_at=?, locked_by_id=? where id=?",
+        return this.simpleUpdate("update ledger set state=?, created_at=?, expires_at=?, locked_by_id=? where id=?",
             record.state.ordinal,
+            Math.floor(record.createdAt.getTime() / 1000),
             Math.floor(record.expiresAt.getTime() / 1000),
             record.lockedByRecordId,
             record.recordId);

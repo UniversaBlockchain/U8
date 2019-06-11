@@ -439,7 +439,7 @@ class NetworkV2 extends Network {
     async getItemState(nodeInfo, id) {
         let client = this.cachedClients.get(nodeInfo);
         if (client == null) {
-            client = new HttpClient(nodeInfo.publicUrlString(), 64, 256);
+            client = new HttpClient(nodeInfo.publicUrlString(), 4, 256);
             await client.start(this.myKey, nodeInfo.publicKey, null);
 
             this.cachedClients.set(nodeInfo, client);

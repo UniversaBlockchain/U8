@@ -32,8 +32,11 @@ class Node {
         this.processors = new t.GenericMap();
         this.parcelProcessors = new t.GenericMap();
         this.resyncProcessors = new t.GenericMap();
+
         this.keyRequests = new t.GenericMap();
         this.keysUnlimited = new t.GenericMap();
+        this.epochMinute = 0;
+
         this.executorService = new ExecutorService();
 
         this.config.updateConsensus(this.network.getNodesCount());
@@ -127,6 +130,37 @@ class Node {
     }
 
     /**
+     * Check the state of the item. This method does not start elections and can be safely called from a client.
+     *
+     * @param {HashId} itemId - ID of item to check.
+     *
+     * @return {ItemResult} last known state.
+     */
+    async checkItem(itemId) {
+        this.report("check item processor state for item: " + itemId.toString(), VerboseLevel.BASE);
+
+        let x = await this.checkItemInternal(itemId);
+
+        let ir = ItemResult.UNDEFINED;
+        if (x instanceof ItemResult)
+            ir = x;
+        else if (x instanceof ItemProcessor || x instanceof ResyncProcessor)
+            ir = x.getResult();
+
+        this.report("item state for: " + itemId.toString() + " is " + ir.state.val, VerboseLevel.BASE);
+
+        ir = ir.copy();
+
+        let record = this.informer.takeFor(itemId);
+        if (record != null)
+            ir.errors = record.errorRecords;
+
+        ir.isTestnet = await this.ledger.isTestnet(itemId);
+
+        return ir;
+    }
+
+    /**
      * Optimized for various usages, check the item, start processing as need, return object depending on the current
      * state. Note that actual error codes are set to the item itself.
      *
@@ -206,6 +240,48 @@ class Node {
         } catch (err) {
             throw new Error("failed to checkItem" + err.message);
         }
+    }
+
+    /**
+     * Checks limit of requests for key.
+     *
+     * @param {crypto.PublicKey} key - Key for checking limit of requests.
+     * @return {boolean} result of checking.
+     */
+    checkKeyLimit(key) {
+        //TODO: PublicKey
+        /*console.log(key instanceof crypto.SymmetricKey);
+
+        if (this.config == null ||
+            Config.networkAdminKeyAddress.match(key) ||
+            this.myInfo.publicKey.equals(key) ||
+            this.config.keysWhiteList().some(k => k.equals(key)) ||
+            this.config.addressesWhiteList.some(addr => addr.match(key)))
+            return true;*/
+
+        let currentEpochMinute = Math.floor(Date.now() / 60000);
+        if (this.epochMinute !== currentEpochMinute) {
+            this.keyRequests.clear();
+            this.epochMinute = currentEpochMinute;
+        }
+
+        let expiredUnlimit = this.keysUnlimited.get(key);
+        if (expiredUnlimit != null) {
+            if (expiredUnlimit < Math.floor(Date.now() / 1000))
+                this.keysUnlimited.delete(key);
+            else
+                return true;
+        }
+
+        let requests = this.keyRequests.get(key);
+        if (requests == null)
+            requests = 0;
+        if (requests >= Config.limitRequestsForKeyPerMinute)
+            return false;
+
+        this.keyRequests.set(key, requests + 1);
+
+        return true;
     }
 
     /**

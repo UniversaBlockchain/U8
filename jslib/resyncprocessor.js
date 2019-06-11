@@ -29,7 +29,7 @@ class ResyncProcessor {
         let expires = new Date();
         expires.setMinutes(expires.getMinutes() + 5);
         let result = ItemResult.from(ItemState.PENDING, false, new Date(), expires);
-        result.extraDataBinder = {};
+        result.extra = {};
         result.errors = [];
         return result;
     }
@@ -64,7 +64,7 @@ class ResyncProcessor {
     }
 
     async startResyncSubTree() {
-        await Promise.all(this.resyncingSubTreeItems.map(
+        await Promise.all(Array.from(this.resyncingSubTreeItems).map(
             async (k) => await this.node.resync(k, ri => this.onResyncSubTreeItemFinish(ri))));
     }
 
@@ -268,8 +268,9 @@ class ResyncingItem {
                                     let items = 1;
                                     let summ = tsCreated;
                                     list.forEach(ts => {
-                                        items += createdAtClusters.get(ts);
-                                        summ += ts * items;
+                                        let tsItems = createdAtClusters.get(ts);
+                                        items += tsItems;
+                                        summ += ts * tsItems;
                                         createdAtClusters.delete(ts);
                                     });
 
@@ -286,8 +287,9 @@ class ResyncingItem {
                                     let items = 1;
                                     let summ = tsExpires;
                                     list.forEach(ts => {
-                                        items += expiresAtClusters.get(ts);
-                                        summ += ts * items;
+                                        let tsItems = expiresAtClusters.get(ts);
+                                        items += tsItems;
+                                        summ += ts * tsItems;
                                         expiresAtClusters.delete(ts);
                                     });
 
@@ -317,8 +319,8 @@ class ResyncingItem {
                         expiresTs = ts;
                     }
 
-                let createdAt = new Date(createdTs * 1000);
-                let expiresAt = new Date(expiresTs * 1000);
+                let createdAt = new Date(Math.floor(createdTs) * 1000);
+                let expiresAt = new Date(Math.floor(expiresTs) * 1000);
 
                 try {
                     this.record = await this.node.ledger.findOrCreate(this.hashId);
@@ -326,7 +328,7 @@ class ResyncingItem {
                     this.record.createdAt = createdAt;
                     this.record.expiresAt = expiresAt;
                     if (committingState === ItemState.APPROVED)
-                        await this.record.approve(createdAt, true);
+                        await this.record.approve(expiresAt, true);
                     else if (committingState === ItemState.DECLINED)
                         await this.record.decline(true);
                     else if (committingState === ItemState.REVOKED)

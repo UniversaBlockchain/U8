@@ -9,6 +9,8 @@ import * as tk from 'unit_tests/test_keys'
 const Main = require("main").Main;
 const Boss = require('boss.js');
 const ExtendedSignature = require("extendedsignature").ExtendedSignature;
+const ItemState = require("itemstate").ItemState;
+const ScheduleExecutor = require("executorservice").ScheduleExecutor;
 
 async function createMain(name, nolog, postfix = "") {
 
@@ -223,7 +225,7 @@ unit.test("main_test: createTestSpace", async () => {
 
 unit.test("main_test: resync", async () => {
     let key = new PrivateKey(await (await io.openRead("../test/keys/reconfig_key.private.unikey")).allBytes());
-    let ts = await new TestSpace(key).create(false);
+    let ts = await new TestSpace(key).create(/*false*/);
 
     for (let i = 0; i < 4; i++) {
         ts.nodes[i].setVerboseLevel(VerboseLevel.DETAILED);
@@ -232,18 +234,31 @@ unit.test("main_test: resync", async () => {
 
     let id = HashId.of(randomBytes(64));
 
+    let createdAtSumm = 0;
+    let expiresAtSumm = 0;
     for (let i = 0; i < 4; i++)
         if (i !== 1) {
             let record = await ts.nodes[i].ledger.findOrCreate(id);
+            createdAtSumm += Math.floor(record.createdAt.getTime() / 1000);
+            expiresAtSumm += Math.floor(record.expiresAt.getTime() / 1000);
             await record.approve();
         }
+
+    assert(await ts.nodes[1].ledger.getRecord(id) == null);
 
     let fire = null;
     let event = new Promise((resolve) => {fire = resolve});
 
-    await ts.nodes[1].node.resync(id, () => fire());
+    await ts.nodes[1].node.resync(id, () => fire(true));
 
-    await event;
+    new ScheduleExecutor(() => fire(false), 10000).run();
+    assert(await event);
+
+    let rec = await ts.nodes[1].ledger.getRecord(id);
+    assert(rec.state === ItemState.APPROVED);
+
+    assert(Math.floor(createdAtSumm / 3) * 1000 === rec.createdAt.getTime());
+    assert(Math.floor(expiresAtSumm / 3) * 1000 === rec.expiresAt.getTime());
 
     await ts.shutdown();
 });

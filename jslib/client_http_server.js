@@ -13,6 +13,7 @@ const ex = require("exceptions");
 const t = require("tools");
 const Contract = require("contract").Contract;
 const ItemResult = require('itemresult').ItemResult;
+const ItemState = require('itemstate').ItemState;
 
 class ClientHTTPServer extends network.HttpServer {
 
@@ -178,26 +179,26 @@ class ClientHTTPServer extends network.HttpServer {
             };
         });
 
-        this.addSecureEndpoint("getStats", this.getStats);
-        this.addSecureEndpoint("getState", this.getState);
-        this.addSecureEndpoint("getParcelProcessingState", this.getParcelProcessingState);
-        this.addSecureEndpoint("approve", this.approve);
-        this.addSecureEndpoint("resyncItem", this.resyncItem);
-        this.addSecureEndpoint("pingNode", this.pingNode);
-        this.addSecureEndpoint("setVerbose", this.setVerbose);
-        this.addSecureEndpoint("approveParcel", this.approveParcel);
-        this.addSecureEndpoint("startApproval", this.startApproval);
-        this.addSecureEndpoint("storageGetRate", this.storageGetRate);
-        this.addSecureEndpoint("querySlotInfo", this.querySlotInfo);
-        this.addSecureEndpoint("queryContract", this.queryContract);
-        this.addSecureEndpoint("unsRate", this.unsRate);
-        this.addSecureEndpoint("queryNameRecord", this.queryNameRecord);
-        this.addSecureEndpoint("queryNameContract", this.queryNameContract);
-        this.addSecureEndpoint("getBody", this.getBody);
-        this.addSecureEndpoint("getContract", this.getContract);
-        this.addSecureEndpoint("followerGetRate", this.followerGetRate);
-        this.addSecureEndpoint("queryFollowerInfo", this.queryFollowerInfo);
-        this.addSecureEndpoint("proxy", this.proxy);
+        this.addSecureEndpoint("getStats", (params, sessionKey) => this.getStats(params, sessionKey));
+        this.addSecureEndpoint("getState", (params, sessionKey) => this.getState(params, sessionKey));
+        this.addSecureEndpoint("getParcelProcessingState", (params, sessionKey) => this.getParcelProcessingState(params, sessionKey));
+        this.addSecureEndpoint("approve", (params, sessionKey) => this.approve(params, sessionKey));
+        this.addSecureEndpoint("resyncItem", (params, sessionKey) => this.resyncItem(params, sessionKey));
+        this.addSecureEndpoint("pingNode", (params, sessionKey) => this.pingNode(params, sessionKey));
+        this.addSecureEndpoint("setVerbose", (params, sessionKey) => this.setVerbose(params, sessionKey));
+        this.addSecureEndpoint("approveParcel", (params, sessionKey) => this.approveParcel(params, sessionKey));
+        this.addSecureEndpoint("startApproval", (params, sessionKey) => this.startApproval(params, sessionKey));
+        this.addSecureEndpoint("storageGetRate", (params, sessionKey) => this.storageGetRate(params, sessionKey));
+        this.addSecureEndpoint("querySlotInfo", (params, sessionKey) => this.querySlotInfo(params, sessionKey));
+        this.addSecureEndpoint("queryContract", (params, sessionKey) => this.queryContract(params, sessionKey));
+        this.addSecureEndpoint("unsRate", (params, sessionKey) => this.unsRate(params, sessionKey));
+        this.addSecureEndpoint("queryNameRecord", (params, sessionKey) => this.queryNameRecord(params, sessionKey));
+        this.addSecureEndpoint("queryNameContract", (params, sessionKey) => this.queryNameContract(params, sessionKey));
+        this.addSecureEndpoint("getBody", (params, sessionKey) => this.getBody(params, sessionKey));
+        this.addSecureEndpoint("getContract", (params, sessionKey) => this.getContract(params, sessionKey));
+        this.addSecureEndpoint("followerGetRate", (params, sessionKey) => this.followerGetRate(params, sessionKey));
+        this.addSecureEndpoint("queryFollowerInfo", (params, sessionKey) => this.queryFollowerInfo(params, sessionKey));
+        this.addSecureEndpoint("proxy", (params, sessionKey) => this.proxy(params, sessionKey));
 
         super.startServer();
     }
@@ -211,7 +212,7 @@ class ClientHTTPServer extends network.HttpServer {
         if (this.node == null)
             throw new ex.CommandFailedError(Errors.NOT_READY, "please call again after a while");
 
-        if (this.node.isSanitating) {   //TODO: node
+        if (this.node.isSanitating()) {
             //WHILE NODE IS SANITATING IT COMMUNICATES WITH THE OTHER NODES ONLY
             if (this.netConfig.toList().some(nodeInfo => nodeInfo.publicKey.equals(sessionKey)))
                 return;
@@ -220,7 +221,7 @@ class ClientHTTPServer extends network.HttpServer {
         }
 
         // checking key limit
-        if (checkKeyLimit && !this.node.checkKeyLimit(sessionKey))   //TODO: node
+        if (checkKeyLimit && !this.node.checkKeyLimit(sessionKey))
             throw new ex.CommandFailedError(Errors.COMMAND_FAILED, "exceeded the limit of requests for key per minute, please call again after a while");
     }
 
@@ -370,8 +371,8 @@ class ClientHTTPServer extends network.HttpServer {
         return res;
     }
 
-    itemResultOfError(error, object, message) {
-        let itemResult = ItemResult.from(ItemState.UNDEFINED, false, Date.now(), Date.now());
+    static itemResultOfError(error, object, message) {
+        let itemResult = ItemResult.from(ItemState.UNDEFINED, false, new Date(), new Date());
         itemResult.errors = [new ErrorRecord(error, object, message)];
         return itemResult;
     }
@@ -389,16 +390,16 @@ class ClientHTTPServer extends network.HttpServer {
                 contract = Contract.fromPackedTransaction(t.getOrThrow(params, "packedItem"));
             } catch (err) {
                 this.logger.log("approve ERROR: " + err.message);
-                return {itemResult : this.itemResultOfError(Errors.COMMAND_FAILED,"approve", err.message)};
+                return {itemResult : ClientHTTPServer.itemResultOfError(Errors.COMMAND_FAILED,"approve", err.message)};
             }
 
             if (contract == null || !contract.isUnlimitKeyContract(config)) {
                 if (contract.errors.length > 0) {
                     contract.errors.forEach(err => this.logger.log(err.message));
-                    return {itemResult : this.itemResultOfError(Errors.FAILED_CHECK, "approve", contract.errors[contract.errors.length - 1].message)};
+                    return {itemResult : ClientHTTPServer.itemResultOfError(Errors.FAILED_CHECK, "approve", contract.errors[contract.errors.length - 1].message)};
                 } else {
                     this.logger.log("approve ERROR: command needs client key from whitelist");
-                    return {itemResult : this.itemResultOfError(Errors.BAD_CLIENT_KEY, "approve", "command needs client key from whitelist")};
+                    return {itemResult : ClientHTTPServer.itemResultOfError(Errors.BAD_CLIENT_KEY, "approve", "command needs client key from whitelist")};
                 }
             }
         }
@@ -407,7 +408,7 @@ class ClientHTTPServer extends network.HttpServer {
             return {itemResult : await this.node.registerItem(Contract.fromPackedTransaction(t.getOrThrow(params, "packedItem")))}; //TODO: node
         } catch (err) {
             this.logger.log("approve ERROR: " + err.message);
-            return {itemResult : this.itemResultOfError(Errors.COMMAND_FAILED,"approve", err.message)};
+            return {itemResult : ClientHTTPServer.itemResultOfError(Errors.COMMAND_FAILED,"approve", err.message)};
         }
     }
 
@@ -418,7 +419,7 @@ class ClientHTTPServer extends network.HttpServer {
             return {result : await this.node.registerParcel(Parcel.unpack(t.getOrThrow(params, "packedItem")))}; //TODO: node
         } catch (err) {
             this.logger.log("approveParcel ERROR: " + err.message);
-            return {result : this.itemResultOfError(Errors.COMMAND_FAILED,"approveParcel", err.message)};
+            return {result : ClientHTTPServer.itemResultOfError(Errors.COMMAND_FAILED,"approveParcel", err.message)};
         }
     }
 
@@ -428,7 +429,7 @@ class ClientHTTPServer extends network.HttpServer {
              !this.config.addressesWhiteList.some(addr => addr.match(sessionKey)))))
         {
             this.logger.log("startApproval ERROR: session key should be in the white list");
-            return {itemResult : this.itemResultOfError(Errors.BAD_CLIENT_KEY, "startApproval", "command needs client key from whitelist")};
+            return {itemResult : ClientHTTPServer.itemResultOfError(Errors.BAD_CLIENT_KEY, "startApproval", "command needs client key from whitelist")};
         }
 
         let k = 0;
@@ -453,12 +454,12 @@ class ClientHTTPServer extends network.HttpServer {
         this.checkNode(sessionKey, true);
 
         try {
-            return {itemResult : await this.node.checkItem(params.itemId)}; //TODO: node
+            return {itemResult : await this.node.checkItem(params.itemId)};
         } catch (err) {
             this.logger.log(err.stack);
             this.logger.log("getState ERROR: " + err.message);
 
-            return {itemResult : this.itemResultOfError(Errors.COMMAND_FAILED, "approveParcel", err.message)};
+            return {itemResult : ClientHTTPServer.itemResultOfError(Errors.COMMAND_FAILED, "getState", err.message)};
         }
     }
 
@@ -480,7 +481,7 @@ class ClientHTTPServer extends network.HttpServer {
             this.config.addressesWhiteList.some(addr => addr.match(sessionKey))))
         {
             this.logger.log("resyncItem ERROR: command needs client key from whitelist");
-            return {itemResult : this.itemResultOfError(Errors.BAD_CLIENT_KEY, "resyncItem", "command needs client key from whitelist")};
+            return {itemResult : ClientHTTPServer.itemResultOfError(Errors.BAD_CLIENT_KEY, "resyncItem", "command needs client key from whitelist")};
         }
 
         try {
@@ -491,7 +492,7 @@ class ClientHTTPServer extends network.HttpServer {
             this.logger.log(err.stack);
             this.logger.log("resyncItem ERROR: " + err.message);
 
-            return {itemResult : this.itemResultOfError(Errors.COMMAND_FAILED,"resyncItem", err.message)};
+            return {itemResult : ClientHTTPServer.itemResultOfError(Errors.COMMAND_FAILED,"resyncItem", err.message)};
         }
     }
 
@@ -547,7 +548,7 @@ class ClientHTTPServer extends network.HttpServer {
             this.config.addressesWhiteList.some(addr => addr.match(sessionKey))))
         {
             this.logger.log("setVerbose ERROR: command needs client key from whitelist");
-            return {itemResult : this.itemResultOfError(Errors.BAD_CLIENT_KEY, "setVerbose", "command needs client key from whitelist")};
+            return {itemResult : ClientHTTPServer.itemResultOfError(Errors.BAD_CLIENT_KEY, "setVerbose", "command needs client key from whitelist")};
         }
 
         try {
@@ -564,11 +565,11 @@ class ClientHTTPServer extends network.HttpServer {
         } catch (err) {
             this.logger.log("setVerbose ERROR: " + err.message);
 
-            return {itemResult : this.itemResultOfError(Errors.COMMAND_FAILED, "setVerbose", err.message)};
+            return {itemResult : ClientHTTPServer.itemResultOfError(Errors.COMMAND_FAILED, "setVerbose", err.message)};
         }
     }
 
-    getStats(params, sessionKey) {
+    async getStats(params, sessionKey) {
         this.checkNode(sessionKey, true);
 
         if (this.config == null || this.node == null || !(
@@ -578,10 +579,10 @@ class ClientHTTPServer extends network.HttpServer {
             this.config.addressesWhiteList.some(addr => addr.match(sessionKey))))
         {
             this.logger.log("command needs admin key");
-            return {itemResult : this.itemResultOfError(Errors.BAD_CLIENT_KEY, "getStats", "command needs admin key")};
+            return {itemResult : ClientHTTPServer.itemResultOfError(Errors.BAD_CLIENT_KEY, "getStats", "command needs admin key")};
         }
 
-        return this.node.provideStats(t.getOrDefault(params, "showDays", null)); //TODO: node
+        return await this.node.provideStats(t.getOrDefault(params, "showDays", null)); //TODO: node
     }
 
     getParcelProcessingState(params, sessionKey) {

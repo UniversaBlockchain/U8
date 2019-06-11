@@ -374,7 +374,7 @@ network.HttpServer = class {
             }
             let results = await Promise.all(promises);
             for (let i = 0; i < length; ++i) {
-                reqBuf.setAnswer(i, Boss.dump(results[i]));
+                reqBuf.setAnswer(i, Boss.dump(DefaultBiMapper.getInstance().serialize(results[i])));
             }
         }
     }
@@ -383,7 +383,7 @@ network.HttpServer = class {
         try {
             if (this.secureEndpoints_.has(params.command))
                 return new Promise(async resolve=>{
-                    resolve({result: await this.secureEndpoints_.get(params.command)(params, sessionKey)});
+                    resolve({result: await this.secureEndpoints_.get(params.command)(params.params, sessionKey)});
                 });
             else {
                 throw new ErrorRecord(Errors.UNKNOWN_COMMAND, "command", "unknown: " + params.command);
@@ -482,7 +482,7 @@ network.HttpClient = class {
         let paramsBin = Boss.dump(DefaultBiMapper.getInstance().serialize({"command": name, "params": params}));
         let reqId = this.getReqId();
         this.callbacks_.set(reqId, (decrypted) => {
-            let binder = Boss.load(decrypted);
+            let binder = DefaultBiMapper.getInstance().deserialize(Boss.load(decrypted));
             let result = binder.result;
             if (result) {
                 onComplete(result);

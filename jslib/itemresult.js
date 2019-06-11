@@ -33,7 +33,25 @@ class ItemResult {
         this.errors = null;
         this.isTestnet = null;
         this.lockedById = null;
-        this.extraDataBinder = null;
+        this.extra = null;
+    }
+
+    copy() {
+        let res = ItemResult.from(this.state, this.haveCopy, this.createdAt, this.expiresAt);
+
+        res.lockedById = this.lockedById;
+        res.isTestnet = this.isTestnet;
+
+        if (this.errors != null) {
+            res.errors = [];
+            this.errors.forEach(error => res.errors.push(error));
+        }
+        if (this.extra != null) {
+            res.extra = {};
+            Array.from(Object.keys(this.extra)).forEach(key => res.extra.set(key, this.extra[key]));
+        }
+
+        return res;
     }
 
     deserialize(data, deserializer) {
@@ -156,8 +174,8 @@ class ItemResult {
 
         result.state = state;
         result.haveCopy = haveCopy;
-        result.createdAt = createdAt;
-        result.expiresAt = expiresAt;
+        result.createdAt = new Date(createdAt);
+        result.expiresAt = new Date(expiresAt);
 
         return result;
     }

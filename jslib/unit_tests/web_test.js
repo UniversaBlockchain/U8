@@ -57,7 +57,7 @@ unit.test("hello web", async () => {
     //countToSend = 200000000;
     let receiveCounter = 0;
 
-    let httpClient = new network.HttpClient("http://localhost:8080", 128, 128);
+    let httpClient = new network.HttpClient("http://localhost:8080", 32, 128);
     await httpClient.start(clientKey, new crypto.PublicKey(nodeKey));
 
     let t00 = new Date().getTime();
@@ -110,7 +110,7 @@ unit.test("http secure endpoints", async () => {
     //countToSend = 200000000;
     let receiveCounter = 0;
 
-    let httpClient = new network.HttpClient("http://localhost:8080", 64, 64);
+    let httpClient = new network.HttpClient("http://localhost:8080", 32, 64);
     //let httpClient = new network.HttpClient("http://192.168.1.146:8080", 64, 64);
     await httpClient.start(clientKey, new crypto.PublicKey(nodeKey));
 
