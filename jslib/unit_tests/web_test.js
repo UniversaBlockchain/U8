@@ -44,9 +44,9 @@ unit.test("hello web", async () => {
         return {"ping": "pong"};
     });
     let unsRateDbg = 333;
-    httpServer.addSecureEndpoint("unsRate", async (reqParams, sessionKey) => {
+    httpServer.addSecureEndpoint("unsRate", async (reqParams, clientPublicKey) => {
         // console.log(JSON.stringify(reqParams));
-        // console.log(btoa(sessionKey.packed));
+        // console.log(btoa(clientPublicKey.packed));
         unsRateDbg += 1;
         await sleep(1);
         return {U: unsRateDbg};
@@ -94,12 +94,13 @@ unit.test("http secure endpoints", async () => {
     let httpServer = new network.HttpServer("0.0.0.0", 8080, 1, 20);
     let nodeKey = new crypto.PrivateKey(atob("JgAcAQABvID6D5ZdM9EKrZSztm/R/RcywM4K8Z4VBtX+NZp2eLCWtfAgGcBCQLtNz4scH7dPBerkkxckW6+9CLlnu/tgOxvzS6Z1Ec51++fVP9gaWbBQe9/dSg7xVPg5p9ibhfTB+iRXyevCkNj0hrlLyXl1BkPjN9+lZfXJsp9OnGIJ/AaAb7yA99E65gvZnbb3/oA3rG0pM45af6ppZKe2HeiAK+fcXm5KTQzfTce45f/mJ0jsDmFf1HFosS4waXSAz0ZfcssjPeoF3PuXfJLtM8czJ55+Nz6NMCbzrSk6zkKssGBieYFOb4eG2AdtfjTrpcSSHBgJpsbcmRx4bZNfBAZPqT+Sd20="));
     let clientKey = await crypto.PrivateKey.generate(2048);
+    // console.log("clientKey: " + btoa(new crypto.PublicKey(clientKey).fingerprints));
     httpServer.initSecureProtocol(nodeKey);
     let counter = 0;
     let unsRateDbg = 333;
-    httpServer.addSecureEndpoint("unsRate", async (reqParams, sessionKey) => {
+    httpServer.addSecureEndpoint("unsRate", async (reqParams, clientPublicKey) => {
         // console.log(JSON.stringify(reqParams));
-        // console.log(btoa(sessionKey.packed));
+        // console.log(btoa(clientPublicKey.fingerprints));
         unsRateDbg += 1;
         await sleep(1);
         return {U: ""+unsRateDbg};

@@ -357,7 +357,7 @@ network.HttpServer = class {
             let promises = [];
             for (let i = 0; i < length; ++i) {
                 let params = DefaultBiMapper.getInstance().deserialize(Boss.load(reqBuf.getParamsBin(i)));
-                let sessionKey = new crypto.SymmetricKey(reqBuf.getSessionKeyBin(i));
+                let clientPublicKey = new crypto.PublicKey(reqBuf.getPublicKeyBin(i));
                 switch (params.command) {
                     case "hello":
                         promises.push({result: {status: "OK", message: "welcome to the Universa"}});
@@ -369,7 +369,7 @@ network.HttpServer = class {
                         throw new Error("sample error");
                         break;
                     default:
-                        promises.push(this.processSecureCommand(params, sessionKey));
+                        promises.push(this.processSecureCommand(params, clientPublicKey));
                 }
             }
             let results = await Promise.all(promises);
@@ -379,11 +379,11 @@ network.HttpServer = class {
         }
     }
 
-    processSecureCommand(params, sessionKey) {
+    processSecureCommand(params, clientPublicKey) {
         try {
             if (this.secureEndpoints_.has(params.command))
                 return new Promise(async resolve=>{
-                    resolve({result: await this.secureEndpoints_.get(params.command)(params.params, sessionKey)});
+                    resolve({result: await this.secureEndpoints_.get(params.command)(params.params, clientPublicKey)});
                 });
             else {
                 throw new ErrorRecord(Errors.UNKNOWN_COMMAND, "command", "unknown: " + params.command);

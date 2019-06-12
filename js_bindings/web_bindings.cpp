@@ -517,8 +517,8 @@ public:
     byte_vector getParamsBin(int idx) {
         return buf_[idx].first;
     }
-    byte_vector getSessionKeyBin(int idx) {
-        return buf_[idx].second->sessionKey->pack();
+    byte_vector getPublicKeyBin(int idx) {
+        return buf_[idx].second->publicKey.pack();
     }
     void setAnswer(int idx, byte_vector&& ans) {
         answers_[idx] = std::move(ans);
@@ -1221,11 +1221,11 @@ void HttpServerSecureRequestBuf_getParamsBin(const FunctionCallbackInfo<Value> &
     });
 }
 
-void HttpServerSecureRequestBuf_getSessionKeyBin(const FunctionCallbackInfo<Value> &args) {
+void HttpServerSecureRequestBuf_getPublicKeyBin(const FunctionCallbackInfo<Value> &args) {
     Scripter::unwrapArgs(args, [](ArgsContext &ac) {
         if (ac.args.Length() == 1) {
             auto httpServerSecureRequestBuf = unwrap<HttpServerSecureRequestBuf>(ac.args.This());
-            ac.setReturnValue(ac.toBinary(httpServerSecureRequestBuf->getSessionKeyBin(ac.asInt(0))));
+            ac.setReturnValue(ac.toBinary(httpServerSecureRequestBuf->getPublicKeyBin(ac.asInt(0))));
             return;
         }
         ac.throwError("invalid arguments");
@@ -1255,7 +1255,7 @@ void JsInitHttpServerSecureRequest(Isolate *isolate, const Local<ObjectTemplate>
     prototype->Set(isolate, "version", String::NewFromUtf8(isolate, "0.0.1"));
     prototype->Set(isolate, "getBufLength", FunctionTemplate::New(isolate, HttpServerSecureRequestBuf_getBufLength));
     prototype->Set(isolate, "getParamsBin", FunctionTemplate::New(isolate, HttpServerSecureRequestBuf_getParamsBin));
-    prototype->Set(isolate, "getSessionKeyBin", FunctionTemplate::New(isolate, HttpServerSecureRequestBuf_getSessionKeyBin));
+    prototype->Set(isolate, "getPublicKeyBin", FunctionTemplate::New(isolate, HttpServerSecureRequestBuf_getPublicKeyBin));
     prototype->Set(isolate, "setAnswer", FunctionTemplate::New(isolate, HttpServerSecureRequestBuf_setAnswer));
 
     // register it into global namespace
