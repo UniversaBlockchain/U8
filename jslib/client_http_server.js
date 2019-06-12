@@ -179,26 +179,26 @@ class ClientHTTPServer extends network.HttpServer {
             };
         });
 
-        this.addSecureEndpoint("getStats", (params, sessionKey) => this.getStats(params, sessionKey));
-        this.addSecureEndpoint("getState", (params, sessionKey) => this.getState(params, sessionKey));
-        this.addSecureEndpoint("getParcelProcessingState", (params, sessionKey) => this.getParcelProcessingState(params, sessionKey));
-        this.addSecureEndpoint("approve", (params, sessionKey) => this.approve(params, sessionKey));
-        this.addSecureEndpoint("resyncItem", (params, sessionKey) => this.resyncItem(params, sessionKey));
-        this.addSecureEndpoint("pingNode", (params, sessionKey) => this.pingNode(params, sessionKey));
-        this.addSecureEndpoint("setVerbose", (params, sessionKey) => this.setVerbose(params, sessionKey));
-        this.addSecureEndpoint("approveParcel", (params, sessionKey) => this.approveParcel(params, sessionKey));
-        this.addSecureEndpoint("startApproval", (params, sessionKey) => this.startApproval(params, sessionKey));
-        this.addSecureEndpoint("storageGetRate", (params, sessionKey) => this.storageGetRate(params, sessionKey));
-        this.addSecureEndpoint("querySlotInfo", (params, sessionKey) => this.querySlotInfo(params, sessionKey));
-        this.addSecureEndpoint("queryContract", (params, sessionKey) => this.queryContract(params, sessionKey));
-        this.addSecureEndpoint("unsRate", (params, sessionKey) => this.unsRate(params, sessionKey));
-        this.addSecureEndpoint("queryNameRecord", (params, sessionKey) => this.queryNameRecord(params, sessionKey));
-        this.addSecureEndpoint("queryNameContract", (params, sessionKey) => this.queryNameContract(params, sessionKey));
-        this.addSecureEndpoint("getBody", (params, sessionKey) => this.getBody(params, sessionKey));
-        this.addSecureEndpoint("getContract", (params, sessionKey) => this.getContract(params, sessionKey));
-        this.addSecureEndpoint("followerGetRate", (params, sessionKey) => this.followerGetRate(params, sessionKey));
-        this.addSecureEndpoint("queryFollowerInfo", (params, sessionKey) => this.queryFollowerInfo(params, sessionKey));
-        this.addSecureEndpoint("proxy", (params, sessionKey) => this.proxy(params, sessionKey));
+        this.addSecureEndpoint("getStats", (params, clientKey) => this.getStats(params, clientKey));
+        this.addSecureEndpoint("getState", (params, clientKey) => this.getState(params, clientKey));
+        this.addSecureEndpoint("getParcelProcessingState", (params, clientKey) => this.getParcelProcessingState(params, clientKey));
+        this.addSecureEndpoint("approve", (params, clientKey) => this.approve(params, clientKey));
+        this.addSecureEndpoint("resyncItem", (params, clientKey) => this.resyncItem(params, clientKey));
+        this.addSecureEndpoint("pingNode", (params, clientKey) => this.pingNode(params, clientKey));
+        this.addSecureEndpoint("setVerbose", (params, clientKey) => this.setVerbose(params, clientKey));
+        this.addSecureEndpoint("approveParcel", (params, clientKey) => this.approveParcel(params, clientKey));
+        this.addSecureEndpoint("startApproval", (params, clientKey) => this.startApproval(params, clientKey));
+        this.addSecureEndpoint("storageGetRate", (params, clientKey) => this.storageGetRate(params, clientKey));
+        this.addSecureEndpoint("querySlotInfo", (params, clientKey) => this.querySlotInfo(params, clientKey));
+        this.addSecureEndpoint("queryContract", (params, clientKey) => this.queryContract(params, clientKey));
+        this.addSecureEndpoint("unsRate", (params, clientKey) => this.unsRate(params, clientKey));
+        this.addSecureEndpoint("queryNameRecord", (params, clientKey) => this.queryNameRecord(params, clientKey));
+        this.addSecureEndpoint("queryNameContract", (params, clientKey) => this.queryNameContract(params, clientKey));
+        this.addSecureEndpoint("getBody", (params, clientKey) => this.getBody(params, clientKey));
+        this.addSecureEndpoint("getContract", (params, clientKey) => this.getContract(params, clientKey));
+        this.addSecureEndpoint("followerGetRate", (params, clientKey) => this.followerGetRate(params, clientKey));
+        this.addSecureEndpoint("queryFollowerInfo", (params, clientKey) => this.queryFollowerInfo(params, clientKey));
+        this.addSecureEndpoint("proxy", (params, clientKey) => this.proxy(params, clientKey));
 
         super.startServer();
     }
@@ -207,21 +207,21 @@ class ClientHTTPServer extends network.HttpServer {
         await super.stopServer();
     }
 
-    checkNode(sessionKey, checkKeyLimit = false) {
+    checkNode(clientKey, checkKeyLimit = false) {
         // checking node
         if (this.node == null)
             throw new ex.CommandFailedError(Errors.NOT_READY, "please call again after a while");
 
         if (this.node.isSanitating()) {
             //WHILE NODE IS SANITATING IT COMMUNICATES WITH THE OTHER NODES ONLY
-            if (this.netConfig.toList().some(nodeInfo => nodeInfo.publicKey.equals(sessionKey)))
+            if (this.netConfig.toList().some(nodeInfo => nodeInfo.publicKey.equals(clientKey)))
                 return;
 
             throw new ex.CommandFailedError(Errors.NOT_READY, "please call again after a while");
         }
 
         // checking key limit
-        if (checkKeyLimit && !this.node.checkKeyLimit(sessionKey))
+        if (checkKeyLimit && !this.node.checkKeyLimit(clientKey))
             throw new ex.CommandFailedError(Errors.COMMAND_FAILED, "exceeded the limit of requests for key per minute, please call again after a while");
     }
 
@@ -239,14 +239,14 @@ class ClientHTTPServer extends network.HttpServer {
         });
     }
 
-    unsRate(params, sessionKey) {
-        this.checkNode(sessionKey, true);
+    unsRate(params, clientKey) {
+        this.checkNode(clientKey, true);
 
         return {U: Config.rate[NSmartContract.SmartContractType.UNS1].toFixed()};
     }
 
-    async queryNameRecord(params, sessionKey) {
-        this.checkNode(sessionKey, true);
+    async queryNameRecord(params, clientKey) {
+        this.checkNode(clientKey, true);
 
         let loadedNameRecord = null;
         let address = params.address;
@@ -270,8 +270,8 @@ class ClientHTTPServer extends network.HttpServer {
         };
     }
 
-    async queryNameContract(params, sessionKey) {
-        this.checkNode(sessionKey, true);
+    async queryNameContract(params, clientKey) {
+        this.checkNode(clientKey, true);
 
         let nr = await this.node.ledger.getNameRecord(t.getOrThrow(params, "name"));
         if (nr != null) {
@@ -283,8 +283,8 @@ class ClientHTTPServer extends network.HttpServer {
         return {};
     }
 
-    async getBody(params, sessionKey) {
-        this.checkNode(sessionKey, true);
+    async getBody(params, clientKey) {
+        this.checkNode(clientKey, true);
 
         if (!this.config.permanetMode)
             return {};
@@ -295,8 +295,8 @@ class ClientHTTPServer extends network.HttpServer {
         if (body != null)
             return {packedContract: body};
 
-        await this.node.resync(itemId);                       //TODO: node
-        let itemResult = await this.node.checkItem(itemId);   //TODO: node
+        await this.node.resync(itemId);
+        let itemResult = await this.node.checkItem(itemId);
 
         if (itemResult.state === ItemState.UNDEFINED)
             return {};
@@ -315,8 +315,8 @@ class ClientHTTPServer extends network.HttpServer {
         return {};
     }
 
-    async getContract(params, sessionKey) {
-        this.checkNode(sessionKey, true);
+    async getContract(params, clientKey) {
+        this.checkNode(clientKey, true);
 
         let res = {};
 
@@ -377,13 +377,13 @@ class ClientHTTPServer extends network.HttpServer {
         return itemResult;
     }
 
-    async approve(params, sessionKey) {
-        this.checkNode(sessionKey);
+    async approve(params, clientKey) {
+        this.checkNode(clientKey);
 
         if (this.config.limitFreeRegistrations() && !(
-            Config.networkAdminKeyAddress.match(sessionKey) ||
-            this.config.keysWhiteList.some(key => key.equals(sessionKey)) ||
-            this.config.addressesWhiteList.some(addr => addr.match(sessionKey))))
+            Config.networkAdminKeyAddress.match(clientKey) ||
+            this.config.keysWhiteList.some(key => key.equals(clientKey)) ||
+            this.config.addressesWhiteList.some(addr => addr.match(clientKey))))
         {
             let contract = null;
             try {
@@ -412,8 +412,8 @@ class ClientHTTPServer extends network.HttpServer {
         }
     }
 
-    async approveParcel(params, sessionKey) {
-        this.checkNode(sessionKey);
+    async approveParcel(params, clientKey) {
+        this.checkNode(clientKey);
 
         try {
             return {result : await this.node.registerParcel(Parcel.unpack(t.getOrThrow(params, "packedItem")))}; //TODO: node
@@ -423,10 +423,10 @@ class ClientHTTPServer extends network.HttpServer {
         }
     }
 
-    async startApproval(params, sessionKey) {
+    async startApproval(params, clientKey) {
         if (this.config == null || (this.config.limitFreeRegistrations() &&
-            (!this.config.keysWhiteList.some(key => key.equals(sessionKey)) &&
-             !this.config.addressesWhiteList.some(addr => addr.match(sessionKey)))))
+            (!this.config.keysWhiteList.some(key => key.equals(clientKey)) &&
+             !this.config.addressesWhiteList.some(addr => addr.match(clientKey)))))
         {
             this.logger.log("startApproval ERROR: session key should be in the white list");
             return {itemResult : ClientHTTPServer.itemResultOfError(Errors.BAD_CLIENT_KEY, "startApproval", "command needs client key from whitelist")};
@@ -436,7 +436,7 @@ class ClientHTTPServer extends network.HttpServer {
         let results = [];
         await Promise.all(t.getOrThrow(params, "packedItems").map(async(item) => {
             try {
-                this.checkNode(sessionKey);
+                this.checkNode(clientKey);
                 k++;
                 this.logger.log("Request to start registration:" + k);
 
@@ -450,8 +450,8 @@ class ClientHTTPServer extends network.HttpServer {
         return {itemResults: results};
     }
 
-    async getState(params, sessionKey) {
-        this.checkNode(sessionKey, true);
+    async getState(params, clientKey) {
+        this.checkNode(clientKey, true);
 
         try {
             return {itemResult : await this.node.checkItem(params.itemId)};
@@ -463,8 +463,8 @@ class ClientHTTPServer extends network.HttpServer {
         }
     }
 
-    async resyncItem(params, sessionKey) {
-        this.checkNode(sessionKey, true);
+    async resyncItem(params, clientKey) {
+        this.checkNode(clientKey, true);
 
         let tmpAddress = null;
         try {
@@ -475,10 +475,10 @@ class ClientHTTPServer extends network.HttpServer {
         }
 
         if (this.config.limitFreeRegistrations && !(
-            tmpAddress.match(sessionKey) ||
-            Config.networkAdminKeyAddress.match(sessionKey) ||
-            this.config.keysWhiteList.some(key => key.equals(sessionKey)) ||
-            this.config.addressesWhiteList.some(addr => addr.match(sessionKey))))
+            tmpAddress.match(clientKey) ||
+            Config.networkAdminKeyAddress.match(clientKey) ||
+            this.config.keysWhiteList.some(key => key.equals(clientKey)) ||
+            this.config.addressesWhiteList.some(addr => addr.match(clientKey))))
         {
             this.logger.log("resyncItem ERROR: command needs client key from whitelist");
             return {itemResult : ClientHTTPServer.itemResultOfError(Errors.BAD_CLIENT_KEY, "resyncItem", "command needs client key from whitelist")};
@@ -496,7 +496,7 @@ class ClientHTTPServer extends network.HttpServer {
         }
     }
 
-    async pingNode(params, sessionKey) {
+    async pingNode(params, clientKey) {
         // checking node
         if (this.node == null)
             throw new ex.CommandFailedError(Errors.NOT_READY, "please call again after a while");
@@ -509,10 +509,10 @@ class ClientHTTPServer extends network.HttpServer {
             this.logger.log("pingNode ERROR: " + err.message);
         }
 
-        if (!(tmpAddress.match(sessionKey) ||
-            Config.networkAdminKeyAddress.match(sessionKey) ||
-            this.config.keysWhiteList.some(key => key.equals(sessionKey)) ||
-            this.config.addressesWhiteList.some(addr => addr.match(sessionKey))))
+        if (!(tmpAddress.match(clientKey) ||
+            Config.networkAdminKeyAddress.match(clientKey) ||
+            this.config.keysWhiteList.some(key => key.equals(clientKey)) ||
+            this.config.addressesWhiteList.some(addr => addr.match(clientKey))))
                 throw new ex.IllegalArgumentError("command needs client key from whitelist");
 
         let nodeNumber = t.getOrThrow(params, "nodeNumber");
@@ -530,8 +530,8 @@ class ClientHTTPServer extends network.HttpServer {
         };
     }
 
-    setVerbose(params, sessionKey) {
-        this.checkNode(sessionKey, true);
+    setVerbose(params, clientKey) {
+        this.checkNode(clientKey, true);
 
         let tmpAddress = null;
         try {
@@ -542,10 +542,10 @@ class ClientHTTPServer extends network.HttpServer {
         }
 
         if (this.config.limitFreeRegistrations && !(
-            tmpAddress.match(sessionKey) ||
-            Config.networkAdminKeyAddress.match(sessionKey) ||
-            this.config.keysWhiteList.some(key => key.equals(sessionKey)) ||
-            this.config.addressesWhiteList.some(addr => addr.match(sessionKey))))
+            tmpAddress.match(clientKey) ||
+            Config.networkAdminKeyAddress.match(clientKey) ||
+            this.config.keysWhiteList.some(key => key.equals(clientKey)) ||
+            this.config.addressesWhiteList.some(addr => addr.match(clientKey))))
         {
             this.logger.log("setVerbose ERROR: command needs client key from whitelist");
             return {itemResult : ClientHTTPServer.itemResultOfError(Errors.BAD_CLIENT_KEY, "setVerbose", "command needs client key from whitelist")};
@@ -569,14 +569,14 @@ class ClientHTTPServer extends network.HttpServer {
         }
     }
 
-    async getStats(params, sessionKey) {
-        this.checkNode(sessionKey, true);
+    async getStats(params, clientKey) {
+        this.checkNode(clientKey, true);
 
         if (this.config == null || this.node == null || !(
-            Config.networkAdminKeyAddress.match(sessionKey) ||
-            this.node.myInfo.publicKey.equals(sessionKey) ||
-            this.config.keysWhiteList.some(key => key.equals(sessionKey)) ||
-            this.config.addressesWhiteList.some(addr => addr.match(sessionKey))))
+            Config.networkAdminKeyAddress.match(clientKey) ||
+            this.node.myInfo.publicKey.equals(clientKey) ||
+            this.config.keysWhiteList.some(key => key.equals(clientKey)) ||
+            this.config.addressesWhiteList.some(addr => addr.match(clientKey))))
         {
             this.logger.log("command needs admin key");
             return {itemResult : ClientHTTPServer.itemResultOfError(Errors.BAD_CLIENT_KEY, "getStats", "command needs admin key")};
@@ -585,8 +585,8 @@ class ClientHTTPServer extends network.HttpServer {
         return await this.node.provideStats(t.getOrDefault(params, "showDays", null)); //TODO: node
     }
 
-    getParcelProcessingState(params, sessionKey) {
-        this.checkNode(sessionKey, true);
+    getParcelProcessingState(params, clientKey) {
+        this.checkNode(clientKey, true);
 
         try {
             return {processingState : this.node.checkParcelProcessingState(params.parcelId)}; //TODO: node
@@ -598,14 +598,14 @@ class ClientHTTPServer extends network.HttpServer {
         }
     }
 
-    storageGetRate(params, sessionKey) {
-        this.checkNode(sessionKey, true);
+    storageGetRate(params, clientKey) {
+        this.checkNode(clientKey, true);
 
         return {U: Config.rate[NSmartContract.SmartContractType.SLOT1].toFixed()};
     }
 
-    async querySlotInfo(params, sessionKey) {
-        this.checkNode(sessionKey, true);
+    async querySlotInfo(params, clientKey) {
+        this.checkNode(clientKey, true);
 
         let slot_id = t.getOrThrow(params, "slot_id");
         let slotBin = await this.node.ledger.getSmartContractById(crypto.HashId.withDigest(slot_id));
@@ -618,8 +618,8 @@ class ClientHTTPServer extends network.HttpServer {
         return {slot_state: null};
     }
 
-    async queryContract(params, sessionKey) {
-        this.checkNode(sessionKey, true);
+    async queryContract(params, clientKey) {
+        this.checkNode(clientKey, true);
 
         let contract = null;
         let slot_id = params.slot_id;
@@ -661,8 +661,8 @@ class ClientHTTPServer extends network.HttpServer {
         return {contract: contract};
     }
 
-    followerGetRate(params, sessionKey) {
-        this.checkNode(sessionKey, true);
+    followerGetRate(params, clientKey) {
+        this.checkNode(clientKey, true);
 
         let rateOriginDays = Config.rate[NSmartContract.SmartContractType.FOLLOWER1];
         let rateCallback = Config.rate[NSmartContract.SmartContractType.FOLLOWER1 + ":callback"].div(rateOriginDays);
@@ -673,8 +673,8 @@ class ClientHTTPServer extends network.HttpServer {
         };
     }
 
-    async queryFollowerInfo(params, sessionKey) {
-        this.checkNode(sessionKey, true);
+    async queryFollowerInfo(params, clientKey) {
+        this.checkNode(clientKey, true);
 
         let follower_id = t.getOrThrow(params, "follower_id");
         let followerBin = await this.node.ledger.getSmartContractById(crypto.HashId.withDigest(follower_id));
@@ -698,8 +698,8 @@ class ClientHTTPServer extends network.HttpServer {
         return res;
     }
 
-    proxy(params, sessionKey) {
-        this.checkNode(sessionKey, true);
+    proxy(params, clientKey) {
+        this.checkNode(clientKey, true);
 
         let url = t.getOrThrow(params, "url");
 

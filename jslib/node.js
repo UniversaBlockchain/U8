@@ -173,7 +173,7 @@ class Node {
      * @param {boolean} ommitItemResult - Do not return ItemResult for processed item,
      *                        create new ItemProcessor instead (if autoStart is true). Default is false.
      *
-     * @return {ItemProcessor} instance of ItemProcessor if the item is being processed (also if it was started by the call),
+     * @return {ItemResult| ItemProcessor | ResyncProcessor} instance of ItemProcessor if the item is being processed (also if it was started by the call),
      *         ItemResult if it is already processed or can't be processed, say, created_at field is too far in
      *         the past, in which case result state will be ItemState#DISCARDED.
      */
@@ -249,15 +249,12 @@ class Node {
      * @return {boolean} result of checking.
      */
     checkKeyLimit(key) {
-        //TODO: PublicKey
-        /*console.log(key instanceof crypto.SymmetricKey);
-
         if (this.config == null ||
             Config.networkAdminKeyAddress.match(key) ||
             this.myInfo.publicKey.equals(key) ||
-            this.config.keysWhiteList().some(k => k.equals(key)) ||
+            this.config.keysWhiteList.some(k => k.equals(key)) ||
             this.config.addressesWhiteList.some(addr => addr.match(key)))
-            return true;*/
+            return true;
 
         let currentEpochMinute = Math.floor(Date.now() / 60000);
         if (this.epochMinute !== currentEpochMinute) {

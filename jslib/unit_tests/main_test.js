@@ -262,3 +262,37 @@ unit.test("main_test: resync", async () => {
 
     await ts.shutdown();
 });
+
+unit.test("main_test: resyncBreak", async () => {
+    let key = new PrivateKey(await (await io.openRead("../test/keys/reconfig_key.private.unikey")).allBytes());
+    let ts = await new TestSpace(key).create(/*false*/);
+
+    for (let i = 0; i < 4; i++) {
+        ts.nodes[i].setVerboseLevel(VerboseLevel.DETAILED);
+        ts.nodes[i].setUDPVerboseLevel(VerboseLevel.DETAILED);
+    }
+
+    let id = HashId.of(randomBytes(64));
+
+    let record = await ts.nodes[1].ledger.findOrCreate(id);
+    await record.decline();
+
+    record = await ts.nodes[3].ledger.findOrCreate(id);
+    await record.approve();
+
+    assert(await ts.nodes[0].ledger.getRecord(id) == null);
+    assert(await ts.nodes[2].ledger.getRecord(id) == null);
+
+    let fire = null;
+    let event = new Promise((resolve) => {fire = resolve});
+
+    await ts.nodes[2].node.resync(id, () => fire(true));
+
+    new ScheduleExecutor(() => fire(false), 10000).run();
+    assert(await event);
+
+    // resync breaked
+    assert(await ts.nodes[2].ledger.getRecord(id) === null);
+
+    await ts.shutdown();
+});

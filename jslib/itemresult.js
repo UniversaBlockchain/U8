@@ -8,8 +8,8 @@ const ItemState = require("itemstate").ItemState;
  * expose local data in direct mode. It is a "structure" of final members, to simplify access and avoid getters.
  */
 class ItemResult {
-    static DISCARDED = new ItemResult(ItemState.DISCARDED, false, null, null);
-    static UNDEFINED = new ItemResult(ItemState.UNDEFINED, false, null, null);
+    static DISCARDED = ItemResult.from(ItemState.DISCARDED, false, null, null);
+    static UNDEFINED = ItemResult.from(ItemState.UNDEFINED, false, null, null);
 
     constructor() {
         /**
