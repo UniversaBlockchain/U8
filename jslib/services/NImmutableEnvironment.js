@@ -45,6 +45,7 @@ class NImmutableEnvironment extends ImmutableEnvironment {
         this.storagesSet = new Set(storages);
         this.nameRecordsSet = new Set(nameRecords);
         this.followerService = followerService;
+        this.nameCache = null;
     }
 
     get(keyName, defaultValue) {

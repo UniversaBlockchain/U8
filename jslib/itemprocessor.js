@@ -1,4 +1,4 @@
-import {ScheduleExecutor, ExecutorWithDynamicPeriod} from "executorservice";
+import {ScheduleExecutor, ExecutorWithDynamicPeriod, EventTimeoutError, AsyncEvent} from "executorservice";
 import {VerboseLevel} from "node_consts";
 import {ParcelNotification, ParcelNotificationType} from "notification";
 
@@ -89,6 +89,8 @@ class ItemProcessor {
         this.isCheckingForce = isCheckingForce;
         this.processingState = ItemProcessingState.INIT;
 
+        this.record = null;
+
         this.sources = new Set();
 
         this.positiveNodes = new Set();
@@ -104,16 +106,15 @@ class ItemProcessor {
         this.lockedToRevoke = [];
         this.lockedToCreate = [];
 
-        this.pollingExpiresAt = Math.floor(Date.now() / 1000) + Config.maxElectionsTime;
-        this.consensusReceivedExpiresAt = Math.floor(Date.now() / 1000) + Config.maxConsensusReceivedCheckTime;
+        this.pollingExpiresAt = Date.now() + Config.maxElectionsTime * 1000;    // in milliseconds
+        this.consensusReceivedExpiresAt = Date.now() + Config.maxConsensusReceivedCheckTime * 1000;    // in milliseconds
 
         this.alreadyChecked = false;
 
         this.extra = {};
 
-        this.downloadedEvent = new Promise(resolve => this.downloadedFire = resolve);
-        this.doneEvent = new Promise(resolve => this.doneFire = resolve);
-        this.pollingReadyEvent = new Promise(resolve => this.pollingReadyFire = resolve);
+        this.downloadedEvent = new AsyncEvent(this.node.executorService);
+        this.doneEvent = new AsyncEvent(this.node.executorService);
         this.removedEvent = new Promise(resolve => this.removedFire = resolve);
 
         this.poller = null;
@@ -680,9 +681,8 @@ class ItemProcessor {
             if (this.item == null) {
                 // If positive consensus os found, we can spend more time for final download, and can try
                 // all the network as the source:
-                this.pollingExpiresAt = Math.floor(Date.now() / 1000) + Config.maxDownloadOnApproveTime;
-                //TODO:
-                //downloadedEvent.await(this.getMillisLeft());
+                this.pollingExpiresAt = Date.now() + Config.maxDownloadOnApproveTime * 1000;
+                await this.downloadedEvent.await(this.getMillisLeft());
             }
             // We use the caching capability of ledger so we do not get records from
             // lockedToRevoke/lockedToCreate, as, due to conflicts, these could differ from what the item
@@ -715,88 +715,95 @@ class ItemProcessor {
             if (this.record.state !== ItemState.APPROVED)
                 this.node.logger.log("ERROR: record is not approved " + this.record.state);
 
-            /*try {
+            try {
                 // if item is smart contract node calls onCreated or onUpdated
-                if(item instanceof NSmartContract) {
+                if (this.item instanceof NSmartContract) {
                     // slot need ledger, config and nodeInfo for processing
-                    ((NSmartContract) item).setNodeInfoProvider(nodeInfoProvider);
+                    this.item.nodeInfoProvider = this.node.nodeInfoProvider;        //TODO: node.nodeInfoProvider
 
+                    if (this.negativeNodes.has(this.node.myInfo))
+                        this.addItemToResync(this.item.id, this.record);
+                    else {
+                        let ime = await this.node.getEnvironmentByItem(this.item);  //TODO: node.getEnvironmentByItem
+                        ime.nameCache = this.node.nameCache;
+                        let me = ime.getMutable();
 
-                    if(negativeNodes.contains(myInfo)) {
-                        addItemToResync(item.getId(),record);
-                    } else {
-
-                        NImmutableEnvironment ime = getEnvironment((NSmartContract) item);
-                        ime.setNameCache(nameCache);
-                        NMutableEnvironment me = ime.getMutable();
-
-                        if (((NSmartContract) item).getRevision() == 1) {
+                        if (this.item.state.revision === 1) {
                             // and call onCreated
-                            extraResult.set("onCreatedResult", ((NSmartContract) item).onCreated(me));
+                            this.extra.onCreatedResult = this.item.onCreated(me);
                         } else {
-                            extraResult.set("onUpdateResult", ((NSmartContract) item).onUpdated(me));
+                            this.extra.onUpdateResult = this.item.onUpdated(me);
 
-                            lowPrioExecutorService.schedule(() -> callbackService.synchronizeFollowerCallbacks(me.getId()), 1, TimeUnit.SECONDS);
+                            //TODO: callbackService
+                            //new ScheduleExecutor(() => this.node.callbackService.synchronizeFollowerCallbacks(me.id),
+                            //    1000, this.node.executorService).run();
                         }
 
-                        me.save();
+                        await me.save();
 
-                        if (item != null) {
-                            synchronized (cache) {
-                                cache.update(itemId, getResult());
-                            }
-                        }
+                        if (this.item != null)
+                            cache.update(this.itemId, this.getResult());
                     }
 
-                    ((NSmartContract)item).getExtraResultForApprove().forEach((k, v) -> extraResult.putAll(k, v));
+                    let extraResult = this.item.getExtraResultForApprove();
+                    for (let k of Object.keys(extraResult))
+                        this.extra[k] = extraResult[k];
                 }
 
                 // update item's smart contracts link to
-                notifyContractSubscribers(item, getState());
+                this.notifyContractSubscribers(this.item, this.record.state);
 
-            } catch (Exception ex) {
-                System.err.println(myInfo);
-                ex.printStackTrace();
+            } catch (err) {
+                this.node.logger.log(err.stack);
+                this.node.logger.log("error downloadAndCommit for NSmartContract: " + err.message);
             }
 
-            lowPrioExecutorService.schedule(() -> checkSpecialItem(item),100,TimeUnit.MILLISECONDS);
+            //TODO: node.checkSpecialItem
+            new ScheduleExecutor(() => this.node.checkSpecialItem(this.item), 100, this.node.executorService).run();
 
-            if(!resyncingItems.isEmpty()) {
-                processingState = ItemProcessingState.RESYNCING;
-                startResync();
+            if (this.resyncingItems.size > 0) {
+                this.processingState = ItemProcessingState.RESYNCING;
+                this.startResync();
                 return;
-            }*/
+            }
 
-        } catch (err) {     //TODO: TimeoutException | InterruptedException
-            /*report(getLabel(), () -> concatReportMessage("timeout ",
-                    itemId, " from parcel: ", parcelId,
-                    " :: downloadAndCommit timeoutException, state ", processingState, " itemState: ", getState()),
-                    DatagramAdapter.VerboseLevel.NOTHING);
-            e.printStackTrace();
-            setState(ItemState.UNDEFINED);
+        } catch (err) {
+            if (!err instanceof EventTimeoutError)
+                throw err;
+
+            this.node.report("timeout " + this.itemId + " from parcel: " + this.parcelId +
+                " :: downloadAndCommit timeoutException, state " + this.processingState.val + " itemState: " + this.record.state,
+                VerboseLevel.NOTHING);
+
+            this.node.logger.log(err.stack);
+
             try {
-                itemLock.synchronize(record.getId(), lock -> {
-                    record.destroy();
+                await this.record.destroy();
 
-                    if (item != null) {
-                        synchronized (cache) {
-                            cache.update(itemId, null);
-                        }
-                    }
-                    return null;
-                });
-            } catch (Exception ee) {
-                ee.printStackTrace();
-            }*/
+                if (this.item != null)
+                    this.node.cache.update(this.itemId, null);
+            } catch (err2) {
+                this.node.logger.log(err2.stack);
+                this.node.logger.log("destroy record by timeout error: " + err2.message);
+            }
         }
+
         this.close();
     }
 
     isPollingExpired() {
-        return this.pollingExpiresAt < Math.floor(Date.now() / 1000);
+        return this.pollingExpiresAt < Date.now();
+    }
+
+    getMillisLeft() {
+        return this.pollingExpiresAt - Date.now();
     }
 
     //******************** common section ********************//
+
+    isConsensusReceivedExpired() {
+        return this.consensusReceivedExpiresAt < Date.now();
+    }
 
     getResult() {
         let result = ItemResult.fromStateRecord(this.record, this.item != null);

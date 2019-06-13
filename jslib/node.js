@@ -7,6 +7,7 @@ import {Errors, ErrorRecord} from "errors"
 const ItemResult = require('itemresult').ItemResult;
 const ItemState = require('itemstate').ItemState;
 const ItemCache = require("itemcache").ItemCache;
+const NameCache = require("namecache").NameCache;
 const Config = require("config").Config;
 const ResyncProcessor = require("resyncprocessor").ResyncProcessor;
 const ItemInformer = require("iteminformer").ItemInformer;
@@ -23,6 +24,7 @@ class Node {
         this.informer = new ItemInformer();
 
         this.cache = new ItemCache(Config.maxCacheAge);
+        this.nameCache = new NameCache(Config.maxNameCacheAge);
         // TODO: other caches
 
         this.verboseLevel = VerboseLevel.NOTHING;

@@ -284,4 +284,49 @@ class ExecutorWithDynamicPeriod extends Executor {
     }
 }
 
-module.exports = {ExecutorService, Executor, ScheduleExecutor, ExecutorWithFixedPeriod, ExecutorWithDynamicPeriod};
+class EventTimeoutError extends Error {
+    constructor(message = undefined) {
+        super();
+        this.message = message;
+    }
+}
+
+class AsyncEvent {
+    constructor(executorService = undefined) {
+        this.result = null;
+        this.fired = false;
+        this.es = executorService;
+        this.timer = null;
+        this.event = new Promise((resolve, reject) => {
+            this.fireCallback = resolve;
+            this.rejectCallback = reject;
+        });
+    }
+
+    addConsumer(consumer) {
+        this.event.then(consumer);
+    }
+
+    fire(result = null) {
+        this.fireCallback(result);
+        this.fired = true;
+        this.result = result;
+        if (this.timer != null)
+            this.timer.cancel();
+    }
+
+    async await(milliseconds = 0) {
+        if (!this.fired) {
+            if (milliseconds > 0)
+                this.timer = new ScheduleExecutor(() => this.rejectCallback(new EventTimeoutError()),
+                    milliseconds, this.es).run();
+
+            return await this.event;
+        }
+
+        return this.result;
+    }
+}
+
+module.exports = {ExecutorService, Executor, ScheduleExecutor, ExecutorWithFixedPeriod, ExecutorWithDynamicPeriod,
+    EventTimeoutError, AsyncEvent};

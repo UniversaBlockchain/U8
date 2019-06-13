@@ -9,6 +9,7 @@ class Config {
     static maxElectionsTime = 15*60; //15 minutes
     static maxResyncTime = 5*60; //5 minutes
     static maxCacheAge = 20*60; //20 minutes
+    static maxNameCacheAge = 5*60; //5 minutes
     static resyncTime = [0, 1000, 1000, 1000, 2000, 4000, 8000, 16000, 32000, 60000];
     static pollTimeMillis = [0, 1000, 1000, 1000, 2000, 4000, 8000, 16000, 32000, 60000];
     static maxConsensusReceivedCheckTime = 15*60; //15 minutes
