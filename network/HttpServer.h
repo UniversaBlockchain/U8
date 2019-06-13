@@ -75,10 +75,10 @@ private:
 class HttpServerSession {
 public:
     HttpServerSession(const crypto::PublicKey& key): publicKey(key) {}
-    HttpServerSession(const HttpServerSession& copyFrom) = default;
-    HttpServerSession(HttpServerSession&& moveFrom) = default;
-    HttpServerSession& operator= (const HttpServerSession& copyFrom) = default;
-    HttpServerSession& operator= (HttpServerSession&& moveFrom) = default;
+    HttpServerSession(const HttpServerSession& copyFrom) = delete;
+    HttpServerSession(HttpServerSession&& moveFrom) = delete;
+    HttpServerSession& operator= (const HttpServerSession& copyFrom) = delete;
+    HttpServerSession& operator= (HttpServerSession&& moveFrom) = delete;
     crypto::PublicKey publicKey;
     std::shared_ptr<crypto::SymmetricKey> sessionKey;
     byte_vector serverNonce;

@@ -59,6 +59,29 @@ void JsAsyncStatMode(const FunctionCallbackInfo<Value> &args) {
     });
 }
 
+void JsAsyncFileRemove(const FunctionCallbackInfo<Value> &args) {
+    Scripter::unwrap(args, [&](const shared_ptr<Scripter> &se, auto isolate, auto context) {
+        auto file_path = se->getString(args[0]);
+        Persistent<Function> *pcb = new Persistent<Function>(isolate, args[1].As<Function>());
+
+        asyncio::IOFile::remove(file_path.data(), [=](auto result) {
+            se->inPool([=](Local<Context> &context) {
+                auto fn = pcb->Get(context->GetIsolate());
+                if (fn->IsNull())
+                    se->throwError("null callback in IOFile::remove");
+                else {
+                    Local<Value> res = Integer::New(isolate, result);
+                    auto unused = fn->Call(context, fn, 1, &res);
+                }
+                pcb->Reset();
+                delete pcb;
+            });
+        });
+
+        args.GetReturnValue().SetNull();
+    });
+}
+
 void JsAsyncFileOpen(const FunctionCallbackInfo<Value> &args) {
     Scripter::unwrap(args, [&](const shared_ptr<Scripter> &se, auto isolate, auto context) {
         auto file_name = se->getString(args[0]);
@@ -575,6 +598,7 @@ void JsInitIOFile(Isolate *isolate, const Local<ObjectTemplate> &global) {
     // class methods
     tpl->Set(isolate, "getErrorText", FunctionTemplate::New(isolate, JsAsyncGetErrorText));
     tpl->Set(isolate, "stat_mode", FunctionTemplate::New(isolate, JsAsyncStatMode));
+    tpl->Set(isolate, "remove", FunctionTemplate::New(isolate, JsAsyncFileRemove));
 
     // register it into global namespace
     FileTemplate.Reset(isolate, tpl);
@@ -694,6 +718,52 @@ void JsAsyncDirNext(const FunctionCallbackInfo<Value> &args) {
     });
 }
 
+void JsAsyncDirCreate(const FunctionCallbackInfo<Value> &args) {
+    Scripter::unwrap(args, [&](const shared_ptr<Scripter> &se, auto isolate, auto context) {
+        auto dir_path = se->getString(args[0]);
+        Persistent<Function> *pcb = new Persistent<Function>(isolate, args[1].As<Function>());
+
+        asyncio::IODir::createDir(dir_path.data(), S_IRWXU | S_IRGRP | S_IXGRP | S_IROTH | S_IXOTH, [=](auto result) {
+            se->inPool([=](Local<Context> &context) {
+                auto fn = pcb->Get(context->GetIsolate());
+                if (fn->IsNull())
+                    se->throwError("null callback in IODir::create");
+                else {
+                    Local<Value> res = Integer::New(isolate, result);
+                    auto unused = fn->Call(context, fn, 1, &res);
+                }
+                pcb->Reset();
+                delete pcb;
+            });
+        });
+
+        args.GetReturnValue().SetNull();
+    });
+}
+
+void JsAsyncDirRemove(const FunctionCallbackInfo<Value> &args) {
+    Scripter::unwrap(args, [&](const shared_ptr<Scripter> &se, auto isolate, auto context) {
+        auto dir_path = se->getString(args[0]);
+        Persistent<Function> *pcb = new Persistent<Function>(isolate, args[1].As<Function>());
+
+        asyncio::IODir::removeDir(dir_path.data(), [=](auto result) {
+            se->inPool([=](Local<Context> &context) {
+                auto fn = pcb->Get(context->GetIsolate());
+                if (fn->IsNull())
+                    se->throwError("null callback in IODir::remove");
+                else {
+                    Local<Value> res = Integer::New(isolate, result);
+                    auto unused = fn->Call(context, fn, 1, &res);
+                }
+                pcb->Reset();
+                delete pcb;
+            });
+        });
+
+        args.GetReturnValue().SetNull();
+    });
+}
+
 void JsInitIODir(Isolate *isolate, const Local<ObjectTemplate> &global) {
     // Bind object with default constructor
     Local<FunctionTemplate> tpl = bindCppClass<asyncio::IODir>(isolate, "IODir");
@@ -706,6 +776,8 @@ void JsInitIODir(Isolate *isolate, const Local<ObjectTemplate> &global) {
 
     // class methods
     tpl->Set(isolate, "getErrorText", FunctionTemplate::New(isolate, JsAsyncGetErrorText));
+    tpl->Set(isolate, "create", FunctionTemplate::New(isolate, JsAsyncDirCreate));
+    tpl->Set(isolate, "remove", FunctionTemplate::New(isolate, JsAsyncDirRemove));
 
     // register it into global namespace
     DirTemplate.Reset(isolate, tpl);

@@ -387,5 +387,59 @@ async function getFilesFromDir(url) {
     return result;
 }
 
+function getTmpDirPath() {
+    //TODO: bind some cross platform function here
+    return "/tmp";
+}
+
+/**
+ * New dir with rwxr-xr-x permissions.
+ */
+function createDir(path) {
+    let ap = new AsyncProcessor();
+    IODir.create(path, code => {
+        // 'already exists' is ok
+        if (code == -17)
+            code = 0;
+        ap.process(code, true);
+    });
+    return ap.promise;
+}
+
+/**
+ * Removes all contents recursively.
+ */
+async function removeDir(path) {
+    let ents = [];
+    try {ents = await getEntriesFromDir(path);} catch (e) {/*do nothing*/}
+    for (let e of ents) {
+        if (e[1] === EntryType.fileEntry) {
+            let ap = new AsyncProcessor();
+            IOFile.remove(path + "/" + e[0], code => ap.process(code, true));
+            await ap.promise;
+        } else {
+            await removeDir(path + "/" + e[0]);
+        }
+    }
+    return removeEmptyDir(path);
+}
+
+function removeEmptyDir(path) {
+    let ap = new AsyncProcessor();
+    IODir.remove(path, code => {
+        // 'no such file or directory' is ok
+        if (code == -2)
+            code = 0;
+        ap.process(code, true);
+    });
+    return ap.promise;
+}
+
+async function filePutContents(path, contents) {
+    let h = await openWrite(path);
+    await h.write(contents);
+    await h.close();
+}
+
 module.exports = {openRead, openWrite, InputStream, OutputStream, AsyncProcessor, IoError, isAccessible, isFile, isDir,
-    EntryType, getEntriesFromDir, getFilesFromDir};
+    EntryType, getEntriesFromDir, getFilesFromDir, getTmpDirPath, createDir, removeDir, filePutContents};
