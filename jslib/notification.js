@@ -192,11 +192,55 @@ class ResyncNotification extends ItemNotification {
     }
 }
 
+const ParcelNotificationType = {
+    PAYMENT : {val: "PAYMENT", isU : true, ordinal: 0},
+    PAYLOAD : {val: "PAYLOAD", isU : false, ordinal: 1}
+};
+
+ParcelNotificationType.byOrdinal = new Map();
+ParcelNotificationType.byOrdinal.set(ParcelNotificationType.PAYMENT.ordinal, ParcelNotificationType.PAYMENT);
+ParcelNotificationType.byOrdinal.set(ParcelNotificationType.PAYLOAD.ordinal, ParcelNotificationType.PAYLOAD);
+
 class ParcelNotification extends ItemNotification {
 
+    constructor(from, itemId, parcelId, itemResult, requestResult, type) {
+        super(from, itemId, itemResult, requestResult);
+        this.parcelId = parcelId;
+        this.type = type;
+        this.typeCode = CODE_PARCEL_NOTIFICATION;
+    }
+
+    writeTo(bw) {
+        super.writeTo(bw);
+        bw.write(this.type.ordinal);
+        if (this.parcelId != null)
+            bw.write(this.parcelId.digest);
+    }
+
+    readFrom(br) {
+        super.readFrom(br);
+        this.type = ParcelNotificationType.byOrdinal.get(br.read());
+        this.parcelId = null;
+        try {
+            let parcelBytes = br.read();
+            if (parcelBytes != null)
+                this.parcelId = HashId.withDigest(parcelBytes);
+        } catch (err) {
+            this.parcelId = null;
+        }
+    }
+
+    toString() {
+        return "[ParcelNotification from node: " + this.from.number
+            + " for parcel: " + this.parcelId.toString()
+            + " and item: " + this.itemId.toString()
+            + ", type is: " + type.val
+            + ", is answer requested: " + this.requestResult + "]";
+    }
 }
 
 Notification.registerClass(CODE_ITEM_NOTIFICATION, ItemNotification);
 Notification.registerClass(CODE_RESYNC_NOTIFICATION, ResyncNotification);
+Notification.registerClass(CODE_PARCEL_NOTIFICATION, ParcelNotification);
 
-module.exports = {Notification, ItemNotification, ResyncNotification, ParcelNotification};
+module.exports = {Notification, ItemNotification, ResyncNotification, ParcelNotification, ParcelNotificationType};

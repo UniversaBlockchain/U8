@@ -1,6 +1,6 @@
 import {ExecutorService, ScheduleExecutor, ExecutorWithFixedPeriod, ExecutorWithDynamicPeriod} from "executorservice";
 import {Notification, ItemNotification, ResyncNotification, ParcelNotification} from "notification";
-import {ItemProcessor, ItemProcessingState} from "itemprocessor"
+import {ItemProcessor} from "itemprocessor"
 import {VerboseLevel} from "node_consts";
 import {Errors, ErrorRecord} from "errors"
 
@@ -10,6 +10,7 @@ const ItemCache = require("itemcache").ItemCache;
 const Config = require("config").Config;
 const ResyncProcessor = require("resyncprocessor").ResyncProcessor;
 const ItemInformer = require("iteminformer").ItemInformer;
+const t = require("tools");
 
 class Node {
 

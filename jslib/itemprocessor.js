@@ -1,24 +1,28 @@
-import {ScheduleExecutor} from "executorservice";
-const Logger = require("logger").Logger;
+import {ScheduleExecutor, ExecutorWithDynamicPeriod} from "executorservice";
+import {VerboseLevel} from "node_consts";
+import {ParcelNotification, ParcelNotificationType} from "notification";
+
+const ItemResult = require('itemresult').ItemResult;
+const ItemState = require('itemstate').ItemState;
 const Config = require("config").Config;
 const Contract = require("contract").Contract;
 const NSmartContract = require("services/NSmartContract").NSmartContract;
-
+const t = require("tools");
 
 const ItemProcessingState = {
-    NOT_EXIST : {val: "NOT_EXIST", isProcessedToConsensus : false, isDone : false},
-    INIT : {val: "INIT", isProcessedToConsensus : false, isDone : false},
-    DOWNLOADING : {val: "DOWNLOADING", isProcessedToConsensus : false, isDone : false},
-    DOWNLOADED : {val: "DOWNLOADED", isProcessedToConsensus : false, isDone : false},
-    CHECKING : {val: "CHECKING", isProcessedToConsensus : false, isDone : false},
-    RESYNCING : {val: "RESYNCING", isProcessedToConsensus : false, isDone : false},
-    GOT_RESYNCED_STATE : {val: "GOT_RESYNCED_STATE", isProcessedToConsensus : false, isDone : false},
-    POLLING : {val: "POLLING", isProcessedToConsensus : false, isDone : false},
-    GOT_CONSENSUS : {val: "GOT_CONSENSUS", isProcessedToConsensus : true, isDone : false},
-    DONE : {val: "DONE", isProcessedToConsensus : true, isDone : true},
-    SENDING_CONSENSUS : {val: "SENDING_CONSENSUS", isProcessedToConsensus : true, isDone : true},
-    FINISHED : {val: "FINISHED", isProcessedToConsensus : true, isDone : true},
-    EMERGENCY_BREAK : {val: "EMERGENCY_BREAK", isProcessedToConsensus : false, isDone : false}
+    NOT_EXIST : {val: "NOT_EXIST", isProcessedToConsensus : false, isDone : false, canContinue: true, canRemoveSelf: false, ordinal: 0},
+    INIT : {val: "INIT", isProcessedToConsensus : false, isDone : false, canContinue: true, canRemoveSelf: false, ordinal: 1},
+    DOWNLOADING : {val: "DOWNLOADING", isProcessedToConsensus : false, isDone : false, canContinue: true, canRemoveSelf: false, ordinal: 2},
+    DOWNLOADED : {val: "DOWNLOADED", isProcessedToConsensus : false, isDone : false, canContinue: true, canRemoveSelf: false, ordinal: 3},
+    CHECKING : {val: "CHECKING", isProcessedToConsensus : false, isDone : false, canContinue: true, canRemoveSelf: false, ordinal: 4},
+    RESYNCING : {val: "RESYNCING", isProcessedToConsensus : false, isDone : false, canContinue: true, canRemoveSelf: false, ordinal: 5},
+    GOT_RESYNCED_STATE : {val: "GOT_RESYNCED_STATE", isProcessedToConsensus : false, isDone : false, canContinue: true, canRemoveSelf: false, ordinal: 6},
+    POLLING : {val: "POLLING", isProcessedToConsensus : false, isDone : false, canContinue: true, canRemoveSelf: false, ordinal: 7},
+    GOT_CONSENSUS : {val: "GOT_CONSENSUS", isProcessedToConsensus : true, isDone : false, canContinue: true, canRemoveSelf: false, ordinal: 8},
+    DONE : {val: "DONE", isProcessedToConsensus : true, isDone : true, canContinue: true, canRemoveSelf: false, ordinal: 9},
+    SENDING_CONSENSUS : {val: "SENDING_CONSENSUS", isProcessedToConsensus : true, isDone : true, canContinue: true, canRemoveSelf: false, ordinal: 10},
+    FINISHED : {val: "FINISHED", isProcessedToConsensus : true, isDone : true, canContinue: true, canRemoveSelf: true, ordinal: 11},
+    EMERGENCY_BREAK : {val: "EMERGENCY_BREAK", isProcessedToConsensus : false, isDone : false, canContinue: false, canRemoveSelf: true, ordinal: 12}
 };
 
 /**
@@ -85,12 +89,13 @@ class ItemProcessor {
         this.isCheckingForce = isCheckingForce;
         this.processingState = ItemProcessingState.INIT;
 
-        this.logger = new Logger(4096);
-
         this.sources = new Set();
 
         this.positiveNodes = new Set();
         this.negativeNodes = new Set();
+
+        this.resyncingItems = new t.GenericMap();
+        this.resyncingItemsResults = new t.GenericMap();
 
         this.node = node;
         if (this.item == null)
@@ -99,13 +104,19 @@ class ItemProcessor {
         this.lockedToRevoke = [];
         this.lockedToCreate = [];
 
-        this.pollingExpiresAt = new Date();
-        this.pollingExpiresAt.setTime(this.pollingExpiresAt.getTime() + Config.maxElectionsTime);
-
-        this.consensusReceivedExpiresAt = new Date();
-        this.consensusReceivedExpiresAt.setTime(this.consensusReceivedExpiresAt.getTime() + Config.maxConsensusReceivedCheckTime);
+        this.pollingExpiresAt = Math.floor(Date.now() / 1000) + Config.maxElectionsTime;
+        this.consensusReceivedExpiresAt = Math.floor(Date.now() / 1000) + Config.maxConsensusReceivedCheckTime;
 
         this.alreadyChecked = false;
+
+        this.extra = {};
+
+        this.downloadedEvent = new Promise(resolve => this.downloadedFire = resolve);
+        this.doneEvent = new Promise(resolve => this.doneFire = resolve);
+        this.pollingReadyEvent = new Promise(resolve => this.pollingReadyFire = resolve);
+        this.removedEvent = new Promise(resolve => this.removedFire = resolve);
+
+        this.poller = null;
     }
 
     async run() {
@@ -123,7 +134,7 @@ class ItemProcessor {
         return this;
     }
 
-    // download section
+    //******************** download section ********************//
 
     pulseDownload() {
         if(this.processingState !== ItemProcessingState.EMERGENCY_BREAK) {
@@ -205,7 +216,7 @@ class ItemProcessor {
             downloader.cancel(true);
     }
 
-    // check item section
+    //******************** check item section ********************//
 
     async checkItem() {
         this.node.report("item processor for item: ",
@@ -457,61 +468,343 @@ class ItemProcessor {
         }
     }
 
-    commitCheckedAndStartPolling() {
-       /* report(getLabel(), () -> concatReportMessage("item processor for item: ",
-            itemId, " from parcel: ", parcelId,
-            " :: commitCheckedAndStartPolling, state ", processingState, " itemState: ", getState()),
-            DatagramAdapter.VerboseLevel.BASE);
-        if(processingState.canContinue()) {
+    async commitCheckedAndStartPolling() {
+        this.node.report("item processor for item: " + this.itemId + " from parcel: " + this.parcelId +
+            " :: commitCheckedAndStartPolling, state " + this.processingState.val + " itemState: " + this.record.state,
+            VerboseLevel.BASE);
 
-            if (!processingState.isProcessedToConsensus()) {
-                boolean checkPassed = item.getErrors().isEmpty();
+        if (!this.processingState.canContinue)
+            return;
 
-                if (!checkPassed) {
-                    informer.inform(item);
+        if (!this.processingState.isProcessedToConsensus) {
+            let checkPassed = this.item.errors.length === 0;
+
+            if (!checkPassed)
+                this.node.informer.inform(this.item);
+
+            this.record.expiresAt = this.item.getExpiresAt();
+
+            if (this.record.state === ItemState.PENDING) {
+                try {
+                    if (checkPassed)
+                        await this.record.setPendingPositive();
+                    else
+                        await this.record.setPendingNegative();
+
+                    if (this.item != null)
+                        this.node.cache.update(this.itemId, this.getResult());
+
+                } catch (err) {
+                    this.node.logger.log(err.stack);
+                    this.node.logger.log("commitCheckedAndStartPolling error: " + err.message);
+                    this.emergencyBreak();
+                    return;
                 }
-
-                synchronized (mutex) {
-                    if (record.getState() == ItemState.PENDING) {
-                        if (checkPassed) {
-                            setState(ItemState.PENDING_POSITIVE);
-                        } else {
-                            setState(ItemState.PENDING_NEGATIVE);
-                        }
-                    }
-
-                    record.setExpiresAt(item.getExpiresAt());
-                    try {
-                        if (record.getState() != ItemState.UNDEFINED) {
-                            record.save();
-
-                            if (item != null) {
-                                synchronized (cache) {
-                                    cache.update(itemId, getResult());
-                                }
-                            }
-                        } else {
-                            log.e("Checked item with state ItemState.UNDEFINED (should be ItemState.PENDING)");
-                            emergencyBreak();
-                        }
-                    } catch (Ledger.Failure failure) {
-                        emergencyBreak();
-                        return;
-                    }
-                }
-
-                if(!processingState.isProcessedToConsensus()) {
-                    processingState = ItemProcessingState.POLLING;
-                }
-
-                vote(myInfo, record.getState());
-                broadcastMyState();
-                pulseStartPolling();
-                pollingReadyEvent.fire();
+            } else {
+                this.node.logger.log("commitCheckedAndStartPolling: checked item state should be ItemState.PENDING");
+                this.emergencyBreak();
             }
-        }*/
+
+            if (!this.processingState.isProcessedToConsensus)
+                this.processingState = ItemProcessingState.POLLING;
+
+            this.vote(this.node.myInfo, this.record.state);
+            this.broadcastMyState();
+            this.pulseStartPolling();
+            this.pollingReadyFire();
+        }
     }
 
+    async isNeedToResync(baseCheckPassed) {
+        if (!this.processingState.canContinue)
+            return new t.GenericMap();
+
+        let unknownParts = new t.GenericMap();
+        let knownParts = new t.GenericMap();
+
+        if (baseCheckPassed) {
+            // check the referenced items
+            for (let ref of this.item.getReferencedItems()) {
+                let r = await this.node.ledger.getRecord(ref.id);
+
+                if (r == null || !r.state.isConsensusFound)
+                    unknownParts.set(ref.id, r);
+                else
+                    knownParts.set(ref.id, r);
+            }
+
+            // check revoking items
+            for (let rev of this.item.revokingItems) {
+                let r = await this.node.ledger.getRecord(rev.id);
+
+                if (r == null || !r.state.isConsensusFound)
+                    unknownParts.set(rev.id, r);
+                else
+                    knownParts.set(rev.id, r);
+            }
+        }
+
+        // contract is complex and consist from parts
+        if ((unknownParts.size + knownParts.size > 0) && baseCheckPassed && unknownParts.size > 0 &&
+            knownParts.size >= Config.knownSubContractsToResync)
+            return unknownParts;
+
+        return new t.GenericMap();
+    }
+
+    //******************** polling section ********************//
+
+    broadcastMyState() {
+        this.node.report("item processor for item: " + this.itemId + " from parcel: " + this.parcelId +
+            " :: broadcastMyState, state " + this.processingState.val + " itemState: " + this.record.state,
+            VerboseLevel.BASE);
+
+        if (this.processingState.canContinue) {
+            let notification = new ParcelNotification(this.node.myInfo, this.itemId, this.parcelId, this.getResult(), true,
+                this.item.shouldBeU ? ParcelNotificationType.PAYMENT : ParcelNotificationType.PAYLOAD);
+
+            this.node.network.broadcast(this.node.myInfo, notification);
+        }
+    }
+
+    pulseStartPolling() {
+        this.node.report("item processor for item: " + this.itemId + " from parcel: " + this.parcelId +
+            " :: pulseStartPolling, state " + this.processingState.val + " itemState: " + this.record.state,
+            VerboseLevel.BASE);
+
+        if (this.processingState.canContinue)
+            if (!this.processingState.isProcessedToConsensus)
+                // at this point the item is with us, so we can start
+                if (this.poller == null)
+                    this.poller = new ExecutorWithDynamicPeriod(() => this.sendStartPollingNotification(),
+                        Config.pollTimeMillis, this.node.executorService).run();
+    }
+
+    sendStartPollingNotification() {
+        if (!this.processingState.canContinue)
+            return;
+
+        if (!this.processingState.isProcessedToConsensus) {
+            if (this.isPollingExpired()) {
+                // cancel by timeout expired
+                this.processingState = ItemProcessingState.GOT_CONSENSUS;
+
+                this.stopPoller();
+                this.stopDownloader();
+                this.rollbackChanges(ItemState.UNDEFINED);
+                return;
+            }
+
+            // at this point we should to request the nodes that did not yet answered us
+            let notification = new ParcelNotification(this.node.myInfo, this.itemId, this.parcelId, this.getResult(), true,
+                this.item.shouldBeU ? ParcelNotificationType.PAYMENT : ParcelNotificationType.PAYLOAD);
+
+            this.node.network.allNodes()
+                .filter(n => (!this.positiveNodes.has(n) && !this.negativeNodes.has(n)))
+                .forEach(n => this.node.network.deliver(n, notification));
+        }
+    }
+
+    vote(node, state) {
+        if (!this.processingState.canContinue)
+            return;
+
+        this.node.report("item processor for item: " + this.itemId + " from parcel: " + this.parcelId +
+            " :: vote " + state.val + " from node " + node.number + ", state ", this.processingState.val +
+            " :: itemState: " + this.record.state,
+            VerboseLevel.BASE);
+
+        let positiveConsensus = false;
+        let negativeConsensus = false;
+
+        // check if vote already count
+        if ((state.isPositive() && this.positiveNodes.has(node)) ||
+            (!state.isPositive() && this.negativeNodes.has(node)))
+            return;
+
+        if (this.processingState.canRemoveSelf)
+            return;
+
+        if (state.isPositive) {
+            this.positiveNodes.add(node);
+            this.negativeNodes.delete(node);
+        } else {
+            this.negativeNodes.add(node);
+            this.positiveNodes.delete(node);
+        }
+
+        if (this.processingState.isProcessedToConsensus) {
+            if (this.processingState.isDone)
+                this.close();
+
+            return;
+        }
+
+        if (this.negativeNodes.size >= this.node.config.negativeConsensus) {
+            negativeConsensus = true;
+            this.processingState = ItemProcessingState.GOT_CONSENSUS;
+        } else if (this.positiveNodes.size >= this.node.config.positiveConsensus) {
+            positiveConsensus = true;
+            this.processingState = ItemProcessingState.GOT_CONSENSUS;
+        }
+        if (!this.processingState.isProcessedToConsensus)
+            return;
+
+        if (positiveConsensus)
+            this.approveAndCommit();
+        else if (negativeConsensus)
+            this.rollbackChanges(ItemState.DECLINED);
+        else
+            throw new Error("error: consensus reported without consensus");
+    }
+
+    approveAndCommit() {
+        this.node.report("item processor for item: " + this.itemId + " from parcel: " + this.parcelId +
+            " :: approveAndCommit, state " + this.processingState.val + " itemState: " + this.record.state,
+            VerboseLevel.BASE);
+
+        if (this.processingState.canContinue)
+            // downloadAndCommit set state to APPROVED
+            new ScheduleExecutor(() => this.downloadAndCommit(), 0, this.node.executorService).run();
+    }
+
+    async downloadAndCommit() {
+        if (!this.processingState.canContinue)
+            return;
+
+        // it may happen that consensus is found earlier than item is download
+        // we still need item to fix all its relations:
+        try {
+            this.resyncingItems.clear();
+
+            if (this.item == null) {
+                // If positive consensus os found, we can spend more time for final download, and can try
+                // all the network as the source:
+                this.pollingExpiresAt = Math.floor(Date.now() / 1000) + Config.maxDownloadOnApproveTime;
+                //TODO:
+                //downloadedEvent.await(this.getMillisLeft());
+            }
+            // We use the caching capability of ledger so we do not get records from
+            // lockedToRevoke/lockedToCreate, as, due to conflicts, these could differ from what the item
+            // yields. We just clean them up afterwards:
+
+            // first, commit all new items
+            this.downloadAndCommitNewItemsOf(this.item);
+
+            // then, commit all revokes
+            this.downloadAndCommitRevokesOf(this.item);
+
+            this.lockedToCreate.clear();
+            this.lockedToRevoke.clear();
+
+            try {
+                await this.record.approve(this.item.getExpiresAt());
+
+                if (this.item != null) {
+                    cache.update(this.itemId, this.getResult());
+
+                    //save item to DB in Permanet mode
+                    if (config.permanetMode)
+                        await this.node.ledger.putKeptItem(this.record, this.item);
+                }
+            } catch (err) {
+                this.emergencyBreak();
+                return;
+            }
+
+            if (this.record.state !== ItemState.APPROVED)
+                this.node.logger.log("ERROR: record is not approved " + this.record.state);
+
+            /*try {
+                // if item is smart contract node calls onCreated or onUpdated
+                if(item instanceof NSmartContract) {
+                    // slot need ledger, config and nodeInfo for processing
+                    ((NSmartContract) item).setNodeInfoProvider(nodeInfoProvider);
+
+
+                    if(negativeNodes.contains(myInfo)) {
+                        addItemToResync(item.getId(),record);
+                    } else {
+
+                        NImmutableEnvironment ime = getEnvironment((NSmartContract) item);
+                        ime.setNameCache(nameCache);
+                        NMutableEnvironment me = ime.getMutable();
+
+                        if (((NSmartContract) item).getRevision() == 1) {
+                            // and call onCreated
+                            extraResult.set("onCreatedResult", ((NSmartContract) item).onCreated(me));
+                        } else {
+                            extraResult.set("onUpdateResult", ((NSmartContract) item).onUpdated(me));
+
+                            lowPrioExecutorService.schedule(() -> callbackService.synchronizeFollowerCallbacks(me.getId()), 1, TimeUnit.SECONDS);
+                        }
+
+                        me.save();
+
+                        if (item != null) {
+                            synchronized (cache) {
+                                cache.update(itemId, getResult());
+                            }
+                        }
+                    }
+
+                    ((NSmartContract)item).getExtraResultForApprove().forEach((k, v) -> extraResult.putAll(k, v));
+                }
+
+                // update item's smart contracts link to
+                notifyContractSubscribers(item, getState());
+
+            } catch (Exception ex) {
+                System.err.println(myInfo);
+                ex.printStackTrace();
+            }
+
+            lowPrioExecutorService.schedule(() -> checkSpecialItem(item),100,TimeUnit.MILLISECONDS);
+
+            if(!resyncingItems.isEmpty()) {
+                processingState = ItemProcessingState.RESYNCING;
+                startResync();
+                return;
+            }*/
+
+        } catch (err) {     //TODO: TimeoutException | InterruptedException
+            /*report(getLabel(), () -> concatReportMessage("timeout ",
+                    itemId, " from parcel: ", parcelId,
+                    " :: downloadAndCommit timeoutException, state ", processingState, " itemState: ", getState()),
+                    DatagramAdapter.VerboseLevel.NOTHING);
+            e.printStackTrace();
+            setState(ItemState.UNDEFINED);
+            try {
+                itemLock.synchronize(record.getId(), lock -> {
+                    record.destroy();
+
+                    if (item != null) {
+                        synchronized (cache) {
+                            cache.update(itemId, null);
+                        }
+                    }
+                    return null;
+                });
+            } catch (Exception ee) {
+                ee.printStackTrace();
+            }*/
+        }
+        this.close();
+    }
+
+    isPollingExpired() {
+        return this.pollingExpiresAt < Math.floor(Date.now() / 1000);
+    }
+
+    //******************** common section ********************//
+
+    getResult() {
+        let result = ItemResult.fromStateRecord(this.record, this.item != null);
+        result.extra = this.extra;
+        if (this.item != null)
+            result.errors = [...this.item.errors];
+        return result;
+    }
 }
 
 

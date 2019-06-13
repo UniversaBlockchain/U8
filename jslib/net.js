@@ -161,7 +161,7 @@ class Network {
     /**
      * Get {@link NodeInfo} from all network nodes.
      *
-     * @return {Array<NodeInfo>} array of {@link NodeInfo}.
+     * @return {Array<network.NodeInfo>} array of {@link NodeInfo}.
      */
     allNodes() {
         return this.netConfig.toList();
