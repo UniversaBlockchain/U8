@@ -1,8 +1,8 @@
 import {ExecutorService, ScheduleExecutor, ExecutorWithFixedPeriod, ExecutorWithDynamicPeriod} from "executorservice";
 import {Notification, ItemNotification, ResyncNotification, ParcelNotification} from "notification";
-import {ItemProcessor} from "itemprocessor"
+import {ItemProcessor} from "itemprocessor";
 import {VerboseLevel} from "node_consts";
-import {Errors, ErrorRecord} from "errors"
+import {Errors, ErrorRecord} from "errors";
 
 const ItemResult = require('itemresult').ItemResult;
 const ItemState = require('itemstate').ItemState;
