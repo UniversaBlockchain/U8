@@ -336,8 +336,7 @@ class ResyncingItem {
                     else if (committingState === ItemState.UNDEFINED)
                         await this.record.setUndefined(true);
 
-                    if (this.node.cache.update(this.record.id, ItemResult.fromStateRecord(this.record)) != null)
-                        this.node.cache.subscribeStateRecord(this.record);
+                    this.node.cache.update(this.record.id, ItemResult.fromStateRecord(this.record));
 
                 } catch (err) {
                     console.log(err.message);

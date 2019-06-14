@@ -186,7 +186,7 @@ class ItemProcessor {
         this.node.report("item processor for item: ",  this.itemId, " from parcel: ", this.parcelId,
             " :: itemDownloaded, state ", this.processingState, " itemState: ", this.record.state, VerboseLevel.BASE);
         if(this.processingState !== ItemProcessingState.EMERGENCY_BREAK) {
-            this.node.cache.put(this.item, getResult()); //TODO
+            this.node.cache.put(this.item, this.getResult(), this.record);
 
             //save item in disk cache
             await this.node.ledger.putItem(this.record, this.item, Instant.now().plus(config.getMaxDiskCacheAge()));
@@ -669,6 +669,79 @@ class ItemProcessor {
             new ScheduleExecutor(() => this.downloadAndCommit(), 0, this.node.executorService).run();
     }
 
+    // commit subitems of given item to the ledger (recursively)
+    async downloadAndCommitNewItemsOf(commitingItem) {
+        if (!this.processingState.canContinue)
+            return;
+
+        for (let newItem of commitingItem.newItems) {
+            // The record may not exist due to ledger desync too, so we create it if need
+            try {
+                let r = await this.node.ledger.findOrCreate(newItem.id);
+                try {
+                    await r.approve(newItem.getExpiresAt());
+
+                    //save newItem to DB in Permanet mode
+                    if (this.node.config.permanetMode)
+                        await this.node.ledger.putKeptItem(r, newItem);
+
+                    let newExtraResult = {};
+                    // if new item is smart contract node calls method onCreated or onUpdated
+                    if (newItem instanceof NSmartContract) {
+                        if (this.negativeNodes.has(this.node.myInfo))
+                            this.addItemToResync(this.itemId, this.record);
+                        else {
+                            newItem.nodeInfoProvider = this.node.nodeInfoProvider;    //TODO: node.nodeInfoProvider
+
+                            let ime = await this.node.getEnvironmentByItem(newItem);  //TODO: node.getEnvironmentByItem
+                            ime.nameCache = this.node.nameCache;
+                            let me = ime.getMutable();
+
+                            if (newItem.state.revision === 1) {
+                                // and call onCreated
+                                newExtraResult.onCreatedResult = this.item.onCreated(me);
+                            } else {
+                                newExtraResult.onUpdateResult = this.item.onUpdated(me);
+
+                                //TODO: callbackService
+                                //new ScheduleExecutor(() => this.node.callbackService.synchronizeFollowerCallbacks(me.id),
+                                //    1000, this.node.executorService).run();
+                            }
+
+                            await me.save();
+                        }
+                    }
+
+                    // update new item's smart contracts link to
+                    this.notifyContractSubscribers(newItem, r.state);
+
+                    let result = ItemResult.fromStateRecord(r);
+                    result.extra = newExtraResult;
+                    if (this.node.cache.get(r.id) == null)
+                        this.node.cache.put(newItem, result, r);
+                    else
+                        this.node.cache.update(r.id, result);
+
+                } catch (err) {
+                    this.emergencyBreak();
+                    return null;
+                }
+                return null;
+
+            } catch (err) {
+                this.node.logger.log(err.stack);
+                this.node.logger.log("error downloadAndCommitNewItemsOf: " + err.message);
+            }
+
+            //TODO: node.checkSpecialItem
+            new ScheduleExecutor(() => this.node.checkSpecialItem(this.item), 100, this.node.executorService).run();
+
+            await this.downloadAndCommitNewItemsOf(newItem);
+        }
+    }
+
+
+
     async downloadAndCommit() {
         if (!this.processingState.canContinue)
             return;
@@ -689,10 +762,10 @@ class ItemProcessor {
             // yields. We just clean them up afterwards:
 
             // first, commit all new items
-            this.downloadAndCommitNewItemsOf(this.item);
+            await this.downloadAndCommitNewItemsOf(this.item);
 
             // then, commit all revokes
-            this.downloadAndCommitRevokesOf(this.item);
+            await this.downloadAndCommitRevokesOf(this.item);
 
             this.lockedToCreate.clear();
             this.lockedToRevoke.clear();

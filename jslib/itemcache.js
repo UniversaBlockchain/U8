@@ -34,9 +34,12 @@ class ItemCache {
         return r != null ? r.result : null;
     }
 
-    put(item, result) {
+    put(item, result, recordToSubscribe = undefined) {
         // this will plainly override current if any
         new Record(item, result, this);
+
+        if (recordToSubscribe != null)
+            this.subscribeStateRecord(recordToSubscribe);
     }
 
     update(itemId, result) {
