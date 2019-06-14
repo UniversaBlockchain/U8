@@ -670,77 +670,114 @@ class ItemProcessor {
     }
 
     // commit subitems of given item to the ledger (recursively)
-    async downloadAndCommitNewItemsOf(commitingItem) {
+    async downloadAndCommitNewItemsOf(commitingItem, con) {
         if (!this.processingState.canContinue)
             return;
 
         for (let newItem of commitingItem.newItems) {
             // The record may not exist due to ledger desync too, so we create it if need
-            try {
-                let r = await this.node.ledger.findOrCreate(newItem.id);
-                try {
-                    await r.approve(newItem.getExpiresAt());
+            let r = await this.node.ledger.findOrCreate(newItem.id);
 
-                    //save newItem to DB in Permanet mode
-                    if (this.node.config.permanetMode)
-                        await this.node.ledger.putKeptItem(r, newItem);
+            await r.approve(con, newItem.getExpiresAt());
 
-                    let newExtraResult = {};
-                    // if new item is smart contract node calls method onCreated or onUpdated
-                    if (newItem instanceof NSmartContract) {
-                        if (this.negativeNodes.has(this.node.myInfo))
-                            this.addItemToResync(this.itemId, this.record);
-                        else {
-                            newItem.nodeInfoProvider = this.node.nodeInfoProvider;    //TODO: node.nodeInfoProvider
+            //save newItem to DB in Permanet mode
+            if (this.node.config.permanetMode)
+                await this.node.ledger.putKeptItem(r, newItem, con);
 
-                            let ime = await this.node.getEnvironmentByItem(newItem);  //TODO: node.getEnvironmentByItem
-                            ime.nameCache = this.node.nameCache;
-                            let me = ime.getMutable();
+            let newExtraResult = {};
+            // if new item is smart contract node calls method onCreated or onUpdated
+            if (newItem instanceof NSmartContract) {
+                if (this.negativeNodes.has(this.node.myInfo))
+                    this.addItemToResync(this.itemId, this.record);
+                else {
+                    newItem.nodeInfoProvider = this.node.nodeInfoProvider;
 
-                            if (newItem.state.revision === 1) {
-                                // and call onCreated
-                                newExtraResult.onCreatedResult = this.item.onCreated(me);
-                            } else {
-                                newExtraResult.onUpdateResult = this.item.onUpdated(me);
+                    let ime = await this.node.getEnvironmentByItem(newItem);  //TODO: node.getEnvironmentByItem
+                    ime.nameCache = this.node.nameCache;
+                    let me = ime.getMutable();
 
-                                //TODO: callbackService
-                                //new ScheduleExecutor(() => this.node.callbackService.synchronizeFollowerCallbacks(me.id),
-                                //    1000, this.node.executorService).run();
-                            }
+                    if (newItem.state.revision === 1) {
+                        // and call onCreated
+                        newExtraResult.onCreatedResult = this.item.onCreated(me);
+                    } else {
+                        newExtraResult.onUpdateResult = this.item.onUpdated(me);
 
-                            await me.save();
-                        }
+                        //TODO: callbackService
+                        //new ScheduleExecutor(() => this.node.callbackService.synchronizeFollowerCallbacks(me.id),
+                        //    1000, this.node.executorService).run();
                     }
 
-                    // update new item's smart contracts link to
-                    this.notifyContractSubscribers(newItem, r.state);
-
-                    let result = ItemResult.fromStateRecord(r);
-                    result.extra = newExtraResult;
-                    if (this.node.cache.get(r.id) == null)
-                        this.node.cache.put(newItem, result, r);
-                    else
-                        this.node.cache.update(r.id, result);
-
-                } catch (err) {
-                    this.emergencyBreak();
-                    return null;
+                    await me.save(con);
                 }
-                return null;
-
-            } catch (err) {
-                this.node.logger.log(err.stack);
-                this.node.logger.log("error downloadAndCommitNewItemsOf: " + err.message);
             }
+
+            // update new item's smart contracts link to
+            await this.notifyContractSubscribers(newItem, r.state, con);
+
+            let result = ItemResult.fromStateRecord(r);
+            result.extra = newExtraResult;
+            if (this.node.cache.get(r.id) == null)
+                this.node.cache.put(newItem, result, r);
+            else
+                this.node.cache.update(r.id, result);
 
             //TODO: node.checkSpecialItem
             new ScheduleExecutor(() => this.node.checkSpecialItem(this.item), 100, this.node.executorService).run();
 
-            await this.downloadAndCommitNewItemsOf(newItem);
+            await this.downloadAndCommitNewItemsOf(newItem, con);
         }
     }
 
+    // commit subitems of given item to the ledger (recursively)
+    async downloadAndCommitRevokesOf(commitingItem, con) {
+        if (!this.processingState.canContinue)
+            return;
 
+        for (let revokingItem of commitingItem.revokingItems) {
+            // The record may not exist due to ledger desync, so we create it if need
+            let r = await this.node.ledger.findOrCreate(revokingItem.id);
+
+            await r.revoke(con);
+
+            let revokingProcessor = this.node.processors.get(revokingItem.id);
+            if (revokingProcessor != null)
+                revokingProcessor.forceRemoveSelf();
+
+            // if revoking item is smart contract node calls method onRevoked
+            if (revokingItem instanceof NSmartContract && !this.searchNewItemWithParent(this.item, revokingItem.id)) {
+                revokingItem.nodeInfoProvider = this.node.nodeInfoProvider;
+
+                let ime = await this.node.getEnvironmentByItem(revokingItem);  //TODO: node.getEnvironmentByItem
+                if (ime != null) {
+                    // and run onRevoked
+                    revokingItem.onRevoked(ime);
+                    await this.node.removeEnvironment(revokingItem.id, con);
+                }
+            }
+
+            await this.notifyContractSubscribers(revokingItem, r.state, con);
+
+            let result = ItemResult.fromStateRecord(r);
+            if (this.node.cache.get(r.id) == null)
+                this.node.cache.put(revokingItem, result, r);
+            else
+                this.node.cache.update(r.id, result);
+        }
+
+        for (let newItem of commitingItem.newItems)
+            await this.downloadAndCommitRevokesOf(newItem, con);
+    }
+
+    searchNewItemWithParent(item, id) {
+        if (item instanceof Contract && item.state.parent != null && item.state.parent.equals(id))
+            return true;
+
+        for (let newItem of item.newItems)
+            if (this.searchNewItemWithParent(newItem, id))
+                return true;
+
+        return false;
+    }
 
     async downloadAndCommit() {
         if (!this.processingState.canContinue)
@@ -757,42 +794,38 @@ class ItemProcessor {
                 this.pollingExpiresAt = Date.now() + Config.maxDownloadOnApproveTime * 1000;
                 await this.downloadedEvent.await(this.getMillisLeft());
             }
-            // We use the caching capability of ledger so we do not get records from
-            // lockedToRevoke/lockedToCreate, as, due to conflicts, these could differ from what the item
-            // yields. We just clean them up afterwards:
 
-            // first, commit all new items
-            await this.downloadAndCommitNewItemsOf(this.item);
+            // Commit transaction
+            await this.node.ledger.transaction(async(con) => {
+                // first, commit all new items
+                await this.downloadAndCommitNewItemsOf(this.item, con);
 
-            // then, commit all revokes
-            await this.downloadAndCommitRevokesOf(this.item);
+                // then, commit all revokes
+                await this.downloadAndCommitRevokesOf(this.item, con);
 
-            this.lockedToCreate.clear();
-            this.lockedToRevoke.clear();
+                // We use the caching capability of ledger so we do not get records from
+                // lockedToRevoke/lockedToCreate, as, due to conflicts, these could differ from what the item
+                // yields. We just clean them up afterwards:
+                this.lockedToCreate.clear();
+                this.lockedToRevoke.clear();
 
-            try {
-                await this.record.approve(this.item.getExpiresAt());
+                await this.record.approve(con, this.item.getExpiresAt());
 
                 if (this.item != null) {
                     cache.update(this.itemId, this.getResult());
 
                     //save item to DB in Permanet mode
                     if (config.permanetMode)
-                        await this.node.ledger.putKeptItem(this.record, this.item);
+                        await this.node.ledger.putKeptItem(this.record, this.item, con);
                 }
-            } catch (err) {
-                this.emergencyBreak();
-                return;
-            }
 
-            if (this.record.state !== ItemState.APPROVED)
-                this.node.logger.log("ERROR: record is not approved " + this.record.state);
+                if (this.record.state !== ItemState.APPROVED)
+                    this.node.logger.log("ERROR: record is not approved " + this.record.state);
 
-            try {
                 // if item is smart contract node calls onCreated or onUpdated
                 if (this.item instanceof NSmartContract) {
                     // slot need ledger, config and nodeInfo for processing
-                    this.item.nodeInfoProvider = this.node.nodeInfoProvider;        //TODO: node.nodeInfoProvider
+                    this.item.nodeInfoProvider = this.node.nodeInfoProvider;
 
                     if (this.negativeNodes.has(this.node.myInfo))
                         this.addItemToResync(this.item.id, this.record);
@@ -812,7 +845,7 @@ class ItemProcessor {
                             //    1000, this.node.executorService).run();
                         }
 
-                        await me.save();
+                        await me.save(con);
 
                         if (this.item != null)
                             cache.update(this.itemId, this.getResult());
@@ -824,12 +857,8 @@ class ItemProcessor {
                 }
 
                 // update item's smart contracts link to
-                this.notifyContractSubscribers(this.item, this.record.state);
-
-            } catch (err) {
-                this.node.logger.log(err.stack);
-                this.node.logger.log("error downloadAndCommit for NSmartContract: " + err.message);
-            }
+                await this.notifyContractSubscribers(this.item, this.record.state, con);
+            });
 
             //TODO: node.checkSpecialItem
             new ScheduleExecutor(() => this.node.checkSpecialItem(this.item), 100, this.node.executorService).run();
@@ -841,27 +870,180 @@ class ItemProcessor {
             }
 
         } catch (err) {
-            if (!err instanceof EventTimeoutError)
-                throw err;
+            if (err instanceof db.DatabaseError) {
+                this.emergencyBreak();
+                return;
 
-            this.node.report("timeout " + this.itemId + " from parcel: " + this.parcelId +
-                " :: downloadAndCommit timeoutException, state " + this.processingState.val + " itemState: " + this.record.state,
-                VerboseLevel.NOTHING);
+            } else if (err instanceof EventTimeoutError) {
+                this.node.report("timeout " + this.itemId + " from parcel: " + this.parcelId +
+                    " :: downloadAndCommit timeoutException, state " + this.processingState.val + " itemState: " + this.record.state,
+                    VerboseLevel.NOTHING);
 
-            this.node.logger.log(err.stack);
+                this.node.logger.log(err.stack);
 
-            try {
-                await this.record.destroy();
+                try {
+                    await this.record.destroy();
 
-                if (this.item != null)
-                    this.node.cache.update(this.itemId, null);
-            } catch (err2) {
-                this.node.logger.log(err2.stack);
-                this.node.logger.log("destroy record by timeout error: " + err2.message);
+                    if (this.item != null)
+                        this.node.cache.update(this.itemId, null);
+                } catch (lerr) {
+                    this.node.logger.log(lerr.stack);
+                    this.node.logger.log("destroy record by timeout error: " + lerr.message);
+                }
+
+            } else {
+                this.node.logger.log(err.stack);
+                this.node.logger.log("error downloadAndCommit in transaction: " + err.message);
             }
         }
 
         this.close();
+    }
+
+    /**
+     * Method looking for item's subscriptions and if it exist fire events.
+     *
+     * @param {Contract} updatingItem - Item that processing.
+     * @param {ItemState} updatingState - State that is consensus for processing item.
+     * @param {db.SqlDriverConnection} con - Transaction connection. Optional.
+     */
+    async notifyContractSubscribers(updatingItem, updatingState, con = undefined) {
+        try {
+            let lookingId = null;
+            let origin = null;
+
+            // we are looking for updatingItem's parent subscriptions and want to update it
+            if (updatingState === ItemState.APPROVED)
+                if (updatingItem instanceof Contract && updatingItem.state.parent != null)
+                    lookingId = updatingItem.state.parent;
+
+            // we are looking for own id and will update own subscriptions
+            if (updatingState === ItemState.REVOKED)
+                lookingId = updatingItem.id;
+
+            // we are looking for updatingItem's subscriptions by origin
+            if (updatingItem instanceof Contract && (updatingState === ItemState.APPROVED || updatingState === ItemState.REVOKED))
+                origin = updatingItem.getOrigin();
+
+            // find all environments that have subscription for item
+            let environmentIds = new Set();
+            if (lookingId != null) {
+                let environmentIdsForContractId = await this.node.ledger.getSubscriptionEnviromentIds(lookingId);
+                environmentIdsForContractId.forEach(envId => environmentIds.add(envId));
+            }
+
+            if (origin != null) {
+                let environmentIdsForOrigin = await this.node.ledger.getSubscriptionEnviromentIds(origin);
+                environmentIdsForOrigin.forEach(envId => environmentIds.add(envId));
+            }
+
+            /*for (Long environmentId : environmentIds) {
+                synchronized (callbackService) {
+                    NImmutableEnvironment ime = getEnvironment(environmentId);
+                    ime.setNameCache(nameCache);
+                    NSmartContract contract = ime.getContract();
+                    contract.setNodeInfoProvider(nodeInfoProvider);
+                    NMutableEnvironment me = ime.getMutable();
+
+                    for (ContractSubscription sub : ime.subscriptions()) {
+                        if ((lookingId != null) && (sub.getContractId() != null) && (lookingId.equals(sub.getContractId()))) {
+                            ContractSubscription subscription = sub;
+
+                            if (updatingState == ItemState.APPROVED) {
+                                contract.onContractSubscriptionEvent(new ContractSubscription.ApprovedEvent() {
+                                    @Override
+                                    public Contract getNewRevision() {
+                                        return (Contract) updatingItem;
+                                    }
+
+                                    @Override
+                                    public byte[] getPackedTransaction() {
+                                        return ((Contract) updatingItem).getPackedTransaction();
+                                    }
+
+                                    @Override
+                                    public MutableEnvironment getEnvironment() {
+                                        return me;
+                                    }
+
+                                    @Override
+                                    public ContractSubscription getSubscription() {
+                                        return subscription;
+                                    }
+                                });
+                                me.save();
+                            }
+
+                            if (updatingState == ItemState.REVOKED) {
+                                contract.onContractSubscriptionEvent(new ContractSubscription.RevokedEvent() {
+                                    @Override
+                                    public MutableEnvironment getEnvironment() {
+                                        return me;
+                                    }
+
+                                    @Override
+                                    public ContractSubscription getSubscription() {
+                                        return subscription;
+                                    }
+                                });
+                                me.save();
+                            }
+
+                            break;
+                        }
+
+                        if ((origin != null) && (sub.getOrigin() != null) && (origin.equals(sub.getOrigin()))) {
+                            if (contract.canFollowContract((Contract) updatingItem)) {
+                                if (updatingState == ItemState.APPROVED) {
+                                    contract.onContractSubscriptionEvent(new ContractSubscription.ApprovedWithCallbackEvent() {
+                                        @Override
+                                        public Contract getNewRevision() {
+                                            return (Contract) updatingItem;
+                                        }
+
+                                        @Override
+                                        public MutableEnvironment getEnvironment() {
+                                            return me;
+                                        }
+
+                                        @Override
+                                        public CallbackService getCallbackService() {
+                                            return callbackService;
+                                        }
+                                    });
+                                    me.save();
+                                }
+
+                                if (updatingState == ItemState.REVOKED) {
+                                    contract.onContractSubscriptionEvent(new ContractSubscription.RevokedWithCallbackEvent() {
+                                        @Override
+                                        public Contract getRevokingItem() {
+                                            return (Contract) updatingItem;
+                                        }
+
+                                        @Override
+                                        public MutableEnvironment getEnvironment() {
+                                            return me;
+                                        }
+
+                                        @Override
+                                        public CallbackService getCallbackService() {
+                                            return callbackService;
+                                        }
+                                    });
+                                    me.save();
+                                }
+                            }
+
+                            break;
+                        }
+                    }
+                }
+            }*/
+        } catch (err) {
+            this.node.logger.log(err.stack);
+            this.node.logger.log("error notifyContractSubscribers: " + err.message);
+        }
     }
 
     isPollingExpired() {

@@ -164,12 +164,14 @@ unit.test("ledger_test: lockForCreate", async () => {
 function getTestRecordsCount(ledger, hashId) {
     return ledger.simpleQuery("select count(*) from ledger_testrecords where hash = ?",
         x => Number(x),
+        null,
         hashId.digest);
 }
 
 function getRecordsCount(ledger, hashId) {
     return ledger.simpleQuery("select count(*) from ledger where hash = ?",
         x => Number(x),
+        null,
         hashId.digest);
 }
 
@@ -762,6 +764,7 @@ unit.test("ledger_test: ledgerCleanupTest", async () => {
 
     let count = await ledger.simpleQuery("select count(*) from items where id in (select id from ledger where hash = ?)",
         x => Number(x),
+        null,
         contract2.id.digest);
 
     assert(count === 0);

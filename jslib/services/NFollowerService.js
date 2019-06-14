@@ -104,8 +104,8 @@ class NFollowerService extends FollowerService {
         this.me = me;
     }
 
-    async save() {
-        await this.ledger.saveFollowerEnvironment(this.environmentId, this.expiresAt, this.mutedAt, this.spent, this.startedCallbacks);
+    async save(connection = undefined) {
+        await this.ledger.saveFollowerEnvironment(this.environmentId, this.expiresAt, this.mutedAt, this.spent, this.startedCallbacks, connection);
 
         if (this.callbackService != null) {
             // start scheduled callback processor

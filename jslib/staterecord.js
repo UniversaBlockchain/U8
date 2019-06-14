@@ -71,7 +71,7 @@ class StateRecord {
      * @param {HashId} idToRevoke is id for item should be revoked
      * @return {StateRecord} locked record id null if it could not be node
      */
-    async lockToRevoke(idToRevoke) {
+    async lockToRevoke(idToRevoke, connection = undefined) {
         if (this.state !== ItemState.PENDING)
             throw new ex.IllegalStateError("only pending records are allowed to lock others");
 
@@ -98,12 +98,12 @@ class StateRecord {
 
         lockedRecord.lockedByRecordId = this.recordId;
         lockedRecord.state = targetState;
-        await lockedRecord.save();
+        await lockedRecord.save(connection);
 
         return lockedRecord;
     }
 
-    async lockForCreate(idToCreate) {
+    async lockForCreate(idToCreate, connection = undefined) {
         if (this.recordId === 0)
             throw new ex.IllegalStateError("the record must be created");
         if (this.state !== ItemState.PENDING)
@@ -115,16 +115,16 @@ class StateRecord {
         return await this.ledger.findOrCreate(idToCreate, ItemState.LOCKED_FOR_CREATION, this.recordId);
     }
 
-    async unlock() {
+    async unlock(connection = undefined) {
         switch (this.state) {
             case ItemState.LOCKED:
                 this.state = ItemState.APPROVED;
                 this.lockedByRecordId = 0;
-                await this.save();
+                await this.save(connection);
                 break;
             case ItemState.LOCKED_FOR_CREATION:
             case ItemState.LOCKED_FOR_CREATION_REVOKED:
-                await this.destroy();
+                await this.destroy(connection);
                 break;
             default:
                 break;
@@ -132,62 +132,62 @@ class StateRecord {
         return this;
     }
 
-    async revoke(force = false) {
+    async revoke(connection = undefined, force = false) {
         if (this.state === ItemState.LOCKED || this.state === ItemState.LOCKED_FOR_CREATION_REVOKED ||
             (force && (this.state.isPending || this.state === ItemState.UNDEFINED || this.state === ItemState.APPROVED))) {
 
             this.state = ItemState.REVOKED;
             this.expiresAt = new Date();
             this.expiresAt.setSeconds(this.expiresAt.getSeconds() + Config.revokedItemExpiration);
-            await this.save();
+            await this.save(connection);
         } else
             throw new ex.IllegalStateError("attempt to revoke record from wrong state: " + this.state.val);
     }
 
-    async approve(newExpiresAt = undefined, force = false) {
+    async approve(connection = undefined, newExpiresAt = undefined, force = false) {
         if (this.state.isPending || this.state === ItemState.LOCKED_FOR_CREATION ||
             (force && (this.state === ItemState.UNDEFINED || this.state === ItemState.LOCKED || this.state === ItemState.APPROVED))) {
 
             this.state = ItemState.APPROVED;
             if (newExpiresAt !== undefined)
                 this.expiresAt = newExpiresAt;
-            await this.save();
+            await this.save(connection);
         } else
             throw new ex.IllegalStateError("attempt to approve record from wrong state: " + this.state.val);
     }
 
-    async decline(force = false) {
+    async decline(connection = undefined, force = false) {
         if (this.state.isPending || (force && this.state === ItemState.UNDEFINED)) {
             this.state = ItemState.DECLINED;
             this.expiresAt = new Date();
             this.expiresAt.setSeconds(this.expiresAt.getSeconds() + Config.declinedItemExpiration);
-            await this.save();
+            await this.save(connection);
         } else
             throw new ex.IllegalStateError("attempt to decline record from wrong state: " + this.state.val);
     }
 
-    async setUndefined(force = false) {
+    async setUndefined(connection = undefined, force = false) {
         if (this.state.isPending || this.isExpired() ||
             (force && (this.state === ItemState.DECLINED || this.state === ItemState.REVOKED || this.state === ItemState.APPROVED))) {
 
             this.state = ItemState.UNDEFINED;
-            await this.save();
+            await this.save(connection);
         } else
             throw new ex.IllegalStateError("attempt setUndefined record from wrong state: " + this.state.val);
     }
 
-    async setPendingPositive() {
+    async setPendingPositive(connection = undefined) {
         if (this.state === ItemState.PENDING) {
             this.state = ItemState.PENDING_POSITIVE;
-            await this.save();
+            await this.save(connection);
         } else
             throw new ex.IllegalStateError("attempt setPendingPositive record from wrong state: " + this.state.val);
     }
 
-    async setPendingNegative() {
+    async setPendingNegative(connection = undefined) {
         if (this.state === ItemState.PENDING) {
             this.state = ItemState.PENDING_NEGATIVE;
-            await this.save();
+            await this.save(connection);
         } else
             throw new ex.IllegalStateError("attempt setPendingNegative record from wrong state: " + this.state.val);
     }

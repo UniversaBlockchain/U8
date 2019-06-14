@@ -119,7 +119,7 @@ unit.test("itemcache_test: subscribeStateRecord", async () => {
 
     let newExpires = new Date(record.expiresAt);
     newExpires.setMonth(newExpires.getMonth() + 3);
-    await record.approve(newExpires);
+    await record.approve(null, newExpires);
 
     assert(cache.get(contract.id).equals(contract));
     assert(cache.getResult(contract.id).state === ItemState.APPROVED);

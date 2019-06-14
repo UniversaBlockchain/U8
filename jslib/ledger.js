@@ -98,29 +98,37 @@ class Ledger {
         this.timers_[i] = trs.timeout(delay, f);
     }
 
-    simpleUpdate(sql, ...params) {
+    simpleUpdate(sql, connection = undefined, ...params) {
         return new Promise((resolve, reject) => {
-            this.dbPool_.withConnection(con => {
+            let update = con => {
                 con.executeUpdate(qr => {
-                        con.release();
+                        if (connection == null)
+                            con.release();
                         resolve();
                     }, e => {
-                        con.release();
+                        if (connection == null)
+                            con.release();
                         reject(e);
                     },
                     sql,
                     ...params
                 );
-            });
+            };
+
+            if (connection == null)
+                this.dbPool_.withConnection(update);
+            else
+                update(connection);
         });
     }
 
-    simpleQuery(sql, processValue, ...params) {
+    simpleQuery(sql, processValue, connection = undefined, ...params) {
         return new Promise((resolve, reject) => {
-            this.dbPool_.withConnection(con => {
+            let query = con => {
                 con.executeQuery(qr => {
                         let row = qr.getRows(1)[0];
-                        con.release();
+                        if (connection == null)
+                            con.release();
 
                         let value = null;
                         if (row != null && row[0] != null)
@@ -131,13 +139,19 @@ class Ledger {
                         else
                             resolve(value);
                     }, e => {
-                        con.release();
+                        if (connection == null)
+                            con.release();
                         reject(e);
                     },
                     sql,
                     ...params
                 );
-            });
+            };
+
+            if (connection == null)
+                this.dbPool_.withConnection(query);
+            else
+                query(connection);
         });
     }
 
@@ -495,19 +509,16 @@ class Ledger {
      * @param {db.SqlDriverConnection} connection - Transaction connection for destroy record. Optional.
      * @return {Promise} resolved when record destroyed.
      */
-    destroy(record, connection) {
+    destroy(record, connection = undefined) {
         if (record.recordId === 0)
             throw new ex.IllegalStateError("can't destroy record without recordId");
 
         this.cachedRecords.delete(record.id);
         this.cachedRecordsById.delete(record.recordId);
 
-        if (connection !== undefined)
-            return this.transactionDestroy(record, connection);
-
-        return this.simpleUpdate("DELETE FROM items WHERE id = ?;", record.recordId)
+        return this.simpleUpdate("DELETE FROM items WHERE id = ?;", connection, record.recordId)
             .then(() => {
-                return this.simpleUpdate("DELETE FROM ledger WHERE id = ?;", record.recordId);
+                return this.simpleUpdate("DELETE FROM ledger WHERE id = ?;", connection, record.recordId);
             });
     }
 
@@ -518,7 +529,7 @@ class Ledger {
      * @param {db.SqlDriverConnection} connection - Transaction connection for destroy record.
      * @return {Promise} resolved when record destroyed.
      */
-    transactionDestroy(record, connection) {
+    /*transactionDestroy(record, connection) {
         return new Promise((resolve, reject) => {
             connection.executeUpdate(qr => {
                     resolve();
@@ -540,7 +551,7 @@ class Ledger {
                 );
             });
         });
-    }
+    }*/
 
     /**
      * Save a record into the ledger.
@@ -549,48 +560,19 @@ class Ledger {
      * @param {db.SqlDriverConnection} connection - Transaction connection for save record. Optional.
      * @return {Promise<StateRecord>} resolved when record saved.
      */
-    save(record, connection) {
+    save(record, connection = undefined) {
         if (record.ledger == null) {
             record.ledger = this;
         } else if (record.ledger !== this)
             throw new ex.IllegalStateError("can't save with a different ledger (make a copy!)");
 
-        if (connection != null)
-            return this.transactionSave(record, connection);
-
         if (record.recordId === 0)
             throw new ex.IllegalStateError("can't save record with id equals 0");
-
-            /*return new Promise((resolve, reject) => {
-                this.dbPool_.withConnection(con => {
-                    con.executeQuery(qr => {
-                            let row = qr.getRows(1)[0];
-                            con.release();
-
-                            if (row != null && row[0] != null)
-                                record.recordId = row[0];
-
-                            this.putToCache(record);
-
-                            resolve(record);
-                        }, e => {
-                            con.release();
-                            reject(e);
-                        },
-                        "insert into ledger(hash, state, created_at, expires_at, locked_by_id) values(?,?,?,?,?) RETURNING id;",
-                        record.id.digest,
-                        record.state.ordinal,
-                        Math.floor(record.createdAt.getTime() / 1000),
-                        Math.floor(record.expiresAt.getTime() / 1000),
-                        record.lockedByRecordId
-                    );
-                });
-            });
-        else*/
 
         this.putToCache(record);
 
         return this.simpleUpdate("update ledger set state=?, created_at=?, expires_at=?, locked_by_id=? where id=?",
+            connection,
             record.state.ordinal,
             Math.floor(record.createdAt.getTime() / 1000),
             Math.floor(record.expiresAt.getTime() / 1000),
@@ -605,32 +587,9 @@ class Ledger {
      * @param {db.SqlDriverConnection} connection - Transaction connection for save record.
      * @return {Promise<StateRecord>} resolved when record saved.
      */
-    transactionSave(record, connection) {
+    /*transactionSave(record, connection) {
         if (record.recordId === 0)
             throw new ex.IllegalStateError("can't save record with id equals 0");
-
-            /*return new Promise((resolve, reject) => {
-                connection.executeQuery(qr => {
-                        let row = qr.getRows(1)[0];
-
-                        if (row != null && row[0] != null)
-                            record.recordId = row[0];
-
-                        this.putToCache(record);
-
-                        resolve(record);
-                    }, e => {
-                        reject(e);
-                    },
-                    "insert into ledger(hash, state, created_at, expires_at, locked_by_id) values(?,?,?,?,?) RETURNING id;",
-                    record.id.digest,
-                    record.state.ordinal,
-                    Math.floor(record.createdAt.getTime() / 1000),
-                    Math.floor(record.expiresAt.getTime() / 1000),
-                    record.lockedByRecordId
-                );
-            });
-        else*/
 
         return new Promise((resolve, reject) => {
             connection.executeUpdate(qr => {
@@ -646,7 +605,7 @@ class Ledger {
                 record.recordId
             );
         });
-    }
+    }*/
 
     /**
      * Refresh record.
@@ -788,6 +747,7 @@ class Ledger {
      */
     savePayment(amount, date) {
         return this.simpleUpdate("insert into payments_summary (amount,date) VALUES (?,?) ON CONFLICT (date) DO UPDATE SET amount = payments_summary.amount + excluded.amount",
+            null,
             amount,
             Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()) / 1000);
     }
@@ -839,7 +799,8 @@ class Ledger {
      * @return {Promise<void>}
      */
     markTestRecord(itemId) {
-        return this.simpleUpdate("insert into ledger_testrecords(hash) values(?) on conflict do nothing;", itemId.digest);
+        return this.simpleUpdate("insert into ledger_testrecords(hash) values(?) on conflict do nothing;",
+            null, itemId.digest);
     }
 
     /**
@@ -851,6 +812,7 @@ class Ledger {
     isTestnet(itemId) {
         return this.simpleQuery("select exists(select 1 from ledger_testrecords where hash=?)",
             x => Boolean(x),
+            null,
             itemId.digest);
     }
 
@@ -859,10 +821,11 @@ class Ledger {
      *
      * @param {number} subscriptionId - Subscription ID.
      * @param {Date} expiresAt - Expiration time.
+     * @param {db.SqlDriverConnection} con - Transaction connection. Optional.
      * @return {Promise<void>}
      */
-    updateSubscriptionInStorage(subscriptionId, expiresAt) {
-        return this.simpleUpdate("UPDATE contract_subscription SET expires_at = ? WHERE id = ?",
+    updateSubscriptionInStorage(subscriptionId, expiresAt, con = undefined) {
+        return this.simpleUpdate("UPDATE contract_subscription SET expires_at = ? WHERE id = ?", con,
             Math.floor(expiresAt.getTime() / 1000),
             subscriptionId);
     }
@@ -872,10 +835,11 @@ class Ledger {
      *
      * @param {number} storageId - Storage Id.
      * @param {Date} expiresAt - Expiration time.
+     * @param {db.SqlDriverConnection} con - Transaction connection. Optional.
      * @return {Promise<void>}
      */
-    updateStorageExpiresAt(storageId, expiresAt) {
-        return this.simpleUpdate("UPDATE contract_storage SET expires_at = ? WHERE id = ?",
+    updateStorageExpiresAt(storageId, expiresAt, con = undefined) {
+        return this.simpleUpdate("UPDATE contract_storage SET expires_at = ? WHERE id = ?", con,
             Math.floor(expiresAt.getTime() / 1000),
             storageId);
     }
@@ -888,12 +852,14 @@ class Ledger {
      * @param {Date} mutedAt - The time before which the contract sends notifications.
      * @param {number} spent - Amount of U spent on sending the callbacks.
      * @param {number} startedCallbacks - Number of running callbacks.
+     * @param {db.SqlDriverConnection} con - Transaction connection. Optional.
      * @return {Promise<void>}
      */
-    saveFollowerEnvironment(environmentId, expiresAt, mutedAt, spent, startedCallbacks) {
+    saveFollowerEnvironment(environmentId, expiresAt, mutedAt, spent, startedCallbacks, con = undefined) {
         return this.simpleUpdate("INSERT INTO follower_environments (environment_id, expires_at, muted_at, spent_for_callbacks, started_callbacks) " +
             "VALUES (?,?,?,?,?) ON CONFLICT (environment_id) DO UPDATE SET expires_at = EXCLUDED.expires_at, " +
             "muted_at = EXCLUDED.muted_at, spent_for_callbacks = EXCLUDED.spent_for_callbacks, started_callbacks = EXCLUDED.started_callbacks",
+            con,
             environmentId,
             Math.floor(expiresAt.getTime() / 1000),
             Math.floor(mutedAt.getTime() / 1000),
@@ -906,10 +872,11 @@ class Ledger {
      *
      * @param {number} nameRecordId - Name record id.
      * @param {Date} expiresAt - Storage expiration time name record.
+     * @param {db.SqlDriverConnection} con - Transaction connection. Optional.
      * @return {Promise<void>}
      */
-    updateNameRecord(nameRecordId, expiresAt) {
-        return this.simpleUpdate("UPDATE name_storage SET expires_at = ? WHERE id = ?",
+    updateNameRecord(nameRecordId, expiresAt, con = undefined) {
+        return this.simpleUpdate("UPDATE name_storage SET expires_at = ? WHERE id = ?", con,
             Math.floor(expiresAt.getTime() / 1000),
             nameRecordId);
     }
@@ -925,6 +892,7 @@ class Ledger {
                 else
                     return Number(x);
             },
+            null,
             ncontractType,
             ncontractHashId.digest,
             kvStorage,
@@ -1148,7 +1116,7 @@ class Ledger {
             } else
                 sqlText = "insert into config(http_client_port,http_server_port,udp_server_port, node_number, node_name, public_host,host,public_key) values(?,?,?,?,?,?,?,?);";
 
-            await this.simpleUpdate(sqlText, ...params);
+            await this.simpleUpdate(sqlText, null, ...params);
         }
     }*/
 
@@ -1231,6 +1199,7 @@ class Ledger {
      */
     /*addNode(nodeInfo) {
         return this.simpleUpdate("insert into config(http_client_port,http_server_port,udp_server_port, node_number, node_name, public_host,host,public_key) values(?,?,?,?,?,?,?,?);",
+            null,
             nodeInfo.clientAddress.port,
             nodeInfo.serverAddress.port,
             nodeInfo.nodeAddress.port,
@@ -1248,7 +1217,7 @@ class Ledger {
      * @return {Promise<void>}
      */
     /*removeNode(nodeInfo) {
-        return this.simpleUpdate("delete from config where node_number = ?;",
+        return this.simpleUpdate("delete from config where node_number = ?;", null,
             nodeInfo.number);
     }*/
 
@@ -1305,6 +1274,7 @@ class Ledger {
     getItem(record) {
         return this.simpleQuery("select packed from items where id = ?",
             x => Contract.fromPackedTransaction(x),
+            null,
             record.recordId);
     }
 
@@ -1320,7 +1290,7 @@ class Ledger {
         if (!item instanceof Contract)
             return;
 
-        return this.simpleUpdate("insert into items(id,packed,keepTill) values(?,?,?);",
+        return this.simpleUpdate("insert into items(id,packed,keepTill) values(?,?,?);", null,
             record.recordId,
             item.getPackedTransaction(),
             Math.floor(keepTill.getTime() / 1000));
@@ -1347,13 +1317,15 @@ class Ledger {
      *
      * @param {StateRecord} record - State record.
      * @param {Contract} item - Contract.
+     * @param {db.SqlDriverConnection} con - Transaction connection. Optional.
      * @return {Promise<void> | void}
      */
-    putKeptItem(record, item) {
+    putKeptItem(record, item, con = undefined) {
         if (!item instanceof Contract)
             return;
 
         return this.simpleUpdate("insert into kept_items (ledger_id,origin,parent,packed) values(?,?,?,?);",
+            con,
             record.recordId,
             item.getOrigin().digest,
             item.parent != null ? item.parent.digest : null,
@@ -1571,6 +1543,7 @@ class Ledger {
     getEnvironmentIdForSmartContractId(smartContractId) {
         return this.simpleQuery("SELECT id FROM environments WHERE ncontract_hash_id=?",
             x => (x != null) ? Number(x) : null,
+            null,
             smartContractId.digest);
     }
 
@@ -1650,10 +1623,12 @@ class Ledger {
      * @param {HashId} ncontractHashId - Ncontract HashId.
      * @param {number[]} kvStorage - Key-value storage.
      * @param {number[]} transactionPack - Contract transaction pack.
+     * @param {db.SqlDriverConnection} con - Transaction connection. Optional.
      * @return {Promise<void>}
      */
-    updateEnvironment(id, ncontractType, ncontractHashId, kvStorage, transactionPack) {
+    updateEnvironment(id, ncontractType, ncontractHashId, kvStorage, transactionPack, con = undefined) {
         return this.simpleUpdate("UPDATE environments  SET ncontract_type = ?,ncontract_hash_id = ?,kv_storage = ?,transaction_pack = ? WHERE id = ?",
+            con,
             ncontractType,
             ncontractHashId.digest,
             kvStorage,
@@ -1669,10 +1644,12 @@ class Ledger {
      * @param {Date} expiresAt - Expiration time.
      * @param {HashId} origin - Contracts chain origin.
      * @param {number} environmentId - Environment ID.
+     * @param {db.SqlDriverConnection} con - Transaction connection. Optional.
      * @return {Promise}
      */
-    saveContractInStorage(contractId, binData, expiresAt, origin, environmentId) {
+    saveContractInStorage(contractId, binData, expiresAt, origin, environmentId, con = undefined) {
         return this.simpleUpdate("INSERT INTO contract_binary (hash_id, bin_data) VALUES (?,?) ON CONFLICT (hash_id) DO UPDATE SET bin_data=EXCLUDED.bin_data",
+            con,
             contractId.digest,
             binData)
             .then(() => {
@@ -1683,6 +1660,7 @@ class Ledger {
                         else
                             return Number(x);
                     },
+                    con,
                     contractId.digest,
                     origin.digest,
                     Math.floor(expiresAt.getTime() / 1000),
@@ -1697,9 +1675,10 @@ class Ledger {
      * @param {boolean} subscriptionOnChain - true if subscribe by contract ID, false if subscribe by origin.
      * @param {Date} expiresAt - Expiration time.
      * @param {number} environmentId - Environment ID.
+     * @param {db.SqlDriverConnection} con - Transaction connection. Optional.
      * @return {Promise}
      */
-    saveSubscriptionInStorage(hashId, subscriptionOnChain, expiresAt, environmentId) {
+    saveSubscriptionInStorage(hashId, subscriptionOnChain, expiresAt, environmentId, con = undefined) {
         return this.simpleQuery("INSERT INTO contract_subscription (hash_id, subscription_on_chain, expires_at, environment_id) VALUES(?,?,?,?) RETURNING id",
             x => {
                 if (x == null)
@@ -1707,6 +1686,7 @@ class Ledger {
                 else
                     return Number(x);
             },
+            con,
             hashId.digest,
             subscriptionOnChain,
             Math.floor(expiresAt.getTime() / 1000),
@@ -1767,6 +1747,7 @@ class Ledger {
                 else
                     return Object.values(NCallbackService.FollowerCallbackState)[x];
             },
+            null,
             id.digest);
     }
 
@@ -1871,6 +1852,7 @@ class Ledger {
      */
     addFollowerCallback(id, environmentId, expiresAt, storedUntil) {
         return this.simpleUpdate("INSERT INTO follower_callbacks (id, state, environment_id, expires_at, stored_until) VALUES (?,?,?,?,?)",
+            null,
             id.digest,
             NCallbackService.FollowerCallbackState.STARTED.ordinal,
             environmentId,
@@ -1886,7 +1868,7 @@ class Ledger {
      * @return {Promise<void>}
      */
     updateFollowerCallbackState(id, state) {
-        return this.simpleUpdate("UPDATE follower_callbacks SET state = ? WHERE id = ?",
+        return this.simpleUpdate("UPDATE follower_callbacks SET state = ? WHERE id = ?", null,
             state.ordinal,
             id.digest);
     }
@@ -1898,7 +1880,7 @@ class Ledger {
      * @return {Promise<void>}
      */
     removeFollowerCallback(id) {
-        return this.simpleUpdate("DELETE FROM follower_callbacks WHERE id = ?", id.digest);
+        return this.simpleUpdate("DELETE FROM follower_callbacks WHERE id = ?", null, id.digest);
     }
 
     /**
@@ -1907,7 +1889,8 @@ class Ledger {
      * @return {Promise<void>}
      */
     clearExpiredStorages() {
-        return this.simpleUpdate("DELETE FROM contract_storage WHERE expires_at < ?", Math.floor(Date.now() / 1000));
+        return this.simpleUpdate("DELETE FROM contract_storage WHERE expires_at < ?", null,
+            Math.floor(Date.now() / 1000));
     }
 
     /**
@@ -1916,17 +1899,19 @@ class Ledger {
      * @return {Promise<void>}
      */
     clearExpiredSubscriptions() {
-        return this.simpleUpdate("DELETE FROM contract_subscription WHERE expires_at < ?", Math.floor(Date.now() / 1000));
+        return this.simpleUpdate("DELETE FROM contract_subscription WHERE expires_at < ?", null,
+            Math.floor(Date.now() / 1000));
     }
 
     /**
      * Remove expired stored contracts.
      *
+     * @param {db.SqlDriverConnection} con - Transaction connection. Optional.
      * @return {Promise<void>}
      */
-    clearExpiredStorageContractBinaries() {
+    clearExpiredStorageContractBinaries(con = undefined) {
         //TODO: add trigger for delete expired contracts after deleting all subscriptions, and remove this function
-        return this.simpleUpdate("DELETE FROM contract_binary WHERE hash_id NOT IN (SELECT hash_id FROM contract_storage GROUP BY hash_id)");
+        return this.simpleUpdate("DELETE FROM contract_binary WHERE hash_id NOT IN (SELECT hash_id FROM contract_storage GROUP BY hash_id)", con);
     }
 
     /**
@@ -1937,6 +1922,7 @@ class Ledger {
      */
     getSmartContractById(smartContractId) {
         return this.simpleQuery("SELECT transaction_pack FROM environments WHERE ncontract_hash_id=?",
+            null,
             null,
             smartContractId.digest);
     }
@@ -1949,6 +1935,7 @@ class Ledger {
      */
     getContractInStorage(contractId) {
         return this.simpleQuery("SELECT bin_data FROM contract_binary WHERE hash_id=?",
+            null,
             null,
             contractId.digest);
     }
@@ -2002,40 +1989,44 @@ class Ledger {
      * Remove subscription by ID.
      *
      * @param subscriptionId - Subscription ID.
+     * @param {db.SqlDriverConnection} con - Transaction connection. Optional.
      * @return {Promise<void>}
      */
-    removeEnvironmentSubscription(subscriptionId) {
-        return this.simpleUpdate("DELETE FROM contract_subscription WHERE id = ?", subscriptionId);
+    removeEnvironmentSubscription(subscriptionId, con = undefined) {
+        return this.simpleUpdate("DELETE FROM contract_subscription WHERE id = ?", con, subscriptionId);
     }
 
     /**
      * Remove storage subscription by ID.
      *
      * @param {number} storageId - Storage ID.
+     * @param {db.SqlDriverConnection} con - Transaction connection. Optional.
      * @return {Promise<void>}
      */
-    removeEnvironmentStorage(storageId) {
-        return this.simpleUpdate("DELETE FROM contract_storage WHERE id = ?", storageId);
+    removeEnvironmentStorage(storageId, con = undefined) {
+        return this.simpleUpdate("DELETE FROM contract_storage WHERE id = ?", con, storageId);
     }
 
     /**
      * Remove subscription by environment ID.
      *
      * @param {number} environmentId - Environment ID.
+     * @param {db.SqlDriverConnection} con - Transaction connection. Optional.
      * @return {Promise<void>}
      */
-    removeSubscriptionsByEnvId(environmentId) {
-        return this.simpleUpdate("DELETE FROM contract_subscription WHERE environment_id = ?", environmentId);
+    removeSubscriptionsByEnvId(environmentId, con = undefined) {
+        return this.simpleUpdate("DELETE FROM contract_subscription WHERE environment_id = ?", con, environmentId);
     }
 
     /**
      * Remove storage contract by environment ID.
      *
      * @param environmentId - Environment ID.
+     * @param {db.SqlDriverConnection} con - Transaction connection. Optional.
      * @return {Promise<void>}
      */
-    removeStorageContractsByEnvId(environmentId) {
-        return this.simpleUpdate("DELETE FROM contract_storage WHERE environment_id = ?", environmentId);
+    removeStorageContractsByEnvId(environmentId, con = undefined) {
+        return this.simpleUpdate("DELETE FROM contract_storage WHERE environment_id = ?", con, environmentId);
     }
 
     /**
@@ -2052,6 +2043,7 @@ class Ledger {
                 else
                     return Number(x);
             },
+            null,
             ncontractHashId.digest);
     }
 
@@ -2059,24 +2051,18 @@ class Ledger {
      * Remove environment by smart contract ID.
      *
      * @param {HashId} ncontractHashId - smart contract ID.
-     * @return {Promise<number>} removed environment ID.
+     * @param {db.SqlDriverConnection} con - Transaction connection. Optional.
+     * @return {Promise<void>}
      */
-    async removeEnvironment(ncontractHashId) {
+    async removeEnvironment(ncontractHashId, con = undefined) {
         let envId = await this.getEnvironmentId(ncontractHashId);
         if (envId === 0)
-            return 0;
+            return;
 
-        await this.removeSubscriptionsByEnvId(envId);
-        await this.removeStorageContractsByEnvId(envId);
-        await this.clearExpiredStorageContractBinaries();
-        return await this.simpleQuery("DELETE FROM environments WHERE ncontract_hash_id=? RETURNING id",
-            x => {
-                if (x == null)
-                    return 0;
-                else
-                    return Number(x);
-            },
-            ncontractHashId.digest);
+        await this.removeSubscriptionsByEnvId(envId, con);
+        await this.removeStorageContractsByEnvId(envId, con);
+        await this.clearExpiredStorageContractBinaries(con);
+        await this.simpleUpdate("DELETE FROM environments WHERE ncontract_hash_id=?", con, ncontractHashId.digest);
     }
 
     /**
@@ -2093,10 +2079,10 @@ class Ledger {
      * Save UNS name.
      *
      * @param {NNameRecord} nameRecord - UNS name.
-     *
+     * @param {db.SqlDriverConnection} con - Transaction connection. Optional.
      * @return {Promise<number>} created name record ID.
      */
-    addNameStorage(nameRecord) {
+    addNameStorage(nameRecord, con = undefined) {
         return this.simpleQuery(
             "INSERT INTO name_storage (name_reduced,name_full,description,url,expires_at,environment_id) " +
             "VALUES (?,?,?,?,?,?) ON CONFLICT (name_reduced) DO UPDATE SET name_full=EXCLUDED.name_full, " +
@@ -2108,6 +2094,7 @@ class Ledger {
                 else
                     return Number(x);
             },
+            con,
             nameRecord.nameReduced,
             nameRecord.name,
             nameRecord.description,
@@ -2120,10 +2107,10 @@ class Ledger {
      * Save UNS name record entry.
      *
      * @param {NNameRecordEntry} nameRecordEntry - UNS name record entry.
-     *
+     * @param {db.SqlDriverConnection} con - Transaction connection. Optional.
      * @return {Promise<number>} created name record entry ID.
      */
-    addNameEntry(nameRecordEntry) {
+    addNameEntry(nameRecordEntry, con = undefined) {
         return this.simpleQuery(
             "INSERT INTO name_entry (name_storage_id,short_addr,long_addr,origin) VALUES (?,?,?,?) RETURNING entry_id",
             x => {
@@ -2132,6 +2119,7 @@ class Ledger {
                 else
                     return Number(x);
             },
+            con,
             nameRecordEntry.nameRecordId,
             nameRecordEntry.shortAddress,
             nameRecordEntry.longAddress,
@@ -2142,18 +2130,18 @@ class Ledger {
      * Save UNS name record.
      *
      * @param {NNameRecord} nameRecord - UNS name record.
-     *
+     * @param {db.SqlDriverConnection} con - Transaction connection. Optional.
      * @return {Promise<void>}
      */
-    async addNameRecord(nameRecord) {
-        let nameStorageId = await this.addNameStorage(nameRecord);
+    async addNameRecord(nameRecord, con = undefined) {
+        let nameStorageId = await this.addNameStorage(nameRecord, con);
         if (nameStorageId !== 0) {
             nameRecord.id = nameStorageId;
-            await this.removeNameRecordEntries(nameStorageId);
+            await this.removeNameRecordEntries(nameStorageId, con);
 
             await Promise.all(nameRecord.entries.map(async(entry) => {
                 entry.nameRecordId = nameStorageId;
-                await this.addNameEntry(entry);
+                await this.addNameEntry(entry, con);
             }));
         } else
             throw new LedgerException("addNameRecord failed");
@@ -2163,22 +2151,22 @@ class Ledger {
      * Remove UNS name record.
      *
      * @param {string} nameReduced - Reduced name of UNS name record.
-     *
+     * @param {db.SqlDriverConnection} con - Transaction connection. Optional.
      * @return {Promise<void>}
      */
-    removeNameRecord(nameReduced) {
-        return this.simpleUpdate("DELETE FROM name_storage WHERE name_reduced=?", nameReduced);
+    removeNameRecord(nameReduced, con = undefined) {
+        return this.simpleUpdate("DELETE FROM name_storage WHERE name_reduced=?", con, nameReduced);
     }
 
     /**
      * Remove UNS name record entries.
      *
      * @param {number} nameStorageId - UNS name record ID.
-     *
+     * @param {db.SqlDriverConnection} con - Transaction connection. Optional.
      * @return {Promise<void>}
      */
-    removeNameRecordEntries(nameStorageId) {
-        return this.simpleUpdate("DELETE FROM name_entry WHERE name_storage_id=?", nameStorageId);
+    removeNameRecordEntries(nameStorageId, con = undefined) {
+        return this.simpleUpdate("DELETE FROM name_entry WHERE name_storage_id=?", con, nameStorageId);
     }
 
     /**
@@ -2473,7 +2461,8 @@ class Ledger {
      * @return {Promise<void>}
      */
     clearExpiredNameRecords(holdDuration) {
-        return this.simpleUpdate("DELETE FROM name_storage WHERE expires_at < ? ", Math.floor(Date.now() / 1000) - holdDuration);
+        return this.simpleUpdate("DELETE FROM name_storage WHERE expires_at < ? ", null,
+            Math.floor(Date.now() / 1000) - holdDuration);
     }
 
     /**
@@ -2485,11 +2474,11 @@ class Ledger {
     async cleanup(isPermanetMode) {
         let now = Math.floor(Date.now() / 1000);
 
-        await this.simpleUpdate("delete from items where id in (select id from ledger where expires_at < ?);", now);
-        await this.simpleUpdate("delete from items where keepTill < ?;", now);
-        await this.simpleUpdate("delete from follower_callbacks where stored_until < ?;", now);
+        await this.simpleUpdate("delete from items where id in (select id from ledger where expires_at < ?);", null, now);
+        await this.simpleUpdate("delete from items where keepTill < ?;", null, now);
+        await this.simpleUpdate("delete from follower_callbacks where stored_until < ?;", null, now);
         if (!isPermanetMode)
-            await this.simpleUpdate("delete from ledger where expires_at < ?;", now);
+            await this.simpleUpdate("delete from ledger where expires_at < ?;", null, now);
     }
 }
 

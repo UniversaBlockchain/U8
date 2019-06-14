@@ -11,6 +11,7 @@ const NameCache = require("namecache").NameCache;
 const Config = require("config").Config;
 const ResyncProcessor = require("resyncprocessor").ResyncProcessor;
 const ItemInformer = require("iteminformer").ItemInformer;
+const NodeInfoProvider = require("services/NSmartContract").NodeInfoProvider;
 const t = require("tools");
 
 class Node {
@@ -22,6 +23,7 @@ class Node {
         this.network = network;
         this.logger = logger;
         this.informer = new ItemInformer();
+        this.nodeInfoProvider = new BaseNodeInfoProvider(this.config);
 
         this.cache = new ItemCache(Config.maxCacheAge);
         this.nameCache = new NameCache(Config.maxNameCacheAge);
@@ -309,9 +311,9 @@ class Node {
         return result;
     }
 
-    removeEnvironment(id) {
+    removeEnvironment(id, con) {
         //this.envCache.remove(id);
-        return this.ledger.removeEnvironment(id);
+        return this.ledger.removeEnvironment(id, con);
     }
 
     async sanitateRecord(r) {
@@ -416,6 +418,37 @@ class Node {
                 this.checkItemInternal(contract.id, null, contract, true, true, false);
             }
         }
+    }
+}
+
+class BaseNodeInfoProvider extends NodeInfoProvider {
+
+    constructor(config) {
+        super();
+        this.config = config;
+    }
+
+    getUIssuerKeys() {
+        return this.config.uIssuerKeys;
+    }
+
+    getUIssuerName() {
+        return Config.uIssuerName;
+    }
+
+    getMinPayment(extendedType) {
+        return Config.minPayment[extendedType];
+    }
+
+    getServiceRate(extendedType) {
+        return Config.rate[extendedType];
+    }
+
+    getAdditionalKeysToSignWith(extendedType) {
+        if (extendedType === NSmartContract.SmartContractType.UNS1)
+            return [Config.authorizedNameServiceCenterKey];
+
+        return [];
     }
 }
 

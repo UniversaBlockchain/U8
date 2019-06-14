@@ -328,13 +328,13 @@ class ResyncingItem {
                     this.record.createdAt = createdAt;
                     this.record.expiresAt = expiresAt;
                     if (committingState === ItemState.APPROVED)
-                        await this.record.approve(expiresAt, true);
+                        await this.record.approve(null, expiresAt, true);
                     else if (committingState === ItemState.DECLINED)
-                        await this.record.decline(true);
+                        await this.record.decline(null, true);
                     else if (committingState === ItemState.REVOKED)
-                        await this.record.revoke(true);
+                        await this.record.revoke(null, true);
                     else if (committingState === ItemState.UNDEFINED)
-                        await this.record.setUndefined(true);
+                        await this.record.setUndefined(null, true);
 
                     this.node.cache.update(this.record.id, ItemResult.fromStateRecord(this.record));
 

@@ -99,48 +99,48 @@ class NMutableEnvironment extends NImmutableEnvironment {
         this.nameRecordsToDestroy.add(nameRecord);
     }
 
-    async save() {
+    async save(connection = undefined) {
         await this.ledger.updateEnvironment(this.id, this.contract.getExtendedType(), this.contract.id,
-            Boss.dump(this.kvStore), this.contract.getPackedTransaction());
+            Boss.dump(this.kvStore), this.contract.getPackedTransaction(), connection);
 
         await Promise.all(Array.from(this.subscriptionsToDestroy).map(
-            async(sub) => await this.ledger.removeEnvironmentSubscription(sub.id)
+            async(sub) => await this.ledger.removeEnvironmentSubscription(sub.id, connection)
         ));
 
         await Promise.all(Array.from(this.subscriptionsToSave).map(
-            async(sub) => await this.ledger.updateSubscriptionInStorage(sub.id, sub.expiresAt)
+            async(sub) => await this.ledger.updateSubscriptionInStorage(sub.id, sub.expiresAt, connection)
         ));
 
         await Promise.all(Array.from(this.subscriptionsToAdd).map(
             async(sub) => sub.id = await this.ledger.saveSubscriptionInStorage(
-                sub.hashId, sub.isChainSubscription, sub.expiresAt, this.id)
+                sub.hashId, sub.isChainSubscription, sub.expiresAt, this.id, connection)
         ));
 
         await Promise.all(Array.from(this.storagesToDestroy).map(
-            async(storage) => await this.ledger.removeEnvironmentStorage(storage.id)
+            async(storage) => await this.ledger.removeEnvironmentStorage(storage.id, connection)
         ));
 
         await Promise.all(Array.from(this.storagesToSave).map(
-            async(storage) => await this.ledger.updateStorageExpiresAt(storage.id, storage.expiresAt)
+            async(storage) => await this.ledger.updateStorageExpiresAt(storage.id, storage.expiresAt, connection)
         ));
 
         await Promise.all(Array.from(this.storagesToAdd).map(
             async(storage) => storage.id = await this.ledger.saveContractInStorage(
-                storage.contract.id, storage.packedContract, storage.expiresAt, storage.contract.getOrigin(), this.id)
+                storage.contract.id, storage.packedContract, storage.expiresAt, storage.contract.getOrigin(), this.id, connection)
         ));
 
         await Promise.all(Array.from(this.nameRecordsToDestroy).map(
-            async(nameRecord) => await this.ledger.removeNameRecord(nameRecord.nameReduced)
+            async(nameRecord) => await this.ledger.removeNameRecord(nameRecord.nameReduced, connection)
         ));
 
-        await this.ledger.clearExpiredStorageContractBinaries();
+        await this.ledger.clearExpiredStorageContractBinaries(connection);
 
         let addressList = [];
         let nameList = [];
         let originsList = [];
 
         await Promise.all(Array.from(this.nameRecordsToSave).map(async(nameRecord) => {
-            await this.ledger.updateNameRecord(nameRecord.id, nameRecord.expiresAt);
+            await this.ledger.updateNameRecord(nameRecord.id, nameRecord.expiresAt, connection);
             nameList.push(nameRecord.nameReduced);
             nameRecord.getEntries().forEach(e => {
                 if (e.getOrigin() != null)
@@ -155,7 +155,7 @@ class NMutableEnvironment extends NImmutableEnvironment {
         }));
 
         await Promise.all(Array.from(this.nameRecordsToAdd).map(async(nameRecord) => {
-            await this.ledger.addNameRecord(nameRecord);
+            await this.ledger.addNameRecord(nameRecord, connection);
             nameList.push(nameRecord.nameReduced);
             nameRecord.getEntries().forEach(e => {
                 if (e.getOrigin() != null)
@@ -185,7 +185,7 @@ class NMutableEnvironment extends NImmutableEnvironment {
         this.immutable.kvStore = this.kvStore;
 
         if (this.followerService != null)
-            this.followerService.save();
+            this.followerService.save(connection);
     }
 }
 
