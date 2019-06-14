@@ -1,7 +1,8 @@
-import {ScheduleExecutor, ExecutorWithDynamicPeriod} from "executorservice";
+import {ScheduleExecutor, ExecutorWithDynamicPeriod, EventTimeoutError, AsyncEvent} from "executorservice";
 import {VerboseLevel} from "node_consts";
 import {ParcelNotification, ParcelNotificationType} from "notification";
 import {Errors, ErrorRecord} from "errors";
+import {ApprovedEvent, RevokedEvent, ApprovedWithCallbackEvent, RevokedWithCallbackEvent} from "services/contractSubscription";
 
 const ItemResult = require('itemresult').ItemResult;
 const ItemState = require('itemstate').ItemState;
@@ -696,7 +697,7 @@ class ItemProcessor {
                 else {
                     newItem.nodeInfoProvider = this.node.nodeInfoProvider;
 
-                    let ime = await this.node.getEnvironmentByItem(newItem);  //TODO: node.getEnvironmentByItem
+                    let ime = await this.node.getEnvironmentByContract(newItem, con);
                     ime.nameCache = this.node.nameCache;
                     let me = ime.getMutable();
 
@@ -751,7 +752,7 @@ class ItemProcessor {
             if (revokingItem instanceof NSmartContract && !this.searchNewItemWithParent(this.item, revokingItem.id)) {
                 revokingItem.nodeInfoProvider = this.node.nodeInfoProvider;
 
-                let ime = await this.node.getEnvironmentByItem(revokingItem);  //TODO: node.getEnvironmentByItem
+                let ime = await this.node.getEnvironmentByContract(revokingItem, con);
                 if (ime != null) {
                     // and run onRevoked
                     revokingItem.onRevoked(ime);
@@ -834,7 +835,7 @@ class ItemProcessor {
                     if (this.negativeNodes.has(this.node.myInfo))
                         this.addItemToResync(this.item.id, this.record);
                     else {
-                        let ime = await this.node.getEnvironmentByItem(this.item);  //TODO: node.getEnvironmentByItem
+                        let ime = await this.node.getEnvironmentByContract(this.item, con);
                         ime.nameCache = this.node.nameCache;
                         let me = ime.getMutable();
 
@@ -932,118 +933,74 @@ class ItemProcessor {
             // find all environments that have subscription for item
             let environmentIds = new Set();
             if (lookingId != null) {
-                let environmentIdsForContractId = await this.node.ledger.getSubscriptionEnviromentIds(lookingId);
+                let environmentIdsForContractId = await this.node.ledger.getSubscriptionEnviromentIds(lookingId, con);
                 environmentIdsForContractId.forEach(envId => environmentIds.add(envId));
             }
 
             if (origin != null) {
-                let environmentIdsForOrigin = await this.node.ledger.getSubscriptionEnviromentIds(origin);
+                let environmentIdsForOrigin = await this.node.ledger.getSubscriptionEnviromentIds(origin, con);
                 environmentIdsForOrigin.forEach(envId => environmentIds.add(envId));
             }
 
-            /*for (Long environmentId : environmentIds) {
-                synchronized (callbackService) {
-                    NImmutableEnvironment ime = getEnvironment(environmentId);
-                    ime.setNameCache(nameCache);
-                    NSmartContract contract = ime.getContract();
-                    contract.setNodeInfoProvider(nodeInfoProvider);
-                    NMutableEnvironment me = ime.getMutable();
+            for (let environmentId of environmentIds) {
+                let ime = await this.node.getEnvironment(environmentId, con);
+                ime.nameCache = this.node.nameCache;
+                let contract = ime.getContract();
+                contract.nodeInfoProvider = this.node.nodeInfoProvider;
+                let me = ime.getMutable();
 
-                    for (ContractSubscription sub : ime.subscriptions()) {
-                        if ((lookingId != null) && (sub.getContractId() != null) && (lookingId.equals(sub.getContractId()))) {
-                            ContractSubscription subscription = sub;
+                for (let sub of ime.subscriptions()) {
+                    if (lookingId != null && sub.getContractId() != null && lookingId.equals(sub.getContractId())) {
+                        if (updatingState === ItemState.APPROVED) {
+                            let event = new ApprovedEvent();
+                            event.getNewRevision = () => updatingItem;
+                            event.getPackedTransaction = () => updatingItem.getPackedTransaction();
+                            event.getEnvironment = () => me;
+                            event.getSubscription = () => sub;
 
-                            if (updatingState == ItemState.APPROVED) {
-                                contract.onContractSubscriptionEvent(new ContractSubscription.ApprovedEvent() {
-                                    @Override
-                                    public Contract getNewRevision() {
-                                        return (Contract) updatingItem;
-                                    }
-
-                                    @Override
-                                    public byte[] getPackedTransaction() {
-                                        return ((Contract) updatingItem).getPackedTransaction();
-                                    }
-
-                                    @Override
-                                    public MutableEnvironment getEnvironment() {
-                                        return me;
-                                    }
-
-                                    @Override
-                                    public ContractSubscription getSubscription() {
-                                        return subscription;
-                                    }
-                                });
-                                me.save();
-                            }
-
-                            if (updatingState == ItemState.REVOKED) {
-                                contract.onContractSubscriptionEvent(new ContractSubscription.RevokedEvent() {
-                                    @Override
-                                    public MutableEnvironment getEnvironment() {
-                                        return me;
-                                    }
-
-                                    @Override
-                                    public ContractSubscription getSubscription() {
-                                        return subscription;
-                                    }
-                                });
-                                me.save();
-                            }
-
-                            break;
+                            contract.onContractSubscriptionEvent(event);
+                            await me.save(con);
                         }
 
-                        if ((origin != null) && (sub.getOrigin() != null) && (origin.equals(sub.getOrigin()))) {
-                            if (contract.canFollowContract((Contract) updatingItem)) {
-                                if (updatingState == ItemState.APPROVED) {
-                                    contract.onContractSubscriptionEvent(new ContractSubscription.ApprovedWithCallbackEvent() {
-                                        @Override
-                                        public Contract getNewRevision() {
-                                            return (Contract) updatingItem;
-                                        }
+                        if (updatingState === ItemState.REVOKED) {
+                            let event = new RevokedEvent();
+                            event.getEnvironment = () => me;
+                            event.getSubscription = () => sub;
 
-                                        @Override
-                                        public MutableEnvironment getEnvironment() {
-                                            return me;
-                                        }
+                            contract.onContractSubscriptionEvent(event);
+                            await me.save(con);
+                        }
 
-                                        @Override
-                                        public CallbackService getCallbackService() {
-                                            return callbackService;
-                                        }
-                                    });
-                                    me.save();
-                                }
+                        break;
+                    }
 
-                                if (updatingState == ItemState.REVOKED) {
-                                    contract.onContractSubscriptionEvent(new ContractSubscription.RevokedWithCallbackEvent() {
-                                        @Override
-                                        public Contract getRevokingItem() {
-                                            return (Contract) updatingItem;
-                                        }
+                    if (origin != null && sub.getOrigin() != null && origin.equals(sub.getOrigin())) {
+                        if (contract.canFollowContract(updatingItem)) {
+                            if (updatingState === ItemState.APPROVED) {
+                                let event = new ApprovedWithCallbackEvent();
+                                event.getNewRevision = () => updatingItem;
+                                event.getEnvironment = () => me;
+                                event.getCallbackService = () => this.node.callbackService;
 
-                                        @Override
-                                        public MutableEnvironment getEnvironment() {
-                                            return me;
-                                        }
-
-                                        @Override
-                                        public CallbackService getCallbackService() {
-                                            return callbackService;
-                                        }
-                                    });
-                                    me.save();
-                                }
+                                contract.onContractSubscriptionEvent(event);
+                                await me.save(con);
                             }
 
-                            break;
+                            if (updatingState === ItemState.REVOKED) {
+                                let event = new RevokedWithCallbackEvent();
+                                event.getRevokingItem = () => updatingItem;
+                                event.getEnvironment = () => me;
+                                event.getCallbackService = () => this.node.callbackService;
+
+                                contract.onContractSubscriptionEvent(event);
+                                await me.save(con);
+                            }
                         }
+
+                        break;
                     }
                 }
-            }*/
+            }
         } catch (err) {
             this.node.logger.log(err.stack);
             this.node.logger.log("error notifyContractSubscribers: " + err.message);
@@ -1124,7 +1081,7 @@ class ItemProcessor {
     }
 
     stopConsensusReceivedChecker() {
-        if(this.consensusReceivedChecker != null)
+        if (this.consensusReceivedChecker != null)
             this.consensusReceivedChecker.cancel(true); //TODO
     }
 
@@ -1311,10 +1268,6 @@ class ItemProcessor {
 
     toString() {
         return "ip -> parcel: " + this.parcelId + ", item: " + this.itemId + ", processing state: " + this.processingState;
-    }
-
-    isConsensusReceivedExpired() {
-        return this.consensusReceivedExpiresAt < Date.now();
     }
 }
 

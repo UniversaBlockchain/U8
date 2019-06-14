@@ -881,7 +881,7 @@ class Ledger {
             nameRecordId);
     }
 
-    saveEnvironmentToStorage(ncontractType, ncontractHashId, kvStorage, transactionPack) {
+    saveEnvironmentToStorage(ncontractType, ncontractHashId, kvStorage, transactionPack, con = undefined) {
         return this.simpleQuery(
             "INSERT INTO environments (ncontract_type,ncontract_hash_id,kv_storage,transaction_pack) VALUES (?,?,?,?) " +
             "ON CONFLICT (ncontract_hash_id) DO UPDATE SET ncontract_type=EXCLUDED.ncontract_type, " +
@@ -892,7 +892,7 @@ class Ledger {
                 else
                     return Number(x);
             },
-            null,
+            con,
             ncontractType,
             ncontractHashId.digest,
             kvStorage,
@@ -1337,15 +1337,16 @@ class Ledger {
      * Get data of smart contract with the specified environment ID.
      *
      * @param {number} environmentId - Environment ID.
-     *
+     * @param {db.SqlDriverConnection} connection - Transaction connection. Optional.
      * @return {Promise<{pack: number[], kvStorage: number[], hashDigest: number[]}>} smart contract data.
      */
-    getSmartContractForEnvironmentId(environmentId) {
+    getSmartContractForEnvironmentId(environmentId, connection = undefined) {
         return new Promise((resolve, reject) => {
-            this.dbPool_.withConnection(con => {
+            let query = con => {
                 con.executeQuery(qr => {
                         let row = qr.getRows(1)[0];
-                        con.release();
+                        if (connection == null)
+                            con.release();
 
                         if (row == null)
                             resolve(null);
@@ -1356,13 +1357,19 @@ class Ledger {
                                 hashDigest: row[2]
                             });
                     }, e => {
-                        con.release();
+                        if (connection == null)
+                            con.release();
                         reject(e);
                     },
                     "SELECT transaction_pack, kv_storage, ncontract_hash_id FROM environments WHERE id=?",
                     environmentId
                 );
-            });
+            };
+
+            if (connection == null)
+                this.dbPool_.withConnection(query);
+            else
+                query(connection);
         });
     }
 
@@ -1370,12 +1377,12 @@ class Ledger {
      * Get contract subscriptions with the specified environment ID.
      *
      * @param {number} environmentId - Environment ID.
-     *
+     * @param {db.SqlDriverConnection} connection - Transaction connection. Optional.
      * @return {Promise<NContractSubscription[]>} list of contract subscriptions.
      */
-    getContractSubscriptions(environmentId) {
+    getContractSubscriptions(environmentId, connection = undefined) {
         return new Promise(async(resolve, reject) => {
-            this.dbPool_.withConnection(con => {
+            let query = con => {
                 con.executeQuery(qr => {
                         let result = [];
                         let count = qr.getRowsCount();
@@ -1398,16 +1405,23 @@ class Ledger {
                                 }
                         }
 
-                        con.release();
+                        if (connection == null)
+                            con.release();
                         resolve(result);
                     }, e => {
-                        con.release();
+                        if (connection == null)
+                            con.release();
                         reject(e);
                     },
                     "SELECT hash_id, subscription_on_chain, expires_at, id FROM contract_subscription WHERE environment_id = ?",
                     environmentId
                 );
-            });
+            };
+
+            if (connection == null)
+                this.dbPool_.withConnection(query);
+            else
+                query(connection);
         });
     }
 
@@ -1415,12 +1429,12 @@ class Ledger {
      * Get contract storages with the specified environment ID.
      *
      * @param {number} environmentId - Environment ID.
-     *
+     * @param {db.SqlDriverConnection} connection - Transaction connection. Optional.
      * @return {Promise<NContractStorage[]>} list of contract storages.
      */
-    getContractStorages(environmentId) {
+    getContractStorages(environmentId, connection = undefined) {
         return new Promise(async(resolve, reject) => {
-            this.dbPool_.withConnection(con => {
+            let query = con => {
                 con.executeQuery(qr => {
                         let result = [];
                         let count = qr.getRowsCount();
@@ -1442,17 +1456,24 @@ class Ledger {
                                 }
                         }
 
-                        con.release();
+                        if (connection == null)
+                            con.release();
                         resolve(result);
                     }, e => {
-                        con.release();
+                        if (connection == null)
+                            con.release();
                         reject(e);
                     },
                     "SELECT bin_data, expires_at, id FROM contract_storage JOIN contract_binary " +
                     "ON contract_binary.hash_id = contract_storage.hash_id WHERE environment_id = ?",
                     environmentId
                 );
-            });
+            };
+
+            if (connection == null)
+                this.dbPool_.withConnection(query);
+            else
+                query(connection);
         });
     }
 
@@ -1460,12 +1481,12 @@ class Ledger {
      * Get UNS reduced names by the specified environment ID.
      *
      * @param {number} environmentId - Environment ID.
-     *
+     * @param {db.SqlDriverConnection} connection - Transaction connection. Optional.
      * @return {Promise<string[]>} list of UNS reduced names.
      */
-    getReducedNames(environmentId) {
+    getReducedNames(environmentId, connection = undefined) {
         return new Promise(async(resolve, reject) => {
-            this.dbPool_.withConnection(con => {
+            let query = con => {
                 con.executeQuery(qr => {
                         let result = [];
                         let count = qr.getRowsCount();
@@ -1484,10 +1505,12 @@ class Ledger {
                                     result.push(rows[i][0]);
                         }
 
-                        con.release();
+                        if (connection == null)
+                            con.release();
                         resolve(result);
                     }, e => {
-                        con.release();
+                        if (connection == null)
+                            con.release();
                         reject(e);
                     },
                     "SELECT DISTINCT name_storage.name_reduced AS name_reduced " +
@@ -1495,7 +1518,12 @@ class Ledger {
                     "WHERE name_storage.environment_id=?",
                     environmentId
                 );
-            });
+            };
+
+            if (connection == null)
+                this.dbPool_.withConnection(query);
+            else
+                query(connection);
         });
     }
 
@@ -1503,15 +1531,16 @@ class Ledger {
      * Get follower service by the specified environment ID.
      *
      * @param {number} environmentId - Environment ID.
-     *
+     * @param {db.SqlDriverConnection} connection - Transaction connection. Optional.
      * @return {Promise<NFollowerservice>} follower service.
      */
-    getFollowerService(environmentId) {
+    getFollowerService(environmentId, connection = undefined) {
         return new Promise((resolve, reject) => {
-            this.dbPool_.withConnection(con => {
+            let query = con => {
                 con.executeQuery(qr => {
                         let row = qr.getRows(1)[0];
-                        con.release();
+                        if (connection == null)
+                            con.release();
 
                         if (row == null)
                             resolve(null);
@@ -1523,13 +1552,19 @@ class Ledger {
                                 row[2],
                                 row[3]));
                     }, e => {
-                        con.release();
+                        if (connection == null)
+                            con.release();
                         reject(e);
                     },
                     "SELECT expires_at, muted_at, spent_for_callbacks, started_callbacks FROM follower_environments WHERE environment_id = ?",
                     environmentId
                 );
-            });
+            };
+
+            if (connection == null)
+                this.dbPool_.withConnection(query);
+            else
+                query(connection);
         });
     }
 
@@ -1537,13 +1572,13 @@ class Ledger {
      * Get environment ID by specified smart contract ID.
      *
      * @param {HashId} smartContractId - Smart contract ID.
-     *
+     * @param {db.SqlDriverConnection} con - Transaction connection. Optional.
      * @return {Promise<number>} environment ID.
      */
-    getEnvironmentIdForSmartContractId(smartContractId) {
+    getEnvironmentIdForSmartContractId(smartContractId, con = undefined) {
         return this.simpleQuery("SELECT id FROM environments WHERE ncontract_hash_id=?",
             x => (x != null) ? Number(x) : null,
-            null,
+            con,
             smartContractId.digest);
     }
 
@@ -1551,24 +1586,24 @@ class Ledger {
      * Get contract environment with the specified environment ID.
      *
      * @param {number} environmentId - Environment ID.
-     *
+     * @param {db.SqlDriverConnection} con - Transaction connection. Optional.
      * @return {Promise<NImmutableEnvironment>} environment.
      */
-    async getEnvironment(environmentId) {
-        let smkv = await this.getSmartContractForEnvironmentId(environmentId);
+    async getEnvironment(environmentId, con = undefined) {
+        let smkv = await this.getSmartContractForEnvironmentId(environmentId, con);
         let nContractHashId = crypto.HashId.withDigest(smkv.hashDigest);
         let contract = NSmartContract.fromPackedTransaction(smkv.pack);
         let findNContract = (contract.transactionPack != null) ? contract.transactionPack.subItems.get(nContractHashId) : null;
         contract = (findNContract == null) ? contract : findNContract;
         let kvStorage = Boss.load(smkv.kvStorage);
 
-        let contractSubscriptions = await this.getContractSubscriptions(environmentId);
-        let contractStorages = await this.getContractStorages(environmentId);
-        let followerService = await this.getFollowerService(environmentId);
-        let reducedNames = await this.getReducedNames(environmentId);
+        let contractSubscriptions = await this.getContractSubscriptions(environmentId, con);
+        let contractStorages = await this.getContractStorages(environmentId, con);
+        let followerService = await this.getFollowerService(environmentId, con);
+        let reducedNames = await this.getReducedNames(environmentId, con);
 
         let nameRecords = [];
-        await Promise.all(reducedNames.map(async(name) => nameRecords.push(await this.getNameRecord(name))));
+        await Promise.all(reducedNames.map(async(name) => nameRecords.push(await this.getNameRecord(name, con))));
 
         let nImmutableEnvironment = new NImmutableEnvironment(contract, this, kvStorage, contractSubscriptions,
             contractStorages, nameRecords, followerService);
@@ -1581,13 +1616,13 @@ class Ledger {
      * Get contract environment by specified smart contract ID.
      *
      * @param {HashId} smartContractId - Smart contract ID.
-     *
+     * @param {db.SqlDriverConnection} con - Transaction connection. Optional.
      * @return {Promise<NImmutableEnvironment> | null} environment or null if error.
      */
-    async getEnvironmentByContractID(smartContractId) {
-        let envId = await this.getEnvironmentIdForSmartContractId(smartContractId);
+    async getEnvironmentByContractID(smartContractId, con = undefined) {
+        let envId = await this.getEnvironmentIdForSmartContractId(smartContractId, con);
         if (envId != null)
-            return await this.getEnvironment(envId);
+            return await this.getEnvironment(envId, con);
         return null;
     }
 
@@ -1596,19 +1631,19 @@ class Ledger {
      * If environment not found (also by parent contract), save new environment.
      *
      * @param {NSmartContract} smartContract - Smart contract.
-     *
+     * @param {db.SqlDriverConnection} con - Transaction connection. Optional.
      * @return {Promise<NImmutableEnvironment>} environment.
      */
-    async getEnvironmentByContract(smartContract) {
-        let nim = await this.getEnvironmentByContractID(smartContract.id);
+    async getEnvironmentByContract(smartContract, con = undefined) {
+        let nim = await this.getEnvironmentByContractID(smartContract.id, con);
 
         if (nim == null && smartContract.state.parent != null)
-            nim = await this.getEnvironmentByContractID(smartContract.state.parent);
+            nim = await this.getEnvironmentByContractID(smartContract.state.parent, con);
 
         if (nim == null) {
             let envId = await this.saveEnvironmentToStorage(smartContract.getExtendedType(), smartContract.id,
-                Boss.dump({}), smartContract.getPackedTransaction());
-            nim = await this.getEnvironment(envId);
+                Boss.dump({}), smartContract.getPackedTransaction(), con);
+            nim = await this.getEnvironment(envId, con);
         } else
             nim.contract = smartContract;
 
@@ -1697,11 +1732,12 @@ class Ledger {
      * Get a set of IDs of all environments that are subscribed to a contract with the specified ID.
      *
      * @param {HashId} id - Subscription HashId (contract ID or origin).
+     * @param {db.SqlDriverConnection} connection - Transaction connection. Optional.
      * @return {Promise<Set<number>>} - set of environments IDs.
      */
-    getSubscriptionEnviromentIds(id) {
+    getSubscriptionEnviromentIds(id, connection = undefined) {
         return new Promise(async(resolve, reject) => {
-            this.dbPool_.withConnection(con => {
+            let query = con => {
                 con.executeQuery(async(qr) => {
                         let environmentIds = new Set();
                         let count = qr.getRowsCount();
@@ -1720,16 +1756,23 @@ class Ledger {
                             }
                         }
 
-                        con.release();
+                        if (connection == null)
+                            con.release();
                         resolve(environmentIds);
                     }, e => {
-                        con.release();
+                        if (connection == null)
+                            con.release();
                         reject(e);
                     },
                     "SELECT environment_id FROM contract_subscription WHERE hash_id = ? GROUP BY environment_id",
                     id.digest
                 );
-            });
+            };
+
+            if (connection == null)
+                this.dbPool_.withConnection(query);
+            else
+                query(connection);
         });
     }
 
@@ -2173,11 +2216,12 @@ class Ledger {
      * Get UNS name record with specified SQL clause WHERE.
      *
      * @param {string} clause - SQL clause WHERE.
+     * @param {db.SqlDriverConnection} connection - Transaction connection. Optional.
      * @param params - query parameters.
      *
      * @return {Promise<NNameRecord>} UNS name record.
      */
-    getNameBy(clause, ...params) {
+    getNameBy(clause, connection = undefined, ...params) {
         let query = "SELECT " +
             "  name_storage.id AS id, " +
             "  name_storage.name_reduced AS name_reduced, " +
@@ -2194,7 +2238,7 @@ class Ledger {
             clause;
 
         return new Promise(async(resolve, reject) => {
-            this.dbPool_.withConnection(con => {
+            let qblock = con => {
                 con.executeQuery(qr => {
                         let unsName = new UnsName();
                         let nameRecord_id = 0;
@@ -2244,20 +2288,27 @@ class Ledger {
                                 }
                         }
 
-                        con.release();
+                        if (connection == null)
+                            con.release();
                         if (count > 0)
                             resolve(new NNameRecord(unsName, nameRecord_expiresAt, entries, nameRecord_id, nameRecord_environmentId));
                         else
                             resolve(null);
 
                     }, e => {
-                        con.release();
+                        if (connection == null)
+                            con.release();
                         reject(e);
                     },
                     query,
                     ...params
                 );
-            });
+            };
+
+            if (connection == null)
+                this.dbPool_.withConnection(qblock);
+            else
+                qblock(connection);
         });
     }
 
@@ -2265,11 +2316,11 @@ class Ledger {
      * Get UNS name record by reduced name.
      *
      * @param {string} nameReduced - reduced name.
-     *
+     * @param {db.SqlDriverConnection} con - Transaction connection. Optional.
      * @return {Promise<NNameRecord>} UNS name record.
      */
-    getNameRecord(nameReduced) {
-        return this.getNameBy("WHERE name_storage.name_reduced=?", nameReduced);
+    getNameRecord(nameReduced, con = undefined) {
+        return this.getNameBy("WHERE name_storage.name_reduced=?", con, nameReduced);
     }
 
     /**

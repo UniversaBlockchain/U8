@@ -47,6 +47,7 @@ class Node {
         this.config.updateConsensus(this.network.getNodesCount());
         this.network.subscribe(this.myInfo, notification => new ScheduleExecutor(() => this.onNotification(notification), 0, this.executorService).run());
 
+        this.callbackService = null;
         // TODO: callbackService
         // TODO: pulseCleanUp
     }
@@ -304,11 +305,36 @@ class Node {
     async getEnvironmentByContractID(id) {
         //let result = this.envCache.get(id);
         //if (result == null) {
-        let result = await this.ledger.getEnvironmentByContractID(id);
+        //    result = await this.ledger.getEnvironmentByContractID(id);
         //    if (result != null)
         //        envCache.put(result);
         //}
-        return result;
+        //return result;
+        return await this.ledger.getEnvironmentByContractID(id);
+    }
+
+    async getEnvironmentByContract(item, connection = undefined) {
+        //let result = this.envCache.get(item.id);
+        //if (result == null && item.state.parent != null)
+        //    result = this.envCache.get(item.state.parent);
+
+        //if (result == null) {
+        //    result = await this.ledger.getEnvironment(item);
+        //    this.envCache.put(result);
+        //}
+        //return result;
+        return await this.ledger.getEnvironmentByContract(item, connection);
+    }
+
+    async getEnvironment(environmentId, connection = undefined) {
+        //let result = this.envCache.get(environmentId);
+        //if (result == null) {
+        //    result = await this.ledger.getEnvironment(environmentId);
+        //    if (result != null)
+        //        this.envCache.put(result);
+        //}
+        //return result;
+        return await this.ledger.getEnvironment(environmentId, connection);
     }
 
     removeEnvironment(id, con) {
