@@ -17,12 +17,12 @@ async function prepareConfigFiles(count) {
         let ubotName = ubotNamePrefix + i;
         let yamlStr = "---\n";
         yamlStr += "http_client_port: "+(18000+i)+"\n";
-        yamlStr += "http_server_port: "+(17000+i)+"\n";
+        yamlStr += "http_public_port: "+(17000+i)+"\n";
         yamlStr += "udp_server_port: "+(16000+i)+"\n";
         yamlStr += "database: jdbc:postgresql://localhost:5432/universa_ubot_t"+i+"\n";
-        yamlStr += "ubot_number: "+i+"\n";
+        yamlStr += "node_number: "+i+"\n";
         yamlStr += "public_host: localhost\n";
-        yamlStr += "ubot_name: "+ubotName+"\n";
+        yamlStr += "node_name: "+ubotName+"\n";
         yamlStr += "ip:\n";
         yamlStr += "- 127.0.0.1\n";
         configs.push(yamlStr);
@@ -43,7 +43,7 @@ async function prepareConfigFiles(count) {
             let otherUbotName = ubotNamePrefix + j;
             let otherUbotPubKeyDir = ubotConfigDir + "/config/keys";
             await io.createDir(otherUbotPubKeyDir);
-            let otherUbotConfigDir = ubotConfigDir + "/config/ubots";
+            let otherUbotConfigDir = ubotConfigDir + "/config/nodes";
             await io.createDir(otherUbotConfigDir);
             let otherUbotPubKeyPath = otherUbotPubKeyDir+"/"+otherUbotName+".public.unikey";
             let otherUbotConfigPath = otherUbotConfigDir+"/"+otherUbotName+".yaml";
@@ -53,8 +53,8 @@ async function prepareConfigFiles(count) {
     }
 }
 
-async function createUbotMain(nolog) {
-    let args = [];
+async function createUbotMain(name, nolog) {
+    let args = ["--config", CONFIG_ROOT+"/"+name];
     if (nolog)
         args.push("--nolog");
 
@@ -66,14 +66,17 @@ async function createUbotMain(nolog) {
 
 unit.test("ubot_main_test: hello ubot", async () => {
     console.log("hello ubot test");
-    await prepareConfigFiles(10);
-    // let tmpPath = io.getTmpDirPath();
-    // await io.removeDir(tmpPath + "/cfg1");
-    // await io.createDir(tmpPath + "/cfg1");
-    // await io.createDir(tmpPath + "/cfg1/dir14");
-    // await io.createDir(tmpPath + "/cfg1/dir15");
-    // await io.createDir(tmpPath + "/cfg1/dir16");
-    // await io.createDir(tmpPath + "/cfg1/dir15/someshit");
-    let ubm = await createUbotMain(false);
-    await ubm.shutdown();
+    const count = 6;
+    await prepareConfigFiles(count);
+    let ubotMains = [];
+    for (let i = 0; i < count; ++i)
+        ubotMains.push(await createUbotMain("ubot"+i, false));
+
+    console.log("\ntest send...");
+    ubotMains[4].debugSendUdp("hi all, ubot4 here");
+
+    await sleep(1000);
+
+    for (let i = 0; i < count; ++i)
+        await ubotMains[i].shutdown();
 });

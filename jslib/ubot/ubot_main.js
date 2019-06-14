@@ -1,9 +1,16 @@
+import {NetConfig, NodeInfo} from "web";
+import * as io from "io";
+import * as t from "tools";
+import {KeyAddress, PrivateKey} from "crypto";
+
 const Logger = require("logger").Logger;
 const OptionParser = require("optionparser").OptionParser;
 const UBotHttpServer = require("ubot/ubot_http_server").UBotHttpServer;
 const UBotNetwork = require("ubot/ubot_network").UBotNetwork;
 const UBotLedger = require("ubot/ubot_ledger").UBotLedger;
 const UBot = require("ubot/ubot").UBot;
+const yaml = require("yaml");
+const UBotTestNotification = require("ubot/ubot_notification").UBotTestNotification;
 
 const UBOT_VERSION = VERSION;
 
@@ -13,6 +20,10 @@ class UBotMain {
 
     constructor(...args) {
         this.logger = new Logger(4096);
+
+        this.configRoot = null;
+        this.netConfig = null;
+        this.myInfo = null;
 
         this.network = null;
         this.httpServer = null;
@@ -24,36 +35,55 @@ class UBotMain {
     }
 
     async start() {
-        this.processOptions();
+        if (await this.processOptions())
+            return;
 
         this.logger.log("UBotMain.start()... start httpServer...");
-        this.httpServer = new UBotHttpServer(await crypto.PrivateKey.generate(2048), "127.0.0.1", 18080, this.logger);
+        this.httpServer = new UBotHttpServer(this.nodeKey, "127.0.0.1", this.myInfo.clientAddress.port, this.logger);
 
         this.logger.log("UBotMain.start()... start network...");
-        this.network = new UBotNetwork(this.logger);
+        this.network = new UBotNetwork(this.netConfig, this.myInfo, this.nodeKey, this.logger);
 
         this.logger.log("UBotMain.start()... start ledger...");
         this.ledger = new UBotLedger(this.logger);
 
         this.logger.log("UBotMain.start()... start ubot...");
         this.ubot = new UBot(this.logger);
+
+        this.network.subscribe(notify => {
+            this.logger.log("ubot"+this.myInfo.number+" receive notify: " + notify);
+            if (notify.requestResult)
+                this.network.deliver(notify.from, new UBotTestNotification(this.myInfo, "hi ubot"+notify.from.number, false));
+        });
     }
 
-    processOptions() {
+    async processOptions() {
+        /* Return true to exit, false to continue execution. */
+
         if (this.parser.options.has("nolog"))
             this.logger.nolog = true;
 
         if (this.parser.options.has("version")) {
             console.log("Version " + UBOT_VERSION);
-            return this;
+            return true;
         }
 
         if (this.parser.options.has("?")) {
             console.log("usage called\n");
             console.log(UBotMain.NAME_STRING);
             console.log(this.parser.help());
-            return this;
+            return true;
         }
+
+        if (this.parser.values.has("config")) {
+            await this.loadNodeConfig();
+            await this.loadNetConfig();
+        } else {
+            console.error("No --config option passed, leaving");
+            return true;
+        }
+
+        return false;
     }
 
     static initOptionParser() {
@@ -62,7 +92,9 @@ class UBotMain {
         parser
             .option(["?", "h", "help"], 'show help')
             .option(["nolog"], "do not buffer log messages (good for testing)")
-            .option(["version"], "show version");
+            .option(["version"], "show version")
+            .option(["c", "config"], "configuration file for the network", true, "config_file")
+        ;
 
         return parser;
     }
@@ -78,6 +110,49 @@ class UBotMain {
         if (this.ubot != null)
             promises.push(this.ubot.shutdown());
         return Promise.all(promises);
+    }
+
+    async loadNodeConfig() {
+        this.configRoot = this.parser.values.get("config");
+
+        let settings = yaml.load(await (await io.openRead(this.configRoot + "/config/config.yaml")).allAsString());
+
+        // let settingsShared;
+        // if (await io.isAccessible(this.configRoot + "/config/shared.yaml"))
+        //     settingsShared = yaml.load(await (await io.openRead(this.configRoot + "/config/shared.yaml")).allAsString());
+        // else
+        //     settingsShared = settings;
+
+        //this.logger.log("node settings: " + JSON.stringify(settings, null, 2));
+
+        let nodeName = t.getOrThrow(settings, "node_name");
+        let nodeKeyFileName = this.configRoot + "/tmp/" + nodeName + ".private.unikey";
+        //this.logger.log("nodeKeyFileName: " + nodeKeyFileName);
+
+        this.nodeKey = new PrivateKey(await (await io.openRead(nodeKeyFileName)).allBytes());
+
+        this.myInfo = NodeInfo.withParameters(this.nodeKey.publicKey,
+            t.getOrThrow(settings, "node_number"),
+            nodeName,
+            t.getOrThrow(settings, "ip")[0],
+            settings.hasOwnProperty("ipv6") ? settings.ipv6[0] : null,
+            t.getOrThrow(settings, "public_host"),
+            t.getOrThrow(settings, "udp_server_port"),
+            t.getOrThrow(settings, "http_client_port"),
+            t.getOrThrow(settings, "http_public_port"));
+
+        this.logger.log("key loaded: " + this.nodeKey.toString());
+        this.logger.log("node local URL: " + this.myInfo.serverUrlString());
+        this.logger.log("node public URL: " + this.myInfo.publicUrlString());
+    }
+
+    async loadNetConfig() {
+        this.netConfig = await NetConfig.loadByPath(this.configRoot + "/config/nodes");
+        this.logger.log("Network configuration is loaded from " + this.configRoot + ", " + this.netConfig.size + " ubots.");
+    }
+
+    debugSendUdp(val) {
+        this.network.broadcast(this.myInfo, new UBotTestNotification(this.myInfo, val, true));
     }
 
 }
