@@ -72,6 +72,37 @@ unit.test("ledger_test: ledgerBenchmark", async () => {
     await ledger.close();
 });
 
+unit.test("ledger_test: simpleFindOrCreate benchmark", async () => {
+    let ledger = await createTestLedger();
+    console.log();
+    let nIds = 4;
+    console.log("prepare hashes...");
+    let hashes = [];
+    for (let i = 0; i < nIds; ++i)
+        hashes.push(crypto.HashId.of(randomBytes(16)));
+    console.log("start benchmark...");
+    let t0 = new Date().getTime();
+    let promises = [];
+    for (let i = 0; i < nIds*2; ++i) {
+        let rnd = Math.floor(Math.random()*nIds);
+        promises.push(new Promise(async (resolve, reject) => {
+            ledger.transaction(async con => {
+                let stateRecord = await ledger.simpleFindOrCreate(hashes[rnd], ItemState.PENDING, 0, con);
+                if (!hashes[rnd].equals(stateRecord.id))
+                    reject(new Error("findOrCreate returns wrong hashId"));
+                resolve();
+            });
+        }));
+    }
+    await Promise.all(promises);
+    let dt = new Date().getTime() - t0;
+    console.log("total time: " + dt + " ms");
+    console.log("  TPS: " + (nIds*2/dt*1000).toFixed(0));
+    console.log("  ledger size: " + jsonStringify(await ledger.getLedgerSize()));
+    assert(ledger.bufParams.findOrCreate_insert.bufInProc.size == 0);
+    await ledger.close();
+});
+
 unit.test("ledger_test: getRecord", async () => {
     let ledger = await createTestLedger();
 

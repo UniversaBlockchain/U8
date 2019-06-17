@@ -244,6 +244,55 @@ class Ledger {
         });
     }
 
+    /**
+     * Compatibility with transactions, but no buffered mode.
+     */
+    simpleFindOrCreate(itemId, newState = ItemState.PENDING, locked_by_id = 0, connection = null) {
+        return new Promise(async (resolve0, reject0) => {
+            let f = async con => {
+                let promise1 = new Promise((resolve, reject) => {
+                    con.executeUpdate(qr => {
+                            resolve();
+                        }, e => {
+                            if (connection == null)
+                                con.release();
+                            reject(e);
+                        },
+                        "INSERT INTO ledger(hash, state, created_at, expires_at, locked_by_id) VALUES (?,?,?,?,?) ON CONFLICT (hash) DO NOTHING;",
+                        itemId.digest,
+                        newState.ordinal,
+                        Math.floor(new Date().getTime() / 1000),
+                        Math.floor(new Date().getTime() / 1000) + Config.maxElectionsTime + Math.floor(Math.random() * 10),
+                        locked_by_id
+                    );
+                });
+                await promise1;
+                let promise2 = new Promise((resolve, reject) => {
+                    con.executeQuery(qr => {
+                            let row = qr.getRows(1)[0];
+                            let record = StateRecord.initFrom(this, row);
+                            if (connection == null)
+                                con.release();
+                            resolve(record);
+                        }, e => {
+                            if (connection == null)
+                                con.release();
+                            reject(e);
+                        },
+                        "SELECT * FROM ledger WHERE hash=? limit 1;",
+                        itemId.digest
+                    );
+                });
+                let res = await promise2;
+                return res;
+            };
+            if (connection == null)
+                this.dbPool_.withConnection(async con => resolve0(await f(con)));
+            else
+                resolve0(await f(connection));
+        });
+    }
+
     findOrCreate_buffered_insert(itemId, newState, locked_by_id) {
         if ((newState != ItemState.PENDING) && (newState != ItemState.LOCKED_FOR_CREATION))
             throw new ex.IllegalStateError("can't create new item with state " + newState.val);
