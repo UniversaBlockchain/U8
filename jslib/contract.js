@@ -988,17 +988,11 @@ class Contract extends bs.BiSerializable {
     /**
      * Asynchronously checks contract filling the {@link Contract.errors}. Call it without params on root contract of transaction
      *
-     * @param prefix - used for subsequent checks of children contracts
-     * @param contractsTree - used for subsequent checks of children contracts
+     * @param {string} prefix - used for subsequent checks of children contracts
+     * @param {t.GenericMap} contractsTree - used for subsequent checks of children contracts
      * @returns {Promise<boolean>} indicating if check was successful
      */
-    async check(prefix,contractsTree) {
-        if(typeof prefix === "undefined")
-            prefix = "";
-
-        if(typeof  contractsTree === "undefined")
-            contractsTree = null;
-
+    async check(prefix = "", contractsTree = null) {
         this.errors = [];
 
         this.quantiser.reset(this.quantiser.quantaLimit_);
@@ -1057,7 +1051,7 @@ class Contract extends bs.BiSerializable {
         let index = 0;
         for (let c of this.newItems) {
             let p = prefix + "new[" + index + "].";
-            this.checkSubItemQuantized(c, p, contractsTree);
+            await this.checkSubItemQuantized(c, p, contractsTree);
             c.errors.forEach(e => this.errors.push(e));
             index++;
         }
@@ -1149,6 +1143,138 @@ class Contract extends bs.BiSerializable {
     }
 
     /**
+     * Check contract to be a valid "U" payment. This includes standard contract check and additional payment related checks.
+     *
+     * @param {Array<crypto.KeyAddress>} issuerKeys - Addresses of keys used by the network to issue "U".
+     * @throws Quantiser.QuantiserException when quantas limit was reached during check.
+     * @return if check was successful.
+     */
+    async paymentCheck(issuerKeys) {
+        let res = true;
+
+        // Checks that there is a payment contract and the payment should be >= 1
+        let u = t.getOrDefault(this.state.data, "transaction_units", -1);
+        let test_u = t.getOrDefault(this.state.data, "test_transaction_units", -1);
+        if (u === -1) {
+            res = false;
+            this.errors.push(new ErrorRecord(Errors.BAD_VALUE, "", "u < 0"));
+        }
+
+        // check valid name/type fields combination
+        if (typeof u === "number") {
+            res = false;
+            this.errors.push(new ErrorRecord(Errors.BAD_VALUE, "", "u name/type mismatch"));
+        }
+
+        if (test_u !== -1) {
+            if (typeof test_u === "number") {
+                res = false;
+                this.errors.push(new ErrorRecord(Errors.BAD_VALUE, "", "test_u name/type mismatch"));
+            }
+
+            if (test_u < 0) {
+                res = false;
+                this.errors.push(new ErrorRecord(Errors.BAD_VALUE, "", "test_u < 0"));
+            }
+
+            if (this.state.origin != null) {
+                this.updateContext();
+                let parent;
+                // if exist siblings for contract (more then itself)
+                if (this.context.siblings.size > 1)
+                    parent = this.context.base;
+                else
+                    parent = this.getRevokingItem(this.state.parent);
+
+                let was_u = t.getOrDefault(parent.state.data, "transaction_units", -1);
+                let was_test_u = t.getOrDefault(parent.state.data, "test_transaction_units", -1);
+
+                if (u !== was_u && test_u !== was_test_u) {
+                    res = false;
+                    this.errors.push(new ErrorRecord(Errors.BAD_VALUE, "", "u and test_u can not be spent both"));
+                }
+            } else if (this.limitedForTestnet) {
+                res = false;
+                this.errors.push(new ErrorRecord(Errors.BAD_VALUE, "",
+                    "Payment contract has not origin but it is not allowed for parcel. Use standalone register for payment contract."));
+            }
+        } else if(this.limitedForTestnet) {
+            res = false;
+            this.errors.push(new ErrorRecord(Errors.BAD_VALUE, "", "Payment contract that marked as for testnet has not test_u."));
+        }
+
+        // check valid decrement_permission
+        /*if (!isPermitted("decrement_permission", getSealedByKeys())) {
+            res = false;
+            addError(Errors.BAD_VALUE, "decrement_permission is missing");
+        }
+
+        // The "U" contract is checked to have valid issuer key (one of preset URS keys)
+
+        Role issuer = getIssuer();
+        if(!(issuer instanceof SimpleRole)) {
+            res = false;
+            addError(Errors.BAD_VALUE, "issuer is not valid. must be simple role");
+        } else {
+            Set<KeyAddress> thisIssuerAddresses = new HashSet<>(((SimpleRole) issuer).getSimpleKeyAddresses());
+            for (PublicKey publicKey : ((SimpleRole) issuer).getSimpleKeys())
+                thisIssuerAddresses.add(publicKey.getShortAddress());
+
+
+            if (Collections.disjoint(issuerKeys, thisIssuerAddresses)) {
+                res = false;
+                addError(Errors.BAD_VALUE, "issuerKeys is not valid");
+            }
+        }
+
+        // If the check is failed, checking process is aborting
+        if (!res) {
+            return res;
+        }
+
+        // The U shouldn't have any new items
+        if (newItems.size() > 0) {
+            res = false;
+            addError(Errors.BAD_NEW_ITEM, "payment contract can not have any new items");
+        }
+
+        // If the check is failed, checking process is aborting
+        if (!res) {
+            return res;
+        }
+
+        // check if payment contract not origin itself, means has revision more then 1
+        // don't make this check for initial u contract
+        if ((getRevision() != 1) || (getParent()!=null)) {
+            if (getOrigin().equals(getId())) {
+                res = false;
+                addError(Errors.BAD_VALUE, "can't origin itself");
+            }
+            if (getRevision() <= 1) {
+                res = false;
+                addError(Errors.BAD_VALUE, "revision must be greater than 1");
+            }
+
+            // The "U" is checked for its parent validness, it should be in the revoking items
+            if (revokingItems.size() != 1) {
+                res = false;
+                addError(Errors.BAD_REVOKE, "revokingItems.size != 1");
+            } else {
+                Contract revoking = revokingItems.iterator().next();
+                if (!revoking.getOrigin().equals(getOrigin())) {
+                    res = false;
+                    addError(Errors.BAD_REVOKE, "origin mismatch");
+                }
+            }
+        }*/
+
+        if (res)
+            res = await this.check();
+
+        return res;
+    }
+
+    /**
      * Calculates transaction processing cost in U
      * @returns {number} - transaction processing const in U
      */
@@ -1189,10 +1315,10 @@ class Contract extends bs.BiSerializable {
             this.quantiser.addWorkCost(Quantiser.QuantiserProcesses.PRICE_SPLITJOIN_PERM);
     }
 
-    checkSubItemQuantized(subitem, prefix, neighbourContracts) {
+    async checkSubItemQuantized(subitem, prefix, neighbourContracts) {
         // Add checks from subItem quanta
         subitem.quantiser.reset(this.quantiser.quantasLeft());
-        subitem.check(prefix, neighbourContracts);
+        await subitem.check(prefix, neighbourContracts);
         this.quantiser.addWorkCostFrom(subitem.quantiser);
     }
 

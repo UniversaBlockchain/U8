@@ -12,6 +12,7 @@ const NSmartContract = require("services/NSmartContract").NSmartContract;
 const t = require("tools");
 const ResyncingItem = require("resyncprocessor").ResyncingItem;
 const QuantiserException = require("quantiser").QuantiserException;
+const DatabaseError = require("db_driver").DatabaseError;
 
 const ItemProcessingState = {
     NOT_EXIST : {val: "NOT_EXIST", isProcessedToConsensus : false, isDone : false, canContinue: true, canRemoveSelf: false, ordinal: 0},
@@ -43,12 +44,12 @@ const ItemProcessingState = {
  * First of all item should be downloaded from other node or get from param of a constructor.
  *
  * Then item will be checked. Immediately after download if {@link ItemProcessor#isCheckingForce} is true
- * or after {@link ItemProcessor#forceChecking(boolean)} call. Will call {@link Approvable#check()}
- * or {@link Approvable#paymentCheck(Set)} if item is payment ({@link Approvable#shouldBeU()}).
- * Then subitems will be checked: {@link Approvable#getReferencedItems()} will checked if exists in the ledger;
- * {@link Approvable#getRevokingItems()} will checked if exists in the ledger and its
- * own {@link Approvable#getReferencedItems()} will recursively checked and will get {@link ItemState#LOCKED};
- * {@link Approvable#getNewItems()} will checked if errors exists (after {@link Approvable#check()} -
+ * or after {@link ItemProcessor#forceChecking(boolean)} call. Will call {@link Contract#check()}
+ * or {@link Approvable#paymentCheck(Set)} if item is payment ({@link Contract#shouldBeU()}).
+ * Then subitems will be checked: {@link Contract#getReferencedItems()} will checked if exists in the ledger;
+ * {@link Contract#revokingItems} will checked if exists in the ledger and its
+ * own {@link Contract#getReferencedItems()} will recursively checked and will get {@link ItemState#LOCKED};
+ * {@link Contract#newItems} will checked if errors exists (after {@link Contract#check()} -
  * it recursively call check() for new items) and recursively checked for own references, revokes and new items,
  * if all is ok - item will get {@link ItemState#LOCKED_FOR_CREATION} state.
  *
@@ -69,16 +70,18 @@ const ItemProcessingState = {
  * And finally, if node got answers from all  other nodes - item processor removing via {@link ItemProcessor#removeSelf()}
  *
  * Look at {@link ItemProcessor#processingState} to know what happend with processing at calling time.
- *
- * @param itemId is item's id to be process.
- * @param parcelId is parcel's id that item belongs to.
- * @param item is item object if exist.
- * @param lock is object for synchronization (it is object from {@link ItemLock} that points to item's hashId)
- * @param isCheckingForce if true checking item processing without delays. If false checking item wait until forceChecking() will be called.
- * @param node
  */
 class ItemProcessor {
 
+    /**
+     * @param {crypto.HashId} itemId - Item's id to be process.
+     * @param {crypto.HashId} parcelId - Parcel's id that item belongs to.
+     * @param {Contract | null} item - Item object if exist.
+     * @param {boolean} isCheckingForce - If true checking item processing without delays. If false checking item wait until forceChecking() will be called.
+     * @param {network.NodeInfo} node - ItemProcessor`s node.
+     *
+     * @constructor
+     */
     constructor(itemId, parcelId, item, isCheckingForce, node) {
         this.itemId = itemId;
         this.parcelId = parcelId;
@@ -124,7 +127,7 @@ class ItemProcessor {
         this.record = await this.node.ledger.findOrCreate(this.itemId);
 
         this.node.report("item processor for item: " + this.itemId + " from parcel: " + this.parcelId +
-            " :: created, state " + this.processingState.val + " itemState: " + this.record.state,
+            " :: created, state " + this.processingState.val + " itemState: " + this.record.state.val,
             VerboseLevel.BASE);
 
         if (this.item != null)
@@ -175,7 +178,7 @@ class ItemProcessor {
 
     async itemDownloaded() {
         this.node.report("item processor for item: " + this.itemId + " from parcel: " + this.parcelId +
-            " :: itemDownloaded, state " + this.processingState + " itemState: " + this.record.state,
+            " :: itemDownloaded, state " + this.processingState.val + " itemState: " + this.record.state.val,
             VerboseLevel.BASE);
 
         if (!this.processingState.canContinue)
@@ -217,7 +220,7 @@ class ItemProcessor {
 
     async checkItem() {
         this.node.report("item processor for item: " + this.itemId + " from parcel: " + this.parcelId +
-            " :: checkItem, state " + this.processingState + " itemState: " + this.record.state,
+            " :: checkItem, state " + this.processingState.val + " itemState: " + this.record.state.val,
             VerboseLevel.BASE);
 
         if (!this.processingState.canContinue)
@@ -252,7 +255,7 @@ class ItemProcessor {
 
                 if (this.item.shouldBeU) {
                     if (this.item.isU(this.node.config.uIssuerKeys, Config.uIssuerName))
-                        checkPassed = this.item.paymentCheck(this.node.config.uIssuerKeys); //TODO add paymentCheck in Contract
+                        checkPassed = await this.item.paymentCheck(this.node.config.uIssuerKeys);
                     else {
                         checkPassed = false;
                         this.item.errors.push(new ErrorRecord(Errors.BADSTATE, this.item.id.toString(),
@@ -296,7 +299,7 @@ class ItemProcessor {
                     this.item.errors.push(new ErrorRecord(Errors.FAILURE, this.item.id.toString(),
                         "Not enough payment for process item (quantas limit)"));
                     this.node.informer.inform(this.item);
-                    this.emergencyBreak();
+                    await this.emergencyBreak();
                     return;
 
                 } else {
@@ -461,7 +464,7 @@ class ItemProcessor {
 
     async commitCheckedAndStartPolling() {
         this.node.report("item processor for item: " + this.itemId + " from parcel: " + this.parcelId +
-            " :: commitCheckedAndStartPolling, state " + this.processingState.val + " itemState: " + this.record.state,
+            " :: commitCheckedAndStartPolling, state " + this.processingState.val + " itemState: " + this.record.state.val,
             VerboseLevel.BASE);
 
         if (!this.processingState.canContinue)
@@ -488,21 +491,20 @@ class ItemProcessor {
                 } catch (err) {
                     this.node.logger.log(err.stack);
                     this.node.logger.log("commitCheckedAndStartPolling error: " + err.message);
-                    this.emergencyBreak();
+                    await this.emergencyBreak();
                     return;
                 }
             } else {
                 this.node.logger.log("commitCheckedAndStartPolling: checked item state should be ItemState.PENDING");
-                this.emergencyBreak();
+                await this.emergencyBreak();
             }
 
             if (!this.processingState.isProcessedToConsensus)
                 this.processingState = ItemProcessingState.POLLING;
 
-            this.vote(this.node.myInfo, this.record.state);
+            await this.vote(this.node.myInfo, this.record.state);
             this.broadcastMyState();
             this.pulseStartPolling();
-            this.pollingReadyFire();
         }
     }
 
@@ -547,7 +549,7 @@ class ItemProcessor {
 
     broadcastMyState() {
         this.node.report("item processor for item: " + this.itemId + " from parcel: " + this.parcelId +
-            " :: broadcastMyState, state " + this.processingState.val + " itemState: " + this.record.state,
+            " :: broadcastMyState, state " + this.processingState.val + " itemState: " + this.record.state.val,
             VerboseLevel.BASE);
 
         if (this.processingState.canContinue) {
@@ -560,18 +562,16 @@ class ItemProcessor {
 
     pulseStartPolling() {
         this.node.report("item processor for item: " + this.itemId + " from parcel: " + this.parcelId +
-            " :: pulseStartPolling, state " + this.processingState.val + " itemState: " + this.record.state,
+            " :: pulseStartPolling, state " + this.processingState.val + " itemState: " + this.record.state.val,
             VerboseLevel.BASE);
 
-        if (this.processingState.canContinue)
-            if (!this.processingState.isProcessedToConsensus)
-                // at this point the item is with us, so we can start
-                if (this.poller == null)
-                    this.poller = new ExecutorWithDynamicPeriod(() => this.sendStartPollingNotification(),
-                        Config.pollTimeMillis, this.node.executorService).run();
+        if (this.processingState.canContinue && !this.processingState.isProcessedToConsensus && this.poller == null)
+            // at this point the item is with us, so we can start
+            this.poller = new ExecutorWithDynamicPeriod(() => this.sendStartPollingNotification(), Config.pollTimeMillis,
+                this.node.executorService).run();
     }
 
-    sendStartPollingNotification() {
+    async sendStartPollingNotification() {
         if (!this.processingState.canContinue)
             return;
 
@@ -582,7 +582,7 @@ class ItemProcessor {
 
                 this.stopPoller();
                 this.stopDownloader();
-                this.rollbackChanges();
+                await this.rollbackChanges();
                 return;
             }
 
@@ -596,13 +596,13 @@ class ItemProcessor {
         }
     }
 
-    vote(node, state) {
+    async vote(node, state) {
         if (!this.processingState.canContinue)
             return;
 
         this.node.report("item processor for item: " + this.itemId + " from parcel: " + this.parcelId +
             " :: vote " + state.val + " from node " + node.number + ", state " + this.processingState.val +
-            " :: itemState: " + this.record.state,
+            " :: itemState: " + this.record.state.val,
             VerboseLevel.BASE);
 
         let positiveConsensus = false;
@@ -644,14 +644,14 @@ class ItemProcessor {
         if (positiveConsensus)
             this.approveAndCommit();
         else if (negativeConsensus)
-            this.rollbackChanges(true);
+            await this.rollbackChanges(true);
         else
             throw new Error("error: consensus reported without consensus");
     }
 
     approveAndCommit() {
         this.node.report("item processor for item: " + this.itemId + " from parcel: " + this.parcelId +
-            " :: approveAndCommit, state " + this.processingState.val + " itemState: " + this.record.state,
+            " :: approveAndCommit, state " + this.processingState.val + " itemState: " + this.record.state.val,
             VerboseLevel.BASE);
 
         if (this.processingState.canContinue)
@@ -810,7 +810,7 @@ class ItemProcessor {
                 }
 
                 if (this.record.state !== ItemState.APPROVED)
-                    this.node.logger.log("ERROR: record is not approved " + this.record.state);
+                    this.node.logger.log("ERROR: record is not approved " + this.record.state.val);
 
                 // if item is smart contract node calls onCreated or onUpdated
                 if (this.item instanceof NSmartContract) {
@@ -855,21 +855,21 @@ class ItemProcessor {
 
             if (this.resyncingItems.size > 0) {
                 this.processingState = ItemProcessingState.RESYNCING;
-                this.startResync();
+                await this.startResync();
                 return;
             }
 
         } catch (err) {
-            if (err instanceof db.DatabaseError) {
+            if (err instanceof DatabaseError) {
                 this.node.logger.log(err.stack);
                 this.node.logger.log("DatabaseError downloadAndCommit in transaction: " + err.message);
-                this.emergencyBreak();
+                await this.emergencyBreak();
                 return;
 
             } else if (err instanceof EventTimeoutError) {
                 this.node.report("timeout " + this.itemId + " from parcel: " + this.parcelId +
-                    " :: downloadAndCommit timeoutException, state " + this.processingState.val + " itemState: " + this.record.state,
-                    VerboseLevel.NOTHING);
+                    " :: downloadAndCommit timeoutException, state " + this.processingState.val + " itemState: " +
+                    this.record.state.val, VerboseLevel.NOTHING);
 
                 this.node.logger.log(err.stack);
 
@@ -996,7 +996,7 @@ class ItemProcessor {
 
     async rollbackChanges(doDecline = false) {
         this.node.report("item processor for item: " + this.itemId + " from parcel: " + this.parcelId +
-            " :: rollbackChanges, state " + this.processingState.val + " :: itemState: " + this.record.state,
+            " :: rollbackChanges, state " + this.processingState.val + " :: itemState: " + this.record.state.val,
             VerboseLevel.BASE);
 
         try {
@@ -1036,7 +1036,7 @@ class ItemProcessor {
                     await this.record.destroy(con);
             });
         } catch (err) {
-            if (err instanceof db.DatabaseError) {
+            if (err instanceof DatabaseError) {
                 this.node.logger.log(err.stack);
                 this.node.logger.log("DatabaseError rollbackChanges in transaction: " + err.message);
             }
@@ -1058,28 +1058,27 @@ class ItemProcessor {
 
     pulseSendNewConsensus() {
         this.node.report("item processor for item: " + this.itemId + " from parcel: " + this.parcelId +
-            " :: pulseSendNewConsensus, state " + this.processingState + " itemState: " + this.record.state,
+            " :: pulseSendNewConsensus, state " + this.processingState.val + " itemState: " + this.record.state.val,
             VerboseLevel.BASE);
 
-        if(!this.processingState.canContinue)
+        if (!this.processingState.canContinue)
             return;
 
         this.processingState = ItemProcessingState.SENDING_CONSENSUS;
 
-        if(this.consensusReceivedChecker == null) {
+        if (this.consensusReceivedChecker == null)
             this.consensusReceivedChecker = new ExecutorWithDynamicPeriod(() => this.sendNewConsensusNotification(),
                 Config.consensusReceivedCheckTime, this.node.executorService).run();
-        }
     }
 
-    sendNewConsensusNotification() {
-        if(!this.processingState.canContinue || this.processingState.isConsensusSentAndReceived) //TODO
+    async sendNewConsensusNotification() {
+        if (!this.processingState.canContinue || this.processingState === ItemProcessingState.FINISHED)
             return;
 
         if (this.isConsensusReceivedExpired()) {
             this.node.report("consensus received expired " + this.itemId + " from parcel: " + this.parcelId +
-                " :: sendNewConsensusNotification isConsensusReceivedExpired, state " + this.processingState + " itemState: " + this.record.state,
-                VerboseLevel.NOTHING);
+                " :: sendNewConsensusNotification isConsensusReceivedExpired, state " + this.processingState.val +
+                " itemState: " + this.record.state.val, VerboseLevel.NOTHING);
 
             // cancel by timeout expired
             this.processingState = ItemProcessingState.FINISHED;
@@ -1092,20 +1091,19 @@ class ItemProcessor {
         let notification = new ParcelNotification(this.node.myInfo, this.itemId, this.parcelId, this.getResult(), true,
             this.item.shouldBeU ? ParcelNotificationType.PAYMENT : ParcelNotificationType.PAYLOAD);
 
-        this.node.network.allNodes()
-            .filter(n => (!this.positiveNodes.has(n) && !this.negativeNodes.has(n)))  //TODO
-            // if node do not know own vote we do not send notification, just looking for own state
-            /*if(!myInfo.equals(node)) {
-                network.deliver(node, notification);
-            } else {
-                if(processingState.isProcessedToConsensus()) {
-                vote(myInfo, record.getState());
-                }*/
+        for (let n of this.node.network.allNodes())
+            if (!this.positiveNodes.has(n) && !this.negativeNodes.has(n)) {
+                // if node do not know own vote we do not send notification, just looking for own state
+                if (!this.node.myInfo.equals(node))
+                    this.node.network.deliver(node, notification);
+                else if (this.processingState.isProcessedToConsensus)
+                    await this.vote(this.node.myInfo, this.record.state);
+            }
     }
 
     checkIfAllReceivedConsensus() {
-        if(!this.processingState.canContinue)
-        return true;
+        if (!this.processingState.canContinue)
+            return true;
 
         let nodes = this.node.network.allNodes();
         let allReceived = nodes.length <= this.positiveNodes.size + this.negativeNodes.size;
@@ -1125,33 +1123,29 @@ class ItemProcessor {
 
     stopConsensusReceivedChecker() {
         if (this.consensusReceivedChecker != null)
-            this.consensusReceivedChecker.cancel(true); //TODO
+            this.consensusReceivedChecker.cancel();
     }
 
     //******************** resync section ********************//
 
     async startResync() {
-        if(this.processingState.canContinue) {
-            if (!this.processingState.isProcessedToConsensus) {
-                this.processingState = ItemProcessingState.RESYNCING;
+        if (!this.processingState.canContinue || this.processingState.isProcessedToConsensus)
+            return;
 
-                await Promise.all(Array.from(this.resyncingItems).map(
-                    async(k) => await this.node.resync(k, (re) => this.onResyncItemFinished(re))
-                ));
+        this.processingState = ItemProcessingState.RESYNCING;
 
-            }
-        }
+        await Promise.all(Array.from(this.resyncingItems.keys()).map(
+            async(k) => await this.node.resync(k, (re) => this.onResyncItemFinished(re))
+        ));
     }
 
     async onResyncItemFinished(ri) {
-        if(this.processingState.canContinue) {
-            if (!this.processingState.isProcessedToConsensus) {
-                this.resyncingItemsResults.set(ri.hashId, ri.getItemState());
-                if (this.resyncingItemsResults.size >= this.resyncingItems.size) {
-                    await this.onAllResyncItemsFinished();
-                }
-            }
-        }
+        if (!this.processingState.canContinue || this.processingState.isProcessedToConsensus)
+            return;
+
+        this.resyncingItemsResults.set(ri.hashId, ri.getItemState());
+        if (this.resyncingItemsResults.size >= this.resyncingItems.size)
+            await this.onAllResyncItemsFinished();
     }
 
     async onAllResyncItemsFinished() {
@@ -1161,18 +1155,17 @@ class ItemProcessor {
             await this.checkSubItems();
         } catch (err) {
             this.node.logger.log(err.stack);
-            this.node.logger.log("onAllResyncItemsFinished: " + err.message);
-            this.node.report("error: ItemProcessor.onAllResyncItemsFinished() exception: " + err, VerboseLevel.BASE);
+            this.node.logger.log("onAllResyncItemsFinished ERROR: " + err.message);
+            this.node.report("error: ItemProcessor.onAllResyncItemsFinished() exception: " + err.message, VerboseLevel.BASE);
         }
 
         await this.commitCheckedAndStartPolling();
     }
 
     addItemToResync(hid, record) {
-        if (this.processingState.canContinue) {
+        if (this.processingState.canContinue)
             if (this.resyncingItems.get(hid) == null)
                 this.resyncingItems.set(hid, new ResyncingItem(hid, record, this.node));
-        }
     }
 
     //******************** common section ********************//
@@ -1189,23 +1182,21 @@ class ItemProcessor {
      */
     forceChecking(isCheckingForce) {
         this.node.report("item processor for item: " +  this.itemId + " from parcel: " + this.parcelId +
-            " :: forceChecking, state " + this.processingState + " itemState: " +  this.record.state,
+            " :: forceChecking, state " + this.processingState.val + " itemState: " +  this.record.state.val,
             VerboseLevel.BASE);
 
         this.isCheckingForce = isCheckingForce;
-        if(this.processingState.canContinue) {
-            if (this.processingState === ItemProcessingState.DOWNLOADED) {
-                new ScheduleExecutor(() => this.checkItem(), 0, this.node.executorService).run(); //TODO
-            }
-        }
+
+        if (this.processingState === ItemProcessingState.DOWNLOADED)
+            new ScheduleExecutor(() => this.checkItem(), 0, this.node.executorService).run();
     }
 
     close() {
         this.node.report("item processor for item: " + this.itemId + " from parcel: " + this.parcelId +
-            " :: close, state " + this.processingState + " itemState: " + this.record.state,
+            " :: close, state " + this.processingState.val + " itemState: " + this.record.state.val,
             VerboseLevel.BASE);
 
-        if(this.processingState.canContinue)
+        if (this.processingState.canContinue)
             this.processingState = ItemProcessingState.DONE;
 
         this.stopPoller();
@@ -1214,24 +1205,22 @@ class ItemProcessor {
         this.downloadedEvent.fire();
         this.doneEvent.fire();
 
-        if(this.processingState.canContinue) {
+        if (this.processingState.canContinue) {
             this.checkIfAllReceivedConsensus();
-            if (this.processingState === ItemProcessingState.DONE) {
+            if (this.processingState === ItemProcessingState.DONE)
                 this.pulseSendNewConsensus();
-            } else {
+            else
                 this.removeSelf();
-            }
-        } else {
+        } else
             this.removeSelf();
-        }
     }
 
     /**
      * Emergency break all processes and remove self.
      */
-    emergencyBreak() {
+    async emergencyBreak() {
         this.node.report("item processor for item: " + this.itemId + " from parcel: " + this.parcelId +
-            " :: emergencyBreak, state " + this.processingState + " itemState: " + this.record.state,
+            " :: emergencyBreak, state " + this.processingState.val + " itemState: " + this.record.state.val,
             VerboseLevel.BASE);
 
         let doRollback = !this.processingState.isDone;
@@ -1242,31 +1231,27 @@ class ItemProcessor {
         this.stopPoller();
         this.stopConsensusReceivedChecker();
 
-        for(let ri of this.resyncingItems.values()) {
-            if(!ri.isCommitFinished()) {
+        for (let ri of this.resyncingItems.values())
+            if (!ri.isCommitFinished())
                 ri.closeByTimeout();
-            }
-        }
 
-        if(doRollback)
-            this.rollbackChanges();
+        if (doRollback)
+            await this.rollbackChanges();
         else
-            close();
+            this.close();
 
         this.processingState = ItemProcessingState.FINISHED;
     }
 
     removeSelf() {
         this.node.report("item processor for item: " + this.itemId + " from parcel: " + this.parcelId +
-            " :: removeSelf, state ", this.processingState + " itemState: " + this.record.state,
+            " :: removeSelf, state ", this.processingState.val + " itemState: " + this.record.state.val,
             VerboseLevel.BASE);
 
-        if(this.processingState.canRemoveSelf) {
+        if (this.processingState.canRemoveSelf)
             this.forceRemoveSelf();
-        }
     }
 
-    //used in test purposes
     forceRemoveSelf() {
         this.node.processors.delete(this.itemId);
 
@@ -1277,10 +1262,8 @@ class ItemProcessor {
         // fire all event to release possible listeners
         this.downloadedEvent.fire();
         this.doneEvent.fire();
-        this.removedEvent.fire();
+        this.removedFire();
     }
-
-
 
     getResult() {
         let result = ItemResult.fromStateRecord(this.record, this.item != null);
@@ -1291,10 +1274,10 @@ class ItemProcessor {
     }
 
     /**
-     * True if we need to get vote from a node.
+     * Check we need to get vote from a node.
      *
-     * @param node we might need vote from.
-     * @return
+     * @param {network.NodeInfo} node - We might need vote from.
+     * @return true if we need to get vote from a node.
      */
     needsVoteFrom(node) {
         return this.record.state.isPending && !this.positiveNodes.has(node) && !this.negativeNodes.has(node);
@@ -1304,16 +1287,17 @@ class ItemProcessor {
         if (this.item != null)
             return;
 
-        if (this.sources.add(node)) {
+        if (this.sources.add(node))
             this.pulseDownload();
-        }
+    }
+
+    isDone() {
+        return this.processingState.isDone;
     }
 
     toString() {
-        return "ip -> parcel: " + this.parcelId + ", item: " + this.itemId + ", processing state: " + this.processingState;
+        return "ip -> parcel: " + this.parcelId + ", item: " + this.itemId + ", processing state: " + this.processingState.val;
     }
 }
-
-
 
 module.exports = {ItemProcessor, ItemProcessingState};

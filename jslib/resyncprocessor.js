@@ -371,7 +371,8 @@ class ResyncingItem {
      * @return {boolean}
      */
     isCommitFinished() {
-        return this.resyncingState === ResyncingItemProcessingState.COMMIT_SUCCESSFUL || this.resyncingState === ResyncingItemProcessingState.COMMIT_FAILED;
+        return this.resyncingState === ResyncingItemProcessingState.COMMIT_SUCCESSFUL ||
+               this.resyncingState === ResyncingItemProcessingState.COMMIT_FAILED;
     }
 
     getItemState() {
