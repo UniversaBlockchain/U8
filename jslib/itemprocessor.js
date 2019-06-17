@@ -70,27 +70,21 @@ const ItemProcessingState = {
  *
  * Look at {@link ItemProcessor#processingState} to know what happend with processing at calling time.
  *
+ * @param itemId is item's id to be process.
+ * @param parcelId is parcel's id that item belongs to.
+ * @param item is item object if exist.
+ * @param lock is object for synchronization (it is object from {@link ItemLock} that points to item's hashId)
+ * @param isCheckingForce if true checking item processing without delays. If false checking item wait until forceChecking() will be called.
+ * @param node
  */
 class ItemProcessor {
 
     constructor(itemId, parcelId, item, isCheckingForce, node) {
-        /**
-         * Item's id to be process.
-         */
         this.itemId = itemId;
-        /**
-         * Parcel's id that item belongs to.
-         */
         this.parcelId = parcelId;
-        /**
-         * Item object if exist.
-         */
         this.item = item;
-        /**
-         * If true checking item processing without delays.
-         * If false checking item wait until forceChecking() will be called.
-         */
         this.isCheckingForce = isCheckingForce;
+
         this.processingState = ItemProcessingState.INIT;
 
         this.record = null;

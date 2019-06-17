@@ -2,6 +2,7 @@ const BigDecimal  = require("big").Big;
 
 class Config {
     static quantiser_quantaPerU = 200;
+    static paymentQuantaLimit = 200;
     static maxExpirationDaysInTestMode = 365;
     static maxCostUInTestMode = 3;
     static validUntilTailTime = 5*60; //5 minutes
@@ -19,6 +20,7 @@ class Config {
     static declinedItemExpiration = 10*24*3600; //10 days
     static maxGetItemTime = 30; //30 seconds
     static maxDownloadOnApproveTime = 5*60; //5 minutes
+    static getItemRetryCount = 10;
 
     /**
      * num of known (approved, declined, revoked or locked) subcontracts of a complex contract that starts resync
