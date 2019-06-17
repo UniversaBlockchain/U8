@@ -69,6 +69,7 @@ class StateRecord {
      * checked locally and is therefore in PENDING_NEGATIVE or PENDING_POSITIVE state, it can not lock any other items.
      *
      * @param {HashId} idToRevoke is id for item should be revoked
+     * @param {db.SqlDriverConnection} connection - Transaction connection. Optional.
      * @return {StateRecord} locked record id null if it could not be node
      */
     async lockToRevoke(idToRevoke, connection = undefined) {

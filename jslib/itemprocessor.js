@@ -11,6 +11,7 @@ const Contract = require("contract").Contract;
 const NSmartContract = require("services/NSmartContract").NSmartContract;
 const t = require("tools");
 const ResyncingItem = require("resyncprocessor").ResyncingItem;
+const QuantiserException = require("quantiser").QuantiserException;
 
 const ItemProcessingState = {
     NOT_EXIST : {val: "NOT_EXIST", isProcessedToConsensus : false, isDone : false, canContinue: true, canRemoveSelf: false, ordinal: 0},
@@ -106,8 +107,8 @@ class ItemProcessor {
         if (this.item == null)
             this.item = this.node.cache.get(itemId);
 
-        this.lockedToRevoke = [];
-        this.lockedToCreate = [];
+        this.lockedToRevoke = new Set();
+        this.lockedToCreate = new Set();
 
         this.pollingExpiresAt = Date.now() + Config.maxElectionsTime * 1000;    // in milliseconds
         this.consensusReceivedExpiresAt = Date.now() + Config.maxConsensusReceivedCheckTime * 1000;    // in milliseconds
@@ -120,18 +121,17 @@ class ItemProcessor {
         this.doneEvent = new AsyncEvent(this.node.executorService);
         this.removedEvent = new Promise(resolve => this.removedFire = resolve);
 
+        this.downloader = null;
         this.poller = null;
         this.consensusReceivedChecker = null;
     }
 
     async run() {
-        let recordWas = await this.node.ledger.getRecord(this.itemId);
-        if (recordWas != null)
-            this.stateWas = recordWas.state;
-        else
-            this.stateWas = ItemState.UNDEFINED;
-
         this.record = await this.node.ledger.findOrCreate(this.itemId);
+
+        this.node.report("item processor for item: " + this.itemId + " from parcel: " + this.parcelId +
+            " :: created, state " + this.processingState.val + " itemState: " + this.record.state,
+            VerboseLevel.BASE);
 
         if (this.item != null)
             new ScheduleExecutor(() => this.itemDownloaded(), 0, this.node.executorService).run();
@@ -142,50 +142,41 @@ class ItemProcessor {
     //******************** download section ********************//
 
     pulseDownload() {
-        if(this.processingState !== ItemProcessingState.EMERGENCY_BREAK) {
+        if (this.processingState !== ItemProcessingState.EMERGENCY_BREAK && !this.processingState.isProcessedToConsensus) {
+            this.processingState = ItemProcessingState.DOWNLOADING;
 
-            if (!this.processingState.isProcessedToConsensus) {
-                if(!this.processingState.isProcessedToConsensus) {
-                    this.processingState = ItemProcessingState.DOWNLOADING;
-                }
-
-                if (this.item == null && (downloader == null || downloader.isDone)) {  //TODO
-                    //downloader = new ScheduleExecutor(() => this.download(), 0, this.node.executorService).run();
-                }
-
-            }
+            if (this.item == null && this.downloader == null)
+                this.downloader = new ScheduleExecutor(() => this.download(), 0, this.node.executorService).run();
         }
     }
 
     async download() {
-        if(this.processingState === ItemProcessingState.EMERGENCY_BREAK)
-            return;
+        if (this.processingState.canContinue) {
+            while (!this.isPollingExpired() && this.item == null) {
+                if (this.sources.size === 0) {
+                    this.node.logger.log("empty sources for download tasks, stopping");
+                    break;
+                } else {
+                    try {
+                        // first we have to wait for sources
+                        let source = Array.from(this.sources)[Math.floor(Math.random() * this.sources.size)];
 
-        while (!this.isPollingExpired() && this.item == null) {
-            if (this.sources.size === 0) {
-                // log.e("empty sources for download tasks, stopping"); //TODO
-                return;
-            } else {
-                try {
-                    // first we have to wait for sources
-                    let source;
-                    // Important: it could be disturbed by notifications
-                    source = Array.from(this.sources)[Math.floor(Math.random() * this.sources.size)];
+                        this.item = await this.node.network.getItem(this.itemId, source, Config.maxGetItemTime);
+                        if (this.item != null) {
+                            await this.itemDownloaded();
+                            break;
+                        } else
+                            await sleep(100);
 
-                    this.item = this.node.network.getItem(this.itemId, source, Config.maxGetItemTime);
-                    if (this.item != null) {
-                        await this.itemDownloaded();
-                        return;
-                    } else {
-                        await sleep(100);
+                    } catch (err) {
+                        this.node.logger.log(err.stack);
+                        this.node.logger.log("download ERROR: " + err.message);
                     }
-                } catch (err) {
-                    this.node.logger.log(err.stack);
-                    this.node.logger.log("download ERROR: " + err.message);
                 }
             }
         }
 
+        this.downloader = null;
     }
 
     async itemDownloaded() {
@@ -193,37 +184,39 @@ class ItemProcessor {
             " :: itemDownloaded, state " + this.processingState + " itemState: " + this.record.state,
             VerboseLevel.BASE);
 
-        if(this.processingState !== ItemProcessingState.EMERGENCY_BREAK) {
-            this.node.cache.put(this.item, this.getResult(), this.record);
+        if (!this.processingState.canContinue)
+            return;
 
-            //save item in disk cache
-            await this.node.ledger.putItem(this.record, this.item, Math.floor(Date.now() / 1000) + Config.maxDiskCacheAge);
+        this.node.cache.put(this.item, this.getResult(), this.record);
 
-            if(this.item instanceof Contract) {
-                if(this.item.limitedForTestnet) {
-                    await this.markContractTest(this.item);
-                }
-            }
+        //save item in disk cache
+        let keepTill = new Date();
+        keepTill.setSeconds(keepTill.getSeconds() + Config.maxDiskCacheAge);
+        await this.node.ledger.putItem(this.record, this.item, keepTill);
 
-            if(!this.processingState.isProcessedToConsensus) {
-                this.processingState = ItemProcessingState.DOWNLOADED;
-            }
-            if(this.isCheckingForce) {
-                await this.checkItem();
-            }
-            this.downloadedEvent.fire();
-        }
+        if (this.item instanceof Contract && this.item.limitedForTestnet)
+            await this.markContractTest(this.item);
+
+        if (!this.processingState.isProcessedToConsensus)
+            this.processingState = ItemProcessingState.DOWNLOADED;
+
+        if (this.isCheckingForce)
+            await this.checkItem();
+
+        this.downloadedEvent.fire();
     }
 
     async markContractTest(contract) {
         await this.node.ledger.markTestRecord(contract.id);
 
-        contract.new.forEach(c => this.markContractTest(c));
+        contract.newItems.forEach(c => this.markContractTest(c));
     }
 
     stopDownloader() {
-        if (downloader != null)
-            downloader.cancel(true);
+        if (this.downloader != null) {
+            this.downloader.cancel();
+            this.downloader = null;
+        }
     }
 
     //******************** check item section ********************//
@@ -241,13 +234,11 @@ class ItemProcessor {
             && this.processingState !== ItemProcessingState.CHECKING
             && this.processingState !== ItemProcessingState.RESYNCING) {
 
-            if (this.alreadyChecked) {
+            if (this.alreadyChecked)
                 throw new Error("Check already processed");
-            }
 
-            if (!this.processingState.isProcessedToConsensus()) {
+            if (!this.processingState.isProcessedToConsensus)
                 this.processingState = ItemProcessingState.CHECKING;
-            }
 
             // Check the internal state
             // Too bad if basic check isn't passed, we will not process it further
@@ -255,25 +246,26 @@ class ItemProcessor {
             let needToResync = false;
 
             try {
-                let checkPassed;
+                let checkPassed = false;
 
-                if (this.item instanceof Contract) {
-                    let referencedItems = this.item.transactionPack.getReferencedItems();
+                if (this.item instanceof Contract && this.item.transactionPack != null) {
+                    let referencedItems = this.item.transactionPack.referencedItems;
                     if (referencedItems.size > 0) {
-                        let invalidItems = await this.node.ledger.findBadReferencesOf(referencedItems.keys());
+                        let invalidItems = await this.node.ledger.findBadReferencesOf(new Set(referencedItems.keys()));
                         invalidItems.forEach(id => referencedItems.delete(id));
                     }
                 }
 
                 if (this.item.shouldBeU) {
-                    if (this.item.isU(this.node.config.uIssuerKeys, Config.uIssuerName)) {
+                    if (this.item.isU(this.node.config.uIssuerKeys, Config.uIssuerName))
                         checkPassed = this.item.paymentCheck(this.node.config.uIssuerKeys); //TODO add paymentCheck in Contract
-                    } else {
+                    else {
                         checkPassed = false;
-                        this.item.errors.push(new ErrorRecord(Errors.BADSTATE, this.item.id.toString() + "Item that should be U contract is not U contract"));
+                        this.item.errors.push(new ErrorRecord(Errors.BADSTATE, this.item.id.toString(),
+                            "Item that should be U contract is not U contract"));
                     }
                 } else {
-                    checkPassed = this.item.check();
+                    checkPassed = await this.item.check();
 
                     // if item is smart contract we check it additionally
                     if (this.item instanceof NSmartContract) {
@@ -281,52 +273,54 @@ class ItemProcessor {
                         this.item.nodeInfoProvider = this.node.nodeInfoProvider;
 
                         // restore environment if exist, otherwise create new.
-                        let ime = this.node.getEnvironment(this.item);
+                        let ime = await this.node.getEnvironmentByContract(this.item);
                         ime.nameCache = this.node.nameCache;
                         // Here can be only APPROVED state, so we call only beforeCreate or beforeUpdate
-                        if (this.item.revision === 1) {
+                        if (this.item.state.revision === 1) {
                             if (!this.item.beforeCreate(ime))
-                                this.item.errors.push(new ErrorRecord(Errors.FAILED_CHECK, this.item.id.toString(), "beforeCreate fails"));
+                                this.item.errors.push(new ErrorRecord(Errors.FAILED_CHECK, this.item.id.toString(),
+                                    "beforeCreate fails"));
                         } else {
                             if (!this.item.beforeUpdate(ime))
-                                this.item.errors.push(new ErrorRecord(Errors.FAILED_CHECK, this.item.id.toString(), "beforeUpdate fails"));
+                                this.item.errors.push(new ErrorRecord(Errors.FAILED_CHECK, this.item.id.toString(),
+                                    "beforeUpdate fails"));
                         }
                     }
                 }
 
                 if (checkPassed) {
-
-                    itemsToResync = this.isNeedToResync(true);
-                    needToResync = itemsToResync.size !== 0;  //TODO
+                    itemsToResync = await this.isNeedToResync(true);
+                    needToResync = itemsToResync.size > 0;
 
                     // If no need to resync subItems, check them
-                    if (!needToResync) {
-                        this.checkSubItems();
-                    }
+                    if (!needToResync)
+                        await this.checkSubItems();
                 }
 
             } catch (err) {
-                this.item.errors.push(new ErrorRecord(Errors.FAILURE, this.item.id.toString(),
-                    "Not enough payment for process item (quantas limit)"));
-                this.node.informer.inform(this.item);
-                this.emergencyBreak();
-                return;
-            } /*catch (err2) {
-                        this.item.errors.push(new ErrorRecord(Errors.FAILED_CHECK,this.item.id.toString(), "Exception during check: " + e.getMessage()));
-                        //if(verboseLevel > DatagramAdapter.VerboseLevel.NOTHING) {
-                        this.node.logger.log(err2.stack);
-                        this.node.logger.log("checkItem ERROR: " + err2.message);
-                        //}
-                        this.node.informer.inform(this.item);
-                    }*/
+                if (err instanceof QuantiserException) {
+                    this.item.errors.push(new ErrorRecord(Errors.FAILURE, this.item.id.toString(),
+                        "Not enough payment for process item (quantas limit)"));
+                    this.node.informer.inform(this.item);
+                    this.emergencyBreak();
+                    return;
+
+                } else {
+                    this.item.errors.push(new ErrorRecord(Errors.FAILED_CHECK, this.item.id.toString(),
+                        "Exception during check: " + err.message));
+                    this.node.logger.log(err.stack);
+                    this.node.logger.log("checkItem ERROR: " + err.message);
+                    this.node.informer.inform(this.item);
+                }
+            }
+
             this.alreadyChecked = true;
 
-            if (!needToResync) {
+            if (!needToResync)
                 await this.commitCheckedAndStartPolling();
-            } else {
-                for (let hid of itemsToResync.keys()) {
+            else {
+                for (let hid of itemsToResync.keys())
                     this.addItemToResync(hid, itemsToResync.get(hid));
-                }
 
                 await this.startResync();
             }
@@ -335,82 +329,80 @@ class ItemProcessor {
     }
 
     // check subitems of main item and lock subitems in the ledger
-    checkSubItems() {
-        if (!this.processingState.canContinue || this.processingState.isProcessedToConsensus)
-            return;
-        this.checkSubItemsOf(this.item);
+    async checkSubItems() {
+        if (this.processingState.canContinue && !this.processingState.isProcessedToConsensus)
+            await this.checkSubItemsOf(this.item);
     }
 
     // check subitems of given item recursively (down for newItems line)
-    checkSubItemsOf(checkingItem) {
+    async checkSubItemsOf(checkingItem) {
         if (!this.processingState.canContinue || this.processingState.isProcessedToConsensus)
             return;
 
         // check all new new items in tree
-        this.checkNewsOf(checkingItem);
+        await this.checkNewsOf(checkingItem);
+
         // check revoking items in tree
-        this.checkRevokesOf(checkingItem);
+        await this.checkRevokesOf(checkingItem);
     }
 
-    checkRevokesOf(checkingItem) {
+    async checkRevokesOf(checkingItem) {
         if (!this.processingState.canContinue || this.processingState.isProcessedToConsensus)
             return;
 
         // check new items
         for (let newItem of checkingItem.newItems) {
-            this.checkRevokesOf(newItem);
+            await this.checkRevokesOf(newItem);
 
-            for (let err of newItem.errors) {
-                checkingItem.errors.push(Errors.BAD_NEW_ITEM, newItem.id.toString(), "bad new item: " + err);
-            }
+            for (let err of newItem.errors)
+                checkingItem.errors.push(new ErrorRecord(Errors.BAD_NEW_ITEM, newItem.id.toString(),
+                    "bad new item: " + err.toString()));
         }
 
         // check revoking items
-        for (let revokingItem of checkingItem.getRevokingItems()) {
+        for (let revokingItem of checkingItem.revokingItems) {
 
             if (revokingItem instanceof Contract)
-                revokingItem.errors.clear();
+                revokingItem.errors = [];
 
             // if revoking item is smart contract node additionally check it
-            if(revokingItem instanceof NSmartContract) {
+            if (revokingItem instanceof NSmartContract) {
                 // slot contract need ledger, node's config and nodeInfo to work
                 revokingItem.nodeInfoProvider = this.node.nodeInfoProvider;
 
                 // restore environment if exist
-                let ime = this.node.getEnvironment(revokingItem);
+                let ime = await this.node.getEnvironmentByContract(revokingItem);
 
-                if(ime != null) {
+                if (ime != null) {
                     ime.nameCache = this.node.nameCache;
                     // Here only REVOKED states, so we call only beforeRevoke
                     revokingItem.beforeRevoke(ime);
-                } else {
-                    revokingItem.errors.push(new ErrorRecord(Errors.FAILED_CHECK, revokingItem.id.toString(), "can't load environment to revoke"));
-                }
+                } else
+                    revokingItem.errors.push(new ErrorRecord(Errors.FAILED_CHECK, revokingItem.id.toString(),
+                        "can't load environment to revoke"));
             }
 
-            for (let err of revokingItem.errors) {
-                checkingItem.errors.push(new ErrorRecord(Errors.BAD_REVOKE, revokingItem.id.toString(), "can't revoke: " + err));
-            }
+            for (let err of revokingItem.errors)
+                checkingItem.errors.push(new ErrorRecord(Errors.BAD_REVOKE, revokingItem.id.toString(),
+                    "can't revoke: " + err.toString()));
 
             try {
-                if (this.record.state === ItemState.APPROVED) {
+                if (this.record.state === ItemState.APPROVED)
                     // item can be approved by network consensus while our node do checking
                     // stop checking in this case
                     return;
+
+                let r = await this.record.lockToRevoke(revokingItem.id);
+                if (r == null)
+                    checkingItem.errors.push(new ErrorRecord(Errors.BAD_REVOKE, revokingItem.id.toString(), "can't revoke"));
+                else {
+                    if (!this.lockedToRevoke.has(r))
+                        this.lockedToRevoke.add(r);
+
+                    if (r.state === ItemState.LOCKED_FOR_CREATION_REVOKED)
+                        this.lockedToCreate.delete(r);
                 }
-                /*itemLock.synchronize(revokingItem.id, lock -> {
-                    let r = this.record.lockToRevoke(revokingItem.id);
-                    if (r == null) {
-                        checkingItem.errors.push(new ErrorRecord(Errors.BAD_REVOKE, revokingItem.id.toString(), "can't revoke"));
-                    } else {
-                        if (!this.lockedToRevoke.contains(r))
-                            this.lockedToRevoke.add(r);
-                        if(r.state === ItemState.LOCKED_FOR_CREATION_REVOKED) {
-                            this.lockedToCreate.remove(r);
-                        }
-                    }
-                    return null;
-                });*/
+
             } catch (err) {
                 this.node.logger.log(err.stack);
                 this.node.logger.log("checkRevokesOf ERROR: " + err.message);
@@ -418,54 +410,53 @@ class ItemProcessor {
         }
     }
 
-    checkNewsOf(checkingItem) {
+    async checkNewsOf(checkingItem) {
         if (!this.processingState.canContinue || this.processingState.isProcessedToConsensus)
             return;
 
         // check new items
         for (let newItem of checkingItem.newItems) {
 
-            this.checkNewsOf(newItem);
+            await this.checkNewsOf(newItem);
 
             // if new item is smart contract we check it additionally
-            if(newItem instanceof NSmartContract) {
+            if (newItem instanceof NSmartContract) {
                 // slot contract need ledger, node's config and nodeInfo to work
                 newItem.nodeInfoProvider = nodeInfoProvider;
 
                 // restore environment if exist, otherwise create new.
-                let ime = this.node.getEnvironment(newItem);
+                let ime = await this.node.getEnvironmentByContract(newItem);
                 ime.nameCache = this.node.nameCache;
                 // Here only APPROVED states, so we call only beforeCreate or beforeUpdate
-                if (newItem.revision === 1) {
+                if (newItem.state.revision === 1) {
                     if (!newItem.beforeCreate(ime))
-                    newItem.errors.push(new ErrorRecord(Errors.BAD_NEW_ITEM, this.item.id.toString(), "newItem.beforeCreate fails"));
+                        newItem.errors.push(new ErrorRecord(Errors.BAD_NEW_ITEM, this.item.id.toString(),
+                            "newItem.beforeCreate fails"));
                 } else {
                     if (!newItem.beforeUpdate(ime))
-                    newItem.errors.push(new ErrorRecord(Errors.BAD_NEW_ITEM, this.item.id.toString(), "newItem.beforeUpdate fails"));
+                        newItem.errors.push(new ErrorRecord(Errors.BAD_NEW_ITEM, this.item.id.toString(),
+                            "newItem.beforeUpdate fails"));
                 }
             }
 
-            if (newItem.errors.length !== 0) {
-                for (let er of newItem.errors) {
-                    checkingItem.errors.push(new ErrorRecord(Errors.BAD_NEW_ITEM, newItem.id.toString(), "bad new item: " + er));
-                }
+            if (newItem.errors.length > 0) {
+                for (let err of newItem.errors)
+                    checkingItem.errors.push(new ErrorRecord(Errors.BAD_NEW_ITEM, newItem.id.toString(),
+                        "bad new item: " + err.toString()));
             } else {
                 try {
-                    if (this.record.state === ItemState.APPROVED) {
+                    if (this.record.state === ItemState.APPROVED)
                         // item can be approved by network consensus while our node do checking
                         // stop checking in this case
                         return;
-                    }
-                    /*itemLock.synchronize(newItem.id, lock => {
-                       let r = this.record.createOutputLockRecord(newItem.id);
-                        if (r == null) {
-                            checkingItem.errors.push(new ErrorRecord(Errors.NEW_ITEM_EXISTS, newItem.id.toString(), "new item exists in ledger"));
-                        } else {
-                            if (!this.lockedToCreate.contains(r))
-                                this.lockedToCreate.add(r);
-                        }
-                        return null;
-                    });*/
+
+                    let r = await this.record.lockForCreate(newItem.id);
+                    if (r == null)
+                        checkingItem.errors.push(new ErrorRecord(Errors.NEW_ITEM_EXISTS, newItem.id.toString(),
+                            "new item exists in ledger"));
+                    else if (!this.lockedToCreate.has(r))
+                        this.lockedToCreate.add(r);
+
                 } catch (err) {
                     this.node.logger.log(err.stack);
                     this.node.logger.log("checkNewsOf ERROR: " + err.message);
@@ -597,7 +588,7 @@ class ItemProcessor {
 
                 this.stopPoller();
                 this.stopDownloader();
-                this.rollbackChanges(ItemState.UNDEFINED);
+                this.rollbackChanges();
                 return;
             }
 
@@ -616,7 +607,7 @@ class ItemProcessor {
             return;
 
         this.node.report("item processor for item: " + this.itemId + " from parcel: " + this.parcelId +
-            " :: vote " + state.val + " from node " + node.number + ", state ", this.processingState.val +
+            " :: vote " + state.val + " from node " + node.number + ", state " + this.processingState.val +
             " :: itemState: " + this.record.state,
             VerboseLevel.BASE);
 
@@ -659,7 +650,7 @@ class ItemProcessor {
         if (positiveConsensus)
             this.approveAndCommit();
         else if (negativeConsensus)
-            this.rollbackChanges(ItemState.DECLINED);
+            this.rollbackChanges(true);
         else
             throw new Error("error: consensus reported without consensus");
     }
@@ -681,7 +672,7 @@ class ItemProcessor {
 
         for (let newItem of commitingItem.newItems) {
             // The record may not exist due to ledger desync too, so we create it if need
-            let r = await this.node.ledger.findOrCreate(newItem.id);
+            let r = await this.node.ledger.simpleFindOrCreate(newItem.id, ItemState.PENDING, 0, con);
 
             await r.approve(con, newItem.getExpiresAt());
 
@@ -740,7 +731,7 @@ class ItemProcessor {
 
         for (let revokingItem of commitingItem.revokingItems) {
             // The record may not exist due to ledger desync, so we create it if need
-            let r = await this.node.ledger.findOrCreate(revokingItem.id);
+            let r = await this.node.ledger.simpleFindOrCreate(revokingItem.id, ItemState.PENDING, 0, con);
 
             await r.revoke(con);
 
@@ -876,6 +867,8 @@ class ItemProcessor {
 
         } catch (err) {
             if (err instanceof db.DatabaseError) {
+                this.node.logger.log(err.stack);
+                this.node.logger.log("DatabaseError downloadAndCommit in transaction: " + err.message);
                 this.emergencyBreak();
                 return;
 
@@ -1007,6 +1000,62 @@ class ItemProcessor {
         }
     }
 
+    async rollbackChanges(doDecline = false) {
+        this.node.report("item processor for item: " + this.itemId + " from parcel: " + this.parcelId +
+            " :: rollbackChanges, state " + this.processingState.val + " :: itemState: " + this.record.state,
+            VerboseLevel.BASE);
+
+        try {
+            // Rollback transaction
+            await this.node.ledger.transaction(async(con) => {
+                await Promise.all(Array.from(this.lockedToRevoke).map(async(r) => {
+                    await r.unlock(con);
+
+                    let cr = this.node.cache.getResult(r.id);
+                    let rr = ItemResult.fromStateRecord(r);
+                    if (cr != null)
+                        rr.extra = cr.extra;
+                    this.node.cache.update(r.id, rr);
+                }));
+
+                this.lockedToRevoke.clear();
+
+                // form created records, we touch only these that we have actually created
+                await Promise.all(Array.from(this.lockedToCreate).map(async(r) => {
+                    await r.unlock(con);
+
+                    let cr = this.node.cache.getResult(r.id);
+                    let rr = ItemResult.fromStateRecord(r);
+                    if (cr != null)
+                        rr.extra = cr.extra;
+                    this.node.cache.update(r.id, rr);
+                }));
+
+                this.lockedToCreate.clear();
+
+                if (doDecline) {
+                    await this.record.decline(con);
+
+                    if (this.item != null)
+                        this.node.cache.update(this.itemId, this.getResult());
+                } else
+                    await this.record.destroy(con);
+            });
+        } catch (err) {
+            if (err instanceof db.DatabaseError) {
+                this.node.logger.log(err.stack);
+                this.node.logger.log("DatabaseError rollbackChanges in transaction: " + err.message);
+            }
+        }
+
+        this.close();
+    }
+
+    stopPoller() {
+        if (this.poller != null)
+            this.poller.cancel();
+    }
+
     isPollingExpired() {
         return this.pollingExpiresAt < Date.now();
     }
@@ -1115,7 +1164,7 @@ class ItemProcessor {
         this.processingState = ItemProcessingState.CHECKING;
 
         try {
-            this.checkSubItems();
+            await this.checkSubItems();
         } catch (err) {
             this.node.logger.log(err.stack);
             this.node.logger.log("onAllResyncItemsFinished: " + err.message);
@@ -1126,7 +1175,7 @@ class ItemProcessor {
     }
 
     addItemToResync(hid, record) {
-        if(this.processingState.canContinue) {
+        if (this.processingState.canContinue) {
             if (this.resyncingItems.get(hid) == null)
                 this.resyncingItems.set(hid, new ResyncingItem(hid, record, this.node));
         }
@@ -1206,7 +1255,7 @@ class ItemProcessor {
         }
 
         if(doRollback)
-            this.rollbackChanges(this.stateWas);
+            this.rollbackChanges();
         else
             close();
 
