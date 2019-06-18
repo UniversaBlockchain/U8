@@ -1,5 +1,5 @@
 import {ExecutorService, ScheduleExecutor, ExecutorWithFixedPeriod, ExecutorWithDynamicPeriod} from "executorservice";
-import {Notification, ItemNotification, ResyncNotification, ParcelNotification} from "notification";
+import {Notification, ItemNotification, ResyncNotification, ParcelNotification, ParcelNotificationType} from "notification";
 import {ItemProcessor} from "itemprocessor";
 import {VerboseLevel} from "node_consts";
 import {Errors, ErrorRecord} from "errors";
@@ -45,11 +45,28 @@ class Node {
         this.executorService = new ExecutorService();
 
         this.config.updateConsensus(this.network.getNodesCount());
-        this.network.subscribe(this.myInfo, notification => new ScheduleExecutor(() => this.onNotification(notification), 0, this.executorService).run());
+        this.network.subscribe(this.myInfo, notification => new ScheduleExecutor(async () => await this.onNotification(notification), 0, this.executorService).run());
 
         this.callbackService = null;
-        // TODO: callbackService
-        // TODO: pulseCleanUp
+
+        this.pulseStartCleanup();
+    }
+
+    pulseStartCleanup() {
+        new ExecutorWithDynamicPeriod(async () => {
+            if (this.ledger != null)
+                await this.ledger.cleanup(this.config.permanetMode)
+        }, [1000, Config.maxDiskCacheAge * 1000], this.executorService).run();
+
+        new ExecutorWithFixedPeriod(async () => {
+            if (this.ledger != null)
+                await this.ledger.removeExpiredStoragesAndSubscriptionsCascade()
+        }, Config.expriedStorageCleanupInterval * 1000, this.executorService).run();
+
+        new ExecutorWithFixedPeriod(async () => {
+            if (this.ledger != null)
+                await this.ledger.clearExpiredNameRecords(this.config.holdDuration);
+        }, Config.expriedNamesCleanupInterval * 1000, this.executorService).run();
     }
 
     async run() {
@@ -57,6 +74,7 @@ class Node {
         this.logger.log(this.label + "records to sanitation: " + this.recordsToSanitate.size);
 
         // TODO: sanitation
+        // TODO: callbackService
 
         return this;
     }
@@ -93,6 +111,47 @@ class Node {
                 await this.obtainCommonNotification(notification);
         //} else if (notification instanceof CallbackNotification) {
         //    await this.callbackService.obtainCallbackNotification(notification);
+        }
+    }
+
+    /**
+     * Obtain got common item notification: looking for result or item processor and register vote.
+     *
+     * @param {ItemNotification} notification - Common item notification.
+     *
+     */
+    async obtainCommonNotification(notification) {
+        // get processor, create if need
+        // register my vote
+        let x = await this.checkItemInternal(notification.itemId, null, null, true, true);
+
+        // If it is not ParcelNotification we think t is payment type of notification
+        let notType;
+        if (notification instanceof ParcelNotification)
+            notType = notification.type;
+        else
+            notType = ParcelNotificationType.PAYMENT;
+
+        if (x instanceof ItemResult) {
+            // we have solution and need not answer, we answer if requested:
+            if (notification.requestResult)
+                this.network.deliver(notification.from,
+                    new ParcelNotification(this.myInfo, notification.itemId, null, x, false, notType));
+
+        } else if (x instanceof ItemProcessor) {
+            // we might still need to download and process it
+            if (notification.itemResult.haveCopy)
+                x.addToSources(notification.from);
+
+            if (notification.itemResult.state !== ItemState.PENDING)
+                await x.vote(notification.from, notification.itemResult.state);
+            else
+                this.logger.log("pending vote on item " + notification.itemId + " from " + notification.from);
+
+            // We answer only if (1) answer is requested and (2) we have position on the subject:
+            if (notification.requestResult && x.record.state !== ItemState.PENDING)
+                this.network.deliver(notification.from,
+                    new ParcelNotification(this.myInfo, notification.itemId, null, x.getResult(), x.needsVoteFrom(notification.from), notType));
         }
     }
 
@@ -270,7 +329,7 @@ class Node {
 
         let expiredUnlimit = this.keysUnlimited.get(key);
         if (expiredUnlimit != null) {
-            if (expiredUnlimit < Math.floor(Date.now() / 1000))
+            if (expiredUnlimit < Date.now())
                 this.keysUnlimited.delete(key);
             else
                 return true;
@@ -357,7 +416,7 @@ class Node {
         if (this.recordsToSanitate.has(record.id)) {
             this.report("itemSanitationTimeout " + record.id + " " + this.recordsToSanitate.size, VerboseLevel.BASE);
 
-            new ScheduleExecutor(() => this.sanitateRecord(record), 5000, this.executorService).run();
+            new ScheduleExecutor(async () => await this.sanitateRecord(record), 5000, this.executorService).run();
         }
     }
 
@@ -444,6 +503,38 @@ class Node {
                 this.checkItemInternal(contract.id, null, contract, true, true, false);
             }
         }
+    }
+
+    checkSpecialItem(item) {
+        if (!item instanceof Contract)
+            return;
+
+        //this.checkForNetConfig(item); TODO: Deprecated. outdated method. will be replaced with new one soon
+        this.checkForSetUnlimit(item);
+    }
+
+    checkForSetUnlimit(contract) {
+        // check unlimit contract
+        if (!contract.isUnlimitKeyContract(config))
+            return;
+
+        // get key for setting unlimited requests
+        let key = null;
+        try {
+            let packedKey = contract.transactional.data.unlimited_key;
+            if (packedKey == null)
+                return;
+
+            key = new crypto.PublicKey(packedKey);
+
+        } catch (err) {
+            return;
+        }
+
+        // setting unlimited requests for a key
+        this.keyRequests.delete(key);
+        this.keysUnlimited.delete(key);
+        this.keysUnlimited.set(key, Date.now() + Config.unlimitPeriod * 1000);
     }
 }
 

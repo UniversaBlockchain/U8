@@ -21,6 +21,8 @@ class Config {
     static maxGetItemTime = 30; //30 seconds
     static maxDownloadOnApproveTime = 5*60; //5 minutes
     static getItemRetryCount = 10;
+    static expriedStorageCleanupInterval = 5*60; //5 minutes
+    static expriedNamesCleanupInterval = 5*60; //5 minutes
 
     /**
      * num of known (approved, declined, revoked or locked) subcontracts of a complex contract that starts resync
@@ -30,6 +32,7 @@ class Config {
 
     static rateLimitDisablingPayment = 5;
     static limitRequestsForKeyPerMinute = 30;
+    static unlimitPeriod = 5*60; //5 minutes
 
     // SmartContract services
     static rate = {
@@ -59,6 +62,7 @@ class Config {
             new crypto.KeyAddress("J3uaVvHE7JqhvVb1c26RyDhfJw9eP2KR1KRhm2VdmYx7NwHpzdHTyEPjcmKpgkJAtzWLSPUw")
         ];
         this.main = null;
+        this.holdDuration = 30*24*3600; // 30 days
 
         // Permanet mode
         this.permanetMode = false;

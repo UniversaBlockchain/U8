@@ -45,7 +45,7 @@ const ItemProcessingState = {
  *
  * Then item will be checked. Immediately after download if {@link ItemProcessor#isCheckingForce} is true
  * or after {@link ItemProcessor#forceChecking(boolean)} call. Will call {@link Contract#check()}
- * or {@link Approvable#paymentCheck(Set)} if item is payment ({@link Contract#shouldBeU()}).
+ * or {@link Contract#paymentCheck(Set)} if item is payment ({@link Contract#shouldBeU()}).
  * Then subitems will be checked: {@link Contract#getReferencedItems()} will checked if exists in the ledger;
  * {@link Contract#revokingItems} will checked if exists in the ledger and its
  * own {@link Contract#getReferencedItems()} will recursively checked and will get {@link ItemState#LOCKED};
@@ -131,7 +131,7 @@ class ItemProcessor {
             VerboseLevel.BASE);
 
         if (this.item != null)
-            new ScheduleExecutor(() => this.itemDownloaded(), 0, this.node.executorService).run();
+            new ScheduleExecutor(async () => await this.itemDownloaded(), 0, this.node.executorService).run();
 
         return this;
     }
@@ -143,7 +143,7 @@ class ItemProcessor {
             this.processingState = ItemProcessingState.DOWNLOADING;
 
             if (this.item == null && this.downloader == null)
-                this.downloader = new ScheduleExecutor(() => this.download(), 0, this.node.executorService).run();
+                this.downloader = new ScheduleExecutor(async () => await this.download(), 0, this.node.executorService).run();
         }
     }
 
@@ -567,7 +567,7 @@ class ItemProcessor {
 
         if (this.processingState.canContinue && !this.processingState.isProcessedToConsensus && this.poller == null)
             // at this point the item is with us, so we can start
-            this.poller = new ExecutorWithDynamicPeriod(() => this.sendStartPollingNotification(), Config.pollTimeMillis,
+            this.poller = new ExecutorWithDynamicPeriod(async () => await this.sendStartPollingNotification(), Config.pollTimeMillis,
                 this.node.executorService).run();
     }
 
@@ -656,7 +656,7 @@ class ItemProcessor {
 
         if (this.processingState.canContinue)
             // downloadAndCommit set state to APPROVED
-            new ScheduleExecutor(() => this.downloadAndCommit(), 0, this.node.executorService).run();
+            new ScheduleExecutor(async () => await this.downloadAndCommit(), 0, this.node.executorService).run();
     }
 
     // commit subitems of given item to the ledger (recursively)
@@ -711,7 +711,6 @@ class ItemProcessor {
             else
                 this.node.cache.update(r.id, result);
 
-            //TODO: node.checkSpecialItem
             new ScheduleExecutor(() => this.node.checkSpecialItem(this.item), 100, this.node.executorService).run();
 
             await this.downloadAndCommitNewItemsOf(newItem, con);
@@ -850,7 +849,6 @@ class ItemProcessor {
                 await this.notifyContractSubscribers(this.item, this.record.state, con);
             });
 
-            //TODO: node.checkSpecialItem
             new ScheduleExecutor(() => this.node.checkSpecialItem(this.item), 100, this.node.executorService).run();
 
             if (this.resyncingItems.size > 0) {
@@ -1067,7 +1065,7 @@ class ItemProcessor {
         this.processingState = ItemProcessingState.SENDING_CONSENSUS;
 
         if (this.consensusReceivedChecker == null)
-            this.consensusReceivedChecker = new ExecutorWithDynamicPeriod(() => this.sendNewConsensusNotification(),
+            this.consensusReceivedChecker = new ExecutorWithDynamicPeriod(async () => await this.sendNewConsensusNotification(),
                 Config.consensusReceivedCheckTime, this.node.executorService).run();
     }
 
@@ -1188,7 +1186,7 @@ class ItemProcessor {
         this.isCheckingForce = isCheckingForce;
 
         if (this.processingState === ItemProcessingState.DOWNLOADED)
-            new ScheduleExecutor(() => this.checkItem(), 0, this.node.executorService).run();
+            new ScheduleExecutor(async () => await this.checkItem(), 0, this.node.executorService).run();
     }
 
     close() {

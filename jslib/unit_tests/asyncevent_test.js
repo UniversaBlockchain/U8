@@ -1,5 +1,5 @@
 import {expect, assert, unit} from 'test'
-import {ScheduleExecutor, EventTimeoutError, AsyncEvent} from "executorservice";
+import {ScheduleExecutor, EventTimeoutError, AsyncEvent, ExecutorWithFixedPeriod} from "executorservice";
 
 unit.test("asyncevent_test: await", async () => {
     let event = new AsyncEvent();

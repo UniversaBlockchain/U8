@@ -3,6 +3,9 @@ import {PrivateKey, KeyAddress} from 'crypto'
 import {NodeInfo, NetConfig} from 'web'
 import * as t from 'tools'
 
+import {HashId} from 'crypto'
+import {randomBytes} from 'tools'
+
 const NODE_VERSION = VERSION;
 const OptionParser = require("optionparser").OptionParser;
 const Logger = require("logger").Logger;
@@ -194,8 +197,14 @@ class Main {
     }
 
     async shutdown() {
-        if (this.ledger != null)
+        if (this.ledger != null) {
+            // delete node ledger for stop cleanup works
+            if (this.node != null)
+                this.node.ledger = null;
+
             await this.ledger.close();
+            this.ledger = null;
+        }
 
         if (this.network != null)
             this.network.shutdown();

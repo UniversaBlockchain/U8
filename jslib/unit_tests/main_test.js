@@ -52,7 +52,7 @@ class TestSpace {
     };
 
     async shutdown() {
-        await Promise.all(this.nodes.map(n => n.shutdown()));
+        await Promise.all(this.nodes.map(async (n) => await n.shutdown()));
     }
 }
 

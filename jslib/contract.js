@@ -1210,19 +1210,17 @@ class Contract extends bs.BiSerializable {
         }
 
         // The "U" contract is checked to have valid issuer key (one of preset URS keys)
-
         if (!this.roles.issuer instanceof roles.SimpleRole) {
             res = false;
             this.errors.push(new ErrorRecord(Errors.BAD_VALUE, "", "issuer is not valid. must be simple role"));
         } else {
             let thisIssuerAddresses = new Set(this.roles.issuer.keyAddresses);
-            for (let publicKey of this.roles.issuer.keyRecords.keys())
-                thisIssuerAddresses.add(publicKey.shortAddress);
+            Array.from(this.roles.issuer.keyRecords.keys()).forEach(pk => thisIssuerAddresses.add(pk.shortAddress));
 
-            /*if (Collections.disjoint(issuerKeys, thisIssuerAddresses)) {
+            if (!issuerKeys.some(k => thisIssuerAddresses.has(k))) {
                 res = false;
                 this.errors.push(new ErrorRecord(Errors.BAD_VALUE, "", "issuerKeys is not valid"));
-            }*/
+            }
         }
 
         // If the check is failed, checking process is aborting
