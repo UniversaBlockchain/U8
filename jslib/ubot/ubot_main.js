@@ -38,17 +38,13 @@ class UBotMain {
         if (await this.processOptions())
             return;
 
-        this.logger.log("UBotMain.start()... start httpServer...");
-        this.httpServer = new UBotHttpServer(this.nodeKey, "127.0.0.1", this.myInfo.clientAddress.port, this.logger);
+        this.ubot = new UBot(this.logger);
 
-        this.logger.log("UBotMain.start()... start network...");
+        this.httpServer = new UBotHttpServer(this.nodeKey, "127.0.0.1", this.myInfo.clientAddress.port, this.logger, this.ubot);
+
         this.network = new UBotNetwork(this.netConfig, this.myInfo, this.nodeKey, this.logger);
 
-        this.logger.log("UBotMain.start()... start ledger...");
         this.ledger = new UBotLedger(this.logger);
-
-        this.logger.log("UBotMain.start()... start ubot...");
-        this.ubot = new UBot(this.logger);
 
         this.network.subscribe(notify => {
             this.logger.log("ubot"+this.myInfo.number+" receive notify: " + notify);

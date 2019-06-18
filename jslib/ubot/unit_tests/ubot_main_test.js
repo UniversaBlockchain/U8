@@ -3,7 +3,6 @@ let io = require("io");
 const UBotMain = require("ubot/ubot_main").UBotMain;
 const cs = require("contractsservice");
 const BigDecimal  = require("big").Big;
-const Contract = require("contract").Contract;
 
 const CONFIG_ROOT = io.getTmpDirPath() + "/ubot_config";
 
@@ -96,7 +95,7 @@ unit.test("ubot_main_test: hello ubot", async () => {
 });
 
 unit.test("ubot_main_test: execJS", async () => {
-    const count = 4;
+    const count = 8;
     let ubotMains = await createUBots(count);
 
     console.log("\ntest send...");
@@ -105,15 +104,16 @@ unit.test("ubot_main_test: execJS", async () => {
     await client.start(tk.TestKeys.getKey(), ubotMains[0].myInfo.publicKey, null);
     let userPrivKey = tk.TestKeys.getKey();
     let contract = await cs.createTokenContract([userPrivKey], [userPrivKey.publicKey], new BigDecimal("100"));
+    contract.state.data.poolSize = 3;
     await contract.seal();
     let contractBin = contract.getPackedTransaction();
-    client.command("execJS", {contract: contractBin}, resp=>{
+    client.command("executeCloudMethod", {contract: contractBin}, resp=>{
         console.log("resp: " + JSON.stringify(resp));
     }, err=>{
         console.log("err: " + err);
     });
 
-    await sleep(2500);
+    await sleep(1000);
 
     await shutdownUBots(ubotMains);
 });
