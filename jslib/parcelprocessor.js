@@ -54,16 +54,14 @@ ParcelProcessingState.byVal.set(ParcelProcessingState.EMERGENCY_BREAK.val, Parce
  *
  * @param parcelId is parcel's id to processing
  * @param parcel is {@link Parcel} if exists. Will download if not exists.
- * @param lock is lock object for parcel.
  * @param node
  */
 class ParcelProcessor {
 
-    constructor(parcelId, parcel, lock, node) {
+    constructor(parcelId, parcel, node) {
         this.parcelId = parcelId;
         this.parcel = parcel;
         this.node = node;
-        this.lock = lock;
 
         this.paymentResult = null;
         this.payloadResult = null;
@@ -498,4 +496,11 @@ class ParcelProcessor {
             return this.payloadProcessor.isPollingExpired();
         return false;
     }
+
+    isDone() {
+        return this.processingState === ParcelProcessingState.FINISHED;
+    }
+
 }
+
+module.exports = {ParcelProcessor, ParcelProcessingState};

@@ -589,7 +589,7 @@ class ClientHTTPServer extends network.HttpServer {
         this.checkNode(clientKey, true);
 
         try {
-            return {processingState : this.node.checkParcelProcessingState(params.parcelId)}; //TODO: node
+            return {processingState : this.node.checkParcelProcessingState(params.parcelId)};
         } catch (err) {
             this.logger.log("getParcelProcessingState ERROR: " + err.message);
 
