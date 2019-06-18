@@ -9,6 +9,8 @@ import * as t from 'tools'
 import * as d from 'deltas'
 import * as tk from 'unit_tests/test_keys'
 
+const tt = require("test_tools");
+
 unit.test("contract copy test", async () => {
     let k = tk.TestKeys.getKey();
     let c1 = cnt.Contract.fromPrivateKey(k);
@@ -37,3 +39,49 @@ unit.test("contract copy test", async () => {
     assert(d.Delta.between(null,ds1,ds2) == null);
 });
 
+unit.test("contract packing test", async () => {
+    let k = tk.TestKeys.getKey();
+    let c1 = cnt.Contract.fromPrivateKey(k);
+
+    let role = new roles.SimpleRole("owner",k.publicKey.shortAddress);
+    role.keyAddresses.add(k.publicKey.shortAddress);
+    c1.registerRole(role);
+
+    let bb = await c1.seal();
+
+    let c2 = cnt.Contract.fromSealedBinary(bb);
+
+    tt.assertSameContracts(c1, c2);
+});
+
+unit.test("transactionPack packing test", async () => {
+    let k = tk.TestKeys.getKey();
+    let c1 = cnt.Contract.fromPrivateKey(k);
+
+    let role = new roles.SimpleRole("owner",k.publicKey.shortAddress);
+    role.keyAddresses.add(k.publicKey.shortAddress);
+    c1.registerRole(role);
+
+    await c1.seal();
+
+    let bb = c1.getPackedTransaction();
+
+    let c2 = cnt.Contract.fromPackedTransaction(bb);
+
+    tt.assertSameContracts(c1, c2);
+});
+
+unit.test("unpack contract from fromPackedTransaction", async () => {
+    let k = tk.TestKeys.getKey();
+    let c1 = cnt.Contract.fromPrivateKey(k);
+
+    let role = new roles.SimpleRole("owner",k.publicKey.shortAddress);
+    role.keyAddresses.add(k.publicKey.shortAddress);
+    c1.registerRole(role);
+
+    let bb = await c1.seal();
+
+    let c2 = cnt.Contract.fromPackedTransaction(bb);
+
+    tt.assertSameContracts(c1, c2);
+});

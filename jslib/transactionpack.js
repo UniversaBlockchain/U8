@@ -4,7 +4,6 @@ const BossBiMapper = require("bossbimapper").BossBiMapper;
 const t = require("tools");
 const Boss = require("boss");
 const ex = require("exceptions");
-//const Contract = require("contract").Contract;
 
 ///////////////////////////
 //TransactionPack
