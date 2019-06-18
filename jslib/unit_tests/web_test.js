@@ -161,5 +161,6 @@ unit.test("http secure endpoints", async () => {
         //await client.start(clientKey, nodeKey.publicKey);
 
         await httpServer.stopServer();
+        //gc();
     }
 });*/

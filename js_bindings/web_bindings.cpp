@@ -578,9 +578,7 @@ public:
     }
 
     ~HttpServerBuffered() {
-        cout << "~HttpServerBuffered" << endl;
-        delete srv_;
-        srv_ = nullptr;
+        stop();
     }
 
     void addEndpoint(const std::string &endpoint) {
@@ -626,9 +624,11 @@ public:
     }
 
     void stop() {
-        timer_.stop();
-        srv_->stop();
-        srv_->join();
+        if (srv_ != nullptr) {
+            timer_.stop();
+            srv_->stop();
+            srv_->join();
+        }
         delete srv_;
         srv_ = nullptr;
     }
