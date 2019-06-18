@@ -408,6 +408,7 @@ network.HttpServer = class {
 
         //wait for delayed timer callbacks
         await sleep(300);
+        this.httpServer_ = null;
     }
 
     addRawEndpoint(endpoint, block) {

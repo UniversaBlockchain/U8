@@ -549,7 +549,7 @@ class HttpServerBuffered {
 public:
 
     void initSecureEndpoint() {
-        srv_.addSecureCallback([this](const byte_vector& paramsBin, std::shared_ptr<HttpServerSession> session, std::function<void(const byte_vector& ansBin)>&& sendAnswer){
+        srv_->addSecureCallback([this](const byte_vector& paramsBin, std::shared_ptr<HttpServerSession> session, std::function<void(const byte_vector& ansBin)>&& sendAnswer){
             atomic<bool> needSend(false);
             {
                 lock_guard lock(mutex_);
@@ -568,8 +568,8 @@ public:
     }
 
     HttpServerBuffered(std::string host, int port, int poolSize, int bufSize)
-     : srv_(host, port, poolSize)
-     , bufSize_(bufSize) {
+     : bufSize_(bufSize) {
+        srv_ = new HttpServer(host, port, poolSize);
         timer_.scheduleAtFixedRate([this](){
             sendAllFromBuf();
             sendAllFromSecureBuf();
@@ -577,8 +577,14 @@ public:
         initSecureEndpoint();
     }
 
+    ~HttpServerBuffered() {
+        cout << "~HttpServerBuffered" << endl;
+        delete srv_;
+        srv_ = nullptr;
+    }
+
     void addEndpoint(const std::string &endpoint) {
-        srv_.addEndpoint(endpoint, [this](HttpServerRequest *req) {
+        srv_->addEndpoint(endpoint, [this](HttpServerRequest *req) {
             atomic<bool> needSend(false);
             {
                 lock_guard lock(mutex_);
@@ -612,7 +618,19 @@ public:
 
     void initSecureProtocol(byte_vector nodePrivateKeyPacked) {
         crypto::PrivateKey nodePrivateKey(nodePrivateKeyPacked);
-        srv_.initSecureProtocol(nodePrivateKey);
+        srv_->initSecureProtocol(nodePrivateKey);
+    }
+
+    void start() {
+        srv_->start();
+    }
+
+    void stop() {
+        timer_.stop();
+        srv_->stop();
+        srv_->join();
+        delete srv_;
+        srv_ = nullptr;
     }
 
 private:
@@ -663,7 +681,7 @@ private:
     }
 
 private:
-    HttpServer srv_;
+    HttpServer* srv_;
     std::vector<HttpServerRequest*> buf_;
     std::vector<SecureEndpointParams> bufSecure_;
     std::mutex mutex_;
@@ -702,7 +720,7 @@ void httpServer_setBufferedSecureCallback(const FunctionCallbackInfo<Value> &arg
 void httpServer_startServer(const FunctionCallbackInfo<Value> &args) {
     Scripter::unwrapArgs(args, [](ArgsContext &ac) {
         if (ac.args.Length() == 0) {
-            auto httpServer = unwrap<HttpServer>(ac.args.This());
+            auto httpServer = unwrap<HttpServerBuffered>(ac.args.This());
             httpServer->start();
             return;
         }
@@ -713,9 +731,9 @@ void httpServer_startServer(const FunctionCallbackInfo<Value> &args) {
 void httpServer_stopServer(const FunctionCallbackInfo<Value> &args) {
     Scripter::unwrapArgs(args, [](ArgsContext &ac) {
         if (ac.args.Length() == 0) {
-            auto httpServer = unwrap<HttpServer>(ac.args.This());
+            auto httpServer = unwrap<HttpServerBuffered>(ac.args.This());
             httpServer->stop();
-            httpServer->join();
+            //delete httpServer; - don't delete it here. It should be deleted automatically from js GC call.
             return;
         }
         ac.throwError("invalid arguments");
