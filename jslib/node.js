@@ -86,6 +86,51 @@ class Node {
         this.cache.shutdown();
     }
 
+    /**
+     * Asynchronous (non blocking) check/register for item from white list. If the item is new and eligible to process with the
+     * consensus, the processing will be started immediately. If it is already processing, the current state will be
+     * returned.
+     *
+     * If item is not signed by keys from white list will return {@link ItemResult#UNDEFINED}.
+     *
+     * @param {Contract} item - Item to register/check state.
+     *
+     * @return {ItemResult} current (or last known) item state.
+     */
+    async registerItem(item) {
+        this.report("register item: " + item.id, VerboseLevel.BASE);
+
+        let x = await this.checkItemInternal(item.id, null, item, true, true);
+
+        let ir = (x instanceof ItemResult) ? x : x.getResult();
+        this.report("item processor for: " + item.id + " was created, state is " + ir.state.val, VerboseLevel.BASE);
+        return ir;
+    }
+
+    /**
+     * If the item is being electing, block until the item been processed with the consensus. Otherwise
+     * returns state immediately.
+     *
+     * @param {HashId} itemId - Item to check or wait for.
+     * @param {number} millisToWait - Time to wait in milliseconds.
+     * @return {ItemResult} item state.
+     * @throws {EventTimeoutError} for timeout.
+     */
+    async waitItem(itemId, millisToWait) {
+        let x = await this.checkItemInternal(itemId);
+
+        if (x instanceof ItemProcessor) {
+            if (!x.isDone())
+                await x.doneEvent.await(millisToWait);
+
+            return x.getResult();
+
+        } else if (x instanceof ResyncProcessor)
+            return x.getResult();
+
+        return x;
+    }
+
     report(message, level) {
         if (level <= this.verboseLevel)
             this.logger.log(this.label + message);

@@ -207,7 +207,7 @@ class Main {
         }
 
         if (this.network != null)
-            this.network.shutdown();
+            await this.network.shutdown();
 
         if (this.node != null)
             this.node.shutdown();

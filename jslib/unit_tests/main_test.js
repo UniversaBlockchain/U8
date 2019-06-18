@@ -41,17 +41,18 @@ class TestSpace {
         this.node = this.nodes[0];
 
         this.clients = [];
-        for (let i = 0; i < 4; i++) {
+        /*for (let i = 0; i < 4; i++) {
             let client = new HttpClient(this.nodes[i].myInfo.publicUrlString(), 4, 256);
             await client.start(this.myKey, this.nodes[i].myInfo.publicKey);
             this.clients.push(client);
         }
-        this.client = this.clients[0];
+        this.client = this.clients[0];*/
 
         return this;
     };
 
     async shutdown() {
+        await Promise.all(this.clients.map(async (c) => await c.stop()));
         await Promise.all(this.nodes.map(async (n) => await n.shutdown()));
     }
 }
@@ -201,6 +202,7 @@ unit.test("main_test: sendHttpRequests", async () => {
 
     await Promise.all(events);
 
+    await httpClient.stop();
     await main.shutdown();
 });
 

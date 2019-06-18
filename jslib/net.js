@@ -203,9 +203,12 @@ class NetworkV2 extends Network {
         this.adapter.setReceiveCallback((packet, fromNode) => this.onReceived(packet, fromNode));
     }
 
-    shutdown() {
+    async shutdown() {
         if (this.adapter != null)
             this.adapter.close();
+
+        for (let client of this.cachedClients.values())
+            await client.stop();
     }
 
     /**
@@ -353,7 +356,10 @@ class NetworkV2 extends Network {
                 fire(item);
             });
 
-            return await event;
+            let res = await event;
+            await httpClient.stop();
+
+            return res;
 
         } catch (err) {
             this.report("download failure. from: " + nodeInfo.number + " by: " + this.myInfo.number +
