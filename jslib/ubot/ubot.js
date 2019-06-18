@@ -4,7 +4,7 @@ class UBot {
     }
 
     async shutdown() {
-        this.logger.log("UBot.shutdown()...");
+        //this.logger.log("UBot.shutdown()...");
     }
 }
 

@@ -353,6 +353,8 @@ private:
             auto bufCopy = buf_;
             buf_.clear();
             se_->inPool([=](Local<Context> &context) {
+                if (se_ == nullptr)
+                    return;
                 auto fn = pcb_->Get(context->GetIsolate());
                 if (fn->IsNull()) {
                     se_->throwError("null callback in setReceiveCallback");

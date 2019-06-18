@@ -100,6 +100,7 @@ class UBotMain {
     }
 
     async shutdown() {
+        this.logger.log("UBotMain.shutdown()...");
         let promises = [];
         if (this.ledger != null)
             promises.push(this.ledger.close());

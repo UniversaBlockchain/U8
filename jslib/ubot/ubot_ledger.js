@@ -4,7 +4,7 @@ class UBotLedger {
     }
 
     async close() {
-        this.logger.log("UBotLedger.close()...");
+        //this.logger.log("UBotLedger.close()...");
     }
 }
 

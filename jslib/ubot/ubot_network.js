@@ -20,7 +20,7 @@ class UBotNetwork {
     }
 
     async shutdown() {
-        this.report("UBotNetwork.shutdown()...", VerboseLevel.BASE);
+        //this.report("UBotNetwork.shutdown()...", VerboseLevel.BASE);
         if (this.adapter != null)
             this.adapter.close();
     }
