@@ -814,15 +814,20 @@ struct HttpClientCommandAnswer {
 
 class HttpClientBuffered {
 public:
-    HttpClientBuffered(const std::string& rootUrl, int poolSize, int bufSize): httpClient_(rootUrl, poolSize), bufSize_(bufSize), startPool_(1) {
+    HttpClientBuffered(const std::string& rootUrl, int poolSize, int bufSize): bufSize_(bufSize), startPool_(1) {
+        httpClient_ = new HttpClient(rootUrl, poolSize);
         timer_.scheduleAtFixedRate([this](){
             sendAllFromBuf();
             sendAllFromBufCommand();
         }, 20, 20);
     }
 
+    ~HttpClientBuffered() {
+        stop();
+    }
+
     void sendGetRequest(int reqId, const std::string& url) {
-        httpClient_.sendGetRequest(url, [this,reqId](int respStatus, byte_vector&& body) {
+        httpClient_->sendGetRequest(url, [this,reqId](int respStatus, byte_vector&& body) {
             atomic<bool> needSend(false);
             {
                 lock_guard lock(mutex_);
@@ -841,7 +846,7 @@ public:
     }
 
     void command(int reqId, const byte_vector& callBin) {
-        httpClient_.command(callBin, [this,reqId](byte_vector&& decrypted){
+        httpClient_->command(callBin, [this,reqId](byte_vector&& decrypted){
             atomic<bool> needSend(false);
             {
                 lock_guard lock(mutex_);
@@ -878,9 +883,16 @@ public:
 
     void start(const byte_vector& clientPrivateKeyPacked, const byte_vector& nodePublicKeyPacked, const std::function<void()>& onComplete) {
         startPool_.execute([this,clientPrivateKeyPacked,nodePublicKeyPacked,onComplete](){
-            httpClient_.start(crypto::PrivateKey(clientPrivateKeyPacked), crypto::PublicKey(nodePublicKeyPacked));
+            httpClient_->start(crypto::PrivateKey(clientPrivateKeyPacked), crypto::PublicKey(nodePublicKeyPacked));
             onComplete();
         });
+    }
+
+    void stop() {
+        if (httpClient_ != nullptr)
+            timer_.stop();
+        delete httpClient_;
+        httpClient_ = nullptr;
     }
 
 private:
@@ -934,7 +946,7 @@ private:
     }
 
 private:
-    HttpClient httpClient_;
+    HttpClient* httpClient_;
     Persistent<Function>* pcb_ = nullptr;
     shared_ptr<Scripter> se_ = nullptr;
     std::vector<HttpClientAnswer> buf_;
@@ -1032,6 +1044,17 @@ void httpClient_start(const FunctionCallbackInfo<Value> &args) {
     });
 }
 
+void httpClient_stop(const FunctionCallbackInfo<Value> &args) {
+    Scripter::unwrap(args, [&](const shared_ptr<Scripter> se, auto isolate, auto context) {
+        if (args.Length() == 0) {
+            auto httpClient = unwrap<HttpClientBuffered>(args.This());
+            httpClient->stop();
+            return;
+        }
+        se->throwError("invalid arguments");
+    });
+}
+
 Local<FunctionTemplate> initHttpClient(Isolate *isolate) {
     Local<FunctionTemplate> tpl = bindCppClass<HttpClientBuffered>(
             isolate,
@@ -1061,6 +1084,7 @@ Local<FunctionTemplate> initHttpClient(Isolate *isolate) {
     prototype->Set(isolate, "__setBufferedCallback", FunctionTemplate::New(isolate, httpClient_setBufferedCallback));
     prototype->Set(isolate, "__setBufferedCommandCallback", FunctionTemplate::New(isolate, httpClient_setBufferedCommandCallback));
     prototype->Set(isolate, "__start", FunctionTemplate::New(isolate, httpClient_start));
+    prototype->Set(isolate, "__stop", FunctionTemplate::New(isolate, httpClient_stop));
 
     HttpClientTpl.Reset(isolate, tpl);
     return tpl;

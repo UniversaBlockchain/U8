@@ -157,10 +157,11 @@ unit.test("http secure endpoints", async () => {
         httpServer.initSecureProtocol(nodeKey);
         httpServer.startServer();
 
-        //let client = new network.HttpClient("http://localhost:8080", 64, 256);
-        //await client.start(clientKey, nodeKey.publicKey);
+        let client = new network.HttpClient("http://localhost:8080", 64, 64);
+        await client.start(clientKey, nodeKey.publicKey);
 
         await httpServer.stopServer();
+        await client.stop();
         //gc();
     }
 });*/

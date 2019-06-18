@@ -473,6 +473,11 @@ network.HttpClient = class {
         });
     }
 
+    async stop() {
+        this.httpClient_.__stop();
+        this.httpClient_ = null;
+    }
+
     sendGetRequest(url, block) {
         let reqId = this.getReqId();
         this.callbacks_.set(reqId, block);
