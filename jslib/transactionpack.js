@@ -173,11 +173,10 @@ class TransactionPack {
         let x = Boss.load(bytes);
 
         let res = BossBiMapper.getInstance().deserialize(x);
-        if(res instanceof TransactionPack) {
+        if (res instanceof TransactionPack)
             return res;
-        }
 
-        let c = new Contract(bytes);
+        let c = Contract.fromSealedBinary(bytes);
         return c.transactionPack;
     }
 }

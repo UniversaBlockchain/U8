@@ -1204,69 +1204,66 @@ class Contract extends bs.BiSerializable {
         }
 
         // check valid decrement_permission
-        /*if (!isPermitted("decrement_permission", getSealedByKeys())) {
+        if (!this.isPermitted("decrement_permission", new Set(this.sealedByKeys.keys()))) {
             res = false;
-            addError(Errors.BAD_VALUE, "decrement_permission is missing");
+            this.errors.push(new ErrorRecord(Errors.BAD_VALUE, "", "decrement_permission is missing"));
         }
 
         // The "U" contract is checked to have valid issuer key (one of preset URS keys)
 
-        Role issuer = getIssuer();
-        if(!(issuer instanceof SimpleRole)) {
+        if (!this.roles.issuer instanceof roles.SimpleRole) {
             res = false;
-            addError(Errors.BAD_VALUE, "issuer is not valid. must be simple role");
+            this.errors.push(new ErrorRecord(Errors.BAD_VALUE, "", "issuer is not valid. must be simple role"));
         } else {
-            Set<KeyAddress> thisIssuerAddresses = new HashSet<>(((SimpleRole) issuer).getSimpleKeyAddresses());
-            for (PublicKey publicKey : ((SimpleRole) issuer).getSimpleKeys())
-                thisIssuerAddresses.add(publicKey.getShortAddress());
+            let thisIssuerAddresses = new Set(this.roles.issuer.keyAddresses);
+            for (let publicKey of this.roles.issuer.keyRecords.keys())
+                thisIssuerAddresses.add(publicKey.shortAddress);
 
-
-            if (Collections.disjoint(issuerKeys, thisIssuerAddresses)) {
+            /*if (Collections.disjoint(issuerKeys, thisIssuerAddresses)) {
                 res = false;
-                addError(Errors.BAD_VALUE, "issuerKeys is not valid");
-            }
+                this.errors.push(new ErrorRecord(Errors.BAD_VALUE, "", "issuerKeys is not valid"));
+            }*/
         }
 
         // If the check is failed, checking process is aborting
-        if (!res) {
+        if (!res)
             return res;
-        }
 
         // The U shouldn't have any new items
-        if (newItems.size() > 0) {
+        if (this.newItems.size > 0) {
             res = false;
-            addError(Errors.BAD_NEW_ITEM, "payment contract can not have any new items");
+            this.errors.push(new ErrorRecord(Errors.BAD_NEW_ITEM, "", "payment contract can not have any new items"));
         }
 
         // If the check is failed, checking process is aborting
-        if (!res) {
+        if (!res)
             return res;
-        }
 
         // check if payment contract not origin itself, means has revision more then 1
         // don't make this check for initial u contract
-        if ((getRevision() != 1) || (getParent()!=null)) {
-            if (getOrigin().equals(getId())) {
+        if (this.state.revision !== 1 || this.state.parent != null) {
+            if (this.getOrigin().equals(this.id)) {
                 res = false;
-                addError(Errors.BAD_VALUE, "can't origin itself");
+                this.errors.push(new ErrorRecord(Errors.BAD_VALUE, "", "can't origin itself"));
             }
-            if (getRevision() <= 1) {
+
+            if (this.state.revision <= 1) {
                 res = false;
-                addError(Errors.BAD_VALUE, "revision must be greater than 1");
+                this.errors.push(new ErrorRecord(Errors.BAD_VALUE, "", "revision must be greater than 1"));
             }
 
             // The "U" is checked for its parent validness, it should be in the revoking items
-            if (revokingItems.size() != 1) {
+            if (this.revokingItems.size !== 1) {
                 res = false;
-                addError(Errors.BAD_REVOKE, "revokingItems.size != 1");
+                this.errors.push(new ErrorRecord(Errors.BAD_REVOKE, "", "revokingItems.size != 1"));
             } else {
-                Contract revoking = revokingItems.iterator().next();
-                if (!revoking.getOrigin().equals(getOrigin())) {
+                let revoking = Array.from(this.revokingItems)[0];
+                if (!revoking.getOrigin().equals(this.getOrigin())) {
                     res = false;
-                    addError(Errors.BAD_REVOKE, "origin mismatch");
+                    this.errors.push(new ErrorRecord(Errors.BAD_REVOKE, "", "origin mismatch"));
                 }
             }
-        }*/
+        }
 
         if (res)
             res = await this.check();
@@ -2063,9 +2060,9 @@ class Contract extends bs.BiSerializable {
      * @param contract - init contract (example, NSmartContract). Optional.
      * @returns {Contract | NSmartContract | SlotContract | UnsContract | FollowerContract} extracted contract
      */
-    static fromSealedBinary(sealed, transactionPack, contract = undefined) {
+    static fromSealedBinary(sealed, transactionPack = null, contract = undefined) {
         let result = (contract === undefined) ? new Contract() : contract;
-        if(!transactionPack)
+        if (transactionPack == null)
             transactionPack = new TransactionPack(result);
 
         result.sealedBinary = sealed;
