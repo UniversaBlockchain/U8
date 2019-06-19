@@ -303,3 +303,59 @@ unit.test("main_test: resyncBreak", async () => {
 
     await ts.shutdown();
 });
+
+unit.test("main_test: register item", async () => {
+    let key = new PrivateKey(await (await io.openRead("../test/keys/reconfig_key.private.unikey")).allBytes());
+    let ts = await new TestSpace(key).create(/*false*/);
+
+    for (let i = 0; i < 4; i++) {
+        ts.nodes[i].setVerboseLevel(VerboseLevel.DETAILED);
+        ts.nodes[i].setUDPVerboseLevel(VerboseLevel.DETAILED);
+    }
+
+    let k = tk.TestKeys.getKey();
+    let item = Contract.fromPrivateKey(k);
+
+    await item.seal(true);
+
+    await ts.node.node.registerItem(item);
+    let ir = await ts.node.node.waitItem(item.id, 10000);
+    assert(ir.state === ItemState.APPROVED);
+    ir = await ts.nodes[1].node.waitItem(item.id, 10000);
+    assert(ir.state === ItemState.APPROVED);
+    ir = await ts.nodes[2].node.waitItem(item.id, 10000);
+    assert(ir.state === ItemState.APPROVED);
+    ir = await ts.nodes[3].node.waitItem(item.id, 10000);
+    assert(ir.state === ItemState.APPROVED);
+
+    assert((await ts.nodes[0].ledger.getRecord(item.id)).state === ItemState.APPROVED);
+    assert((await ts.nodes[1].ledger.getRecord(item.id)).state === ItemState.APPROVED);
+    assert((await ts.nodes[2].ledger.getRecord(item.id)).state === ItemState.APPROVED);
+    assert((await ts.nodes[3].ledger.getRecord(item.id)).state === ItemState.APPROVED);
+
+    /*ir = await ts.nodes[0].node.network.getItemState(ts.nodes[1].node.myInfo, item.id);
+    assert(ir.state === ItemState.APPROVED);
+    ir = await ts.nodes[0].node.network.getItemState(ts.nodes[2].node.myInfo, item.id);
+    assert(ir.state === ItemState.APPROVED);
+    ir = await ts.nodes[0].node.network.getItemState(ts.nodes[3].node.myInfo, item.id);
+    assert(ir.state === ItemState.APPROVED);
+
+    let fire = [];
+    let events = [];
+    for (let i = 0; i < 4; i++)
+        events.push(new Promise((resolve) => {fire.push(resolve)}));
+
+    ts.clients[0].command("getState", {itemId: item.id}, (result) => fire[0](result), () => fire[0](null));
+    ts.clients[1].command("getState", {itemId: item.id}, (result) => fire[1](result), () => fire[1](null));
+    ts.clients[2].command("getState", {itemId: item.id}, (result) => fire[2](result), () => fire[2](null));
+    ts.clients[3].command("getState", {itemId: item.id}, (result) => fire[3](result), () => fire[3](null));
+
+    (await Promise.all(events)).forEach(ir => {
+        assert(ir != null);
+        assert(ir.itemResult.state === ItemState.APPROVED);
+    });*/
+
+    await sleep(1000);
+
+    await ts.shutdown();
+});

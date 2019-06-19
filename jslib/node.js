@@ -140,7 +140,7 @@ class Node {
     }
 
     isSanitating() {
-        return this.recordsToSanitate.size > 0;
+        return false;//this.recordsToSanitate.size > 0;     //TODO: activate sanitating
     }
 
     /**
@@ -155,7 +155,7 @@ class Node {
         } else if (notification instanceof ResyncNotification) {
             await this.obtainResyncNotification(notification);
         } else if (notification instanceof ItemNotification) {
-            if(!this.isSanitating())
+            if (!this.isSanitating())
                 await this.obtainCommonNotification(notification);
         //} else if (notification instanceof CallbackNotification) {
         //    await this.callbackService.obtainCallbackNotification(notification);
@@ -211,7 +211,7 @@ class Node {
     async obtainParcelCommonNotification(notification) {
 
         // if notification hasn't parcelId we think this is simple item notification and obtain it as it
-        if(notification.parcelId == null) {
+        if (notification.parcelId == null) {
             await this.obtainCommonNotification(notification);
         } else {
             // check if item for notification is already processed
@@ -264,7 +264,6 @@ class Node {
                             }
                         }
                     }
-                    return null;
                 }
             }
         }
@@ -479,7 +478,7 @@ class Node {
 
                 this.report("checkItemInternal: " + itemId + "nothing found, will create item processor",
                     VerboseLevel.BASE);
-                let processor = new ItemProcessor(itemId, parcelId, item, forceChecking, this);
+                let processor = await new ItemProcessor(itemId, parcelId, item, forceChecking, this).run();
                 this.processors.set(itemId, processor);
                 return processor;
 
@@ -740,7 +739,7 @@ class Node {
 
     checkForSetUnlimit(contract) {
         // check unlimit contract
-        if (!contract.isUnlimitKeyContract(config))
+        if (!contract.isUnlimitKeyContract(this.config))
             return;
 
         // get key for setting unlimited requests

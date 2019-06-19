@@ -78,7 +78,7 @@ class ItemProcessor {
      * @param {crypto.HashId} parcelId - Parcel's id that item belongs to.
      * @param {Contract | null} item - Item object if exist.
      * @param {boolean} isCheckingForce - If true checking item processing without delays. If false checking item wait until forceChecking() will be called.
-     * @param {network.NodeInfo} node - ItemProcessor`s node.
+     * @param {Node} node - ItemProcessor`s node.
      *
      * @constructor
      */
@@ -609,8 +609,8 @@ class ItemProcessor {
         let negativeConsensus = false;
 
         // check if vote already count
-        if ((state.isPositive() && this.positiveNodes.has(node)) ||
-            (!state.isPositive() && this.negativeNodes.has(node)))
+        if ((state.isPositive && this.positiveNodes.has(node)) ||
+            (!state.isPositive && this.negativeNodes.has(node)))
             return;
 
         if (this.processingState.canRemoveSelf)
@@ -801,10 +801,10 @@ class ItemProcessor {
                 await this.record.approve(con, this.item.getExpiresAt());
 
                 if (this.item != null) {
-                    cache.update(this.itemId, this.getResult());
+                    this.node.cache.update(this.itemId, this.getResult());
 
                     //save item to DB in Permanet mode
-                    if (config.permanetMode)
+                    if (this.node.config.permanetMode)
                         await this.node.ledger.putKeptItem(this.record, this.item, con);
                 }
 
@@ -1044,8 +1044,10 @@ class ItemProcessor {
     }
 
     stopPoller() {
-        if (this.poller != null)
+        if (this.poller != null) {
             this.poller.cancel();
+            this.poller = null;
+        }
     }
 
     isPollingExpired() {
