@@ -23,7 +23,7 @@ async function createMain(name, nolog, postfix = "") {
 
     main.config.uIssuerKeys.push(new KeyAddress("Zau3tT8YtDkj3UDBSznrWHAjbhhU4SXsfQLWDFsv5vw24TLn6s"));
 
-    let key = new PrivateKey(await (await io.openRead("../test/keys/u_key.private.unikey")).allBytes());
+    let key = new PrivateKey(await io.fileGetContentsAsBytes("../test/keys/u_key.private.unikey"));
     main.config.addressesWhiteList.push(key.publicKey.longAddress);
 
     return main;
@@ -227,7 +227,8 @@ unit.test("main_test: createTestSpace", async () => {
 });
 
 unit.test("main_test: resync", async () => {
-    let key = new PrivateKey(await (await io.openRead("../test/keys/reconfig_key.private.unikey")).allBytes());
+    let key = new PrivateKey(await io.fileGetContentsAsBytes("../test/keys/reconfig_key.private.unikey"));
+
     let ts = await new TestSpace(key).create(/*false*/);
 
     for (let i = 0; i < 4; i++) {
@@ -267,7 +268,8 @@ unit.test("main_test: resync", async () => {
 });
 
 unit.test("main_test: resyncBreak", async () => {
-    let key = new PrivateKey(await (await io.openRead("../test/keys/reconfig_key.private.unikey")).allBytes());
+    let key = new PrivateKey(await io.fileGetContentsAsBytes("../test/keys/reconfig_key.private.unikey"));
+
     let ts = await new TestSpace(key).create(/*false*/);
 
     for (let i = 0; i < 4; i++) {
@@ -301,7 +303,8 @@ unit.test("main_test: resyncBreak", async () => {
 });
 
 unit.test("main_test: register item", async () => {
-    let key = new PrivateKey(await (await io.openRead("../test/keys/reconfig_key.private.unikey")).allBytes());
+    let key = new PrivateKey(await io.fileGetContentsAsBytes("../test/keys/reconfig_key.private.unikey"));
+
     let ts = await new TestSpace(key).create(/*false*/);
 
     for (let i = 0; i < 4; i++) {
@@ -346,7 +349,8 @@ unit.test("main_test: register item", async () => {
 });
 
 unit.test("main_test: register bad item", async () => {
-    let key = new PrivateKey(await (await io.openRead("../test/keys/reconfig_key.private.unikey")).allBytes());
+    let key = new PrivateKey(await io.fileGetContentsAsBytes("../test/keys/reconfig_key.private.unikey"));
+
     let ts = await new TestSpace(key).create(/*false*/);
 
     for (let i = 0; i < 4; i++) {

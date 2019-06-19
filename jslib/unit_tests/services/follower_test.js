@@ -11,8 +11,8 @@ const KeyRecord = require("keyrecord").KeyRecord;
 const roles = require('roles');
 
 unit.test("follower_test: goodFollowerContract", async () => {
-    let key = new crypto.PrivateKey(await (await io.openRead("../test/_xer0yfe2nn1xthc.private.unikey")).allBytes());
-    let key2 = new crypto.PrivateKey(await (await io.openRead("../test/test_network_whitekey.private.unikey")).allBytes());
+    let key = new crypto.PrivateKey(await io.fileGetContentsAsBytes("../test/_xer0yfe2nn1xthc.private.unikey"));
+    let key2 = new crypto.PrivateKey(await io.fileGetContentsAsBytes("../test/test_network_whitekey.private.unikey"));
 
     let simpleContract = Contract.fromPrivateKey(key2);
     await simpleContract.seal(true);
@@ -68,8 +68,8 @@ unit.test("follower_test: goodFollowerContract", async () => {
 });
 
 unit.test("follower_test: goodFollowerContractFromDSL", async () => {
-    let key = new crypto.PrivateKey(await (await io.openRead("../test/_xer0yfe2nn1xthc.private.unikey")).allBytes());
-    let key2 = new crypto.PrivateKey(await (await io.openRead("../test/test_network_whitekey.private.unikey")).allBytes());
+    let key = new crypto.PrivateKey(await io.fileGetContentsAsBytes("../test/_xer0yfe2nn1xthc.private.unikey"));
+    let key2 = new crypto.PrivateKey(await io.fileGetContentsAsBytes("../test/test_network_whitekey.private.unikey"));
 
     let simpleContract = Contract.fromPrivateKey(key2);
     await simpleContract.seal(true);
@@ -103,8 +103,8 @@ unit.test("follower_test: goodFollowerContractFromDSL", async () => {
 });
 
 unit.test("follower_test: serializeFollowerContract", async () => {
-    let key = new crypto.PrivateKey(await (await io.openRead("../test/_xer0yfe2nn1xthc.private.unikey")).allBytes());
-    let key2 = new crypto.PrivateKey(await (await io.openRead("../test/test_network_whitekey.private.unikey")).allBytes());
+    let key = new crypto.PrivateKey(await io.fileGetContentsAsBytes("../test/_xer0yfe2nn1xthc.private.unikey"));
+    let key2 = new crypto.PrivateKey(await io.fileGetContentsAsBytes("../test/test_network_whitekey.private.unikey"));
 
     let simpleContract = Contract.fromPrivateKey(key2);
     await simpleContract.seal(true);
@@ -182,8 +182,8 @@ unit.test("follower_test: serializeFollowerContract", async () => {
 unit.test("follower_test: followerContractNewRevision", async () => {
     let provider = tt.createNodeInfoProvider();
 
-    let key = new crypto.PrivateKey(await (await io.openRead("../test/_xer0yfe2nn1xthc.private.unikey")).allBytes());
-    let key2 = new crypto.PrivateKey(await (await io.openRead("../test/test_network_whitekey.private.unikey")).allBytes());
+    let key = new crypto.PrivateKey(await io.fileGetContentsAsBytes("../test/_xer0yfe2nn1xthc.private.unikey"));
+    let key2 = new crypto.PrivateKey(await io.fileGetContentsAsBytes("../test/test_network_whitekey.private.unikey"));
 
     let simpleContract = Contract.fromPrivateKey(key2);
     await simpleContract.seal(true);
@@ -282,8 +282,8 @@ unit.test("follower_test: followerContractNewRevision", async () => {
 });
 
 unit.test("follower_test: testCanFollowContract", async () => {
-    let key = new crypto.PrivateKey(await (await io.openRead("../test/_xer0yfe2nn1xthc.private.unikey")).allBytes());
-    let key2 = new crypto.PrivateKey(await (await io.openRead("../test/test_network_whitekey.private.unikey")).allBytes());
+    let key = new crypto.PrivateKey(await io.fileGetContentsAsBytes("../test/_xer0yfe2nn1xthc.private.unikey"));
+    let key2 = new crypto.PrivateKey(await io.fileGetContentsAsBytes("../test/test_network_whitekey.private.unikey"));
 
     let simpleContract = Contract.fromPrivateKey(key2);
     await simpleContract.seal(true);
@@ -366,7 +366,8 @@ unit.test("follower_test: testCanFollowContract", async () => {
 });
 
 unit.test("follower_test: testAllCanFollowContract", async () => {
-    let key = new crypto.PrivateKey(await (await io.openRead("../test/_xer0yfe2nn1xthc.private.unikey")).allBytes());
+    let key = new crypto.PrivateKey(await io.fileGetContentsAsBytes("../test/_xer0yfe2nn1xthc.private.unikey"));
+
     let followerKey = tk.TestKeys.getKey();
 
     let simpleContract = Contract.fromPrivateKey(key);

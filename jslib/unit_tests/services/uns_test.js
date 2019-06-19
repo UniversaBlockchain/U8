@@ -12,7 +12,8 @@ const BossBiMapper = require("bossbimapper").BossBiMapper;
 const DefaultBiMapper = require("defaultbimapper").DefaultBiMapper;
 
 unit.test("uns_test: goodUnsContract", async () => {
-    let key = new crypto.PrivateKey(await (await io.openRead("../test/_xer0yfe2nn1xthc.private.unikey")).allBytes());
+    let key = new crypto.PrivateKey(await io.fileGetContentsAsBytes("../test/_xer0yfe2nn1xthc.private.unikey"));
+
     let randomPrivKey = tk.TestKeys.getKey();
 
     let authorizedNameServiceKey = tk.TestKeys.getKey();
@@ -73,7 +74,8 @@ unit.test("uns_test: goodUnsContract", async () => {
 });
 
 unit.test("uns_test: goodUnsContractFromDSL", async () => {
-    let key = new crypto.PrivateKey(await (await io.openRead("../test/_xer0yfe2nn1xthc.private.unikey")).allBytes());
+    let key = new crypto.PrivateKey(await io.fileGetContentsAsBytes("../test/_xer0yfe2nn1xthc.private.unikey"));
+
 
     let authorizedNameServiceKey = tk.TestKeys.getKey();
     let authorizedNameServiceKeyBackup = Config.authorizedNameServiceCenterKey;
@@ -105,7 +107,8 @@ unit.test("uns_test: goodUnsContractFromDSL", async () => {
 });
 
 unit.test("uns_test: serializeUnsContract", async () => {
-    let key = new crypto.PrivateKey(await (await io.openRead("../test/_xer0yfe2nn1xthc.private.unikey")).allBytes());
+    let key = new crypto.PrivateKey(await io.fileGetContentsAsBytes("../test/_xer0yfe2nn1xthc.private.unikey"));
+
     let randomPrivKey = tk.TestKeys.getKey();
 
     let authorizedNameServiceKey = tk.TestKeys.getKey();
@@ -207,7 +210,7 @@ unit.test("uns_test: serializeUnsContract", async () => {
 });
 
 async function createUnsPayment() {
-    let ownerKey = new crypto.PrivateKey(await (await io.openRead("../test/keys/test_payment_owner.private.unikey")).allBytes());
+    let ownerKey = new crypto.PrivateKey(await io.fileGetContentsAsBytes("../test/keys/test_payment_owner.private.unikey"));
 
     let unsU = await tt.createFreshU(100000000, [ownerKey.publicKey]);
     let paymentDecreased = unsU.createRevision([ownerKey]);

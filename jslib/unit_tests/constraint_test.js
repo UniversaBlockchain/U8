@@ -300,8 +300,7 @@ unit.test("constraint test: checkConstraints", async () => {
     let contract1 = await Contract.fromDslFile(ROOT_PATH + "ReferencedConditions_contract1.yml");
     let contract2 = await Contract.fromDslFile(ROOT_PATH + "ReferencedConditions_contract2.yml");
 
-    let privateBytes = await (await io.openRead("../test/_xer0yfe2nn1xthc.private.unikey")).allBytes();
-    let key = new PrivateKey(privateBytes);
+    let key = new PrivateKey(await io.fileGetContentsAsBytes("../test/_xer0yfe2nn1xthc.private.unikey"));
 
     let conditions = contract1.constraints.get("ref_roles").conditions;
     let condList = conditions["all_of"];
@@ -382,8 +381,7 @@ unit.test("constraint test: checkConstraintsAPILevel4", async () => {
     let contract1 = await Contract.fromDslFile(ROOT_PATH + "ReferencedConditions_contract1_v4.yml");
     let contract2 = await Contract.fromDslFile(ROOT_PATH + "ReferencedConditions_contract2.yml");
 
-    let privateBytes = await (await io.openRead("../test/_xer0yfe2nn1xthc.private.unikey")).allBytes();
-    let key = new PrivateKey(privateBytes);
+    let key = new PrivateKey(await io.fileGetContentsAsBytes("../test/_xer0yfe2nn1xthc.private.unikey"));
 
     let conditions = contract1.constraints.get("ref_roles").conditions;
     let condList = conditions["all_of"];

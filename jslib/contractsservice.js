@@ -543,7 +543,7 @@ async function createNotaryContract(issuerKeys, ownerKeys, filePaths = null, fil
         let files = {};
 
         for (let i = 0; i < filePaths.length; i++) {
-            let buffer = await (await io.openRead(filePaths[i])).allBytes();
+            let buffer = await io.fileGetContentsAsBytes(filePaths[i]);
 
             let fileName = filePaths[i].replace(/^.*[\\\/]/, "");
             let line = fileName.replace(/\W/g, "_");
@@ -592,7 +592,7 @@ async function checkAttachNotaryContract(notaryContract, filePaths) {
         normalPath = filePaths + "/";
 
     if (isFile) {
-        let buffer = await (await io.openRead(normalPath)).allBytes();
+        let buffer = await io.fileGetContentsAsBytes(normalPath);
         let fileHash = HashId.of(buffer);
 
         return Object.keys(files).some(key => {
@@ -619,7 +619,8 @@ async function checkAttachNotaryContract(notaryContract, filePaths) {
                 else if (!filePath.endsWith(file.file_name))
                     return false;
 
-                let buffer = await (await io.openRead(filePath)).allBytes();
+                let buffer = await io.fileGetContentsAsBytes(filePath);
+
                 let fileHash = HashId.of(buffer);
                 let notaryHash = BossBiMapper.getInstance().deserialize(file.hash_id);
 

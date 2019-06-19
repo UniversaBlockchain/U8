@@ -58,7 +58,7 @@ function createNodeInfoProvider() {
  * @return sealed U contract; should be registered in the Universa by simplified procedure.
  */
 async function createFreshU(amount, ownerKeys, withTestU = false) {
-    let manufacturePrivateKey = new crypto.PrivateKey(await (await io.openRead(uKeyPath)).allBytes());
+    let manufacturePrivateKey = new crypto.PrivateKey(await io.fileGetContentsAsBytes(uKeyPath));
 
     let u = await Contract.fromDslFile(withTestU ? testUTemplatePath : uTemplatePath);
 

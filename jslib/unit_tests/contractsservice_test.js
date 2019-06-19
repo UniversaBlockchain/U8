@@ -125,7 +125,7 @@ async function simpleCheckContract(contract, issuerKey, ownerKey) {
 }
 
 unit.test("contractsservice_test: badRevoke", async () => {
-    let key = new crypto.PrivateKey(await (await io.openRead("../test/_xer0yfe2nn1xthc.private.unikey")).allBytes());
+    let key = new crypto.PrivateKey(await io.fileGetContentsAsBytes("../test/_xer0yfe2nn1xthc.private.unikey"));
 
     let c = await Contract.fromDslFile("../test/simple_root_contract.yml");
     c.keysToSignWith.add(key);
@@ -141,7 +141,7 @@ unit.test("contractsservice_test: badRevoke", async () => {
 });
 
 unit.test("contractsservice_test: goodRevoke", async () => {
-    let key = new crypto.PrivateKey(await (await io.openRead("../test/_xer0yfe2nn1xthc.private.unikey")).allBytes());
+    let key = new crypto.PrivateKey(await io.fileGetContentsAsBytes("../test/_xer0yfe2nn1xthc.private.unikey"));
 
     let c = await Contract.fromDslFile("../test/simple_root_contract.yml");
 
@@ -757,7 +757,7 @@ unit.test("contractsservice_test: createFollowerContract", async () => {
 });
 
 unit.test("contractsservice_test: addConstraintToContract", async () => {
-    let key = new crypto.PrivateKey(await (await io.openRead("../test/_xer0yfe2nn1xthc.private.unikey")).allBytes());
+    let key = new crypto.PrivateKey(await io.fileGetContentsAsBytes("../test/_xer0yfe2nn1xthc.private.unikey"));
 
     let c = await Contract.fromDslFile("../test/simple_root_contract.yml");
     c.definition.data.const = "qwerty";

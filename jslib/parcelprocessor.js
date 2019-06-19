@@ -4,6 +4,7 @@ import {Errors, ErrorRecord} from "errors";
 
 const Quantiser = require("quantiser").Quantiser;
 const ItemProcessor = require("itemprocessor").ItemProcessor;
+import {randomBytes} from 'tools'
 
 const ParcelProcessingState = {
 
@@ -87,6 +88,8 @@ class ParcelProcessor {
 
         this.downloader = null;
         this.processSchedule = null;
+
+        this.mutex = HashId.of(randomBytes(64));
     }
 
     async run() {
@@ -94,7 +97,7 @@ class ParcelProcessor {
             VerboseLevel.BASE);
 
         if (this.parcel != null)
-            new ScheduleExecutor(() => this.parcelDownloaded(), 0, this.node.executorService).run();
+            new ScheduleExecutor(async () => await this.parcelDownloaded(), 0, this.node.executorService).run();
 
         return this;
     }
@@ -107,7 +110,7 @@ class ParcelProcessor {
 
         if(this.processingState.canContinue) {
             if (this.processSchedule == null || this.processSchedule.isDone)
-                new ScheduleExecutor(() => this.process(), 0, this.node.executorService).run();
+                new ScheduleExecutor(async () => await this.process(), 0, this.node.executorService).run();
         }
     }
 
@@ -126,6 +129,7 @@ class ParcelProcessor {
             return;
 
         this.processingState = ParcelProcessingState.PREPARING;
+
         try {
             this.node.report("parcel processor for: " +
                 this.parcelId + " :: check payment, state " + this.processingState,
@@ -136,7 +140,7 @@ class ParcelProcessor {
                 this.processingState = ParcelProcessingState.PAYMENT_CHECKING;
 
                 for (let ni of this.paymentDelayedVotes.keys())
-                this.paymentProcessor.vote(ni, this.paymentDelayedVotes.get(ni));
+                await this.paymentProcessor.vote(ni, this.paymentDelayedVotes.get(ni));
                 this.paymentDelayedVotes.clear();
 
                 this.processingState = ParcelProcessingState.PAYMENT_POLLING;
@@ -164,7 +168,7 @@ class ParcelProcessor {
                 if (this.payment.getOrigin().equals(this.payload.getOrigin())) {
                     this.payload.errors.push(new ErrorRecord(Errors.BADSTATE, this.payload.id.toString(), "can't register contract with same origin as payment contract "));
 
-                    this.payloadProcessor.emergencyBreak();
+                    await this.payloadProcessor.emergencyBreak();
                     await this.payloadProcessor.doneEvent.await();
                 } else {
                     if (this.payloadResult == null) {
@@ -177,7 +181,7 @@ class ParcelProcessor {
                         this.payloadProcessor.forceChecking(true);
 
                         for (let ni of this.payloadDelayedVotes.keys())
-                        this.payloadProcessor.vote(ni, this.payloadDelayedVotes.get(ni));
+                        await this.payloadProcessor.vote(ni, this.payloadDelayedVotes.get(ni));
                         this.payloadDelayedVotes.clear();
 
                         this.processingState = ParcelProcessingState.PAYLOAD_POLLING;
@@ -189,7 +193,7 @@ class ParcelProcessor {
 
                     if ((this.payloadResult != null) && this.payloadResult.state.isApproved)
                         if(!this.payload.limitedForTestnet) {
-                            let paidU = this.payload.state.data().getInt(NSmartContract.PAID_U_FIELD_NAME, 0); //TODO
+                            let paidU = t.getOrDefault(this.payload.state.data, NSmartContract.PAID_U_FIELD_NAME, 0);
                             if (paidU > 0)
                                 await this.node.ledger.savePayment(paidU,
                                     this.payloadProcessor != null ? this.payloadProcessor.record.getCreatedAt() : await this.node.ledger.getRecord(this.payload.id).getCreatedAt());
@@ -206,7 +210,7 @@ class ParcelProcessor {
                     VerboseLevel.BASE);
 
                 if(this.payloadProcessor != null) {
-                    this.payloadProcessor.emergencyBreak();
+                    await this.payloadProcessor.emergencyBreak();
                     await this.payloadProcessor.doneEvent.await();
                 }
             }
@@ -253,7 +257,7 @@ class ParcelProcessor {
         this.processingState = ParcelProcessingState.DOWNLOADING;
 
         if (this.parcel == null && (this.downloader == null || this.downloader.isDone)) {
-            this.downloader = new ScheduleExecutor(() => this.download(), 0, this.node.executorService).run();
+            this.downloader = new ScheduleExecutor(async () => await this.download(), 0, this.node.executorService).run();
         }
     }
 
@@ -299,65 +303,68 @@ class ParcelProcessor {
         if(!this.processingState.canContinue)
             return;
 
-        this.node.parcelCache.put(this.parcel); //TODO add parcelCache
+        this.node.parcelCache.put(this.parcel);
 
         this.payment = this.parcel.getPaymentContract();
         this.payload = this.parcel.getPayloadContract();
 
         // create item processors or get results for payment and payload
 
-        this.payment.quantiser.reset(Config.paymentQuantaLimit);
+        await this.node.lock.synchronize(this.mutex, async () => {
 
-        let x = this.node.checkItemInternal(this.payment.id, this.parcelId, this.payment, true, true);
-        if (x instanceof ItemProcessor) {
-            this.paymentProcessor = x;
+            this.payment.quantiser.reset(Config.paymentQuantaLimit);
 
-            this.node.report("parcel processor for: " +
-                this.parcelId + " :: payment is processing, item processing state: " +
-                this.paymentProcessor.processingState + ", parcel processing state " + this.processingState +
-                ", item state ", this.paymentProcessor.record.state,
-                VerboseLevel.BASE);
+            let x = await this.node.checkItemInternal(this.payment.id, this.parcelId, this.payment, true, true);
+            if (x instanceof ItemProcessor) {
+                this.paymentProcessor = x;
 
-            // if current item processor for payment was inited by another parcel we should decline this payment
-            if(!this.parcelId.equals(this.paymentProcessor.parcelId)) {
-                this.paymentResult = ItemResult.UNDEFINED;
+                this.node.report("parcel processor for: " +
+                    this.parcelId + " :: payment is processing, item processing state: " +
+                    this.paymentProcessor.processingState + ", parcel processing state " + this.processingState +
+                    ", item state ", this.paymentProcessor.record.state,
+                    VerboseLevel.BASE);
+
+                // if current item processor for payment was inited by another parcel we should decline this payment
+                if(!this.parcelId.equals(this.paymentProcessor.parcelId)) {
+                    this.paymentResult = ItemResult.UNDEFINED;
+                }
+            } else {
+                this.paymentResult = x;
+
+                this.node.report("parcel processor for: " +
+                    this.parcelId + " :: payment already processed, parcel processing state " +
+                    this.processingState +
+                    ", item state ", this.paymentResult.state,
+                    VerboseLevel.BASE);
+
+                // if ledger already have approved state for payment it means onw of two:
+                // 1. payment was already processed and cannot be used as payment for current parcel
+                // 2. payment having been processing but this node starts too old and consensus already got.
+                // So, in both ways we can answer undefined
+                if (this.paymentResult.state === ItemState.APPROVED) {
+                    this.paymentResult = ItemResult.UNDEFINED;
+                }
             }
-        } else {
-            this.paymentResult = x;
+            // we freeze payload checking until payment will be approved
+            x = await this.node.checkItemInternal(this.payload.id, this.parcelId, this.payload, true, false);
+            if (x instanceof ItemProcessor) {
+                this.payloadProcessor = x;
 
-            this.node.report("parcel processor for: " +
-                this.parcelId + " :: payment already processed, parcel processing state " +
-                this.processingState +
-                ", item state ", this.paymentResult.state,
-                VerboseLevel.BASE);
+                this.node.report("parcel processor for: " +
+                    this.parcelId + " :: payload is processing, item processing state: " +
+                    this.payloadProcessor.processingState + ", parcel processing state " + this.processingState +
+                    ", item state " + this.payloadProcessor.record.state,
+                    VerboseLevel.BASE);
+            } else {
+                this.payloadResult = x;
 
-            // if ledger already have approved state for payment it means onw of two:
-            // 1. payment was already processed and cannot be used as payment for current parcel
-            // 2. payment having been processing but this node starts too old and consensus already got.
-            // So, in both ways we can answer undefined
-            if (this.paymentResult.state === ItemState.APPROVED) {
-                this.paymentResult = ItemResult.UNDEFINED;
+                this.node.report("parcel processor for: " +
+                    this.parcelId, " :: payload already processed, parcel processing state " +
+                    this.processingState +
+                    ", item state ", this.payloadResult.state +
+                    VerboseLevel.BASE);
             }
-        }
-        // we freeze payload checking until payment will be approved
-        x = await this.node.checkItemInternal(this.payload.id, this.parcelId, this.payload, true, false);
-        if (x instanceof ItemProcessor) {
-            this.payloadProcessor = x;
-
-            this.node.report("parcel processor for: " +
-                this.parcelId + " :: payload is processing, item processing state: " +
-                this.payloadProcessor.processingState + ", parcel processing state " + this.processingState +
-                ", item state " + this.payloadProcessor.record.state,
-                VerboseLevel.BASE);
-        } else {
-            this.payloadResult = x;
-
-            this.node.report("parcel processor for: " +
-                this.parcelId, " :: payload already processed, parcel processing state " +
-                this.processingState +
-                ", item state ", this.payloadResult.state +
-                VerboseLevel.BASE);
-        }
+        });
 
         this.pulseProcessing();
         this.downloadedEvent.fire();
@@ -372,7 +379,7 @@ class ParcelProcessor {
 
     //******************** polling section ********************//
 
-    vote(node, state, isU) {
+    async vote(node, state, isU) {
         if(!this.processingState.canContinue)
             return;
 
@@ -380,13 +387,13 @@ class ParcelProcessor {
         // Otherwise we give vote to item processor
         if(isU){
             if (this.paymentProcessor != null) {
-                this.paymentProcessor.vote(node, state);
+                await this.paymentProcessor.vote(node, state);
             } else {
                 this.paymentDelayedVotes.set(node, state);
             }
         } else {
             if (this.payloadProcessor != null) {
-                this.payloadProcessor.vote(node, state);
+                await this.payloadProcessor.vote(node, state);
             } else {
                 this.payloadDelayedVotes.set(node, state);
             }

@@ -16,8 +16,7 @@ unit.test("symmetric keys", () => {
 import * as io from 'io'
 
 unit.test("asymmetric keys", async () => {
-    let privateBytes = await (await io.openRead("../test/pregenerated_key.private.unikey")).allBytes();
-    let privateKey = new crypto.PrivateKey(privateBytes);
+    let privateKey = new crypto.PrivateKey(await io.fileGetContentsAsBytes("../test/pregenerated_key.private.unikey"));
 
     let pk1 = new crypto.PrivateKey(privateKey.packed);
 

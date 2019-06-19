@@ -17,11 +17,12 @@ unit.test("file read all", async () => {
 
 unit.test("input iterate bytes", async () => {
     let input = await io.openRead("../test/test.txt");
-    await input.nextByte()
-    await input.nextByte()
+    await input.nextByte();
+    await input.nextByte();
     let x = await input.read(12);
     assert("this is a te" == utf8Decode(x));
     assert(x.length == 12);
+    await input.close();
 });
 
 unit.test("output write bytes", async () => {
@@ -33,5 +34,6 @@ unit.test("output write bytes", async () => {
     let data = await input.allBytes();
     expect.equal( 4, data.length);
     expect.equalArrays(data, src );
+    await input.close();
 
 });

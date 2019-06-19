@@ -9,7 +9,7 @@ const BossBiMapper = require("bossbimapper").BossBiMapper;
 const DefaultBiMapper = require("defaultbimapper").DefaultBiMapper;
 
 unit.test("slot_test: goodSlotContract", async () => {
-    let key = new crypto.PrivateKey(await (await io.openRead("../test/_xer0yfe2nn1xthc.private.unikey")).allBytes());
+    let key = new crypto.PrivateKey(await io.fileGetContentsAsBytes("../test/_xer0yfe2nn1xthc.private.unikey"));
 
     let simpleContract = Contract.fromPrivateKey(key);
     await simpleContract.seal(true);
@@ -46,7 +46,8 @@ unit.test("slot_test: goodSlotContract", async () => {
 });
 
 unit.test("slot_test: goodSlotContractFromDSL", async () => {
-    let key = new crypto.PrivateKey(await (await io.openRead("../test/_xer0yfe2nn1xthc.private.unikey")).allBytes());
+    let key = new crypto.PrivateKey(await io.fileGetContentsAsBytes("../test/_xer0yfe2nn1xthc.private.unikey"));
+
     let simpleContract = Contract.fromPrivateKey(key);
 
     await simpleContract.seal(true);
@@ -84,7 +85,8 @@ unit.test("slot_test: goodSlotContractFromDSL", async () => {
 });
 
 unit.test("slot_test: serializeSlotContract", async () => {
-    let key = new crypto.PrivateKey(await (await io.openRead("../test/_xer0yfe2nn1xthc.private.unikey")).allBytes());
+    let key = new crypto.PrivateKey(await io.fileGetContentsAsBytes("../test/_xer0yfe2nn1xthc.private.unikey"));
+
     let simpleContract = Contract.fromPrivateKey(key);
 
     await simpleContract.seal(true);
@@ -154,7 +156,7 @@ unit.test("slot_test: serializeSlotContract", async () => {
 });
 
 unit.test("slot_test: keepRevisions", async () => {
-    let key = new crypto.PrivateKey(await (await io.openRead("../test/_xer0yfe2nn1xthc.private.unikey")).allBytes());
+    let key = new crypto.PrivateKey(await io.fileGetContentsAsBytes("../test/_xer0yfe2nn1xthc.private.unikey"));
 
     let simpleContract = Contract.fromPrivateKey(key);
     await simpleContract.seal(true);
@@ -225,7 +227,7 @@ unit.test("slot_test: keepRevisions", async () => {
 });
 
 async function createSlotPayment() {
-    let ownerKey = new crypto.PrivateKey(await (await io.openRead("../test/keys/test_payment_owner.private.unikey")).allBytes());
+    let ownerKey = new crypto.PrivateKey(await io.fileGetContentsAsBytes("../test/keys/test_payment_owner.private.unikey"));
 
     let slotU = await tt.createFreshU(100000000, [ownerKey.publicKey]);
     let paymentDecreased = slotU.createRevision([ownerKey]);
