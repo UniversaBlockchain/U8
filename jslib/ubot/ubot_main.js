@@ -38,11 +38,11 @@ class UBotMain {
         if (await this.processOptions())
             return;
 
-        this.ubot = new UBot(this.logger);
+        this.network = new UBotNetwork(this.netConfig, this.myInfo, this.nodeKey, this.logger);
+
+        this.ubot = new UBot(this.logger, this.network);
 
         this.httpServer = new UBotHttpServer(this.nodeKey, "127.0.0.1", this.myInfo.clientAddress.port, this.logger, this.ubot);
-
-        this.network = new UBotNetwork(this.netConfig, this.myInfo, this.nodeKey, this.logger);
 
         this.ledger = new UBotLedger(this.logger);
 

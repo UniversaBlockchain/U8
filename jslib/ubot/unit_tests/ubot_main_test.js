@@ -83,8 +83,8 @@ async function shutdownUBots(ubots) {
 }
 
 unit.test("ubot_main_test: hello ubot", async () => {
-    const count = 6;
-    let ubotMains = await createUBots(count);
+    const ubotsCount = 6;
+    let ubotMains = await createUBots(ubotsCount);
 
     console.log("\ntest send...");
     ubotMains[4].debugSendUdp("hi all, ubot4 here");
@@ -94,9 +94,9 @@ unit.test("ubot_main_test: hello ubot", async () => {
     await shutdownUBots(ubotMains);
 });
 
-unit.test("ubot_main_test: execJS", async () => {
-    const count = 8;
-    let ubotMains = await createUBots(count);
+unit.test("ubot_main_test: executeCloudMethod", async () => {
+    const ubotsCount = 8;
+    let ubotMains = await createUBots(ubotsCount);
 
     console.log("\ntest send...");
     let url = "http://localhost:"+ubotMains[0].myInfo.clientAddress.port;
@@ -117,48 +117,3 @@ unit.test("ubot_main_test: execJS", async () => {
 
     await shutdownUBots(ubotMains);
 });
-
-// unit.test("ubot_main_test: recreate http servers", async () => {
-//     console.log();
-//
-//     for (let kkk = 0; kkk < 1000; ++kkk) {
-//
-//         console.log("kkk = " + kkk);
-//
-//         let privKey = tk.TestKeys.getKey();
-//         const count = 200;
-//         let servers = [];
-//         for (let i = 0; i < count; ++i) {
-//             let s = new network.HttpServer("127.0.0.1", 10000 + i, 20, 20);
-//             s.initSecureProtocol(privKey);
-//             s.addSecureEndpoint("someSecureCmd", (params, clientKey) => {
-//                 console.log("!!! server someSecureCmd received !!!");
-//                 return {};
-//             });
-//             s.startServer();
-//             servers.push(s);
-//         }
-//         let url = "http://127.0.0.1:" + (10000 + count - 1);
-//         let client = new network.HttpClient(url, 64, 64);
-//         console.log("start client... url: " + url);
-//         await client.start(tk.TestKeys.getKey(), privKey.publicKey, null);
-//
-//         console.log("send command...");
-//         client.command("someSecureCmd", {}, resp => {
-//             console.log("!!! resp: " + JSON.stringify(resp) + " !!!");
-//         }, err => {
-//             console.log("err: " + err);
-//         });
-//
-//         console.log("sleep...");
-//         await sleep(2000);
-//         console.log("exit...");
-//
-//         let stopPromises = [];
-//         for (let i = 0; i < servers.length; ++i)
-//             stopPromises.push(servers[i].stopServer());
-//         stopPromises.push(client.stop());
-//         await Promise.all(stopPromises);
-//
-//     }
-// });

@@ -303,5 +303,23 @@ function getOrThrow(obj, key) {
     throw new Error("can't get " + key);
 }
 
+/**
+ * Adds two maps to enum: byVal and byOrdinal. See UBotPoolState for example.
+ * Also, adds .val text values.
+ * @param target enum
+ */
+function addValAndOrdinalMaps(en) {
+    let byOrdinal = new Map();
+    for (let k in en) {
+        if (en.hasOwnProperty(k)) {
+            en[k].val = k;
+            byOrdinal.set(en[k].ordinal, en[k]);
+        }
+    }
+    en.byOrdinal = byOrdinal;
+    en.byVal = {};
+    en.byVal.get = function (key) {return en[key]};
+}
+
 module.exports = {arraysEqual, valuesEqual, randomString, MemoiseMixin, PackedEqMixin, DigestEqMixin, GenericMap, equals,
-    THROW_EXCEPTIONS, convertToDate, randomBytes, getOrDefault, getOrThrow};
+    THROW_EXCEPTIONS, convertToDate, randomBytes, getOrDefault, getOrThrow, addValAndOrdinalMaps};

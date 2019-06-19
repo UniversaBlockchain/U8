@@ -1,16 +1,8 @@
-function addValAndOrdinalMaps(en) {
-    let byOrdinal = new Map();
-    for (let k in en) {
-        if (en.hasOwnProperty(k)) {
-            en[k].val = k;
-            byOrdinal.set(en[k].ordinal, en[k]);
-        }
-    }
-    en.byOrdinal = byOrdinal;
-    en.byVal = {};
-    en.byVal.get = function (key) {return en[key]};
-}
-
+const UBotConfig = require("ubot/ubot_config").UBotConfig;
+const ExecutorWithFixedPeriod = require("executorservice").ExecutorWithFixedPeriod;
+const ex = require("exceptions");
+const t = require("tools");
+const UBotCloudNotification = require("ubot/ubot_notification").UBotCloudNotification;
 
 const UBotPoolState = {
 
@@ -32,14 +24,18 @@ const UBotPoolState = {
 
 };
 
-addValAndOrdinalMaps(UBotPoolState);
+t.addValAndOrdinalMaps(UBotPoolState);
 
 
 class CloudProcessor {
     constructor(initialState, contractRequest, ubot) {
         this.state = initialState;
+        this.poolId = contractRequest.id;
         this.contractRequest = contractRequest;
         this.ubot = ubot;
+        this.currentTask = null;
+        this.pool = [];
+
         this.startProcessingCurrentState();
     }
 
@@ -63,7 +59,53 @@ class CloudProcessor {
         this.startProcessingCurrentState();
     }
 
+    randomChoice(list, count, safe = true) {
+        if (safe)
+            list = [...list];
+        if (count > list.length)
+            throw new ex.IllegalArgumentError("randomChoice error: count > arr.length");
+        let res = [];
+        while (res.length < count) {
+            let pick = Math.floor(Math.random()*list.length);
+            res.push(list[pick]);
+            list.splice(pick, 1);
+        }
+        return res;
+    }
+
     startSendingCloudMethod() {
+        // select pool
+        let list = this.ubot.network.netConfig.toList();
+        let myIndex = 0;
+        for (let i = 1; i < list.length; ++i)
+            if (list[i].number == this.ubot.network.myInfo.number) {
+                myIndex = i;
+                break;
+            }
+        let me = list[myIndex];
+        list.splice(myIndex, 1);
+        this.pool = this.randomChoice(list, 2);
+        this.pool.push(me);
+
+        // periodically send notifications
+        this.pulseSendingCloudMethod();
+        this.currentTask = new ExecutorWithFixedPeriod(() => {
+            this.pulseSendingCloudMethod();
+        }, UBotConfig.sending_cloud_method_period).run();
+    }
+
+    pulseSendingCloudMethod() {
+        for (let i = 0; i < this.pool.length; ++i)
+            if (this.pool[i].number != this.ubot.network.myInfo.number)
+                this.ubot.network.deliver(
+                    this.pool[i],
+                    new UBotCloudNotification(
+                        this.ubot.network.myInfo,
+                        this.poolId,
+                        UBotCloudNotification.types.DOWNLOAD_CLOUD_METHOD,
+                        false
+                    )
+                );
     }
 
     waitOtherUbotsDownloadCloudMethod() {
