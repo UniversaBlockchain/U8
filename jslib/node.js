@@ -14,6 +14,7 @@ const ResyncProcessor = require("resyncprocessor").ResyncProcessor;
 const ParcelProcessor = require("parcelprocessor").ParcelProcessor;
 const ItemInformer = require("iteminformer").ItemInformer;
 const NodeInfoProvider = require("services/NSmartContract").NodeInfoProvider;
+const Lock = require("lock").Lock;
 const t = require("tools");
 
 class Node {
@@ -46,6 +47,7 @@ class Node {
         this.epochMinute = 0;
 
         this.executorService = new ExecutorService();
+        this.lock = new Lock();
 
         this.config.updateConsensus(this.network.getNodesCount());
         this.network.subscribe(this.myInfo, notification => new ScheduleExecutor(async () => await this.onNotification(notification), 0, this.executorService).run());
@@ -435,62 +437,65 @@ class Node {
         try {
             this.report("checkItemInternal: " + itemId, VerboseLevel.BASE);
 
-            let ip = this.processors.get(itemId);
-            if (ip != null) {
-                this.report("checkItemInternal: " + itemId + "found item processor in state: " +
-                    ip.processingState.val, VerboseLevel.BASE);
-                return ip;
-            }
+            return await this.lock.synchronize(itemId, async () => {
 
-            // if we want to get already processed result for item
-            if (!ommitItemResult) {
-                let r = await this.ledger.getRecord(itemId);
-                // if it is not pending, it means it is already processed:
-                if (r != null && !r.state.isPending) {
-                    // it is, and we may still have it cached - we do not put it again:
-                    this.report("checkItemInternal: " + itemId + "found item result, and state is: " +
-                        r.state.val, VerboseLevel.BASE);
-
-                    let cachedItem = this.cache.get(itemId);
-                    let result = this.cache.getResult(itemId);
-                    if (result == null)
-                        result = ItemResult.fromStateRecord(r, cachedItem != null);
-
-                    return result;
+                let ip = this.processors.get(itemId);
+                if (ip != null) {
+                    this.report("checkItemInternal: " + itemId + "found item processor in state: " +
+                        ip.processingState.val, VerboseLevel.BASE);
+                    return ip;
                 }
 
-                // we have no consensus on it. We might need to find one, after some precheck.
-                // The contract should not be too old to process:
-                if (item != null && item.getCreatedAt().getTime() < Date.now() - Config.maxItemCreationAge * 1000) {
-                    // it is too old - client must manually check other nodes. For us it's unknown
-                    item.errors.push(new ErrorRecord(Errors.EXPIRED, "created_at", "too old"));
-                    this.informer.inform(item);
+                // if we want to get already processed result for item
+                if (!ommitItemResult) {
+                    let r = await this.ledger.getRecord(itemId);
+                    // if it is not pending, it means it is already processed:
+                    if (r != null && !r.state.isPending) {
+                        // it is, and we may still have it cached - we do not put it again:
+                        this.report("checkItemInternal: " + itemId + "found item result, and state is: " +
+                            r.state.val, VerboseLevel.BASE);
 
-                    this.report("checkItemInternal: " + itemId + "too old: ", VerboseLevel.BASE);
-                    return ItemResult.DISCARDED;
+                        let cachedItem = this.cache.get(itemId);
+                        let result = this.cache.getResult(itemId);
+                        if (result == null)
+                            result = ItemResult.fromStateRecord(r, cachedItem != null);
+
+                        return result;
+                    }
+
+                    // we have no consensus on it. We might need to find one, after some precheck.
+                    // The contract should not be too old to process:
+                    if (item != null && item.getCreatedAt().getTime() < Date.now() - Config.maxItemCreationAge * 1000) {
+                        // it is too old - client must manually check other nodes. For us it's unknown
+                        item.errors.push(new ErrorRecord(Errors.EXPIRED, "created_at", "too old"));
+                        this.informer.inform(item);
+
+                        this.report("checkItemInternal: " + itemId + "too old: ", VerboseLevel.BASE);
+                        return ItemResult.DISCARDED;
+                    }
                 }
-            }
 
-            // if we want to create new ItemProcessor
-            if (autoStart) {
-                if (item != null)
-                    this.cache.put(item, ItemResult.UNDEFINED);
+                // if we want to create new ItemProcessor
+                if (autoStart) {
+                    if (item != null)
+                        this.cache.put(item, ItemResult.UNDEFINED);
 
-                this.report("checkItemInternal: " + itemId + "nothing found, will create item processor",
-                    VerboseLevel.BASE);
-                let processor = await new ItemProcessor(itemId, parcelId, item, forceChecking, this).run();
-                this.processors.set(itemId, processor);
-                return processor;
+                    this.report("checkItemInternal: " + itemId + "nothing found, will create item processor",
+                        VerboseLevel.BASE);
+                    let processor = await new ItemProcessor(itemId, parcelId, item, forceChecking, this).run();
+                    this.processors.set(itemId, processor);
+                    return processor;
 
-            } else {
-                let rp = this.resyncProcessors.get(itemId);
-                if (rp == null)
-                    return ItemResult.UNDEFINED;
+                } else {
+                    let rp = this.resyncProcessors.get(itemId);
+                    if (rp == null)
+                        return ItemResult.UNDEFINED;
 
-                this.report("checkItemInternal: " + itemId + "found resync processor in state: " +
-                    rp.resyncingItem.resyncingState.val, VerboseLevel.BASE);
-                return rp;
-            }
+                    this.report("checkItemInternal: " + itemId + "found resync processor in state: " +
+                        rp.resyncingItem.resyncingState.val, VerboseLevel.BASE);
+                    return rp;
+                }
+            });
         } catch (err) {
             throw new Error("failed to checkItem" + err.message);
         }
@@ -686,7 +691,6 @@ class Node {
                             idsToRemove.add(r.id);
                         }
                     }
-                    return null;
 
                 } catch (err) {
                     this.logger.log(err.message);
@@ -699,34 +703,38 @@ class Node {
     }
 
     async itemSanitationDone(record) {
-        if (this.recordsToSanitate.has(record.id)) {
-            this.recordsToSanitate.delete(record.id);
-            await this.removeLocks(record);
-            this.report("itemSanitationDone " + record.id + " " + this.recordsToSanitate.size, VerboseLevel.BASE);
-        }
+        await this.lock.synchronize("recordsToSanitate", async () => {
+            if (this.recordsToSanitate.has(record.id)) {
+                this.recordsToSanitate.delete(record.id);
+                await this.removeLocks(record);
+                this.report("itemSanitationDone " + record.id + " " + this.recordsToSanitate.size, VerboseLevel.BASE);
+            }
+        });
     }
 
     async itemSanitationFailed(record) {
-        if (this.recordsToSanitate.has(record.id)) {
-            this.recordsToSanitate.delete(record.id);
+        await this.lock.synchronize("recordsToSanitate", async () => {
+            if (this.recordsToSanitate.has(record.id)) {
+                this.recordsToSanitate.delete(record.id);
 
-            record.state = ItemState.UNDEFINED;
-            await this.removeLocks(record);
+                record.state = ItemState.UNDEFINED;
+                await this.removeLocks(record);
 
-            //item unknown to network we must restart voting
-            let contract = await this.ledger.getItem(record);
+                //item unknown to network we must restart voting
+                let contract = await this.ledger.getItem(record);
 
-            await record.destroy();
+                await record.destroy();
 
-            this.report("itemSanitationFailed " + record.id + " " + this.recordsToSanitate.size, VerboseLevel.BASE);
+                this.report("itemSanitationFailed " + record.id + " " + this.recordsToSanitate.size, VerboseLevel.BASE);
 
-            if (contract != null) {
-                this.report("restart vote after sanitation fail: " + record.id, VerboseLevel.BASE);
+                if (contract != null) {
+                    this.report("restart vote after sanitation fail: " + record.id, VerboseLevel.BASE);
 
-                //Item found in disk cache. Restart voting.
-                this.checkItemInternal(contract.id, null, contract, true, true, false);
+                    //Item found in disk cache. Restart voting.
+                    this.checkItemInternal(contract.id, null, contract, true, true, false);
+                }
             }
-        }
+        });
     }
 
     checkSpecialItem(item) {

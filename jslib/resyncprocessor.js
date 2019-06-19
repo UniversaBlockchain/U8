@@ -323,20 +323,22 @@ class ResyncingItem {
                 let expiresAt = new Date(Math.floor(expiresTs) * 1000);
 
                 try {
-                    this.record = await this.node.ledger.findOrCreate(this.hashId);
+                    await this.node.lock.synchronize(this.hashId, async () => {
+                        this.record = await this.node.ledger.findOrCreate(this.hashId);
 
-                    this.record.createdAt = createdAt;
-                    this.record.expiresAt = expiresAt;
-                    if (committingState === ItemState.APPROVED)
-                        await this.record.approve(null, expiresAt, true);
-                    else if (committingState === ItemState.DECLINED)
-                        await this.record.decline(null, true);
-                    else if (committingState === ItemState.REVOKED)
-                        await this.record.revoke(null, true);
-                    else if (committingState === ItemState.UNDEFINED)
-                        await this.record.setUndefined(null, true);
+                        this.record.createdAt = createdAt;
+                        this.record.expiresAt = expiresAt;
+                        if (committingState === ItemState.APPROVED)
+                            await this.record.approve(null, expiresAt, true);
+                        else if (committingState === ItemState.DECLINED)
+                            await this.record.decline(null, true);
+                        else if (committingState === ItemState.REVOKED)
+                            await this.record.revoke(null, true);
+                        else if (committingState === ItemState.UNDEFINED)
+                            await this.record.setUndefined(null, true);
 
-                    this.node.cache.update(this.record.id, ItemResult.fromStateRecord(this.record));
+                        this.node.cache.update(this.record.id, ItemResult.fromStateRecord(this.record));
+                    });
 
                 } catch (err) {
                     console.log(err.message);

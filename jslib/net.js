@@ -4,6 +4,7 @@ import {Notification, ItemNotification, ResyncNotification, ParcelNotification} 
 
 const Boss = require('boss.js');
 const ItemResult = require('itemresult').ItemResult;
+const Lock = require("lock").Lock;
 
 class Network {
     /**
@@ -198,6 +199,7 @@ class NetworkV2 extends Network {
         this.label = "Network Node " + this.myInfo.number + ": ";
         this.consumer = null;
         this.cachedClients = new t.GenericMap();
+        this.lock = new Lock();
 
         this.adapter = new UDPAdapter(this.myKey, this.myInfo.number, this.netConfig);
         this.adapter.setReceiveCallback((packet, fromNode) => this.onReceived(packet, fromNode));
@@ -446,13 +448,16 @@ class NetworkV2 extends Network {
      * @return {ItemResult} result containing state of the requested item.
      */
     async getItemState(nodeInfo, id) {
-        let client = this.cachedClients.get(nodeInfo);
-        if (client == null) {
-            client = new HttpClient(nodeInfo.publicUrlString(), 4, 256);
-            await client.start(this.myKey, nodeInfo.publicKey, null);
+        let client;
+        await this.lock.synchronize("cachedClients", async () => {
+            client = this.cachedClients.get(nodeInfo);
+            if (client == null) {
+                client = new HttpClient(nodeInfo.publicUrlString(), 4, 256);
+                await client.start(this.myKey, nodeInfo.publicKey, null);
 
-            this.cachedClients.set(nodeInfo, client);
-        }
+                this.cachedClients.set(nodeInfo, client);
+            }
+        });
 
         //TODO: replace to Client
         //return client.getState(id);

@@ -11,6 +11,7 @@ const Boss = require('boss.js');
 const ExtendedSignature = require("extendedsignature").ExtendedSignature;
 const ItemState = require("itemstate").ItemState;
 const ScheduleExecutor = require("executorservice").ScheduleExecutor;
+const Constraint = require('constraint').Constraint;
 
 async function createMain(name, nolog, postfix = "") {
 
@@ -207,27 +208,22 @@ unit.test("main_test: sendHttpRequests", async () => {
 });
 
 unit.test("main_test: createTestSpace", async () => {
-    for (let i = 0; i < 30; i++)
-    {
-        console.log(i);
-        let key = new PrivateKey(await io.fileGetContentsAsBytes("../test/keys/reconfig_key.private.unikey"));
-        let ts = await new TestSpace(key).create();
+    let key = new PrivateKey(await io.fileGetContentsAsBytes("../test/keys/reconfig_key.private.unikey"));
+    let ts = await new TestSpace(key).create();
 
-        for (let i = 0; i < 4; i++) {
-            assert(ts.nodes[i].logger.buffer.includes("ledger constructed"));
-            assert(ts.nodes[i].logger.buffer.includes("key loaded: " + ts.nodes[i].nodeKey.toString()));
-            assert(ts.nodes[i].logger.buffer.includes("node local URL: " + ts.nodes[i].myInfo.serverUrlString()));
-            assert(ts.nodes[i].logger.buffer.includes("node public URL: " + ts.nodes[i].myInfo.publicUrlString()));
-            assert(ts.nodes[i].logger.buffer.includes("Network configuration is loaded from " + ts.nodes[i].configRoot + ", " + ts.nodes[i].netConfig.size + " nodes."));
-            assert(ts.nodes[i].logger.buffer.includes("Starting the client HTTP server..."));
-            assert(ts.nodes[i].logger.buffer.includes("prepare to start client HTTP server on " + ts.nodes[i].myInfo.clientAddress.port));
-            assert(ts.nodes[i].logger.buffer.includes("Starting the Universa node service..."));
-            assert(ts.nodes[i].logger.buffer.includes(ts.nodes[i].myInfo.number + ": Network consensus is set to (negative/positive/resyncBreak): 2 / 3 / 2"));
-        }
-
-        await ts.shutdown();
+    for (let i = 0; i < 4; i++) {
+        assert(ts.nodes[i].logger.buffer.includes("ledger constructed"));
+        assert(ts.nodes[i].logger.buffer.includes("key loaded: " + ts.nodes[i].nodeKey.toString()));
+        assert(ts.nodes[i].logger.buffer.includes("node local URL: " + ts.nodes[i].myInfo.serverUrlString()));
+        assert(ts.nodes[i].logger.buffer.includes("node public URL: " + ts.nodes[i].myInfo.publicUrlString()));
+        assert(ts.nodes[i].logger.buffer.includes("Network configuration is loaded from " + ts.nodes[i].configRoot + ", " + ts.nodes[i].netConfig.size + " nodes."));
+        assert(ts.nodes[i].logger.buffer.includes("Starting the client HTTP server..."));
+        assert(ts.nodes[i].logger.buffer.includes("prepare to start client HTTP server on " + ts.nodes[i].myInfo.clientAddress.port));
+        assert(ts.nodes[i].logger.buffer.includes("Starting the Universa node service..."));
+        assert(ts.nodes[i].logger.buffer.includes(ts.nodes[i].myInfo.number + ": Network consensus is set to (negative/positive/resyncBreak): 2 / 3 / 2"));
     }
 
+    await ts.shutdown();
 });
 
 unit.test("main_test: resync", async () => {
@@ -321,41 +317,83 @@ unit.test("main_test: register item", async () => {
     await ts.node.node.registerItem(item);
     let ir = await ts.node.node.waitItem(item.id, 10000);
     assert(ir.state === ItemState.APPROVED);
-    ir = await ts.nodes[1].node.waitItem(item.id, 10000);
-    assert(ir.state === ItemState.APPROVED);
-    ir = await ts.nodes[2].node.waitItem(item.id, 10000);
-    assert(ir.state === ItemState.APPROVED);
-    ir = await ts.nodes[3].node.waitItem(item.id, 10000);
-    assert(ir.state === ItemState.APPROVED);
 
-    assert((await ts.nodes[0].ledger.getRecord(item.id)).state === ItemState.APPROVED);
-    assert((await ts.nodes[1].ledger.getRecord(item.id)).state === ItemState.APPROVED);
-    assert((await ts.nodes[2].ledger.getRecord(item.id)).state === ItemState.APPROVED);
-    assert((await ts.nodes[3].ledger.getRecord(item.id)).state === ItemState.APPROVED);
+    for (let i = 0; i < 4; i++) {
+        ir = await ts.nodes[i].node.waitItem(item.id, 10000);
+        assert(ir.state === ItemState.APPROVED);
 
-    /*ir = await ts.nodes[0].node.network.getItemState(ts.nodes[1].node.myInfo, item.id);
-    assert(ir.state === ItemState.APPROVED);
-    ir = await ts.nodes[0].node.network.getItemState(ts.nodes[2].node.myInfo, item.id);
-    assert(ir.state === ItemState.APPROVED);
-    ir = await ts.nodes[0].node.network.getItemState(ts.nodes[3].node.myInfo, item.id);
-    assert(ir.state === ItemState.APPROVED);
+        assert((await ts.nodes[i].ledger.getRecord(item.id)).state === ItemState.APPROVED);
+
+        if (i !== 0)
+        ir = await ts.nodes[0].node.network.getItemState(ts.nodes[i].node.myInfo, item.id);
+        assert(ir.state === ItemState.APPROVED);
+    }
 
     let fire = [];
     let events = [];
     for (let i = 0; i < 4; i++)
         events.push(new Promise((resolve) => {fire.push(resolve)}));
 
-    ts.clients[0].command("getState", {itemId: item.id}, (result) => fire[0](result), () => fire[0](null));
-    ts.clients[1].command("getState", {itemId: item.id}, (result) => fire[1](result), () => fire[1](null));
-    ts.clients[2].command("getState", {itemId: item.id}, (result) => fire[2](result), () => fire[2](null));
-    ts.clients[3].command("getState", {itemId: item.id}, (result) => fire[3](result), () => fire[3](null));
+    for (let i = 0; i < 4; i++)
+        ts.clients[i].command("getState", {itemId: item.id}, (result) => fire[i](result), () => fire[i](null));
 
     (await Promise.all(events)).forEach(ir => {
         assert(ir != null);
         assert(ir.itemResult.state === ItemState.APPROVED);
-    });*/
+    });
 
-    await sleep(1000);
+    await ts.shutdown();
+});
+
+unit.test("main_test: register bad item", async () => {
+    let key = new PrivateKey(await (await io.openRead("../test/keys/reconfig_key.private.unikey")).allBytes());
+    let ts = await new TestSpace(key).create(/*false*/);
+
+    for (let i = 0; i < 4; i++) {
+        ts.nodes[i].setVerboseLevel(VerboseLevel.DETAILED);
+        ts.nodes[i].setUDPVerboseLevel(VerboseLevel.DETAILED);
+    }
+
+    let k = tk.TestKeys.getKey();
+    let item = Contract.fromPrivateKey(k);
+
+    let cr = new Constraint(item);
+    cr.type = Constraint.TYPE_EXISTING_DEFINITION;
+    cr.name = "bad_constraint";
+    let conditions = {};
+    conditions[Constraint.conditionsModeType.all_of] = ["this.state.data.some_field defined"];
+    cr.setConditions(conditions);
+    item.addConstraint(cr);
+
+    await item.seal(true);
+
+    await ts.node.node.registerItem(item);
+    let ir = await ts.node.node.waitItem(item.id, 10000);
+    assert(ir.state === ItemState.DECLINED);
+
+    for (let i = 0; i < 4; i++) {
+        ir = await ts.nodes[i].node.waitItem(item.id, 10000);
+        assert(ir.state === ItemState.DECLINED);
+
+        assert((await ts.nodes[i].ledger.getRecord(item.id)).state === ItemState.DECLINED);
+
+        if (i !== 0)
+            ir = await ts.nodes[0].node.network.getItemState(ts.nodes[i].node.myInfo, item.id);
+        assert(ir.state === ItemState.DECLINED);
+    }
+
+    let fire = [];
+    let events = [];
+    for (let i = 0; i < 4; i++)
+        events.push(new Promise((resolve) => {fire.push(resolve)}));
+
+    for (let i = 0; i < 4; i++)
+        ts.clients[i].command("getState", {itemId: item.id}, (result) => fire[i](result), () => fire[i](null));
+
+    (await Promise.all(events)).forEach(ir => {
+        assert(ir != null);
+        assert(ir.itemResult.state === ItemState.DECLINED);
+    });
 
     await ts.shutdown();
 });
