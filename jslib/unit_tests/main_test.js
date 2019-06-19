@@ -41,12 +41,12 @@ class TestSpace {
         this.node = this.nodes[0];
 
         this.clients = [];
-        /*for (let i = 0; i < 4; i++) {
+        for (let i = 0; i < 4; i++) {
             let client = new HttpClient(this.nodes[i].myInfo.publicUrlString(), 4, 256);
             await client.start(this.myKey, this.nodes[i].myInfo.publicKey);
             this.clients.push(client);
         }
-        this.client = this.clients[0];*/
+        this.client = this.clients[0];
 
         return this;
     };
@@ -207,22 +207,27 @@ unit.test("main_test: sendHttpRequests", async () => {
 });
 
 unit.test("main_test: createTestSpace", async () => {
-    let key = new PrivateKey(await (await io.openRead("../test/keys/reconfig_key.private.unikey")).allBytes());
-    let ts = await new TestSpace(key).create();
+    for (let i = 0; i < 30; i++)
+    {
+        console.log(i);
+        let key = new PrivateKey(await (await io.openRead("../test/keys/reconfig_key.private.unikey")).allBytes());
+        let ts = await new TestSpace(key).create();
 
-    for (let i = 0; i < 4; i++) {
-        assert(ts.nodes[i].logger.buffer.includes("ledger constructed"));
-        assert(ts.nodes[i].logger.buffer.includes("key loaded: " + ts.nodes[i].nodeKey.toString()));
-        assert(ts.nodes[i].logger.buffer.includes("node local URL: " + ts.nodes[i].myInfo.serverUrlString()));
-        assert(ts.nodes[i].logger.buffer.includes("node public URL: " + ts.nodes[i].myInfo.publicUrlString()));
-        assert(ts.nodes[i].logger.buffer.includes("Network configuration is loaded from " + ts.nodes[i].configRoot + ", " + ts.nodes[i].netConfig.size + " nodes."));
-        assert(ts.nodes[i].logger.buffer.includes("Starting the client HTTP server..."));
-        assert(ts.nodes[i].logger.buffer.includes("prepare to start client HTTP server on " + ts.nodes[i].myInfo.clientAddress.port));
-        assert(ts.nodes[i].logger.buffer.includes("Starting the Universa node service..."));
-        assert(ts.nodes[i].logger.buffer.includes(ts.nodes[i].myInfo.number + ": Network consensus is set to (negative/positive/resyncBreak): 2 / 3 / 2"));
+        for (let i = 0; i < 4; i++) {
+            assert(ts.nodes[i].logger.buffer.includes("ledger constructed"));
+            assert(ts.nodes[i].logger.buffer.includes("key loaded: " + ts.nodes[i].nodeKey.toString()));
+            assert(ts.nodes[i].logger.buffer.includes("node local URL: " + ts.nodes[i].myInfo.serverUrlString()));
+            assert(ts.nodes[i].logger.buffer.includes("node public URL: " + ts.nodes[i].myInfo.publicUrlString()));
+            assert(ts.nodes[i].logger.buffer.includes("Network configuration is loaded from " + ts.nodes[i].configRoot + ", " + ts.nodes[i].netConfig.size + " nodes."));
+            assert(ts.nodes[i].logger.buffer.includes("Starting the client HTTP server..."));
+            assert(ts.nodes[i].logger.buffer.includes("prepare to start client HTTP server on " + ts.nodes[i].myInfo.clientAddress.port));
+            assert(ts.nodes[i].logger.buffer.includes("Starting the Universa node service..."));
+            assert(ts.nodes[i].logger.buffer.includes(ts.nodes[i].myInfo.number + ": Network consensus is set to (negative/positive/resyncBreak): 2 / 3 / 2"));
+        }
+
+        await ts.shutdown();
     }
 
-    await ts.shutdown();
 });
 
 unit.test("main_test: resync", async () => {

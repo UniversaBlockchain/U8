@@ -87,6 +87,7 @@ unit.test("hello web", async () => {
     console.logPut(" rps=" + rps + " ");
     assert(receiveCounter == countToSend);
 
+    await httpClient.stop();
     await httpServer.stopServer();
 });
 
@@ -145,6 +146,7 @@ unit.test("http secure endpoints", async () => {
     console.logPut(" rps=" + rps + " ");
     assert(receiveCounter == countToSend);
 
+    await httpClient.stop();
     await httpServer.stopServer();
 });
 
