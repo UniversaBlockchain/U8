@@ -257,6 +257,8 @@ function InputStream(handle, buferLength = chunkSize) {
      */
     this.readAllAsString = this.allAsString;
 
+    this.close = async function() { return handle.close() };
+
     return this;
 }
 
@@ -287,7 +289,7 @@ function OutputStream(handle, bufferSize = chunkSize) {
         await handle.write(data);
     };
 
-    this.close = async function() { handle.close() };
+    this.close = async function() { return handle.close() };
 }
 
 async function openWrite(url, mode = "w", {bufferLength = chunkSize, umask = 0o644}={}) {
@@ -441,5 +443,20 @@ async function filePutContents(path, contents) {
     await h.close();
 }
 
+async function fileGetContentsAsString(path, contents) {
+    let h = await openRead(path);
+    let res = await h.allAsString();
+    await h.close();
+    return res;
+}
+
+async function fileGetContentsAsBytes(path, contents) {
+    let h = await openRead(path);
+    let res = await h.allBytes();
+    await h.close();
+    return res;
+}
+
 module.exports = {openRead, openWrite, InputStream, OutputStream, AsyncProcessor, IoError, isAccessible, isFile, isDir,
-    EntryType, getEntriesFromDir, getFilesFromDir, getTmpDirPath, createDir, removeDir, filePutContents};
+    EntryType, getEntriesFromDir, getFilesFromDir, getTmpDirPath, createDir, removeDir, filePutContents,
+    fileGetContentsAsString, fileGetContentsAsBytes};

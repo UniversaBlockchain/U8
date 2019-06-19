@@ -112,11 +112,11 @@ class UBotMain {
     async loadNodeConfig() {
         this.configRoot = this.parser.values.get("config");
 
-        let settings = yaml.load(await (await io.openRead(this.configRoot + "/config/config.yaml")).allAsString());
+        let settings = yaml.load(await io.fileGetContentsAsString(this.configRoot + "/config/config.yaml"));
 
         // let settingsShared;
         // if (await io.isAccessible(this.configRoot + "/config/shared.yaml"))
-        //     settingsShared = yaml.load(await (await io.openRead(this.configRoot + "/config/shared.yaml")).allAsString());
+        //     settingsShared = yaml.load(await io.fileGetContentsAsString(this.configRoot + "/config/shared.yaml"));
         // else
         //     settingsShared = settings;
 
@@ -126,7 +126,7 @@ class UBotMain {
         let nodeKeyFileName = this.configRoot + "/tmp/" + nodeName + ".private.unikey";
         //this.logger.log("nodeKeyFileName: " + nodeKeyFileName);
 
-        this.nodeKey = new PrivateKey(await (await io.openRead(nodeKeyFileName)).allBytes());
+        this.nodeKey = new PrivateKey(await io.fileGetContentsAsBytes(nodeKeyFileName));
 
         this.myInfo = NodeInfo.withParameters(this.nodeKey.publicKey,
             t.getOrThrow(settings, "node_number"),

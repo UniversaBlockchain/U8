@@ -78,7 +78,7 @@ network.NodeInfo = class {
 
     static async loadYaml(fileName) {
         try {
-            let data = yaml.load(await (await io.openRead(fileName)).allAsString());
+            let data = yaml.load(await io.fileGetContentsAsString(fileName));
 
             let nodeName = t.getOrThrow(data, "node_name");
 
@@ -89,7 +89,7 @@ network.NodeInfo = class {
             let keyPath = fileName.substring(0, fileName.length - nodePathEnd.length) + "/keys/" + nodeName + ".public.unikey";
             //console.log("expected key file path: <" + keyPath + ">");
 
-            let key = new PublicKey(await (await io.openRead(keyPath)).allBytes());
+            let key = new PublicKey(await io.fileGetContentsAsBytes(keyPath));
             return network.NodeInfo.withParameters(key,
                 t.getOrThrow(data, "node_number"),
                 nodeName,

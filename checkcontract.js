@@ -10,6 +10,7 @@ async function main(args) {
 
     let input = await io.openRead(args[0]);
     let sealed = await input.allBytes();
+    await input.close();
 
     let contract = TransactionPack.unpack(sealed).contract;
     await contract.check();

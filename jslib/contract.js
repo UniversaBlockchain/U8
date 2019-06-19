@@ -2135,6 +2135,7 @@ class Contract extends bs.BiSerializable {
     static async fromDslFile(fileName, contract = undefined) {
         let input = await io.openRead(fileName);
         let data = await input.allAsString();
+        await input.close();
 
         let root = DefaultBiMapper.getInstance().deserialize(yaml.load(data));
 

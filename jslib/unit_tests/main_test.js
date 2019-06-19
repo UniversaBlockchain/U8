@@ -210,7 +210,7 @@ unit.test("main_test: createTestSpace", async () => {
     for (let i = 0; i < 30; i++)
     {
         console.log(i);
-        let key = new PrivateKey(await (await io.openRead("../test/keys/reconfig_key.private.unikey")).allBytes());
+        let key = new PrivateKey(await io.fileGetContentsAsBytes("../test/keys/reconfig_key.private.unikey"));
         let ts = await new TestSpace(key).create();
 
         for (let i = 0; i < 4; i++) {
