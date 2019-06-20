@@ -45,16 +45,16 @@ function parcelAssertions(parcel1, parcel2) {
     tt.assertSameContracts(parcel1.payload.contract, parcel2.payload.contract);
     tt.assertSameContracts(parcel1.payment.contract, parcel2.payment.contract);
 
-    for (let k of Object.keys(parcel1.payload.subItems))
+    for (let k of parcel1.payload.subItems.keys())
         tt.assertSameContracts(parcel1.payload.subItems.get(k), parcel2.payload.subItems.get(k));
 
-    for (let k of Object.keys(parcel1.payload.referencedItems))
+    for (let k of parcel1.payload.referencedItems.keys())
         tt.assertSameContracts(parcel1.payload.referencedItems.get(k), parcel2.payload.referencedItems.get(k));
 
-    for (let k of Object.keys(parcel1.payment.subItems))
+    for (let k of parcel1.payment.subItems.keys())
         tt.assertSameContracts(parcel1.payment.subItems.get(k), parcel2.payment.subItems.get(k));
 
-    for (let k of Object.keys(parcel1.payment.referencedItems))
+    for (let k of parcel1.payment.referencedItems.keys())
         tt.assertSameContracts(parcel1.payment.referencedItems.get(k), parcel2.payment.referencedItems.get(k));
 }
 

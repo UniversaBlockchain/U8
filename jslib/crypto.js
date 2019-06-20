@@ -167,6 +167,13 @@ const PublicKey = crypto.PublicKey = class extends crypto.PublicKeyImpl {
         return this.memoise("__bits", () => this.__getBitsStrength())
     }
 
+    stringId() {
+        if (this.stringId_ == null)
+            this.stringId_ = "Puk:" + this.longAddress.toString();
+
+        return this.stringId_;
+    }
+
     toString() {
         return "Puk:" + this.longAddress.toString().slice(0, 14) + "...";
     }
@@ -282,6 +289,13 @@ const HashId = crypto.HashId = class extends crypto.HashIdImpl {
      */
     equals(anotherId) {
         return equalArrays(this.digest, anotherId.digest);
+    }
+
+    stringId() {
+        if (this.stringId_ == null)
+            this.stringId_ = this.base64;
+
+        return this.stringId_;
     }
 
     toString() {

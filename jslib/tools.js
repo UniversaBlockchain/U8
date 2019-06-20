@@ -133,36 +133,69 @@ Object.prototype.equals = function(to) {
     throw new ex.IllegalArgumentError("Error: equals is not redefined for custom object "); //+ JSON.stringify(this);
 };
 
+Object.prototype.stringId = function () {
+    console.log("Error: stringId is not redefined for custom object " + this.constructor.name);
+    throw new ex.IllegalArgumentError("Error: stringId is not redefined for custom object " + this.constructor.name);
+};
+
+Uint8Array.prototype.stringId = function () {
+    if (this.stringId_ == null)
+        this.stringId_ = btoa(this);
+
+    return this.stringId_;
+};
 
 class GenericMap extends Map {
-    get(x) {
-        for (let k of this.keys())
-            if (valuesEqual(k, x))
-                return super.get(k);
 
-        return null;
+    constructor() {
+        super();
+        this.genKeys = new Map();
+    }
+
+    get(x) {
+        let k = (typeof x === "object") ? x.stringId() : x;
+
+        return super.get(k);
     }
 
     has(x) {
-        for (let k of this.keys())
-            if (valuesEqual(k, x))
-                return true;
+        let k = (typeof x === "object") ? x.stringId() : x;
 
-        return false;
+        return super.has(k);
     }
 
     delete(x) {
-        for (let k of this.keys())
-            if (valuesEqual(k, x))
-                return super.delete(k);
+        let k = (typeof x === "object") ? x.stringId() : x;
 
-        return false;
+        this.genKeys.delete(k);
+        return super.delete(k);
     }
 
     set(key, value) {
-        this.delete(key);
+        let k = (typeof key === "object") ? key.stringId() : key;
 
-        return super.set(key, value);
+        this.genKeys.set(k, key);
+        return super.set(k, value);
+    }
+
+    keys() {
+        return this.genKeys.values();
+    }
+
+    entries() {
+        return {
+            next: function() {
+                let k = this.genKeys.next();
+                return { value: [this.originalKeys.get(k.value), this.genValues.next().value], done: k.done };
+            },
+            genKeys: super.keys(),
+            genValues: this.values(),
+            originalKeys: this.genKeys
+        };
+    }
+
+    [Symbol.iterator]() {
+        return this.entries();
     }
 }
 

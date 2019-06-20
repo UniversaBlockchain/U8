@@ -401,3 +401,71 @@ unit.test("main_test: register bad item", async () => {
 
     await ts.shutdown();
 });
+
+/*unit.test("main_test: simpleBenchmark", async () => {
+    let key = new PrivateKey(await (await io.openRead("../test/keys/reconfig_key.private.unikey")).allBytes());
+    let ts = await new TestSpace(key).create();
+
+    let k = tk.TestKeys.getKey();
+    let start = new Date().getTime();
+
+    for (let i = 0; i < 100; i++) {
+        console.log("iteration " + i);
+        let item = Contract.fromPrivateKey(k);
+        item.state.data.val = i;
+
+        await item.seal(true);
+
+        await ts.node.node.registerItem(item);
+        let ir = await ts.node.node.waitItem(item.id, 8000);
+        assert(ir.state === ItemState.APPROVED);
+    }
+
+    let finish = new Date().getTime();
+    let time = finish - start;
+
+    console.log("result " + time + " ms");
+    //45096
+    //44298
+    //44450
+    //43126
+    //43710
+
+    await ts.shutdown();
+});
+
+unit.test("main_test: parallelBenchmark", async () => {
+    let key = new PrivateKey(await (await io.openRead("../test/keys/reconfig_key.private.unikey")).allBytes());
+    let ts = await new TestSpace(key).create();
+
+    let promises = [];
+
+    let k = tk.TestKeys.getKey();
+    let start = new Date().getTime();
+
+    for (let i = 0; i < 100; i++) {
+        console.log("iteration " + i);
+        let item = Contract.fromPrivateKey(k);
+        item.state.data.val = i;
+
+        await item.seal(true);
+
+        await ts.node.node.registerItem(item);
+        promises.push(ts.node.node.waitItem(item.id, 10000));
+    }
+
+    let res = (await Promise.all(promises)).every(ir => ir.state === ItemState.APPROVED);
+    assert(res);
+
+    let finish = new Date().getTime();
+    let time = finish - start;
+
+    console.log("result " + time + " ms");
+    //20780
+    //21757
+    //21806
+    //23061
+    //21556
+
+    await ts.shutdown();
+});*/

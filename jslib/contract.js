@@ -989,7 +989,7 @@ class Contract extends bs.BiSerializable {
      * Asynchronously checks contract filling the {@link Contract.errors}. Call it without params on root contract of transaction
      *
      * @param {string} prefix - used for subsequent checks of children contracts
-     * @param {t.GenericMap} contractsTree - used for subsequent checks of children contracts
+     * @param {GenericMap} contractsTree - used for subsequent checks of children contracts
      * @returns {Promise<boolean>} indicating if check was successful
      */
     async check(prefix = "", contractsTree = null) {
@@ -1073,7 +1073,7 @@ class Contract extends bs.BiSerializable {
 
     checkDupesCreation(contractsTree) {
         let revisionIds = new Set();
-        for (let [id,c] of  contractsTree) {
+        for (let c of contractsTree.values()) {
             let cid = c.getRevisionId();
             if (revisionIds.has(cid)) {
                 this.errors.push(new ErrorRecord(Errors.BAD_VALUE, "", "duplicated revision id: " + cid));

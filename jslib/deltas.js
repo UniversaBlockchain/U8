@@ -100,7 +100,7 @@ class MapDelta extends Delta {
         this.changes = {};
 
         for (let key in oldMap) {
-            if(key === "equals")
+            if (key === "equals" || key === "stringId")
                 continue;
 
             if(newMap.hasOwnProperty(key)) {
@@ -114,7 +114,7 @@ class MapDelta extends Delta {
 
         // detecting new items
         for (let key in newMap) {
-            if(key === "equals")
+            if (key === "equals" || key === "stringId")
                 continue;
 
             if (!oldMap.hasOwnProperty(key) ) {

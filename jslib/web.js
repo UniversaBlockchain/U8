@@ -132,6 +132,13 @@ network.NodeInfo = class {
             "http://localhost:" + this.clientAddress.port :
             "http://" + this.host + ":" + this.publicPort;
     }
+
+    stringId() {
+        if (this.stringId_ == null)
+            this.stringId_ = this.number.toString();
+
+        return this.stringId_;
+    }
 };
 Object.assign(network.NodeInfo.prototype, MemoiseMixin);
 

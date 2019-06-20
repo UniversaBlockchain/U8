@@ -628,9 +628,9 @@ class SimpleRole extends Role {
         let data = Object.getPrototypeOf(SimpleRole.prototype).serialize.call(this,serializer);
 
         let array = [];
-        for (let [k,v] of this.keyRecords) {
+        for (let v of this.keyRecords.values())
             array.push(v);
-        }
+
         data.keys = serializer.serialize(array);
         data.addresses = serializer.serialize(this.keyAddresses);
 
