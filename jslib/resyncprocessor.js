@@ -14,9 +14,9 @@ class ResyncProcessor {
         this.resyncingItem = null;
         this.resyncExpiresAt = null;
         this.resyncer = null;
-        this.envSources = new Set();
-        this.resyncingSubTreeItems = new Set();
-        this.resyncingSubTreeItemsResults = new Map();
+        this.envSources = new t.GenericSet();
+        this.resyncingSubTreeItems = new t.GenericSet();
+        this.resyncingSubTreeItemsResults = new t.GenericSet();
         this.obtainedAnswersFromNodes = new Set();
         this.resyncExpirationTimer = null;
 
@@ -152,7 +152,7 @@ class ResyncProcessor {
 
     async saveResyncedEnvironments() {
         if (this.envSources.size > 0) {
-            let itemsToReResync = new Set();
+            let itemsToReResync = new t.GenericSet();
             let array = Array.from(this.envSources);
             let from = array[array.length * Math.random()];
 
@@ -186,10 +186,10 @@ class ResyncingItem {
         this.finishEvent = new Promise(resolve => this.finishFire = resolve);
 
         this.resyncNodes = new Map();
-        this.resyncNodes.set(ItemState.APPROVED, new Set());
-        this.resyncNodes.set(ItemState.REVOKED, new Set());
-        this.resyncNodes.set(ItemState.DECLINED, new Set());
-        this.resyncNodes.set(ItemState.UNDEFINED, new Set());
+        this.resyncNodes.set(ItemState.APPROVED, new t.GenericSet());
+        this.resyncNodes.set(ItemState.REVOKED, new t.GenericSet());
+        this.resyncNodes.set(ItemState.DECLINED, new t.GenericSet());
+        this.resyncNodes.set(ItemState.UNDEFINED, new t.GenericSet());
     }
 
     resyncVote(node, state) {
@@ -206,7 +206,7 @@ class ResyncingItem {
                 this.resyncNodes.get(is).delete(node);
 
         if (!this.resyncNodes.has(state))
-            this.resyncNodes.set(state, new Set());
+            this.resyncNodes.set(state, new t.GenericSet());
 
         this.resyncNodes.get(state).add(node);
 
@@ -248,7 +248,7 @@ class ResyncingItem {
         new ScheduleExecutor(async () => {
             if (committingState.isConsensusFound) {
                 // make local set of nodes to prevent changing set of nodes while committing
-                let rNodes = new Set(this.resyncNodes.get(committingState));
+                let rNodes = new t.GenericSet(this.resyncNodes.get(committingState));
 
                 let createdAtClusters = new Map();
                 let expiresAtClusters = new Map();

@@ -50,7 +50,7 @@ unit.test("collection_test: GenericMap", async () => {
     assert(!m.delete(HashId.of(randomBytes(64))));
 });
 
-unit.test("collection_test: Set", async () => {
+unit.test("collection_test: t.GenericSet", async () => {
     let h1 = HashId.of(randomBytes(64));
     let h2 = HashId.of(randomBytes(64));
 
@@ -60,7 +60,7 @@ unit.test("collection_test: Set", async () => {
     assert(h1copy.equals(h1));
     assert(h2copy.equals(h2));
 
-    let s = new Set();
+    let s = new t.GenericSet();
 
     s.add(h1);
     s.add(h2);
@@ -70,7 +70,7 @@ unit.test("collection_test: Set", async () => {
 
     assert (s.size === 2);
 
-    let s2 = new Set();
+    let s2 = new t.GenericSet();
 
     s2.add(h2copy);
     s2.add(h1copy);

@@ -229,8 +229,8 @@ class UnsContract extends NSmartContract {
      * Save constraints with origin conditions to state.
      */
     saveOriginConstraintsToState() {
-        let origins = new Set();
-        let constraintsToRemove = new Set();
+        let origins = new t.GenericSet();
+        let constraintsToRemove = new t.GenericSet();
 
         this.storedNames.forEach(sn => sn.unsRecords.forEach(unsRecord => {
             if (unsRecord.unsOrigin != null)
@@ -495,7 +495,7 @@ class UnsContract extends NSmartContract {
     }
 
     getOriginsToCheck() {
-        let origins = new Set();
+        let origins = new t.GenericSet();
         this.storedNames.forEach(sn => sn.unsRecords.forEach(rec => {
             if (rec.unsOrigin != null)
                 origins.add(rec.unsOrigin);

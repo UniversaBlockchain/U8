@@ -93,7 +93,7 @@ class Constraint extends bs.BiSerializable {
         this.signed_by = [];
         this.fields = [];
         this.roles = [];
-        this.matchingItems = new Set();
+        this.matchingItems = new t.GenericSet();
         this.conditions = {};
         this.comment = null;
     }
@@ -1714,6 +1714,17 @@ class Constraint extends bs.BiSerializable {
             throw new ex.IllegalArgumentError("Expected all_of or any_of");
     }
 
+    toString() {
+        return crypto.HashId.of(t.randomBytes(64));
+    }
+
+    stringId() {
+        if (this.stringId_ == null)
+            this.stringId_ = this.toString();
+
+        return this.stringId_;
+    }
+
     static fromDsl(c, contract) {
         let result = new Constraint(contract);
 
@@ -1728,7 +1739,7 @@ class Constraint extends bs.BiSerializable {
         if(c.hasOwnProperty("where")) {
             let where = {};
             let proto = Object.getPrototypeOf(c.where);
-            if (proto === Array.prototype || proto === Set.prototype)
+            if (proto === Array.prototype || proto === Set.prototype || proto === t.GenericSet.prototype)
                 where[Constraint.conditionsModeType.all_of] = c.where;
             else
                 where = c.where;

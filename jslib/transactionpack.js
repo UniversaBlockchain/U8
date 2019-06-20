@@ -13,7 +13,7 @@ class TransactionPack {
     constructor(contract) {
         this.subItems = new t.GenericMap();
         this.referencedItems = new t.GenericMap();
-        this.keysForPack = new Set();
+        this.keysForPack = new t.GenericSet();
         this.contract = contract;
         if(contract) {
             this.extractAllSubItemsAndReferenced(contract);
@@ -61,7 +61,7 @@ class TransactionPack {
             }
         }
 
-        let missingIds = new Set();
+        let missingIds = new t.GenericSet();
         let allDeps = [];
         for(let subitemBinary of deserializer.deserialize(data.subItems)) {
             let deps = new ContractDependencies(subitemBinary);
@@ -184,7 +184,7 @@ class TransactionPack {
 function ContractDependencies(binary) {
     this.id = crypto.HashId.of(binary);
     this.binary = binary;
-    this.dependencies = new Set();
+    this.dependencies = new t.GenericSet();
     let data = Boss.load(binary);
     let contractBytes = data.data;
     let serializedContract = Boss.load(contractBytes);

@@ -75,7 +75,7 @@ class ParcelProcessor {
             this.payload = parcel.getPayloadContract();
         }
 
-        this.sources = new Set();
+        this.sources = new t.GenericSet();
 
         this.paymentDelayedVotes = new t.GenericMap();
         this.payloadDelayedVotes = new t.GenericMap();

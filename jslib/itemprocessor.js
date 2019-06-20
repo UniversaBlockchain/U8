@@ -94,10 +94,10 @@ class ItemProcessor {
 
         this.record = null;
 
-        this.sources = new Set();
+        this.sources = new t.GenericSet();
 
-        this.positiveNodes = new Set();
-        this.negativeNodes = new Set();
+        this.positiveNodes = new t.GenericSet();
+        this.negativeNodes = new t.GenericSet();
 
         this.resyncingItems = new t.GenericMap();
         this.resyncingItemsResults = new t.GenericMap();
@@ -106,8 +106,8 @@ class ItemProcessor {
         if (this.item == null)
             this.item = this.node.cache.get(itemId);
 
-        this.lockedToRevoke = new Set();
-        this.lockedToCreate = new Set();
+        this.lockedToRevoke = new t.GenericSet();
+        this.lockedToCreate = new t.GenericSet();
 
         this.pollingExpiresAt = Date.now() + Config.maxElectionsTime * 1000;    // in milliseconds
         this.consensusReceivedExpiresAt = Date.now() + Config.maxConsensusReceivedCheckTime * 1000;    // in milliseconds
@@ -254,7 +254,7 @@ class ItemProcessor {
                 if (this.item instanceof Contract && this.item.transactionPack != null) {
                     let referencedItems = this.item.transactionPack.referencedItems;
                     if (referencedItems.size > 0) {
-                        let invalidItems = await this.node.ledger.findBadReferencesOf(new Set(referencedItems.keys()));
+                        let invalidItems = await this.node.ledger.findBadReferencesOf(new t.GenericSet(referencedItems.keys()));
                         invalidItems.forEach(id => referencedItems.delete(id));
                     }
                 }

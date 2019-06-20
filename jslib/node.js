@@ -650,7 +650,7 @@ class Node {
     }
 
     async removeLocks(record) {
-        let idsToRemove = new Set();
+        let idsToRemove = new t.GenericSet();
         for (let r of this.recordsToSanitate.values()) {
             if (r.lockedByRecordId === record.recordId) {
                 try {

@@ -402,7 +402,7 @@ unit.test("main_test: register bad item", async () => {
     await ts.shutdown();
 });
 
-/*unit.test("main_test: simpleBenchmark", async () => {
+unit.test("main_test: simpleBenchmark", async () => {
     let key = new PrivateKey(await (await io.openRead("../test/keys/reconfig_key.private.unikey")).allBytes());
     let ts = await new TestSpace(key).create();
 
@@ -468,4 +468,4 @@ unit.test("main_test: parallelBenchmark", async () => {
     //21556
 
     await ts.shutdown();
-});*/
+});

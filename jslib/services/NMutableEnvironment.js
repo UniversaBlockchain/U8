@@ -17,17 +17,17 @@ class NMutableEnvironment extends NImmutableEnvironment {
         this.id = ime.id;
         this.immutable = ime;
 
-        this.subscriptionsToAdd = new Set();
-        this.subscriptionsToDestroy = new Set();
-        this.subscriptionsToSave = new Set();
+        this.subscriptionsToAdd = new t.GenericSet();
+        this.subscriptionsToDestroy = new t.GenericSet();
+        this.subscriptionsToSave = new t.GenericSet();
 
-        this.nameRecordsToAdd = new Set();
-        this.nameRecordsToDestroy = new Set();
-        this.nameRecordsToSave = new Set();
+        this.nameRecordsToAdd = new t.GenericSet();
+        this.nameRecordsToDestroy = new t.GenericSet();
+        this.nameRecordsToSave = new t.GenericSet();
 
-        this.storagesToAdd = new Set();
-        this.storagesToDestroy = new Set();
-        this.storagesToSave = new Set();
+        this.storagesToAdd = new t.GenericSet();
+        this.storagesToDestroy = new t.GenericSet();
+        this.storagesToSave = new t.GenericSet();
     }
 
     set(key, value) {

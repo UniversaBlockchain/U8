@@ -347,7 +347,7 @@ class SlotContract extends NSmartContract {
         let newContracts = new t.GenericMap();
         this.trackingContracts.forEach(c => newContracts.set(c.id, c));
 
-        let newContractIds = new Set(newContracts.keys());
+        let newContractIds = new t.GenericSet(newContracts.keys());
 
         // update storages
         me.storages().forEach(storage => {

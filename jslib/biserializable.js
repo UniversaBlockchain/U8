@@ -94,13 +94,7 @@ class BiMapper {
                 result[key] = this.serialize(object[key]);
             }
             return result;
-        } else if(object instanceof Array) {
-            let result = [];
-            for(let element of object) {
-                result.push(this.serialize(element));
-            }
-            return result;
-        } else if(object instanceof Set) {
+        } else if(object instanceof Array || object instanceof Set || object instanceof t.GenericSet) {
             let result = [];
             for(let element of object) {
                 result.push(this.serialize(element));

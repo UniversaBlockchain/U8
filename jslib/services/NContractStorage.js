@@ -1,5 +1,6 @@
 const ContractStorage = require("services/contractStorage").ContractStorage;
 const ex = require("exceptions");
+const t = require("tools");
 
 /**
  * Implements {@see ContractStorage} interface for contract.
@@ -42,6 +43,17 @@ class NContractStorage extends ContractStorage {
             packedContract : serializer.serialize(this.packedContract),
             expiresAt : serializer.serialize(this.expiresAt)
         };
+    }
+
+    toString() {
+        return crypto.HashId.of(t.randomBytes(64));
+    }
+
+    stringId() {
+        if (this.stringId_ == null)
+            this.stringId_ = this.toString();
+
+        return this.stringId_;
     }
 }
 

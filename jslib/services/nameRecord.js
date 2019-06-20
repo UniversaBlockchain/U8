@@ -41,7 +41,7 @@ class NameRecord {
     }
 
     /**
-     * @return {[NameRecordEntry]}
+     * @return {GenericSet<NameRecordEntry>}
      */
     getEntries() {
         throw new Error("not implemented");

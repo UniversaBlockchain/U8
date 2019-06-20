@@ -1,4 +1,5 @@
 import * as trs from "timers";
+import * as t from "tools";
 
 class ExecutorService {
 
@@ -8,7 +9,7 @@ class ExecutorService {
      * @class
      */
     constructor() {
-        this.executors = new Set();
+        this.executors = new t.GenericSet();
     }
 
     /**
@@ -64,6 +65,17 @@ class Executor {
      */
     equals(to) {
         return this === to;
+    }
+
+    toString() {
+        return crypto.HashId.of(t.randomBytes(64));
+    }
+
+    stringId() {
+        if (this.stringId_ == null)
+            this.stringId_ = this.toString();
+
+        return this.stringId_;
     }
 }
 

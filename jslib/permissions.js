@@ -420,7 +420,7 @@ class SplitJoinPermission extends Permission {
 
         // We need to find the splitted contracts
         let sum = new BigDecimal("0");
-        let revokesToRemove = new Set();
+        let revokesToRemove = new t.GenericSet();
 
         for (let s of changed.context.siblings) {
 
@@ -450,7 +450,7 @@ class SplitJoinPermission extends Permission {
 
         // merge means there are mergeable contracts in the revoking items
         let sum = new BigDecimal("0");
-        let revokesToRemove = new Set();
+        let revokesToRemove = new t.GenericSet();
         for (let c of changed.revokingItems) {
 
             if (!this.isMergeable(c) || !this.validateMergeFields(changed, c) || !this.hasSimilarPermission(c, keys,true))

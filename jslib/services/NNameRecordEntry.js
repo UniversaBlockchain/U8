@@ -1,4 +1,5 @@
 const NameRecordEntry = require("services/nameRecordEntry").NameRecordEntry;
+const t = require("tools");
 
 /**
  * Implements {@see NameRecordEntry} interface for UNS contract.
@@ -50,6 +51,17 @@ class NNameRecordEntry extends NameRecordEntry {
             shortAddress : serializer.serialize(this.shortAddress),
             longAddress : serializer.serialize(this.longAddress)
         };
+    }
+
+    toString() {
+        return crypto.HashId.of(t.randomBytes(64));
+    }
+
+    stringId() {
+        if (this.stringId_ == null)
+            this.stringId_ = this.toString();
+
+        return this.stringId_;
     }
 }
 

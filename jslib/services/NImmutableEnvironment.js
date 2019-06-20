@@ -32,18 +32,18 @@ class NImmutableEnvironment extends ImmutableEnvironment {
 
         if (kvStorage === undefined || subscriptions === undefined || storages === undefined ||
             nameRecords === undefined || followerService === undefined) {
-            this.subscriptionsSet = new Set();
-            this.storagesSet = new Set();
-            this.nameRecordsSet = new Set();
+            this.subscriptionsSet = new t.GenericSet();
+            this.storagesSet = new t.GenericSet();
+            this.nameRecordsSet = new t.GenericSet();
             return;
         }
 
         if (kvStorage != null)
             this.kvStore = kvStorage;
 
-        this.subscriptionsSet = new Set(subscriptions);
-        this.storagesSet = new Set(storages);
-        this.nameRecordsSet = new Set(nameRecords);
+        this.subscriptionsSet = new t.GenericSet(subscriptions);
+        this.storagesSet = new t.GenericSet(storages);
+        this.nameRecordsSet = new t.GenericSet(nameRecords);
         this.followerService = followerService;
         this.nameCache = null;
     }
@@ -169,9 +169,9 @@ class NImmutableEnvironment extends ImmutableEnvironment {
 
     deserialize(data, deserializer) {
         this.createdAt = deserializer.deserialize(data.createdAt);
-        this.subscriptionsSet = new Set(deserializer.deserialize(data.subscriptions));
-        this.storagesSet = new Set(deserializer.deserialize(data.storages));
-        this.nameRecordsSet = new Set(deserializer.deserialize(data.nameRecords));
+        this.subscriptionsSet = new t.GenericSet(deserializer.deserialize(data.subscriptions));
+        this.storagesSet = new t.GenericSet(deserializer.deserialize(data.storages));
+        this.nameRecordsSet = new t.GenericSet(deserializer.deserialize(data.nameRecords));
         this.contract = Contract.fromPackedTransaction(data.contract);
         this.kvStore = deserializer.deserialize(data.kvStore);
     }

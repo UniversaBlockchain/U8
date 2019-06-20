@@ -1,4 +1,5 @@
 const ContractSubscription = require("services/contractSubscription").ContractSubscription;
+const t = require("tools");
 
 /**
  * Implements {@see ContractSubscription} interface for contract.
@@ -51,6 +52,17 @@ class NContractSubscription extends ContractSubscription {
             isChainSubscription : this.isChainSubscription,
             expiresAt : serializer.serialize(this.expiresAt)
         };
+    }
+
+    toString() {
+        return crypto.HashId.of(t.randomBytes(64));
+    }
+
+    stringId() {
+        if (this.stringId_ == null)
+            this.stringId_ = this.toString();
+
+        return this.stringId_;
     }
 }
 

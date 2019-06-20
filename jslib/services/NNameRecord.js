@@ -1,5 +1,6 @@
 const NameRecord = require("services/nameRecord").NameRecord;
 const NNameRecordEntry = require("services/NNameRecordEntry").NNameRecordEntry;
+const t = require("tools");
 
 /**
  * Implements {@see NameRecord} interface for UNS contract.
@@ -16,9 +17,9 @@ class NNameRecord extends NameRecord {
         this.expiresAt = expiresAt;
 
         if (entries !== undefined)
-            this.entries = new Set(entries);
+            this.entries = new t.GenericSet(entries);
         else {
-            this.entries = new Set();
+            this.entries = new t.GenericSet();
 
             unsName.unsRecords.forEach(unsRecord => {
                 let longAddress = null;
@@ -67,7 +68,7 @@ class NNameRecord extends NameRecord {
     }
 
     getEntries() {
-        return new Set(this.entries);
+        return new t.GenericSet(this.entries);
     }
 
     deserialize(data, deserializer) {
@@ -86,7 +87,7 @@ class NNameRecord extends NameRecord {
 
         this.expiresAt = deserializer.deserialize(data.expiresAt);
 
-        this.entries = new Set(deserializer.deserialize(data.entries));
+        this.entries = new t.GenericSet(deserializer.deserialize(data.entries));
     }
 
     serialize(serializer) {
@@ -98,6 +99,17 @@ class NNameRecord extends NameRecord {
             expiresAt : serializer.serialize(this.expiresAt),
             entries : serializer.serialize(Array.from(this.entries))
         };
+    }
+
+    toString() {
+        return crypto.HashId.of(t.randomBytes(64));
+    }
+
+    stringId() {
+        if (this.stringId_ == null)
+            this.stringId_ = this.toString();
+
+        return this.stringId_;
     }
 }
 

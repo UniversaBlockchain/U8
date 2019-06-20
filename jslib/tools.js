@@ -1,3 +1,4 @@
+const ex = require("exceptions");
 
 function arraysEqual(a, b) {
     if (a === b) return true;
@@ -9,7 +10,7 @@ function arraysEqual(a, b) {
     // Please note that calling sort on an array will modify that array.
     // you might want to clone your array first.
 
-    for (var i = 0; i < a.length; ++i) {
+    for (let i = 0; i < a.length; ++i) {
         if (a[i] !== b[i]) return false;
     }
     return true;
@@ -109,7 +110,7 @@ Object.prototype.equals = function(to) {
     }
 
     //Set
-    if(this instanceof Set) {
+    if(this instanceof Set || this instanceof GenericSet) {
         if(this.size !== to.size) {
             return false;
         }
@@ -186,11 +187,10 @@ class GenericMap extends Map {
         return {
             next: function() {
                 let k = this.genKeys.next();
-                return { value: [this.originalKeys.get(k.value), this.genValues.next().value], done: k.done };
+                return { value: [k.value, this.genValues.next().value], done: k.done };
             },
-            genKeys: super.keys(),
-            genValues: this.values(),
-            originalKeys: this.genKeys
+            genKeys: this.keys(),
+            genValues: this.values()
         };
     }
 
@@ -199,10 +199,53 @@ class GenericMap extends Map {
     }
 }
 
+class GenericSet {
 
-let addFunc = Set.prototype.add;
-let deleteFunc = Set.prototype.delete;
+    constructor(iterable = null) {
+        this.genKeys = new Map();
 
+        if (iterable != null)
+            for (let i of iterable)
+                this.genKeys.set((typeof i === "object") ? i.stringId() : i, i);
+    }
+
+    add(x) {
+        let k = (typeof x === "object") ? x.stringId() : x;
+
+        this.genKeys.set(k, x);
+
+        return this;
+    }
+
+    has(x) {
+        let k = (typeof x === "object") ? x.stringId() : x;
+
+        return this.genKeys.has(k);
+    }
+
+    delete(x) {
+        let k = (typeof x === "object") ? x.stringId() : x;
+
+        return this.genKeys.delete(k);
+    }
+
+    clear() {
+        this.genKeys.clear();
+    }
+
+    get size() {
+        return this.genKeys.size;
+    }
+
+    forEach(callback) {
+        for (let v of this.genKeys.values())
+            callback(v);
+    }
+
+    [Symbol.iterator]() {
+        return this.genKeys.values();
+    }
+}
 
 Date.prototype.equals = function(to) {
     if(this === to)
@@ -213,6 +256,9 @@ Date.prototype.equals = function(to) {
 
     return this.getTime() === to.getTime();
 };
+
+/*let addFunc = Set.prototype.add;
+let deleteFunc = Set.prototype.delete;
 
 Set.prototype.has = function(value) {
     for(let k of this) {
@@ -242,7 +288,7 @@ Set.prototype.delete = function (value) {
         return deleteFunc.call(this, found);
 
     return false;
-};
+};*/
 
 function randomString(length) {
     let string = "";
@@ -354,5 +400,5 @@ function addValAndOrdinalMaps(en) {
     en.byVal.get = function (key) {return en[key]};
 }
 
-module.exports = {arraysEqual, valuesEqual, randomString, MemoiseMixin, PackedEqMixin, DigestEqMixin, GenericMap, equals,
-    THROW_EXCEPTIONS, convertToDate, randomBytes, getOrDefault, getOrThrow, addValAndOrdinalMaps};
+module.exports = {arraysEqual, valuesEqual, randomString, MemoiseMixin, PackedEqMixin, DigestEqMixin, GenericMap, GenericSet,
+    equals, THROW_EXCEPTIONS, convertToDate, randomBytes, getOrDefault, getOrThrow, addValAndOrdinalMaps};

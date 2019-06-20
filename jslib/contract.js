@@ -25,7 +25,7 @@ const MAX_API_LEVEL = 4;
 
 function Context(base) {
     this.base = base;
-    this.siblings = new Set();
+    this.siblings = new t.GenericSet();
 }
 
 class Transactional extends bs.BiSerializable {
@@ -39,7 +39,7 @@ class Transactional extends bs.BiSerializable {
         super();
         this.contract = contract;
         this.id = null;
-        this.constraints = new Set();
+        this.constraints = new t.GenericSet();
         this.validUntil = null;
         this.data = {};
     }
@@ -99,7 +99,7 @@ class State extends bs.BiSerializable {
         this.parent = null;
         this.data = {};
         this.branchId = null;
-        this.constraints = new Set();
+        this.constraints = new t.GenericSet();
 
         //TODO:setJS
     }
@@ -183,7 +183,7 @@ class State extends bs.BiSerializable {
         else if (data.hasOwnProperty("references"))
             this.constraints = deserializer.deserialize(data.references);
         else
-            this.constraints = new Set();
+            this.constraints = new t.GenericSet();
 
         let r = this.contract.registerRole(deserializer.deserialize(data.owner))
         if(r.name !== "owner")
@@ -280,7 +280,7 @@ class Definition extends bs.BiSerializable {
         this.createdAt.setMilliseconds(0);
         this.expiresAt = null;
         this.data = {};
-        this.constraints = new Set();
+        this.constraints = new t.GenericSet();
         this.extendedType = null;
         this.permissions = new Map();
 
@@ -376,7 +376,7 @@ class Definition extends bs.BiSerializable {
         else if (data.hasOwnProperty("references"))
             this.constraints = deserializer.deserialize(data.references);
         else
-            this.constraints = new Set();
+            this.constraints = new t.GenericSet();
 
         let perms = deserializer.deserialize(data.permissions);
         for(let pid of Object.keys(perms)) {
@@ -459,7 +459,7 @@ class Definition extends bs.BiSerializable {
                 // this complex logic is needed to process both yaml-imported structures
                 // and regular serialized data in the same place
                 let proto = Object.getPrototypeOf(params);
-                if (proto === Array.prototype || proto === Set.prototype)
+                if (proto === Array.prototype || proto === Set.prototype || proto === t.GenericSet.prototype)
                     for (let param of params)
                         this.loadDslPermission(name, param);
                 else if (params instanceof permissions.Permission)
@@ -514,8 +514,8 @@ class Contract extends bs.BiSerializable {
      */
     constructor() {
         super();
-        this.revokingItems = new Set();
-        this.newItems = new Set();
+        this.revokingItems = new t.GenericSet();
+        this.newItems = new t.GenericSet();
         this.roles = {};
         this.definition = new Definition(this);
         this.state = new State(this);
@@ -530,7 +530,7 @@ class Contract extends bs.BiSerializable {
         this.isNeedVerifySealedKeys = false;
         this.sealedByKeys = new t.GenericMap();
         this.effectiveKeys = new Map();
-        this.keysToSignWith = new Set();
+        this.keysToSignWith = new t.GenericSet();
         this.constraints = new Map();
         this.id = null;
         this.transactionPack = null;
@@ -901,7 +901,7 @@ class Contract extends bs.BiSerializable {
     async addSignatureToSeal(x) {
         let keys;
         let proto = Object.getPrototypeOf(x);
-        if(proto === Array.prototype || proto === Set.prototype) {
+        if(proto === Array.prototype || proto === Set.prototype  || proto === t.GenericSet.prototype) {
             keys = x;
         } else if(proto === crypto.PrivateKey.prototype){
             keys = [];
@@ -983,6 +983,17 @@ class Contract extends bs.BiSerializable {
             return false;
 
         return true;
+    }
+
+    toString() {
+        return crypto.HashId.of(t.randomBytes(64));
+    }
+
+    stringId() {
+        if (this.stringId_ == null)
+            this.stringId_ = this.toString();
+
+        return this.stringId_;
     }
 
     /**
@@ -1204,7 +1215,7 @@ class Contract extends bs.BiSerializable {
         }
 
         // check valid decrement_permission
-        if (!this.isPermitted("decrement_permission", new Set(this.sealedByKeys.keys()))) {
+        if (!this.isPermitted("decrement_permission", new t.GenericSet(this.sealedByKeys.keys()))) {
             res = false;
             this.errors.push(new ErrorRecord(Errors.BAD_VALUE, "", "decrement_permission is missing"));
         }
@@ -1214,7 +1225,7 @@ class Contract extends bs.BiSerializable {
             res = false;
             this.errors.push(new ErrorRecord(Errors.BAD_VALUE, "", "issuer is not valid. must be simple role"));
         } else {
-            let thisIssuerAddresses = new Set(this.roles.issuer.keyAddresses);
+            let thisIssuerAddresses = new t.GenericSet(this.roles.issuer.keyAddresses);
             Array.from(this.roles.issuer.keyRecords.keys()).forEach(pk => thisIssuerAddresses.add(pk.shortAddress));
 
             if (!issuerKeys.some(k => thisIssuerAddresses.has(k))) {
@@ -1403,14 +1414,14 @@ class Contract extends bs.BiSerializable {
 
         if (this.roles.creator == null || !this.roles.creator.isValid())
             this.errors.push(new ErrorRecord(Errors.MISSING_CREATOR, prefix+"state.created_by", "missing or invalid"));
-        else if (!this.roles.creator.isAllowedForKeys(new Set(this.effectiveKeys.keys())))
+        else if (!this.roles.creator.isAllowedForKeys(new t.GenericSet(this.effectiveKeys.keys())))
             this.errors.push(new ErrorRecord(Errors.NOT_SIGNED, prefix, "missing creator signature(s)"));
     }
 
     checkRootContract(prefix) {
         //issuer presence and validity is already checked within basicCheck
         if(this.roles.issuer != null && this.roles.issuer.isValid()) {
-            if (!this.roles.issuer.isAllowedForKeys(new Set(this.effectiveKeys.keys()))) {
+            if (!this.roles.issuer.isAllowedForKeys(new t.GenericSet(this.effectiveKeys.keys()))) {
                 this.errors.push(new ErrorRecord(Errors.ISSUER_MUST_CREATE, prefix, "missing issuer signature(s)"));
             }
         }
@@ -1441,7 +1452,7 @@ class Contract extends bs.BiSerializable {
             if(permissions != null) {
                 for(let p of permissions) {
                     this.quantiser.addWorkCost(QuantiserProcesses.PRICE_APPLICABLE_PERM);
-                    if(p.isAllowedForKeys(new Set(this.effectiveKeys.keys()))) {
+                    if(p.isAllowedForKeys(new t.GenericSet(this.effectiveKeys.keys()))) {
                         found = true;
                         break;
                     }
@@ -1501,7 +1512,7 @@ class Contract extends bs.BiSerializable {
      */
     getReferencedItems() {
 
-        let referencedItems = new Set();
+        let referencedItems = new t.GenericSet();
 
         if (this.transactional != null)
             for (let constr of this.transactional.constraints)
@@ -1597,7 +1608,7 @@ class Contract extends bs.BiSerializable {
         if (this.constraints.size === 0)
             return true;        // if contract has no constraints -> then it's checkConstraints check is ok
 
-        let neighbours = new Set(contractsTree.values());
+        let neighbours = new t.GenericSet(contractsTree.values());
 
         // check each constraint, all must be ok
         let allRefs_check = true;
@@ -1976,7 +1987,7 @@ class Contract extends bs.BiSerializable {
         if(!(issuer instanceof roles.SimpleRole))
             return false;
 
-        let thisIssuerAddresses = new Set(issuer.keyAddresses);
+        let thisIssuerAddresses = new t.GenericSet(issuer.keyAddresses);
 
         Array.from(issuer.keyRecords.keys()).forEach(pk => thisIssuerAddresses.add(pk.shortAddress));
 

@@ -13,6 +13,13 @@ import {MemoiseMixin, PackedEqMixin, DigestEqMixin} from 'tools'
 // alias for KeyAddress
 const KeyAddress = crypto.KeyAddress;
 
+KeyAddress.prototype.stringId = function () {
+    if (this.stringId_ == null)
+        this.stringId_ = this.toString();
+
+    return this.stringId_;
+};
+
 /**
  * Universa private fast async key implementation (C++ bindings). Keys could be compared with `key.equals(anotherKey)`.
  *
@@ -113,6 +120,13 @@ const PrivateKey = crypto.PrivateKey = class extends crypto.PrivateKeyImpl {
      */
     get bitStrength() {
         return this.publicKey.bitStrength;
+    }
+
+    stringId() {
+        if (this.stringId_ == null)
+            this.stringId_ = "Prk:" + this.longAddress.toString();
+
+        return this.stringId_;
     }
 
     toString() {

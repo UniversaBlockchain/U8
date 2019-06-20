@@ -854,7 +854,7 @@ unit.test("ledger_test: findBadReferencesOfTest", async () => {
         await r2.save(con);
     });
 
-    let ids = await ledger.findBadReferencesOf(new Set([r1.id, r2.id]));
+    let ids = await ledger.findBadReferencesOf(new t.GenericSet([r1.id, r2.id]));
 
     assert(ids.size === 1);
     assert(ids.has(r2.id));

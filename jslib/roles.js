@@ -166,6 +166,17 @@ class Role extends bs.BiSerializable {
         return newRole;
     }
 
+    toString() {
+        return crypto.HashId.of(t.randomBytes(64));
+    }
+
+    stringId() {
+        if (this.stringId_ == null)
+            this.stringId_ = this.toString();
+
+        return this.stringId_;
+    }
+
     static fromDsl(name, serializedRole) {
         if (name == null)
             name = serializedRole.name;
@@ -382,7 +393,7 @@ class ListRole extends Role {
                 return false;
         }
 
-        if(!t.valuesEqual(new Set(this.roles),new Set(to.roles)))
+        if(!t.valuesEqual(new t.GenericSet(this.roles), new t.GenericSet(to.roles)))
             return false;
 
         return true;
@@ -406,7 +417,7 @@ class ListRole extends Role {
                 return false;
         }
 
-        if(!t.valuesEqual(new Set(this.roles),new Set(to.roles)))
+        if(!t.valuesEqual(new t.GenericSet(this.roles), new t.GenericSet(to.roles)))
             return false;
 
         return true;
@@ -470,8 +481,8 @@ class ListRole extends Role {
         else if(this.mode === ListRoleMode.QUORUM)
             required = this.quorumSize;
 
-        if (!keys instanceof Set)
-            keys = new Set(keys);
+        if (!keys instanceof t.GenericSet)
+            keys = new t.GenericSet(keys);
         for(let r of this.roles) {
             if(r.isAllowedForKeys(keys)) {
                 valid++;
@@ -523,7 +534,7 @@ class SimpleRole extends Role {
      */
     constructor(name,param) {
         super(name);
-        this.keyAddresses = new Set();
+        this.keyAddresses = new t.GenericSet();
         this.keyRecords = new t.GenericMap();
 
         if(param instanceof crypto.KeyAddress) {
@@ -532,7 +543,7 @@ class SimpleRole extends Role {
             this.keyRecords.set(param,new KeyRecord(param));
         } else if(param instanceof crypto.PrivateKey) {
             this.keyRecords.set(param.publicKey,new KeyRecord(param.publicKey));
-        } else if(param instanceof Array || param instanceof Set) {
+        } else if(param instanceof Array || param instanceof Set || param instanceof t.GenericSet) {
             for(let p of param) {
                 if(p instanceof crypto.KeyAddress) {
                     this.keyAddresses.add(p);
@@ -702,11 +713,11 @@ dbm.DefaultBiMapper.registerAdapter(new bs.BiAdapter("SimpleRole",SimpleRole));
 const RoleExtractor = {
     extractKeys : function (role) {
         if(role instanceof SimpleRole) {
-            return new Set(role.keyRecords.keys());
+            return new t.GenericSet(role.keyRecords.keys());
         } else if(role instanceof RoleLink) {
             return this.extractKeys(role.resolve());
         } else if(role instanceof ListRole) {
-            let result = new Set();
+            let result = new t.GenericSet();
             role.roles.forEach(r => {
                 let extracted = this.extractKeys(r);
                 extracted.forEach(e => result.add(e));
@@ -721,7 +732,7 @@ const RoleExtractor = {
         } else if(role instanceof RoleLink) {
             return this.extractAddresses(role.resolve());
         } else if(role instanceof ListRole) {
-            let result = new Set();
+            let result = new t.GenericSet();
             role.roles.forEach(r => {
                 let extracted = this.extractAddresses(r);
                 extracted.forEach(e => result.add(e));

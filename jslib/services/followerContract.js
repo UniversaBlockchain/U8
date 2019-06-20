@@ -319,7 +319,7 @@ class FollowerContract extends NSmartContract {
 
         fs.setExpiresAndMutedAt(newExpires, newMuted);
 
-        let newOrigins = new Set(this.trackingOrigins.keys());
+        let newOrigins = new t.GenericSet(this.trackingOrigins.keys());
 
         me.subscriptions().forEach(sub => {
             let origin = sub.getOrigin();

@@ -1002,7 +1002,7 @@ class Ledger {
         }
 
         if (queries.length === 0)
-            return new Set();
+            return new t.GenericSet();
 
         let sqlQuery = queries.join(" UNION ");
 
@@ -1023,7 +1023,7 @@ class Ledger {
         return new Promise((resolve, reject) => {
             this.dbPool_.withConnection(con => {
                 con.executeQuery(qr => {
-                        let result = new Set();
+                        let result = new t.GenericSet();
                         let count = qr.getRowsCount();
                         while (count > 0) {
                             let rows;
@@ -1088,8 +1088,8 @@ class Ledger {
     /**
      * Find bad (not approved) items in ledger by set of IDs.
      *
-     * @param {Set<HashId>} ids - Set of HashId`s.
-     * @return {Promise<Set<HashId>>} set of IDs not approved items.
+     * @param {GenericSet<HashId>} ids - Set of HashId`s.
+     * @return {Promise<GenericSet<HashId>>} set of IDs not approved items.
      */
     findBadReferencesOf(ids) {
         if (ids.size < 1)
@@ -2293,7 +2293,7 @@ class Ledger {
                         let nameRecord_id = 0;
                         let nameRecord_expiresAt = new Date();
                         let nameRecord_environmentId = 0;
-                        let entries = new Set();
+                        let entries = new t.GenericSet();
                         let firstRow = true;
                         let rowsCount = 0;
 
