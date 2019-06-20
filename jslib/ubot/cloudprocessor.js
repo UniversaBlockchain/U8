@@ -17,12 +17,12 @@ const UBotPoolState = {
      * and periodically send to them udp notifications with invite to download startingContract.
      * Meanwhile, CloudProcessor is waiting for other ubots in pool to downloads startingContract.
      */
-    SENDING_CLOUD_METHOD                       : {ordinal: 1},
+    SEND_STARTING_CONTRACT                     : {ordinal: 1},
 
     /**
      * CloudProcessor is downloading startingContract from pool starter ubot.
      */
-    DOWNLOAD_CLOUD_METHOD                      : {ordinal: 2},
+    DOWNLOAD_STARTING_CONTRACT                 : {ordinal: 2},
 
 };
 
@@ -43,16 +43,16 @@ class CloudProcessor {
 
     startProcessingCurrentState() {
         switch (this.state) {
-            case UBotPoolState.SENDING_CLOUD_METHOD:
-                this.currentProcess = new ProcessSendingCloudMethod(this, ()=>{
-                    this.logger.log("CloudProcessor.ProcessSendingCloudMethod.onReady");
+            case UBotPoolState.SEND_STARTING_CONTRACT:
+                this.currentProcess = new ProcessSendStartingContract(this, ()=>{
+                    this.logger.log("CloudProcessor.ProcessSendStartingContract.onReady");
                     //this.changeState(SOME_NEW_STATE);
                 });
                 this.currentProcess.start();
                 break;
-            case UBotPoolState.DOWNLOAD_CLOUD_METHOD:
-                this.currentProcess = new ProcessDownloadCloudMethod(this, () => {
-                    this.logger.log("CloudProcessor.ProcessDownloadCloudMethod.onReady, poolSize = " + this.startingContract.state.data.poolSize);
+            case UBotPoolState.DOWNLOAD_STARTING_CONTRACT:
+                this.currentProcess = new ProcessDownloadStartingContract(this, () => {
+                    this.logger.log("CloudProcessor.ProcessDownloadStartingContract.onReady, poolSize = " + this.startingContract.state.data.poolSize);
                     //this.changeState(SOME_NEW_STATE);
                 });
                 this.currentProcess.start();
@@ -70,8 +70,8 @@ class CloudProcessor {
         if (this.state != UBotPoolState.INIT)
             this.logger.log("error: CloudProcessor.onNotifyInit() -> state != INIT");
         this.respondToNotification = notification;
-        if (notification.type == UBotCloudNotification.types.DOWNLOAD_CLOUD_METHOD) {
-            this.changeState(UBotPoolState.DOWNLOAD_CLOUD_METHOD);
+        if (notification.type == UBotCloudNotification.types.DOWNLOAD_STARTING_CONTRACT) {
+            this.changeState(UBotPoolState.DOWNLOAD_STARTING_CONTRACT);
         }
     }
 
@@ -105,7 +105,7 @@ class ProcessBase {
     }
 }
 
-class ProcessSendingCloudMethod extends ProcessBase {
+class ProcessSendStartingContract extends ProcessBase {
     constructor(processor, onReady) {
         super(processor, onReady);
         this.currentTask = null;
@@ -133,7 +133,7 @@ class ProcessSendingCloudMethod extends ProcessBase {
         this.pulse();
         this.currentTask = new ExecutorWithFixedPeriod(() => {
             this.pulse();
-        }, UBotConfig.sending_cloud_method_period).run();
+        }, UBotConfig.send_starting_contract_period).run();
     }
 
     pulse() {
@@ -141,14 +141,14 @@ class ProcessSendingCloudMethod extends ProcessBase {
             new UBotCloudNotification(
                 this.pr.ubot.network.myInfo,
                 this.pr.poolId,
-                UBotCloudNotification.types.DOWNLOAD_CLOUD_METHOD,
+                UBotCloudNotification.types.DOWNLOAD_STARTING_CONTRACT,
                 false
             )
         );
     }
 
     onNotify(notification) {
-        if (notification.type == UBotCloudNotification.types.DOWNLOAD_CLOUD_METHOD && notification.isAnswer) {
+        if (notification.type == UBotCloudNotification.types.DOWNLOAD_STARTING_CONTRACT && notification.isAnswer) {
             this.otherAnswers.set(notification.from.number, 1);
             if (this.otherAnswers.size >= this.pr.pool.length-1) {
                 this.currentTask.cancel();
@@ -159,13 +159,13 @@ class ProcessSendingCloudMethod extends ProcessBase {
 
 }
 
-class ProcessDownloadCloudMethod extends ProcessBase {
+class ProcessDownloadStartingContract extends ProcessBase {
     constructor(processor, onReady) {
         super(processor, onReady)
     }
 
     start() {
-        this.pr.logger.log("startDownloadCloudMethod");
+        this.pr.logger.log("startDownloadStartingContract");
 
         // periodically try to download starting contract (retry on notify)
         this.pulse();
@@ -182,7 +182,7 @@ class ProcessDownloadCloudMethod extends ProcessBase {
                         new UBotCloudNotification(
                             this.pr.ubot.network.myInfo,
                             this.pr.poolId,
-                            UBotCloudNotification.types.DOWNLOAD_CLOUD_METHOD,
+                            UBotCloudNotification.types.DOWNLOAD_STARTING_CONTRACT,
                             true
                         )
                     );
@@ -195,7 +195,7 @@ class ProcessDownloadCloudMethod extends ProcessBase {
     }
 
     onNotify(notification) {
-        if (notification.type == UBotCloudNotification.types.DOWNLOAD_CLOUD_METHOD && !notification.isAnswer) {
+        if (notification.type == UBotCloudNotification.types.DOWNLOAD_STARTING_CONTRACT && !notification.isAnswer) {
             this.pulse();
         }
     }

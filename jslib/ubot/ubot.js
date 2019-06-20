@@ -20,7 +20,7 @@ class UBot {
     executeCloudMethod(contract) {
         this.logger.log("executeCloudMethod: id = " + contract.id.base64);
         this.logger.log("  contract.state.data: " + JSON.stringify(contract.state.data));
-        let processor = new CloudProcessor(UBotPoolState.SENDING_CLOUD_METHOD, contract.id, this);
+        let processor = new CloudProcessor(UBotPoolState.SEND_STARTING_CONTRACT, contract.id, this);
         processor.startingContract = contract;
         processor.startProcessingCurrentState();
         this.processors.set(contract.id.base64, processor);

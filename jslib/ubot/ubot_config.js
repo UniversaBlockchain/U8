@@ -1,5 +1,5 @@
 class UBotConfig {
-    static sending_cloud_method_period = 4000; // ms
+    static send_starting_contract_period = 4000; // ms
 }
 
 module.exports = {UBotConfig};
