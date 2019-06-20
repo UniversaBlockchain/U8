@@ -104,7 +104,7 @@ unit.test("ubot_main_test: executeCloudMethod", async () => {
     await client.start(tk.TestKeys.getKey(), ubotMains[0].myInfo.publicKey, null);
     let userPrivKey = tk.TestKeys.getKey();
     let contract = await cs.createTokenContract([userPrivKey], [userPrivKey.publicKey], new BigDecimal("100"));
-    contract.state.data.poolSize = 3;
+    contract.state.data.poolSize = 5;
     await contract.seal();
     let contractBin = contract.getPackedTransaction();
     client.command("executeCloudMethod", {contract: contractBin}, resp=>{

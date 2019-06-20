@@ -1,4 +1,4 @@
-import {UDPAdapter} from "web";
+import {UDPAdapter, HttpClient} from "web";
 import {VerboseLevel} from "node_consts";
 import {Notification} from "notification";
 
@@ -13,16 +13,25 @@ class UBotNetwork {
         this.logger = logger;
 
         this.verboseLevel = VerboseLevel.NOTHING;
-        this.label = "UBot " + this.myInfo.number + ": ";
+        this.label = "UBot" + this.myInfo.number + ": ";
 
         this.adapter = new UDPAdapter(this.myKey, this.myInfo.number, this.netConfig);
         this.adapter.setReceiveCallback((packet, fromNode) => this.onReceived(packet, fromNode));
+
+        // this.httpClient is used for connection to all other ubots, so it's does not matter which rootUrl we use
+        this.httpClient = new HttpClient(this.myInfo.serverUrlString(), 20, 20);
     }
 
     async shutdown() {
         //this.report("UBotNetwork.shutdown()...", VerboseLevel.BASE);
-        if (this.adapter != null)
+        if (this.adapter != null) {
             this.adapter.close();
+            this.adapter = null;
+        }
+        if (this.httpClient != null) {
+            await this.httpClient.stop();
+            this.httpClient = null;
+        }
     }
 
     onReceived(packet, fromNode) {
@@ -105,13 +114,13 @@ class UBotNetwork {
         }
     }
 
-    deliver(toNode, notification) {
+    deliver(toUbot, notification) {
         try {
             let data = this.packNotifications(this.myInfo, [notification]);
-            //this.logNotification(notification, toNode, this.myInfo);
+            //this.logNotification(notification, toUbot, this.myInfo);
 
             if (this.adapter != null)
-                this.adapter.send(toNode.number, data);
+                this.adapter.send(toUbot.number, data);
             else
                 this.report("UDPAdapter is null", VerboseLevel.DETAILED);
 
@@ -124,6 +133,12 @@ class UBotNetwork {
         this.netConfig.toList().forEach(node => {
             if (exceptNode == null || !exceptNode.equals(node))
                 this.deliver(node, notification);
+        });
+    }
+
+    sendGetRequestToUbot(toUbot, path, onComplete) {
+        this.httpClient.sendGetRequestUrl(toUbot.serverUrlString()+path, async (respCode, body) => {
+            onComplete(respCode, body);
         });
     }
 

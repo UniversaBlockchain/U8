@@ -145,16 +145,28 @@ void HttpClient::releaseWorker(int workerId) {
     poolCV_.notify_one();
 }
 
-void HttpClient::sendGetRequest(const std::string& url, const std::function<void(int,byte_vector&&)>& callback) {
+void HttpClient::sendGetRequest(const std::string& path, const std::function<void(int,byte_vector&&)>& callback) {
+    std::function<void(int,byte_vector&&)> callbackCopy = callback;
+    sendGetRequest(path, std::move(callbackCopy));
+}
+
+void HttpClient::sendGetRequest(const std::string& path, std::function<void(int,byte_vector&&)>&& callback) {
+    poolControlThread_.execute([callback{std::move(callback)}, path, this]() mutable {
+        auto client = getUnusedWorker();
+        std::string fullUrl = makeFullUrl(path);
+        client->sendGetRequest(fullUrl, std::move(callback));
+    });
+}
+
+void HttpClient::sendGetRequestUrl(const std::string& url, const std::function<void(int,byte_vector&&)>& callback) {
     std::function<void(int,byte_vector&&)> callbackCopy = callback;
     sendGetRequest(url, std::move(callbackCopy));
 }
 
-void HttpClient::sendGetRequest(const std::string& url, std::function<void(int,byte_vector&&)>&& callback) {
+void HttpClient::sendGetRequestUrl(const std::string& url, std::function<void(int,byte_vector&&)>&& callback) {
     poolControlThread_.execute([callback{std::move(callback)}, url, this]() mutable {
         auto client = getUnusedWorker();
-        std::string fullUrl = makeFullUrl(url);
-        client->sendGetRequest(fullUrl, std::move(callback));
+        client->sendGetRequest(url, std::move(callback));
     });
 }
 

@@ -11,6 +11,7 @@ const UBotLedger = require("ubot/ubot_ledger").UBotLedger;
 const UBot = require("ubot/ubot").UBot;
 const yaml = require("yaml");
 const UBotTestNotification = require("ubot/ubot_notification").UBotTestNotification;
+const UBotCloudNotification = require("ubot/ubot_notification").UBotCloudNotification;
 
 const UBOT_VERSION = VERSION;
 
@@ -46,10 +47,15 @@ class UBotMain {
 
         this.ledger = new UBotLedger(this.logger);
 
-        this.network.subscribe(notify => {
-            this.logger.log("ubot"+this.myInfo.number+" receive notify: " + notify);
-            if (notify.requestResult)
-                this.network.deliver(notify.from, new UBotTestNotification(this.myInfo, "hi ubot"+notify.from.number, false));
+        this.network.subscribe(notification => {
+            if (notification instanceof UBotCloudNotification) {
+                this.ubot.onCloudNotify(notification);
+            } else {
+                // debug case
+                this.logger.log("ubot" + this.myInfo.number + " receive notify: " + notification);
+                if (notification.requestResult)
+                    this.network.deliver(notification.from, new UBotTestNotification(this.myInfo, "hi ubot" + notification.from.number, false));
+            }
         });
     }
 

@@ -485,10 +485,16 @@ network.HttpClient = class {
         this.httpClient_ = null;
     }
 
-    sendGetRequest(url, block) {
+    sendGetRequest(path, block) {
         let reqId = this.getReqId();
         this.callbacks_.set(reqId, block);
-        this.httpClient_.__sendGetRequest(reqId, url);
+        this.httpClient_.__sendGetRequest(reqId, path);
+    }
+
+    sendGetRequestUrl(url, block) {
+        let reqId = this.getReqId();
+        this.callbacks_.set(reqId, block);
+        this.httpClient_.__sendGetRequestUrl(reqId, url);
     }
 
     command(name, params, onComplete, onError) {

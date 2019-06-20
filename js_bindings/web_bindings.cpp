@@ -826,8 +826,27 @@ public:
         stop();
     }
 
-    void sendGetRequest(int reqId, const std::string& url) {
-        httpClient_->sendGetRequest(url, [this,reqId](int respStatus, byte_vector&& body) {
+    void sendGetRequest(int reqId, const std::string& path) {
+        httpClient_->sendGetRequest(path, [this,reqId](int respStatus, byte_vector&& body) {
+            atomic<bool> needSend(false);
+            {
+                lock_guard lock(mutex_);
+                HttpClientAnswer ans;
+                ans.reqId = reqId;
+                ans.respStatus = respStatus;
+                ans.body = std::move(body);
+                buf_.emplace_back(ans);
+                if (buf_.size() >= bufSize_)
+                    needSend = true;
+            }
+            if (needSend) {
+                sendAllFromBuf();
+            }
+        });
+    }
+
+    void sendGetRequestUrl(int reqId, const std::string& url) {
+        httpClient_->sendGetRequestUrl(url, [this,reqId](int respStatus, byte_vector&& body) {
             atomic<bool> needSend(false);
             {
                 lock_guard lock(mutex_);
@@ -970,6 +989,17 @@ void httpClient_sendGetRequest(const FunctionCallbackInfo<Value> &args) {
     });
 }
 
+void httpClient_sendGetRequestUrl(const FunctionCallbackInfo<Value> &args) {
+    Scripter::unwrapArgs(args, [](ArgsContext &ac) {
+        if (ac.args.Length() == 2) {
+            auto httpClient = unwrap<HttpClientBuffered>(ac.args.This());
+            httpClient->sendGetRequestUrl(ac.asInt(0), ac.asString(1));
+            return;
+        }
+        ac.throwError("invalid arguments");
+    });
+}
+
 void httpClient_command(const FunctionCallbackInfo<Value> &args) {
     Scripter::unwrapArgs(args, [](ArgsContext &ac) {
         if (ac.args.Length() == 2) {
@@ -1080,6 +1110,7 @@ Local<FunctionTemplate> initHttpClient(Isolate *isolate) {
             });
     auto prototype = tpl->PrototypeTemplate();
     prototype->Set(isolate, "__sendGetRequest", FunctionTemplate::New(isolate, httpClient_sendGetRequest));
+    prototype->Set(isolate, "__sendGetRequestUrl", FunctionTemplate::New(isolate, httpClient_sendGetRequestUrl));
     prototype->Set(isolate, "__command", FunctionTemplate::New(isolate, httpClient_command));
     prototype->Set(isolate, "__setBufferedCallback", FunctionTemplate::New(isolate, httpClient_setBufferedCallback));
     prototype->Set(isolate, "__setBufferedCommandCallback", FunctionTemplate::New(isolate, httpClient_setBufferedCommandCallback));

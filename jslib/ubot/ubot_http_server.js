@@ -1,5 +1,6 @@
 import * as network from "web";
 const Contract = require("contract").Contract;
+const HashId = require("crypto").HashId;
 
 class UBotHttpServer extends network.HttpServer {
 
@@ -9,7 +10,9 @@ class UBotHttpServer extends network.HttpServer {
         this.ubot = ubot;
         super.initSecureProtocol(privateKey);
 
-        this.addSecureEndpoint("executeCloudMethod", (params, clientKey) => this.executeCloudMethod(params, clientKey));
+        this.addSecureEndpoint("executeCloudMethod", (params, clientKey) => this.onExecuteCloudMethod(params, clientKey));
+
+        this.addRawEndpoint("/getStartingContract", request => this.onGetStartingContract(request));
 
         super.startServer();
     }
@@ -18,7 +21,7 @@ class UBotHttpServer extends network.HttpServer {
         return this.stopServer();
     }
 
-    async executeCloudMethod(params, clientKey) {
+    async onExecuteCloudMethod(params, clientKey) {
         try {
             let contract = Contract.fromPackedTransaction(params.contract);
             this.ubot.executeCloudMethod(contract);
@@ -26,6 +29,18 @@ class UBotHttpServer extends network.HttpServer {
             console.log("err: " + e.stack);
         }
         return {status:"ok"};
+    }
+
+    onGetStartingContract(request) {
+        let paramIndex = request.path.indexOf("/", 1) + 1;
+        let encodedString = request.path.substring(paramIndex);
+        let hashId = HashId.withBase64Digest(encodedString);
+        let contract = this.ubot.getStartingContract(hashId);
+        if (contract != null)
+            request.setAnswerBody(contract.getPackedTransaction());
+        else
+            request.setStatusCode(204);
+        request.sendAnswer();
     }
 
 }

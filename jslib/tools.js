@@ -400,5 +400,19 @@ function addValAndOrdinalMaps(en) {
     en.byVal.get = function (key) {return en[key]};
 }
 
+function randomChoice(list, count, safe = true) {
+    if (safe)
+        list = [...list];
+    if (count > list.length)
+        throw new ex.IllegalArgumentError("randomChoice error: count > arr.length");
+    let res = [];
+    while (res.length < count) {
+        let pick = Math.floor(Math.random()*list.length);
+        res.push(list[pick]);
+        list.splice(pick, 1);
+    }
+    return res;
+}
+
 module.exports = {arraysEqual, valuesEqual, randomString, MemoiseMixin, PackedEqMixin, DigestEqMixin, GenericMap, GenericSet,
-    equals, THROW_EXCEPTIONS, convertToDate, randomBytes, getOrDefault, getOrThrow, addValAndOrdinalMaps};
+    equals, THROW_EXCEPTIONS, convertToDate, randomBytes, getOrDefault, getOrThrow, addValAndOrdinalMaps, randomChoice};

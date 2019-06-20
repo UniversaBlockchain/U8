@@ -2,6 +2,7 @@
 
 let DefaultBiMapper = require("defaultbimapper").DefaultBiMapper;
 let Contract = require("contract").Contract;
+let t = require("tools");
 
 import {unit} from 'test'
 

@@ -54,8 +54,11 @@ public:
     HttpClient(const std::string& rootUrl, size_t poolSize);
     virtual ~HttpClient();
 
-    void sendGetRequest(const std::string& url, const std::function<void(int,byte_vector&&)>& callback);
-    void sendGetRequest(const std::string& url, std::function<void(int,byte_vector&&)>&& callback);
+    void sendGetRequest(const std::string& path, const std::function<void(int,byte_vector&&)>& callback);
+    void sendGetRequest(const std::string& path, std::function<void(int,byte_vector&&)>&& callback);
+
+    void sendGetRequestUrl(const std::string& path, const std::function<void(int,byte_vector&&)>& callback);
+    void sendGetRequestUrl(const std::string& path, std::function<void(int,byte_vector&&)>&& callback);
 
     void sendRawRequest(const std::string& url, const std::string& method, const byte_vector& reqBody, const std::function<void(int,byte_vector&&)>& callback);
     void sendRawRequest(const std::string& url, const std::string& method, const byte_vector& reqBody, std::function<void(int,byte_vector&&)>&& callback);
