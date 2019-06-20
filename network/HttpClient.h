@@ -44,7 +44,7 @@ struct HttpClientSession {
     std::string connectMessage;
     shared_ptr<crypto::PrivateKey> clientPrivateKey;
     shared_ptr<crypto::SymmetricKey> sessionKey;
-    long sessionId;
+    int64_t sessionId;
     shared_ptr<crypto::PublicKey> nodePublicKey;
 };
 
