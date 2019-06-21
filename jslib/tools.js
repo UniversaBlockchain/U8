@@ -66,7 +66,7 @@ Object.prototype.equals = function(to) {
     }
 
     //Map
-    if(this instanceof Map) {
+    if(this instanceof Map || this instanceof GenericMap) {
         if(this.size !== to.size) {
             return false;
         }
@@ -146,41 +146,50 @@ Uint8Array.prototype.stringId = function () {
     return this.stringId_;
 };
 
-class GenericMap extends Map {
+class GenericMap {
 
     constructor() {
-        super();
         this.genKeys = new Map();
+        this.genValues = new Map();
     }
 
     get(x) {
         let k = (typeof x === "object") ? x.stringId() : x;
 
-        return super.get(k);
+        return this.genValues.get(k);
     }
 
     has(x) {
         let k = (typeof x === "object") ? x.stringId() : x;
 
-        return super.has(k);
+        return this.genValues.has(k);
     }
 
     delete(x) {
         let k = (typeof x === "object") ? x.stringId() : x;
 
         this.genKeys.delete(k);
-        return super.delete(k);
+        return this.genValues.delete(k);
     }
 
     set(key, value) {
         let k = (typeof key === "object") ? key.stringId() : key;
 
         this.genKeys.set(k, key);
-        return super.set(k, value);
+        return this.genValues.set(k, value);
+    }
+
+    clear() {
+        this.genKeys.clear();
+        this.genValues.clear();
     }
 
     keys() {
         return this.genKeys.values();
+    }
+
+    values() {
+        return this.genValues.values();
     }
 
     entries() {
@@ -196,6 +205,10 @@ class GenericMap extends Map {
 
     [Symbol.iterator]() {
         return this.entries();
+    }
+
+    get size() {
+        return this.genValues.size;
     }
 }
 

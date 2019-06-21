@@ -50,7 +50,7 @@ unit.test("collection_test: GenericMap", async () => {
     assert(!m.delete(HashId.of(randomBytes(64))));
 });
 
-unit.test("collection_test: t.GenericSet", async () => {
+unit.test("collection_test: GenericSet", async () => {
     let h1 = HashId.of(randomBytes(64));
     let h2 = HashId.of(randomBytes(64));
 
