@@ -1,6 +1,7 @@
 import {VerboseLevel} from "node_consts";
 import {UDPAdapter, HttpClient} from 'web'
 import {Notification, ItemNotification, ResyncNotification, ParcelNotification} from "notification";
+import {ExecutorService, AsyncEvent} from "executorservice";
 
 const Boss = require('boss.js');
 const ItemResult = require('itemresult').ItemResult;
@@ -200,6 +201,7 @@ class NetworkV2 extends Network {
         this.consumer = null;
         this.cachedClients = new t.GenericMap();
         this.lock = new Lock();
+        this.executorService = new ExecutorService();
 
         this.adapter = new UDPAdapter(this.myKey, this.myInfo.number, this.netConfig);
         this.adapter.setReceiveCallback((packet, fromNode) => this.onReceived(packet, fromNode));
@@ -350,8 +352,7 @@ class NetworkV2 extends Network {
             if (this.httpClient == null)
                 this.httpClient = new HttpClient("", 4, 4096);
 
-            let fire = null;
-            let event = new Promise((resolve) => {fire = resolve});
+            let event = new AsyncEvent(this.executorService);
 
             //TODO: httpClient setRequestProperty/setTimeout
             //connection.setRequestProperty("User-Agent", "Universa JAVA API Client");
@@ -360,12 +361,10 @@ class NetworkV2 extends Network {
             //connection.setReadTimeout(maxTimeout);
             this.httpClient.sendGetRequestUrl(URL, (respCode, body) => {
                 let item = (respCode === 200) ? TransactionPack.unpack(body, true).contract : null;
-                fire(item);
+                event.fire(item);
             });
 
-            let res = await event;
-
-            return res;
+            return await event.await(maxTimeout);
 
         } catch (err) {
             this.report("download failure. from: " + nodeInfo.number + " by: " + this.myInfo.number +
@@ -389,8 +388,7 @@ class NetworkV2 extends Network {
             if (this.httpClient == null)
                 this.httpClient = new HttpClient("", 4, 4096);
 
-            let fire = null;
-            let event = new Promise((resolve) => {fire = resolve});
+            let event = new AsyncEvent(this.executorService);
 
             //TODO: httpClient setRequestProperty/setTimeout
             //connection.setRequestProperty("User-Agent", "Universa JAVA API Client");
@@ -399,10 +397,10 @@ class NetworkV2 extends Network {
             //connection.setReadTimeout(maxTimeout);
             this.httpClient.sendGetRequestUrl(URL, (respCode, body) => {
                 let env = (respCode === 200) ? Boss.load(body) : null;
-                fire(env);
+                event.fire(env);
             });
 
-            return await event;
+            return await event.await(maxTimeout);
 
         } catch (err) {
             this.report("download failure. from: " + nodeInfo.number + " by: " + this.myInfo.number +
@@ -426,8 +424,7 @@ class NetworkV2 extends Network {
             if (this.httpClient == null)
                 this.httpClient = new HttpClient("", 4, 4096);
 
-            let fire = null;
-            let event = new Promise((resolve) => {fire = resolve});
+            let event = new AsyncEvent(this.executorService);
 
             //TODO: httpClient setRequestProperty/setTimeout
             //connection.setRequestProperty("User-Agent", "Universa JAVA API Client");
@@ -436,10 +433,10 @@ class NetworkV2 extends Network {
             //connection.setReadTimeout(maxTimeout);
             this.httpClient.sendGetRequestUrl(URL, (respCode, body) => {
                 let parcel = (respCode === 200) ? Parcel.unpack(body) : null;
-                fire(parcel);
+                event.fire(parcel);
             });
 
-            return await event;
+            return await event.await(maxTimeout);
 
         } catch (err) {
             this.report("download failure. from: " + nodeInfo.number + " by: " + this.myInfo.number +

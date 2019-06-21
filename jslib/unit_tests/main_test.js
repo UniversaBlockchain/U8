@@ -425,11 +425,11 @@ unit.test("main_test: register bad item", async () => {
     let time = finish - start;
 
     console.log("result " + time + " ms");
-    //45096
-    //44298
-    //44450
-    //43126
-    //43710
+    //31795
+    //31728
+    //33660
+    //34045
+    //29309
 
     await ts.shutdown();
 });
@@ -461,11 +461,11 @@ unit.test("main_test: parallelBenchmark", async () => {
     let time = finish - start;
 
     console.log("result " + time + " ms");
-    //20780
-    //21757
-    //21806
-    //23061
-    //21556
+    //13477
+    //12367
+    //16558
+    //10810
+    //10525
 
     await ts.shutdown();
 });*/
