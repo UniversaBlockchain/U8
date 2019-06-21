@@ -209,6 +209,9 @@ class NetworkV2 extends Network {
         if (this.adapter != null)
             this.adapter.close();
 
+        if (this.httpClient != null)
+            await this.httpClient.stop();
+
         for (let client of this.cachedClients.values())
             await client.stop();
     }
@@ -342,8 +345,10 @@ class NetworkV2 extends Network {
      */
     async getItem(itemId, nodeInfo, maxTimeout) {
         try {
-            let URL = "/contracts/" + itemId.base64;
-            let httpClient = new HttpClient(nodeInfo.serverUrlString(), 1, 4096);
+            let URL = nodeInfo.serverUrlString() + "/contracts/" + itemId.base64;
+
+            if (this.httpClient == null)
+                this.httpClient = new HttpClient("", 4, 4096);
 
             let fire = null;
             let event = new Promise((resolve) => {fire = resolve});
@@ -353,13 +358,12 @@ class NetworkV2 extends Network {
             //connection.setRequestProperty("Connection", "close");
             //connection.setConnectTimeout(4000);
             //connection.setReadTimeout(maxTimeout);
-            httpClient.sendGetRequest(URL, (respCode, body) => {
+            this.httpClient.sendGetRequestUrl(URL, (respCode, body) => {
                 let item = (respCode === 200) ? TransactionPack.unpack(body, true).contract : null;
                 fire(item);
             });
 
             let res = await event;
-            await httpClient.stop();
 
             return res;
 
@@ -380,8 +384,10 @@ class NetworkV2 extends Network {
      */
     async getEnvironment(itemId, nodeInfo, maxTimeout) {
         try {
-            let URL = "/environments/" + itemId.base64;
-            let httpClient = new HttpClient(nodeInfo.serverUrlString(), 1, 4096);
+            let URL = nodeInfo.serverUrlString() + "/environments/" + itemId.base64;
+
+            if (this.httpClient == null)
+                this.httpClient = new HttpClient("", 4, 4096);
 
             let fire = null;
             let event = new Promise((resolve) => {fire = resolve});
@@ -391,7 +397,7 @@ class NetworkV2 extends Network {
             //connection.setRequestProperty("Connection", "close");
             //connection.setConnectTimeout(4000);
             //connection.setReadTimeout(maxTimeout);
-            httpClient.sendGetRequest(URL, (respCode, body) => {
+            this.httpClient.sendGetRequestUrl(URL, (respCode, body) => {
                 let env = (respCode === 200) ? Boss.load(body) : null;
                 fire(env);
             });
@@ -415,8 +421,10 @@ class NetworkV2 extends Network {
      */
     async getParcel(itemId, nodeInfo, maxTimeout) {
         try {
-            let URL = "/parcels/" + itemId.base64;
-            let httpClient = new HttpClient(nodeInfo.serverUrlString(), 1, 4096);
+            let URL = nodeInfo.serverUrlString() + "/parcels/" + itemId.base64;
+
+            if (this.httpClient == null)
+                this.httpClient = new HttpClient("", 4, 4096);
 
             let fire = null;
             let event = new Promise((resolve) => {fire = resolve});
@@ -426,7 +434,7 @@ class NetworkV2 extends Network {
             //connection.setRequestProperty("Connection", "close");
             //connection.setConnectTimeout(4000);
             //connection.setReadTimeout(maxTimeout);
-            httpClient.sendGetRequest(URL, (respCode, body) => {
+            this.httpClient.sendGetRequestUrl(URL, (respCode, body) => {
                 let parcel = (respCode === 200) ? Parcel.unpack(body) : null;
                 fire(parcel);
             });

@@ -705,7 +705,7 @@ class Ledger {
                 if (delay < this.bufParams[key].delayMillis)
                     delay = this.bufParams[key].delayMillis;
         });
-        await sleep(200+delay*1.5);
+        await sleep(500+delay*1.5);
     }
 
     /**

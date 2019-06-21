@@ -59,18 +59,20 @@ ParcelProcessingState.byVal.set(ParcelProcessingState.EMERGENCY_BREAK.val, Parce
  */
 class ParcelProcessor {
 
-    constructor(parcelId, parcel, node) {
+    constructor(parcelId, parcel, mutex, node) {
         this.parcelId = parcelId;
-        this.parcel = parcel;
+        this.mutex = mutex;
         this.node = node;
 
         this.paymentResult = null;
         this.payloadResult = null;
 
         if (parcel == null)
-            this.parcel = this.node.parcelCache.parcelId;
-        this.parcel = parcel;
-        if(this.parcel != null) {
+            this.parcel = this.node.parcelCache.get(parcelId);
+        else
+            this.parcel = parcel;
+
+        if (this.parcel != null) {
             this.payment = parcel.getPaymentContract();
             this.payload = parcel.getPayloadContract();
         }
@@ -82,19 +84,14 @@ class ParcelProcessor {
 
         this.processingState = ParcelProcessingState.INIT;
 
-        this.downloadedEvent = new AsyncEvent(this.node.executorService);
         this.doneEvent = new AsyncEvent(this.node.executorService);
-        this.removedEvent = new Promise(resolve => this.removedFire = resolve);
 
         this.downloader = null;
         this.processSchedule = null;
-
-        this.mutex = HashId.of(randomBytes(64));
     }
 
     async run() {
-        this.node.report("parcel processor for: " + this.parcelId + " created",
-            VerboseLevel.BASE);
+        this.node.report("parcel processor for: " + this.parcelId + " created", VerboseLevel.BASE);
 
         if (this.parcel != null)
             new ScheduleExecutor(async () => await this.parcelDownloaded(), 0, this.node.executorService).run();
