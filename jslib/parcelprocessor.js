@@ -249,13 +249,12 @@ class ParcelProcessor {
     //******************** download section ********************//
 
     pulseDownload() {
-        if(!this.processingState.canContinue || this.processingState.isProcessedToConsensus)
-            return;
+        if (this.processingState.canContinue || !this.processingState.isProcessedToConsensus) {
+            this.processingState = ParcelProcessingState.DOWNLOADING;
 
-        this.processingState = ParcelProcessingState.DOWNLOADING;
-
-        if (this.parcel == null && (this.downloader == null || this.downloader.isDone)) {
-            this.downloader = new ScheduleExecutor(async () => await this.download(), 0, this.node.executorService).run();
+            if (this.parcel == null && this.downloader == null) {
+                this.downloader = new ScheduleExecutor(async () => await this.download(), 0, this.node.executorService).run();
+            }
         }
     }
 
@@ -295,10 +294,10 @@ class ParcelProcessor {
     async parcelDownloaded() {
 
         this.node.report("parcel processor for: " +
-            this.parcelId + " :: parcelDownloaded, state " + this.processingState,
+            this.parcelId + " :: parcelDownloaded, state " + this.processingState.val,
             VerboseLevel.BASE);
 
-        if(!this.processingState.canContinue)
+        if (!this.processingState.canContinue)
             return;
 
         this.node.parcelCache.put(this.parcel);
@@ -318,12 +317,12 @@ class ParcelProcessor {
 
                 this.node.report("parcel processor for: " +
                     this.parcelId + " :: payment is processing, item processing state: " +
-                    this.paymentProcessor.processingState + ", parcel processing state " + this.processingState +
-                    ", item state ", this.paymentProcessor.record.state,
+                    this.paymentProcessor.processingState.val + ", parcel processing state " + this.processingState.val +
+                    ", item state ", this.paymentProcessor.record.state.val,
                     VerboseLevel.BASE);
 
                 // if current item processor for payment was inited by another parcel we should decline this payment
-                if(!this.parcelId.equals(this.paymentProcessor.parcelId)) {
+                if (!this.parcelId.equals(this.paymentProcessor.parcelId)) {
                     this.paymentResult = ItemResult.UNDEFINED;
                 }
             } else {
@@ -331,7 +330,7 @@ class ParcelProcessor {
 
                 this.node.report("parcel processor for: " +
                     this.parcelId + " :: payment already processed, parcel processing state " +
-                    this.processingState +
+                    this.processingState.val +
                     ", item state ", this.paymentResult.state,
                     VerboseLevel.BASE);
 
@@ -350,7 +349,7 @@ class ParcelProcessor {
 
                 this.node.report("parcel processor for: " +
                     this.parcelId + " :: payload is processing, item processing state: " +
-                    this.payloadProcessor.processingState + ", parcel processing state " + this.processingState +
+                    this.payloadProcessor.processingState.val + ", parcel processing state " + this.processingState.val +
                     ", item state " + this.payloadProcessor.record.state,
                     VerboseLevel.BASE);
             } else {
@@ -358,7 +357,7 @@ class ParcelProcessor {
 
                 this.node.report("parcel processor for: " +
                     this.parcelId, " :: payload already processed, parcel processing state " +
-                    this.processingState +
+                    this.processingState.val +
                     ", item state ", this.payloadResult.state +
                     VerboseLevel.BASE);
             }
@@ -382,7 +381,7 @@ class ParcelProcessor {
 
         // if we got vote but item processor not exist yet - we store that vote.
         // Otherwise we give vote to item processor
-        if(isU){
+        if (isU){
             if (this.paymentProcessor != null) {
                 await this.paymentProcessor.vote(node, state);
             } else {
@@ -401,33 +400,33 @@ class ParcelProcessor {
     //******************** common section ********************//
 
      getPayloadResult() {
-        if(this.payloadResult != null)
+        if (this.payloadResult != null)
             return this.payloadResult;
-        if(this.payloadProcessor != null)
+        if (this.payloadProcessor != null)
             return this.payloadProcessor.getResult();
         return ItemResult.UNDEFINED;
     }
 
     getPayloadState() {
-        if(this.payloadResult != null)
+        if (this.payloadResult != null)
             return this.payloadResult.state;
-        if(this.payloadProcessor != null)
+        if (this.payloadProcessor != null)
             return this.payloadProcessor.record.state;
         return ItemState.PENDING;
     }
 
     getPaymentResult() {
-        if(this.paymentResult != null)
+        if (this.paymentResult != null)
             return this.paymentResult;
-        if(this.paymentProcessor != null)
+        if (this.paymentProcessor != null)
             return this.paymentProcessor.getResult();
         return ItemResult.UNDEFINED;
     }
 
     getPaymentState() {
-        if(this.paymentResult != null)
+        if (this.paymentResult != null)
             return this.paymentResult.state;
-        if(this.paymentProcessor != null)
+        if (this.paymentProcessor != null)
             return this.paymentProcessor.record.state;
         return ItemState.PENDING;
     }
@@ -439,7 +438,7 @@ class ParcelProcessor {
     }
 
     getPayloadProcessingState() {
-        if(this.payloadProcessor != null)
+        if (this.payloadProcessor != null)
             return this.payloadProcessor.processingState;
         return ItemProcessingState.NOT_EXIST;
     }
@@ -451,7 +450,7 @@ class ParcelProcessor {
      * @return
      */
     needsPayloadVoteFrom(node) {
-        if(this.payloadProcessor != null)
+        if (this.payloadProcessor != null)
             return this.payloadProcessor.needsVoteFrom(node);
         return false;
     }
@@ -463,7 +462,7 @@ class ParcelProcessor {
      * @return
      */
     needsPaymentVoteFrom(node) {
-        if(this.paymentProcessor != null)
+        if (this.paymentProcessor != null)
             return this.paymentProcessor.needsVoteFrom(node);
         return false;
     }
@@ -482,10 +481,10 @@ class ParcelProcessor {
      */
     removeSelf() {
         this.node.report("parcel processor for: " +
-            this.parcelId + " :: removeSelf, state " + this.processingState,
+            this.parcelId + " :: removeSelf, state " + this.processingState.val,
             VerboseLevel.BASE);
 
-        if(this.processingState.canRemoveSelf) {
+        if (this.processingState.canRemoveSelf) {
             this.node.parcelProcessors.remove(this.parcelId);
 
             this.stopDownloader();
@@ -496,7 +495,7 @@ class ParcelProcessor {
     }
 
     isPayloadPollingExpired() {
-        if(this.payloadProcessor != null)
+        if (this.payloadProcessor != null)
             return this.payloadProcessor.isPollingExpired();
         return false;
     }

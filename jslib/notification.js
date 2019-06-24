@@ -239,8 +239,94 @@ class ParcelNotification extends ItemNotification {
     }
 }
 
+const CallbackNotificationType = {
+    COMPLETED : {val: "COMPLETED", ordinal: 0},
+    NOT_RESPONDING : {val: "NOT_RESPONDING", ordinal: 1},
+    GET_STATE : {val: "GET_STATE", ordinal: 2},
+    RETURN_STATE : {val: "RETURN_STATE", ordinal: 3}
+};
+
+CallbackNotificationType.byOrdinal = new Map();
+CallbackNotificationType.byOrdinal.set(CallbackNotificationType.COMPLETED.ordinal, CallbackNotificationType.COMPLETED);
+CallbackNotificationType.byOrdinal.set(CallbackNotificationType.NOT_RESPONDING.ordinal, CallbackNotificationType.NOT_RESPONDING);
+CallbackNotificationType.byOrdinal.set(CallbackNotificationType.GET_STATE.ordinal, CallbackNotificationType.GET_STATE);
+CallbackNotificationType.byOrdinal.set(CallbackNotificationType.RETURN_STATE.ordinal, CallbackNotificationType.RETURN_STATE);
+
+/**
+ * The success notification for follower callback, carries callback identifier and signature of updated item id
+ * request.
+ * For success notification: sending node notifies receiving node that follower callback is success.
+ * And send signature of updated item id.
+ *
+ * Also may contain a notification that callback is not responding to the node request.
+ * In this case send a notification without signature. If some nodes (rate defined in config) also sended callback
+ * and received packed item (without answer) callback is deemed complete.
+ */
+class CallbackNotification extends Notification {
+    /**
+     * Create callback notification.
+     * For type COMPLETED callback notification should be contain signature.
+     * For type RETURN_STATE callback notification should be contain state.
+     *
+     * @param {NodeInfo} from - NodeInfo of node that sent the callback notification.
+     * @param {HashId} id - Callback identifier.
+     * @param {CallbackNotificationType} type - Type of callback notification.
+     * @param {number} signature - Receipt signed by follower callback server (required if type == COMPLETED).
+     * @param {FollowerCallbackState} state - Callback state (required if type == RETURN_STATE).
+     */
+    constructor(from, id, type, signature, state) {
+        super(from);
+        this.id = id;
+        this.signature = signature;
+        this.type = type;
+        this.state = state;
+        this.typeCode = CODE_CALLBACK_NOTIFICATION;
+    }
+
+    writeTo(bw) {
+        bw.write(this.id.digest);
+        bw.write(this.signature);
+        bw.write(this.type.ordinal);
+        bw.write(this.state.ordinal);
+    }
+
+    readFrom(br) {
+        this.id = HashId.withDigest(br.read());
+        this.signature = br.read();
+        this.type = CallbackNotificationType.byOrdinal.get(br.read());
+        //this.state = NCallbackService.FollowerCallbackState.values()[br.readInt()];
+    }
+
+    equals(o) {
+        if (this === o)
+            return true;
+
+        if(Object.getPrototypeOf(this) !== Object.getPrototypeOf(o))
+            return false;
+
+        if (!t.valuesEqual(this.from, o.from))
+            return false;
+
+        if (!t.valuesEqual(this.id, o.id))
+            return false;
+
+        if (!t.valuesEqual(this.type, o.type))
+            return false;
+
+        if (!t.valuesEqual(this.state, o.state))
+            return false;
+
+        return t.valuesEqual(this.signature, o.signature);
+    }
+
+    toString() {
+        return "[CallbackNotification from " + this.from.number + " with id: " + this.id.toString() + "]";
+    }
+}
+
 Notification.registerClass(CODE_ITEM_NOTIFICATION, ItemNotification);
 Notification.registerClass(CODE_RESYNC_NOTIFICATION, ResyncNotification);
 Notification.registerClass(CODE_PARCEL_NOTIFICATION, ParcelNotification);
+Notification.registerClass(CODE_CALLBACK_NOTIFICATION, CallbackNotification);
 
-module.exports = {Notification, ItemNotification, ResyncNotification, ParcelNotification, ParcelNotificationType};
+module.exports = {Notification, ItemNotification, ResyncNotification, ParcelNotification, ParcelNotificationType, CallbackNotification};
