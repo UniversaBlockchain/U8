@@ -136,6 +136,54 @@ class Node {
         return x;
     }
 
+    /**
+     * Asynchronous (non blocking) parcel (contract with payment) register.
+     * Use Node.waitParcel for waiting parcel being processed.
+     * For checking parcel parts use Node.waitItem or Node.checkItem after Node.waitParcel
+     * with parcel.getPayloadContract().getId() or parcel.getPaymentContract().getId() as params.
+     *
+     * @param {Parcel} parcel - Parcel to register/check state.
+     * @return {boolean} true if Parcel launch to processing. Otherwise exception will be thrown.
+     */
+    async registerParcel(parcel) {
+        this.report("register parcel: " + parcel.hashId, VerboseLevel.BASE);
+
+        try {
+            let x = await this.checkParcelInternal(parcel.hashId, parcel, true);
+
+            if (x instanceof ParcelProcessor) {
+                this.report("parcel processor created for parcel: " + parcel.hashId + ", state is " +
+                    x.processingState.val, VerboseLevel.BASE);
+
+                return true;
+            }
+
+            this.report("parcel processor hasn't created: " + parcel.hashId, VerboseLevel.BASE);
+
+            return false;
+
+        } catch (err) {
+            this.report("register parcel: " + parcel.hashId + " failed: " + err.message, VerboseLevel.BASE);
+
+            throw new Error("failed to process parcel: " + err.message);
+        }
+    }
+
+    /**
+     * If the parcel is being processing, block until the parcel been processed (been processed payment and payload contracts).
+     *
+     * @param {HashId} parcelId - Parcel to wait for.
+     * @param {number} millisToWait - Time to wait in milliseconds.
+     * @throws {EventTimeoutError} for timeout.
+     */
+    async waitParcel(parcelId, millisToWait) {
+        // first check if item is processing as part of parcel
+        let x = await this.checkParcelInternal(parcelId);
+
+        if (x instanceof ParcelProcessor && !x.isDone())
+            await x.doneEvent.await(millisToWait);
+    }
+
     report(message, level) {
         if (level <= this.verboseLevel)
             this.logger.log(this.label + message);
@@ -208,64 +256,62 @@ class Node {
     /**
      * Obtain got common parcel notification: looking for result or parcel processor and register vote.
      *
-     * @param {ItemNotification} notification Common item notification.
+     * @param {ParcelNotification} notification - Common parcel notification.
      */
     async obtainParcelCommonNotification(notification) {
 
         // if notification hasn't parcelId we think this is simple item notification and obtain it as it
-        if (notification.parcelId == null) {
+        if (notification.parcelId == null)
             await this.obtainCommonNotification(notification);
-        } else {
+        else {
             // check if item for notification is already processed
             let item_x = await this.checkItemInternal(notification.itemId);
             // if already processed and result has consensus - answer immediately
             if (item_x instanceof ItemResult && item_x.state.isConsensusFound) {
-
                 // we have solution and need not answer, we answer if requested:
-                if (notification.requestResult) {
-                    this.network.deliver(notification.from,
-                        new ParcelNotification(this.myInfo, notification.itemId,
+                if (notification.requestResult)
+                    this.network.deliver(notification.from, new ParcelNotification(this.myInfo, notification.itemId,
                         notification.parcelId, item_x, false, notification.type));
-                }
+
             } else {
                 // if we haven't results for item, we looking for or create parcel processor
-                let x = this.checkParcelInternal(notification.parcelId, null, true);
-                let from = notification.from;
+                let x = await this.checkParcelInternal(notification.parcelId, null, true);
 
                 if (x instanceof ParcelProcessor) {
                     let resultVote = notification.itemResult;
 
-                    // we might still need to download and process it
-                    if (resultVote.haveCopy) {
-                        x.addToSources(from);
-                    }
-                    if (resultVote.state !== ItemState.PENDING)
-                        x.vote(from, resultVote.state, notification.type.isU);
-                    else
-                        this.logger.log("pending vote on parcel " + notification.parcelId
-                            + " and item " + notification.itemId + " from " + from);
+                    await this.lock.synchronize(x.parcelId, async () => {
+                        // we might still need to download and process it
+                        if (resultVote.haveCopy)
+                            x.addToSources(notification.from);
 
-                    // We answer only if (1) answer is requested and (2) we have position on the subject:
-                    if (notification.requestResult) {
-                        // if notification type is payment, we use payment data from parcel, otherwise we use payload data
-                        if (notification.type.isU) {
-                            // parcel for payment
-                            if (x.getPaymentState() !== ItemState.PENDING) {
-                                this.network.deliver(from,
-                                    new ParcelNotification(this.myInfo, notification.itemId, notification.parcelId,
-                                        x.getPaymentResult(), x.needsPaymentVoteFrom(from), notification.type)
-                                );
-                            }
-                        } else {
-                            // parcel for payload
-                            if (x.getPayloadState() !== ItemState.PENDING) {
-                                this.network.deliver(from,
-                                    new ParcelNotification(this.myInfo, notification.itemId, notification.parcelId,
-                                        x.getPayloadResult(), x.needsPayloadVoteFrom(from), notification.type)
-                                );
+                        if (resultVote.state !== ItemState.PENDING)
+                            await x.vote(notification.from, resultVote.state, notification.type.isU);
+                        else
+                            this.logger.log("pending vote on parcel " + notification.parcelId + " and item " +
+                                notification.itemId + " from " + notification.from);
+
+                        // We answer only if (1) answer is requested and (2) we have position on the subject:
+                        if (notification.requestResult) {
+                            // if notification type is payment, we use payment data from parcel, otherwise we use payload data
+                            if (notification.type.isU) {
+                                // parcel for payment
+                                if (x.getPaymentState() !== ItemState.PENDING)
+                                    this.network.deliver(notification.from,
+                                        new ParcelNotification(this.myInfo, notification.itemId, notification.parcelId,
+                                            x.getPaymentResult(), x.needsPaymentVoteFrom(notification.from), notification.type)
+                                    );
+
+                            } else {
+                                // parcel for payload
+                                if (x.getPayloadState() !== ItemState.PENDING)
+                                    this.network.deliver(notification.from,
+                                        new ParcelNotification(this.myInfo, notification.itemId, notification.parcelId,
+                                            x.getPayloadResult(), x.needsPayloadVoteFrom(notification.from), notification.type)
+                                    );
                             }
                         }
-                    }
+                    });
                 }
             }
         }
@@ -311,53 +357,19 @@ class Node {
     }
 
     /**
-     * Asynchronous (non blocking) parcel (contract with payment) register.
-     * Use Node.waitParcel for waiting parcel being processed.
-     * For checking parcel parts use Node.waitItem or Node.checkItem after Node.waitParcel
-     * with parcel.getPayloadContract().getId() or parcel.getPaymentContract().getId() as params.
-     *
-     * @param {Parcel} parcel - Parcel to register/check state.
-     * @return {boolean} true if Parcel launch to processing. Otherwise exception will be thrown.
-     */
-    registerParcel(parcel) { //TODO
-        this.report("register parcel: " + parcel.id, VerboseLevel.BASE);
-
-        try {
-            let x = this.checkParcelInternal(parcel.id, parcel, true);
-
-            if (x instanceof ParcelProcessor) {
-                this.report("parcel processor created for parcel: " + parcel.id + ", state is ", x.processingState,
-                VerboseLevel.BASE);
-
-                return true;
-            }
-
-            this.report("parcel processor hasn't created: " + parcel.id, VerboseLevel.BASE);
-
-            return false;
-
-        } catch (err) {
-            this.report("register parcel: " + parcel.id + "failed" + err.message,
-                VerboseLevel.BASE);
-
-            throw new Error("failed to process parcel" + err.message);
-        }
-    }
-
-    /**
      * Check the parcel's processing state. If parcel is not under processing (not start or already finished)
      * return ParcelProcessingState.NOT_EXIST.
      *
      * @param {HashId} parcelId - Parcel to check.
      * @return {ParcelProcessingState} processing state.
      */
-    checkParcelProcessingState(parcelId) {
+    async checkParcelProcessingState(parcelId) {
         this.report("check parcel processor state for parcel: " + parcelId, VerboseLevel.BASE);
 
-        let x = this.checkParcelInternal(parcelId);
+        let x = await this.checkParcelInternal(parcelId);
 
         if (x instanceof ParcelProcessor) {
-            this.report("parcel processor for parcel: " + parcelId + " state is " + x.processingState,
+            this.report("parcel processor for parcel: " + parcelId + " state is " + x.processingState.val,
             VerboseLevel.BASE);
 
             return x.processingState;
@@ -367,22 +379,6 @@ class Node {
             VerboseLevel.BASE);
 
         return ParcelProcessingState.NOT_EXIST;
-    }
-
-    /**
-     * If the parcel is being processing, block until the parcel been processed (been processed payment and payload contracts).
-     *
-     * @param {HashId} parcelId - Parcel to wait for.
-     * @param {number} millisToWait - Time to wait in milliseconds.
-     */
-    async waitParcel(parcelId, millisToWait) {
-        // first check if item is processing as part of parcel
-        let x = this.checkParcelInternal(parcelId);
-
-        if (x instanceof ParcelProcessor) {
-            if(!x.isDone())
-                await x.doneEvent.await(millisToWait);
-        }
     }
 
     /**
@@ -508,31 +504,32 @@ class Node {
      * @param {HashId} parcelId - Parcel's id.
      * @param {Parcel} parcel - Provide parcel if need, can be null. Default is null.
      * @param {boolean} autoStart - create new ParcelProcessor if not exist. Default is false.
-     * @return {ItemResult | ParcelProcessor} instance of ParcelProcessor if the parcel is being processed (also if it was started by the call),
-     *         ItemResult if it is can't be processed.
+     * @return {ItemResult | ParcelProcessor} instance of ParcelProcessor if the parcel is being processed
+     *         (also if it was started by the call), ItemResult if it is can't be processed.
      */
-    checkParcelInternal(parcelId, parcel = null, autoStart = false) {
+    async checkParcelInternal(parcelId, parcel = null, autoStart = false) {
         try {
-            // let's look existing parcel processor
-            let processor = this.parcelProcessors.get(parcelId);
-            if (processor != null) {
-                return processor;
-            }
+            return await this.lock.synchronize(parcelId, async () => {
+                // let's look existing parcel processor
+                let processor = this.parcelProcessors.get(parcelId);
+                if (processor != null)
+                    return processor;
 
-            // if nothing found and need to create new - create it
-            if (autoStart) {
-                if (parcel != null) {
-                    this.parcelCache.put(parcel);
-                }
-                processor = new ParcelProcessor(parcelId, parcel, this);
-                this.parcelProcessors.set(parcelId, processor);
+                // if nothing found and need to create new - create it
+                if (autoStart) {
+                    if (parcel != null)
+                        this.parcelCache.put(parcel);
 
-                return processor;
-            } else {
-                return ItemResult.UNDEFINED;
-            }
+                    processor = await new ParcelProcessor(parcelId, parcel, this).run();
+                    this.parcelProcessors.set(parcelId, processor);
+
+                    return processor;
+                } else
+                    return ItemResult.UNDEFINED;
+            });
         } catch (err) {
-            throw new Error("failed to checkItem" + err.message);
+            console.log(err.stack);
+            throw new Error("failed to checkParcel: " + err.message);
         }
     }
 

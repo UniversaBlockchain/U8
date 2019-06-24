@@ -4,6 +4,7 @@ import {randomBytes} from 'tools'
 import {HttpClient} from 'web'
 import {VerboseLevel} from "node_consts";
 import * as io from 'io'
+import * as tt from 'test_tools'
 import * as tk from 'unit_tests/test_keys'
 
 const Main = require("main").Main;
@@ -12,6 +13,7 @@ const ExtendedSignature = require("extendedsignature").ExtendedSignature;
 const ItemState = require("itemstate").ItemState;
 const ScheduleExecutor = require("executorservice").ScheduleExecutor;
 const Constraint = require('constraint').Constraint;
+const cs = require("contractsservice");
 
 async function createMain(name, nolog, postfix = "") {
 
@@ -401,6 +403,64 @@ unit.test("main_test: register bad item", async () => {
 
     await ts.shutdown();
 });
+
+/*unit.test("main_test: register parcel", async () => {
+    let key = new PrivateKey(await io.fileGetContentsAsBytes("../test/keys/reconfig_key.private.unikey"));
+
+    let ts = await new TestSpace(key).create(false);
+
+    for (let i = 0; i < 4; i++) {
+        ts.nodes[i].setVerboseLevel(VerboseLevel.DETAILED);
+        ts.nodes[i].setUDPVerboseLevel(VerboseLevel.DETAILED);
+    }
+
+    let ownerKey = tk.TestKeys.getKey();
+    let U = await tt.createFreshU(100000000, [ownerKey.publicKey]);
+
+    await ts.node.node.registerItem(U);
+    let ir = await ts.node.node.waitItem(U.id, 10000);
+    assert(ir.state === ItemState.APPROVED);
+
+    let k = tk.TestKeys.getKey();
+    let item = Contract.fromPrivateKey(k);
+
+    await item.seal(true);
+
+    let parcel = await cs.createParcel(item, U, 1, [ownerKey], false);
+
+    await ts.node.node.registerParcel(parcel);
+    await ts.node.node.waitParcel(parcel.hashId, 10000);
+    ir = await ts.node.node.waitItem(item.id, 10000);
+    assert(ir.state === ItemState.APPROVED);
+
+    /*for (let i = 0; i < 4; i++) {
+        ir = await ts.nodes[i].node.waitItem(item.id, 10000);
+        assert(ir.state === ItemState.APPROVED);
+
+        assert((await ts.nodes[i].ledger.getRecord(item.id)).state === ItemState.APPROVED);
+
+        if (i !== 0)
+            ir = await ts.nodes[0].node.network.getItemState(ts.nodes[i].node.myInfo, item.id);
+        assert(ir.state === ItemState.APPROVED);
+    }
+
+    let fire = [];
+    let events = [];
+    for (let i = 0; i < 4; i++)
+        events.push(new Promise((resolve) => {fire.push(resolve)}));
+
+    for (let i = 0; i < 4; i++)
+        ts.clients[i].command("getState", {itemId: item.id}, (result) => fire[i](result), () => fire[i](null));
+
+    (await Promise.all(events)).forEach(ir => {
+        assert(ir != null);
+        assert(ir.itemResult.state === ItemState.APPROVED);
+    });
+
+    await ts.shutdown();
+});*/
+
+// BENCHMARKS
 
 /*unit.test("main_test: simpleBenchmark", async () => {
     let key = new PrivateKey(await (await io.openRead("../test/keys/reconfig_key.private.unikey")).allBytes());

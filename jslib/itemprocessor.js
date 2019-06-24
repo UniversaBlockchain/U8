@@ -143,7 +143,7 @@ class ItemProcessor {
     //******************** download section ********************//
 
     pulseDownload() {
-        if (this.processingState !== ItemProcessingState.EMERGENCY_BREAK && !this.processingState.isProcessedToConsensus) {
+        if (this.processingState.canContinue && !this.processingState.isProcessedToConsensus) {
             this.processingState = ItemProcessingState.DOWNLOADING;
 
             if (this.item == null && this.downloader == null)
@@ -162,7 +162,7 @@ class ItemProcessor {
                         // first we have to wait for sources
                         let source = Array.from(this.sources)[Math.floor(Math.random() * this.sources.size)];
 
-                        this.item = await this.node.network.getItem(this.itemId, source, Config.maxGetItemTime);
+                        this.item = await this.node.network.getItem(this.itemId, source, Config.maxGetItemTime * 1000);
                         if (this.item != null) {
                             await this.itemDownloaded();
                             break;

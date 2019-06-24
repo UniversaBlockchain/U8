@@ -585,11 +585,11 @@ class ClientHTTPServer extends network.HttpServer {
         return await this.node.provideStats(t.getOrDefault(params, "showDays", null)); //TODO: node
     }
 
-    getParcelProcessingState(params, clientKey) {
+    async getParcelProcessingState(params, clientKey) {
         this.checkNode(clientKey, true);
 
         try {
-            return {processingState : this.node.checkParcelProcessingState(params.parcelId)};
+            return {processingState : await this.node.checkParcelProcessingState(params.parcelId)};
         } catch (err) {
             this.logger.log("getParcelProcessingState ERROR: " + err.message);
 

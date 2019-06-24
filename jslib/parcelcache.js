@@ -26,9 +26,9 @@ class ParcelCache {
         return i != null ? i.parcel : null;
     }
 
-    put(item, result) {
+    put(parcel) {
         // this will plainly override current if any
-        new Record(item, result);
+        new Record(parcel, this);
     }
 
     get size() {
