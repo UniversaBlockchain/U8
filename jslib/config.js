@@ -20,7 +20,7 @@ class Config {
     static declinedItemExpiration = 10*24*3600; //10 days
     static maxGetItemTime = 30; //30 seconds
     static maxDownloadOnApproveTime = 5*60; //5 minutes
-    static itemRetryCount = 10;
+    static itemGetRetryCount = 10;
     static expriedStorageCleanupInterval = 5*60; //5 minutes
     static expriedNamesCleanupInterval = 5*60; //5 minutes
 

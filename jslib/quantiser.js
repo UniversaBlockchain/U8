@@ -48,7 +48,7 @@ class Quantiser {
 
     quantasLeft() {
         if (this.quantaLimit_ >= 0) {
-            return this.quantaLimit_ - this.quantiser.quantaSum_;
+            return this.quantaLimit_ - this.quantaSum_;
         }
         return -1;
     }

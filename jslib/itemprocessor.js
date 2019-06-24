@@ -1319,7 +1319,10 @@ class ItemProcessor {
         if (this.item != null)
             return;
 
-        if (this.sources.add(node))
+        let has = this.sources.has(node);
+
+        this.sources.add(node);
+        if (!has)
             this.pulseDownload();
     }
 

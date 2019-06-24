@@ -41,12 +41,12 @@ class Record {
         this.parcelCache = parcelCache;
         this.parcel = parcel;
         this.expiresAt = Math.floor(Date.now() / 1000) + this.parcelCache.maxAge;
-        this.parcelCache.records.set(this.parcel.id, this);
+        this.parcelCache.records.set(this.parcel.hashId, this);
     }
 
     checkExpiration(now) {
         if (this.expiresAt < now)
-            this.parcelCache.records.delete(this.parcel.id);
+            this.parcelCache.records.delete(this.parcel.hashId);
     }
 
 }

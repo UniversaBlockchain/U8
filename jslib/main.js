@@ -175,7 +175,7 @@ class Main {
         this.network = new NetworkV2(this.netConfig, this.myInfo, this.nodeKey, this.logger);
         this.node = await new Node(this.config, this.myInfo, this.ledger, this.network, this.nodeKey, this.logger).run();
         this.cache = this.node.cache;
-        //this.parcelCache = this.node.parcelCache;
+        this.parcelCache = this.node.parcelCache;
 
         this.clientHTTPServer.node = this.node;
         this.clientHTTPServer.cache = this.cache;

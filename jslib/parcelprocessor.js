@@ -1,9 +1,13 @@
 import {ScheduleExecutor, AsyncEvent} from "executorservice";
+import {ItemProcessor, ItemProcessingState} from "itemprocessor";
 import {VerboseLevel} from "node_consts";
 import {Errors, ErrorRecord} from "errors";
 
 const Quantiser = require("quantiser").Quantiser;
-const ItemProcessor = require("itemprocessor").ItemProcessor;
+const Config = require("config").Config;
+const ItemResult = require('itemresult').ItemResult;
+const ItemState = require('itemstate').ItemState;
+const NSmartContract = require("services/NSmartContract").NSmartContract;
 
 const ParcelProcessingState = {
 
@@ -261,7 +265,7 @@ class ParcelProcessor {
             return;
         }
 
-        let retryCounter = Config.itemRetryCount;
+        let retryCounter = Config.itemGetRetryCount;
         while (!this.isPayloadPollingExpired() && this.parcel == null) {
             if (this.sources.size === 0) {
                 //this.node.logger.log("empty sources for download tasks, stopping");
@@ -307,7 +311,6 @@ class ParcelProcessor {
         this.payload = this.parcel.getPayloadContract();
 
         // create item processors or get results for payment and payload
-
         await this.node.lock.synchronize(this.parcelId, async () => {
 
             this.payment.quantiser.reset(Config.paymentQuantaLimit);
@@ -451,7 +454,10 @@ class ParcelProcessor {
         if (this.parcel != null)
             return;
 
-        if (this.sources.add(node))
+        let has = this.sources.has(node);
+
+        this.sources.add(node);
+        if (!has)
             this.pulseDownload();
     }
 

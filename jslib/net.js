@@ -4,6 +4,7 @@ import {Notification, ItemNotification, ResyncNotification, ParcelNotification} 
 import {ExecutorService, AsyncEvent} from "executorservice";
 
 const Boss = require('boss.js');
+const Parcel = require("parcel").Parcel;
 const ItemResult = require('itemresult').ItemResult;
 const Lock = require("lock").Lock;
 
@@ -250,7 +251,7 @@ class NetworkV2 extends Network {
     logNotification(notification, to, from) {
         if (notification instanceof ParcelNotification && notification.parcelId != null)
             this.report(from.number + "->" + to.number + " PN " + notification.parcelId.toString() + " " +
-                notification.type == null ? "NULL" : notification.type, VerboseLevel.DETAILED);
+                (notification.type == null ? "NULL" : notification.type.val), VerboseLevel.DETAILED);
         else if (notification instanceof ResyncNotification)
             this.report(from.number + "->" + to.number + " RN " + notification.itemState.val, VerboseLevel.DETAILED);
         else if (notification instanceof ItemNotification)

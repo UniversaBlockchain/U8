@@ -57,6 +57,13 @@ class StateRecord {
         return "State<"+this.id+"/"+this.recordId+":"+this.state.val+":"+this.createdAt+"/"+this.expiresAt+">"
     }
 
+    stringId() {
+        if (this.stringId_ == null)
+            this.stringId_ = this.toString();
+
+        return this.stringId_;
+    }
+
     isExpired() {
         return this.expiresAt != null && this.expiresAt.getTime() < new Date().getTime();
     }

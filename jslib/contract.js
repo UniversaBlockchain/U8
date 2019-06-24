@@ -1172,13 +1172,13 @@ class Contract extends bs.BiSerializable {
         }
 
         // check valid name/type fields combination
-        if (typeof u === "number") {
+        if (u == null || typeof u !== "number") {
             res = false;
             this.errors.push(new ErrorRecord(Errors.BAD_VALUE, "", "u name/type mismatch"));
         }
 
         if (test_u !== -1) {
-            if (typeof test_u === "number") {
+            if (test_u == null || typeof test_u !== "number") {
                 res = false;
                 this.errors.push(new ErrorRecord(Errors.BAD_VALUE, "", "test_u name/type mismatch"));
             }
@@ -1214,8 +1214,10 @@ class Contract extends bs.BiSerializable {
             this.errors.push(new ErrorRecord(Errors.BAD_VALUE, "", "Payment contract that marked as for testnet has not test_u."));
         }
 
+        await this.verifySealedKeys(false);
+
         // check valid decrement_permission
-        if (!this.isPermitted("decrement_permission", new t.GenericSet(this.sealedByKeys.keys()))) {
+        if (!this.isPermitted("decrement_permission", this.sealedByKeys.keys())) {
             res = false;
             this.errors.push(new ErrorRecord(Errors.BAD_VALUE, "", "decrement_permission is missing"));
         }
