@@ -23,6 +23,7 @@ class Config {
     static itemGetRetryCount = 10;
     static expriedStorageCleanupInterval = 5*60; //5 minutes
     static expriedNamesCleanupInterval = 5*60; //5 minutes
+    static followerCallbackExpiration = 10*60; //10 minutes
 
     /**
      * num of known (approved, declined, revoked or locked) subcontracts of a complex contract that starts resync

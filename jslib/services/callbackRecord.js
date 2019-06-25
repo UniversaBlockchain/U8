@@ -141,7 +141,7 @@ class CallbackRecord {
      * @return {boolean} true if callback synchronization is ended
      */
     endSynchronize(ledger, node) {
-        if (this.expiresAt != null && this.expiresAt.getTime() > Date.now());
+        if (this.expiresAt != null && this.expiresAt.getTime() > Date.now())
             return false;
 
         // final (additional) check for consensus of callback state

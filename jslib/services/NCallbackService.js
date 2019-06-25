@@ -1,6 +1,7 @@
 import {VerboseLevel} from "node_consts";
 import {CallbackNotification, CallbackNotificationType} from "notification";
 
+const ItemState = require('itemstate').ItemState;
 const CallbackService = require("services/callbackService").CallbackService;
 const ex = require("exceptions");
 const Config = require("config").Config;
@@ -51,7 +52,7 @@ class NCallbackService extends CallbackService {
             return;
 
         let callbackRecords = this.ledger.getFollowerCallbacksToResyncByEnvId(environmentId);
-        if (callbackRecords.isEmpty())
+        if (callbackRecords.isEmpty()) //TODO
             return;
 
         this.startSynchronizeFollowerCallbacks(callbackRecords, nodesCount);
@@ -91,7 +92,7 @@ class NCallbackService extends CallbackService {
      * @param {Contract} updatingItem - New revision of following contract.
      * @param {ItemState} state - State of new revision of following contract.
      * @param {NSmartContract} contract - Contract is follower contract.
-     * @param me is environment
+     * @param {MutableEnvironment} me is environment.
      */
     startCallbackProcessor(updatingItem, state, contract, me) {
         // initialize callback processor
@@ -102,22 +103,23 @@ class NCallbackService extends CallbackService {
 
         // run callback processor
         let startDelay = callback.delay;
-        let repeatDelay = this.config.followerCallbackDelay * (this.network.getNodesCount() + 2); //TODO toMillis
-        //callback.setExecutor(executorService.scheduleWithFixedDelay(() -> callback.call(), startDelay, repeatDelay, TimeUnit.MILLISECONDS));
+        let repeatDelay = this.config.followerCallbackDelay * 1000 * (this.network.getNodesCount() + 2); //TODO
+
+        //callback.setExecutor(executorService.scheduleWithFixedDelay(() => callback.call(), startDelay, repeatDelay, TimeUnit.MILLISECONDS));
 
         //synchronized (callbackProcessors) {
             this.callbackProcessors.set(callback.id, callback);
 
-            node.report("notifyFollowerSubscribers: put callback " + callback.id, VerboseLevel.DETAILED);
+            node.report("notifyFollowerSubscribers: put callback " + callback.id.base64, VerboseLevel.DETAILED);
 
             let deferredNotification = this.deferredCallbackNotifications.get(callback.id);
             if (deferredNotification != null) {
                 // do deferred notification
                 callback.obtainNotification(deferredNotification);
 
-                this.deferredCallbackNotifications.remove(callback.id);
+                this.deferredCallbackNotifications.delete(callback.id);
 
-                node.report("notifyFollowerSubscribers: remove deferred notification for callback " + callback.id,
+                node.report("notifyFollowerSubscribers: remove deferred notification for callback " + callback.id.base64,
                     VerboseLevel.DETAILED);
             }
         //}
@@ -135,19 +137,19 @@ class NCallbackService extends CallbackService {
      *
      */
      /*requestFollowerCallback(callback, callbackURL, packedData) {
-        synchronized (this) {
-            String charset = "UTF-8";
+        //synchronized (this) {
+            let charset = "UTF-8";
 
             let call;
 
-            if (callback.state == ItemState.APPROVED)
+            if (callback.state === ItemState.APPROVED)
                 call = Binder.fromKeysValues(
                     "event", "new",
                     "data", packedData,
                     "signature", nodeKey.sign(packedData, HashType.SHA512),
                     "key", nodeKey.getPublicKey().pack()
                 );
-            else if (callback.getState() == ItemState.REVOKED)
+            else if (callback.state === ItemState.REVOKED)
                 call = Binder.fromKeysValues(
                     "event", "revoke",
                     "id", packedData,
@@ -207,45 +209,46 @@ class NCallbackService extends CallbackService {
                 return null;
 
             return res.getBinary("receipt");
-        }
-    }
+        //}
+    }*/
 
     obtainCallbackNotification(notification) {
         let callback;
 
-        node.report("obtainCallbackNotification: callback " +  notification.id + " type " + notification.getType().name(),
+        node.report("obtainCallbackNotification: callback " +  notification.id.base64 + " type " + notification.type.val,
             VerboseLevel.DETAILED);
 
-        if (notification.getType() == CallbackNotification.CallbackNotificationType.GET_STATE) {
-            network.deliver(notification.getFrom(), new CallbackNotification(myInfo, notification.id,
-                CallbackNotification.CallbackNotificationType.RETURN_STATE, null,
-                ledger.getFollowerCallbackStateById(notification.id)));
-        } else if (notification.getType() == CallbackNotification.CallbackNotificationType.RETURN_STATE) {
-            synchronized (callbackProcessors) {
-                CallbackRecord record = callbacksToSynchronize.get(notification.id);
+        if (notification.type === CallbackNotificationType.GET_STATE) {
+            this.network.deliver(notification.from, new CallbackNotification(this.myInfo, notification.id,
+                CallbackNotificationType.RETURN_STATE, null,
+                this.ledger.getFollowerCallbackStateById(notification.id)));
 
-                if ((record != null) && record.synchronizeState(notification.getState(), ledger, node)) {
-                    callbacksToSynchronize.remove(notification.id);
+        } else if (notification.type === CallbackNotificationType.RETURN_STATE) {
+            //synchronized (callbackProcessors) {
+                let record = this.callbacksToSynchronize.get(notification.id);
 
-                    node.report("obtainCallbackNotification: callback " + notification.id +
-                        " synchronized with state " + notification.getState().name(), VerboseLevel.DETAILED);
+                if ((record != null) && record.synchronizeState(notification.state, this.ledger, this.node)) {
+                    this.callbacksToSynchronize.delete(notification.id);
+
+                    node.report("obtainCallbackNotification: callback " + notification.id.base64 +
+                        " synchronized with state " + notification.state.val, VerboseLevel.DETAILED);
                 }
-            }
+            //}
         } else {
-            synchronized (callbackProcessors) {
-                callback = callbackProcessors.get(notification.id);
+            //synchronized (callbackProcessors) {
+                callback = this.callbackProcessors.get(notification.id);
                 if (callback == null) {
-                    node.report("obtainCallbackNotification not found callback " + notification.id,
+                    node.report("obtainCallbackNotification not found callback " + notification.id.base64,
                         VerboseLevel.BASE,);
 
-                    deferredCallbackNotifications.put(notification.id, notification);
+                    this.deferredCallbackNotifications.set(notification.id, notification);
                     return;
                 }
             }
 
             callback.obtainNotification(notification);
-        }
-    }*/
+        //}
+    }
 }
 
 class CallbackProcessor {
@@ -254,94 +257,120 @@ class CallbackProcessor {
         this.state = state;
         this.environmentId = environmentId;
         this.callbackService = callbackService;
+        this.delay = 1;
+        this.packedItem = item.getPackedTransaction();
+
+        this.isItemSended = false;
+
+        this.nodesSendCallback = new t.GenericSet();
+
+        // calculate callback hash
+        /*let digest = this.itemId.digest;
+        let URL = this.callbackURL.getBytes(StandardCharsets.UTF_8);
+        let concat = new byte[digest.length + URL.length + 1];
+        concat[0] = state.ordinal();
+        System.arraycopy(digest, 0, concat, 1, digest.length);
+        System.arraycopy(URL, 0, concat, digest.length + 1, URL.length);
+        this.id = HashId.of(concat);*/
+
+        // calculate expiration time
+        this.expiresAt = Date.now() + Config.followerCallbackExpiration * 1000; //TODO
+
+
+        // save callback information
+        this.callbackURL = follower.trackingOrigins.get(item.origin);
+        this.callbackKey = follower.callbackKeys.get(this.callbackURL);
     }
 
     addNodeToSended(addedNodeNumber) {
-        nodesSendCallback.add(addedNodeNumber);
+        this.nodesSendCallback.add(addedNodeNumber);
     }
 
-    /*checkForComplete() {
+    checkForComplete() {
         // if some nodes (rate defined in config) also sended callback and received packed item (without answer)
         // callback is deemed complete
-        if (nodesSendCallback.size() >= (int) Math.floor(network.allNodes().size() * config.getRateNodesSendFollowerCallbackToComplete()))
-        complete();
+        //if (this.nodesSendCallback.size() >= (int) Math.floor(network.allNodes().size() * config.getRateNodesSendFollowerCallbackToComplete())) //TODO Deprecated
+        this.complete();
     }
 
     checkCallbackSignature(signature) {
         try {
-            return callbackKey.verify(itemId.getDigest(), signature, HashType.SHA512);
+            return this.callbackKey.verify(this.itemId.digest, signature, crypto.SHA512);
         } catch (err) {
             return false;
         }
     }
 
     obtainNotification(notification) {
-        node.report("Notify callback " + notification.id + " type " + notification.getType().name(),
-            " from node " + notification.getFrom().getName(), VerboseLevel.DETAILED);
+        node.report("Notify callback " + notification.id.base64 + " type " + notification.type.val,
+            " from node " + notification.from.val, VerboseLevel.DETAILED);
 
-        if (notification.getType() == CallbackNotification.CallbackNotificationType.COMPLETED) {
-            if (checkCallbackSignature(notification.getSignature()))
-                complete();
-        } else if (notification.getType() == CallbackNotification.CallbackNotificationType.NOT_RESPONDING) {
-            addNodeToSended(notification.getFrom().getNumber());
-            checkForComplete();
+        if (notification.type === CallbackNotificationType.COMPLETED) {
+            if (this.checkCallbackSignature(notification.signature))
+                this.complete();
+        } else if (notification.type === CallbackNotificationType.NOT_RESPONDING) {
+            this.addNodeToSended(notification.from.number);
+            this.checkForComplete();
         }
     }
 
     complete() {
-        synchronized (callbackService) {
+        //synchronized (callbackService) {
             // full environment
             let fullEnvironment = node.getFullEnvironment(environmentId);
-            let follower = (NSmartContract) fullEnvironment.get("follower");
-            let environment = (NMutableEnvironment) fullEnvironment.get("environment");
+            let follower =  fullEnvironment.get("follower");
+            let environment = fullEnvironment.get("environment");
 
-            callbackProcessors.remove(id);
+            callbackProcessors.delete(this.id);
 
-            node.report("CallbackProcessor.complete: Removed callback " + id, VerboseLevel.DETAILED);
+            node.report("CallbackProcessor.complete: Removed callback " + this.id.base64, VerboseLevel.DETAILED);
 
-            follower.onContractSubscriptionEvent(new ContractSubscription.CompletedEvent() {
-            @Override
+           /* follower.onContractSubscriptionEvent(new ContractSubscription.CompletedEvent() {
+
                 public MutableEnvironment getEnvironment() {
                     return environment;
                 }
-            });
+            });*/
+
             environment.save();
-        }
+        //}
 
         // save new callback state in DB record
-        ledger.updateFollowerCallbackState(id, FollowerCallbackState.COMPLETED);
+        ledger.updateFollowerCallbackState(this.id, FollowerCallbackState.COMPLETED);
 
-        node.report("Completed callback " + id, VerboseLevel.BASE);
+        node.report("Completed callback " + this.id.base64, VerboseLevel.BASE);
 
         stop();
     }
 
     fail() {
-        synchronized (callbackService) {
+        //synchronized (callbackService) {
             // full environment
             let fullEnvironment = node.getFullEnvironment(environmentId);
-            let follower = (NSmartContract) fullEnvironment.get("follower");
-            let environment = (NMutableEnvironment) fullEnvironment.get("environment");
+            let follower = fullEnvironment.get("follower");
+            let environment = fullEnvironment.get("environment");
 
-            callbackProcessors.remove(id);
+            callbackProcessors.delete(this.id);
 
-            node.report("CallbackProcessor.fail: Removed callback " + id, VerboseLevel.DETAILED);
+            node.report("CallbackProcessor.fail: Removed callback " + this.id.base64, VerboseLevel.DETAILED);
 
-            follower.onContractSubscriptionEvent(new ContractSubscription.FailedEvent() {
+            /*follower.onContractSubscriptionEvent(new ContractSubscription.FailedEvent() {
+
             @Override
                 public MutableEnvironment getEnvironment() {
                     return environment;
                 }
-            });
+            });*/
+
             environment.save();
-        }
+        //}
 
         // save new callback state in DB record
-        ledger.updateFollowerCallbackState(id, FollowerCallbackState.EXPIRED);
+        ledger.updateFollowerCallbackState(this.id, FollowerCallbackState.EXPIRED);
 
-        node.report("Failed callback " + id, VerboseLevel.BASE);
+        node.report("Failed callback " + this.id.base64, VerboseLevel.BASE);
 
-        stop();
+        this.stop();
     }
 
     stop() {
@@ -350,37 +379,37 @@ class CallbackProcessor {
     }
 
     call() {
-        if (ZonedDateTime.now().isAfter(expiresAt))
-            fail();     // callback failed (expired)
+        if (this.expiresAt != null && this.expiresAt.getTime() < Date.now())
+            this.fail();     // callback failed (expired)
         else {
-            if (isItemSended) {       // callback has already been called and received packed item
+            if (this.isItemSended) {       // callback has already been called and received packed item
                 // send notification to other nodes
-                network.broadcast(myInfo, new CallbackNotification(myInfo, id,
-                    CallbackNotification.CallbackNotificationType.NOT_RESPONDING, null));
+                network.broadcast(myInfo, new CallbackNotification(myInfo, this.id,
+                    CallbackNotificationType.NOT_RESPONDING, null));
 
-                addNodeToSended(myInfo.getNumber());
-                checkForComplete();
+                this.addNodeToSended(myInfo.number);
+                this.checkForComplete();
             } else {     // callback not previously called
                 // request HTTP follower callback
-                byte[] signature = null;
+                let signature = null;
                 try {
-                    if (state == ItemState.APPROVED)
-                        signature = requestFollowerCallback(this, callbackURL, packedItem);
-                    else if (state == ItemState.REVOKED)
-                        signature = requestFollowerCallback(this, callbackURL, itemId.getDigest());
-                } catch (IOException e) {
-                    e.printStackTrace();
-                    System.err.println("error request HTTP follower callback");
+                    if (this.state === ItemState.APPROVED)
+                        signature = requestFollowerCallback(this, this.callbackURL, this.packedItem);
+                    else if (this.state === ItemState.REVOKED)
+                        signature = requestFollowerCallback(this, this.callbackURL, this.itemId.digest);
+                } catch (err) {
+                    node.logger.log(err.stack);
+                    node.logger.log("error call: request HTTP follower callback: " + err.message);
                 }
 
-                if ((signature != null) && checkCallbackSignature(signature)) {
-                    network.broadcast(myInfo, new CallbackNotification(myInfo, id,
-                        CallbackNotification.CallbackNotificationType.COMPLETED, signature));
-                    complete();
+                if ((signature != null) && this.checkCallbackSignature(signature)) {
+                    network.broadcast(myInfo, new CallbackNotification(myInfo, this.id,
+                        CallbackNotificationType.COMPLETED, signature));
+                    this.complete();
                 }
             }
         }
-    }*/
+    }
 }
 
 module.exports = {NCallbackService};

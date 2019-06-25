@@ -213,6 +213,30 @@ class Node {
     }
 
     /**
+     * Get environment and follower contract by environment identifier.
+     *
+     * @param {number} environmentId - Environment subscription.
+     *
+     * @return {Object} with environment and follower contract.
+     *
+     */
+    getFullEnvironment(environmentId) {
+        let ime = this.getEnvironment(environmentId);
+        ime.nameCache = this.nameCache;
+        let contract = ime.getContract();
+        contract.nodeInfoProvider = this.nodeInfoProvider;
+        let me = ime.getMutable();
+
+        if (me == null)
+            return {};
+
+        return {
+            "follower": contract,
+            "environment": me
+        };
+    }
+
+    /**
      * Obtain got common item notification: looking for result or item processor and register vote.
      *
      * @param {ItemNotification} notification - Common item notification.
