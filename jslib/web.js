@@ -397,7 +397,6 @@ network.HttpServer = class {
                         .catch(err => {
                             resolve({error: new ErrorRecord(Errors.COMMAND_FAILED, params.command, err.toString())});
                         });
-                    resolve({result: await this.secureEndpoints_.get(params.command)(params.params, clientPublicKey)});
                 });
             else {
                 throw new ErrorRecord(Errors.UNKNOWN_COMMAND, "command", "unknown: " + params.command);
