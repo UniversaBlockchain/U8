@@ -247,8 +247,6 @@ namespace db {
         size_t availableConnections();
 
         /**
-         * deprecated
-         * <p>
          * Executes string sql command. All query parameters should be inside string.
          * You can concatenate several sql commands in one string. Callback receives vecror<QueryResult> parameter,
          * one result for each sql command.

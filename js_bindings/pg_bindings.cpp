@@ -99,6 +99,65 @@ void JsPGPoolClose(const FunctionCallbackInfo<Value> &args) {
     });
 }
 
+void JsPGPoolExec(const FunctionCallbackInfo<Value> &args) {
+    Scripter::unwrapArgs(args, [&](ArgsContext &ac) {
+
+        auto scripter = ac.scripter;
+        if (args.Length() != 3)
+            scripter->throwError("invalid number of arguments");
+
+        auto onSuccess = ac.as<Function>(0);
+        if (onSuccess->IsNull() || onSuccess->IsUndefined()) {
+            scripter->throwError("null onSuccess in JsBusyConnectionExecuteQuery");
+            return;
+        }
+        Persistent<Function> *onSuccessPcb = new Persistent<Function>(ac.isolate, onSuccess);
+        auto onError = ac.as<Function>(1);
+        if (onError->IsNull() || onError->IsUndefined()) {
+            scripter->throwError("null onError in JsBusyConnectionExecuteQuery");
+            return;
+        }
+        Persistent<Function> *onErrorPcb = new Persistent<Function>(ac.isolate, onError);
+        auto queryString = ac.asString(2);
+
+        auto pool = unwrap<db::PGPool>(args.This());
+
+        pool->exec(queryString, [=](db::QueryResultsArr &qra){
+            bool isSuccess = true;
+            std::string errorText = "";
+            for (auto &qr : qra) {
+                if (qr.isError()) {
+                    isSuccess = true;
+                    errorText = qr.getErrorText();
+                    break;
+                }
+            }
+            if (isSuccess) {
+                scripter->inPool([=](auto context) {
+                    Isolate *isolate = context->GetIsolate();
+                    auto fn = onSuccessPcb->Get(isolate);
+                    auto unused = fn->Call(context, fn, 0, nullptr);
+                    onSuccessPcb->Reset();
+                    onErrorPcb->Reset();
+                    delete onSuccessPcb;
+                    delete onErrorPcb;
+                });
+            } else {
+                scripter->inPool([=](auto context) {
+                    Isolate *isolate = context->GetIsolate();
+                    auto fn = onErrorPcb->Get(isolate);
+                    Local<Value> result = scripter->v8String(errorText);
+                    auto unused = fn->Call(context, fn, 1, &result);
+                    onSuccessPcb->Reset();
+                    onErrorPcb->Reset();
+                    delete onSuccessPcb;
+                    delete onErrorPcb;
+                });
+            }
+        });
+    });
+}
+
 // BusyConnection methods
 
 void JsBusyConnectionExecuteQuery(const FunctionCallbackInfo<Value> &args) {
@@ -258,6 +317,7 @@ void JsInitPGPool(Isolate *isolate, const Local<ObjectTemplate> &global) {
     prototype->Set(isolate, "_totalConnections", FunctionTemplate::New(isolate, JsPGPoolTotalConnections));
     prototype->Set(isolate, "_availableConnections", FunctionTemplate::New(isolate, JsPGPoolAvailableConnections));
     prototype->Set(isolate, "_close", FunctionTemplate::New(isolate, JsPGPoolClose));
+    prototype->Set(isolate, "_exec", FunctionTemplate::New(isolate, JsPGPoolExec));
 
     // register it into global namespace
     PGPoolTemplate.Reset(isolate, tpl);

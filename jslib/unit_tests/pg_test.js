@@ -79,7 +79,7 @@ function createPool(poolSize) {
     return pool;
 }
 
-async function recreateTestTable() {
+async function recreateTestTableBak() {
     //alter database unit_tests SET client_min_messages TO WARNING;
 
     let pool = createPool(1);
@@ -114,6 +114,49 @@ async function recreateTestTable() {
             boolean_val boolean
         );
     `);
+
+    pool.close();
+}
+
+async function recreateTestTable() {
+    //alter database unit_tests SET client_min_messages TO WARNING;
+
+    let pool = createPool(1);
+
+    let resolver;
+    let promise = new Promise((resolve, reject) => {
+        resolver = resolve;
+    });
+
+    let sql = `
+        drop table if exists table1;
+        create table table1(
+            id serial primary key,
+            hash bytea not null,
+            state integer,
+            locked_by_id integer,
+            created_at integer not null,
+            expires_at bigint
+        );
+        create unique index ix_table1_hashes on table1(hash);
+        create index ix_table1_expires_at on table1(expires_at);
+        drop table if exists table2;
+        create table table2(
+            id serial primary key,
+            text_val text not null,
+            double_val double precision,
+            boolean_val boolean
+        );
+    `;
+
+    pool.execSql(() => {
+        resolver();
+    }, (errText) => {
+        console.error(e);
+        resolver();
+    }, sql);
+
+    await promise;
 
     pool.close();
 }
@@ -719,8 +762,8 @@ unit.test("performance: multithreading", async () => {
     let dt = new Date().getTime() - t1;
     testResult += ", total time: " + dt + " ms ...";
     console.logPut(testResult);
-    assert(dt > 300*0.8);
-    assert(dt < 300*1.2);
+    assert(dt > 300*0.7);
+    assert(dt < 300*1.3);
     pool.close();
 });
 

@@ -34,6 +34,20 @@ class PgDriverPool extends db.SqlDriverPool {
     close() {
         this.pool._close();
     }
+
+    /**
+     * Slow, but can execute multiple sql queries separated by semicolon.
+     * Don't accepts query parameters.
+     * Please, don't use it in high load cases.
+     * It is used for migrations applying.
+     */
+    execSql(onSuccess, onError, sql) {
+        this.pool._exec(() => {
+            onSuccess();
+        }, (errText) => {
+            onError(new db.DatabaseError(errText));
+        }, sql);
+    }
 }
 
 class PgDriverConnection extends db.SqlDriverConnection {
