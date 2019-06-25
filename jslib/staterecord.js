@@ -226,6 +226,7 @@ class StateRecord {
     destroy(con) {
         if (this.destroyNotification != null)
             this.destroyNotification(this);
+        this.state = ItemState.UNDEFINED;
         return this.ledger.destroy(this, con);
     }
 }

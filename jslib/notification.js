@@ -3,6 +3,7 @@ import {HashId} from 'crypto'
 const ItemResult = require('itemresult').ItemResult;
 const ItemState = require('itemstate').ItemState;
 const t = require("tools");
+const FollowerCallbackState = require("services/followerCallbackState").FollowerCallbackState;
 
 const CODE_ITEM_NOTIFICATION = 0;
 const CODE_PARCEL_NOTIFICATION = 2;
@@ -268,13 +269,13 @@ class CallbackNotification extends Notification {
      * For type COMPLETED callback notification should be contain signature.
      * For type RETURN_STATE callback notification should be contain state.
      *
-     * @param {NodeInfo} from - NodeInfo of node that sent the callback notification.
+     * @param {network.NodeInfo} from - NodeInfo of node that sent the callback notification.
      * @param {HashId} id - Callback identifier.
      * @param {CallbackNotificationType} type - Type of callback notification.
-     * @param {number} signature - Receipt signed by follower callback server (required if type == COMPLETED).
+     * @param {Uint8Array} signature - Receipt signed by follower callback server (required if type == COMPLETED).
      * @param {FollowerCallbackState} state - Callback state (required if type == RETURN_STATE).
      */
-    constructor(from, id, type, signature, state) {
+    constructor(from, id, type, signature, state = FollowerCallbackState.UNDEFINED) {
         super(from);
         this.id = id;
         this.signature = signature;
@@ -294,14 +295,14 @@ class CallbackNotification extends Notification {
         this.id = HashId.withDigest(br.read());
         this.signature = br.read();
         this.type = CallbackNotificationType.byOrdinal.get(br.read());
-        //this.state = NCallbackService.FollowerCallbackState.values()[br.readInt()];
+        this.state = FollowerCallbackState.byOrdinal.get(br.read());
     }
 
     equals(o) {
         if (this === o)
             return true;
 
-        if(Object.getPrototypeOf(this) !== Object.getPrototypeOf(o))
+        if (Object.getPrototypeOf(this) !== Object.getPrototypeOf(o))
             return false;
 
         if (!t.valuesEqual(this.from, o.from))
@@ -321,6 +322,13 @@ class CallbackNotification extends Notification {
 
     toString() {
         return "[CallbackNotification from " + this.from.number + " with id: " + this.id.toString() + "]";
+    }
+
+    stringId() {
+        if (this.stringId_ == null)
+            this.stringId_ = this.toString();
+
+        return this.stringId_;
     }
 }
 

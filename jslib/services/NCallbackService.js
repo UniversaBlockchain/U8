@@ -4,19 +4,12 @@ import {CallbackNotification, CallbackNotificationType} from "notification";
 const CallbackService = require("services/callbackService").CallbackService;
 const ex = require("exceptions");
 const Config = require("config").Config;
+const FollowerCallbackState = require("services/followerCallbackState").FollowerCallbackState;
 
 /**
  * Implements CallbackService interface for Universa node.
  */
 class NCallbackService extends CallbackService {
-
-    static FollowerCallbackState = {
-        UNDEFINED : {val:"UNDEFINED", ordinal:0},
-        STARTED : {val:"STARTED", ordinal:1},
-        EXPIRED : {val:"EXPIRED", ordinal:2},    // not commited failed
-        COMPLETED : {val:"COMPLETED", ordinal:3},
-        FAILED : {val:"FAILED", ordinal:4}
-    };
 
     /**
      * Initialize callback service on node and start synchronization thread.
@@ -27,7 +20,7 @@ class NCallbackService extends CallbackService {
      * @param {Ledger} ledger - DB ledger.
      * @param {Network} network - Universa network.
      * @param {PrivateKey} nodeKey - Public key of node.
-     * @param {} executorService is executor service from node to run synchronization.
+     * @param {ExecutorService} executorService is executor service from node to run synchronization.
      */
     constructor(node, config, myInfo, ledger, network, nodeKey, executorService) {
         super();

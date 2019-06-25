@@ -63,13 +63,14 @@ class Transactional extends bs.BiSerializable {
             this.id = data.id;
 
             if (data.hasOwnProperty("constraints"))
-                this.constraints = deserializer.deserialize(data.constraints);
+                this.constraints = new t.GenericSet(deserializer.deserialize(data.constraints));
             else if (data.hasOwnProperty("references"))
-                this.constraints = deserializer.deserialize(data.references);
+                this.constraints = new t.GenericSet(deserializer.deserialize(data.references));
+            else
+                this.constraints = new t.GenericSet();
 
-            if(data.hasOwnProperty("valid_until")) {
+            if (data.hasOwnProperty("valid_until"))
                 this.validUntil = data.valid_until;
-            }
 
             this.data = data.data;
         }
@@ -179,9 +180,9 @@ class State extends bs.BiSerializable {
             throw new ex.IllegalArgumentError("illegal revision number: " + this.revision);
 
         if (data.hasOwnProperty("constraints"))
-            this.constraints = deserializer.deserialize(data.constraints);
+            this.constraints = new t.GenericSet(deserializer.deserialize(data.constraints));
         else if (data.hasOwnProperty("references"))
-            this.constraints = deserializer.deserialize(data.references);
+            this.constraints = new t.GenericSet(deserializer.deserialize(data.references));
         else
             this.constraints = new t.GenericSet();
 
@@ -372,9 +373,9 @@ class Definition extends bs.BiSerializable {
         }
 
         if (data.hasOwnProperty("constraints"))
-            this.constraints = deserializer.deserialize(data.constraints);
+            this.constraints = new t.GenericSet(deserializer.deserialize(data.constraints));
         else if (data.hasOwnProperty("references"))
-            this.constraints = deserializer.deserialize(data.references);
+            this.constraints = new t.GenericSet(deserializer.deserialize(data.references));
         else
             this.constraints = new t.GenericSet();
 

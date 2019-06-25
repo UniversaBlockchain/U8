@@ -1068,6 +1068,9 @@ class ItemProcessor {
                 if (err instanceof DatabaseError) {
                     this.node.logger.log(err.stack);
                     this.node.logger.log("DatabaseError rollbackChanges in transaction: " + err.message);
+                } else {
+                    this.node.logger.log(err.stack);
+                    this.node.logger.log("Error rollbackChanges in transaction: " + err.message);
                 }
             }
 

@@ -75,8 +75,8 @@ class ParcelProcessor {
             this.parcel = parcel;
 
         if (this.parcel != null) {
-            this.payment = parcel.getPaymentContract();
-            this.payload = parcel.getPayloadContract();
+            this.payment = this.parcel.getPaymentContract();
+            this.payload = this.parcel.getPayloadContract();
         }
 
         this.sources = new t.GenericSet();

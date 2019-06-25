@@ -472,6 +472,173 @@ unit.test("main_test: register parcel", async () => {
     await ts.shutdown();
 });
 
+unit.test("main_test: register parcel with bad payload", async () => {
+    let key = new PrivateKey(await io.fileGetContentsAsBytes("../test/keys/reconfig_key.private.unikey"));
+
+    let ts = await new TestSpace(key).create(/*false*/);
+
+    for (let i = 0; i < 4; i++) {
+        ts.nodes[i].setVerboseLevel(VerboseLevel.DETAILED);
+        ts.nodes[i].setUDPVerboseLevel(VerboseLevel.DETAILED);
+    }
+
+    let ownerKey = tk.TestKeys.getKey();
+    let U = await tt.createFreshU(100000000, [ownerKey.publicKey]);
+
+    await ts.node.node.registerItem(U);
+    let ir = await ts.node.node.waitItem(U.id, 10000);
+    assert(ir.state === ItemState.APPROVED);
+
+    let k = tk.TestKeys.getKey();
+    let item = Contract.fromPrivateKey(k);
+
+    let cr = new Constraint(item);
+    cr.type = Constraint.TYPE_EXISTING_DEFINITION;
+    cr.name = "bad_constraint";
+    let conditions = {};
+    conditions[Constraint.conditionsModeType.all_of] = ["this.state.data.some_field defined"];
+    cr.setConditions(conditions);
+    item.addConstraint(cr);
+
+    await item.seal(true);
+
+    let parcel = await cs.createParcel(item, U, 1, [ownerKey], false);
+
+    await ts.node.node.registerParcel(parcel);
+    await ts.node.node.waitParcel(parcel.hashId, 10000);
+    ir = await ts.node.node.waitItem(item.id, 10000);
+    assert(ir.state === ItemState.DECLINED);
+    ir = await ts.node.node.waitItem(parcel.getPaymentContract().id, 10000);
+    assert(ir.state === ItemState.APPROVED);
+
+    for (let i = 0; i < 4; i++) {
+        ir = await ts.nodes[i].node.waitItem(item.id, 10000);
+        assert(ir.state === ItemState.DECLINED);
+        ir = await ts.nodes[i].node.waitItem(parcel.getPaymentContract().id, 10000);
+        assert(ir.state === ItemState.APPROVED);
+
+        assert((await ts.nodes[i].ledger.getRecord(item.id)).state === ItemState.DECLINED);
+        assert((await ts.nodes[i].ledger.getRecord(parcel.getPaymentContract().id)).state === ItemState.APPROVED);
+
+        if (i !== 0) {
+            ir = await ts.nodes[0].node.network.getItemState(ts.nodes[i].node.myInfo, item.id);
+            assert(ir.state === ItemState.DECLINED);
+            ir = await ts.nodes[0].node.network.getItemState(ts.nodes[i].node.myInfo, parcel.getPaymentContract().id);
+            assert(ir.state === ItemState.APPROVED);
+        }
+    }
+
+    let fire = [];
+    let events = [];
+    for (let i = 0; i < 4; i++)
+        events.push(new Promise((resolve) => {fire.push(resolve)}));
+
+    for (let i = 0; i < 4; i++) {
+        ts.clients[i].command("getState", {itemId: item.id}, (result) => fire[i](result), () => fire[i](null));
+    }
+
+    (await Promise.all(events)).forEach(ir => {
+        assert(ir != null);
+        assert(ir.itemResult.state === ItemState.DECLINED);
+    });
+
+    fire = [];
+    events = [];
+    for (let i = 0; i < 4; i++)
+        events.push(new Promise((resolve) => {fire.push(resolve)}));
+
+    for (let i = 0; i < 4; i++) {
+        ts.clients[i].command("getState", {itemId: parcel.getPaymentContract().id}, (result) => fire[i](result), () => fire[i](null));
+    }
+
+    (await Promise.all(events)).forEach(ir => {
+        assert(ir != null);
+        assert(ir.itemResult.state === ItemState.APPROVED);
+    });
+
+    await ts.shutdown();
+});
+
+unit.test("main_test: register parcel with bad payment", async () => {
+    let key = new PrivateKey(await io.fileGetContentsAsBytes("../test/keys/reconfig_key.private.unikey"));
+
+    let ts = await new TestSpace(key).create(/*false*/);
+
+    for (let i = 0; i < 4; i++) {
+        ts.nodes[i].setVerboseLevel(VerboseLevel.DETAILED);
+        ts.nodes[i].setUDPVerboseLevel(VerboseLevel.DETAILED);
+    }
+
+    let ownerKey = tk.TestKeys.getKey();
+    let U = await tt.createFreshU(100000000, [ownerKey.publicKey]);
+
+    await ts.node.node.registerItem(U);
+    let ir = await ts.node.node.waitItem(U.id, 10000);
+    assert(ir.state === ItemState.APPROVED);
+
+    let k = tk.TestKeys.getKey();
+    let item = Contract.fromPrivateKey(k);
+
+    await item.seal(true);
+
+    let parcel = await cs.createParcel(item, U, 1, [k], false);
+
+    await ts.node.node.registerParcel(parcel);
+    await ts.node.node.waitParcel(parcel.hashId, 10000);
+    ir = await ts.node.node.waitItem(parcel.getPaymentContract().id, 10000);
+    assert(ir.state === ItemState.DECLINED);
+    ir = await ts.node.node.waitItem(item.id, 10000);
+    assert(ir.state === ItemState.UNDEFINED);
+
+    for (let i = 0; i < 4; i++) {
+        await ts.nodes[i].node.waitParcel(parcel.hashId, 10000);
+        ir = await ts.nodes[i].node.waitItem(item.id, 10000);
+        assert(ir.state === ItemState.UNDEFINED);
+        ir = await ts.nodes[i].node.waitItem(parcel.getPaymentContract().id, 10000);
+        assert(ir.state === ItemState.DECLINED);
+
+        assert((await ts.nodes[i].ledger.getRecord(item.id)) == null);
+        assert((await ts.nodes[i].ledger.getRecord(parcel.getPaymentContract().id)).state === ItemState.DECLINED);
+
+        if (i !== 0) {
+            ir = await ts.nodes[0].node.network.getItemState(ts.nodes[i].node.myInfo, item.id);
+            assert(ir.state === ItemState.UNDEFINED);
+            ir = await ts.nodes[0].node.network.getItemState(ts.nodes[i].node.myInfo, parcel.getPaymentContract().id);
+            assert(ir.state === ItemState.DECLINED);
+        }
+    }
+
+    let fire = [];
+    let events = [];
+    for (let i = 0; i < 4; i++)
+        events.push(new Promise((resolve) => {fire.push(resolve)}));
+
+    for (let i = 0; i < 4; i++) {
+        ts.clients[i].command("getState", {itemId: item.id}, (result) => fire[i](result), () => fire[i](null));
+    }
+
+    (await Promise.all(events)).forEach(ir => {
+        assert(ir != null);
+        assert(ir.itemResult.state === ItemState.UNDEFINED);
+    });
+
+    fire = [];
+    events = [];
+    for (let i = 0; i < 4; i++)
+        events.push(new Promise((resolve) => {fire.push(resolve)}));
+
+    for (let i = 0; i < 4; i++) {
+        ts.clients[i].command("getState", {itemId: parcel.getPaymentContract().id}, (result) => fire[i](result), () => fire[i](null));
+    }
+
+    (await Promise.all(events)).forEach(ir => {
+        assert(ir != null);
+        assert(ir.itemResult.state === ItemState.DECLINED);
+    });
+
+    await ts.shutdown();
+});
+
 // BENCHMARKS
 
 /*unit.test("main_test: simpleBenchmark", async () => {

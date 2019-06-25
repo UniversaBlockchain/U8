@@ -19,7 +19,7 @@ class CallbackRecord {
      *
      * @param {crypto.HashId} id is callback identifier
      * @param {number} environmentId is environment subscription
-     * @param {NCallbackService.FollowerCallbackState} state is callback state
+     * @param {FollowerCallbackState} state is callback state
      */
     constructor(id, environmentId, state) {
         this.id = id;
@@ -95,29 +95,29 @@ class CallbackRecord {
      * synchronized if the number of notifications from Universa nodes with states COMPLETED or FAILED reached
      * a given consensus.
      *
-     * @param {NCallbackService.FollowerCallbackState} newState is callback state received from notification
+     * @param {FollowerCallbackState} newState is callback state received from notification
      * @param {Ledger} ledger is node ledger
      * @param {Node} node is Universa node
      *
      * @return {boolean} true if callback state is synchronized
      */
     synchronizeState(newState, ledger, node) {
-        if (newState === NCallbackService.FollowerCallbackState.COMPLETED) {
+        if (newState === FollowerCallbackState.COMPLETED) {
             if (this.incrementCompletedNodes() >= this.consensus) {
-                if (this.state === NCallbackService.FollowerCallbackState.STARTED)
+                if (this.state === FollowerCallbackState.STARTED)
                     this.complete(node);
-                else if (this.state === NCallbackService.FollowerCallbackState.EXPIRED)
+                else if (this.state === FollowerCallbackState.EXPIRED)
                     this.spent(node);
 
-                ledger.updateFollowerCallbackState(this.id, NCallbackService.FollowerCallbackState.COMPLETED);
+                ledger.updateFollowerCallbackState(this.id, FollowerCallbackState.COMPLETED);
                 return true;
             }
-        } else if ((newState === NCallbackService.FollowerCallbackState.FAILED) || (newState === NCallbackService.FollowerCallbackState.EXPIRED)) {
+        } else if ((newState === FollowerCallbackState.FAILED) || (newState === FollowerCallbackState.EXPIRED)) {
             if (this.incrementFailedNodes() >= this.consensus) {
-                if (this.state === NCallbackService.FollowerCallbackState.STARTED)
+                if (this.state === FollowerCallbackState.STARTED)
                     this.fail(node);
 
-                ledger.updateFollowerCallbackState(this.id, NCallbackService.FollowerCallbackState.FAILED);
+                ledger.updateFollowerCallbackState(this.id, FollowerCallbackState.FAILED);
                 return true;
             }
         } else
@@ -146,17 +146,17 @@ class CallbackRecord {
 
         // final (additional) check for consensus of callback state
         if (Atomics.load(this.nodesCounters, completedNodes) >= this.consensus) {
-            if (this.state === NCallbackService.FollowerCallbackState.STARTED)
+            if (this.state === FollowerCallbackState.STARTED)
                 this.complete(node);
-            else if (this.state === NCallbackService.FollowerCallbackState.EXPIRED)
+            else if (this.state === FollowerCallbackState.EXPIRED)
                 this.spent(node);
 
-            ledger.updateFollowerCallbackState(this.id, NCallbackService.FollowerCallbackState.COMPLETED);
+            ledger.updateFollowerCallbackState(this.id, FollowerCallbackState.COMPLETED);
         } else if (Atomics.load(this.nodesCounters, failedNodes) >= this.consensus) {
-            if (this.state === NCallbackService.FollowerCallbackState.STARTED)
+            if (this.state === FollowerCallbackState.STARTED)
                 this.fail(node);
 
-            ledger.updateFollowerCallbackState(this.id, NCallbackService.FollowerCallbackState.FAILED);
+            ledger.updateFollowerCallbackState(this.id, FollowerCallbackState.FAILED);
         } else if (Atomics.load(this.nodesCounters, allNodes) >= this.limit)
             // remove callback if synchronization is impossible
             ledger.removeFollowerCallback(this.id);

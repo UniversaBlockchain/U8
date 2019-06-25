@@ -16,7 +16,7 @@ const NNameRecord = require("services/NNameRecord").NNameRecord;
 const NNameRecordEntry = require("services/NNameRecordEntry").NNameRecordEntry;
 const NFollowerService = require("services/NFollowerService").NFollowerService;
 const NImmutableEnvironment = require("services/NImmutableEnvironment").NImmutableEnvironment;
-const NCallbackService = require("services/NCallbackService").NCallbackService;
+const FollowerCallbackState = require("services/followerCallbackState").FollowerCallbackState;
 const CallbackRecord = require("services/callbackRecord").CallbackRecord;
 const Contract = require("contract").Contract;
 
@@ -1829,15 +1829,15 @@ class Ledger {
      * Get state of follower callback with the specified ID.
      *
      * @param {HashId} id - follower callback ID.
-     * @return {Promise<NCallbackService.FollowerCallbackState>} - set of environments IDs.
+     * @return {Promise<FollowerCallbackState>} - set of environments IDs.
      */
     getFollowerCallbackStateById(id) {
         return this.simpleQuery("SELECT state FROM follower_callbacks WHERE id = ?",
             x => {
                 if (x == null)
-                    return NCallbackService.FollowerCallbackState.UNDEFINED;
+                    return FollowerCallbackState.UNDEFINED;
                 else
-                    return Object.values(NCallbackService.FollowerCallbackState)[x];
+                    return FollowerCallbackState.byOrdinal.get(x);
             },
             null,
             id.digest);
@@ -1869,7 +1869,7 @@ class Ledger {
                                     records.push(new CallbackRecord(
                                         crypto.HashId.withDigest(rows[i][0]),
                                         environmentId,
-                                        Object.values(NCallbackService.FollowerCallbackState)[rows[i][1]]));
+                                        FollowerCallbackState.byOrdinal.get(rows[i][1])));
                             }
                         }
 
@@ -1882,8 +1882,8 @@ class Ledger {
                     "SELECT id, state FROM follower_callbacks WHERE environment_id = ? AND expires_at < ? AND (state = ? OR state = ?)",
                     environmentId,
                     Math.floor(Date.now() / 1000),
-                    NCallbackService.FollowerCallbackState.STARTED.ordinal,
-                    NCallbackService.FollowerCallbackState.EXPIRED.ordinal
+                    FollowerCallbackState.STARTED.ordinal,
+                    FollowerCallbackState.EXPIRED.ordinal
                 );
             });
         });
@@ -1914,7 +1914,7 @@ class Ledger {
                                     records.push(new CallbackRecord(
                                         crypto.HashId.withDigest(rows[i][0]),
                                         rows[i][2],
-                                        Object.values(NCallbackService.FollowerCallbackState)[rows[i][1]]));
+                                        FollowerCallbackState.byOrdinal.get(rows[i][1])));
                             }
                         }
 
@@ -1926,8 +1926,8 @@ class Ledger {
                     },
                     "SELECT id, state, environment_id FROM follower_callbacks WHERE expires_at < ? AND (state = ? OR state = ?)",
                     Math.floor(Date.now() / 1000),
-                    NCallbackService.FollowerCallbackState.STARTED.ordinal,
-                    NCallbackService.FollowerCallbackState.EXPIRED.ordinal
+                    FollowerCallbackState.STARTED.ordinal,
+                    FollowerCallbackState.EXPIRED.ordinal
                 );
             });
         });
@@ -1946,7 +1946,7 @@ class Ledger {
         return this.simpleUpdate("INSERT INTO follower_callbacks (id, state, environment_id, expires_at, stored_until) VALUES (?,?,?,?,?)",
             null,
             id.digest,
-            NCallbackService.FollowerCallbackState.STARTED.ordinal,
+            FollowerCallbackState.STARTED.ordinal,
             environmentId,
             Math.floor(expiresAt.getTime() / 1000),
             Math.floor(storedUntil.getTime() / 1000));
@@ -1956,7 +1956,7 @@ class Ledger {
      * Update in the storage the callback record of the follower contract.
      *
      * @param {HashId} id - Callback ID.
-     * @param {NCallbackService.FollowerCallbackState} state - Callback state.
+     * @param {FollowerCallbackState} state - Callback state.
      * @return {Promise<void>}
      */
     updateFollowerCallbackState(id, state) {
