@@ -390,6 +390,13 @@ network.HttpServer = class {
         try {
             if (this.secureEndpoints_.has(params.command))
                 return new Promise(async resolve=>{
+                    this.secureEndpoints_.get(params.command)(params.params, clientPublicKey)
+                        .then(r => {
+                            resolve({result: r});
+                        })
+                        .catch(err => {
+                            resolve({error: new ErrorRecord(Errors.COMMAND_FAILED, params.command, err.toString())});
+                        });
                     resolve({result: await this.secureEndpoints_.get(params.command)(params.params, clientPublicKey)});
                 });
             else {
