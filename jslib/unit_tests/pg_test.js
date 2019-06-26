@@ -149,12 +149,16 @@ async function recreateTestTable() {
         );
     `;
 
-    pool.execSql(() => {
-        resolver();
-    }, (errText) => {
-        console.error(e);
-        resolver();
-    }, sql);
+    pool.withConnection(con => {
+        con.execSql(() => {
+            con.release();
+            resolver();
+        }, (errText) => {
+            console.error(e);
+            con.release();
+            resolver();
+        }, sql);
+    });
 
     await promise;
 

@@ -165,6 +165,13 @@ namespace db {
         void executeUpdateArrStr(UpdateSuccessCallback onSuccess, UpdateErrorCallback onError, const std::string& queryString, std::vector<std::any>& params);
 
         /**
+         * Executes string sql command. All query parameters should be inside string.
+         * You can concatenate several sql commands in one string. Callback receives vector<QueryResult> parameter,
+         * one result for each sql command.
+         */
+        void exec(const std::string &query, QueryCallback callback);
+
+        /**
          * Release the connection. Call it after pgPool.withConnection().
          */
         void release();
@@ -245,13 +252,6 @@ namespace db {
          * Return number of available connections in the pool.
          */
         size_t availableConnections();
-
-        /**
-         * Executes string sql command. All query parameters should be inside string.
-         * You can concatenate several sql commands in one string. Callback receives vecror<QueryResult> parameter,
-         * one result for each sql command.
-         */
-        void exec(const std::string &query, QueryCallback callback);
 
         /**
          * Uses from class BusyConnection.

@@ -21,31 +21,33 @@ db::PGPool pgPool_g(1, "host=localhost port=5432 dbname=unit_tests");
 void recreateTestTable() {
     //alter database unit_tests SET client_min_messages TO WARNING;
     Semaphore sem;
-    pgPool_g.exec("drop table if exists table1;"
-                "create table table1("
-                "    id serial primary key,"
-                "    hash bytea not null,"
-                "    state integer,"
-                "    locked_by_id integer,"
-                "    created_at integer not null,"
-                "    expires_at bigint"
-                ");"
-                ""
-                "create unique index ix_table1_hashes on table1(hash);"
-                "create index ix_table1_expires_at on table1(expires_at);"
-                ""
-                "drop table if exists table2;"
-                "create table table2("
-                "    id serial primary key,"
-                "    text_val text not null,"
-                "    double_val double precision,"
-                "    boolean_val boolean"
-                ");"
-                ,[&sem](db::QueryResultsArr &qra) {
-        for (auto &qr : qra)
-            if (qr.isError())
-                cout << "error(" << qr.getErrorCode() << "): " << qr.getErrorText() << endl;
-        sem.notify();
+    pgPool_g.withConnection([&sem](shared_ptr<db::BusyConnection> con) {
+        con->exec("drop table if exists table1;"
+                 "create table table1("
+                 "    id serial primary key,"
+                 "    hash bytea not null,"
+                 "    state integer,"
+                 "    locked_by_id integer,"
+                 "    created_at integer not null,"
+                 "    expires_at bigint"
+                 ");"
+                 ""
+                 "create unique index ix_table1_hashes on table1(hash);"
+                 "create index ix_table1_expires_at on table1(expires_at);"
+                 ""
+                 "drop table if exists table2;"
+                 "create table table2("
+                 "    id serial primary key,"
+                 "    text_val text not null,"
+                 "    double_val double precision,"
+                 "    boolean_val boolean"
+                 ");", [&sem,con](db::QueryResultsArr &qra) {
+            for (auto &qr : qra)
+                if (qr.isError())
+                    cout << "error(" << qr.getErrorCode() << "): " << qr.getErrorText() << endl;
+            con->release();
+            sem.notify();
+        });
     });
     sem.wait();
 }
@@ -66,14 +68,17 @@ TEST_CASE("PGPool") {
             vector<unsigned char> rndBytes(16);
             sprng_read(&rndBytes[0], 16, NULL);
             auto b64 = base64_encode(rndBytes);
-            pgPool.exec(
+            pgPool.withConnection([&sem,&readyCounter,b64](shared_ptr<db::BusyConnection> con){
+                con->exec(
                     string("INSERT INTO table1(hash,state,locked_by_id,created_at,expires_at) VALUES (decode('") + b64 +
-                    string("', 'base64'), 4, 0, 33, 44) RETURNING id;"), [&sem, &readyCounter](db::QueryResultsArr &qra) {
+                    string("', 'base64'), 4, 0, 33, 44) RETURNING id;"), [&sem, &readyCounter, con](db::QueryResultsArr &qra) {
                         if (qra[0].isError())
                             throw std::runtime_error("error: " + string(qra[0].getErrorText()));
                         ++readyCounter;
+                        con->release();
                         sem.notify();
                     });
+            });
 
             // insert with pgPool.execParams()
             pgPool.withConnection([&sem,&readyCounter](db::BusyConnection& con) {

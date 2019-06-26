@@ -354,6 +354,21 @@ namespace db {
         );
     }
 
+    void BusyConnection::exec(const std::string &query, QueryCallback callback) {
+        exec([callback, query, this](){
+            PQsendQuery(conPtr(), query.c_str());
+            PQflush(conPtr());
+            QueryResultsArr results;
+            while (true) {
+                pg_result *r = PQgetResult(conPtr());
+                if (r == nullptr)
+                    break;
+                results.push_back(QueryResult(this->parent_, r));
+            }
+            callback(results);
+        });
+    }
+
     void BusyConnection::release() {
         if (parent_ != nullptr)
             parent_->releaseConnection(getId());
@@ -455,24 +470,6 @@ namespace db {
     size_t PGPool::availableConnections() {
         std::lock_guard guard(poolMutex_);
         return connPool_.size();
-    }
-
-    void PGPool::exec(const std::string &query, QueryCallback callback) {
-        withConnection([=](shared_ptr<BusyConnection> bc){
-            bc->exec([bc, callback, query, this](){
-                PQsendQuery(bc.get()->conPtr(), query.c_str());
-                PQflush(bc.get()->conPtr());
-                QueryResultsArr results;
-                while (true) {
-                    pg_result *r = PQgetResult(bc.get()->conPtr());
-                    if (r == nullptr)
-                        break;
-                    results.push_back(QueryResult(this, r));
-                }
-                callback(results);
-                bc->release();
-            });
-        });
     }
 
     std::shared_ptr<BusyConnection> PGPool::getUnusedConnection() {

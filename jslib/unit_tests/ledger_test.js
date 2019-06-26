@@ -14,7 +14,9 @@ function jsonStringify(obj) {
 }
 
 async function createTestLedger() {
-    return new Ledger("host=localhost port=5432 dbname=unit_tests");
+    let ledger =  new Ledger("host=localhost port=5432 dbname=unit_tests");
+    await ledger.init();
+    return ledger;
 }
 
 function assertSameRecords(record1, record2) {
