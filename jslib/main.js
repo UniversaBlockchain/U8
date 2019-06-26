@@ -150,6 +150,7 @@ class Main {
         }
 
         this.ledger = new Ledger(t.getOrThrow(settings, "database"));
+        await this.ledger.init();
         this.logger.log("ledger constructed");
 
         this.logger.log("key loaded: " + this.nodeKey.toString());
