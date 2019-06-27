@@ -1,5 +1,6 @@
 import * as db from 'db_driver'
 import {MemoiseMixin} from 'tools'
+import * as io from "io";
 
 function connect(connectionString, onConnected, onError, maxConnection = 100) {
     let pool = new PGPool();
@@ -33,6 +34,51 @@ class PgDriverPool extends db.SqlDriverPool {
 
     close() {
         this.pool._close();
+    }
+
+    transaction(block) {
+        return new Promise((resolve, reject) => {
+            this.withConnection(async(con) => {
+                con.executeUpdate(affectedRows => {},
+                    e => {
+                        con.release();
+                        reject(e);
+                    },
+                    "BEGIN;"
+                );
+
+                let result = null;
+
+                try {
+                    result = await block(con);
+                } catch (err) {
+
+                    con.executeQuery(qr => {
+                            con.release();
+                            reject(err);
+                        },
+                        e => {
+                            con.release();
+                            reject(e);
+                        },
+                        "ROLLBACK;"
+                    );
+
+                    return;
+                }
+
+                con.executeUpdate(affectedRows => {
+                        con.release();
+                        resolve(result);
+                    },
+                    e => {
+                        con.release();
+                        reject(e);
+                    },
+                    "COMMIT;"
+                );
+            });
+        });
     }
 }
 
@@ -130,4 +176,97 @@ class PgDriverResultSet extends db.SqlDriverResultSet {
 
 Object.assign(PgDriverResultSet.prototype, MemoiseMixin);
 
-module.exports = {connect};
+class MigrationDriver {
+    constructor() {
+    }
+
+    static async createDB(pool, migrationFilesPath) {
+        if (migrationFilesPath == null)
+            return;
+        try {
+            migrationFilesPath = migrationFilesPath.endsWith("/") ? migrationFilesPath : migrationFilesPath + "/";
+            let myVersion = 0;
+            let resolver, rejecter;
+            let promise = new Promise((resolve, reject) => {resolver = resolve; rejecter = reject;});
+            pool.withConnection(con => {
+                con.executeQuery(qr => {
+                    if (qr.getRowsCount() > 0)
+                        myVersion = parseInt(qr.getRows(1)[0]);
+                    con.release();
+                    resolver();
+                }, e => {
+                    con.release();
+                    resolver();
+                }, "SELECT ivalue FROM vars WHERE name = 'version'");
+            });
+            await promise;
+            let currentDbVersion = await MigrationDriver.detectMaxMigrationVersion(migrationFilesPath);
+            //console.log("My db version is " + myVersion + ", current is " + currentDbVersion);
+            while (myVersion < currentDbVersion) {
+                console.log("  Migrating to " + (myVersion + 1));
+                let resolver;
+                let promise = new Promise(resolve => resolver = resolve);
+                pool.transaction(async (con) => {
+                    let sql = await io.fileGetContentsAsString(migrationFilesPath + "migrate_" + myVersion + ".sql");
+                    //this.preMigrate(myVersion);
+                    let res = await MigrationDriver.execSqlSync(con, sql);
+                    if (!res[0])
+                        throw res[1];
+                    //this.postMigrate(myVersion);
+                    ++myVersion;
+                    res = await MigrationDriver.execUpdateSync(con, "update vars set ivalue=? where name='version'", myVersion);
+                    if (!res[0])
+                        throw res[1];
+                }).then(res => {
+                    resolver([true, ""]);
+                }).catch(err => {
+                    resolver([false, err]);
+                });
+                let res = await promise;
+                if (!res[0])
+                    throw res[1];
+            }
+        } catch (e) {
+            console.error("migrations failed, error: " + e);
+            throw e;
+        }
+    }
+
+    static async execSqlSync(con, sql) {
+        let resolver;
+        let promise = new Promise(resolve => resolver = resolve);
+        con.execSql(() => {
+            resolver([true, ""]);
+        }, err => {
+            resolver([false, err]);
+        }, sql);
+        return promise;
+    }
+
+    static async execUpdateSync(con, sql, ...params) {
+        let resolver;
+        let promise = new Promise(resolve => resolver = resolve);
+        con.executeUpdate((affectedRows) => {
+            resolver([true, ""]);
+        }, err => {
+            resolver([false, err]);
+        }, sql, ...params);
+        return promise;
+    }
+
+    static async detectMaxMigrationVersion(path) {
+        let files = await io.getFilesFromDir(path);
+        let res = 0;
+        for (let file of files) {
+            if (file.endsWith(".sql")) {
+                let s = file.substr(8, file.indexOf(".sql")-8);
+                let i = parseInt(s);
+                if (res < i)
+                    res = i;
+            }
+        }
+        return res + 1;
+    }
+}
+
+module.exports = {connect, MigrationDriver};

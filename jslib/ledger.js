@@ -1,7 +1,6 @@
 import * as db from 'pg_driver'
 import * as trs from 'timers'
 import {HashId} from 'crypto'
-import * as io from "io";
 
 const StateRecord = require("staterecord").StateRecord;
 const ItemState = require("itemstate").ItemState;
@@ -60,7 +59,7 @@ class Ledger {
     }
 
     async init() {
-        await MigrationDriver.createDB(this, "../jslib/migrations/postgres");
+        await db.MigrationDriver.createDB(this.dbPool_, "../jslib/migrations/postgres");
     }
 
     // Cache methods
@@ -512,48 +511,7 @@ class Ledger {
      * returns.
      */
     transaction(block) {
-        return new Promise((resolve, reject) => {
-            this.dbPool_.withConnection(async(con) => {
-                con.executeUpdate(affectedRows => {},
-                    e => {
-                        con.release();
-                        reject(e);
-                    },
-                    "BEGIN;"
-                );
-
-                let result = null;
-
-                try {
-                    result = await block(con);
-                } catch (err) {
-
-                    con.executeQuery(qr => {
-                            con.release();
-                            reject(err);
-                        },
-                        e => {
-                            con.release();
-                            reject(e);
-                        },
-                        "ROLLBACK;"
-                    );
-
-                    return;
-                }
-
-                con.executeUpdate(affectedRows => {
-                        con.release();
-                        resolve(result);
-                    },
-                    e => {
-                        con.release();
-                        reject(e);
-                    },
-                    "COMMIT;"
-                );
-            });
-        });
+        return this.dbPool_.transaction(block);
     }
 
     /**
@@ -2584,99 +2542,6 @@ class Ledger {
         await this.simpleUpdate("delete from follower_callbacks where stored_until < ?;", null, now);
         if (!isPermanetMode)
             await this.simpleUpdate("delete from ledger where expires_at < ?;", null, now);
-    }
-}
-
-class MigrationDriver {
-    constructor() {
-    }
-
-    static async createDB(ledger, migrationFilesPath) {
-        if (migrationFilesPath == null)
-            return;
-        try {
-            migrationFilesPath = migrationFilesPath.endsWith("/") ? migrationFilesPath : migrationFilesPath + "/";
-            let myVersion = 0;
-            let resolver, rejecter;
-            let promise = new Promise((resolve, reject) => {resolver = resolve; rejecter = reject;});
-            ledger.dbPool_.withConnection(con => {
-                con.executeQuery(qr => {
-                    if (qr.getRowsCount() > 0)
-                        myVersion = parseInt(qr.getRows(1)[0]);
-                    con.release();
-                    resolver();
-                }, e => {
-                    con.release();
-                    resolver();
-                }, "SELECT ivalue FROM vars WHERE name = 'version'");
-            });
-            await promise;
-            let currentDbVersion = await MigrationDriver.detectMaxMigrationVersion(migrationFilesPath);
-            //console.log("My db version is " + myVersion + ", current is " + currentDbVersion);
-            while (myVersion < currentDbVersion) {
-                console.log("  Migrating to " + (myVersion + 1));
-                let resolver;
-                let promise = new Promise(resolve => resolver = resolve);
-                ledger.transaction(async (con) => {
-                    let sql = await io.fileGetContentsAsString(migrationFilesPath + "migrate_" + myVersion + ".sql");
-                    //this.preMigrate(myVersion);
-                    let res = await MigrationDriver.execSqlSync(con, sql);
-                    if (!res[0])
-                        throw res[1];
-                    //this.postMigrate(myVersion);
-                    ++myVersion;
-                    res = await MigrationDriver.execUpdateSync(con, "update vars set ivalue=? where name='version'", myVersion);
-                    if (!res[0])
-                        throw res[1];
-                }).then(res => {
-                    resolver([true, ""]);
-                }).catch(err => {
-                    resolver([false, err]);
-                });
-                let res = await promise;
-                if (!res[0])
-                    throw res[1];
-            }
-        } catch (e) {
-            console.error("migrations failed, error: " + e);
-            throw e;
-        }
-    }
-
-    static async execSqlSync(con, sql) {
-        let resolver;
-        let promise = new Promise(resolve => resolver = resolve);
-        con.execSql(() => {
-            resolver([true, ""]);
-        }, err => {
-            resolver([false, err]);
-        }, sql);
-        return promise;
-    }
-
-    static async execUpdateSync(con, sql, ...params) {
-        let resolver;
-        let promise = new Promise(resolve => resolver = resolve);
-        con.executeUpdate((affectedRows) => {
-            resolver([true, ""]);
-        }, err => {
-            resolver([false, err]);
-        }, sql, ...params);
-        return promise;
-    }
-
-    static async detectMaxMigrationVersion(path) {
-        let files = await io.getFilesFromDir(path);
-        let res = 0;
-        for (let file of files) {
-            if (file.endsWith(".sql")) {
-                let s = file.substr(8, file.indexOf(".sql")-8);
-                let i = parseInt(s);
-                if (res < i)
-                    res = i;
-            }
-        }
-        return res + 1;
     }
 }
 
