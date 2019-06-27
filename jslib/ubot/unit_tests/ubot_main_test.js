@@ -1,4 +1,5 @@
 import * as tk from "unit_tests/test_keys";
+import * as db from "pg_driver";
 let io = require("io");
 const UBotMain = require("ubot/ubot_main").UBotMain;
 const cs = require("contractsservice");
@@ -21,7 +22,7 @@ async function prepareConfigFiles(count) {
         yamlStr += "http_client_port: "+(18000+i)+"\n";
         yamlStr += "http_public_port: "+(17000+i)+"\n";
         yamlStr += "udp_server_port: "+(16000+i)+"\n";
-        yamlStr += "database: jdbc:postgresql://localhost:5432/universa_ubot_t"+i+"\n";
+        yamlStr += "database: host=localhost port=5432 dbname=ubot_t"+i+"\n";
         yamlStr += "node_number: "+i+"\n";
         yamlStr += "public_host: localhost\n";
         yamlStr += "node_name: "+ubotName+"\n";
@@ -55,15 +56,59 @@ async function prepareConfigFiles(count) {
     }
 }
 
+async function dropAllTables(count) {
+    console.log("======================== dropAllTables ========================");
+    let unlockFile = io.getTmpDirPath() + "/unlock_dropAllTables_45b72e15c8b5";
+    let enabled = await io.isAccessible(unlockFile);
+    if (!enabled) {
+        console.error("  Operation not permitted. To unlock it, please touch " + unlockFile);
+        await sleep(9000);
+    } else {
+        let promises = [];
+        for (let i = 0; i < count; ++i) {
+            promises.push(new Promise(resolve => {
+                let pool = null;
+                db.connect("host=localhost port=5432 dbname=ubot_t" + i, (p) => {
+                    pool = p;
+                }, (e) => {
+                    throw new Error("error: dropAllTables.connect.onError: " + e);
+                }, 1);
+                pool.withConnection(con => {
+                    con.executeQuery(async qr => {
+                        let rows = qr.getRows(0);
+                        for (let i = 0; i < rows.length; ++i) {
+                            let resolver;
+                            let promise = new Promise(resolve => resolver = resolve);
+                            con.executeUpdate(affectedRows => {
+                                resolver();
+                            }, err => {
+                                throw new Error("error: dropAllTables.executeUpdate.onError: " + err);
+                            }, "DROP TABLE " + rows[i][0] + " CASCADE");
+                            await promise;
+                        }
+                        con.release();
+                        resolve();
+                    }, err => {
+                        con.release();
+                        throw new Error("error: dropAllTables.executeQuery.onError: " + err);
+                    }, "SELECT tablename FROM pg_tables where schemaname = 'public'");
+                });
+            }));
+        }
+        await Promise.all(promises);
+    }
+}
+
 async function createUbotMain(name, nolog) {
     let args = ["--config", CONFIG_ROOT+"/"+name];
     if (nolog)
         args.push("--nolog");
 
-    let ubotMain = new UBotMain(...args);
-    await ubotMain.start();
-
-    return ubotMain;
+    return new Promise(async resolve => {
+        let ubotMain = new UBotMain(...args);
+        await ubotMain.start();
+        resolve(ubotMain);
+    });
 }
 
 async function createUBots(count) {
@@ -96,6 +141,7 @@ unit.test("ubot_main_test: hello ubot", async () => {
 
 unit.test("ubot_main_test: executeCloudMethod", async () => {
     const ubotsCount = 8;
+    //await dropAllTables(8);
     let ubotMains = await createUBots(ubotsCount);
 
     console.log("\ntest send...");
@@ -103,9 +149,11 @@ unit.test("ubot_main_test: executeCloudMethod", async () => {
     let client = new network.HttpClient(url, 20, 20);
     await client.start(tk.TestKeys.getKey(), ubotMains[0].myInfo.publicKey, null);
     let userPrivKey = tk.TestKeys.getKey();
-    let contract = await cs.createTokenContract([userPrivKey], [userPrivKey.publicKey], new BigDecimal("100"));
+    let contract = Contract.fromPrivateKey(userPrivKey);
     contract.state.data.poolSize = 5;
-    await contract.seal();
+    contract.state.data.methodName = "calc2x2";
+    contract.state.data.methodStorageName = "single";
+    await contract.seal(true);
     let contractBin = contract.getPackedTransaction();
     client.command("executeCloudMethod", {contract: contractBin}, resp=>{
         console.log("resp: " + JSON.stringify(resp));

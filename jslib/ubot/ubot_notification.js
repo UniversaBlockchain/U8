@@ -48,7 +48,9 @@ class UBotTestNotification extends Notification {
 
 class UBotCloudNotification extends Notification {
 
-    static types = {DOWNLOAD_STARTING_CONTRACT: {ordinal: 0}};
+    static types = {
+        DOWNLOAD_STARTING_CONTRACT:   {ordinal: 0},
+    };
 
     constructor(from, poolId, type, isAnswer) {
         super(from);

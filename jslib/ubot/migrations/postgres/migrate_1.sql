@@ -1,6 +1,17 @@
-create table table1(
-    id serial primary key,
-    hash bytea not null
+create table pool_storage(
+    id bigserial primary key,
+    pool_hash_id bytea not null,
+    executable_contract_id bytea not null,
+    storage_name text not null,
+    storage_data bytea not null,
+    UNIQUE (pool_hash_id)
 );
 
-create unique index ix_table1_hash on table1(hash);
+
+create table pool_storage_multi(
+    id bigserial primary key,
+    pool_storage_id bigint references pool_storage(id),
+    ubot_number int not null,
+    storage_data bytea not null,
+    UNIQUE (pool_storage_id,ubot_number)
+);

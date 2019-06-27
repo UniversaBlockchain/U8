@@ -24,6 +24,11 @@ const UBotPoolState = {
      */
     DOWNLOAD_STARTING_CONTRACT                 : {ordinal: 2},
 
+    /**
+     * CloudProcessor is executing cloud method.
+     */
+    START_EXEC                                 : {ordinal: 3},
+
 };
 
 t.addValAndOrdinalMaps(UBotPoolState);
@@ -46,18 +51,23 @@ class CloudProcessor {
             case UBotPoolState.SEND_STARTING_CONTRACT:
                 this.currentProcess = new ProcessSendStartingContract(this, ()=>{
                     this.logger.log("CloudProcessor.ProcessSendStartingContract.onReady");
-                    //this.changeState(SOME_NEW_STATE);
+                    this.changeState(UBotPoolState.START_EXEC);
                 });
-                this.currentProcess.start();
                 break;
             case UBotPoolState.DOWNLOAD_STARTING_CONTRACT:
                 this.currentProcess = new ProcessDownloadStartingContract(this, () => {
                     this.logger.log("CloudProcessor.ProcessDownloadStartingContract.onReady, poolSize = " + this.startingContract.state.data.poolSize);
-                    //this.changeState(SOME_NEW_STATE);
+                    this.changeState(UBotPoolState.START_EXEC);
                 });
-                this.currentProcess.start();
+                break;
+            case UBotPoolState.START_EXEC:
+                this.currentProcess = new ProcessStartExec(this, () => {
+                    this.logger.log("CloudProcessor.ProcessStartExec.onReady, poolSize = " + this.startingContract.state.data.poolSize);
+                    //this.changeState(UBotPoolState.some_new_state);
+                });
                 break;
         }
+        this.currentProcess.start();
     }
 
     changeState(newState) {
@@ -127,6 +137,8 @@ class ProcessSendStartingContract extends ProcessBase {
     }
 
     start() {
+        this.pr.logger.log("start ProcessSendStartingContract");
+
         this.selectPool();
 
         // periodically send notifications
@@ -165,7 +177,7 @@ class ProcessDownloadStartingContract extends ProcessBase {
     }
 
     start() {
-        this.pr.logger.log("startDownloadStartingContract");
+        this.pr.logger.log("start ProcessDownloadStartingContract");
 
         // periodically try to download starting contract (retry on notify)
         this.pulse();
@@ -200,5 +212,39 @@ class ProcessDownloadStartingContract extends ProcessBase {
         }
     }
 }
+
+class ProcessStartExec extends ProcessBase {
+    constructor(processor, onReady) {
+        super(processor, onReady)
+    }
+
+    start() {
+        this.pr.logger.log("start ProcessStartExec");
+
+        this.pr.logger.log("  methodName: " + this.pr.startingContract.state.data.methodName);
+        this.pr.logger.log("  methodStorageName: " + this.pr.startingContract.state.data.methodStorageName);
+        let methodResult = evalCloudMethod(this.pr.startingContract.state.data.methodName);
+        this.pr.logger.log("  method result: " + JSON.stringify(methodResult));
+    }
+}
+
+//////////////////////////////
+// debug js-contract functions
+
+function evalCloudMethod(methodName) {
+    switch (methodName) {
+        case "calc2x2":
+            return calc2x2();
+        default:
+            return {error: "method " + methodName + " not found"};
+    }
+}
+
+function calc2x2() {
+    return {result: 4};
+}
+
+// debug js-contract methods
+//////////////////////////////
 
 module.exports = {UBotPoolState, CloudProcessor};

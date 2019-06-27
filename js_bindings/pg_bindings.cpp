@@ -436,6 +436,9 @@ static unordered_map<string, std::function<Local<Value>(ArgsContext &ac, const b
     {"bool", [](ArgsContext &ac, const byte_vector& bv){
         return v8::Boolean::New(ac.isolate, db::getBoolValue(bv));
     }},
+    {"name", [](ArgsContext &ac, const byte_vector& bv){
+        return ac.v8String(db::getStringValue(bv));
+    }},
 };
 
 Local<Value> getJsValueFromPgResult(ArgsContext &ac, const byte_vector& data, const string& pgType) {

@@ -25,6 +25,7 @@ class UBotMain {
         this.configRoot = null;
         this.netConfig = null;
         this.myInfo = null;
+        this.settings = null;
 
         this.network = null;
         this.httpServer = null;
@@ -45,7 +46,8 @@ class UBotMain {
 
         this.httpServer = new UBotHttpServer(this.nodeKey, "127.0.0.1", this.myInfo.clientAddress.port, this.logger, this.ubot);
 
-        this.ledger = new UBotLedger(this.logger);
+        this.ledger = new UBotLedger(this.logger, t.getOrThrow(this.settings, "database"));
+        await this.ledger.init();
 
         this.network.subscribe(notification => {
             if (notification instanceof UBotCloudNotification) {
@@ -119,6 +121,7 @@ class UBotMain {
         this.configRoot = this.parser.values.get("config");
 
         let settings = yaml.load(await io.fileGetContentsAsString(this.configRoot + "/config/config.yaml"));
+        this.settings = settings;
 
         // let settingsShared;
         // if (await io.isAccessible(this.configRoot + "/config/shared.yaml"))
@@ -144,9 +147,9 @@ class UBotMain {
             t.getOrThrow(settings, "http_client_port"),
             t.getOrThrow(settings, "http_public_port"));
 
-        this.logger.log("key loaded: " + this.nodeKey.toString());
-        this.logger.log("node local URL: " + this.myInfo.serverUrlString());
-        this.logger.log("node public URL: " + this.myInfo.publicUrlString());
+        this.logger.log("key loaded: " + this.nodeKey.toString() +
+            ",\t node local URL: " + this.myInfo.serverUrlString() +
+            ",\t node public URL: " + this.myInfo.publicUrlString());
     }
 
     async loadNetConfig() {
