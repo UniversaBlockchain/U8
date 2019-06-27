@@ -52,6 +52,10 @@ class Notification {
         throw new Error("not implemented");
     }
 
+    toString() {
+        throw new Error("not implemented");
+    }
+
     static pack(notifications) {
         let writer = new Boss.Writer();
         try {
@@ -99,6 +103,13 @@ class Notification {
             console.log("*** unknown notification class code: " + code);
             return null;
         }
+    }
+
+    stringId() {
+        if (this.stringId_ == null)
+            this.stringId_ = this.toString();
+
+        return this.stringId_;
     }
 }
 
@@ -235,7 +246,7 @@ class ParcelNotification extends ItemNotification {
         return "[ParcelNotification from node: " + this.from.number
             + " for parcel: " + this.parcelId.toString()
             + " and item: " + this.itemId.toString()
-            + ", type is: " + type.val
+            + ", type is: " + this.type.val
             + ", is answer requested: " + this.requestResult + "]";
     }
 }
@@ -322,13 +333,6 @@ class CallbackNotification extends Notification {
 
     toString() {
         return "[CallbackNotification from " + this.from.number + " with id: " + this.id.toString() + "]";
-    }
-
-    stringId() {
-        if (this.stringId_ == null)
-            this.stringId_ = this.toString();
-
-        return this.stringId_;
     }
 }
 

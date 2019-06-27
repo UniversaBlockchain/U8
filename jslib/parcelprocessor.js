@@ -87,6 +87,8 @@ class ParcelProcessor {
         this.processingState = ParcelProcessingState.INIT;
 
         this.doneEvent = new AsyncEvent(this.node.executorService);
+        this.waitPayloadEvent = new AsyncEvent(this.node.executorService);
+        this.finishEvent = new AsyncEvent(this.node.executorService);
 
         this.downloader = null;
         this.processSchedule = null;
@@ -116,6 +118,9 @@ class ParcelProcessor {
      * Then wait decision about payload contract.
      */
     async process() {
+        if (this.processSchedule == null)
+            return;
+
         this.node.report("parcel processor for: " +
             this.parcelId + " :: process, payment " +
             this.payment.id + ", payload " +
@@ -133,6 +138,8 @@ class ParcelProcessor {
             this.node.report("parcel processor for: " + this.parcelId + " :: check payment, state " +
                 this.processingState.val, VerboseLevel.BASE);
 
+            let paymentSuccess = false;
+
             // wait payment
             if (this.paymentResult == null) {
                 this.processingState = ParcelProcessingState.PAYMENT_CHECKING;
@@ -143,22 +150,16 @@ class ParcelProcessor {
                 this.paymentDelayedVotes.clear();
 
                 this.processingState = ParcelProcessingState.PAYMENT_POLLING;
-                if (!this.paymentProcessor.isDone())
-                    await this.paymentProcessor.doneEvent.await();
 
-                this.paymentResult = this.paymentProcessor.getResult();
-            }
+                paymentSuccess = await this.paymentProcessor.waitPayloadEvent.await();
+
+            } else
+                paymentSuccess = this.paymentResult.state.isApproved;
 
             this.node.report("parcel processor for: " + this.parcelId + " :: payment checked, state " +
                 this.processingState.val, VerboseLevel.BASE);
 
-            // if payment is ok, wait payload
-            if (this.paymentResult.state.isApproved) {
-                if (!this.payment.limitedForTestnet)
-                    await this.node.ledger.savePayment(this.parcel.quantasLimit / Quantiser.quantaPerU,
-                        this.paymentProcessor != null ? this.paymentProcessor.record.createdAt :
-                        await this.node.ledger.getRecord(this.payment.id).createdAt);
-
+            if (paymentSuccess) {
                 this.node.report("parcel processor for: " + this.parcelId + " :: check payload, state " +
                     this.processingState.val, VerboseLevel.BASE);
 
@@ -188,6 +189,9 @@ class ParcelProcessor {
                             await this.payloadProcessor.doneEvent.await();
 
                         this.payloadResult = this.payloadProcessor.getResult();
+
+                        if (this.payloadResult == null || !this.payloadResult.state.isApproved)
+                            this.waitPayloadEvent.fire(null);
                     }
 
                     if (this.payloadResult != null && this.payloadResult.state.isApproved)
@@ -202,6 +206,21 @@ class ParcelProcessor {
 
                 this.node.report("parcel processor for: " + this.parcelId + " :: payload checked, state " +
                     this.processingState.val, VerboseLevel.BASE);
+            }
+
+            if (this.paymentResult == null) {
+                if (!this.paymentProcessor.isDone())
+                    await this.paymentProcessor.doneEvent.await();
+
+                this.paymentResult = this.paymentProcessor.getResult();
+            }
+
+            // if payment is ok, wait payload
+            if (this.paymentResult.state.isApproved) {
+                if (!this.payment.limitedForTestnet)
+                    await this.node.ledger.savePayment(this.parcel.quantasLimit / Quantiser.quantaPerU,
+                        this.paymentProcessor != null ? this.paymentProcessor.record.createdAt :
+                        await this.node.ledger.getRecord(this.payment.id).createdAt);
 
             } else {
                 this.node.report("parcel processor for: " + this.parcelId + " :: payment was not approved: " +
@@ -243,7 +262,7 @@ class ParcelProcessor {
 
     stopProcessor() {
         if (this.processSchedule != null) {
-            this.processSchedule.cancel(true);
+            this.processSchedule.cancel();
             this.processSchedule = null;
         }
     }
@@ -260,6 +279,9 @@ class ParcelProcessor {
     }
 
     async download() {
+        if (this.downloader == null)
+            return;
+
         if (!this.processingState.canContinue) {
             this.downloader = null;
             return;
@@ -315,7 +337,7 @@ class ParcelProcessor {
 
             this.payment.quantiser.reset(Config.paymentQuantaLimit);
 
-            let x = await this.node.checkItemInternal(this.payment.id, this.parcelId, this.payment, true, true);
+            let x = await this.node.checkItemInternal(this.payment.id, this.parcelId, this.payment, true, true, false, this, true);
             if (x instanceof ItemProcessor) {
                 this.paymentProcessor = x;
 
@@ -343,7 +365,7 @@ class ParcelProcessor {
                     this.paymentResult = ItemResult.UNDEFINED;
             }
             // we freeze payload checking until payment will be approved
-            x = await this.node.checkItemInternal(this.payload.id, this.parcelId, this.payload, true, false);
+            x = await this.node.checkItemInternal(this.payload.id, this.parcelId, this.payload, true, false, false, this, false);
             if (x instanceof ItemProcessor) {
                 this.payloadProcessor = x;
 

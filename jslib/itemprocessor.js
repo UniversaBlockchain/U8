@@ -81,10 +81,12 @@ class ItemProcessor {
      * @param {Contract | null} item - Item object if exist.
      * @param {boolean} isCheckingForce - If true checking item processing without delays. If false checking item wait until forceChecking() will be called.
      * @param {Node} node - ItemProcessor`s node.
+     * @param {ParcelProcessor} parcelProcessor - Parent parcel processor for synchronize payment and payload. Default is null.
+     * @param {boolean} isPayment - True if item is payment. Default is false.
      *
      * @constructor
      */
-    constructor(itemId, parcelId, item, isCheckingForce, node) {
+    constructor(itemId, parcelId, item, isCheckingForce, node, parcelProcessor = null, isPayment = false) {
         this.itemId = itemId;
         this.parcelId = parcelId;
         this.item = item;
@@ -118,7 +120,10 @@ class ItemProcessor {
 
         this.downloadedEvent = new AsyncEvent(this.node.executorService);
         this.doneEvent = new AsyncEvent(this.node.executorService);
+        this.waitPayloadEvent = new AsyncEvent(this.node.executorService);
         this.removedEvent = new Promise(resolve => this.removedFire = resolve);
+        this.parcelProcessor = parcelProcessor;
+        this.isPayment = isPayment;
 
         this.downloader = null;
         this.poller = null;
@@ -152,6 +157,9 @@ class ItemProcessor {
     }
 
     async download() {
+        if (this.downloader == null)
+            return;
+
         if (this.processingState.canContinue) {
             while (!this.isPollingExpired() && this.item == null) {
                 if (this.sources.size === 0) {
@@ -591,7 +599,7 @@ class ItemProcessor {
     }
 
     async sendStartPollingNotification() {
-        if (!this.processingState.canContinue)
+        if (!this.processingState.canContinue || this.poller == null)
             return;
 
         if (!this.processingState.isProcessedToConsensus) {
@@ -794,6 +802,8 @@ class ItemProcessor {
         if (!this.processingState.canContinue)
             return;
 
+        let success = true;
+
         // it may happen that consensus is found earlier than item is download
         // we still need item to fix all its relations:
         try {
@@ -806,9 +816,33 @@ class ItemProcessor {
                 await this.downloadedEvent.await(this.getMillisLeft());
             }
 
+            let payloadCommitBlock = null;
+            if (this.parcelProcessor != null && this.isPayment) {
+                this.waitPayloadEvent.fire(true);
+
+                this.node.report("item processor for item: " + this.itemId + " from parcel: " + this.parcelId +
+                    " :: downloadAndCommit wait payload, state " + this.processingState.val + " itemState: " +
+                    this.record.state.val, VerboseLevel.DETAILED);
+
+                payloadCommitBlock = await this.parcelProcessor.waitPayloadEvent.await();
+
+                if (payloadCommitBlock != null)
+                    this.node.report("item processor for item: " + this.itemId + " from parcel: " + this.parcelId +
+                        " :: downloadAndCommit received payload commit, state " + this.processingState.val + " itemState: " +
+                        this.record.state.val, VerboseLevel.DETAILED);
+                else {
+                    this.node.report("item processor for item: " + this.itemId + " from parcel: " + this.parcelId +
+                        " :: downloadAndCommit received null payload commit, state " + this.processingState.val + " itemState: " +
+                        this.record.state.val, VerboseLevel.DETAILED);
+
+                    await this.emergencyBreak();
+                    return;
+                }
+            }
+
             await this.node.lock.synchronize(this.mutex, async () => {
-                // Commit transaction
-                await this.node.ledger.transaction(async(con) => {
+
+                let commitBlock = async(con) => {
                     // first, commit all new items
                     await this.downloadAndCommitNewItemsOf(this.item, con);
 
@@ -870,15 +904,62 @@ class ItemProcessor {
 
                     // update item's smart contracts link to
                     await this.notifyContractSubscribers(this.item, this.record.state, con);
-                });
+                };
+
+                // Commit transaction
+                if (this.parcelProcessor != null) {
+                    if (!this.isPayment) {
+                        this.parcelProcessor.waitPayloadEvent.fire(commitBlock);
+
+                        this.node.report("item processor for item: " + this.itemId + " from parcel: " + this.parcelId +
+                            " :: downloadAndCommit wait payload commit, state " + this.processingState.val + " itemState: " +
+                            this.record.state.val, VerboseLevel.DETAILED);
+
+                        success = await this.parcelProcessor.finishEvent.await();
+
+                        this.node.report("item processor for item: " + this.itemId + " from parcel: " + this.parcelId +
+                            " :: downloadAndCommit payload committed with result: " + success + ", state " +
+                            this.processingState.val + " itemState: " + this.record.state.val, VerboseLevel.DETAILED);
+
+                    } else if (payloadCommitBlock != null) {
+                        this.node.report("item processor for item: " + this.itemId + " from parcel: " + this.parcelId +
+                            " :: downloadAndCommit common commit, state " + this.processingState.val + " itemState: " +
+                            this.record.state.val, VerboseLevel.DETAILED);
+
+                        try {
+                            await this.node.ledger.transaction(async (con) => {
+                                await commitBlock(con);
+                                await payloadCommitBlock(con);
+                            });
+                        } catch (err) {
+                            this.parcelProcessor.finishEvent.fire(false);
+
+                            this.node.report("item processor for item: " + this.itemId + " from parcel: " + this.parcelId +
+                                " :: downloadAndCommit common commit failed, state " + this.processingState.val + " itemState: " +
+                                this.record.state.val, VerboseLevel.DETAILED);
+
+                            throw err;
+                        }
+
+                        this.parcelProcessor.finishEvent.fire(true);
+
+                        this.node.report("item processor for item: " + this.itemId + " from parcel: " + this.parcelId +
+                            " :: downloadAndCommit common commit successful, state " + this.processingState.val + " itemState: " +
+                            this.record.state.val, VerboseLevel.DETAILED);
+                    }
+
+                } else
+                    await this.node.ledger.transaction(commitBlock);
             });
 
-            new ScheduleExecutor(() => this.node.checkSpecialItem(this.item), 100, this.node.executorService).run();
+            if (success) {
+                new ScheduleExecutor(() => this.node.checkSpecialItem(this.item), 100, this.node.executorService).run();
 
-            if (this.resyncingItems.size > 0) {
-                this.processingState = ItemProcessingState.RESYNCING;
-                await this.startResync();
-                return;
+                if (this.resyncingItems.size > 0) {
+                    this.processingState = ItemProcessingState.RESYNCING;
+                    await this.startResync();
+                    return;
+                }
             }
 
         } catch (err) {
@@ -1025,6 +1106,9 @@ class ItemProcessor {
             " :: rollbackChanges, state " + this.processingState.val + " :: itemState: " + this.record.state.val,
             VerboseLevel.BASE);
 
+        if (this.parcelProcessor != null && this.isPayment)
+            this.waitPayloadEvent.fire(false);
+
         await this.node.lock.synchronize(this.mutex, async () => {
             try {
                 // Rollback transaction
@@ -1107,7 +1191,8 @@ class ItemProcessor {
     }
 
     async sendNewConsensusNotification() {
-        if (!this.processingState.canContinue || this.processingState === ItemProcessingState.FINISHED)
+        if (!this.processingState.canContinue || this.processingState === ItemProcessingState.FINISHED ||
+            this.consensusReceivedChecker == null)
             return;
 
         if (this.isConsensusReceivedExpired()) {
@@ -1157,8 +1242,10 @@ class ItemProcessor {
     }
 
     stopConsensusReceivedChecker() {
-        if (this.consensusReceivedChecker != null)
+        if (this.consensusReceivedChecker != null) {
             this.consensusReceivedChecker.cancel();
+            this.consensusReceivedChecker = null;
+        }
     }
 
     //******************** resync section ********************//
@@ -1261,6 +1348,8 @@ class ItemProcessor {
         let doRollback = !this.processingState.isDone;
 
         this.processingState = ItemProcessingState.EMERGENCY_BREAK;
+
+        this.node.emergencyBreaked.add(this.itemId);        //TODO: crutch
 
         this.stopDownloader();
         this.stopPoller();

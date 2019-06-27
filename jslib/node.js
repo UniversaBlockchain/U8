@@ -54,6 +54,8 @@ class Node {
 
         this.callbackService = null;
 
+        this.emergencyBreaked = new t.GenericSet();     //TODO: crutch
+
         this.pulseStartCleanup();
     }
 
@@ -263,7 +265,7 @@ class Node {
         // if notification hasn't parcelId we think this is simple item notification and obtain it as it
         if (notification.parcelId == null)
             await this.obtainCommonNotification(notification);
-        else {
+        else if (!this.emergencyBreaked.has(notification.itemId)) {     //TODO: crutch
             // check if item for notification is already processed
             let item_x = await this.checkItemInternal(notification.itemId);
             // if already processed and result has consensus - answer immediately
@@ -424,12 +426,14 @@ class Node {
      *                      Default is false. Use ItemProcessor.forceChecking() to start waiting item checking.
      * @param {boolean} ommitItemResult - Do not return ItemResult for processed item,
      *                        create new ItemProcessor instead (if autoStart is true). Default is false.
+     * @param {ParcelProcessor} parcelProcessor - Parent parcel processor for synchronize payment and payload. Default is null.
+     * @param {boolean} isPayment - True if item is payment. Default is false.
      *
      * @return {ItemResult| ItemProcessor | ResyncProcessor} instance of ItemProcessor if the item is being processed (also if it was started by the call),
      *         ItemResult if it is already processed or can't be processed, say, created_at field is too far in
      *         the past, in which case result state will be ItemState#DISCARDED.
      */
-    async checkItemInternal(itemId, parcelId = null, item = null, autoStart = false, forceChecking = false, ommitItemResult = false) {
+    async checkItemInternal(itemId, parcelId = null, item = null, autoStart = false, forceChecking = false, ommitItemResult = false, parcelProcessor = null, isPayment = false) {
         try {
             this.report("checkItemInternal: " + itemId, VerboseLevel.BASE);
 
@@ -478,7 +482,7 @@ class Node {
 
                     this.report("checkItemInternal: " + itemId + "nothing found, will create item processor",
                         VerboseLevel.BASE);
-                    let processor = await new ItemProcessor(itemId, parcelId, item, forceChecking, this).run();
+                    let processor = await new ItemProcessor(itemId, parcelId, item, forceChecking, this, parcelProcessor, isPayment).run();
                     this.processors.set(itemId, processor);
                     return processor;
 
