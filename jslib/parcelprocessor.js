@@ -92,6 +92,8 @@ class ParcelProcessor {
 
         this.downloader = null;
         this.processSchedule = null;
+
+        //console.error(this.node.label + "PP construct " + new Error().stack);
     }
 
     async run() {
@@ -138,28 +140,23 @@ class ParcelProcessor {
             this.node.report("parcel processor for: " + this.parcelId + " :: check payment, state " +
                 this.processingState.val, VerboseLevel.BASE);
 
-            let paymentSuccess = false;
+            // process payment
+            this.processingState = ParcelProcessingState.PAYMENT_CHECKING;
 
-            // wait payment
-            if (this.paymentResult == null) {
-                this.processingState = ParcelProcessingState.PAYMENT_CHECKING;
+            for (let ni of this.paymentDelayedVotes.keys())
+                this.paymentProcessor.vote(ni, this.paymentDelayedVotes.get(ni));
 
-                for (let ni of this.paymentDelayedVotes.keys())
-                    await this.paymentProcessor.vote(ni, this.paymentDelayedVotes.get(ni));
+            this.paymentDelayedVotes.clear();
 
-                this.paymentDelayedVotes.clear();
+            this.processingState = ParcelProcessingState.PAYMENT_POLLING;
 
-                this.processingState = ParcelProcessingState.PAYMENT_POLLING;
-
-                paymentSuccess = await this.paymentProcessor.waitPayloadEvent.await();
-
-            } else
-                paymentSuccess = this.paymentResult.state.isApproved;
+            await this.paymentProcessor.itemCommitEvent.await();
 
             this.node.report("parcel processor for: " + this.parcelId + " :: payment checked, state " +
                 this.processingState.val, VerboseLevel.BASE);
 
-            if (paymentSuccess) {
+            // if payment is ok, process payload
+            if (this.paymentProcessor.itemCommitEvent.result.success) {
                 this.node.report("parcel processor for: " + this.parcelId + " :: check payload, state " +
                     this.processingState.val, VerboseLevel.BASE);
 
@@ -167,46 +164,58 @@ class ParcelProcessor {
                     this.payload.errors.push(new ErrorRecord(Errors.BADSTATE, this.payload.id.toString(),
                         "can't register contract with same origin as payment contract"));
 
-                    await this.payloadProcessor.emergencyBreak();
-                    await this.payloadProcessor.doneEvent.await();
+                    this.payloadProcessor.emergencyBreak();
 
                 } else {
-                    if (this.payloadResult == null) {
-                        this.processingState = ParcelProcessingState.PAYLOAD_CHECKING;
+                    this.processingState = ParcelProcessingState.PAYLOAD_CHECKING;
 
-                        this.payload.quantiser.reset(this.parcel.quantasLimit);
+                    this.payload.quantiser.reset(this.parcel.quantasLimit);
 
-                        // force payload checking (we've freeze it at processor start)
-                        this.payloadProcessor.forceChecking(true);
+                    // force payload checking (we've freeze it at processor start)
+                    this.payloadProcessor.forceChecking(true);
 
-                        for (let ni of this.payloadDelayedVotes.keys())
-                            await this.payloadProcessor.vote(ni, this.payloadDelayedVotes.get(ni));
+                    for (let ni of this.payloadDelayedVotes.keys())
+                        this.payloadProcessor.vote(ni, this.payloadDelayedVotes.get(ni));
 
-                        this.payloadDelayedVotes.clear();
+                    this.payloadDelayedVotes.clear();
 
-                        this.processingState = ParcelProcessingState.PAYLOAD_POLLING;
-                        if (!this.payloadProcessor.isDone())
-                            await this.payloadProcessor.doneEvent.await();
-
-                        this.payloadResult = this.payloadProcessor.getResult();
-
-                        if (this.payloadResult == null || !this.payloadResult.state.isApproved)
-                            this.waitPayloadEvent.fire(null);
-                    }
-
-                    if (this.payloadResult != null && this.payloadResult.state.isApproved)
-                        if (!this.payload.limitedForTestnet) {
-                            let paidU = t.getOrDefault(this.payload.state.data, NSmartContract.PAID_U_FIELD_NAME, 0);
-                            if (paidU > 0)
-                                await this.node.ledger.savePayment(paidU,
-                                    this.payloadProcessor != null ? this.payloadProcessor.record.createdAt :
-                                        await this.node.ledger.getRecord(this.payload.id).createdAt);
-                        }
+                    this.processingState = ParcelProcessingState.PAYLOAD_POLLING;
                 }
+
+                await this.payloadProcessor.itemCommitEvent.await();
 
                 this.node.report("parcel processor for: " + this.parcelId + " :: payload checked, state " +
                     this.processingState.val, VerboseLevel.BASE);
+
+            } else {
+                this.node.report("parcel processor for: " + this.parcelId + " :: payment was not approved, state "
+                    + this.processingState.val, VerboseLevel.BASE);
+
+                this.payloadProcessor.emergencyBreak();
+                await this.payloadProcessor.itemCommitEvent.await();
             }
+
+            // common commit
+            this.node.report("parcel processor for: " + this.parcelId + " :: common commit, state " +
+                this.processingState.val, VerboseLevel.BASE);
+
+            try {
+                await this.node.ledger.transaction(async (con) => {
+                    await this.paymentProcessor.itemCommitEvent.result.block(con);
+                    await this.payloadProcessor.itemCommitEvent.result.block(con);
+
+                    this.paymentProcessor.parcelCommitEvent.fire(true);
+                    this.payloadProcessor.parcelCommitEvent.fire(true);
+                });
+            } catch (err) {
+                this.paymentProcessor.parcelCommitEvent.fire(false);
+                this.payloadProcessor.parcelCommitEvent.fire(false);
+
+                throw err;
+            }
+
+            this.node.report("parcel processor for: " + this.parcelId + " :: wait payment result, state " +
+                this.processingState.val, VerboseLevel.BASE);
 
             if (this.paymentResult == null) {
                 if (!this.paymentProcessor.isDone())
@@ -215,22 +224,31 @@ class ParcelProcessor {
                 this.paymentResult = this.paymentProcessor.getResult();
             }
 
-            // if payment is ok, wait payload
-            if (this.paymentResult.state.isApproved) {
+            this.node.report("parcel processor for: " + this.parcelId + " :: wait payload result, state " +
+                this.processingState.val, VerboseLevel.BASE);
+
+            if (this.payloadResult == null) {
+                if (!this.payloadProcessor.isDone())
+                    await this.payloadProcessor.doneEvent.await();
+
+                this.payloadResult = this.payloadProcessor.getResult();
+            }
+
+            // save payments
+            if (this.paymentResult != null && this.paymentResult.state.isApproved)
                 if (!this.payment.limitedForTestnet)
                     await this.node.ledger.savePayment(this.parcel.quantasLimit / Quantiser.quantaPerU,
                         this.paymentProcessor != null ? this.paymentProcessor.record.createdAt :
                         await this.node.ledger.getRecord(this.payment.id).createdAt);
 
-            } else {
-                this.node.report("parcel processor for: " + this.parcelId + " :: payment was not approved: " +
-                    this.paymentResult.state.val + ", state " + this.processingState.val, VerboseLevel.BASE);
-
-                if (this.payloadProcessor != null) {
-                    await this.payloadProcessor.emergencyBreak();
-                    await this.payloadProcessor.doneEvent.await();
+            if (this.payloadResult != null && this.payloadResult.state.isApproved)
+                if (!this.payload.limitedForTestnet) {
+                    let paidU = t.getOrDefault(this.payload.state.data, NSmartContract.PAID_U_FIELD_NAME, 0);
+                    if (paidU > 0)
+                        await this.node.ledger.savePayment(paidU,
+                            this.payloadProcessor != null ? this.payloadProcessor.record.createdAt :
+                                await this.node.ledger.getRecord(this.payload.id).createdAt);
                 }
-            }
 
             // we got payment and payload result, can fire done event for waiters
             this.processingState = ParcelProcessingState.FINISHED;
@@ -238,6 +256,7 @@ class ParcelProcessor {
             this.node.report("parcel processor for: " + this.parcelId + " :: processing finished, state " +
                 this.processingState.val, VerboseLevel.BASE);
 
+            //console.error(this.node.label + "PP FIRE!!!!!!");
             this.doneEvent.fire();
 
             // but we want to wait until paymentProcessor and payloadProcessor will be removed
@@ -394,7 +413,7 @@ class ParcelProcessor {
 
     //******************** polling section ********************//
 
-    async vote(node, state, isU) {
+    vote(node, state, isU) {
         if (!this.processingState.canContinue)
             return;
 
@@ -402,13 +421,13 @@ class ParcelProcessor {
         // Otherwise we give vote to item processor
         if (isU) {
             if (this.paymentProcessor != null)
-                await this.paymentProcessor.vote(node, state);
+                this.paymentProcessor.vote(node, state);
             else
                 this.paymentDelayedVotes.set(node, state);
 
         } else {
             if (this.payloadProcessor != null)
-                await this.payloadProcessor.vote(node, state);
+                this.payloadProcessor.vote(node, state);
             else
                 this.payloadDelayedVotes.set(node, state);
         }

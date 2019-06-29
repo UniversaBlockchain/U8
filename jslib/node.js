@@ -54,8 +54,6 @@ class Node {
 
         this.callbackService = null;
 
-        this.emergencyBreaked = new t.GenericSet();     //TODO: crutch
-
         this.pulseStartCleanup();
     }
 
@@ -239,19 +237,21 @@ class Node {
                     new ParcelNotification(this.myInfo, notification.itemId, null, x, false, notType));
 
         } else if (x instanceof ItemProcessor) {
-            // we might still need to download and process it
-            if (notification.itemResult.haveCopy)
-                x.addToSources(notification.from);
+            await this.lock.synchronize(notification.itemId, async () => {
+                // we might still need to download and process it
+                if (notification.itemResult.haveCopy)
+                    x.addToSources(notification.from);
 
-            if (notification.itemResult.state !== ItemState.PENDING)
-                await x.vote(notification.from, notification.itemResult.state);
-            else
-                this.logger.log("pending vote on item " + notification.itemId + " from " + notification.from);
+                if (notification.itemResult.state !== ItemState.PENDING)
+                    x.vote(notification.from, notification.itemResult.state);
+                else
+                    this.logger.log("pending vote on item " + notification.itemId + " from " + notification.from);
 
-            // We answer only if (1) answer is requested and (2) we have position on the subject:
-            if (notification.requestResult && x.record.state !== ItemState.PENDING)
-                this.network.deliver(notification.from,
-                    new ParcelNotification(this.myInfo, notification.itemId, null, x.getResult(), x.needsVoteFrom(notification.from), notType));
+                // We answer only if (1) answer is requested and (2) we have position on the subject:
+                if (notification.requestResult && x.record.state !== ItemState.PENDING)
+                    this.network.deliver(notification.from,
+                        new ParcelNotification(this.myInfo, notification.itemId, null, x.getResult(), x.needsVoteFrom(notification.from), notType));
+            });
         }
     }
 
@@ -265,7 +265,7 @@ class Node {
         // if notification hasn't parcelId we think this is simple item notification and obtain it as it
         if (notification.parcelId == null)
             await this.obtainCommonNotification(notification);
-        else if (!this.emergencyBreaked.has(notification.itemId)) {     //TODO: crutch
+        else {
             // check if item for notification is already processed
             let item_x = await this.checkItemInternal(notification.itemId);
             // if already processed and result has consensus - answer immediately
@@ -288,7 +288,7 @@ class Node {
                             x.addToSources(notification.from);
 
                         if (resultVote.state !== ItemState.PENDING)
-                            await x.vote(notification.from, resultVote.state, notification.type.isU);
+                            x.vote(notification.from, resultVote.state, notification.type.isU);
                         else
                             this.logger.log("pending vote on parcel " + notification.parcelId + " and item " +
                                 notification.itemId + " from " + notification.from);
@@ -437,6 +437,8 @@ class Node {
         try {
             this.report("checkItemInternal: " + itemId, VerboseLevel.BASE);
 
+            //console.error(this.label + "checkItemInternal autoStart = " + autoStart + " STACK:" + new Error().stack);
+
             return await this.lock.synchronize(itemId, async () => {
 
                 let ip = this.processors.get(itemId);
@@ -513,6 +515,8 @@ class Node {
      */
     async checkParcelInternal(parcelId, parcel = null, autoStart = false) {
         try {
+            this.report("checkParcelInternal: " + parcelId, VerboseLevel.BASE);
+
             return await this.lock.synchronize(parcelId, async () => {
                 // let's look existing parcel processor
                 let processor = this.parcelProcessors.get(parcelId);

@@ -10,13 +10,28 @@
 #include "AsyncIO/AsyncIOTests.h"
 #include "crypto/cryptoTests.h"
 #include "serialization/SerializationTest.h"
+#include <execinfo.h>
+#include <zconf.h>
 
 using namespace std;
 
 void usage();
 
+void handler(int sig) {
+    void *array[10];
+
+    // get void*'s for all entries on the stack
+    int size = backtrace(array, 10);
+
+    // print out all the frames to stderr
+    fprintf(stderr, "Error: signal %d:\n", sig);
+    backtrace_symbols_fd(array, size, STDERR_FILENO);
+    exit(1);
+}
+
 int main(int argc, const char **argv) {
 
+    signal(SIGSEGV, handler);   // install our handler
     crypto::initCrypto();
     asyncio::initAndRunLoop();
 

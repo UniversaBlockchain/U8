@@ -81,12 +81,10 @@ class ItemProcessor {
      * @param {Contract | null} item - Item object if exist.
      * @param {boolean} isCheckingForce - If true checking item processing without delays. If false checking item wait until forceChecking() will be called.
      * @param {Node} node - ItemProcessor`s node.
-     * @param {ParcelProcessor} parcelProcessor - Parent parcel processor for synchronize payment and payload. Default is null.
-     * @param {boolean} isPayment - True if item is payment. Default is false.
      *
      * @constructor
      */
-    constructor(itemId, parcelId, item, isCheckingForce, node, parcelProcessor = null, isPayment = false) {
+    constructor(itemId, parcelId, item, isCheckingForce, node) {
         this.itemId = itemId;
         this.parcelId = parcelId;
         this.item = item;
@@ -120,10 +118,9 @@ class ItemProcessor {
 
         this.downloadedEvent = new AsyncEvent(this.node.executorService);
         this.doneEvent = new AsyncEvent(this.node.executorService);
-        this.waitPayloadEvent = new AsyncEvent(this.node.executorService);
         this.removedEvent = new Promise(resolve => this.removedFire = resolve);
-        this.parcelProcessor = parcelProcessor;
-        this.isPayment = isPayment;
+        this.itemCommitEvent = new AsyncEvent(this.node.executorService);
+        this.parcelCommitEvent = new AsyncEvent(this.node.executorService);
 
         this.downloader = null;
         this.poller = null;
@@ -313,7 +310,7 @@ class ItemProcessor {
                     this.item.errors.push(new ErrorRecord(Errors.FAILURE, this.item.id.toString(),
                         "Not enough payment for process item (quantas limit)"));
                     this.node.informer.inform(this.item);
-                    await this.emergencyBreak();
+                    this.emergencyBreak();
                     return;
 
                 } else {
@@ -514,12 +511,12 @@ class ItemProcessor {
                     } catch (err) {
                         this.node.logger.log(err.stack);
                         this.node.logger.log("commitCheckedAndStartPolling error: " + err.message);
-                        await this.emergencyBreak();
+                        this.emergencyBreak();
                         return false;
                     }
                 } else {
                     this.node.logger.log("commitCheckedAndStartPolling: checked item state should be ItemState.PENDING");
-                    await this.emergencyBreak();
+                    this.emergencyBreak();
                 }
 
                 return true;
@@ -529,7 +526,7 @@ class ItemProcessor {
             if (!this.processingState.isProcessedToConsensus)
                 this.processingState = ItemProcessingState.POLLING;
 
-            await this.vote(this.node.myInfo, this.record.state);
+            this.vote(this.node.myInfo, this.record.state);
             this.broadcastMyState();
             this.pulseStartPolling();
         }
@@ -609,7 +606,7 @@ class ItemProcessor {
 
                 this.stopPoller();
                 this.stopDownloader();
-                await this.rollbackChanges();
+                this.rollback();
                 return;
             }
 
@@ -623,7 +620,7 @@ class ItemProcessor {
         }
     }
 
-    async vote(node, state) {
+    vote(node, state) {
         if (!this.processingState.canContinue)
             return;
 
@@ -671,7 +668,7 @@ class ItemProcessor {
         if (positiveConsensus)
             this.approveAndCommit();
         else if (negativeConsensus)
-            await this.rollbackChanges(true);
+            this.rollback(true);
         else
             throw new Error("error: consensus reported without consensus");
     }
@@ -816,7 +813,7 @@ class ItemProcessor {
                 await this.downloadedEvent.await(this.getMillisLeft());
             }
 
-            let payloadCommitBlock = null;
+            /*let payloadCommitBlock = null;
             if (this.parcelProcessor != null && this.isPayment) {
                 this.waitPayloadEvent.fire(true);
 
@@ -824,24 +821,34 @@ class ItemProcessor {
                     " :: downloadAndCommit wait payload, state " + this.processingState.val + " itemState: " +
                     this.record.state.val, VerboseLevel.DETAILED);
 
-                payloadCommitBlock = await this.parcelProcessor.waitPayloadEvent.await();
+                try {
+                    payloadCommitBlock = await this.parcelProcessor.waitPayloadEvent.await(Config.maxDownloadOnApproveTime * 1000); //TODO: ???
+                } catch (err) {
+                    if (err instanceof EventTimeoutError) {
+                        this.node.report("item processor for item: " + this.itemId + " from parcel: " + this.parcelId +
+                            " :: downloadAndCommit timeout payload commit, state " + this.processingState.val + " itemState: " +
+                            this.record.state.val, VerboseLevel.DETAILED);
 
-                if (payloadCommitBlock != null)
-                    this.node.report("item processor for item: " + this.itemId + " from parcel: " + this.parcelId +
-                        " :: downloadAndCommit received payload commit, state " + this.processingState.val + " itemState: " +
-                        this.record.state.val, VerboseLevel.DETAILED);
-                else {
-                    this.node.report("item processor for item: " + this.itemId + " from parcel: " + this.parcelId +
-                        " :: downloadAndCommit received null payload commit, state " + this.processingState.val + " itemState: " +
-                        this.record.state.val, VerboseLevel.DETAILED);
+                        this.item.errors.push(new ErrorRecord(Errors.FAILURE, this.itemId.toString(),
+                            "payload voting has been expired"));
 
-                    await this.emergencyBreak();
-                    return;
+                        await this.rollbackChanges(true);
+                        return;
+
+                    } else {
+                        this.node.logger.log(err.stack);
+                        this.node.logger.log("error downloadAndCommit in waitPayloadEvent: " + err.message);
+                    }
                 }
-            }
+
+                this.node.report("item processor for item: " + this.itemId + " from parcel: " + this.parcelId +
+                    " :: downloadAndCommit received payload commit, state " + this.processingState.val + " itemState: " +
+                    this.record.state.val, VerboseLevel.DETAILED);
+            }*/
 
             await this.node.lock.synchronize(this.mutex, async () => {
 
+                // Commit transaction
                 let commitBlock = async(con) => {
                     // first, commit all new items
                     await this.downloadAndCommitNewItemsOf(this.item, con);
@@ -906,47 +913,17 @@ class ItemProcessor {
                     await this.notifyContractSubscribers(this.item, this.record.state, con);
                 };
 
-                // Commit transaction
-                if (this.parcelProcessor != null) {
-                    if (!this.isPayment) {
-                        this.parcelProcessor.waitPayloadEvent.fire(commitBlock);
+                if (this.parcelId != null) {
+                    this.itemCommitEvent.fire({
+                        block: commitBlock,
+                        success: true
+                    });
 
-                        this.node.report("item processor for item: " + this.itemId + " from parcel: " + this.parcelId +
-                            " :: downloadAndCommit wait payload commit, state " + this.processingState.val + " itemState: " +
-                            this.record.state.val, VerboseLevel.DETAILED);
+                    this.node.report("item processor for item: " + this.itemId + " from parcel: " + this.parcelId +
+                        " :: downloadAndCommit fired event with commit block, state " + this.processingState.val + " itemState: " +
+                        this.record.state.val, VerboseLevel.BASE);
 
-                        success = await this.parcelProcessor.finishEvent.await();
-
-                        this.node.report("item processor for item: " + this.itemId + " from parcel: " + this.parcelId +
-                            " :: downloadAndCommit payload committed with result: " + success + ", state " +
-                            this.processingState.val + " itemState: " + this.record.state.val, VerboseLevel.DETAILED);
-
-                    } else if (payloadCommitBlock != null) {
-                        this.node.report("item processor for item: " + this.itemId + " from parcel: " + this.parcelId +
-                            " :: downloadAndCommit common commit, state " + this.processingState.val + " itemState: " +
-                            this.record.state.val, VerboseLevel.DETAILED);
-
-                        try {
-                            await this.node.ledger.transaction(async (con) => {
-                                await commitBlock(con);
-                                await payloadCommitBlock(con);
-                            });
-                        } catch (err) {
-                            this.parcelProcessor.finishEvent.fire(false);
-
-                            this.node.report("item processor for item: " + this.itemId + " from parcel: " + this.parcelId +
-                                " :: downloadAndCommit common commit failed, state " + this.processingState.val + " itemState: " +
-                                this.record.state.val, VerboseLevel.DETAILED);
-
-                            throw err;
-                        }
-
-                        this.parcelProcessor.finishEvent.fire(true);
-
-                        this.node.report("item processor for item: " + this.itemId + " from parcel: " + this.parcelId +
-                            " :: downloadAndCommit common commit successful, state " + this.processingState.val + " itemState: " +
-                            this.record.state.val, VerboseLevel.DETAILED);
-                    }
+                    success = await this.parcelCommitEvent.await();
 
                 } else
                     await this.node.ledger.transaction(commitBlock);
@@ -966,7 +943,7 @@ class ItemProcessor {
             if (err instanceof DatabaseError) {
                 this.node.logger.log(err.stack);
                 this.node.logger.log("DatabaseError downloadAndCommit in transaction: " + err.message);
-                await this.emergencyBreak();
+                this.emergencyBreak();
                 return;
 
             } else if (err instanceof EventTimeoutError) {
@@ -1101,18 +1078,23 @@ class ItemProcessor {
         }
     }
 
+    rollback(doDecline = false) {
+        this.node.report("item processor for item: " + this.itemId + " from parcel: " + this.parcelId +
+            " :: rollback, state " + this.processingState.val + " itemState: " + this.record.state.val,
+            VerboseLevel.BASE);
+
+        new ScheduleExecutor(async () => await this.rollbackChanges(doDecline), 0, this.node.executorService).run();
+    }
+
     async rollbackChanges(doDecline = false) {
         this.node.report("item processor for item: " + this.itemId + " from parcel: " + this.parcelId +
             " :: rollbackChanges, state " + this.processingState.val + " :: itemState: " + this.record.state.val,
             VerboseLevel.BASE);
 
-        if (this.parcelProcessor != null && this.isPayment)
-            this.waitPayloadEvent.fire(false);
-
         await this.node.lock.synchronize(this.mutex, async () => {
             try {
                 // Rollback transaction
-                await this.node.ledger.transaction(async (con) => {
+                let rollbackBlock = async (con) => {
                     await Promise.all(Array.from(this.lockedToRevoke).map(async (r) =>
                         await this.node.lock.synchronize(r.id, async () => {
                             await r.unlock(con);
@@ -1147,7 +1129,23 @@ class ItemProcessor {
                             this.node.cache.update(this.itemId, this.getResult());
                     } else
                         await this.record.destroy(con);
-                });
+                };
+
+                if (this.parcelId != null) {
+                    this.itemCommitEvent.fire({
+                        block: rollbackBlock,
+                        success: false
+                    });
+
+                    this.node.report("item processor for item: " + this.itemId + " from parcel: " + this.parcelId +
+                        " :: rollbackChanges fired event with rollback block, state " + this.processingState.val + " itemState: " +
+                        this.record.state.val, VerboseLevel.BASE);
+
+                    await this.parcelCommitEvent.await();
+
+                } else
+                    await this.node.ledger.transaction(rollbackBlock);
+
             } catch (err) {
                 if (err instanceof DatabaseError) {
                     this.node.logger.log(err.stack);
@@ -1186,11 +1184,11 @@ class ItemProcessor {
         this.processingState = ItemProcessingState.SENDING_CONSENSUS;
 
         if (this.consensusReceivedChecker == null)
-            this.consensusReceivedChecker = new ExecutorWithDynamicPeriod(async () => await this.sendNewConsensusNotification(),
+            this.consensusReceivedChecker = new ExecutorWithDynamicPeriod(() => this.sendNewConsensusNotification(),
                 Config.consensusReceivedCheckTime, this.node.executorService).run();
     }
 
-    async sendNewConsensusNotification() {
+    sendNewConsensusNotification() {
         if (!this.processingState.canContinue || this.processingState === ItemProcessingState.FINISHED ||
             this.consensusReceivedChecker == null)
             return;
@@ -1217,7 +1215,7 @@ class ItemProcessor {
                 if (!this.node.myInfo.equals(node))
                     this.node.network.deliver(node, notification);
                 else if (this.processingState.isProcessedToConsensus)
-                    await this.vote(this.node.myInfo, this.record.state);
+                    this.vote(this.node.myInfo, this.record.state);
             }
     }
 
@@ -1340,7 +1338,7 @@ class ItemProcessor {
     /**
      * Emergency break all processes and remove self.
      */
-    async emergencyBreak() {
+    emergencyBreak() {
         this.node.report("item processor for item: " + this.itemId + " from parcel: " + this.parcelId +
             " :: emergencyBreak, state " + this.processingState.val + " itemState: " + this.record.state.val,
             VerboseLevel.BASE);
@@ -1348,8 +1346,6 @@ class ItemProcessor {
         let doRollback = !this.processingState.isDone;
 
         this.processingState = ItemProcessingState.EMERGENCY_BREAK;
-
-        this.node.emergencyBreaked.add(this.itemId);        //TODO: crutch
 
         this.stopDownloader();
         this.stopPoller();
@@ -1360,7 +1356,7 @@ class ItemProcessor {
                 ri.closeByTimeout();
 
         if (doRollback)
-            await this.rollbackChanges();
+            this.rollback();
         else
             this.close();
 

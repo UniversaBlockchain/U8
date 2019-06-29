@@ -525,23 +525,23 @@ unit.test("main_test: register parcel with bad payload", async () => {
         ir = await ts.node.node.waitItem(item.id, 10000);
         assert(ir.state === ItemState.DECLINED);
         ir = await ts.node.node.waitItem(parcel.getPaymentContract().id, 10000);
-        assert(ir.state === ItemState.UNDEFINED);
+        assert(ir.state === ItemState.APPROVED);
 
         for (let i = 0; i < 4; i++) {
             await ts.nodes[i].node.waitParcel(parcel.hashId, 10000);
             ir = await ts.nodes[i].node.waitItem(item.id, 10000);
             assert(ir.state === ItemState.DECLINED);
             ir = await ts.nodes[i].node.waitItem(parcel.getPaymentContract().id, 10000);
-            assert(ir.state === ItemState.UNDEFINED);
+            assert(ir.state === ItemState.APPROVED);
 
             assert((await ts.nodes[i].ledger.getRecord(item.id)).state === ItemState.DECLINED);
-            assert(await ts.nodes[i].ledger.getRecord(parcel.getPaymentContract().id) == null);
+            assert((await ts.nodes[i].ledger.getRecord(parcel.getPaymentContract().id)).state === ItemState.APPROVED);
 
             if (i !== 0) {
                 ir = await ts.nodes[0].node.network.getItemState(ts.nodes[i].node.myInfo, item.id);
                 assert(ir.state === ItemState.DECLINED);
                 ir = await ts.nodes[0].node.network.getItemState(ts.nodes[i].node.myInfo, parcel.getPaymentContract().id);
-                assert(ir.state === ItemState.UNDEFINED);
+                assert(ir.state === ItemState.APPROVED);
             }
         }
 
@@ -574,9 +574,8 @@ unit.test("main_test: register parcel with bad payload", async () => {
 
         (await Promise.all(events)).forEach(ir => {
             assert(ir != null);
-            assert(ir.itemResult.state === ItemState.UNDEFINED);
+            assert(ir.itemResult.state === ItemState.APPROVED);
         });
-
     }
 
     await ts.shutdown();

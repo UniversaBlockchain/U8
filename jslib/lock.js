@@ -14,7 +14,15 @@ class Lock {
         let fire = null;
         this.locks.set(obj, new Promise((resolve) => {fire = resolve}));
 
-        let res = await block();
+        let res = null;
+        try {
+            res = await block();
+        } catch (err) {
+            this.locks.delete(obj);
+            fire();
+
+            throw err;
+        }
 
         this.locks.delete(obj);
         fire();
