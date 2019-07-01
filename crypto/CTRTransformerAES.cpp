@@ -44,9 +44,9 @@ namespace crypto {
 
     void CTRTransformerAES::prepareBlock() {
         memcpy(&source[0], &nonce[0], blockSize);
-        counterBytes[0] = (unsigned char) counter >> 24;
-        counterBytes[1] = (unsigned char) counter >> 16;
-        counterBytes[2] = (unsigned char) counter >> 8;
+        counterBytes[0] = (unsigned char) (counter >> 24);
+        counterBytes[1] = (unsigned char) (counter >> 16);
+        counterBytes[2] = (unsigned char) (counter >> 8);
         counterBytes[3] = (unsigned char) counter;
         applyXor(source, blockSize - 4, counterBytes);
 
