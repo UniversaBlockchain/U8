@@ -103,7 +103,8 @@ class ItemResult {
             errors:serializer.serialize(this.errors),
             isTestnet:this.isTestnet,
             lockedById:serializer.serialize(this.lockedById),
-            extra:serializer.serialize(this.extra)
+            extra:serializer.serialize(this.extra),
+            haveCopy:this.haveCopy
         }
     }
 
