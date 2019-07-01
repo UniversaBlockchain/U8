@@ -173,15 +173,20 @@ unit.test("big payload", async () => {
 
     let testData = t.randomBytes(10000);
 
+    let hashOk = null;
     httpClient.command("testEndpoint", {testData: testData}, async (resp) => {
-        let hashOk = t.valuesEqual(resp.hash,crypto.HashId.of(testData));
-        console.log("hash ok: " + hashOk);
-        assert(hashOk);
+        hashOk = t.valuesEqual(resp.hash,crypto.HashId.of(testData));
     }, error => {
         console.log("exception: " + error);
     });
 
-    await sleep(2000);
+    while(hashOk == null) {
+        await sleep(50);
+    }
+
+    console.log("hash ok: " + hashOk);
+    assert(hashOk);
+
 
 
     await httpClient.stop();
