@@ -107,7 +107,7 @@ class Config {
      */
     limitFreeRegistrations() {
         if (this.isFreeRegistrationsLimited === null)
-            this.isFreeRegistrationsLimited = !(~VERSION.indexOf("private") || isFreeRegistrationsAllowedFromYaml);
+            this.isFreeRegistrationsLimited = !(~VERSION.indexOf("private") || this.isFreeRegistrationsAllowedFromYaml);
 
         return this.isFreeRegistrationsLimited;
     }
