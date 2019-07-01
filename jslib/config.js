@@ -63,6 +63,7 @@ class Config {
         ];
         this.main = null;
         this.holdDuration = 30*24*3600; // 30 days
+        this.maxWaitingItemOfParcel = 10*60; //10 minutes
 
         // Permanet mode
         this.permanetMode = false;

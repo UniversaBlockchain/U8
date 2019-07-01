@@ -150,7 +150,12 @@ class ParcelProcessor {
 
             this.processingState = ParcelProcessingState.PAYMENT_POLLING;
 
-            await this.paymentProcessor.itemCommitEvent.await();
+            try {
+                await this.paymentProcessor.itemCommitEvent.await(this.node.config.maxWaitingItemOfParcel * 1000);
+            } catch (err) {
+                this.paymentProcessor.emergencyBreak();
+                await this.paymentProcessor.itemCommitEvent.await();
+            }
 
             this.node.report("parcel processor for: " + this.parcelId + " :: payment checked, state " +
                 this.processingState.val, VerboseLevel.BASE);
@@ -182,7 +187,27 @@ class ParcelProcessor {
                     this.processingState = ParcelProcessingState.PAYLOAD_POLLING;
                 }
 
-                await this.payloadProcessor.itemCommitEvent.await();
+                try {
+                    await this.payloadProcessor.itemCommitEvent.await(this.node.config.maxWaitingItemOfParcel * 1000);
+                } catch (err) {
+                    this.node.report("parcel processor for: " + this.parcelId + " :: payload voting has been expired, state " +
+                        this.processingState.val, VerboseLevel.BASE);
+
+                    this.paymentProcessor.parcelCommitEvent.fire(false);
+
+                    this.paymentProcessor.itemCommitEvent = new AsyncEvent(this.node.executorService);
+                    this.payloadProcessor.itemCommitEvent = new AsyncEvent(this.node.executorService);
+                    this.paymentProcessor.parcelCommitEvent = new AsyncEvent(this.node.executorService);
+
+                    this.paymentProcessor.item.errors.push(new ErrorRecord
+                        (Errors.FAILURE, this.paymentProcessor.itemId.toString(), "payload voting has been expired"));
+
+                    this.paymentProcessor.rollback(true);
+                    await this.paymentProcessor.itemCommitEvent.await();
+
+                    this.payloadProcessor.emergencyBreak();
+                    await this.payloadProcessor.itemCommitEvent.await();
+                }
 
                 this.node.report("parcel processor for: " + this.parcelId + " :: payload checked, state " +
                     this.processingState.val, VerboseLevel.BASE);

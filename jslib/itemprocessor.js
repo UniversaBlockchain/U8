@@ -813,39 +813,6 @@ class ItemProcessor {
                 await this.downloadedEvent.await(this.getMillisLeft());
             }
 
-            /*let payloadCommitBlock = null;
-            if (this.parcelProcessor != null && this.isPayment) {
-                this.waitPayloadEvent.fire(true);
-
-                this.node.report("item processor for item: " + this.itemId + " from parcel: " + this.parcelId +
-                    " :: downloadAndCommit wait payload, state " + this.processingState.val + " itemState: " +
-                    this.record.state.val, VerboseLevel.DETAILED);
-
-                try {
-                    payloadCommitBlock = await this.parcelProcessor.waitPayloadEvent.await(Config.maxDownloadOnApproveTime * 1000); //TODO: ???
-                } catch (err) {
-                    if (err instanceof EventTimeoutError) {
-                        this.node.report("item processor for item: " + this.itemId + " from parcel: " + this.parcelId +
-                            " :: downloadAndCommit timeout payload commit, state " + this.processingState.val + " itemState: " +
-                            this.record.state.val, VerboseLevel.DETAILED);
-
-                        this.item.errors.push(new ErrorRecord(Errors.FAILURE, this.itemId.toString(),
-                            "payload voting has been expired"));
-
-                        await this.rollbackChanges(true);
-                        return;
-
-                    } else {
-                        this.node.logger.log(err.stack);
-                        this.node.logger.log("error downloadAndCommit in waitPayloadEvent: " + err.message);
-                    }
-                }
-
-                this.node.report("item processor for item: " + this.itemId + " from parcel: " + this.parcelId +
-                    " :: downloadAndCommit received payload commit, state " + this.processingState.val + " itemState: " +
-                    this.record.state.val, VerboseLevel.DETAILED);
-            }*/
-
             await this.node.lock.synchronize(this.mutex, async () => {
 
                 // Commit transaction

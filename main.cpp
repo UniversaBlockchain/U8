@@ -11,7 +11,6 @@
 #include "crypto/cryptoTests.h"
 #include "serialization/SerializationTest.h"
 #include <execinfo.h>
-//#include <zconf.h>
 #include <unistd.h>
 
 using namespace std;
@@ -19,10 +18,10 @@ using namespace std;
 void usage();
 
 void handler(int sig) {
-    void *array[10];
+    void *array[100];
 
     // get void*'s for all entries on the stack
-    int size = backtrace(array, 10);
+    int size = backtrace(array, 100);
 
     // print out all the frames to stderr
     fprintf(stderr, "Error: signal %d:\n", sig);
