@@ -149,7 +149,7 @@ void JsBusyConnectionExecuteQuery(const FunctionCallbackInfo<Value> &args) {
                 onErrorPcb->Reset();
                 delete onSuccessPcb;
                 delete onErrorPcb;
-                delete pqr;
+                //delete pqr;
             });
         }, [=](const string& err){
             scripter->inPool([=](auto context) {
@@ -421,6 +421,17 @@ void JsQueryResultGetRows(const FunctionCallbackInfo<Value> &args) {
     });
 }
 
+void JsQueryResultRelease(const FunctionCallbackInfo<Value> &args) {
+    Scripter::unwrapArgs(args, [&](ArgsContext &ac) {
+        auto scripter = ac.scripter;
+        if (args.Length() != 0)
+            scripter->throwError("invalid number of arguments");
+
+        auto pqr = unwrap<db::QueryResult>(args.This());
+        delete pqr;
+    });
+}
+
 void JsInitQueryResult(Isolate *isolate, const Local<ObjectTemplate> &global) {
     // Bind object with default constructor
     Local<FunctionTemplate> tpl = bindCppClass<db::QueryResult>(isolate, "QueryResult");
@@ -434,6 +445,7 @@ void JsInitQueryResult(Isolate *isolate, const Local<ObjectTemplate> &global) {
     prototype->Set(isolate, "_getColNames", FunctionTemplate::New(isolate, JsQueryResultGetColNames));
     prototype->Set(isolate, "_getColTypes", FunctionTemplate::New(isolate, JsQueryResultGetColTypes));
     prototype->Set(isolate, "_getRows", FunctionTemplate::New(isolate, JsQueryResultGetRows));
+    prototype->Set(isolate, "_release", FunctionTemplate::New(isolate, JsQueryResultRelease));
 
     // register it into global namespace
     QueryResultTemplate.Reset(isolate, tpl);

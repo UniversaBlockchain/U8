@@ -11,7 +11,8 @@
 #include "crypto/cryptoTests.h"
 #include "serialization/SerializationTest.h"
 #include <execinfo.h>
-#include <zconf.h>
+//#include <zconf.h>
+#include <unistd.h>
 
 using namespace std;
 
