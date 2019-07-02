@@ -5,6 +5,7 @@ import {VerboseLevel} from "node_consts";
 import {Errors, ErrorRecord} from "errors";
 
 const ItemResult = require('itemresult').ItemResult;
+const NodeStats = require('nodestats').NodeStats;
 const ItemState = require('itemstate').ItemState;
 const ItemCache = require("itemcache").ItemCache;
 const NameCache = require("namecache").NameCache;
@@ -20,6 +21,8 @@ const t = require("tools");
 class Node {
 
     constructor(config, myInfo, ledger, network, nodeKey, logger) {
+        this.nodeStats = new NodeStats();
+
         this.config = config;
         this.myInfo = myInfo;
         this.ledger = ledger;
@@ -36,7 +39,6 @@ class Node {
         this.verboseLevel = VerboseLevel.NOTHING;
         this.label = "Node(" + myInfo.number + ") ";
         this.isShuttingDown = false;
-        this.sanitationFinished = new Promise(resolve => this.sanitationFinishedFire = resolve);
 
         this.processors = new t.GenericMap();
         this.parcelProcessors = new t.GenericMap();
@@ -56,6 +58,81 @@ class Node {
 
         this.pulseStartCleanup();
     }
+
+   /* dbSanitationFinished() {   //
+        this.nodeStats.init(this.ledger, this.config);
+
+        this.pulseCollectStats();
+    }
+
+    pulseCollectStats() {
+        statsCollector = executorService.scheduleAtFixedRate(() -> {
+            if(!nodeStats.collect(ledger,config)) {
+                //config changed. stats aren't collected and being reset
+                statsCollector.cancel(false);
+                statsCollector = null;
+                pulseCollectStats();
+            }
+        },config.getStatsIntervalSmall().getSeconds(),config.getStatsIntervalSmall().getSeconds(),TimeUnit.SECONDS);
+    }
+
+    pulseStartSanitation() {
+        sanitator = lowPrioExecutorService.scheduleAtFixedRate(() -> startSanitation(),
+            2000,
+            500,
+            TimeUnit.MILLISECONDS
+        );
+    }
+
+
+    startSanitation() {
+        if(this.recordsToSanitate.isEmpty()) {
+            this.sanitator.cancel(false);
+            this.dbSanitationFinished();
+            return;
+        }
+
+        for (let i = 0; i < this.sanitatingIds.size(); i++) {
+            if (!this.recordsToSanitate.containsKey(this.sanitatingIds.get(i))) { // T
+                this.sanitatingIds.remove(i);
+                --i;
+            }
+        }
+
+        /*if (this.sanitatingIds.size() < MAX_SANITATING_RECORDS) {
+            //synchronized (recordsToSanitate) {
+                for (StateRecord r : recordsToSanitate.values()) {
+                    if (r.getState() != ItemState.LOCKED && r.getState() != ItemState.LOCKED_FOR_CREATION && !sanitatingIds.contains(r.getId())) {
+                        sanitateRecord(r);
+                        sanitatingIds.add(r.getId());
+                        if (sanitatingIds.size() == MAX_SANITATING_RECORDS) {
+                            break;
+                        }
+                    }
+                }
+            //}
+            if (this.sanitatingIds.size() == 0 && this.recordsToSanitate.size() > 0) {
+                //ONLY LOCKED LEFT -> RESYNC THEM
+                synchronized (recordsToSanitate) {
+                    for (StateRecord r : recordsToSanitate.values()) {
+                        r.setState(ItemState.PENDING);
+                        try {
+                            itemLock.synchronize(r.getId(), lock -> {
+                                r.save();
+                                synchronized (cache) {
+                                    cache.update(r.getId(), new ItemResult(r));
+                                }
+                                return null;
+                            });
+                        } catch (err) {
+                            this.logger.log(err.stack);
+                            this.logger.log("process ERROR: " + err.message);
+                        }
+                    }
+                }
+            }
+        }
+    }*/
 
     pulseStartCleanup() {
         new ExecutorWithDynamicPeriod(async () => {
@@ -216,12 +293,11 @@ class Node {
      * Get environment and follower contract by environment identifier.
      *
      * @param {number} environmentId - Environment subscription.
-     *
      * @return {Object} with environment and follower contract.
      *
      */
-    getFullEnvironment(environmentId) {
-        let ime = this.getEnvironment(environmentId);
+    async getFullEnvironment(environmentId) {
+        let ime = await this.getEnvironment(environmentId);
         ime.nameCache = this.nameCache;
         let contract = ime.getContract();
         contract.nodeInfoProvider = this.nodeInfoProvider;

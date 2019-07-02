@@ -240,6 +240,14 @@ class ParcelNotification extends ItemNotification {
     }
 }
 
+/**
+ * Callback notification type
+ *
+ * COMPLETED - to notify other Universa nodes about the completion of the callback.
+ * NOT_RESPONDING - to notify other Universa nodes that follower callback server received a callback but did not respond.
+ * GET_STATE - to query the state of callback.
+ * RETURN_STATE - to return the state of callback.
+ */
 const CallbackNotificationType = {
     COMPLETED : {val: "COMPLETED", ordinal: 0},
     NOT_RESPONDING : {val: "NOT_RESPONDING", ordinal: 1},

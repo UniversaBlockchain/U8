@@ -1,4 +1,5 @@
 const NCallbackService = require("services/callbackService").NCallbackService;
+const events = require("services/contractSubscription");
 
 // array indexes for atomic synchronization counters
 const completedNodes = 0;
@@ -17,9 +18,9 @@ class CallbackRecord {
     /**
      * Create callback record.
      *
-     * @param {crypto.HashId} id is callback identifier
-     * @param {number} environmentId is environment subscription
-     * @param {FollowerCallbackState} state is callback state
+     * @param {crypto.HashId} id - Callback identifier.
+     * @param {number} environmentId - Environment subscription.
+     * @param {FollowerCallbackState} state - Callback state.
      */
     constructor(id, environmentId, state) {
         this.id = id;
@@ -38,19 +39,19 @@ class CallbackRecord {
     /**
      * Save callback record to ledger for possible synchronization.
      *
-     * @param {HashId} id is callback identifier
-     * @param {number} environmentId is environment identifier
-     * @param {Config} config is node configuration
-     * @param {number} networkNodesCount is count of nodes in Universa network
-     * @param {Ledger} ledger is node ledger
+     * @param {HashId} id - Callback identifier.
+     * @param {number} environmentId - Environment identifier.
+     * @param {Config} config - Node configuration.
+     * @param {number} networkNodesCount - Count of nodes in Universa network.
+     * @param {Ledger} ledger - Node ledger.
      */
-    static addCallbackRecordToLedger(id, environmentId, config, networkNodesCount, ledger) {
+    static async addCallbackRecordToLedger(id, environmentId, config, networkNodesCount, ledger) {
         let expiresAt = new Date();
         expiresAt.setSeconds(expiresAt.getSeconds() + config.followerCallbackExpiration + config.followerCallbackDelay * (networkNodesCount + 3));
         let storedUntil = new Date();
         storedUntil.setSeconds(storedUntil.getSeconds() + config.followerCallbackStateStoreTime);
 
-        ledger.addFollowerCallback(id, environmentId, expiresAt, storedUntil);
+        await ledger.addFollowerCallback(id, environmentId, expiresAt, storedUntil);
     }
 
     incrementCompletedNodes() {
@@ -67,23 +68,53 @@ class CallbackRecord {
         Atomics.add(this.nodesCounters, allNodes, 1);
     }
 
-    complete(node) {
-        // TODO: after Node
+    async complete(node) {
+        await node.lock.synchronize(node.callbackService, async () => {
+            // full environment
+            let fullEnvironment = await node.getFullEnvironment(environmentId);
+
+            // complete event
+            let event = new events.CompletedEvent();
+            event.getEnvironment = () => fullEnvironment.environment;
+            fullEnvironment.follower.onContractSubscriptionEvent(event);
+
+            await fullEnvironment.environment.save();
+        });
     }
 
-    fail(node) {
-        // TODO: after Node
+    async fail(node) {
+        await node.lock.synchronize(node.callbackService, async () => {
+            // full environment
+            let fullEnvironment = await node.getFullEnvironment(environmentId);
+
+            // fail event
+            let event = new events.FailedEvent();
+            event.getEnvironment = () => fullEnvironment.environment;
+            fullEnvironment.follower.onContractSubscriptionEvent(event);
+
+            await fullEnvironment.environment.save();
+        });
     }
 
-    spent(node) {
-        // TODO: after Node
+    async spent(node) {
+        await node.lock.synchronize(node.callbackService, async () => {
+            // full environment
+            let fullEnvironment = await node.getFullEnvironment(environmentId);
+
+            // spent event
+            let event = new events.SpentEvent();
+            event.getEnvironment = () => fullEnvironment.environment;
+            fullEnvironment.follower.onContractSubscriptionEvent(event);
+
+            await fullEnvironment.environment.save();
+        });
     }
 
     /**
      * Set network consensus needed for synchronize callback state. And set limit of network nodes count needed for
      * delete callback record (if 80% network nodes respond, but the state of the callback cannot be synchronized).
      *
-     * @param {number} nodesCount is count of nodes in Universa network
+     * @param {number} nodesCount - Count of nodes in Universa network.
      */
     setConsensusAndLimit(nodesCount) {
         this.consensus = Math.ceil((nodesCount - 1) * 0.51);
@@ -95,29 +126,28 @@ class CallbackRecord {
      * synchronized if the number of notifications from Universa nodes with states COMPLETED or FAILED reached
      * a given consensus.
      *
-     * @param {FollowerCallbackState} newState is callback state received from notification
-     * @param {Ledger} ledger is node ledger
-     * @param {Node} node is Universa node
-     *
-     * @return {boolean} true if callback state is synchronized
+     * @param {FollowerCallbackState} newState - Callback state received from notification.
+     * @param {Ledger} ledger - Node ledger.
+     * @param {Node} node - Universa node.
+     * @return {boolean} true if callback state is synchronized.
      */
-    synchronizeState(newState, ledger, node) {
+    async synchronizeState(newState, ledger, node) {
         if (newState === FollowerCallbackState.COMPLETED) {
             if (this.incrementCompletedNodes() >= this.consensus) {
                 if (this.state === FollowerCallbackState.STARTED)
-                    this.complete(node);
+                    await this.complete(node);
                 else if (this.state === FollowerCallbackState.EXPIRED)
-                    this.spent(node);
+                    await this.spent(node);
 
-                ledger.updateFollowerCallbackState(this.id, FollowerCallbackState.COMPLETED);
+                await ledger.updateFollowerCallbackState(this.id, FollowerCallbackState.COMPLETED);
                 return true;
             }
         } else if ((newState === FollowerCallbackState.FAILED) || (newState === FollowerCallbackState.EXPIRED)) {
             if (this.incrementFailedNodes() >= this.consensus) {
                 if (this.state === FollowerCallbackState.STARTED)
-                    this.fail(node);
+                    await this.fail(node);
 
-                ledger.updateFollowerCallbackState(this.id, FollowerCallbackState.FAILED);
+                await ledger.updateFollowerCallbackState(this.id, FollowerCallbackState.FAILED);
                 return true;
             }
         } else
@@ -135,31 +165,30 @@ class CallbackRecord {
      * If reached the nodes limit for ending synchronization (but the state of the callback cannot be synchronized),
      * callback record removes from ledger.
      *
-     * @param {Ledger} ledger is node ledger
-     * @param {Node} node is Universa node
-     *
-     * @return {boolean} true if callback synchronization is ended
+     * @param {Ledger} ledger - Node ledger.
+     * @param {Node} node - Universa node.
+     * @return {boolean} true if callback synchronization is ended.
      */
-    endSynchronize(ledger, node) {
+    async endSynchronize(ledger, node) {
         if (this.expiresAt != null && this.expiresAt.getTime() > Date.now())
             return false;
 
         // final (additional) check for consensus of callback state
         if (Atomics.load(this.nodesCounters, completedNodes) >= this.consensus) {
             if (this.state === FollowerCallbackState.STARTED)
-                this.complete(node);
+                await this.complete(node);
             else if (this.state === FollowerCallbackState.EXPIRED)
-                this.spent(node);
+                await this.spent(node);
 
-            ledger.updateFollowerCallbackState(this.id, FollowerCallbackState.COMPLETED);
+            await ledger.updateFollowerCallbackState(this.id, FollowerCallbackState.COMPLETED);
         } else if (Atomics.load(this.nodesCounters, failedNodes) >= this.consensus) {
             if (this.state === FollowerCallbackState.STARTED)
-                this.fail(node);
+                await this.fail(node);
 
-            ledger.updateFollowerCallbackState(this.id, FollowerCallbackState.FAILED);
+            await ledger.updateFollowerCallbackState(this.id, FollowerCallbackState.FAILED);
         } else if (Atomics.load(this.nodesCounters, allNodes) >= this.limit)
             // remove callback if synchronization is impossible
-            ledger.removeFollowerCallback(this.id);
+            await ledger.removeFollowerCallback(this.id);
 
         return true;
     }
