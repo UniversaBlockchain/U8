@@ -450,7 +450,12 @@ namespace db {
 
     void PGPool::withConnection(WithConnectionCallbackJs callback) {
         poolControlThread_.execute([callback, this]() {
-            callback(getUnusedConnection());
+            auto con = getUnusedConnection();
+            if (con != nullptr) {
+                callback(con);
+            } else {
+                //cerr << "PGPool warning: withConnection was called on closed pool" << endl;
+            }
         });
     }
 
@@ -477,6 +482,8 @@ namespace db {
         while (connPool_.empty())
             poolCV_.wait(lock);
         auto con = connPool_.front();
+        if (con == nullptr)
+            return nullptr;
         connPool_.pop();
         usedConnections_[con->getId()] = con;
         return con;
