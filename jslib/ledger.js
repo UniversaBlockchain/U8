@@ -1236,7 +1236,7 @@ class Ledger {
     /**
      * Search for unfinished items in Ledger.
      *
-     * @return {Promise<Map<HashId, StateRecord>>} from incomplete records.
+     * @return {Promise<GenericMap<HashId, StateRecord>>} from incomplete records.
      */
     findUnfinished() {
         return new Promise(async(resolve, reject) => {

@@ -35,6 +35,9 @@ class ResyncProcessor {
     }
 
     async startResync() {
+        if (this.node.ledger == null)
+            return;
+
         this.node.report("ResyncProcessor.startResync(itemId=" + this.itemId + ")", VerboseLevel.BASE);
 
         this.resyncExpiresAt = Math.floor(Date.now() / 1000) + Config.maxResyncTime;

@@ -18,11 +18,11 @@ const NodeInfoProvider = require("services/NSmartContract").NodeInfoProvider;
 const Lock = require("lock").Lock;
 const t = require("tools");
 
+const MAX_SANITATING_RECORDS = 64;
+
 class Node {
 
     constructor(config, myInfo, ledger, network, nodeKey, logger) {
-        this.nodeStats = new NodeStats();
-
         this.config = config;
         this.myInfo = myInfo;
         this.ledger = ledger;
@@ -56,83 +56,35 @@ class Node {
 
         this.callbackService = null;
 
+        this.sanitator = null;
+        this.sanitatingIds = new t.GenericSet();
+
+        this.nodeStats = new NodeStats();
+        this.statsCollector = null;
+
         this.pulseStartCleanup();
     }
 
-   /* dbSanitationFinished() {   //
-        this.nodeStats.init(this.ledger, this.config);
+    async run() {
+        this.recordsToSanitate = await this.ledger.findUnfinished();
+        this.logger.log(this.label + "records to sanitation: " + this.recordsToSanitate.size);
 
-        this.pulseCollectStats();
+        //if (this.recordsToSanitate.size > 0)
+        //    this.pulseStartSanitation();
+        //else
+        //    this.dbSanitationFinished();
+
+        // TODO: callbackService
+
+        return this;
     }
 
-    pulseCollectStats() {
-        statsCollector = executorService.scheduleAtFixedRate(() -> {
-            if(!nodeStats.collect(ledger,config)) {
-                //config changed. stats aren't collected and being reset
-                statsCollector.cancel(false);
-                statsCollector = null;
-                pulseCollectStats();
-            }
-        },config.getStatsIntervalSmall().getSeconds(),config.getStatsIntervalSmall().getSeconds(),TimeUnit.SECONDS);
+    shutdown() {
+        this.isShuttingDown = true;
+        // TODO: processors
+        this.executorService.shutdown();
+        this.cache.shutdown();
     }
-
-    pulseStartSanitation() {
-        sanitator = lowPrioExecutorService.scheduleAtFixedRate(() -> startSanitation(),
-            2000,
-            500,
-            TimeUnit.MILLISECONDS
-        );
-    }
-
-
-    startSanitation() {
-        if(this.recordsToSanitate.isEmpty()) {
-            this.sanitator.cancel(false);
-            this.dbSanitationFinished();
-            return;
-        }
-
-        for (let i = 0; i < this.sanitatingIds.size(); i++) {
-            if (!this.recordsToSanitate.containsKey(this.sanitatingIds.get(i))) { // T
-                this.sanitatingIds.remove(i);
-                --i;
-            }
-        }
-
-        /*if (this.sanitatingIds.size() < MAX_SANITATING_RECORDS) {
-            //synchronized (recordsToSanitate) {
-                for (StateRecord r : recordsToSanitate.values()) {
-                    if (r.getState() != ItemState.LOCKED && r.getState() != ItemState.LOCKED_FOR_CREATION && !sanitatingIds.contains(r.getId())) {
-                        sanitateRecord(r);
-                        sanitatingIds.add(r.getId());
-                        if (sanitatingIds.size() == MAX_SANITATING_RECORDS) {
-                            break;
-                        }
-                    }
-                }
-            //}
-            if (this.sanitatingIds.size() == 0 && this.recordsToSanitate.size() > 0) {
-                //ONLY LOCKED LEFT -> RESYNC THEM
-                synchronized (recordsToSanitate) {
-                    for (StateRecord r : recordsToSanitate.values()) {
-                        r.setState(ItemState.PENDING);
-                        try {
-                            itemLock.synchronize(r.getId(), lock -> {
-                                r.save();
-                                synchronized (cache) {
-                                    cache.update(r.getId(), new ItemResult(r));
-                                }
-                                return null;
-                            });
-                        } catch (err) {
-                            this.logger.log(err.stack);
-                            this.logger.log("process ERROR: " + err.message);
-                        }
-                    }
-                }
-            }
-        }
-    }*/
 
     pulseStartCleanup() {
         new ExecutorWithDynamicPeriod(async () => {
@@ -151,21 +103,58 @@ class Node {
         }, Config.expriedNamesCleanupInterval * 1000, this.executorService).run();
     }
 
-    async run() {
-        this.recordsToSanitate = await this.ledger.findUnfinished();
-        this.logger.log(this.label + "records to sanitation: " + this.recordsToSanitate.size);
+    dbSanitationFinished() {
+        //this.nodeStats.init(this.ledger, this.config);
 
-        // TODO: sanitation
-        // TODO: callbackService
-
-        return this;
+        //this.pulseCollectStats();
     }
 
-    shutdown() {
-        this.isShuttingDown = true;
-        // TODO: processors
-        this.executorService.shutdown();
-        this.cache.shutdown();
+    pulseCollectStats() {
+        this.statsCollector = new ExecutorWithFixedPeriod(async () => {
+            if (!await this.nodeStats.collect(this.ledger, this.config)) {
+                //config changed. stats aren't collected and being reset
+                this.statsCollector.cancel();
+                this.statsCollector = null;
+                this.pulseCollectStats();
+            }
+        }, this.config.statsIntervalSmall * 1000, this.executorService).run();
+    }
+
+    pulseStartSanitation() {
+        this.sanitator = new ExecutorWithDynamicPeriod(async () => await this.startSanitation(), [2000, 500], this.executorService).run();
+    }
+
+    async startSanitation() {
+        if (this.recordsToSanitate.size === 0) {
+            this.sanitator.cancel();
+            this.dbSanitationFinished();
+            return;
+        }
+
+        this.sanitatingIds.forEach(id => {
+            if (!this.recordsToSanitate.has(id))
+                this.sanitatingIds.delete(id);
+        });
+
+        if (this.sanitatingIds.size < MAX_SANITATING_RECORDS) {
+            await this.lock.synchronize("recordsToSanitate", async () => {
+                for (let r of this.recordsToSanitate.values())
+                    if (r.state !== ItemState.LOCKED && r.state !== ItemState.LOCKED_FOR_CREATION &&
+                        r.state !== ItemState.LOCKED_FOR_CREATION_REVOKED && !this.sanitatingIds.has(r.id)) {
+                        await this.sanitateRecord(r);
+                        this.sanitatingIds.add(r.id);
+
+                        if (this.sanitatingIds.size === MAX_SANITATING_RECORDS)
+                            break;
+                    }
+            });
+
+            if (this.sanitatingIds.size === 0 && this.recordsToSanitate.size > 0) {
+                //ONLY LOCKED LEFT
+                this.logger.log(this.label + "Locked items left after sanitation: " + this.recordsToSanitate.size);
+                this.recordsToSanitate.clear();
+            }
+        }
     }
 
     /**
@@ -739,8 +728,8 @@ class Node {
                 return;
             await this.resync(r.id);
         } catch (err) {
-            this.logger.log(err.message);
             this.logger.log(err.stack);
+            this.logger.log("sanitateRecord error: " + err.message);
         }
     }
 
@@ -756,49 +745,51 @@ class Node {
         let idsToRemove = new t.GenericSet();
         for (let r of this.recordsToSanitate.values()) {
             if (r.lockedByRecordId === record.recordId) {
-                try {
-                    if (record.state === ItemState.APPROVED) {
-                        //ITEM APPROVED. LOCKED -> REVOKED, LOCKED_FOR_CREATION -> APPROVED
-                        if (r.state === ItemState.LOCKED) {
-                            await r.revoke();
-                            idsToRemove.add(r.id);
-                        } else if (r.state === ItemState.LOCKED_FOR_CREATION) {
-                            await r.approve();
-                            idsToRemove.add(r.id);
+                await this.lock.synchronize(r.id, async () => {
+                    try {
+                        if (record.state === ItemState.APPROVED) {
+                            //ITEM APPROVED. LOCKED -> REVOKED, LOCKED_FOR_CREATION -> APPROVED
+                            if (r.state === ItemState.LOCKED) {
+                                await r.revoke(undefined, true);
+                                idsToRemove.add(r.id);
+                            } else if (r.state === ItemState.LOCKED_FOR_CREATION) {
+                                await r.approve(undefined, undefined, true);
+                                idsToRemove.add(r.id);
+                            }
+                        } else if (record.state === ItemState.DECLINED) {
+                            //ITEM REJECTED. LOCKED -> APPROVED, LOCKED_FOR_CREATION -> REMOVE
+                            if (r.state === ItemState.LOCKED) {
+                                await r.approve(undefined, undefined, true);
+                                idsToRemove.add(r.id);
+                            } else if (r.state === ItemState.LOCKED_FOR_CREATION) {
+                                await r.destroy();
+                                idsToRemove.add(r.id);
+                            }
+                        } else if (record.state === ItemState.REVOKED) {
+                            //ITEM APPROVED AND THEN REVOKED. LOCKED -> REVOKED, LOCKED_FOR_CREATION -> APPROVED
+                            if (r.state === ItemState.LOCKED) {
+                                await r.revoke(undefined, true);
+                                idsToRemove.add(r.id);
+                            } else if (r.state === ItemState.LOCKED_FOR_CREATION) {
+                                await r.approve(undefined, undefined, true);
+                                idsToRemove.add(r.id);
+                            }
+                        } else if (record.state === ItemState.UNDEFINED) {
+                            //ITEM UNDEFINED. LOCKED -> APPROVED, LOCKED_FOR_CREATION -> REMOVE
+                            if (r.state === ItemState.LOCKED) {
+                                await r.approve(undefined, undefined, true);
+                                idsToRemove.add(r.id);
+                            } else if (r.state === ItemState.LOCKED_FOR_CREATION) {
+                                await r.destroy();
+                                idsToRemove.add(r.id);
+                            }
                         }
-                    } else if (record.state === ItemState.DECLINED) {
-                        //ITEM REJECTED. LOCKED -> APPROVED, LOCKED_FOR_CREATION -> REMOVE
-                        if (r.state === ItemState.LOCKED) {
-                            await r.approve();
-                            idsToRemove.add(r.id);
-                        } else if (r.state === ItemState.LOCKED_FOR_CREATION) {
-                            await r.destroy();
-                            idsToRemove.add(r.id);
-                        }
-                    } else if (record.state === ItemState.REVOKED) {
-                        //ITEM APPROVED AND THEN REVOKED. LOCKED -> REVOKED, LOCKED_FOR_CREATION -> APPROVED
-                        if (r.state === ItemState.LOCKED) {
-                            await r.revoke();
-                            idsToRemove.add(r.id);
-                        } else if (r.state === ItemState.LOCKED_FOR_CREATION) {
-                            await r.approve();
-                            idsToRemove.add(r.id);
-                        }
-                    } else if (record.state === ItemState.UNDEFINED) {
-                        //ITEM UNDEFINED. LOCKED -> APPROVED, LOCKED_FOR_CREATION -> REMOVE
-                        if (r.state === ItemState.LOCKED) {
-                            await r.approve();
-                            idsToRemove.add(r.id);
-                        } else if (r.state === ItemState.LOCKED_FOR_CREATION) {
-                            await r.destroy();
-                            idsToRemove.add(r.id);
-                        }
-                    }
 
-                } catch (err) {
-                    this.logger.log(err.message);
-                    this.logger.log(err.stack);
-                }
+                    } catch (err) {
+                        this.logger.log(err.stack);
+                        this.logger.log("removeLocks error: " + err.message);
+                    }
+                });
             }
         }
 
