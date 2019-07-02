@@ -329,9 +329,11 @@ class AsyncEvent {
 
     async await(milliseconds = 0) {
         if (!this.fired) {
-            if (milliseconds > 0)
-                this.timer = new ScheduleExecutor(() => this.rejectCallback(new EventTimeoutError()),
+            if (milliseconds > 0) {
+                let tError = new EventTimeoutError("Timeout error after " + milliseconds + " ms");
+                this.timer = new ScheduleExecutor(() => this.rejectCallback(tError),
                     milliseconds, this.es).run();
+            }
 
             return await this.event;
         }

@@ -470,12 +470,17 @@ class NetworkV2 extends Network {
 
         let fire = null;
         let event = new Promise((resolve) => {fire = resolve});
+        let err = null;
 
-        client.command("getState", {itemId: id}, (result) => fire(result), () => fire(null));
+        client.command("getState", {itemId: id}, (result) => fire(result), (error) => {
+            err = error;
+            fire(null);
+        });
 
         let result = await event;
         if (result == null || result.itemResult == null)
-            this.report("getItemState failure. from: " + nodeInfo.number + " command error occurred", VerboseLevel.BASE);
+            this.report("getItemState failure. from: " + nodeInfo.number + " command error occurred" +
+                (err != null ? ": " + JSON.stringify(err) : ""), VerboseLevel.BASE);
         else if (result.itemResult instanceof ItemResult)
             return result.itemResult;
         else if (typeof result.itemResult === "string")

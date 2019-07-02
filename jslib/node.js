@@ -337,19 +337,21 @@ class Node {
                     new ParcelNotification(this.myInfo, notification.itemId, null, x, false, notType));
 
         } else if (x instanceof ItemProcessor) {
-            // we might still need to download and process it
-            if (notification.itemResult.haveCopy)
-                x.addToSources(notification.from);
+            await this.lock.synchronize(notification.itemId, async () => {
+                // we might still need to download and process it
+                if (notification.itemResult.haveCopy)
+                    x.addToSources(notification.from);
 
-            if (notification.itemResult.state !== ItemState.PENDING)
-                await x.vote(notification.from, notification.itemResult.state);
-            else
-                this.logger.log("pending vote on item " + notification.itemId + " from " + notification.from);
+                if (notification.itemResult.state !== ItemState.PENDING)
+                    x.vote(notification.from, notification.itemResult.state);
+                else
+                    this.logger.log("pending vote on item " + notification.itemId + " from " + notification.from);
 
-            // We answer only if (1) answer is requested and (2) we have position on the subject:
-            if (notification.requestResult && x.record.state !== ItemState.PENDING)
-                this.network.deliver(notification.from,
-                    new ParcelNotification(this.myInfo, notification.itemId, null, x.getResult(), x.needsVoteFrom(notification.from), notType));
+                // We answer only if (1) answer is requested and (2) we have position on the subject:
+                if (notification.requestResult && x.record.state !== ItemState.PENDING)
+                    this.network.deliver(notification.from,
+                        new ParcelNotification(this.myInfo, notification.itemId, null, x.getResult(), x.needsVoteFrom(notification.from), notType));
+            });
         }
     }
 
@@ -386,7 +388,7 @@ class Node {
                             x.addToSources(notification.from);
 
                         if (resultVote.state !== ItemState.PENDING)
-                            await x.vote(notification.from, resultVote.state, notification.type.isU);
+                            x.vote(notification.from, resultVote.state, notification.type.isU);
                         else
                             this.logger.log("pending vote on parcel " + notification.parcelId + " and item " +
                                 notification.itemId + " from " + notification.from);
@@ -524,14 +526,18 @@ class Node {
      *                      Default is false. Use ItemProcessor.forceChecking() to start waiting item checking.
      * @param {boolean} ommitItemResult - Do not return ItemResult for processed item,
      *                        create new ItemProcessor instead (if autoStart is true). Default is false.
+     * @param {ParcelProcessor} parcelProcessor - Parent parcel processor for synchronize payment and payload. Default is null.
+     * @param {boolean} isPayment - True if item is payment. Default is false.
      *
      * @return {ItemResult| ItemProcessor | ResyncProcessor} instance of ItemProcessor if the item is being processed (also if it was started by the call),
      *         ItemResult if it is already processed or can't be processed, say, created_at field is too far in
      *         the past, in which case result state will be ItemState#DISCARDED.
      */
-    async checkItemInternal(itemId, parcelId = null, item = null, autoStart = false, forceChecking = false, ommitItemResult = false) {
+    async checkItemInternal(itemId, parcelId = null, item = null, autoStart = false, forceChecking = false, ommitItemResult = false, parcelProcessor = null, isPayment = false) {
         try {
             this.report("checkItemInternal: " + itemId, VerboseLevel.BASE);
+
+            //console.error(this.label + "checkItemInternal autoStart = " + autoStart + " STACK:" + new Error().stack);
 
             return await this.lock.synchronize(itemId, async () => {
 
@@ -578,7 +584,7 @@ class Node {
 
                     this.report("checkItemInternal: " + itemId + "nothing found, will create item processor",
                         VerboseLevel.BASE);
-                    let processor = await new ItemProcessor(itemId, parcelId, item, forceChecking, this).run();
+                    let processor = await new ItemProcessor(itemId, parcelId, item, forceChecking, this, parcelProcessor, isPayment).run();
                     this.processors.set(itemId, processor);
                     return processor;
 
@@ -609,6 +615,8 @@ class Node {
      */
     async checkParcelInternal(parcelId, parcel = null, autoStart = false) {
         try {
+            this.report("checkParcelInternal: " + parcelId, VerboseLevel.BASE);
+
             return await this.lock.synchronize(parcelId, async () => {
                 // let's look existing parcel processor
                 let processor = this.parcelProcessors.get(parcelId);

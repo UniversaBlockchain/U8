@@ -19,8 +19,8 @@ class PgDriverPool extends db.SqlDriverPool {
     }
 
     withConnection(callback) {
-        this.pool._withConnection((con)=>{
-            callback(new PgDriverConnection(con));
+        this.pool._withConnection(async (con)=>{
+            await callback(new PgDriverConnection(con));
         });
     }
 
@@ -89,18 +89,19 @@ class PgDriverConnection extends db.SqlDriverConnection {
     }
 
     executeQuery(onSuccess, onError, queryString, ...params) {
-        this.con._executeQuery((qr)=>{
-            onSuccess(new PgDriverResultSet(qr));
-        }, (errText)=>{
-            onError(new db.DatabaseError(errText));
+        this.con._executeQuery(async (qr)=>{
+            await onSuccess(new PgDriverResultSet(qr));
+            qr._release();
+        }, async (errText)=>{
+            await onError(new db.DatabaseError(errText));
         }, queryString, params);
     }
 
     executeUpdate(onSuccess, onError, queryString, ...params) {
-        this.con._executeUpdate((affectedRows)=>{
-            onSuccess(affectedRows);
-        }, (errText)=>{
-            onError(new db.DatabaseError(errText));
+        this.con._executeUpdate(async (affectedRows)=>{
+            await onSuccess(affectedRows);
+        }, async (errText)=>{
+            await onError(new db.DatabaseError(errText));
         }, queryString, params);
     }
 

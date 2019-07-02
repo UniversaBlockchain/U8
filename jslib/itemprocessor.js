@@ -119,6 +119,8 @@ class ItemProcessor {
         this.downloadedEvent = new AsyncEvent(this.node.executorService);
         this.doneEvent = new AsyncEvent(this.node.executorService);
         this.removedEvent = new Promise(resolve => this.removedFire = resolve);
+        this.itemCommitEvent = new AsyncEvent(this.node.executorService);
+        this.parcelCommitEvent = new AsyncEvent(this.node.executorService);
 
         this.downloader = null;
         this.poller = null;
@@ -152,6 +154,9 @@ class ItemProcessor {
     }
 
     async download() {
+        if (this.downloader == null)
+            return;
+
         if (this.processingState.canContinue) {
             while (!this.isPollingExpired() && this.item == null) {
                 if (this.sources.size === 0) {
@@ -305,7 +310,7 @@ class ItemProcessor {
                     this.item.errors.push(new ErrorRecord(Errors.FAILURE, this.item.id.toString(),
                         "Not enough payment for process item (quantas limit)"));
                     this.node.informer.inform(this.item);
-                    await this.emergencyBreak();
+                    this.emergencyBreak();
                     return;
 
                 } else {
@@ -506,12 +511,12 @@ class ItemProcessor {
                     } catch (err) {
                         this.node.logger.log(err.stack);
                         this.node.logger.log("commitCheckedAndStartPolling error: " + err.message);
-                        await this.emergencyBreak();
+                        this.emergencyBreak();
                         return false;
                     }
                 } else {
                     this.node.logger.log("commitCheckedAndStartPolling: checked item state should be ItemState.PENDING");
-                    await this.emergencyBreak();
+                    this.emergencyBreak();
                 }
 
                 return true;
@@ -521,7 +526,7 @@ class ItemProcessor {
             if (!this.processingState.isProcessedToConsensus)
                 this.processingState = ItemProcessingState.POLLING;
 
-            await this.vote(this.node.myInfo, this.record.state);
+            this.vote(this.node.myInfo, this.record.state);
             this.broadcastMyState();
             this.pulseStartPolling();
         }
@@ -591,7 +596,7 @@ class ItemProcessor {
     }
 
     async sendStartPollingNotification() {
-        if (!this.processingState.canContinue)
+        if (!this.processingState.canContinue || this.poller == null)
             return;
 
         if (!this.processingState.isProcessedToConsensus) {
@@ -601,7 +606,7 @@ class ItemProcessor {
 
                 this.stopPoller();
                 this.stopDownloader();
-                await this.rollbackChanges();
+                this.rollback();
                 return;
             }
 
@@ -615,7 +620,7 @@ class ItemProcessor {
         }
     }
 
-    async vote(node, state) {
+    vote(node, state) {
         if (!this.processingState.canContinue)
             return;
 
@@ -663,7 +668,7 @@ class ItemProcessor {
         if (positiveConsensus)
             this.approveAndCommit();
         else if (negativeConsensus)
-            await this.rollbackChanges(true);
+            this.rollback(true);
         else
             throw new Error("error: consensus reported without consensus");
     }
@@ -794,6 +799,8 @@ class ItemProcessor {
         if (!this.processingState.canContinue)
             return;
 
+        let success = true;
+
         // it may happen that consensus is found earlier than item is download
         // we still need item to fix all its relations:
         try {
@@ -807,8 +814,9 @@ class ItemProcessor {
             }
 
             await this.node.lock.synchronize(this.mutex, async () => {
+
                 // Commit transaction
-                await this.node.ledger.transaction(async(con) => {
+                let commitBlock = async(con) => {
                     // first, commit all new items
                     await this.downloadAndCommitNewItemsOf(this.item, con);
 
@@ -870,22 +878,39 @@ class ItemProcessor {
 
                     // update item's smart contracts link to
                     await this.notifyContractSubscribers(this.item, this.record.state, con);
-                });
+                };
+
+                if (this.parcelId != null) {
+                    this.itemCommitEvent.fire({
+                        block: commitBlock,
+                        success: true
+                    });
+
+                    this.node.report("item processor for item: " + this.itemId + " from parcel: " + this.parcelId +
+                        " :: downloadAndCommit fired event with commit block, state " + this.processingState.val + " itemState: " +
+                        this.record.state.val, VerboseLevel.BASE);
+
+                    success = await this.parcelCommitEvent.await();
+
+                } else
+                    await this.node.ledger.transaction(commitBlock);
             });
 
-            new ScheduleExecutor(() => this.node.checkSpecialItem(this.item), 100, this.node.executorService).run();
+            if (success) {
+                new ScheduleExecutor(() => this.node.checkSpecialItem(this.item), 100, this.node.executorService).run();
 
-            if (this.resyncingItems.size > 0) {
-                this.processingState = ItemProcessingState.RESYNCING;
-                await this.startResync();
-                return;
+                if (this.resyncingItems.size > 0) {
+                    this.processingState = ItemProcessingState.RESYNCING;
+                    await this.startResync();
+                    return;
+                }
             }
 
         } catch (err) {
             if (err instanceof DatabaseError) {
                 this.node.logger.log(err.stack);
                 this.node.logger.log("DatabaseError downloadAndCommit in transaction: " + err.message);
-                await this.emergencyBreak();
+                this.emergencyBreak();
                 return;
 
             } else if (err instanceof EventTimeoutError) {
@@ -1020,6 +1045,14 @@ class ItemProcessor {
         }
     }
 
+    rollback(doDecline = false) {
+        this.node.report("item processor for item: " + this.itemId + " from parcel: " + this.parcelId +
+            " :: rollback, state " + this.processingState.val + " itemState: " + this.record.state.val,
+            VerboseLevel.BASE);
+
+        new ScheduleExecutor(async () => await this.rollbackChanges(doDecline), 0, this.node.executorService).run();
+    }
+
     async rollbackChanges(doDecline = false) {
         this.node.report("item processor for item: " + this.itemId + " from parcel: " + this.parcelId +
             " :: rollbackChanges, state " + this.processingState.val + " :: itemState: " + this.record.state.val,
@@ -1028,7 +1061,7 @@ class ItemProcessor {
         await this.node.lock.synchronize(this.mutex, async () => {
             try {
                 // Rollback transaction
-                await this.node.ledger.transaction(async (con) => {
+                let rollbackBlock = async (con) => {
                     await Promise.all(Array.from(this.lockedToRevoke).map(async (r) =>
                         await this.node.lock.synchronize(r.id, async () => {
                             await r.unlock(con);
@@ -1063,7 +1096,23 @@ class ItemProcessor {
                             this.node.cache.update(this.itemId, this.getResult());
                     } else
                         await this.record.destroy(con);
-                });
+                };
+
+                if (this.parcelId != null) {
+                    this.itemCommitEvent.fire({
+                        block: rollbackBlock,
+                        success: false
+                    });
+
+                    this.node.report("item processor for item: " + this.itemId + " from parcel: " + this.parcelId +
+                        " :: rollbackChanges fired event with rollback block, state " + this.processingState.val + " itemState: " +
+                        this.record.state.val, VerboseLevel.BASE);
+
+                    await this.parcelCommitEvent.await();
+
+                } else
+                    await this.node.ledger.transaction(rollbackBlock);
+
             } catch (err) {
                 if (err instanceof DatabaseError) {
                     this.node.logger.log(err.stack);
@@ -1102,12 +1151,13 @@ class ItemProcessor {
         this.processingState = ItemProcessingState.SENDING_CONSENSUS;
 
         if (this.consensusReceivedChecker == null)
-            this.consensusReceivedChecker = new ExecutorWithDynamicPeriod(async () => await this.sendNewConsensusNotification(),
+            this.consensusReceivedChecker = new ExecutorWithDynamicPeriod(() => this.sendNewConsensusNotification(),
                 Config.consensusReceivedCheckTime, this.node.executorService).run();
     }
 
-    async sendNewConsensusNotification() {
-        if (!this.processingState.canContinue || this.processingState === ItemProcessingState.FINISHED)
+    sendNewConsensusNotification() {
+        if (!this.processingState.canContinue || this.processingState === ItemProcessingState.FINISHED ||
+            this.consensusReceivedChecker == null)
             return;
 
         if (this.isConsensusReceivedExpired()) {
@@ -1132,7 +1182,7 @@ class ItemProcessor {
                 if (!this.node.myInfo.equals(node))
                     this.node.network.deliver(node, notification);
                 else if (this.processingState.isProcessedToConsensus)
-                    await this.vote(this.node.myInfo, this.record.state);
+                    this.vote(this.node.myInfo, this.record.state);
             }
     }
 
@@ -1157,8 +1207,10 @@ class ItemProcessor {
     }
 
     stopConsensusReceivedChecker() {
-        if (this.consensusReceivedChecker != null)
+        if (this.consensusReceivedChecker != null) {
             this.consensusReceivedChecker.cancel();
+            this.consensusReceivedChecker = null;
+        }
     }
 
     //******************** resync section ********************//
@@ -1253,7 +1305,7 @@ class ItemProcessor {
     /**
      * Emergency break all processes and remove self.
      */
-    async emergencyBreak() {
+    emergencyBreak() {
         this.node.report("item processor for item: " + this.itemId + " from parcel: " + this.parcelId +
             " :: emergencyBreak, state " + this.processingState.val + " itemState: " + this.record.state.val,
             VerboseLevel.BASE);
@@ -1271,7 +1323,7 @@ class ItemProcessor {
                 ri.closeByTimeout();
 
         if (doRollback)
-            await this.rollbackChanges();
+            this.rollback();
         else
             this.close();
 
