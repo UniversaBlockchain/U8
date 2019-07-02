@@ -7,6 +7,7 @@
 #include "async_io_bindings.h"
 #include "binding_tools.h"
 #include "../tools/tools.h"
+#include "../tools/Semaphore.h"
 #include "../AsyncIO/IOFile.h"
 #include "../AsyncIO/IODir.h"
 #include "../AsyncIO/IOTCP.h"
@@ -451,7 +452,9 @@ void JsAsyncUDPRecv(const FunctionCallbackInfo<Value> &args) {
         args.This()->Set(String::NewFromUtf8(ac.isolate, "_pcb"), BigInt::NewFromUnsigned(ac.isolate, (uint64_t) pcb));
 
         handle->recv([=](ssize_t result, const byte_vector& data, const char* IP, unsigned int port) {
-            std::string strIP = IP;
+            //std::string strIP = IP;
+            Semaphore *sem = new Semaphore();
+
             // here we are in the async dispatcher thread we should not lock:
             scripter->inPool([=](auto context) {
                 Isolate *isolate = context->GetIsolate();
@@ -470,7 +473,7 @@ void JsAsyncUDPRecv(const FunctionCallbackInfo<Value> &args) {
                         auto pBuffer = new Persistent<ArrayBuffer>(isolate, ab);
 
                         Local<Value> res[4]{pResult->Get(isolate), Integer::New(isolate, result),
-                                            String::NewFromUtf8(isolate, strIP.data()), Integer::New(isolate, port)};
+                                            String::NewFromUtf8(isolate, IP), Integer::New(isolate, port)};
                         auto unused = fn->Call(context, fn, 4, res);
 
                         pResult->Reset();
@@ -483,9 +486,13 @@ void JsAsyncUDPRecv(const FunctionCallbackInfo<Value> &args) {
                         auto unused = fn->Call(context, fn, 4, res);
                     }
                 }
+                sem->notify();
                 // delete after stopping recv:
                 //delete pcb;
             });
+
+            if (!sem->wait(1s))
+                scripter->throwError("IOUDP::recv callback timeout");
         });
     });
 }

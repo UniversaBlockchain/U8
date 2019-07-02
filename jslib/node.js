@@ -537,8 +537,6 @@ class Node {
         try {
             this.report("checkItemInternal: " + itemId, VerboseLevel.BASE);
 
-            //console.error(this.label + "checkItemInternal autoStart = " + autoStart + " STACK:" + new Error().stack);
-
             return await this.lock.synchronize(itemId, async () => {
 
                 let ip = this.processors.get(itemId);

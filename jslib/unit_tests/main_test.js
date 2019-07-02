@@ -308,12 +308,13 @@ unit.test("main_test: resyncBreak", async () => {
     await ts.shutdown();
 });
 
+const NOLOG = true;
 const WAIT_TIMEOUT = 10000;
 
 unit.test("main_test: register item", async () => {
     let key = new PrivateKey(await io.fileGetContentsAsBytes("../test/keys/reconfig_key.private.unikey"));
 
-    let ts = await new TestSpace(key).create(/*false*/);
+    let ts = await new TestSpace(key).create(NOLOG);
 
     for (let i = 0; i < 4; i++) {
         ts.nodes[i].setVerboseLevel(VerboseLevel.DETAILED);
@@ -360,7 +361,7 @@ unit.test("main_test: register item", async () => {
 unit.test("main_test: register bad item", async () => {
     let key = new PrivateKey(await io.fileGetContentsAsBytes("../test/keys/reconfig_key.private.unikey"));
 
-    let ts = await new TestSpace(key).create(/*false*/);
+    let ts = await new TestSpace(key).create(NOLOG);
 
     for (let i = 0; i < 4; i++) {
         ts.nodes[i].setVerboseLevel(VerboseLevel.DETAILED);
@@ -415,7 +416,7 @@ unit.test("main_test: register bad item", async () => {
 unit.test("main_test: register parcel", async () => {
     let key = new PrivateKey(await io.fileGetContentsAsBytes("../test/keys/reconfig_key.private.unikey"));
 
-    let ts = await new TestSpace(key).create();
+    let ts = await new TestSpace(key).create(NOLOG);
 
     for (let i = 0; i < 4; i++) {
         ts.nodes[i].setVerboseLevel(VerboseLevel.DETAILED);
@@ -488,7 +489,7 @@ unit.test("main_test: register parcel", async () => {
 unit.test("main_test: register parcel with bad payload", async () => {
     let key = new PrivateKey(await io.fileGetContentsAsBytes("../test/keys/reconfig_key.private.unikey"));
 
-    let ts = await new TestSpace(key).create();
+    let ts = await new TestSpace(key).create(NOLOG);
 
     for (let i = 0; i < 4; i++) {
         ts.nodes[i].setVerboseLevel(VerboseLevel.DETAILED);
@@ -584,7 +585,7 @@ unit.test("main_test: register parcel with bad payload", async () => {
 unit.test("main_test: register parcel with bad payment", async () => {
     let key = new PrivateKey(await io.fileGetContentsAsBytes("../test/keys/reconfig_key.private.unikey"));
 
-    let ts = await new TestSpace(key).create();
+    let ts = await new TestSpace(key).create(NOLOG);
 
     for (let i = 0; i < 4; i++) {
         ts.nodes[i].setVerboseLevel(VerboseLevel.DETAILED);
@@ -698,10 +699,8 @@ unit.test("main_test: register parcel with bad payment", async () => {
     await ts.node.node.registerParcel(parcel);
     await ts.node.node.waitParcel(parcel.hashId, WAIT_TIMEOUT);
     ir = await ts.node.node.waitItem(parcel.getPaymentContract().id, WAIT_TIMEOUT);
-    console.error(ir.state.val);
     assert(ir.state === ItemState.DECLINED);
     ir = await ts.node.node.waitItem(item.id, WAIT_TIMEOUT);
-    console.error(ir.state.val);
     assert(ir.state === ItemState.UNDEFINED);
 
     for (let i = 0; i < 4; i++) {

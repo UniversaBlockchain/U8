@@ -92,8 +92,6 @@ class ParcelProcessor {
 
         this.downloader = null;
         this.processSchedule = null;
-
-        //console.error(this.node.label + "PP construct " + new Error().stack);
     }
 
     async run() {
@@ -281,7 +279,6 @@ class ParcelProcessor {
             this.node.report("parcel processor for: " + this.parcelId + " :: processing finished, state " +
                 this.processingState.val, VerboseLevel.BASE);
 
-            //console.error(this.node.label + "PP FIRE!!!!!!");
             this.doneEvent.fire();
 
             // but we want to wait until paymentProcessor and payloadProcessor will be removed
