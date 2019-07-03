@@ -4,6 +4,8 @@ import {udp} from 'network'
 import * as trs from "timers";
 import {HttpServer, HttpClient} from 'web'
 import * as tk from 'unit_tests/test_keys'
+const ExecutorWithFixedPeriod = require("executorservice").ExecutorWithFixedPeriod;
+const ScheduleExecutor = require("executorservice").ScheduleExecutor;
 
 const HTTP = true;
 const CRYPT = true;
@@ -15,6 +17,27 @@ const ITERATIONS = 10;
 const NODES = 10;
 
 const LOG = true;
+
+class RateCounter {
+    constructor(name) {
+        this.name = name;
+        this.t0 = new Date().getTime();
+        this.counter0 = 0;
+        this.counter = 0;
+    }
+
+    inc() {
+        ++this.counter;
+    }
+
+    show() {
+        let now = new Date().getTime();
+        let rate = (this.counter - this.counter0) * 1000 / (now - this.t0);
+        this.t0 = now;
+        this.counter0 = this.counter;
+        console.log(this.name + " rate: " + rate.toFixed(0) + " per sec,\tcounter: " + this.counter);
+    }
+}
 
 unit.test("stress_test", async () => {
     let ledgers = [];
@@ -54,7 +77,7 @@ unit.test("stress_test", async () => {
         let pkArr = [];
         for (let i = 0; i < NODES; i++) {
             let pk = tk.TestKeys.getKey();
-            let n = network.NodeInfo.withParameters(pk.publicKey, i+1, "node-"+1, "127.0.0.1", "0:0:0:0:0:0:0:1", "192.168.1.101", 7001+i, 8001+i, 9001+i);
+            let n = network.NodeInfo.withParameters(pk.publicKey, i+1, "node-"+i, "127.0.0.1", "0:0:0:0:0:0:0:1", "192.168.1.101", 7001+i, 8001+i, 9001+i);
             nc.addNode(n);
             pkArr.push(pk);
         }
@@ -63,7 +86,7 @@ unit.test("stress_test", async () => {
             udpAdapters[i] = new network.UDPAdapter(pkArr[i], i+1, nc);
 
             udpAdapters[i].setReceiveCallback(async (data, fromNode) => {
-                if (data !== "answer")
+                if (utf8Decode(data) !== "answer")
                     await udpAdapters[i].send(fromNode.number, "answer");
             });
         }
@@ -232,4 +255,302 @@ unit.test("stress_test", async () => {
         await UDP_close();
     if (HTTP)
         await HTTP_close();
+});
+
+unit.test("stress_test_with_rates", async () => {
+
+    const TEST_DURATION = 120*1000;
+
+    const NODE_COUNT    = 4;
+    const ENABLE_HTTP   = true;
+    const ENABLE_HTTPS  = true;
+    const ENABLE_UDP    = true;
+    const ENABLE_TIMERS = true;
+    const ENABLE_LEDGER = true;
+
+    const UDP_SEND_SPEED     = 300;
+    const HTTP_SEND_SPEED    = 100;
+    const HTTPS_SEND_SPEED   = 150;
+    const TIMERS_SEND_SPEED  = 1000;
+    const LEDGER_SEND_SPEED  = 1000;
+
+    const ASYNC_HEAVY_WORK         = true; // calls from each callback
+    const UDP_ASYNC_HEAVY_WORK     = true * ASYNC_HEAVY_WORK;
+    const HTTP_ASYNC_HEAVY_WORK    = true * ASYNC_HEAVY_WORK;
+    const HTTPS_ASYNC_HEAVY_WORK   = true * ASYNC_HEAVY_WORK;
+    const TIMERS_ASYNC_HEAVY_WORK  = true * ASYNC_HEAVY_WORK;
+    const LEDGER_ASYNC_HEAVY_WORK  = true * ASYNC_HEAVY_WORK;
+
+    let udpRate         = new RateCounter("       udp");
+    let httpRate        = new RateCounter("      http");
+    let httpsRate       = new RateCounter("     https");
+    let timersRate      = new RateCounter("    timers");
+    let ledgerRate      = new RateCounter("    ledger");
+    let heavyWorkRate   = new RateCounter("heavy work");
+
+    let asyncHeavyWork_key = await crypto.PrivateKey.generate(2048);
+    let asyncHeavyWork = async () => {
+        let data = t.randomString(64);
+        let fakeSig = t.randomString(64);
+        let sig = await asyncHeavyWork_key.publicKey.verify(data, fakeSig.bytes);
+        heavyWorkRate.inc();
+    };
+
+    console.log();
+    console.log("TEST_DURATION: " + (TEST_DURATION/1000) + " sec");
+
+    let udpAdapters = [];
+    let httpServers = [];
+    let httpClients = [];
+    let ledgers     = [];
+
+    let udp_sendCounter = 0;
+    let udp_receiveCounter = 0;
+    let udp_init = async () => {
+        let nc = new network.NetConfig();
+        let pkArr = [];
+        for (let i = 0; i < NODE_COUNT; i++) {
+            let pk = tk.TestKeys.getKey();
+            let n = network.NodeInfo.withParameters(pk.publicKey, i, "node-"+i, "127.0.0.1", "0:0:0:0:0:0:0:1", "192.168.1.101", 7001+i, 8001+i, 9001+i);
+            nc.addNode(n);
+            pkArr.push(pk);
+        }
+
+        for (let i = 0; i < NODE_COUNT; ++i) {
+            udpAdapters[i] = new network.UDPAdapter(pkArr[i], i, nc);
+
+            udpAdapters[i].setReceiveCallback(async (data, fromNode) => {
+                udpRate.inc();
+                if (UDP_ASYNC_HEAVY_WORK)
+                    await asyncHeavyWork();
+                if (utf8Decode(data) === "request") {
+                    ++udp_receiveCounter;
+                    await udpAdapters[i].send(fromNode.number, "answer");
+                }
+            });
+        }
+    };
+
+    let udp_pulse = async () => {
+        return new Promise(resolve => {
+            while (udp_sendCounter - udp_receiveCounter < UDP_SEND_SPEED) {
+                let i = udp_sendCounter % NODE_COUNT;
+                let j = (udp_sendCounter + 1) % NODE_COUNT;
+                udpAdapters[i].send(j, "request");
+                ++udp_sendCounter;
+            }
+            resolve();
+        });
+    };
+
+    let udp_close = async () => {
+        for (let i = 0; i < NODE_COUNT; i++) {
+            await udpAdapters[i].close();
+            udpAdapters[i] = null;
+        }
+    };
+
+    let http_sendCounter = 0;
+    let http_receiveCounter = 0;
+    let https_sendCounter = 0;
+    let https_receiveCounter = 0;
+    let http_init = async () => {
+        for (let i = 0; i < NODE_COUNT; i++) {
+            let httpServer = new network.HttpServer("0.0.0.0", 8080 + i, 1, 10);
+            let nodeKey = new crypto.PrivateKey(atob("JgAcAQABvID6D5ZdM9EKrZSztm/R/RcywM4K8Z4VBtX+NZp2eLCWtfAgGcBCQLtNz4scH7dPBerkkxckW6+9CLlnu/tgOxvzS6Z1Ec51++fVP9gaWbBQe9/dSg7xVPg5p9ibhfTB+iRXyevCkNj0hrlLyXl1BkPjN9+lZfXJsp9OnGIJ/AaAb7yA99E65gvZnbb3/oA3rG0pM45af6ppZKe2HeiAK+fcXm5KTQzfTce45f/mJ0jsDmFf1HFosS4waXSAz0ZfcssjPeoF3PuXfJLtM8czJ55+Nz6NMCbzrSk6zkKssGBieYFOb4eG2AdtfjTrpcSSHBgJpsbcmRx4bZNfBAZPqT+Sd20="));
+            let clientKey = tk.TestKeys.getKey();
+
+            httpServer.addEndpoint("/test", async (request) => {
+                request.setHeader("Content-Type", "text/html");
+                if (HTTP_ASYNC_HEAVY_WORK)
+                    await asyncHeavyWork();
+                httpRate.inc();
+                return {rb: request.requestBody.length, rm: request.method};
+            });
+
+            let httpClient = new network.HttpClient("http://localhost:" + (8080 + i), 30, 128);
+
+
+            if (ENABLE_HTTPS) {
+                httpServer.initSecureProtocol(nodeKey);
+                httpServer.addSecureEndpoint("sec", async (reqParams, clientPublicKey) => {
+                    if (HTTPS_ASYNC_HEAVY_WORK)
+                        await asyncHeavyWork();
+                    httpsRate.inc();
+                    return {U: "12345"};
+                });
+
+                httpServer.startServer();
+
+                await httpClient.start(clientKey, new crypto.PublicKey(nodeKey));
+            } else {
+                httpServer.startServer();
+            }
+
+            httpServers[i] = httpServer;
+            httpClients[i] = httpClient;
+        }
+    };
+
+    let http_pulse = async () => {
+        return new Promise(resolve => {
+            while (http_sendCounter - http_receiveCounter < HTTP_SEND_SPEED) {
+                let i = http_sendCounter % NODE_COUNT;
+                let j = (http_sendCounter + 1) % NODE_COUNT;
+
+                httpClients[i].sendGetRequestUrl("http://localhost:" + (8080 + j) + "/test?a=73&b=1000000", async (respCode, body) => {
+                    ++http_receiveCounter;
+                    if (HTTP_ASYNC_HEAVY_WORK)
+                        await asyncHeavyWork();
+                    httpRate.inc();
+                });
+
+                ++http_sendCounter;
+            }
+            resolve();
+        });
+    };
+
+    let https_pulse = async () => {
+        return new Promise(resolve => {
+            while (https_sendCounter - https_receiveCounter < HTTPS_SEND_SPEED) {
+                let i = https_sendCounter % NODE_COUNT;
+                httpClients[i].command("sec", {}, async (resp) => {
+                    ++https_receiveCounter;
+                    if (HTTPS_ASYNC_HEAVY_WORK)
+                        await asyncHeavyWork();
+                    httpsRate.inc();
+                }, error => {
+                    console.error("exception: " + error);
+                });
+                ++https_sendCounter;
+            }
+            resolve();
+        });
+    };
+
+    let http_close = async () => {
+        for (let i = 0; i < NODE_COUNT; i++) {
+            await httpClients[i].stop();
+            await httpServers[i].stopServer();
+        }
+    };
+
+    let timers_sendCounter = 0;
+    let timers_receiveCounter = 0;
+    let timers_pulse = async () => {
+        return new Promise(resolve => {
+            while (timers_sendCounter - timers_receiveCounter < TIMERS_SEND_SPEED) {
+                ++timers_sendCounter;
+                new ScheduleExecutor(async () => {
+                    if (TIMERS_ASYNC_HEAVY_WORK)
+                        await asyncHeavyWork();
+                    timersRate.inc();
+                    ++timers_receiveCounter;
+                }, timers_sendCounter % 20).run();
+            }
+            resolve();
+        });
+    };
+
+    let ledger_sendCounter = 0;
+    let ledger_receiveCounter = 0;
+    let ledger_init = async () => {
+        for (let i = 0; i < NODE_COUNT; ++i) {
+            ledgers[i] = new Ledger("host=localhost port=5432 dbname=unit_tests");
+            await ledgers[i].init();
+        }
+    };
+
+    let ledger_pulse = async () => {
+        return new Promise(resolve => {
+            while (ledger_sendCounter - ledger_receiveCounter < LEDGER_SEND_SPEED) {
+                ++ledger_sendCounter;
+                let i = ledger_sendCounter % NODE_COUNT;
+                ledgers[i].dbPool_.withConnection(async con => {
+                    if (LEDGER_ASYNC_HEAVY_WORK)
+                        await asyncHeavyWork();
+                    con.executeQuery(
+                        async qr => {
+                            if (LEDGER_ASYNC_HEAVY_WORK)
+                                await asyncHeavyWork();
+                            ledgerRate.inc();
+                            con.release();
+                            ++ledger_receiveCounter;
+                        },
+                        er => {
+                            console.error("ledger_pulse error: " + er);
+                        },
+                        "SELECT COUNT(*) FROM ledger"
+                    )
+                });
+            }
+            resolve();
+        });
+    };
+
+    let ledger_close = async () => {
+        for (let i = 0; i < NODE_COUNT; i++) {
+            await ledgers[i].close();
+            ledgers[i] = null;
+        }
+    };
+
+    // init
+    console.log("\ninit...");
+    if (ENABLE_UDP)
+        await udp_init();
+    if (ENABLE_HTTP || ENABLE_HTTPS)
+        await http_init();
+    if (ENABLE_LEDGER)
+        await ledger_init();
+
+    let showCounters = new ExecutorWithFixedPeriod(async () => {
+        console.log();
+        let dt = new Date().getTime() - startTime;
+        let progress = Math.min(100, dt / TEST_DURATION * 100);
+        console.log("   === progress: " + progress.toFixed(2) + "%, time elapsed: " + (dt/60000).toFixed(0) + " min ===");
+        udpRate.show();
+        httpRate.show();
+        httpsRate.show();
+        timersRate.show();
+        ledgerRate.show();
+        heavyWorkRate.show();
+    }, 2000).run();
+
+    // run
+    console.log("\nrun test...");
+    let now = new Date().getTime();
+    let startTime = now;
+    while (now - startTime < TEST_DURATION) {
+        let promises = [];
+        if (ENABLE_UDP)
+            promises.push(udp_pulse());
+        if (ENABLE_HTTP)
+            promises.push(http_pulse());
+        if (ENABLE_HTTPS)
+            promises.push(https_pulse());
+        if (ENABLE_TIMERS)
+            promises.push(timers_pulse());
+        if (ENABLE_LEDGER)
+            promises.push(ledger_pulse());
+        await Promise.all(promises);
+        now = new Date().getTime();
+        await sleep(10);
+    }
+
+    showCounters.cancel();
+
+    // close
+    console.log("\nclose...");
+    let stopTime = new Date().getTime();
+    await sleep(1000);
+    if (ENABLE_UDP)
+        await udp_close();
+    if (ENABLE_HTTP || ENABLE_HTTPS)
+        await http_close();
+    if (ENABLE_LEDGER)
+        await ledger_close();
+
+    console.log("\nDONE, total time: " + (stopTime-startTime)/1000 + " sec");
 });
