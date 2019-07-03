@@ -1,73 +1,66 @@
 class NodeStats {
-    constructor() {
 
+    constructor() {}
+
+    async init(ledger, config) {
+        this.ledgerStatsHistory = [];
+        this.ledgerHistoryTimestamps = [];
+
+        this.smallIntervalApproved = 0;
+        this.bigIntervalApproved = 0;
+        this.uptimeApproved = 0;
+
+        this.bigInterval = config.statsIntervalBig;
+        this.smallInterval = config.statsIntervalSmall;
+        this.nodeStartTime = Math.floor(Date.now() / 1000);
+        this.lastStatsBuildTime = this.nodeStartTime;
+        this.ledgerSize = await ledger.getLedgerSize(null);
     }
 
- /*   collect(ledger, config) {
-        if(!config.getStatsIntervalSmall().equals(smallInterval) || !config.getStatsIntervalBig().equals(bigInterval)) {
+    async collect(ledger, config) {
+        if (config.statsIntervalSmall !== this.smallInterval || config.statsIntervalBig !== this.bigInterval) {
             //intervals changed. need to reset node
-            init(ledger,config);
+            await this.init(ledger, config);
             return false;
         }
 
-        ZonedDateTime now = ZonedDateTime.now();
-        Map<ItemState, Integer> lastIntervalStats = ledger.getLedgerSize(lastStatsBuildTime);
-        ledgerStatsHistory.addLast(lastIntervalStats);
-        ledgerHistoryTimestamps.addLast(lastStatsBuildTime);
+        let now = Math.floor(Date.now() / 1000);
+        let lastIntervalStats = ledger.getLedgerSize(this.lastStatsBuildTime);
+        this.ledgerStatsHistory.push(lastIntervalStats);
+        this.ledgerHistoryTimestamps.push(this.lastStatsBuildTime);
 
-        smallIntervalApproved = lastIntervalStats.getOrDefault(ItemState.APPROVED,0)+lastIntervalStats.getOrDefault(ItemState.REVOKED,0);
-        bigIntervalApproved += smallIntervalApproved;
-        uptimeApproved += smallIntervalApproved;
+        this.smallIntervalApproved = lastIntervalStats.getOrDefault(ItemState.APPROVED.ordinal,0) +
+            lastIntervalStats.getOrDefault(ItemState.REVOKED.ordinal,0);
+        this.bigIntervalApproved += this.smallIntervalApproved;
+        this.uptimeApproved += this.smallIntervalApproved;
 
-        lastIntervalStats.keySet().forEach(is -> ledgerSize.put(is, ledgerSize.getOrDefault(is,0) + lastIntervalStats.get(is)));
+        Object.keys(lastIntervalStats).forEach(is => this.ledgerSize[is] = this.ledgerSize.getOrDefault(is,0) + lastIntervalStats[is]);
 
-        while (ledgerHistoryTimestamps.getFirst().plus(bigInterval).isBefore(now)) {
-            ledgerHistoryTimestamps.removeFirst();
-            bigIntervalApproved -= ledgerStatsHistory.removeFirst().get(ItemState.APPROVED) + lastIntervalStats.getOrDefault(ItemState.REVOKED,0);
+        while (this.ledgerHistoryTimestamps[0] + this.bigInterval < now) {
+            this.ledgerHistoryTimestamps.shift();
+            this.bigIntervalApproved -= this.ledgerStatsHistory.shift()[ItemState.APPROVED.ordinal] + lastIntervalStats.getOrDefault(ItemState.REVOKED.ordinal,0);
         }
 
-        lastStatsBuildTime = now;
+        this.lastStatsBuildTime = now;
 
-
-
-        Map<Integer, Integer> payments = ledger.getPayments(now.truncatedTo(ChronoUnit.DAYS).minusDays(now.getDayOfMonth()-1).minusMonths(1));
-        payments.keySet().forEach( day -> {
-        });
         return true;
     }
 
-    init(ledger, config) {
-        ledgerStatsHistory.clear();
-        ledgerHistoryTimestamps.clear();
-
-        smallIntervalApproved = 0;
-        bigIntervalApproved = 0;
-        uptimeApproved = 0;
-
-        bigInterval = config.getStatsIntervalBig();
-        smallInterval = config.getStatsIntervalSmall();
-        nodeStartTime = ZonedDateTime.now();
-        lastStatsBuildTime = nodeStartTime;
-        ledgerSize = ledger.getLedgerSize(null);
-
-        DateTimeFormatterBuilder builder = new DateTimeFormatterBuilder();
+    getPaymentStats(ledger, daysNum) {
+        let result = [];
+        /*DateTimeFormatterBuilder builder = new DateTimeFormatterBuilder();
         builder.appendValue(ChronoField.DAY_OF_MONTH,2);
         builder.appendLiteral("/");
         builder.appendValue(ChronoField.MONTH_OF_YEAR,2);
         builder.appendLiteral("/");
         builder.appendValue(ChronoField.YEAR,4);
-        formatter = builder.toFormatter();
-    }
-
-    getPaymentStats(ledger, daysNum) {
-        List<Binder> result = new ArrayList<>();
-        ZonedDateTime now = ZonedDateTime.now();
-        Map<Integer, Integer> payments = ledger.getPayments(now.truncatedTo(ChronoUnit.DAYS).minusDays(daysNum));
+        formatter = builder.toFormatter();*/
+        /*Map<Integer, Integer> payments = ledger.getPayments(now.truncatedTo(ChronoUnit.DAYS).minusDays(daysNum));
         payments.keySet().forEach( day -> {
             result.add(Binder.of("date",ZonedDateTime.ofInstant(Instant.ofEpochSecond(day), ZoneId.systemDefault()).format(formatter), "units",payments.get(day)));
-        });
+        });*/
         return result;
-    }*/
+    }
 }
 
 module.exports = {NodeStats};

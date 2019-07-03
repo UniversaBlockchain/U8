@@ -64,15 +64,16 @@ class Config {
         ];
         this.main = null;
         this.holdDuration = 30*24*3600; // 30 days
-        this.maxWaitingItemOfParcel = 10*60; //10 minutes
-        this.statsIntervalSmall = 30; //30 seconds
+        this.maxWaitingItemOfParcel = 10*60; // 10 minutes
+        this.statsIntervalSmall = 30; // 30 seconds
+        this.statsIntervalBig = 3600; // 1 hour
 
         // Permanet mode
         this.permanetMode = false;
         this.queryContractsLimit = 100;
 
         // Follower callback service
-        this.followerCallbackExpiration = 10*60; //10 minutes
+        this.followerCallbackExpiration = 10*60; // 10 minutes
         this.followerCallbackDelay = 10;
         this.followerCallbackStateStoreTime = 3*24*3600; // 3 days
         this.followerCallbackSynchronizationInterval = 12*3600; // 12 hours

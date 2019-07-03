@@ -727,7 +727,7 @@ class Ledger {
      * Get an Object, the keys of which are the states of the Ledger items,
      * and the values are the number of items that are in this state.
      *
-     * @param {Date} createdAfter - Creation time, those elements that are created after this time are taken into account.
+     * @param {Date} createdAfter - Creation time (in epoch seconds), those elements that are created after this time are taken into account.
      * @return {Promise<Object>}
      */
     getLedgerSize(createdAfter = 0) {
