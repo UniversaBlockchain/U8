@@ -3,6 +3,7 @@ import {Ledger} from 'ledger'
 import {udp} from 'network'
 import * as trs from "timers";
 import {HttpServer, HttpClient} from 'web'
+import * as tk from 'unit_tests/test_keys'
 
 const HTTP = true;
 const CRYPT = true;
@@ -17,7 +18,7 @@ const LOG = true;
 
 unit.test("stress_test", async () => {
     let ledgers = [];
-    let socks = [];
+    let udpAdapters = [];
     let httpServers = [];
     let httpClients = [];
     let httpSecClients = [];
@@ -49,16 +50,21 @@ unit.test("stress_test", async () => {
     };
 
     let UDP_init = async () => {
+        let nc = new network.NetConfig();
+        let pkArr = [];
         for (let i = 0; i < NODES; i++) {
-            socks[i] = udp.open({port: 18207 + i}, (error) => {
-                console.error("open failed: " + error);
-            });
+            let pk = tk.TestKeys.getKey();
+            let n = network.NodeInfo.withParameters(pk.publicKey, i+1, "node-"+1, "127.0.0.1", "0:0:0:0:0:0:0:1", "192.168.1.101", 7001+i, 8001+i, 9001+i);
+            nc.addNode(n);
+            pkArr.push(pk);
+        }
 
-            socks[i].recv(100, async (data, IP, port) => {
+        for (let i = 0; i < NODES; i++) {
+            udpAdapters[i] = new network.UDPAdapter(pkArr[i], i+1, nc);
+
+            udpAdapters[i].setReceiveCallback(async (data, fromNode) => {
                 if (data !== "answer")
-                    await socks[i].send("answer", {port: port});
-            }, (error) => {
-                console.error("recv failed: " + error);
+                    await udpAdapters[i].send(fromNode.number, "answer");
             });
         }
     };
@@ -68,21 +74,21 @@ unit.test("stress_test", async () => {
             if (LOG)
                 console.log("UDP iteration = " + i);
 
-            await socks[num].send("request", {port: 18207 + dest});
+            await udpAdapters[num].send(dest, "request");
         }
     };
 
     let UDP_close = async () => {
         for (let i = 0; i < NODES; i++) {
-            await socks[i].close();
-            socks[i] = null;
+            await udpAdapters[i].close();
+            udpAdapters[i] = null;
         }
     };
 
     let inside_block = async () => {
         for (let i = 0; i < NODES; i++) {
             if (UDP)
-                await UDP_run(i, (i < NODES - 1) ? i + 1 : 0);
+                await UDP_run(i, i+1);//(i < NODES - 1) ? i + 1 : 0);
 
             if (PG)
                 await PG_run(i);
