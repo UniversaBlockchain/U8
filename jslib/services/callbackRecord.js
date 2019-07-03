@@ -39,7 +39,7 @@ class CallbackRecord {
     /**
      * Save callback record to ledger for possible synchronization.
      *
-     * @param {HashId} id - Callback identifier.
+     * @param {crypto.HashId} id - Callback identifier.
      * @param {number} environmentId - Environment identifier.
      * @param {Config} config - Node configuration.
      * @param {number} networkNodesCount - Count of nodes in Universa network.

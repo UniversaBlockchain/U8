@@ -717,9 +717,8 @@ class ItemProcessor {
                         } else {
                             newExtraResult.onUpdateResult = this.item.onUpdated(me);
 
-                            //TODO: callbackService
-                            //new ScheduleExecutor(() => this.node.callbackService.synchronizeFollowerCallbacks(me.id),
-                            //    1000, this.node.executorService).run();
+                            new ScheduleExecutor(async () => await this.node.callbackService.synchronizeFollowerCallbacks(me.id),
+                                1000, this.node.executorService).run();
                         }
 
                         await me.save(con);

@@ -49,16 +49,20 @@ class NCallbackService extends CallbackService {
      *
      * @param {number} environmentId - Callback processor.
      */
-    async synchronizeFollowerCallbacks(environmentId) {
+    async synchronizeFollowerCallbacks(environmentId = undefined) {
         let nodesCount = this.network.getNodesCount();
         if (nodesCount < 2)
             return;
 
-        let callbackRecords = await this.ledger.getFollowerCallbacksToResyncByEnvId(environmentId);
-        if (callbackRecords.isEmpty())
-            return;
+        let callbackRecords;
 
-        this.startSynchronizeFollowerCallbacks(callbackRecords, nodesCount);
+        if (environmentId !== undefined)
+            callbackRecords = await this.ledger.getFollowerCallbacksToResyncByEnvId(environmentId);
+        else
+            callbackRecords = await this.ledger.getFollowerCallbacksToResync();
+
+        if (callbackRecords.length > 0)
+            this.startSynchronizeFollowerCallbacks(callbackRecords, nodesCount);
     }
 
     startSynchronizeFollowerCallbacks(callbackRecords, nodesCount) {
@@ -82,10 +86,12 @@ class NCallbackService extends CallbackService {
     }
 
     async endSynchronizeFollowerCallbacks() {
-        for (let record of this.callbacksToSynchronize.values()) {
-            if (await record.endSynchronize(ledger, node))
-                this.callbacksToSynchronize.delete(record.id);
-        }
+        await this.node.lock.synchronize(this.endSynchronizeFollowerCallbacks, async () => { //TODO
+            for (let record of this.callbacksToSynchronize.values()) {
+                if (await record.endSynchronize(this.ledger, this.node))
+                    this.callbacksToSynchronize.delete(record.id);
+            }
+        });
     }
 
     /**
@@ -112,7 +118,7 @@ class NCallbackService extends CallbackService {
         await this.node.lock.synchronize(this.callbackProcessors, async () => {
             this.callbackProcessors.set(callback.id, callback);
 
-            node.report("notifyFollowerSubscribers: put callback " + callback.id.base64, VerboseLevel.DETAILED);
+            this.node.report("notifyFollowerSubscribers: put callback " + callback.id.base64, VerboseLevel.DETAILED);
 
             let deferredNotification = this.deferredCallbackNotifications.get(callback.id);
             if (deferredNotification != null) {
@@ -121,7 +127,7 @@ class NCallbackService extends CallbackService {
 
                 this.deferredCallbackNotifications.delete(callback.id);
 
-                node.report("notifyFollowerSubscribers: remove deferred notification for callback " + callback.id.base64,
+                this.node.report("notifyFollowerSubscribers: remove deferred notification for callback " + callback.id.base64,
                     VerboseLevel.DETAILED);
             }
         });
@@ -176,7 +182,7 @@ class NCallbackService extends CallbackService {
             try (
                 OutputStream output = connection.getOutputStream();
             PrintWriter writer = new PrintWriter(new OutputStreamWriter(output, charset), true);
-        ) {
+            ) {
                 // Send binary file.
                 writer.append("--" + boundary).append(CRLF);
                 writer.append("Content-Disposition: form-data; name=\"callbackData\"; filename=\"callbackData.boss\"").append(CRLF);
@@ -216,7 +222,7 @@ class NCallbackService extends CallbackService {
     async obtainCallbackNotification(notification) {
         let callback;
 
-        node.report("obtainCallbackNotification: callback " +  notification.id.base64 + " type " + notification.type.val,
+        this.node.report("obtainCallbackNotification: callback " +  notification.id.base64 + " type " + notification.type.val,
             VerboseLevel.DETAILED);
 
         if (notification.type === CallbackNotificationType.GET_STATE) {
@@ -231,7 +237,7 @@ class NCallbackService extends CallbackService {
                 if ((record != null) && await record.synchronizeState(notification.state, this.ledger, this.node)) {
                     this.callbacksToSynchronize.delete(notification.id);
 
-                    node.report("obtainCallbackNotification: callback " + notification.id.base64 +
+                    this.node.report("obtainCallbackNotification: callback " + notification.id.base64 +
                         " synchronized with state " + notification.state.val, VerboseLevel.DETAILED);
                 }
             });
@@ -239,8 +245,8 @@ class NCallbackService extends CallbackService {
             //await this.node.lock.synchronize(this.callbackProcessors, async () => { //TODO
                 callback = this.callbackProcessors.get(notification.id);
                 if (callback == null) {
-                    node.report("obtainCallbackNotification not found callback " + notification.id.base64,
-                        VerboseLevel.BASE,);
+                    this.node.report("obtainCallbackNotification not found callback " + notification.id.base64,
+                        VerboseLevel.BASE);
 
                     this.deferredCallbackNotifications.set(notification.id, notification);
                     return;
@@ -274,7 +280,7 @@ class CallbackProcessor {
         concat.set(digest, 1);
         concat.set(URL, digest.length + 1);
 
-        this.id = HashId.of(concat);
+        this.id = crypto.HashId.of(concat);
 
         // calculate expiration time
         this.expiresAt = Date.now() + Config.followerCallbackExpiration * 1000; //TODO
@@ -292,7 +298,7 @@ class CallbackProcessor {
     async checkForComplete() {
         // if some nodes (rate defined in config) also sended callback and received packed item (without answer)
         // callback is deemed complete
-        if (this.nodesSendCallback.size >= Math.floor(this.callbackService.network.allNodes().length * this.callbackService.config.rateNodesSendFollowerCallbackToComplete))
+        if (this.nodesSendCallback.size >= Math.floor(this.callbackService.network.allNodes().length * this.callbackService.config.ratioNodesSendFollowerCallbackToComplete))
         await this.complete();
     }
 
@@ -305,7 +311,7 @@ class CallbackProcessor {
     }
 
     async obtainNotification(notification) {
-        this.callbackService.node.report("Notify callback " + notification.id.base64 + " type " + notification.type.val,
+        this.callbackService.node.report("Notify callback " + notification.id.base64 + " type " + notification.type.val +
             " from node " + notification.from.val, VerboseLevel.DETAILED);
 
         if (notification.type === CallbackNotificationType.COMPLETED) {
@@ -324,7 +330,7 @@ class CallbackProcessor {
 
             this.callbackService.callbackProcessors.delete(this.id);
 
-            node.report("CallbackProcessor.complete: Removed callback " + this.id.base64, VerboseLevel.DETAILED);
+            this.callbackService.node.report("CallbackProcessor.complete: Removed callback " + this.id.base64, VerboseLevel.DETAILED);
 
             let event = new events.CompletedEvent();
             event.getEnvironment = () => fullEnvironment.environment;
@@ -348,7 +354,7 @@ class CallbackProcessor {
 
             this.callbackService.callbackProcessors.delete(this.id);
 
-            node.report("CallbackProcessor.fail: Removed callback " + this.id.base64, VerboseLevel.DETAILED);
+            this.callbackService.node.report("CallbackProcessor.fail: Removed callback " + this.id.base64, VerboseLevel.DETAILED);
 
             let event = new events.FailedEvent();
             event.getEnvironment = () => fullEnvironment.environment;
@@ -389,9 +395,9 @@ class CallbackProcessor {
                 let signature = null;
                 try {
                     if (this.state === ItemState.APPROVED)
-                        signature = this.requestFollowerCallback(this, this.callbackURL, this.packedItem);
+                        signature = this.callbackService.requestFollowerCallback(this, this.callbackURL, this.packedItem);
                     else if (this.state === ItemState.REVOKED)
-                        signature = this.requestFollowerCallback(this, this.callbackURL, this.itemId.digest);
+                        signature = this.callbackService.requestFollowerCallback(this, this.callbackURL, this.itemId.digest);
                 } catch (err) {
                     node.logger.log(err.stack);
                     node.logger.log("error call: request HTTP follower callback: " + err.message);

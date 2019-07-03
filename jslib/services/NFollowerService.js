@@ -109,7 +109,7 @@ class NFollowerService extends FollowerService {
 
         if (this.callbackService != null) {
             // start scheduled callback processor
-            this.callbackService.startCallbackProcessor(this.updatingItem, this.state, this.contract, this.me);
+            await this.callbackService.startCallbackProcessor(this.updatingItem, this.state, this.contract, this.me);
             this.callbackService = null;
         }
     }

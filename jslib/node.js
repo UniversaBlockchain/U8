@@ -1,5 +1,5 @@
 import {ExecutorService, ScheduleExecutor, ExecutorWithFixedPeriod, ExecutorWithDynamicPeriod} from "executorservice";
-import {Notification, ItemNotification, ResyncNotification, ParcelNotification, ParcelNotificationType} from "notification";
+import {Notification, ItemNotification, ResyncNotification, ParcelNotification, ParcelNotificationType, CallbackNotification} from "notification";
 import {ItemProcessor} from "itemprocessor";
 import {VerboseLevel} from "node_consts";
 import {Errors, ErrorRecord} from "errors";
@@ -69,10 +69,10 @@ class Node {
         this.recordsToSanitate = await this.ledger.findUnfinished();
         this.logger.log(this.label + "records to sanitation: " + this.recordsToSanitate.size);
 
-        //if (this.recordsToSanitate.size > 0)
-        //    this.pulseStartSanitation();
-        //else
-        //    this.dbSanitationFinished();
+        if (this.recordsToSanitate.size > 0)
+            this.pulseStartSanitation();
+        else
+            this.dbSanitationFinished();
 
         // TODO: callbackService
 
@@ -273,8 +273,8 @@ class Node {
         } else if (notification instanceof ItemNotification) {
             if (!this.isSanitating())
                 await this.obtainCommonNotification(notification);
-        //} else if (notification instanceof CallbackNotification) {
-        //    await this.callbackService.obtainCallbackNotification(notification);
+        } else if (notification instanceof CallbackNotification) {
+            await this.callbackService.obtainCallbackNotification(notification);
         }
     }
 

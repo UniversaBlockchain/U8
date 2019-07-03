@@ -14,7 +14,7 @@ class CallbackService {
      * @param {NSmartContract} contract is follower contract
      * @param {MutableEnvironment} me is environment
      */
-    startCallbackProcessor(updatingItem, state, contract, me) {
+    async startCallbackProcessor(updatingItem, state, contract, me) {
         throw new Error("not implemented");
     }
 }
