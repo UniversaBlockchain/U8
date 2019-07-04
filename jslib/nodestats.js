@@ -1,3 +1,6 @@
+const ItemState = require('itemstate').ItemState;
+const t = require("tools");
+
 class NodeStats {
 
     constructor() {}
@@ -29,16 +32,18 @@ class NodeStats {
         this.ledgerStatsHistory.push(lastIntervalStats);
         this.ledgerHistoryTimestamps.push(this.lastStatsBuildTime);
 
-        this.smallIntervalApproved = lastIntervalStats.getOrDefault(ItemState.APPROVED.ordinal,0) +
-            lastIntervalStats.getOrDefault(ItemState.REVOKED.ordinal,0);
+        this.smallIntervalApproved = t.getOrDefault(lastIntervalStats, ItemState.APPROVED.ordinal,0) +
+            t.getOrDefault(lastIntervalStats, ItemState.REVOKED.ordinal,0);
         this.bigIntervalApproved += this.smallIntervalApproved;
         this.uptimeApproved += this.smallIntervalApproved;
 
-        Object.keys(lastIntervalStats).forEach(is => this.ledgerSize[is] = this.ledgerSize.getOrDefault(is,0) + lastIntervalStats[is]);
+        Object.keys(lastIntervalStats).forEach(is =>
+            this.ledgerSize[is] = t.getOrDefault(this.ledgerSize, is,0) + lastIntervalStats[is]);
 
         while (this.ledgerHistoryTimestamps[0] + this.bigInterval < now) {
             this.ledgerHistoryTimestamps.shift();
-            this.bigIntervalApproved -= this.ledgerStatsHistory.shift()[ItemState.APPROVED.ordinal] + lastIntervalStats.getOrDefault(ItemState.REVOKED.ordinal,0);
+            this.bigIntervalApproved -= this.ledgerStatsHistory.shift()[ItemState.APPROVED.ordinal] +
+                t.getOrDefault(lastIntervalStats, ItemState.REVOKED.ordinal,0);
         }
 
         this.lastStatsBuildTime = now;
@@ -57,7 +62,7 @@ class NodeStats {
             let date = new Date(day * 1000);
             let days = date.getDate();
             let month = date.getMonth();
-            let formatted = (days < 10 ? "0": "") + days + "/" + (month < 10 ? "0": "") + month + "/" + date.getFullYear();
+            let formatted = (days < 10 ? "0": "") + days + "/" + (month + 1 < 10 ? "0": "") + (month + 1) + "/" + date.getFullYear();
             result.push({
                 date: formatted,
                 units: pays

@@ -128,7 +128,7 @@ class Node {
         let sizes = Object.values(this.nodeStats.ledgerSize);
         let result = {
             uptime: Math.floor(Date.now() / 1000) - this.nodeStats.nodeStartTime,
-            ledgerSize: sizes.length === 0 ? 0 : sizes.reduce((accumulator, value) => accumulator + value),
+            ledgerSize: Number(sizes.length === 0 ? 0 : sizes.reduce((accumulator, value) => accumulator + value)),
             smallIntervalApproved: this.nodeStats.smallIntervalApproved,
             bigIntervalApproved: this.nodeStats.bigIntervalApproved,
             uptimeApproved: this.nodeStats.uptimeApproved,
@@ -137,7 +137,7 @@ class Node {
         };
 
         if (showDays != null)
-            result.payments = NodeStats.getPaymentStats(ledger, showDays);
+            result.payments = await NodeStats.getPaymentStats(this.ledger, showDays);
 
         return result;
     }
