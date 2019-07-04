@@ -232,6 +232,30 @@ unit.test("main_test: createTestSpace", async () => {
     await ts.shutdown();
 });
 
+unit.test("main_test: sanitation", async () => {
+    let key = new PrivateKey(await io.fileGetContentsAsBytes("../test/keys/reconfig_key.private.unikey"));
+
+    let ts = await new TestSpace(key).create(NOLOG);
+
+    for (let i = 0; i < 4; i++) {
+        let it = 0;
+        while (ts.nodes[i].node.isSanitating()) {
+            if (it > 3000)
+                break;
+
+            await sleep(1);
+            it++;
+        }
+
+        assert(it <= 3000);
+
+        if (it > 0)
+            await sleep(1000);
+    }
+
+    await ts.shutdown();
+});
+
 unit.test("main_test: resync", async () => {
     let key = new PrivateKey(await io.fileGetContentsAsBytes("../test/keys/reconfig_key.private.unikey"));
 

@@ -582,7 +582,7 @@ class ClientHTTPServer extends network.HttpServer {
             return {itemResult : ClientHTTPServer.itemResultOfError(Errors.BAD_CLIENT_KEY, "getStats", "command needs admin key")};
         }
 
-        return await this.node.provideStats(t.getOrDefault(params, "showDays", null)); //TODO: node
+        return await this.node.provideStats(t.getOrDefault(params, "showDays", null));
     }
 
     async getParcelProcessingState(params, clientKey) {
