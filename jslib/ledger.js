@@ -59,6 +59,7 @@ class Ledger {
     }
 
     async init() {
+        //TODO: why hardcoded as if we always run from ./cmake-build-debug?
         await db.MigrationDriver.createDB(this.dbPool_, "../jslib/migrations/postgres");
     }
 

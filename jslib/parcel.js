@@ -5,6 +5,7 @@ const BiAdapter = require("biserializable").BiAdapter;
 const BossBiMapper = require("bossbimapper").BossBiMapper;
 const TransactionPack = require("transactionpack").TransactionPack;
 const Quantiser = require("quantiser").Quantiser;
+const DefaultBiMapper = require("defaultbimapper").DefaultBiMapper;
 
 class Parcel extends bs.BiSerializable {
 

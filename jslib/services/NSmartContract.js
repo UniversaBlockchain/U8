@@ -4,7 +4,7 @@ const e = require("errors");
 const Errors = e.Errors;
 const ErrorRecord = e.ErrorRecord;
 const ex = require("exceptions");
-
+const DefaultBiMapper = require("defaultbimapper").DefaultBiMapper;
 /**
  * Implements {@see NContract} interface for contract {@see Contract}.
  */
