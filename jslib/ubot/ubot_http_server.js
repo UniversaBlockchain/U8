@@ -1,6 +1,7 @@
 import * as network from "web";
 const Contract = require("contract").Contract;
 const HashId = require("crypto").HashId;
+const Boss = require('boss.js');
 
 class UBotHttpServer extends network.HttpServer {
 
@@ -36,10 +37,14 @@ class UBotHttpServer extends network.HttpServer {
         let encodedString = request.path.substring(paramIndex);
         let hashId = HashId.withBase64Digest(encodedString);
         let contract = this.ubot.getStartingContract(hashId);
-        if (contract != null)
-            request.setAnswerBody(contract.getPackedTransaction());
-        else
+        if (contract != null) {
+            let contractBin = contract.getPackedTransaction();
+            let selectedPool = this.ubot.getSelectedPoolNumbers(hashId);
+            let answerBin = Boss.dump({contractBin: contractBin, selectedPool: selectedPool});
+            request.setAnswerBody(answerBin);
+        } else {
             request.setStatusCode(204);
+        }
         request.sendAnswer();
     }
 

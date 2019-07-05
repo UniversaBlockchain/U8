@@ -149,19 +149,36 @@ unit.test("ubot_main_test: executeCloudMethod", async () => {
     let client = new network.HttpClient(url, 20, 20);
     await client.start(tk.TestKeys.getKey(), ubotMains[0].myInfo.publicKey, null);
     let userPrivKey = tk.TestKeys.getKey();
-    let contract = Contract.fromPrivateKey(userPrivKey);
-    contract.state.data.poolSize = 5;
-    contract.state.data.methodName = "calc2x2";
-    contract.state.data.methodStorageName = "single";
-    await contract.seal(true);
-    let contractBin = contract.getPackedTransaction();
-    client.command("executeCloudMethod", {contract: contractBin}, resp=>{
+
+    let executableContract = Contract.fromPrivateKey(userPrivKey);
+    executableContract.state.data.poolSize = 5;
+    executableContract.state.data.ubotAsm = "" +
+        //"generateRandomHash;" + // should decline write to single storage, each ubot has random value
+        "calc2x2;" + // should approve write to single storage, each ubot has same value
+        "writeSingleStorage;" +
+        "finish" +
+        "";
+    //contract.state.data.methodStorageName = "single";
+    await executableContract.seal();
+
+    let startingContract = Contract.fromPrivateKey(userPrivKey);
+    startingContract.createTransactionalSection();
+    startingContract.transactional.data.executableContract = executableContract.getPackedTransaction();
+    startingContract.state.data.methodName = "ubotAsm";
+    startingContract.state.data.executableContractId = executableContract.id.digest;
+    await startingContract.seal(true);
+
+    console.log("executableContract.id: " + executableContract.id);
+    console.log("startingContract.id: " + startingContract.id);
+
+    let startingContractBin = startingContract.getPackedTransaction();
+    client.command("executeCloudMethod", {contract: startingContractBin}, resp=>{
         console.log("resp: " + JSON.stringify(resp));
     }, err=>{
         console.log("err: " + err);
     });
 
-    await sleep(1000);
+    await sleep(3000);
 
     await shutdownUBots(ubotMains);
 });
