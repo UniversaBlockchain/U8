@@ -189,10 +189,10 @@ class ResyncingItem {
         this.finishEvent = new Promise(resolve => this.finishFire = resolve);
 
         this.resyncNodes = new Map();
-        this.resyncNodes.set(ItemState.APPROVED, new t.GenericSet());
-        this.resyncNodes.set(ItemState.REVOKED, new t.GenericSet());
-        this.resyncNodes.set(ItemState.DECLINED, new t.GenericSet());
-        this.resyncNodes.set(ItemState.UNDEFINED, new t.GenericSet());
+        this.resyncNodes.set(ItemState.APPROVED.val, new t.GenericSet());
+        this.resyncNodes.set(ItemState.REVOKED.val, new t.GenericSet());
+        this.resyncNodes.set(ItemState.DECLINED.val, new t.GenericSet());
+        this.resyncNodes.set(ItemState.UNDEFINED.val, new t.GenericSet());
     }
 
     resyncVote(node, state) {
@@ -205,27 +205,27 @@ class ResyncingItem {
         let undefinedConsenus = false;
 
         for (let is of this.resyncNodes.keys())
-            if (is !== state)
+            if (is !== state.val)
                 this.resyncNodes.get(is).delete(node);
 
-        if (!this.resyncNodes.has(state))
-            this.resyncNodes.set(state, new t.GenericSet());
+        if (!this.resyncNodes.has(state.val))
+            this.resyncNodes.set(state.val, new t.GenericSet());
 
-        this.resyncNodes.get(state).add(node);
+        this.resyncNodes.get(state.val).add(node);
 
         if (this.isResyncPollingFinished())
             return;
 
-        if (this.resyncNodes.get(ItemState.REVOKED).size >= this.node.config.positiveConsensus) {
+        if (this.resyncNodes.get(ItemState.REVOKED.val).size >= this.node.config.positiveConsensus) {
             revokedConsenus = true;
             this.resyncingState = ResyncingItemProcessingState.PENDING_TO_COMMIT;
-        } else if (this.resyncNodes.get(ItemState.DECLINED).size >= this.node.config.positiveConsensus) {
+        } else if (this.resyncNodes.get(ItemState.DECLINED.val).size >= this.node.config.positiveConsensus) {
             declinedConsenus = true;
             this.resyncingState = ResyncingItemProcessingState.PENDING_TO_COMMIT;
-        } else if (this.resyncNodes.get(ItemState.APPROVED).size >= this.node.config.positiveConsensus) {
+        } else if (this.resyncNodes.get(ItemState.APPROVED.val).size >= this.node.config.positiveConsensus) {
             approvedConsenus = true;
             this.resyncingState = ResyncingItemProcessingState.PENDING_TO_COMMIT;
-        } else if (this.resyncNodes.get(ItemState.UNDEFINED).size >= this.node.config.resyncBreakConsensus) {
+        } else if (this.resyncNodes.get(ItemState.UNDEFINED.val).size >= this.node.config.resyncBreakConsensus) {
             undefinedConsenus = true;
             this.resyncingState = ResyncingItemProcessingState.PENDING_TO_COMMIT;
         }
@@ -251,7 +251,7 @@ class ResyncingItem {
         new ScheduleExecutor(async () => {
             if (committingState.isConsensusFound) {
                 // make local set of nodes to prevent changing set of nodes while committing
-                let rNodes = new t.GenericSet(this.resyncNodes.get(committingState));
+                let rNodes = new t.GenericSet(this.resyncNodes.get(committingState.val));
 
                 let createdAtClusters = new Map();
                 let expiresAtClusters = new Map();
@@ -327,6 +327,9 @@ class ResyncingItem {
 
                 try {
                     await this.node.lock.synchronize(this.hashId, async () => {
+                        this.node.report("ResyncItem.resyncAndCommit(itemId=" + this.hashId + "), set state: " +
+                            committingState, VerboseLevel.BASE);
+
                         this.record = await this.node.ledger.findOrCreate(this.hashId);
 
                         this.record.createdAt = createdAt;
@@ -337,8 +340,6 @@ class ResyncingItem {
                             await this.record.decline(null, true);
                         else if (committingState === ItemState.REVOKED)
                             await this.record.revoke(null, true);
-                        else if (committingState === ItemState.UNDEFINED)
-                            await this.record.setUndefined(null, true);
 
                         this.node.cache.update(this.record.id, ItemResult.fromStateRecord(this.record));
                     });

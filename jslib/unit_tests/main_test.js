@@ -232,6 +232,30 @@ unit.test("main_test: createTestSpace", async () => {
     await ts.shutdown();
 });
 
+unit.test("main_test: sanitation", async () => {
+    let key = new PrivateKey(await io.fileGetContentsAsBytes("../test/keys/reconfig_key.private.unikey"));
+
+    let ts = await new TestSpace(key).create(NOLOG);
+
+    for (let i = 0; i < 4; i++) {
+        let it = 0;
+        while (ts.nodes[i].node.isSanitating()) {
+            if (it > 3000)
+                break;
+
+            await sleep(1);
+            it++;
+        }
+
+        assert(it <= 3000);
+
+        if (it > 0)
+            await sleep(1000);
+    }
+
+    await ts.shutdown();
+});
+
 unit.test("main_test: resync", async () => {
     let key = new PrivateKey(await io.fileGetContentsAsBytes("../test/keys/reconfig_key.private.unikey"));
 
@@ -426,8 +450,8 @@ unit.test("main_test: register parcel", async () => {
     let ownerKey = tk.TestKeys.getKey();
     let k = tk.TestKeys.getKey();
 
-    //for (let i = 0; i < 50; i++) {
-    //    console.log("Iteration = " + i);
+    //for (let it = 0; it < 50; it++) {
+    //    console.log("Iteration = " + it);
         let U = await tt.createFreshU(100000000, [ownerKey.publicKey]);
 
         await ts.node.node.registerItem(U);
@@ -499,8 +523,8 @@ unit.test("main_test: register parcel with bad payload", async () => {
     let ownerKey = tk.TestKeys.getKey();
     let k = tk.TestKeys.getKey();
 
-    //for (let i = 0; i < 50; i++) {
-    //    console.log("Iteration = " + i);
+    //for (let it = 0; it < 50; it++) {
+    //    console.log("Iteration = " + it);
         let U = await tt.createFreshU(100000000, [ownerKey.publicKey]);
 
         await ts.node.node.registerItem(U);
@@ -595,8 +619,8 @@ unit.test("main_test: register parcel with bad payment", async () => {
     let ownerKey = tk.TestKeys.getKey();
     let k = tk.TestKeys.getKey();
 
-    //for (let i = 0; i < 50; i++) {
-    //    console.log("Iteration = " + i);
+    //for (let it = 0; it < 50; it++) {
+    //    console.log("Iteration = " + it);
         let U = await tt.createFreshU(100000000, [ownerKey.publicKey]);
 
         await ts.node.node.registerItem(U);
@@ -665,6 +689,65 @@ unit.test("main_test: register parcel with bad payment", async () => {
             assert(ir != null);
             assert(ir.itemResult.state === ItemState.DECLINED);
         });
+    //}
+
+    await ts.shutdown();
+});
+
+unit.test("main_test: node stats", async () => {
+    let key = new PrivateKey(await io.fileGetContentsAsBytes("../test/keys/reconfig_key.private.unikey"));
+
+    let ts = await new TestSpace(key).create(NOLOG);
+
+    for (let i = 0; i < 4; i++) {
+        ts.nodes[i].setVerboseLevel(VerboseLevel.DETAILED);
+        ts.nodes[i].setUDPVerboseLevel(VerboseLevel.DETAILED);
+    }
+
+    let ownerKey = tk.TestKeys.getKey();
+    let k = tk.TestKeys.getKey();
+
+    //for (let it = 0; it < 50; it++) {
+    //    console.log("Iteration = " + it);
+        let U = await tt.createFreshU(100000000, [ownerKey.publicKey]);
+
+        await ts.node.node.registerItem(U);
+        let ir = await ts.node.node.waitItem(U.id, WAIT_TIMEOUT);
+        assert(ir.state === ItemState.APPROVED);
+
+        let item = Contract.fromPrivateKey(k);
+
+        await item.seal(true);
+
+        let parcel = await cs.createParcel(item, U, 1, [ownerKey], false);
+
+        let date = new Date();
+        let UTC = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
+        let days = UTC.getDate();
+        let month = UTC.getMonth();
+        let formatted = (days < 10 ? "0": "") + days + "/" + (month + 1 < 10 ? "0": "") + (month + 1) + "/" + UTC.getFullYear();
+
+        await ts.node.node.registerParcel(parcel);
+        await ts.node.node.waitParcel(parcel.hashId, WAIT_TIMEOUT);
+        ir = await ts.node.node.waitItem(item.id, WAIT_TIMEOUT);
+        assert(ir.state === ItemState.APPROVED);
+        ir = await ts.node.node.waitItem(parcel.getPaymentContract().id, WAIT_TIMEOUT);
+        assert(ir.state === ItemState.APPROVED);
+
+        for (let i = 0; i < 4; i++)
+            await ts.nodes[i].node.waitParcel(parcel.hashId, WAIT_TIMEOUT);
+
+        // collect and get stats
+        await ts.node.node.nodeStats.collect(ts.node.node.ledger, ts.node.node.config);
+
+        let fire = null;
+        let event = new Promise(resolve => fire = resolve);
+
+        ts.client.command("getStats", {showDays: 2}, (result) => fire(result), () => fire(null));
+
+        let firstResult = await event;
+        assert(firstResult != null);
+        assert(firstResult.payments.some(pay => pay.date === formatted));
     //}
 
     await ts.shutdown();

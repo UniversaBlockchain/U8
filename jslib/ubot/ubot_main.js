@@ -12,6 +12,7 @@ const UBot = require("ubot/ubot").UBot;
 const yaml = require("yaml");
 const UBotTestNotification = require("ubot/ubot_notification").UBotTestNotification;
 const UBotCloudNotification = require("ubot/ubot_notification").UBotCloudNotification;
+const UBotCloudNotification_asmCommand = require("ubot/ubot_notification").UBotCloudNotification_asmCommand;
 
 const UBOT_VERSION = VERSION;
 
@@ -50,7 +51,8 @@ class UBotMain {
         await this.ledger.init();
 
         this.network.subscribe(notification => {
-            if (notification instanceof UBotCloudNotification) {
+            if ((notification instanceof UBotCloudNotification) ||
+                (notification instanceof UBotCloudNotification_asmCommand)) {
                 this.ubot.onCloudNotify(notification);
             } else {
                 // debug case

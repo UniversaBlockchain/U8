@@ -1,12 +1,15 @@
 import {VerboseLevel} from "node_consts";
 import {CallbackNotification, CallbackNotificationType} from "notification";
+import {HttpServer, HttpClient} from 'web'
+import {AsyncEvent} from "executorservice";
 
+const Boss = require("boss");
 const ItemState = require('itemstate').ItemState;
 const CallbackService = require("services/callbackService").CallbackService;
-const ex = require("exceptions");
 const Config = require("config").Config;
 const FollowerCallbackState = require("services/followerCallbackState").FollowerCallbackState;
 const events = require("services/contractSubscription");
+const t = require("tools");
 
 /**
  * Implements CallbackService interface for Universa node.
@@ -36,6 +39,7 @@ class NCallbackService extends CallbackService {
         this.callbackProcessors = new t.GenericMap();
         this.deferredCallbackNotifications = new t.GenericMap();
         this.callbacksToSynchronize = new t.GenericMap();
+        this.httpClient = null;
 
         // start synchronization
         //executorService.scheduleWithFixedDelay(() => this.synchronizeFollowerCallbacks(), 60, config.followerCallbackSynchronizationInterval);
@@ -139,14 +143,11 @@ class NCallbackService extends CallbackService {
      *
      * @param {CallbackProcessor} callback - Callback processor.
      * @param {String} callbackURL - Callback URL.
-     * @param {number} packedData - Packed new revision of following contract or identifier of revoking following contract.
-     * @return callback receipt (signed with callback key identifier of following contract) or null (if connection error).
-     *
+     * @param {Uint8Array} packedData - Packed new revision of following contract or identifier of revoking following contract.
+     * @return {Uint8Array | null} callback receipt (signed with callback key identifier of following contract) or null (if connection error).
      */
      async requestFollowerCallback(callback, callbackURL, packedData) {
-        await this.node.lock.synchronize(this, async () => {
-            let charset = "UTF-8";
-
+        return await this.node.lock.synchronize("requestFollowerCallback", async () => {
             let call;
 
             if (callback.state === ItemState.APPROVED)
@@ -160,62 +161,73 @@ class NCallbackService extends CallbackService {
                 call = {
                     event : "revoke",
                     id : packedData,
-                    signature : this.nodeKey.sign(packedData, crypto.SHA512),
+                    signature : await this.nodeKey.sign(packedData, crypto.SHA512),
                     key : this.nodeKey.publicKey.packed
                 };
             else
                 return null;
 
-            //let data = Boss.pack(call);
+            let data = Boss.dump(call);
 
-           /* final String CRLF = "\r\n"; // Line separator required by multipart/form-data.
-            String boundary = "==boundary==" + Ut.randomString(48);
+            let CRLF = "\r\n"; // Line separator required by multipart/form-data.
+            let boundary = "==boundary==" + t.randomString(48);
 
-            let connection = new URL(callbackURL).openConnection();
+            if (this.httpClient == null)
+                this.httpClient = new HttpClient("", 4, 4096);
 
-            connection.setDoOutput(true);
-            connection.setConnectTimeout(2000);
-            connection.setReadTimeout(5000);
-            connection.setRequestProperty("Content-Type", "multipart/form-data; boundary=" + boundary);
-            connection.setRequestProperty("User-Agent", "Universa Node");
+            let beginRequest = "";
+            // Send binary file.
+            beginRequest += "--" + boundary + CRLF;
+            beginRequest += "Content-Disposition: form-data; name=\"callbackData\"; filename=\"callbackData.boss\"" + CRLF;
+            beginRequest += "Content-Type: application/octet-stream" + CRLF;
+            beginRequest += "Content-Transfer-Encoding: binary" + CRLF + CRLF;
+            beginRequest = utf8Encode(beginRequest);
 
-            try (
-                OutputStream output = connection.getOutputStream();
-            PrintWriter writer = new PrintWriter(new OutputStreamWriter(output, charset), true);
-            ) {
-                // Send binary file.
-                writer.append("--" + boundary).append(CRLF);
-                writer.append("Content-Disposition: form-data; name=\"callbackData\"; filename=\"callbackData.boss\"").append(CRLF);
-                writer.append("Content-Type: application/octet-stream").append(CRLF);
-                writer.append("Content-Transfer-Encoding: binary").append(CRLF);
-                writer.append(CRLF).flush();
-                output.write(data);
-                output.flush(); // Important before continuing with writer!
-                writer.append(CRLF).flush(); // CRLF is important! It indicates end of boundary.
+            // End of multipart/form-data.
+            let endRequest = CRLF + "--" + boundary + "--" + CRLF;
 
-                // End of multipart/form-data.
-                writer.append("--" + boundary + "--").append(CRLF).flush();
+            let request = new Uint8Array(beginRequest.length + endRequest.length + data.length);
+            request.set(beginRequest);
+            request.set(data, beginRequest.length);
+            request.set(endRequest, beginRequest.length + data.length);
+
+            let event = new AsyncEvent(this.node.executorService);
+
+            //TODO: httpClient setRequestProperty/setTimeout
+            //connection.setDoOutput(true);
+            //connection.setConnectTimeout(2000);
+            //connection.setReadTimeout(5000);
+            //connection.setRequestProperty("Content-Type", "multipart/form-data; boundary=" + boundary);
+            //connection.setRequestProperty("User-Agent", "Universa Node");
+            this.httpClient.sendGetRequestUrl(callbackURL, (respCode, body) => {
+                if (respCode === 200) {
+                    if (body == null || body.length === 0) {
+                        event.fire(null);
+                        return;
+                    }
+
+                    // get receipt from answer
+                    let res = Boss.load(body);
+                    if (!res.hasOwnProperty("receipt")) {
+                        event.fire(null);
+                        return;
+                    }
+
+                    event.fire(res.receipt);
+                } else
+                    event.fire(null);
+            });
+
+            callback.isItemSended = true;
+
+            let res = null;
+            try {
+                res = await event.await(5000);
+            } catch (err) {
+                res = null;
             }
 
-            callback.setItemSended();
-
-            HttpURLConnection httpConnection = (HttpURLConnection) connection;
-            byte[] answer = null;
-
-            if (httpConnection.getResponseCode() == 200)
-                answer = Do.read(httpConnection.getInputStream());
-
-            httpConnection.disconnect();
-
-            // get receipt from answer
-            if (answer == null)
-                return null;
-
-            Binder res = Boss.unpack(answer);
-            if (!res.containsKey("receipt"))
-                return null;
-
-            return res.getBinary("receipt");*/
+            return res;
         });
     }
 

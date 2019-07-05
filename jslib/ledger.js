@@ -1286,7 +1286,7 @@ class Ledger {
      */
     getItem(record) {
         return this.simpleQuery("select packed from items where id = ?",
-            x => Contract.fromPackedTransaction(x),
+            x => (x != null) ? Contract.fromPackedTransaction(x) : null,
             null,
             record.recordId);
     }

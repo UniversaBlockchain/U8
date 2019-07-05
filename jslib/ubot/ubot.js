@@ -18,7 +18,7 @@ class UBot {
     }
 
     executeCloudMethod(contract) {
-        this.logger.log("executeCloudMethod: id = " + contract.id.base64);
+        this.logger.log("executeCloudMethod: startingContract.id = " + contract.id);
         this.logger.log("  contract.state.data: " + JSON.stringify(contract.state.data));
         let processor = new CloudProcessor(UBotPoolState.SEND_STARTING_CONTRACT, contract.id, this);
         processor.startingContract = contract;
@@ -45,6 +45,16 @@ class UBot {
             let proc = this.processors.get(hashId.base64);
             if (proc.startingContract != null)
                 return proc.startingContract;
+        }
+        return null;
+    }
+
+    getSelectedPoolNumbers(hashId) {
+        if (this.processors.has(hashId.base64)) {
+            let proc = this.processors.get(hashId.base64);
+            let res = [];
+            proc.pool.forEach(i => res.push(i.number));
+            return res;
         }
         return null;
     }

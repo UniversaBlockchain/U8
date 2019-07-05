@@ -16,6 +16,7 @@ const ParcelProcessor = require("parcelprocessor").ParcelProcessor;
 const ItemInformer = require("iteminformer").ItemInformer;
 const NodeInfoProvider = require("services/NSmartContract").NodeInfoProvider;
 const Lock = require("lock").Lock;
+const ex = require("exceptions");
 const t = require("tools");
 
 const MAX_SANITATING_RECORDS = 64;
@@ -34,7 +35,7 @@ class Node {
         this.cache = new ItemCache(Config.maxCacheAge);
         this.nameCache = new NameCache(Config.maxNameCacheAge);
         this.parcelCache = new ParcelCache(Config.maxCacheAge);
-        // TODO: other caches
+        // TODO: env cache
 
         this.verboseLevel = VerboseLevel.NOTHING;
         this.label = "Node(" + myInfo.number + ") ";
@@ -72,7 +73,7 @@ class Node {
         if (this.recordsToSanitate.size > 0)
             this.pulseStartSanitation();
         else
-            this.dbSanitationFinished();
+            await this.dbSanitationFinished();
 
         // TODO: callbackService
 
@@ -103,10 +104,10 @@ class Node {
         }, Config.expriedNamesCleanupInterval * 1000, this.executorService).run();
     }
 
-    dbSanitationFinished() {
-        //this.nodeStats.init(this.ledger, this.config);
+    async dbSanitationFinished() {
+        await this.nodeStats.init(this.ledger, this.config);
 
-        //this.pulseCollectStats();
+        this.pulseCollectStats();
     }
 
     pulseCollectStats() {
@@ -120,6 +121,27 @@ class Node {
         }, this.config.statsIntervalSmall * 1000, this.executorService).run();
     }
 
+    async provideStats(showDays) {
+        if (this.nodeStats.nodeStartTime == null)
+            throw new ex.IllegalStateError("node state are not initialized. wait for node initialization to finish.");
+
+        let sizes = Object.values(this.nodeStats.ledgerSize);
+        let result = {
+            uptime: Math.floor(Date.now() / 1000) - this.nodeStats.nodeStartTime,
+            ledgerSize: Number(sizes.length === 0 ? 0 : sizes.reduce((accumulator, value) => accumulator + value)),
+            smallIntervalApproved: this.nodeStats.smallIntervalApproved,
+            bigIntervalApproved: this.nodeStats.bigIntervalApproved,
+            uptimeApproved: this.nodeStats.uptimeApproved,
+            coreVersion: VERSION,
+            nodeNumber: this.myInfo.number
+        };
+
+        if (showDays != null)
+            result.payments = await NodeStats.getPaymentStats(this.ledger, showDays);
+
+        return result;
+    }
+
     pulseStartSanitation() {
         this.sanitator = new ExecutorWithDynamicPeriod(async () => await this.startSanitation(), [2000, 500], this.executorService).run();
     }
@@ -127,7 +149,7 @@ class Node {
     async startSanitation() {
         if (this.recordsToSanitate.size === 0) {
             this.sanitator.cancel();
-            this.dbSanitationFinished();
+            await this.dbSanitationFinished();
             return;
         }
 
@@ -152,6 +174,10 @@ class Node {
             if (this.sanitatingIds.size === 0 && this.recordsToSanitate.size > 0) {
                 //ONLY LOCKED LEFT
                 this.logger.log(this.label + "Locked items left after sanitation: " + this.recordsToSanitate.size);
+
+                //for (let r of this.recordsToSanitate.values())
+                //    await r.destroy();
+
                 this.recordsToSanitate.clear();
             }
         }
@@ -256,7 +282,7 @@ class Node {
     }
 
     isSanitating() {
-        return false;//this.recordsToSanitate.size > 0;     //TODO: activate sanitating
+        return this.recordsToSanitate.size > 0;
     }
 
     /**
