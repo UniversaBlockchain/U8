@@ -393,7 +393,7 @@ class ClientHTTPServer extends network.HttpServer {
                 return {itemResult : ClientHTTPServer.itemResultOfError(Errors.COMMAND_FAILED,"approve", err.message)};
             }
 
-            if (contract == null || !contract.isUnlimitKeyContract(config)) {
+            if (contract == null || !contract.isUnlimitKeyContract(this.config)) {
                 if (contract.errors.length > 0) {
                     contract.errors.forEach(err => this.logger.log(err.message));
                     return {itemResult : ClientHTTPServer.itemResultOfError(Errors.FAILED_CHECK, "approve", contract.errors[contract.errors.length - 1].message)};
