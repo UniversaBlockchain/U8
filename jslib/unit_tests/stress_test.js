@@ -64,7 +64,7 @@ unit.test("stress_test_3", async () => {
                 })
             })
         );
-        if (sendCounter - readyCounter > 100)
+        if (sendCounter - readyCounter > 1000)
             await sleep(10);
     }
     await Promise.all(promises);
