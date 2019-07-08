@@ -257,7 +257,7 @@ unit.test("stress_test", async () => {
         await HTTP_close();
 });
 
-unit.test("stress_test_with_rates", async () => {
+/*unit.test("stress_test_with_rates", async () => {
 
     const TEST_DURATION = 120*1000;
 
@@ -553,4 +553,4 @@ unit.test("stress_test_with_rates", async () => {
         await ledger_close();
 
     console.log("\nDONE, total time: " + (stopTime-startTime)/1000 + " sec");
-});
+});*/
