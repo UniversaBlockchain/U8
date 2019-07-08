@@ -186,7 +186,7 @@ static void publicKeyVerify(const FunctionCallbackInfo <Value> &args) {
                     bool result = key->verify(sigData, sigSize, dataData, dataSize, ht);
                     scripter->lockedContext([=](Local <Context> cxt) {
                         auto fn = onReady->Get(isolate);
-                        onReady->Reset()
+                        onReady->Reset();
                         delete onReady;
                         auto me = pThis->Get(isolate);
                         pThis->Reset();
