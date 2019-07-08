@@ -169,37 +169,18 @@ static void publicKeyVerify(const FunctionCallbackInfo <Value> &args) {
     Scripter::unwrapArgs(args, [](ArgsContext &ac) {
         if (ac.args.Length() == 4) {
             auto key = unwrap<PublicKey>(ac.args.This());
-            auto dataContents = ac.as<TypedArray>(0)->Buffer()->GetContents();
-            auto pDataContents = new Persistent<Value>(ac.isolate, ac.as<TypedArray>(0)->Buffer());
-            auto sigContents = ac.as<TypedArray>(1)->Buffer()->GetContents();
-            auto pSigContents = new Persistent<Value>(ac.isolate, ac.as<TypedArray>(1)->Buffer());
-            auto dataData = dataContents.Data();
-            auto sigData = sigContents.Data();
-            if (sigData && dataData) {
-                auto sigSize = sigContents.ByteLength();
-                auto dataSize = dataContents.ByteLength();
+            auto pdata = ac.asBuffer(0);
+            auto psig = ac.asBuffer(1);
+            if (psig->data() && pdata->data()) {
                 auto ht = (HashType) ac.asInt(2);
                 auto isolate = ac.isolate;
-                auto *onReady = new Persistent<Function>(ac.isolate, ac.as<Function>(3));
+                auto onready = ac.asFunction(3);
                 shared_ptr<Scripter> scripter = ac.scripter;
-
                 jsThreadPool([=]() {
-                    bool result = key->verify(sigData, sigSize, dataData, dataSize, ht);
+                    bool result = key->verify(psig->data(), psig->size(), pdata->data(), pdata->size(), ht);
                     scripter->lockedContext([=](Local <Context> cxt) {
-                        auto fn = onReady->Get(isolate);
-                        onReady->Reset();
-                        delete onReady;
-                        if (fn->IsFunction()) {
                             Local <Value> res = Boolean::New(isolate, result);
-                            auto unused = fn->Call(cxt, fn, 1, &res);
-                        } else {
-                            cerr << "publicKey::verify: callback is not a function\n";
-                        }
-                        pDataContents->Reset();
-                        pSigContents->Reset();
-                        delete pDataContents;
-                        delete pSigContents;
-
+                            onready->call(cxt, 1, &res);
                     });
                 });
                 return;

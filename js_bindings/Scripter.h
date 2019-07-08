@@ -28,15 +28,15 @@ class Scripter : public std::enable_shared_from_this<Scripter>, public Logging {
 public:
 
     // ------------------- helpers -------------------------------
-    Local<String> v8String(string x, NewStringType t = NewStringType::kNormal) {
+    Local <String> v8String(string x, NewStringType t = NewStringType::kNormal) {
         return String::NewFromUtf8(pIsolate, x.c_str(), t).ToLocalChecked();
     }
 
-    Local<String> v8String(const char *cstr, NewStringType t = NewStringType::kNormal) {
+    Local <String> v8String(const char *cstr, NewStringType t = NewStringType::kNormal) {
         return String::NewFromUtf8(pIsolate, cstr, t).ToLocalChecked();
     }
 
-    Local<FunctionTemplate> functionTemplate(FunctionCallback callback) {
+    Local <FunctionTemplate> functionTemplate(FunctionCallback callback) {
         return FunctionTemplate::New(pIsolate, callback);
     }
 
@@ -92,12 +92,12 @@ public:
     }
 
     template<typename T>
-    string getString(MaybeLocal<T> value) {
+    string getString(MaybeLocal <T> value) {
         return getString(value.ToLocalChecked());
     }
 
     template<typename T>
-    string getString(Local<T> value) {
+    string getString(Local <T> value) {
         String::Utf8Value result(pIsolate, value);
         return *result;
     }
@@ -132,7 +132,7 @@ public:
         v8::Locker locker(pIsolate);
         Isolate::Scope iscope(pIsolate);
         v8::HandleScope handle_scope(pIsolate);
-        Local<Context> cxt = context.Get(pIsolate);
+        Local <Context> cxt = context.Get(pIsolate);
         v8::Context::Scope context_scope(cxt);
         return block(cxt);
     }
@@ -145,11 +145,11 @@ public:
      */
     template<typename F>
     void inPool(F block) {
-        jsThreadPool([=](){
+        jsThreadPool([=]() {
             v8::Locker locker(pIsolate);
             Isolate::Scope iscope(pIsolate);
             v8::HandleScope handle_scope(pIsolate);
-            Local<Context> cxt = context.Get(pIsolate);
+            Local <Context> cxt = context.Get(pIsolate);
             v8::Context::Scope context_scope(cxt);
             block(cxt);
         });
@@ -164,13 +164,13 @@ public:
      * @param block to execute in unwrapped Scripter environment
      */
     static void unwrap(
-            const v8::FunctionCallbackInfo<v8::Value> &args,
-            const std::function<void(shared_ptr<Scripter>, v8::Isolate *, const v8::Local<v8::Context> &)> &block
+            const v8::FunctionCallbackInfo <v8::Value> &args,
+            const std::function<void(shared_ptr<Scripter>, v8::Isolate *, const v8::Local <v8::Context> &)> &block
     );
 
     template<typename F>
     static void unwrapArgs(
-            const v8::FunctionCallbackInfo<v8::Value> &args,
+            const v8::FunctionCallbackInfo <v8::Value> &args,
             F &&block
     );
 
@@ -195,9 +195,9 @@ public:
     virtual ~Scripter();
 
     template<class T>
-    void throwPendingException(TryCatch &tc, Local<Context>);
+    void throwPendingException(TryCatch &tc, Local <Context>);
 
-    bool checkException(TryCatch &tc, Local<Context>);
+    bool checkException(TryCatch &tc, Local <Context>);
 
     /**
      * Turn "wait exit" more on (may not be effective except with runAsMain)
@@ -267,7 +267,7 @@ private:
     void initialize();
 
     // Sleep timer is in exclusive use of this function:
-    friend void JsTimer(const v8::FunctionCallbackInfo<v8::Value> &args);
+    friend void JsTimer(const v8::FunctionCallbackInfo <v8::Value> &args);
 
     // used to implement JS timers.
     AsyncSleep asyncSleep;
@@ -282,7 +282,7 @@ private:
     v8::Isolate *pIsolate;
     v8::Isolate::CreateParams create_params;
 
-    v8::Persistent<v8::Context> context;
+    v8::Persistent <v8::Context> context;
 
     // do not construct it manually
     explicit Scripter();
@@ -298,22 +298,35 @@ public:
     using ScriptError::ScriptError;
 };
 
+
+class BufferHandler;
+
+class FunctionHandler;
+
 class ArgsContext {
 public:
     shared_ptr<Scripter> scripter;
     Isolate *isolate;
-    Local<Context> context;
-    const FunctionCallbackInfo<Value> &args;
+    Local <Context> context;
+    const FunctionCallbackInfo <Value> &args;
 
 
-    ArgsContext(const shared_ptr<Scripter> &scripter_, const FunctionCallbackInfo<Value> &args_)
+    ArgsContext(const shared_ptr<Scripter> &scripter_, const FunctionCallbackInfo <Value> &args_)
             : args(args_), scripter(scripter_), isolate(args_.GetIsolate()),
               context(isolate->GetEnteredContext()), pcontext(nullptr) {
     }
 
     template<typename T>
-    Local<T> as(int index) {
+    Local <T> as(int index) {
         return args[index].As<T>();
+    }
+
+    shared_ptr<BufferHandler> asBuffer(unsigned index) {
+        return make_shared<BufferHandler>(*this, index);
+    }
+
+    shared_ptr<FunctionHandler> asFunction(unsigned index) {
+        return make_shared<FunctionHandler>(*this, index);
     }
 
     int32_t asInt(int index) {
@@ -324,43 +337,43 @@ public:
         return scripter->getString(args[index]);
     }
 
-    Local<Uint8Array> toBinary(const void* result,size_t size) {
+    Local <Uint8Array> toBinary(const void *result, size_t size) {
         auto ab = ArrayBuffer::New(isolate, size);
         memcpy(ab->GetContents().Data(), result, size);
         return Uint8Array::New(ab, 0, size);
     }
 
-    Local<Uint8Array> toBinary(const byte_vector& result) {
+    Local <Uint8Array> toBinary(const byte_vector &result) {
         return toBinary(result.data(), result.size());
     }
 
 
-    Local<Uint8Array> toBinary(byte_vector&& result) {
+    Local <Uint8Array> toBinary(byte_vector &&result) {
         return toBinary(result.data(), result.size());
     }
 
-    Local<String> toString(byte_vector&& result) {
-        return String::NewFromUtf8(isolate, (const char*)result.data());
+    Local <String> toString(byte_vector &&result) {
+        return String::NewFromUtf8(isolate, (const char *) result.data());
     }
 
-    void throwError(const char* text) {
+    void throwError(const char *text) {
         scripter->throwError(text);
     }
 
-    void throwError(string&& text) {
+    void throwError(string &&text) {
         scripter->throwError(move(text));
     }
 
-    template <typename T>
-    void setReturnValue(T&& value) {
+    template<typename T>
+    void setReturnValue(T &&value) {
         args.GetReturnValue().Set(value);
     }
 
-    Local<String> v8String(string x, NewStringType t = NewStringType::kNormal) {
+    Local <String> v8String(string x, NewStringType t = NewStringType::kNormal) {
         return scripter->v8String(x, t);
     }
 
-    Local<String> v8String(const char *cstr, NewStringType t = NewStringType::kNormal) {
+    Local <String> v8String(const char *cstr, NewStringType t = NewStringType::kNormal) {
         return scripter->v8String(cstr, t);
     }
 
@@ -370,20 +383,71 @@ public:
 //    }
 
 private:
-    Persistent<Context> *pcontext;
+    Persistent <Context> *pcontext;
 
 };
 
+class BufferHandler {
+private:
+    Persistent <TypedArray> _pbuffer;
+    void *_data;
+    size_t _size;
+public:
+    BufferHandler(Isolate *isolate, Local <TypedArray> &&local) : _pbuffer(isolate, local) {
+        auto contents = local->Buffer()->GetContents();
+        _data = contents.Data();
+        _size = contents.ByteLength();
+    }
+
+    BufferHandler(ArgsContext &ac, unsigned index) : BufferHandler(ac.isolate, ac.as<TypedArray>(index)) {}
+
+    ~BufferHandler() {
+        _pbuffer.Reset();
+        _data = nullptr;
+        _size = 0;
+    }
+
+    inline auto data() const { return _data; }
+
+    inline auto size() const { return _size; }
+};
+
+class FunctionHandler {
+private:
+    Persistent <Function> _pfunction;
+    Isolate *_isolate;
+    shared_ptr<Scripter> _scripter;
+
+public:
+
+    auto call(Local <Context> &cxt, int argsCount, Local<Value>* args) {
+        auto fn = _pfunction.Get(_isolate);
+        if (fn->IsFunction()) {
+            return fn->Call(cxt, fn, argsCount, args);
+        } else {
+            _scripter->throwError("callback is not a function");
+            return MaybeLocal<Value>();
+        }
+    }
+
+    FunctionHandler(ArgsContext &ac, unsigned index)
+            : _pfunction(ac.isolate, ac.as<Function>(index)), _isolate(ac.isolate), _scripter(ac.scripter)
+            {}
+
+    ~FunctionHandler() { _pfunction.Reset(); }
+};
+
+
 template<typename F>
 void Scripter::unwrapArgs(
-        const v8::FunctionCallbackInfo<v8::Value> &args,
+        const v8::FunctionCallbackInfo <v8::Value> &args,
         F &&block
 ) {
     Isolate *isolate = args.GetIsolate();
     HandleScope handle_scope(isolate);
 
     auto context = isolate->GetEnteredContext();
-    Local<External> wrap = Local<External>::Cast(context->GetEmbedderData(1));
+    Local <External> wrap = Local<External>::Cast(context->GetEmbedderData(1));
     auto weak = static_cast<weak_ptr<Scripter> *>(wrap->Value());
     shared_ptr<Scripter> scripter = weak->lock();
     if (scripter) {
@@ -392,7 +456,7 @@ void Scripter::unwrapArgs(
         try {
             block(ac);
         }
-        catch(const exception& e) {
+        catch (const exception &e) {
             ac.throwError("unhandled C++ exception: "s + e.what());
         }
     } else {
