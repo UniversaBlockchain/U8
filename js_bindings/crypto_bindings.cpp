@@ -185,8 +185,6 @@ static void publicKeyVerify(const FunctionCallbackInfo <Value> &args) {
 
                 jsThreadPool([=]() {
                     bool result = key->verify(sigData, sigSize, dataData, dataSize, ht);
-                    delete pDataContents;
-                    delete pSigContents;
                     scripter->lockedContext([=](Local <Context> cxt) {
                         auto fn = onReady->Get(isolate);
                         onReady->Reset();
@@ -197,6 +195,11 @@ static void publicKeyVerify(const FunctionCallbackInfo <Value> &args) {
                         } else {
                             cerr << "publicKey::verify: callback is not a function\n";
                         }
+                        pDataContents->Reset();
+                        pSigContents->Reset();
+                        delete pDataContents;
+                        delete pSigContents;
+
                     });
                 });
                 return;
