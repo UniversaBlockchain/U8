@@ -113,7 +113,7 @@ async function testES() {
 
 
 
-// require('unit_tests/crypto_test')
+require('unit_tests/crypto_test')
 // require('unit_tests/network_test');
 // require('unit_tests/file_tests');
 // require('unit_tests/contract_test')
