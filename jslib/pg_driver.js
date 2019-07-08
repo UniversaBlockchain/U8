@@ -17,22 +17,22 @@ class PgDriverPool extends db.SqlDriverPool {
     constructor(pool) {
         super();
         this.pool = pool;
-        this.buf = [];
-        this.currentTask = new ExecutorWithFixedPeriod(async () => {
-            let buf = this.buf;
-            this.buf = [];
-            let promises = [];
-            for (let i = 0; i < buf.length; ++i)
-                promises.push(buf[i]());
-            await Promise.all(promises);
-        }, 20).run();
+        // this.buf = [];
+        // this.currentTask = new ExecutorWithFixedPeriod(async () => {
+        //     let buf = this.buf;
+        //     this.buf = [];
+        //     let promises = [];
+        //     for (let i = 0; i < buf.length; ++i)
+        //         promises.push(buf[i]());
+        //     await Promise.all(promises);
+        // }, 20).run();
     }
 
     withConnection(callback) {
-        this.pool._withConnection((con)=>{
-            this.buf.push(async ()=>{
+        this.pool._withConnection(async (con)=>{
+            // this.buf.push(async ()=>{
                 await callback(new PgDriverConnection(con));
-            });
+            // });
         });
     }
 
@@ -45,7 +45,7 @@ class PgDriverPool extends db.SqlDriverPool {
     }
 
     close() {
-        this.currentTask.cancel();
+        // this.currentTask.cancel();
         this.pool._close();
     }
 
@@ -99,39 +99,39 @@ class PgDriverConnection extends db.SqlDriverConnection {
     constructor(con) {
         super();
         this.con = con;
-        this.buf = [];
-        this.currentTask = new ExecutorWithFixedPeriod(async () => {
-            let buf = this.buf;
-            this.buf = [];
-            let promises = [];
-            for (let i = 0; i < buf.length; ++i)
-                promises.push(buf[i]());
-            await Promise.all(promises);
-        }, 20).run();
+        // this.buf = [];
+        // this.currentTask = new ExecutorWithFixedPeriod(async () => {
+        //     let buf = this.buf;
+        //     this.buf = [];
+        //     let promises = [];
+        //     for (let i = 0; i < buf.length; ++i)
+        //         promises.push(buf[i]());
+        //     await Promise.all(promises);
+        // }, 20).run();
     }
 
     executeQuery(onSuccess, onError, queryString, ...params) {
-        this.con._executeQuery((qr)=>{
-            this.buf.push(async ()=>{
+        this.con._executeQuery(async (qr)=>{
+            // this.buf.push(async ()=>{
                 await onSuccess(new PgDriverResultSet(qr));
                 qr._release();
-            });
-        }, (errText)=>{
-            this.buf.push(async ()=> {
+            // });
+        }, async (errText)=>{
+            // this.buf.push(async ()=> {
                 await onError(new db.DatabaseError(errText));
-            });
+            // });
         }, queryString, params);
     }
 
     executeUpdate(onSuccess, onError, queryString, ...params) {
-        this.con._executeUpdate((affectedRows)=>{
-            this.buf.push(async ()=> {
+        this.con._executeUpdate(async (affectedRows)=>{
+            // this.buf.push(async ()=> {
                 await onSuccess(affectedRows);
-            });
-        }, (errText)=>{
-            this.buf.push(async ()=> {
+            // });
+        }, async (errText)=>{
+            // this.buf.push(async ()=> {
                 await onError(new db.DatabaseError(errText));
-            });
+            // });
         }, queryString, params);
     }
 
@@ -149,7 +149,7 @@ class PgDriverConnection extends db.SqlDriverConnection {
     }
 
     release() {
-        this.currentTask.cancel();
+        // this.currentTask.cancel();
         this.con._release();
     }
 }
