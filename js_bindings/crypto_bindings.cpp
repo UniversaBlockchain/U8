@@ -170,7 +170,9 @@ static void publicKeyVerify(const FunctionCallbackInfo <Value> &args) {
         if (ac.args.Length() == 4) {
             auto key = unwrap<PublicKey>(ac.args.This());
             auto dataContents = ac.as<TypedArray>(0)->Buffer()->GetContents();
+            auto pDataContents = new Persistent<Value>(ac.isolate, ac.as<TypedArray>(0)->Buffer());
             auto sigContents = ac.as<TypedArray>(1)->Buffer()->GetContents();
+            auto pSigContents = new Persistent<Value>(ac.isolate, ac.as<TypedArray>(1)->Buffer());
             auto dataData = dataContents.Data();
             auto sigData = sigContents.Data();
             if (sigData && dataData) {
@@ -183,6 +185,8 @@ static void publicKeyVerify(const FunctionCallbackInfo <Value> &args) {
 
                 jsThreadPool([=]() {
                     bool result = key->verify(sigData, sigSize, dataData, dataSize, ht);
+                    delete pDataContents;
+                    delete pSigContents;
                     scripter->lockedContext([=](Local <Context> cxt) {
                         auto fn = onReady->Get(isolate);
                         onReady->Reset();
