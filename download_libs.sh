@@ -38,7 +38,7 @@ if [ "$platform" = "linux" ]; then
     download_archive libpq.7z
     download_archive libssl.7z
 elif [ "$platform" = "macos" ]; then
-    download_archive libv8-v7.4.288.25.7z
+    download_archive libv8-v7.4.288.28.7z
     download_archive libtomcrypt.7z
     download_archive libuv.7z
     download_archive libpq.7z
