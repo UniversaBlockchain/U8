@@ -139,7 +139,7 @@ public:
      * Closes the queue. All waiting threads will be unblocked and the QueueClosedException will be thrown in them.
      */
     void close() {
-        mx.lock();
+        unique_lock lock(mx);
         if (!_closed) {
             // tricky part. we want all waiting threads to exit before
             // se destruct cv and mutex, so first we notify them:
@@ -148,12 +148,10 @@ public:
             cv_full.notify_all();
             // now we let them go and wait until they unlock, e.g. get out of our wait
             // cycle:
-            mx.unlock();
+            lock.unlock();
             this_thread::yield();
             // when we lock again, all of them should be already out of our wait methods:
-            mx.lock();
         }
-        mx.unlock();
     }
 
     /**
