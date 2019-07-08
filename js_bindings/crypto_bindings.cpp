@@ -179,7 +179,6 @@ static void publicKeyVerify(const FunctionCallbackInfo <Value> &args) {
                 auto ht = (HashType) ac.asInt(2);
                 auto isolate = ac.isolate;
                 auto *onReady = new Persistent<Function>(ac.isolate, ac.as<Function>(3));
-                auto *pThis = new Persistent<Value>(ac.isolate, ac.args.This());
                 shared_ptr<Scripter> scripter = ac.scripter;
 
                 jsThreadPool([=]() {
@@ -188,9 +187,6 @@ static void publicKeyVerify(const FunctionCallbackInfo <Value> &args) {
                         auto fn = onReady->Get(isolate);
                         onReady->Reset();
                         delete onReady;
-                        auto me = pThis->Get(isolate);
-                        pThis->Reset();
-                        delete pThis;
                         if (fn->IsFunction()) {
                             Local <Value> res = Boolean::New(isolate, result);
                             auto unused = fn->Call(cxt, fn, 1, &res);
