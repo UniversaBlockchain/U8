@@ -18,7 +18,7 @@ namespace network {
     UDPAdapter::UDPAdapter(const crypto::PrivateKey& ownPrivateKey, int ownNodeNumber, const NetConfig& netConfig,
                            const TReceiveCallback& receiveCallback, bool throwErrors)
        :minstdRand_(std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now().time_since_epoch()).count())
-       ,senderPool_(2)
+       ,senderPool_(1)
        ,receiverPool_(1)
        ,netConfig_(netConfig)
        ,ownNodeInfo_(netConfig.getInfo(ownNodeNumber))

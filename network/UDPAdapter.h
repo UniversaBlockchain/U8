@@ -320,8 +320,6 @@ namespace network {
 
     private:
         std::minstd_rand minstdRand_;
-        ThreadPool senderPool_;
-        ThreadPool receiverPool_;
         bool isLogEnabled_ = false;
         bool throwErrors_ = false;
         std::string logLabel_;
@@ -338,6 +336,9 @@ namespace network {
         std::recursive_mutex socketMutex_;
         bool isClosed_ = false;
         bool testMode_ = false;
+
+        ThreadPool senderPool_;
+        ThreadPool receiverPool_;
 
         friend class Retransmitter;
     };
