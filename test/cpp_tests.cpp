@@ -113,17 +113,17 @@ TEST_CASE("Semaphore") {
 
     const int WEIGHT = 100000;
 
-    Semaphore sem;
+    std::shared_ptr<Semaphore> sem = std::make_shared<Semaphore>();
     atomic<long> counter(0);
 
     for (int i = 0; i < 10; ++i) {
-        writerPool.execute([&sem]() {
+        writerPool.execute([sem]() {
             for (int c = 0; c < WEIGHT; ++c)
-                sem.notify();
+                sem->notify();
         });
-        readerPool.execute([&sem, &counter]() {
+        readerPool.execute([sem, &counter]() {
             do {
-                if (sem.wait(10ms))
+                if (sem->wait(10ms))
                     ++counter;
             } while (counter < WEIGHT * 10);
         });
@@ -135,7 +135,7 @@ TEST_CASE("Semaphore") {
     } while (counter < WEIGHT * 10);
 
     REQUIRE(long(counter) == WEIGHT*10);
-    REQUIRE(sem.count() == 0);
+    REQUIRE(sem->count() == 0);
 }
 
 TEST_CASE("Check_V8_version") {
