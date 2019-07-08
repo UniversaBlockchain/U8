@@ -25,10 +25,19 @@ public:
      * Wait for notify. Returning true if it was received, false if timeout expired.
      */
     inline bool wait(std::chrono::milliseconds max_duration = std::chrono::milliseconds::max()) {
+//        std::unique_lock<std::mutex> lock(mtx_);
+//
+//        while (count_ == 0) {
+//            if (cv_.wait_until(lock, (max_duration > std::chrono::hours(1000000)) ? std::chrono::system_clock::time_point::max() : std::chrono::system_clock::now() + max_duration) != std::cv_status::no_timeout)
+//                return false;
+//        }
+//        --count_;
+//        return true;
         std::unique_lock<std::mutex> lock(mtx_);
-
+        if (max_duration == std::chrono::milliseconds::max())
+            max_duration = std::chrono::hours(876000);
         while (count_ == 0) {
-            if (cv_.wait_until(lock, (max_duration > std::chrono::hours(1000000)) ? std::chrono::system_clock::time_point::max() : std::chrono::system_clock::now() + max_duration) != std::cv_status::no_timeout)
+            if (cv_.wait_for(lock, max_duration) != std::cv_status::no_timeout)
                 return false;
         }
         --count_;
