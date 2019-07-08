@@ -40,34 +40,37 @@ class RateCounter {
 }
 
 unit.test("stress_test_3", async () => {
-    let promises = [];
     let t0 = new Date().getTime();
     let c0 = 0;
     let sendCounter = 0;
     let readyCounter = 0;
     let privkey = await crypto.PrivateKey.generate(2048);
     let pubkey = privkey.publicKey;
-    for (let i = 0; i < 100000000; ++i) {
-        ++sendCounter;
-        promises.push(new Promise(resolve => {
-                pubkey.__verify(utf8Encode("data"), utf8Encode("signature"), crypto.SHA3_256, async (val)=>{
-                    await sleep(10);
-                    ++readyCounter;
-                    let dt = new Date().getTime() - t0;
-                    if (dt > 1000) {
-                        console.log("rate = " + ((readyCounter - c0) * 1000 / dt).toFixed(0) +
-                            ", readyCounter = " + readyCounter);
-                        c0 = readyCounter;
-                        t0 = new Date().getTime();
-                    }
-                    resolve(val);
+    for (let k = 0; k < 1000; ++k) {
+        let promises = [];
+        for (let i = 0; i < 1000000; ++i) {
+            ++sendCounter;
+            promises.push(new Promise(resolve => {
+                    pubkey.__verify(utf8Encode("data"), utf8Encode("signature"), crypto.SHA3_256, async (val) => {
+                        await sleep(10);
+                        ++readyCounter;
+                        let dt = new Date().getTime() - t0;
+                        if (dt > 1000) {
+                            console.log("rate = " + ((readyCounter - c0) * 1000 / dt).toFixed(0) +
+                                ", readyCounter = " + readyCounter);
+                            c0 = readyCounter;
+                            t0 = new Date().getTime();
+                        }
+                        resolve(val);
+                    })
                 })
-            })
-        );
-        if (sendCounter - readyCounter > 1000)
-            await sleep(10);
+            );
+            if (sendCounter - readyCounter > 1000)
+                await sleep(10);
+        }
+        await Promise.all(promises);
+        console.log("============ " + k + " ============");
     }
-    await Promise.all(promises);
 });
 
 unit.test("stress_test", async () => {
