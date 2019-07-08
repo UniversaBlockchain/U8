@@ -179,6 +179,7 @@ static void publicKeyVerify(const FunctionCallbackInfo<Value> &args) {
                 auto ht = (HashType) ac.asInt(2);
                 auto isolate = ac.isolate;
                 auto *onReady = new Persistent<Function>(ac.isolate, ac.as<Function>(3));
+                auto *pThis = new Persistent<Value>(ac.isolate, ac.args.This());
                 shared_ptr<Scripter> scripter = ac.scripter;
 
                 jsThreadPool([=]() {
@@ -193,6 +194,7 @@ static void publicKeyVerify(const FunctionCallbackInfo<Value> &args) {
                         } else {
                             cerr << "publicKey::verify: callback is not a function\n";
                         }
+                        delete pThis;
                     });
                 });
                 return;
