@@ -16,10 +16,10 @@
 
 using namespace crypto;
 
-static Persistent<FunctionTemplate> publicKeyTpl;
-static Persistent<FunctionTemplate> privateKeyTpl;
+static Persistent <FunctionTemplate> publicKeyTpl;
+static Persistent <FunctionTemplate> privateKeyTpl;
 
-static void privateKeySign(const FunctionCallbackInfo<Value> &args) {
+static void privateKeySign(const FunctionCallbackInfo <Value> &args) {
     Scripter::unwrapArgs(args, [&](ArgsContext &ac) {
         // __sign(data, hashType, callback)
         if (args.Length() == 3) {
@@ -37,12 +37,12 @@ static void privateKeySign(const FunctionCallbackInfo<Value> &args) {
 
                     jsThreadPool([=]() {
                         auto signature = key->sign(data, size, ht);
-                        scripter->lockedContext([=](Local<Context> cxt) {
+                        scripter->lockedContext([=](Local <Context> cxt) {
                             auto fn = onReady->Get(scripter->isolate());
                             onReady->Reset();
                             delete onReady;
                             if (fn->IsFunction()) {
-                                Local<Value> result = vectorToV8(isolate, signature);
+                                Local <Value> result = vectorToV8(isolate, signature);
                                 auto unused = fn->Call(cxt, fn, 1, &result);
                             }
                         });
@@ -55,7 +55,7 @@ static void privateKeySign(const FunctionCallbackInfo<Value> &args) {
     });
 }
 
-static void privateKeyDecrypt(const FunctionCallbackInfo<Value> &args) {
+static void privateKeyDecrypt(const FunctionCallbackInfo <Value> &args) {
     Scripter::unwrapArgs(args, [&](ArgsContext &ac) {
         // __decrypt(data, callback)
         if (args.Length() == 3) {
@@ -74,29 +74,29 @@ static void privateKeyDecrypt(const FunctionCallbackInfo<Value> &args) {
                         string errorString;
                         try {
                             auto plain = key->decrypt(data, size);
-                            scripter->lockedContext([=](Local<Context> cxt) {
+                            scripter->lockedContext([=](Local <Context> cxt) {
                                 auto fn = onReady->Get(scripter->isolate());
                                 onReady->Reset();
                                 onError->Reset();
                                 delete onReady;
                                 delete onError;
                                 if (fn->IsFunction()) {
-                                    Local<Value> result = vectorToV8(isolate, plain);
+                                    Local <Value> result = vectorToV8(isolate, plain);
                                     auto unused = fn->Call(cxt, fn, 1, &result);
                                 } else {
                                     cerr << "PrivateKey::decrypt invalid callback\n";
                                 }
                             });
                         }
-                        catch(const exception &e) {
-                            scripter->lockedContext([=](Local<Context> cxt) {
+                        catch (const exception &e) {
+                            scripter->lockedContext([=](Local <Context> cxt) {
                                 auto fn = onError->Get(scripter->isolate());
                                 onReady->Reset();
                                 onError->Reset();
                                 delete onReady;
                                 delete onError;
                                 if (fn->IsFunction()) {
-                                    Local<Value> result = scripter->v8String(e.what());
+                                    Local <Value> result = scripter->v8String(e.what());
                                     auto unused = fn->Call(cxt, fn, 1, &result);
                                 } else {
                                     cerr << "PrivateKey::decrypt invalid reject callback\n";
@@ -113,7 +113,7 @@ static void privateKeyDecrypt(const FunctionCallbackInfo<Value> &args) {
     });
 }
 
-static void privateKeyPack(const FunctionCallbackInfo<Value> &args) {
+static void privateKeyPack(const FunctionCallbackInfo <Value> &args) {
     Scripter::unwrapArgs(args, [&](ArgsContext &ac) {
         if (args.Length() == 0) {
             auto key = unwrap<PrivateKey>(args.This());
@@ -124,7 +124,7 @@ static void privateKeyPack(const FunctionCallbackInfo<Value> &args) {
     });
 }
 
-static void privateKeyGenerate(const FunctionCallbackInfo<Value> &args) {
+static void privateKeyGenerate(const FunctionCallbackInfo <Value> &args) {
     Scripter::unwrapArgs(args, [&](ArgsContext &ac) {
         if (args.Length() == 2 && args[0]->IsNumber()) {
             int strength = ac.asInt(0);
@@ -135,14 +135,14 @@ static void privateKeyGenerate(const FunctionCallbackInfo<Value> &args) {
                 shared_ptr<Scripter> scripter = ac.scripter;
                 jsThreadPool([=]() {
                     auto key = new PrivateKey(strength);
-                    scripter->lockedContext([=](Local<Context> cxt) {
+                    scripter->lockedContext([=](Local <Context> cxt) {
                         auto fn = onReady->Get(scripter->isolate());
                         onReady->Reset();
                         delete onReady;
                         if (fn->IsNull()) {
                             scripter->throwError("null callback in PrivateKey::generate");
                         } else {
-                            Local<Value> res[1]{wrap(privateKeyTpl, scripter->isolate(), key)};
+                            Local <Value> res[1]{wrap(privateKeyTpl, scripter->isolate(), key)};
                             auto unused = fn->Call(cxt, fn, 1, res);
                         }
                     });
@@ -154,7 +154,7 @@ static void privateKeyGenerate(const FunctionCallbackInfo<Value> &args) {
     });
 }
 
-static void publicKeyPack(const FunctionCallbackInfo<Value> &args) {
+static void publicKeyPack(const FunctionCallbackInfo <Value> &args) {
     Scripter::unwrapArgs(args, [&](ArgsContext &ac) {
         if (args.Length() == 0) {
             auto key = unwrap<PublicKey>(args.This());
@@ -165,7 +165,7 @@ static void publicKeyPack(const FunctionCallbackInfo<Value> &args) {
     });
 }
 
-static void publicKeyVerify(const FunctionCallbackInfo<Value> &args) {
+static void publicKeyVerify(const FunctionCallbackInfo <Value> &args) {
     Scripter::unwrapArgs(args, [](ArgsContext &ac) {
         if (ac.args.Length() == 4) {
             auto key = unwrap<PublicKey>(ac.args.This());
@@ -184,17 +184,19 @@ static void publicKeyVerify(const FunctionCallbackInfo<Value> &args) {
 
                 jsThreadPool([=]() {
                     bool result = key->verify(sigData, sigSize, dataData, dataSize, ht);
-                    scripter->lockedContext([=](Local<Context> cxt) {
+                    scripter->lockedContext([=](Local <Context> cxt) {
                         auto fn = onReady->Get(isolate);
-                        onReady->Reset();
+                        onReady->Reset()
                         delete onReady;
+                        auto me = pThis->Get(isolate);
+                        pThis->Reset();
+                        delete pThis;
                         if (fn->IsFunction()) {
-                            Local<Value> res = Boolean::New(isolate, result);
+                            Local <Value> res = Boolean::New(isolate, result);
                             auto unused = fn->Call(cxt, fn, 1, &res);
                         } else {
                             cerr << "publicKey::verify: callback is not a function\n";
                         }
-                        delete pThis;
                     });
                 });
                 return;
@@ -204,7 +206,7 @@ static void publicKeyVerify(const FunctionCallbackInfo<Value> &args) {
     });
 }
 
-static void publicKeyEncrypt(const FunctionCallbackInfo<Value> &args) {
+static void publicKeyEncrypt(const FunctionCallbackInfo <Value> &args) {
     Scripter::unwrapArgs(args, [](ArgsContext &ac) {
         if (ac.args.Length() == 2) {
             auto key = unwrap<PublicKey>(ac.args.This());
@@ -217,12 +219,12 @@ static void publicKeyEncrypt(const FunctionCallbackInfo<Value> &args) {
                 shared_ptr<Scripter> scripter = ac.scripter;
                 jsThreadPool([=]() {
                     auto result = key->encrypt(data, size);
-                    scripter->lockedContext([=](Local<Context> cxt) {
+                    scripter->lockedContext([=](Local <Context> cxt) {
                         auto fn = onReady->Get(isolate);
                         onReady->Reset();
                         delete onReady;
                         if (fn->IsFunction()) {
-                            Local<Value> res = vectorToV8(isolate, result);
+                            Local <Value> res = vectorToV8(isolate, result);
                             auto unused = fn->Call(cxt, fn, 1, &res);
                         } else {
                             cerr << "publicKey::encrypt: callback is not a function\n";
@@ -236,7 +238,7 @@ static void publicKeyEncrypt(const FunctionCallbackInfo<Value> &args) {
     });
 }
 
-static void publicKeyFingerprints(const FunctionCallbackInfo<Value> &args) {
+static void publicKeyFingerprints(const FunctionCallbackInfo <Value> &args) {
     Scripter::unwrapArgs(args, [](ArgsContext &ac) {
         if (ac.args.Length() == 0) {
             auto key = unwrap<PublicKey>(ac.args.This());
@@ -247,7 +249,7 @@ static void publicKeyFingerprints(const FunctionCallbackInfo<Value> &args) {
     });
 }
 
-static void publicKeyBitsStrength(const FunctionCallbackInfo<Value> &args) {
+static void publicKeyBitsStrength(const FunctionCallbackInfo <Value> &args) {
     Scripter::unwrapArgs(args, [](ArgsContext &ac) {
         if (ac.args.Length() == 0) {
             auto key = unwrap<PublicKey>(ac.args.This());
@@ -258,7 +260,7 @@ static void publicKeyBitsStrength(const FunctionCallbackInfo<Value> &args) {
     });
 }
 
-static void keyAddressToString(const FunctionCallbackInfo<Value> &args) {
+static void keyAddressToString(const FunctionCallbackInfo <Value> &args) {
     Scripter::unwrapArgs(args, [](ArgsContext &ac) {
         if (ac.args.Length() == 0) {
             auto keyAddress = unwrap<KeyAddress>(ac.args.This());
@@ -269,7 +271,7 @@ static void keyAddressToString(const FunctionCallbackInfo<Value> &args) {
     });
 }
 
-static void keyAddressGetPacked(const FunctionCallbackInfo<Value> &args) {
+static void keyAddressGetPacked(const FunctionCallbackInfo <Value> &args) {
     Scripter::unwrapArgs(args, [](ArgsContext &ac) {
         if (ac.args.Length() == 0) {
             auto keyAddress = unwrap<KeyAddress>(ac.args.This());
@@ -280,13 +282,13 @@ static void keyAddressGetPacked(const FunctionCallbackInfo<Value> &args) {
     });
 }
 
-static void keyAddressMatch(const FunctionCallbackInfo<Value> &args) {
+static void keyAddressMatch(const FunctionCallbackInfo <Value> &args) {
     Scripter::unwrapArgs(args, [](ArgsContext &ac) {
         if (ac.args.Length() == 1) {
             auto keyAddress = unwrap<KeyAddress>(ac.args.This());
             auto isolate = ac.isolate;
             auto pkt = publicKeyTpl.Get(isolate);
-            Local<Object> obj = ac.args[0].As<Object>();
+            Local <Object> obj = ac.args[0].As<Object>();
             if (pkt->HasInstance(obj)) {
                 PublicKey *key = unwrap<PublicKey>(obj);
                 ac.setReturnValue(keyAddress->isMatchingKey(*key));
@@ -300,7 +302,7 @@ static void keyAddressMatch(const FunctionCallbackInfo<Value> &args) {
     });
 }
 
-static void hashIdGetDigest(const FunctionCallbackInfo<Value> &args) {
+static void hashIdGetDigest(const FunctionCallbackInfo <Value> &args) {
     Scripter::unwrapArgs(args, [](ArgsContext &ac) {
         if (ac.args.Length() == 0) {
             auto hashId = unwrap<HashId>(ac.args.This());
@@ -311,7 +313,7 @@ static void hashIdGetDigest(const FunctionCallbackInfo<Value> &args) {
     });
 }
 
-static void hashIdGetBase64String(const FunctionCallbackInfo<Value> &args) {
+static void hashIdGetBase64String(const FunctionCallbackInfo <Value> &args) {
     Scripter::unwrapArgs(args, [](ArgsContext &ac) {
         if (ac.args.Length() == 0) {
             auto hashId = unwrap<HashId>(ac.args.This());
@@ -323,11 +325,11 @@ static void hashIdGetBase64String(const FunctionCallbackInfo<Value> &args) {
 }
 
 
-Local<FunctionTemplate> initPrivateKey(Isolate *isolate) {
-    Local<FunctionTemplate> tpl = bindCppClass<PrivateKey>(
+Local <FunctionTemplate> initPrivateKey(Isolate *isolate) {
+    Local <FunctionTemplate> tpl = bindCppClass<PrivateKey>(
             isolate,
             "PrivateKeyImpl",
-            [=](const FunctionCallbackInfo<Value> &args) -> PrivateKey * {
+            [=](const FunctionCallbackInfo <Value> &args) -> PrivateKey * {
                 if (args.Length() == 1) {
                     if (args[0]->IsTypedArray()) {
                         // load from packed
@@ -350,11 +352,11 @@ Local<FunctionTemplate> initPrivateKey(Isolate *isolate) {
     return tpl;
 }
 
-Local<FunctionTemplate> initPublicKey(Isolate *isolate) {
-    Local<FunctionTemplate> tpl = bindCppClass<PublicKey>(
+Local <FunctionTemplate> initPublicKey(Isolate *isolate) {
+    Local <FunctionTemplate> tpl = bindCppClass<PublicKey>(
             isolate,
             "PublicKeyImpl",
-            [](const FunctionCallbackInfo<Value> &args) -> PublicKey * {
+            [](const FunctionCallbackInfo <Value> &args) -> PublicKey * {
                 Isolate *isolate = args.GetIsolate();
                 if (args.Length() == 1) {
                     if (args[0]->IsTypedArray()) {
@@ -362,7 +364,7 @@ Local<FunctionTemplate> initPublicKey(Isolate *isolate) {
                         return new PublicKey(contents.Data(), contents.ByteLength());
                     } else if (args[0]->IsObject()) {
                         auto pkt = privateKeyTpl.Get(isolate);
-                        Local<Object> obj = args[0].As<Object>();
+                        Local <Object> obj = args[0].As<Object>();
                         if (pkt->HasInstance(obj))
                             return new PublicKey(*unwrap<PrivateKey>(obj));
                         isolate->ThrowException(
@@ -385,11 +387,11 @@ Local<FunctionTemplate> initPublicKey(Isolate *isolate) {
     return tpl;
 }
 
-Local<FunctionTemplate> initKeyAddress(Isolate *isolate) {
-    Local<FunctionTemplate> tpl = bindCppClass<KeyAddress>(
+Local <FunctionTemplate> initKeyAddress(Isolate *isolate) {
+    Local <FunctionTemplate> tpl = bindCppClass<KeyAddress>(
             isolate,
             "KeyAddress",
-            [](const FunctionCallbackInfo<Value> &args) -> KeyAddress * {
+            [](const FunctionCallbackInfo <Value> &args) -> KeyAddress * {
                 auto isolate = args.GetIsolate();
                 auto a0 = args[0];
                 if (a0->IsTypedArray() && args.Length() == 1) {
@@ -401,7 +403,7 @@ Local<FunctionTemplate> initKeyAddress(Isolate *isolate) {
                     String::Utf8Value s(isolate, a0);
                     return new KeyAddress(*s);
                 } else if (a0->IsObject() && args.Length() == 3) {
-                    Local<Object> obj = a0.As<Object>();
+                    Local <Object> obj = a0.As<Object>();
                     auto tpl = publicKeyTpl.Get(isolate);
                     if (tpl->HasInstance(obj)) {
                         auto context = args.GetIsolate()->GetCurrentContext();
@@ -428,11 +430,11 @@ Local<FunctionTemplate> initKeyAddress(Isolate *isolate) {
 /*
  * constructor: new HashId(data, isDigest)
  */
-Local<FunctionTemplate> initHashId(Isolate *isolate) {
-    Local<FunctionTemplate> tpl = bindCppClass<HashId>(
+Local <FunctionTemplate> initHashId(Isolate *isolate) {
+    Local <FunctionTemplate> tpl = bindCppClass<HashId>(
             isolate,
             "HashIdImpl",
-            [=](const FunctionCallbackInfo<Value> &args) -> HashId * {
+            [=](const FunctionCallbackInfo <Value> &args) -> HashId * {
                 if (args.Length() == 2) {
                     bool isDigest = args[0]->BooleanValue(isolate);
                     if (args[1]->IsTypedArray()) {
@@ -458,7 +460,7 @@ Local<FunctionTemplate> initHashId(Isolate *isolate) {
 }
 
 
-static void symmetricKeyEncrypt(const FunctionCallbackInfo<Value> &args) {
+static void symmetricKeyEncrypt(const FunctionCallbackInfo <Value> &args) {
     Scripter::unwrapArgs(args, [](ArgsContext &ac) {
         if (ac.args.Length() == 1 && ac.args[0]->IsTypedArray()) {
             auto key = unwrap<SymmetricKey>(ac.args.This());
@@ -472,7 +474,7 @@ static void symmetricKeyEncrypt(const FunctionCallbackInfo<Value> &args) {
     });
 }
 
-static void symmetricKeyDecrypt(const FunctionCallbackInfo<Value> &args) {
+static void symmetricKeyDecrypt(const FunctionCallbackInfo <Value> &args) {
     Scripter::unwrapArgs(args, [](ArgsContext &ac) {
         if (ac.args.Length() == 1 && ac.args[0]->IsTypedArray()) {
             auto key = unwrap<SymmetricKey>(ac.args.This());
@@ -486,7 +488,7 @@ static void symmetricKeyDecrypt(const FunctionCallbackInfo<Value> &args) {
     });
 }
 
-static void symmetricKeyPack(const FunctionCallbackInfo<Value> &args) {
+static void symmetricKeyPack(const FunctionCallbackInfo <Value> &args) {
     Scripter::unwrapArgs(args, [](ArgsContext &ac) {
         if (ac.args.Length() == 0) {
             auto key = unwrap<SymmetricKey>(ac.args.This());
@@ -506,12 +508,12 @@ static void symmetricKeyPack(const FunctionCallbackInfo<Value> &args) {
  * @param isolate
  * @return
  */
-Local<FunctionTemplate> initSymmetricKey(Isolate *isolate) {
-    Local<FunctionTemplate>
+Local <FunctionTemplate> initSymmetricKey(Isolate *isolate) {
+    Local <FunctionTemplate>
             tpl = bindCppClass<SymmetricKey>(
             isolate,
             "SymmetricKey",
-            [=](const FunctionCallbackInfo<Value> &args) -> SymmetricKey * {
+            [=](const FunctionCallbackInfo <Value> &args) -> SymmetricKey * {
                 switch (args.Length()) {
                     case 1:
                         if (args[0]->IsTypedArray()) {
@@ -542,7 +544,7 @@ Local<FunctionTemplate> initSymmetricKey(Isolate *isolate) {
 }
 
 
-static void JsA2B(const FunctionCallbackInfo<Value> &args) {
+static void JsA2B(const FunctionCallbackInfo <Value> &args) {
     Scripter::unwrapArgs(args, [](ArgsContext &ac) {
         if (ac.args.Length() == 1) {
             ac.setReturnValue(ac.toBinary(base64_decodeToBytes(ac.asString(0))));
@@ -551,7 +553,7 @@ static void JsA2B(const FunctionCallbackInfo<Value> &args) {
     });
 }
 
-static void JsB2A(const FunctionCallbackInfo<Value> &args) {
+static void JsB2A(const FunctionCallbackInfo <Value> &args) {
     Scripter::unwrapArgs(args, [](ArgsContext &ac) {
         if (ac.args.Length() == 1) {
             if (ac.args[0]->IsUint8Array()) {
@@ -564,7 +566,7 @@ static void JsB2A(const FunctionCallbackInfo<Value> &args) {
     });
 }
 
-static void digest(const FunctionCallbackInfo<Value> &args) {
+static void digest(const FunctionCallbackInfo <Value> &args) {
     Scripter::unwrapArgs(args, [](ArgsContext &ac) {
         if (ac.args.Length() == 2) {
             int ht = ac.asInt(0);
@@ -586,7 +588,7 @@ static void digest(const FunctionCallbackInfo<Value> &args) {
 }
 
 
-void JsInitCrypto(Isolate *isolate, const Local<ObjectTemplate> &global) {
+void JsInitCrypto(Isolate *isolate, const Local <ObjectTemplate> &global) {
     auto crypto = ObjectTemplate::New(isolate);
 
     // order is critical!
