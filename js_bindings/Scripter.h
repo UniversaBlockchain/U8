@@ -28,15 +28,15 @@ class Scripter : public std::enable_shared_from_this<Scripter>, public Logging {
 public:
 
     // ------------------- helpers -------------------------------
-    Local <String> v8String(string x, NewStringType t = NewStringType::kNormal) {
+    Local<String> v8String(string x, NewStringType t = NewStringType::kNormal) {
         return String::NewFromUtf8(pIsolate, x.c_str(), t).ToLocalChecked();
     }
 
-    Local <String> v8String(const char *cstr, NewStringType t = NewStringType::kNormal) {
+    Local<String> v8String(const char *cstr, NewStringType t = NewStringType::kNormal) {
         return String::NewFromUtf8(pIsolate, cstr, t).ToLocalChecked();
     }
 
-    Local <FunctionTemplate> functionTemplate(FunctionCallback callback) {
+    Local<FunctionTemplate> functionTemplate(FunctionCallback callback) {
         return FunctionTemplate::New(pIsolate, callback);
     }
 
@@ -92,12 +92,12 @@ public:
     }
 
     template<typename T>
-    string getString(MaybeLocal <T> value) {
+    string getString(MaybeLocal<T> value) {
         return getString(value.ToLocalChecked());
     }
 
     template<typename T>
-    string getString(Local <T> value) {
+    string getString(Local<T> value) {
         String::Utf8Value result(pIsolate, value);
         return *result;
     }
@@ -132,7 +132,7 @@ public:
         v8::Locker locker(pIsolate);
         Isolate::Scope iscope(pIsolate);
         v8::HandleScope handle_scope(pIsolate);
-        Local <Context> cxt = context.Get(pIsolate);
+        Local<Context> cxt = context.Get(pIsolate);
         v8::Context::Scope context_scope(cxt);
         return block(cxt);
     }
@@ -149,7 +149,7 @@ public:
             v8::Locker locker(pIsolate);
             Isolate::Scope iscope(pIsolate);
             v8::HandleScope handle_scope(pIsolate);
-            Local <Context> cxt = context.Get(pIsolate);
+            Local<Context> cxt = context.Get(pIsolate);
             v8::Context::Scope context_scope(cxt);
             block(cxt);
         });
@@ -164,13 +164,13 @@ public:
      * @param block to execute in unwrapped Scripter environment
      */
     static void unwrap(
-            const v8::FunctionCallbackInfo <v8::Value> &args,
-            const std::function<void(shared_ptr<Scripter>, v8::Isolate *, const v8::Local <v8::Context> &)> &block
+            const v8::FunctionCallbackInfo<v8::Value> &args,
+            const std::function<void(shared_ptr<Scripter>, v8::Isolate *, const v8::Local<v8::Context> &)> &block
     );
 
     template<typename F>
     static void unwrapArgs(
-            const v8::FunctionCallbackInfo <v8::Value> &args,
+            const v8::FunctionCallbackInfo<v8::Value> &args,
             F &&block
     );
 
@@ -195,9 +195,9 @@ public:
     virtual ~Scripter();
 
     template<class T>
-    void throwPendingException(TryCatch &tc, Local <Context>);
+    void throwPendingException(TryCatch &tc, Local<Context>);
 
-    bool checkException(TryCatch &tc, Local <Context>);
+    bool checkException(TryCatch &tc, Local<Context>);
 
     /**
      * Turn "wait exit" more on (may not be effective except with runAsMain)
@@ -267,7 +267,7 @@ private:
     void initialize();
 
     // Sleep timer is in exclusive use of this function:
-    friend void JsTimer(const v8::FunctionCallbackInfo <v8::Value> &args);
+    friend void JsTimer(const v8::FunctionCallbackInfo<v8::Value> &args);
 
     // used to implement JS timers.
     AsyncSleep asyncSleep;
@@ -282,7 +282,7 @@ private:
     v8::Isolate *pIsolate;
     v8::Isolate::CreateParams create_params;
 
-    v8::Persistent <v8::Context> context;
+    v8::Persistent<v8::Context> context;
 
     // do not construct it manually
     explicit Scripter();
@@ -307,17 +307,17 @@ class ArgsContext {
 public:
     shared_ptr<Scripter> scripter;
     Isolate *isolate;
-    Local <Context> context;
-    const FunctionCallbackInfo <Value> &args;
+    Local<Context> context;
+    const FunctionCallbackInfo<Value> &args;
 
 
-    ArgsContext(const shared_ptr<Scripter> &scripter_, const FunctionCallbackInfo <Value> &args_)
+    ArgsContext(const shared_ptr<Scripter> &scripter_, const FunctionCallbackInfo<Value> &args_)
             : args(args_), scripter(scripter_), isolate(args_.GetIsolate()),
               context(isolate->GetEnteredContext()), pcontext(nullptr) {
     }
 
     template<typename T>
-    Local <T> as(int index) {
+    Local<T> as(int index) {
         return args[index].As<T>();
     }
 
@@ -337,22 +337,22 @@ public:
         return scripter->getString(args[index]);
     }
 
-    Local <Uint8Array> toBinary(const void *result, size_t size) {
+    Local<Uint8Array> toBinary(const void *result, size_t size) {
         auto ab = ArrayBuffer::New(isolate, size);
         memcpy(ab->GetContents().Data(), result, size);
         return Uint8Array::New(ab, 0, size);
     }
 
-    Local <Uint8Array> toBinary(const byte_vector &result) {
+    Local<Uint8Array> toBinary(const byte_vector &result) {
         return toBinary(result.data(), result.size());
     }
 
 
-    Local <Uint8Array> toBinary(byte_vector &&result) {
+    Local<Uint8Array> toBinary(byte_vector &&result) {
         return toBinary(result.data(), result.size());
     }
 
-    Local <String> toString(byte_vector &&result) {
+    Local<String> toString(byte_vector &&result) {
         return String::NewFromUtf8(isolate, (const char *) result.data());
     }
 
@@ -369,11 +369,11 @@ public:
         args.GetReturnValue().Set(value);
     }
 
-    Local <String> v8String(string x, NewStringType t = NewStringType::kNormal) {
+    Local<String> v8String(string x, NewStringType t = NewStringType::kNormal) {
         return scripter->v8String(x, t);
     }
 
-    Local <String> v8String(const char *cstr, NewStringType t = NewStringType::kNormal) {
+    Local<String> v8String(const char *cstr, NewStringType t = NewStringType::kNormal) {
         return scripter->v8String(cstr, t);
     }
 
@@ -383,13 +383,13 @@ public:
 //    }
 
 private:
-    Persistent <Context> *pcontext;
+    Persistent<Context> *pcontext;
 
 };
 
 class BufferHandler {
 private:
-    Persistent <TypedArray> _pbuffer;
+    Persistent<TypedArray> _pbuffer;
     void *_data;
     size_t _size;
 public:
@@ -414,7 +414,7 @@ public:
 
 class FunctionHandler {
 private:
-    Persistent <Function> _pfunction;
+    Persistent<Function> _pfunction;
     Isolate *_isolate;
     shared_ptr<Scripter> _scripter;
 
@@ -425,9 +425,42 @@ public:
         if (fn->IsFunction()) {
             return fn->Call(cxt, fn, argsCount, args);
         } else {
+            cerr << "callback is not a function\n";
             _scripter->throwError("callback is not a function");
+            // and return empty MaybeLocal
             return MaybeLocal<Value>();
         }
+    }
+
+    MaybeLocal<Value> call(Local<Context> &cxt, int argsCount, const Local<Value> *args) {
+        return call(cxt, argsCount, const_cast<Local<Value> *>(args));
+    }
+
+    /**
+     * Performs call in a locked context of a contained scripter. Useful when the only action in the locked
+     * context is calling the callback.
+     *
+     * @param singleArg to pass to callback
+     */
+    void invoke(Local<Value> &&singleArg) {
+        Local<Value> x[] = {singleArg};
+        invoke(1, x);
+    }
+
+    /**
+     * Performs call in a locked context of a contained scripter. Useful when the only action in the locked
+     * context is calling the callback.
+     * @param argsCount number of arguments
+     * @param args to pass to the callback
+     */
+    void invoke(int argsCount, Local<Value> *args) {
+        _scripter->lockedContext([=](Local<Context> cxt) {
+            call(cxt, argsCount, args);
+        });
+    }
+
+    MaybeLocal<Value> call(Local<Context> &cxt, Local<Value> &&singleArg) {
+        return call(cxt, 1, &singleArg);
     }
 
     FunctionHandler(ArgsContext &ac, unsigned index)
@@ -440,14 +473,14 @@ public:
 
 template<typename F>
 void Scripter::unwrapArgs(
-        const v8::FunctionCallbackInfo <v8::Value> &args,
+        const v8::FunctionCallbackInfo<v8::Value> &args,
         F &&block
 ) {
     Isolate *isolate = args.GetIsolate();
     HandleScope handle_scope(isolate);
 
     auto context = isolate->GetEnteredContext();
-    Local <External> wrap = Local<External>::Cast(context->GetEmbedderData(1));
+    Local<External> wrap = Local<External>::Cast(context->GetEmbedderData(1));
     auto weak = static_cast<weak_ptr<Scripter> *>(wrap->Value());
     shared_ptr<Scripter> scripter = weak->lock();
     if (scripter) {
