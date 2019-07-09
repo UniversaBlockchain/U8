@@ -131,8 +131,7 @@ static void privateKeyGenerate(const FunctionCallbackInfo<Value> &args) {
             if (strength < 2048)
                 ac.throwError("strength must be at least 2048");
             else {
-                auto *onReady = new Persistent<Function>(ac.isolate, ac.as<Function>(1));
-                shared_ptr<Scripter> scripter = ac.scripter;
+                auto onReady = ac.asFunction(1);
                 jsThreadPool([=]() {
                     auto key = new PrivateKey(strength);
                     onReady->lockedContext([=](Local<Context> cxt) {
@@ -168,6 +167,7 @@ static void publicKeyVerify(const FunctionCallbackInfo<Value> &args) {
                 auto onReady = ac.asFunction(3);
                 jsThreadPool([=]() {
                     bool result = key->verify(psig->data(), psig->size(), pdata->data(), pdata->size(), ht);
+//bool result = false;
                     onReady->invoke(Boolean::New(onReady->isolate(), result));
                 });
                 return;

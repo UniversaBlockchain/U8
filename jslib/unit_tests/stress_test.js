@@ -52,7 +52,7 @@ unit.test("stress_test_3", async () => {
             ++sendCounter;
             promises.push(new Promise(resolve => {
                     pubkey.__verify(utf8Encode("data"), utf8Encode("signature"), crypto.SHA3_256, async (val) => {
-                        await sleep(10);
+                        // await sleep(10);
                         ++readyCounter;
                         let dt = new Date().getTime() - t0;
                         if (dt > 1000) {
@@ -65,8 +65,8 @@ unit.test("stress_test_3", async () => {
                     })
                 })
             );
-            if (sendCounter - readyCounter > 1000)
-                await sleep(10);
+            // if (sendCounter - readyCounter > 1000)
+            //     await sleep(10);
         }
         await Promise.all(promises);
         console.log("============ " + k + " ============");

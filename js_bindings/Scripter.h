@@ -387,19 +387,34 @@ private:
 
 };
 
-class BufferHandler {
+class ScripterHolder {
+public:
+    ScripterHolder(ArgsContext &ac) : _scripter(ac.scripter) {}
+
+    Scripter *scripter() { return _scripter.get(); }
+
+    Isolate *isolate() { return _scripter->isolate(); }
+
+    template<typename F>
+    inline auto lockedContext(F block) { _scripter->lockedContext(block); }
+
+protected:
+    shared_ptr<Scripter> _scripter;
+};
+
+class BufferHandler : public ScripterHolder {
 private:
     Persistent<TypedArray> _pbuffer;
     void *_data;
     size_t _size;
 public:
-    BufferHandler(Isolate *isolate, Local <TypedArray> &&local) : _pbuffer(isolate, local) {
+    BufferHandler(ArgsContext &ac, unsigned index) : ScripterHolder(ac) {
+        auto local = ac.as<TypedArray>(index);
+        _pbuffer.Reset(ac.isolate, local);
         auto contents = local->Buffer()->GetContents();
         _data = contents.Data();
         _size = contents.ByteLength();
     }
-
-    BufferHandler(ArgsContext &ac, unsigned index) : BufferHandler(ac.isolate, ac.as<TypedArray>(index)) {}
 
     ~BufferHandler() {
         _pbuffer.Reset();
@@ -412,7 +427,7 @@ public:
     inline auto size() const { return _size; }
 };
 
-class FunctionHandler {
+class FunctionHandler : public ScripterHolder {
 private:
     Persistent<Function> _pfunction;
     Isolate *_isolate;
@@ -420,8 +435,8 @@ private:
 
 public:
 
-    auto call(Local <Context> &cxt, int argsCount, Local<Value>* args) {
-        auto fn = _pfunction.Get(_isolate);
+    MaybeLocal<Value> call(Local<Context> &cxt, int argsCount, Local<Value> *args) {
+        auto fn = _pfunction.Get(cxt->GetIsolate());
         if (fn->IsFunction()) {
             return fn->Call(cxt, fn, argsCount, args);
         } else {
@@ -464,8 +479,8 @@ public:
     }
 
     FunctionHandler(ArgsContext &ac, unsigned index)
-            : _pfunction(ac.isolate, ac.as<Function>(index)), _isolate(ac.isolate), _scripter(ac.scripter)
-            {}
+            : _pfunction(ac.isolate, ac.as<Function>(index)), _isolate(ac.isolate), _scripter(ac.scripter),
+              ScripterHolder(ac) {}
 
     ~FunctionHandler() { _pfunction.Reset(); }
 };
