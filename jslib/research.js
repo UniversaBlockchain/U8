@@ -1,25 +1,37 @@
 research.MemoryUserBase = class {
     constructor(implClass) {
-        this.memoryUser1Impl = new implClass();
+        this.memoryUserImpl = new implClass();
     }
 
     fill(minBytesToUse) {
-        this.memoryUser1Impl.__fill(minBytesToUse);
+        this.memoryUserImpl.__fill(minBytesToUse);
         return this;
     }
 
     fillAsync(minBytesToUse) {
         return new Promise(resolve => {
-            this.memoryUser1Impl.__fillAsync(minBytesToUse, ()=>{resolve(this);});
+            this.memoryUserImpl.__fillAsync(minBytesToUse, /*async*/ ()=>{
+                //await sleep(10);
+                resolve(this);
+            });
         });
     }
 
     clear() {
-        this.memoryUser1Impl.__clear();
+        this.memoryUserImpl.__clear();
     }
 
     check() {
-        return this.memoryUser1Impl.__check();
+        return this.memoryUserImpl.__check();
+    }
+
+    checkAsync() {
+        return new Promise(resolve => {
+            this.memoryUserImpl.__checkAsync(/*async*/ (res)=>{
+                //await sleep(10);
+                resolve(res);
+            });
+        });
     }
 };
 

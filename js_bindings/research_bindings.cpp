@@ -114,6 +114,22 @@ void memoryUser_check(const FunctionCallbackInfo<Value> &args) {
     });
 }
 
+template<class T>
+static void memoryUser_checkAsync(const FunctionCallbackInfo<Value> &args) {
+    Scripter::unwrapArgs(args, [](ArgsContext &ac) {
+        if (ac.args.Length() == 1) {
+            auto memoryUser = unwrap<T>(ac.args.This());
+            auto onReady = ac.asFunction(0);
+            jsThreadPool([=]() {
+                bool res = memoryUser->check();
+                onReady->invoke(Boolean::New(onReady->isolate(), res));
+            });
+            return;
+        }
+        ac.throwError("invalid arguments");
+    });
+}
+
 Local<FunctionTemplate> initMemoryUser1(Isolate *isolate) {
     Local<FunctionTemplate> tpl = bindCppClass<MemoryUser1>(
             isolate,
@@ -138,6 +154,7 @@ Local<FunctionTemplate> initMemoryUser1(Isolate *isolate) {
     prototype->Set(isolate, "__fillAsync", FunctionTemplate::New(isolate, memoryUser_fillAsync<MemoryUser1>));
     prototype->Set(isolate, "__clear", FunctionTemplate::New(isolate, memoryUser_clear<MemoryUser1>));
     prototype->Set(isolate, "__check", FunctionTemplate::New(isolate, memoryUser_check<MemoryUser1>));
+    prototype->Set(isolate, "__checkAsync", FunctionTemplate::New(isolate, memoryUser_checkAsync<MemoryUser1>));
 
     MemoryUser1Tpl.Reset(isolate, tpl);
     return tpl;
@@ -167,6 +184,7 @@ Local<FunctionTemplate> initMemoryUser2(Isolate *isolate) {
     prototype->Set(isolate, "__fillAsync", FunctionTemplate::New(isolate, memoryUser_fillAsync<MemoryUser2>));
     prototype->Set(isolate, "__clear", FunctionTemplate::New(isolate, memoryUser_clear<MemoryUser2>));
     prototype->Set(isolate, "__check", FunctionTemplate::New(isolate, memoryUser_check<MemoryUser2>));
+    prototype->Set(isolate, "__checkAsync", FunctionTemplate::New(isolate, memoryUser_checkAsync<MemoryUser2>));
 
     MemoryUser2Tpl.Reset(isolate, tpl);
     return tpl;
@@ -196,6 +214,7 @@ Local<FunctionTemplate> initMemoryUser3(Isolate *isolate) {
     prototype->Set(isolate, "__fillAsync", FunctionTemplate::New(isolate, memoryUser_fillAsync<MemoryUser3>));
     prototype->Set(isolate, "__clear", FunctionTemplate::New(isolate, memoryUser_clear<MemoryUser3>));
     prototype->Set(isolate, "__check", FunctionTemplate::New(isolate, memoryUser_check<MemoryUser3>));
+    prototype->Set(isolate, "__checkAsync", FunctionTemplate::New(isolate, memoryUser_checkAsync<MemoryUser3>));
 
     MemoryUser3Tpl.Reset(isolate, tpl);
     return tpl;
