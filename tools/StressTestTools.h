@@ -221,8 +221,8 @@ private:
 };
 
 template<class GrinderClass>
-void stressQueueTest() {
-    long testDuration         = 135; // sec
+void stressQueueTest(long durationSecs) {
+    long testDuration         = durationSecs;
     long recreateQueuesPeriod = 30; // sec
     size_t writerThreadsCount = 100;
     size_t readerThreadsCount = 100;
