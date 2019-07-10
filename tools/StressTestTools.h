@@ -46,23 +46,30 @@ public:
         stepSize_ = stepSize;
     }
     byte_vector genPayload(RandomByteVectorGenerator& rg) {
+        return QueueGrinder::genPayload(rg, minBufSize_, maxBufSize_);
+    }
+    static byte_vector genPayload(RandomByteVectorGenerator& rg, size_t minBufSize, size_t maxBufSize) {
         crypto::Digest digest(crypto::HashType::SHA256);
-        size_t size = rg.getRandomSize(minBufSize_, maxBufSize_) + digest.getDigestSize();
+        size_t size = rg.getRandomSize(minBufSize, maxBufSize) + digest.getDigestSize();
         byte_vector payload = rg.get(size);
         digest.update(&payload[0], payload.size() - digest.getDigestSize());
         digest.doFinal();
         byte_vector hash = digest.getDigest();
         memcpy(&payload[payload.size() - digest.getDigestSize()], &hash[0], digest.getDigestSize());
+        //payload[0] = 73; // make bad payload
         return payload;
     }
-    void assertValidPayload(const byte_vector& payload) {
+    static void assertValidPayload(const byte_vector& payload) {
+        assert(isPayloadValid(payload));
+    }
+    static bool isPayloadValid(const byte_vector& payload) {
         crypto::Digest digest(crypto::HashType::SHA256);
         digest.update((void*)&payload[0], payload.size() - digest.getDigestSize());
         digest.doFinal();
         byte_vector hash = digest.getDigest();
         byte_vector savedHash(digest.getDigestSize());
         memcpy(&savedHash[0], &payload[payload.size() - digest.getDigestSize()], digest.getDigestSize());
-        assert(hash == savedHash);
+        return (hash == savedHash);
     }
     void fillStep(RandomByteVectorGenerator& rg) {
         size_t stepSize = rg.getRandomSize(1, stepSize_*2); // x2 for filling queue to its maximum size

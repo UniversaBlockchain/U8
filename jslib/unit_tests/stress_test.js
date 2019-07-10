@@ -1,8 +1,9 @@
-import {expect, unit, assert} from 'test'
+import {expect, unit, assert, assertSilent} from 'test'
 import {Ledger} from 'ledger'
 import {udp} from 'network'
 import * as trs from "timers";
 import {HttpServer, HttpClient} from 'web'
+import {MemoryUser1} from "research"
 import * as tk from 'unit_tests/test_keys'
 const ExecutorWithFixedPeriod = require("executorservice").ExecutorWithFixedPeriod;
 const ScheduleExecutor = require("executorservice").ScheduleExecutor;
@@ -38,6 +39,26 @@ class RateCounter {
         console.log(this.name + " rate: " + rate.toFixed(0) + " per sec,\tcounter: " + this.counter);
     }
 }
+
+unit.test("stress_test_bindCppClass", async () => {
+    let list = [];
+    let counter = 0;
+    let eachItemMinimumBytesUsage = 1*1024;
+    let MemoryUserClasses = [research.MemoryUser1, research.MemoryUser2, research.MemoryUser3];
+    while (true) {
+        ++counter;
+        for (let i = 0; (i < 10) && (list.length < 1000); ++i)
+            list.push((new MemoryUserClasses[Math.floor(Math.random()*3)]).fill(eachItemMinimumBytesUsage));
+        let m = list.shift();
+        let res = m.check();
+        if (res !== true)
+            console.error("error detected, check: " + res);
+        assertSilent(res === true);
+        if (counter % 10000 == 0) {
+            console.log("counter: " + counter + ", list.length: " + list.length);
+        }
+    }
+});
 
 unit.test("stress_test_3", async () => {
     let t0 = new Date().getTime();
