@@ -24,7 +24,7 @@ void SimpleFinalizerCallback(const WeakCallbackInfo<SimpleFinalizerParameter<O, 
 /**
  * Install automatic weak callback to free (delete) provided resource on V8 GC using SetWeak on
  * automatically created and handled Global<>. Just call it once after wrapping your data
- * into some V8 object and it well clean it as need.
+ * into some V8 object and it will clean it as need.
  *
  * @tparam V8Object that holds simpleDate in as internal field (for example).
  * @tparam T type of the data to be deleted as V8 object get reclaimed
@@ -53,6 +53,11 @@ private:
     friend void SimpleFinalizer<O, T>(const Local<O> &object, T *simpleData);
 
     friend void SimpleFinalizerCallback<O, T>(const WeakCallbackInfo<SimpleFinalizerParameter<O, T>> &data);
+
+    ~SimpleFinalizerParameter() {
+        delete data;
+        handle.Reset();
+    }
 };
 
 /**
@@ -60,7 +65,6 @@ private:
  */
 template<typename O, typename T>
 void SimpleFinalizerCallback(const WeakCallbackInfo<SimpleFinalizerParameter<O, T>> &data) {
-    delete data.GetParameter()->data;
     // handle resets by destructor so we just delete our parameter, C++ does the rest ;)
     delete data.GetParameter();
 }
@@ -152,9 +156,15 @@ Local<FunctionTemplate> bindCppClass(Isolate *isolate, const char *class_name, F
                                             args.GetReturnValue().SetUndefined();
                                         } else {
                                             Local<Object> result = args.This();
-                                            result->SetInternalField(0, External::New(isolate, cppObject));
-                                            SimpleFinalizer(result, cppObject);
-                                            args.GetReturnValue().Set(args.This());
+                                            if( result->InternalFieldCount() < 1)
+                                            isolate->ThrowException(
+                                                    Exception::TypeError(String::NewFromUtf8(isolate,
+                                                                                             "bindCppClass: Bad tebplate: internal field count is 0")));
+                                            else {
+                                                result->SetInternalField(0, External::New(isolate, cppObject));
+                                                SimpleFinalizer(result, cppObject);
+                                                args.GetReturnValue().Set(args.This());
+                                            }
                                         }
                                     }
                                     catch(const exception& e) {

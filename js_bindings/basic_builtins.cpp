@@ -70,7 +70,7 @@ void JsTimer(const v8::FunctionCallbackInfo<v8::Value> &args) {
             // We need to re-enter in context as we are in another thread and stack, and as we do
             // it from another thread, we MUST use lockedContext:
             se->lockedContext([=](Local<Context> &context) {
-                // get the local hadnle to function from persistent handle
+                // get the local handle to function from persistent handle
                 auto fn = jsCallback->Get(context->GetIsolate());
                 // call it using the function as the this context:
                 auto unused = fn->Call(context, fn, 0, nullptr);
