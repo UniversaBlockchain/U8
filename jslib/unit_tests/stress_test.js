@@ -71,7 +71,7 @@ unit.test("stress_test_bindCppClass_async", async () => {
     }
 });
 
-unit.test("stress_test_bindCppClass", async () => {
+/*unit.test("stress_test_bindCppClass", async () => {
     let list = [];
     let counter = 0;
     let eachItemMinimumBytesUsage = 1*1024;
@@ -89,9 +89,9 @@ unit.test("stress_test_bindCppClass", async () => {
             console.log("counter: " + counter + ", list.length: " + list.length);
         }
     }
-});
+});*/
 
-unit.test("stress_test_3", async () => {
+/*unit.test("stress_test_3", async () => {
     let t0 = new Date().getTime();
     let c0 = 0;
     let sendCounter = 0;
@@ -123,9 +123,9 @@ unit.test("stress_test_3", async () => {
         await Promise.all(promises);
         console.log("============ " + k + " ============");
     }
-});
+});*/
 
-unit.test("stress_test", async () => {
+/*unit.test("stress_test", async () => {
     let ledgers = [];
     let udpAdapters = [];
     let httpServers = [];
@@ -341,7 +341,7 @@ unit.test("stress_test", async () => {
         await UDP_close();
     if (HTTP)
         await HTTP_close();
-});
+});*/
 
 /*unit.test("stress_test_with_rates", async () => {
 
