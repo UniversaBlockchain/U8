@@ -144,7 +144,8 @@ Local<FunctionTemplate> bindCppClass(Isolate *isolate, const char *class_name, F
             FunctionTemplate::New(
                     isolate,
                     fnptr<void(const FunctionCallbackInfo<Value> &)>(
-                            [=](auto args) {
+                            [constructor](auto args) {
+                                Isolate* isolate = args.GetIsolate();
                                 if (!args.IsConstructCall()) {
                                     isolate->ThrowException(
                                             Exception::TypeError(String::NewFromUtf8(isolate,
