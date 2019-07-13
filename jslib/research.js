@@ -10,8 +10,8 @@ research.MemoryUserBase = class {
 
     fillAsync(minBytesToUse) {
         return new Promise(resolve => {
-            this.memoryUserImpl.__fillAsync(minBytesToUse, /*async*/ ()=>{
-                //await sleep(10);
+            this.memoryUserImpl.__fillAsync(minBytesToUse, async ()=>{
+                await sleep(10);
                 resolve(this);
             });
         });
@@ -27,8 +27,8 @@ research.MemoryUserBase = class {
 
     checkAsync() {
         return new Promise(resolve => {
-            this.memoryUserImpl.__checkAsync(/*async*/ (res)=>{
-                //await sleep(10);
+            this.memoryUserImpl.__checkAsync(async (res)=>{
+                await sleep(10);
                 resolve(res);
             });
         });

@@ -44,7 +44,7 @@ unit.test("stress_test_bindCppClass_async", async () => {
     let asyncBufSize = 100;
     let list = [];
     let counter = 0;
-    let eachItemMinimumBytesUsage = 100*1024;
+    let eachItemMinimumBytesUsage = 10*1024;
     let MemoryUserClasses = [research.MemoryUser1, research.MemoryUser2, research.MemoryUser3];
     while (true) {
         let listFill = [];
