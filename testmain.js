@@ -163,8 +163,6 @@ async function main() {
     // console.log(atob('AQID'));
 
     // await sleep(100);
-    while(true) {
-        await unit.perform();
-    }
+    await unit.perform();
 
 }
