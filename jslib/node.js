@@ -282,7 +282,7 @@ class Node {
     }
 
     isSanitating() {
-        return this.recordsToSanitate.size > 0;
+        return false;//return this.recordsToSanitate.size > 0;      //TODO: activate sanitating
     }
 
     /**

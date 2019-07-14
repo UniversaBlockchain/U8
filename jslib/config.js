@@ -89,7 +89,7 @@ class Config {
         this.negativeConsensus = Math.ceil(n * 0.11);
         if (this.negativeConsensus < 1)
             this.negativeConsensus = 1;
-        this.positiveConsensus = Math.round(n * 0.90);
+        this.positiveConsensus = Math.floor(n * 0.90);  //TODO: round or floor?
         if(this.positiveConsensus == 0)
             this.positiveConsensus = 1;
         if (this.negativeConsensus + this.positiveConsensus === n)
