@@ -108,13 +108,12 @@ TEST_CASE("Queue") {
 }
 
 TEST_CASE("Semaphore") {
+    std::shared_ptr<Semaphore> sem = std::make_shared<Semaphore>();
+    atomic<long> counter(0);
     ThreadPool writerPool(2);
     ThreadPool readerPool(2);
 
     const int WEIGHT = 100000;
-
-    std::shared_ptr<Semaphore> sem = std::make_shared<Semaphore>();
-    atomic<long> counter(0);
 
     for (int i = 0; i < 10; ++i) {
         writerPool.execute([sem]() {
