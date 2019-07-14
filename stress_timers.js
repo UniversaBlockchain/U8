@@ -1,23 +1,4 @@
-class RateCounter {
-    constructor(name) {
-        this.name = name;
-        this.t0 = new Date().getTime();
-        this.counter0 = 0;
-        this.counter = 0;
-    }
-
-    inc() {
-        ++this.counter;
-    }
-
-    show() {
-        let now = new Date().getTime();
-        let rate = (this.counter - this.counter0) * 1000 / (now - this.t0);
-        this.t0 = now;
-        this.counter0 = this.counter;
-        console.log(this.name + " rate: " + rate.toFixed(0) + " per sec,\tcounter: " + this.counter);
-    }
-}
+const t = require('tools.js');
 
 async function main() {
     console.log("stress_timers.js started");
@@ -33,7 +14,7 @@ async function main() {
         console.error("MAX_TIMEOUT should be >= MIN_TIMEOUT");
         return;
     }
-    let rate = new RateCounter("timer events");
+    let rate = new t.RateCounter("timer events");
     let sendCounter = 0;
     let readyCounter = 0;
 
@@ -50,10 +31,11 @@ async function main() {
         let timeout = MIN_TIMEOUT + Math.floor(Math.random()*(MAX_TIMEOUT - MIN_TIMEOUT));
         let startTime = new Date().getTime();
         ++sendCounter;
-        setTimeout(()=>{
+        setTimeout(async ()=>{
             let dt = new Date().getTime() - startTime;
             if (Math.abs(dt - timeout) > TARGET_PRECISION_MILLIS)
-                console.error("dt = " + dt + ", should be " + timeout);
+                console.log("  warning: dt = " + dt + ", should be " + timeout);
+            await sleep(10);
             ++readyCounter;
             rate.inc();
         }, timeout);

@@ -7,6 +7,7 @@ import {MemoryUser1} from "research"
 import * as tk from 'unit_tests/test_keys'
 const ExecutorWithFixedPeriod = require("executorservice").ExecutorWithFixedPeriod;
 const ScheduleExecutor = require("executorservice").ScheduleExecutor;
+const t = require('tools.js');
 
 const HTTP = true;
 const CRYPT = true;
@@ -18,27 +19,6 @@ const ITERATIONS = 10;
 const NODES = 10;
 
 const LOG = true;
-
-class RateCounter {
-    constructor(name) {
-        this.name = name;
-        this.t0 = new Date().getTime();
-        this.counter0 = 0;
-        this.counter = 0;
-    }
-
-    inc() {
-        ++this.counter;
-    }
-
-    show() {
-        let now = new Date().getTime();
-        let rate = (this.counter - this.counter0) * 1000 / (now - this.t0);
-        this.t0 = now;
-        this.counter0 = this.counter;
-        console.log(this.name + " rate: " + rate.toFixed(0) + " per sec,\tcounter: " + this.counter);
-    }
-}
 
 unit.test("stress_test_3", async () => {
     let t0 = new Date().getTime();
@@ -316,12 +296,12 @@ unit.test("stress_test_3", async () => {
     const TIMERS_ASYNC_HEAVY_WORK  = true * ASYNC_HEAVY_WORK;
     const LEDGER_ASYNC_HEAVY_WORK  = true * ASYNC_HEAVY_WORK;
 
-    let udpRate         = new RateCounter("       udp");
-    let httpRate        = new RateCounter("      http");
-    let httpsRate       = new RateCounter("     https");
-    let timersRate      = new RateCounter("    timers");
-    let ledgerRate      = new RateCounter("    ledger");
-    let heavyWorkRate   = new RateCounter("heavy work");
+    let udpRate         = new t.RateCounter("       udp");
+    let httpRate        = new t.RateCounter("      http");
+    let httpsRate       = new t.RateCounter("     https");
+    let timersRate      = new t.RateCounter("    timers");
+    let ledgerRate      = new t.RateCounter("    ledger");
+    let heavyWorkRate   = new t.RateCounter("heavy work");
 
     let asyncHeavyWork_key = await crypto.PrivateKey.generate(2048);
     let asyncHeavyWork = async () => {

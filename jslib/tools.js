@@ -427,5 +427,27 @@ function randomChoice(list, count, safe = true) {
     return res;
 }
 
+class RateCounter {
+    constructor(name) {
+        this.name = name;
+        this.t0 = new Date().getTime();
+        this.counter0 = 0;
+        this.counter = 0;
+    }
+
+    inc() {
+        ++this.counter;
+    }
+
+    show() {
+        let now = new Date().getTime();
+        let rate = (this.counter - this.counter0) * 1000 / (now - this.t0);
+        this.t0 = now;
+        this.counter0 = this.counter;
+        console.log(this.name + " rate: " + rate.toFixed(0) + " per sec,\tcounter: " + this.counter);
+    }
+}
+
 module.exports = {arraysEqual, valuesEqual, randomString, MemoiseMixin, PackedEqMixin, DigestEqMixin, GenericMap, GenericSet,
-    equals, THROW_EXCEPTIONS, convertToDate, randomBytes, getOrDefault, getOrThrow, addValAndOrdinalMaps, randomChoice};
+    equals, THROW_EXCEPTIONS, convertToDate, randomBytes, getOrDefault, getOrThrow, addValAndOrdinalMaps, randomChoice,
+    RateCounter};
