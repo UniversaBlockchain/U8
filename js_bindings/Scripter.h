@@ -386,7 +386,8 @@ protected:
 /**
  * Utility class to pass data from Javascript TypedArray to the sync process. It fixes
  * the array from garbage collection until it is no more used.
- * We recommend getting it from ArgsContext#asBuffer(int).
+ * We recommend getting it from ArgsContext#asBuffer(int). We strongly recommend to use in with shared_ptr to
+ * acoid useless copying and properly get the lifespan of the controlled resources.
  */
 class BufferHandler : public ScripterHolder {
 private:
@@ -395,7 +396,10 @@ private:
     size_t _size;
 public:
     BufferHandler(ArgsContext &ac, unsigned index) : ScripterHolder(ac) {
-        auto buffer = ac.as<Uint8Array>(index)->Buffer();
+        auto l = ac.as<Uint8Array>(index);
+        if( !l->IsTypedArray() )
+            throw std::invalid_argument("not a typed array");
+        auto buffer = l->Buffer();
         _pbuffer = make_shared<Persistent<ArrayBuffer>>(ac.isolate, buffer);
         auto contents = buffer->GetContents();
         _data = contents.Data();
@@ -424,7 +428,8 @@ public:
 /**
  * Utility class to conveniently hold the Javascript function handle across async operation. Do not forget
  * to enter Scripter#lockedContext() first before invoking/calling it! Use
- * ArgsContext#asFunction(int) to get an instance conveniently.
+ * ArgsContext#asFunction(int) to get an instance conveniently. We recommend using only in shared_ptr to avoid useless
+ * copying.
  */
 class FunctionHandler : public ScripterHolder {
 private:
@@ -484,7 +489,9 @@ public:
     }
 
     ~FunctionHandler() {
+        // we need _pfunction content to live after destruction - until in context:
         auto x = _pfunction;
+        // now we jsuc copy it
         _scripter->lockedContext([x](auto unused) { x->Reset(); });
     }
 };

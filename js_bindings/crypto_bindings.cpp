@@ -24,31 +24,19 @@ static void privateKeySign(const FunctionCallbackInfo<Value> &args) {
         // __sign(data, hashType, callback)
         if (args.Length() == 3) {
             auto key = unwrap<PrivateKey>(args.This());
-            if (args[0]->IsTypedArray()) {
-                auto contents = ac.as<Uint8Array>(0)->Buffer()->GetContents();
-                // these parameters will only be copied in lambda (and key, sure)
-                void *data = contents.Data();
-                if (data != nullptr) {
-                    auto isolate = ac.isolate;
-                    auto size = contents.ByteLength();
-                    auto ht = (HashType) ac.asInt(1);
-                    auto *onReady = new Persistent<Function>(ac.isolate, ac.as<Function>(2));
-                    shared_ptr<Scripter> scripter = ac.scripter;
-
-                    jsThreadPool([=]() {
-                        auto signature = key->sign(data, size, ht);
-                        scripter->lockedContext([=](Local<Context> cxt) {
-                            auto fn = onReady->Get(scripter->isolate());
-                            onReady->Reset();
-                            delete onReady;
-                            if (fn->IsFunction()) {
-                                Local<Value> result = vectorToV8(isolate, signature);
-                                auto unused = fn->Call(cxt, fn, 1, &result);
-                            }
-                        });
+            auto data = ac.asBuffer(0);
+            if (data->data() != nullptr) {
+                auto isolate = ac.isolate;
+                auto ht = (HashType) ac.asInt(1);
+                auto onReady = ac.asFunction(2);// new Persistent<Function>(ac.isolate, ac.as<Function>(2));
+                jsThreadPool([=]() {
+                    auto signature = key->sign(data->data(), data->size(), ht);
+                    onReady->lockedContext([=](Local<Context> cxt) {
+                        Local<Value> result = vectorToV8(isolate, signature);
+                        onReady->call(cxt, 1, &result);
                     });
-                    return;
-                }
+                });
+                return;
             }
         }
         ac.throwError("invalid arguments");
@@ -60,53 +48,29 @@ static void privateKeyDecrypt(const FunctionCallbackInfo<Value> &args) {
         // __decrypt(data, callback)
         if (args.Length() == 3) {
             auto key = unwrap<PrivateKey>(args.This());
-            if (args[0]->IsTypedArray()) {
-                auto contents = ac.as<Uint8Array>(0)->Buffer()->GetContents();
-                // these parameters will only be copied in lambda (and key, sure)
-                void *data = contents.Data();
-                if (data != nullptr) {
-                    auto isolate = ac.isolate;
-                    auto size = contents.ByteLength();
-                    auto *onReady = new Persistent<Function>(ac.isolate, ac.as<Function>(1));
-                    auto *onError = new Persistent<Function>(ac.isolate, ac.as<Function>(2));
-                    auto scripter = ac.scripter;
-                    jsThreadPool([=]() {
-                        string errorString;
-                        try {
-                            auto plain = key->decrypt(data, size);
-                            scripter->lockedContext([=](Local<Context> cxt) {
-                                auto fn = onReady->Get(scripter->isolate());
-                                onReady->Reset();
-                                onError->Reset();
-                                delete onReady;
-                                delete onError;
-                                if (fn->IsFunction()) {
-                                    Local<Value> result = vectorToV8(isolate, plain);
-                                    auto unused = fn->Call(cxt, fn, 1, &result);
-                                } else {
-                                    cerr << "PrivateKey::decrypt invalid callback\n";
-                                }
-                            });
-                        }
-                        catch (const exception &e) {
-                            scripter->lockedContext([=](Local<Context> cxt) {
-                                auto fn = onError->Get(scripter->isolate());
-                                onReady->Reset();
-                                onError->Reset();
-                                delete onReady;
-                                delete onError;
-                                if (fn->IsFunction()) {
-                                    Local<Value> result = scripter->v8String(e.what());
-                                    auto unused = fn->Call(cxt, fn, 1, &result);
-                                } else {
-                                    cerr << "PrivateKey::decrypt invalid reject callback\n";
-                                }
-                            });
-
-                        }
-                    });
-                    return;
-                }
+            auto data = ac.asBuffer(0);
+            if (data->data() != nullptr) {
+                auto isolate = ac.isolate;
+                auto onReady = ac.asFunction(1);
+                auto onError = ac.asFunction(2);
+                auto scripter = ac.scripter;
+                jsThreadPool([=]() {
+                    string errorString;
+                    try {
+                        auto plain = key->decrypt(data->data(), data->size());
+                        scripter->lockedContext([=](Local<Context> cxt) {
+                            Local<Value> result = vectorToV8(isolate, plain);
+                            onReady->call(cxt, 1, &result);
+                        });
+                    }
+                    catch (const exception &e) {
+                        scripter->lockedContext([=](Local<Context> cxt) {
+                            Local<Value> result = scripter->v8String(e.what());
+                            onError->call(cxt, 1, &result);
+                        });
+                    }
+                });
+                return;
             }
         }
         ac.throwError("invalid arguments");
@@ -182,25 +146,16 @@ static void publicKeyEncrypt(const FunctionCallbackInfo<Value> &args) {
     Scripter::unwrapArgs(args, [](ArgsContext &ac) {
         if (ac.args.Length() == 2) {
             auto key = unwrap<PublicKey>(ac.args.This());
-            auto contents = ac.as<TypedArray>(0)->Buffer()->GetContents();
-            auto data = contents.Data();
-            auto size = contents.ByteLength();
+            auto data = ac.asBuffer(0);
             if (data) {
                 auto isolate = ac.isolate;
-                auto *onReady = new Persistent<Function>(ac.isolate, ac.as<Function>(1));
+                auto onReady = ac.asFunction(1);
                 shared_ptr<Scripter> scripter = ac.scripter;
                 jsThreadPool([=]() {
-                    auto result = key->encrypt(data, size);
+                    auto result = key->encrypt(data->data(), data->size());
                     scripter->lockedContext([=](Local<Context> cxt) {
-                        auto fn = onReady->Get(isolate);
-                        onReady->Reset();
-                        delete onReady;
-                        if (fn->IsFunction()) {
-                            Local<Value> res = vectorToV8(isolate, result);
-                            auto unused = fn->Call(cxt, fn, 1, &res);
-                        } else {
-                            cerr << "publicKey::encrypt: callback is not a function\n";
-                        }
+                        Local<Value> res = vectorToV8(isolate, result);
+                        onReady->call(cxt, 1, &res);
                     });
                 });
                 return;
