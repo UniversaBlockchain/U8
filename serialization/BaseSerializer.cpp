@@ -144,10 +144,10 @@ UObject BaseSerializer::deserialize(const UObject& o) {
     if (UBinder::isInstance(o)) {
         const UBinder& binder = UBinder::asInstance(o);
         std::string type;
-        const std::string& _type = binder.getStringOrDefault("__type", "");
+        const std::string _type = binder.getStringOrDefault("__type", "");
 
         if (_type.empty()) {
-            const std::string& _t = binder.getStringOrDefault("__t", "");
+            const std::string _t = binder.getStringOrDefault("__t", "");
             if (!_t.empty())
                 type = _t;
         }
