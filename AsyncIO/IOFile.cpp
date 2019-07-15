@@ -13,13 +13,18 @@ namespace asyncio {
 
     IOFile::~IOFile() {
         if (ioReq && !closed) {
-            close([&](ssize_t result) {
+            uv_sem_t sem;
+            uv_sem_init(&sem, 0);
+            close([this,&sem](ssize_t result) {
                 //printf("---AUTO_CLOSING---\n");
                 freeRequest();
+                uv_sem_post(&sem);
             });
-
-        } else
+            uv_sem_wait(&sem);
+            uv_sem_destroy(&sem);
+        } else {
             freeRequest();
+        }
     }
 
     void IOFile::freeRequest() {

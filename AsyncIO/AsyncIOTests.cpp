@@ -578,22 +578,25 @@ void testAsyncFile() {
     uv_sem_init(&stop[0], 0);
 
     auto fc = std::make_shared<asyncio::IOFile>();
+    ThreadPool asyncAutoClosingPool(1);
 
-    fc->open("TestFile0.bin", O_RDWR, 0, [&](ssize_t result) {
+    fc->open("TestFile0.bin", O_RDWR, 0, [&asyncAutoClosingPool,fc{std::move(fc)}](ssize_t result) mutable {
         ASSERT(!asyncio::isError(result));
         printf("File open\n");
 
-        fc->read(1000, [&](const asyncio::byte_vector& data, ssize_t result) {
+        fc->read(1000, [&asyncAutoClosingPool,fc{std::move(fc)}](const asyncio::byte_vector& data, ssize_t result) mutable {
             ASSERT(!asyncio::isError(result));
             printf("Read %ld bytes\n", result);
 
-            fc->write(data, [&](ssize_t result) {
-                ASSERT(!asyncio::isError(result));
-                printf("Wrote %ld bytes\n", result);
+            fc->write(data, [&asyncAutoClosingPool,fc{std::move(fc)}](ssize_t result) mutable {
+                asyncAutoClosingPool([fc{std::move(fc)},result]() mutable {
+                    ASSERT(!asyncio::isError(result));
+                    printf("Wrote %ld bytes\n", result);
 
-                uv_sem_post(&stop[0]);
+                    fc.reset();
 
-                fc.reset();
+                    uv_sem_post(&stop[0]);
+                });
             });
         });
     });
@@ -760,6 +763,8 @@ void testAsyncFile() {
     for (int i = 0; i < NUM_THREADS; i++)
         uv_sem_wait(&stop[0]);
     uv_sem_destroy(&stop[0]);
+
+    free(buff);
 
     printf("testAsyncFile()...done\n\n");
 }
