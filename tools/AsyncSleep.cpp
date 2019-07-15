@@ -45,7 +45,7 @@ AsyncSleep::AsyncSleep() : skip(true), callback(0), delay_millis(TOO_LONG), Logg
     });
 }
 
-void AsyncSleep::delay(long millis, const function<void()>& new_callback) {
+void AsyncSleep::delay(long millis, const function<void()>&& new_callback) {
     unique_lock<std::mutex> lock(mx);
     skip = true;
     delay_millis = millis;

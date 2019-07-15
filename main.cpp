@@ -51,9 +51,9 @@ int main(int argc, const char **argv) {
             // important note. At this point secipter instance is initialized but not locked (owning)
             // the current thread, so can be used in any thread, but only with lockging the context:
             // so we lock the context to execute evaluate:
-            return se->lockedContext([&](auto context) {
+//            return se->inContext(([&](auto context) {
                 if (args[0] == "-e") {
-                    cout << se->evaluate(args[1]) << endl;
+                    se->inContext([&](auto context) { cout << se->evaluate(args[1]) << endl; });
                     return 0;
                 } else {
                     return se->runAsMain(
@@ -61,7 +61,7 @@ int main(int argc, const char **argv) {
                     );
                 }
             });
-        });
+//        });
     }
 }
 

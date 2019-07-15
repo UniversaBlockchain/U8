@@ -30,7 +30,7 @@ public:
      * @param millis to call after
      * @param new_callback, will replace current. Use NULL to disable processing.
      */
-    void delay(long millis, const function<void()>& new_callback);
+    void delay(long millis, const function<void()>&& new_callback);
 
     ~AsyncSleep();
 

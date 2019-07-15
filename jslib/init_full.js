@@ -27,7 +27,7 @@ const VERSION = "4.0.0b5";
  * @returns {String}
  */
 function chomp(str) {
-    while(true) {
+    while (true) {
         const last = str.slice(-1);
         if (last == "\n" || last == "\r")
             str = str.slice(0, -1);
@@ -111,19 +111,17 @@ require('crypto');
 function __call_main(args) {
     let result = main(args);
     if (result instanceof Promise) {
-        waitExit();
-        result
-            .then(code => exit(code))
-            .catch((error) => {
+        // the promise that resolves exit code:
+        result.then(code => exit(code)).catch(
+            (error) => {
                 if (error.stack) {
                     console.error(error.stack);
                 } else
                     console.error("execution of aysnc main failed: " + error);
                 exit(1000);
             });
-        return 0;
     } else
-        return result || 0;
+        exit(+result || 0);
 }
 
 // -------------------------------------- utilities

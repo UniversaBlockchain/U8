@@ -55,9 +55,7 @@ function processQueue() {
         if (!e || e.fireAt > now)
             break;
         entries.removeLast();
-        // console.log(`Calling ${e.callback} at ${currentMillis()}`);
         e.callback();
-        // console.log(`^^ done ${e.callback} at ${currentMillis()}`);
     }
     resetCallback();
 }

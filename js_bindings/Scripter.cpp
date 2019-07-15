@@ -20,7 +20,7 @@ static const char *ARGV0 = nullptr;
 std::unique_ptr<v8::Platform> Scripter::initV8(const char *argv0) {
 
     int _argc = 4;
-    char* _argv[] = {(char *) argv0,
+    char *_argv[] = {(char *) argv0,
                      (char *) "--expose_gc",
                      (char *) "--harmony-await-optimization",
                      (char *) "--async-stack-traces"
@@ -44,7 +44,7 @@ void Scripter::closeV8(std::unique_ptr<v8::Platform> &platform) {
     platform.release();
 }
 
-int Scripter::Application(const char *argv0, function<int(shared_ptr<Scripter>)> block) {
+int Scripter::Application(const char *argv0, function<int(shared_ptr<Scripter>)>&& block) {
     try {
         auto platform = initV8(argv0);
         auto se = New();
@@ -111,6 +111,26 @@ Scripter::Scripter() : Logging("SCR") {
     require_roots.emplace_back(".");
 }
 
+static void JsThrowScripterException(const FunctionCallbackInfo<Value> &args) {
+    Scripter::unwrapArgs(args, [](ArgsContext& ac) {
+        switch(ac.asInt(0)) {
+            case 0:
+                ac.scripter->throwError(ac.asString(1).c_str());
+                break;
+            case 1:
+                ac.scripter->throwError(ac.asString(1));
+                break;
+            case 2:
+                throw std::logic_error(ac.asString(1));
+                break;
+//           case 3:
+//               break;
+            default:
+                throw std::invalid_argument("unknown error type parameter");
+        }
+    });
+}
+
 void Scripter::initialize() {
     if (initialized)
         throw runtime_error("SR is already initialized");
@@ -128,9 +148,9 @@ void Scripter::initialize() {
     v8::Local<v8::ObjectTemplate> global = v8::ObjectTemplate::New(pIsolate);
     // Bind the global 'print' function to the C++ Print callback.
     global->Set(v8String("__bios_print"), functionTemplate(JsPrint));
+    global->Set(v8String("__debug_throw"), functionTemplate(JsThrowScripterException));
     global->Set(v8String("__bios_loadRequired"), functionTemplate(JsLoadRequired));
     global->Set(v8String("__bios_initTimers"), functionTemplate(JsInitTimers));
-    global->Set(v8String("waitExit"), functionTemplate(JsWaitExit));
     global->Set(v8String("exit"), functionTemplate(JsExit));
     global->Set(v8String("utf8Decode"), functionTemplate(JsTypedArrayToString));
     global->Set(v8String("utf8Encode"), functionTemplate(JsStringToTypedArray));
@@ -245,8 +265,9 @@ string Scripter::evaluate(const string &src, bool needsReturn, ScriptOrigin *ori
     return res;
 }
 
-int Scripter::runAsMain(const string &sourceScript, const vector<string> &&args, ScriptOrigin *origin) {
-    int code = inContext([&](Local<Context> &context) {
+int Scripter::runAsMain(string sourceScript, const vector<string> &&args, string fileName) {
+    inContext([&](Local<Context> &context) {
+        ScriptOrigin origin(v8String(fileName));
         auto global = context->Global();
         // fix imports
         global->Set(v8String("__source"), v8String(sourceScript));
@@ -254,35 +275,51 @@ int Scripter::runAsMain(const string &sourceScript, const vector<string> &&args,
                 "let r = __fix_imports(__source); __source = undefined; r",
                 true);
         // run fixed script
-        evaluate(script, false, origin);
+        evaluate(script, false, &origin);
         // run main if any
-        Local<Function> main = Local<Function>::Cast(global->Get(v8String("main")));
+        Local<Function> callmain = Local<Function>::Cast(global->Get(v8String("__call_main")));
 
-        if (!main->IsUndefined()) {
-            auto jsArgs = Array::New(pIsolate);
-            for (int i = 0; i < args.size(); i++) {
-                jsArgs->Set(i, String::NewFromUtf8(pIsolate, args[i].c_str()));
-            }
-            auto param = Local<Value>::Cast(jsArgs);
-            TryCatch tryCatch(pIsolate);
-            context->Global()->Set(v8String("__args"),param);
-            auto result = evaluate("__call_main(__args)", true);
-//            auto result = main->Call(context, global, 1, &param);
-            throwPendingException<ScriptError>(tryCatch, context);
-//            return result.ToLocalChecked()->Int32Value(context).FromJust();
-            return stoi(result);
+        auto jsArgs = Array::New(pIsolate);
+        for (int i = 0; i < args.size(); i++) {
+            jsArgs->Set(i, String::NewFromUtf8(pIsolate, args[i].c_str()));
         }
-        // if we reach this point, there are no main function in the script
-        return 0;
+        auto param = Local<Value>::Cast(jsArgs);
+        TryCatch tryCatch(pIsolate);
+        context->Global()->Set(v8String("__args"), param);
+        auto unused = callmain->Call(context, global, 1, &param);
+        throwPendingException<ScriptError>(tryCatch, context);
     });
-    if (waitExit) {
-        pIsolate->Exit();
-        Unlocker ul(pIsolate);
-        waitExitPromise.get_future().get();
-        pIsolate->Enter();
-        return exitCode;
+
+    // main loop: we process all callbacks here in the same thread:
+    {
+        // optimization: the shared context scope - it could be a problem, then move it insude the loop
+        // actually we do not want to create separate context for every call
+        v8::HandleScope handle_scope(pIsolate);
+        auto cxt = context.Get(pIsolate);
+        v8::Context::Scope context_scope(cxt);
+
+        // loop itself
+        while (isActive) {
+            v8::HandleScope handle_scope(pIsolate); // per-call scope to clean locals:
+            ContextCallback c = callbacks.get();
+            TryCatch tryCatch(pIsolate);
+            c(cxt);
+            if( tryCatch.HasCaught() ) {
+                cerr << "Uncaught exception: " << getString(tryCatch.Exception()) << endl;
+            }
+        }
     }
-    return code;
+
+    return exitCode;
+//
+//    if (waitExit) {
+//        pIsolate->Exit();
+//        Unlocker ul(pIsolate);
+//        waitExitPromise.get_future().get();
+//        pIsolate->Enter();
+//        return exitCode;
+//    }
+//    return code;
 
 }
 

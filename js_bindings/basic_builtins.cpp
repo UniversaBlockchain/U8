@@ -56,33 +56,23 @@ void JsLoadRequired(const v8::FunctionCallbackInfo<v8::Value> &args) {
 }
 
 void JsTimer(const v8::FunctionCallbackInfo<v8::Value> &args) {
-    Scripter::unwrap(args, [&](auto se, auto isolate, auto context) {
+    Scripter::unwrapArgs(args, [&](ArgsContext &ac) {
         // resetTimer( millis, callback)
-        long millis = args[0].As<v8::Integer>()->Value();
         // callback function must persist context change, so we need a persistent handle
-        std::shared_ptr<v8::Persistent<v8::Function>> jsCallback (
-            new v8::Persistent<v8::Function>(isolate, args[1].As<v8::Function>()), [](auto p){
-                p->Reset();
-                delete p;
-            }
-        );
-        se->asyncSleep.delay(millis, [=]() {
+        auto callback = ac.asFunction(1);
+        auto se = ac.scripter;
+        se->asyncSleep.delay(ac.asLong(0), [callback,se]() {
             // We need to re-enter in context as we are in another thread and stack, and as we do
             // it from another thread, we MUST use lockedContext:
-            se->lockedContext([=](Local<Context> &context) {
-                // get the local handle to function from persistent handle
-                auto fn = jsCallback->Get(context->GetIsolate());
-                // call it using the function as the this context:
-                auto unused = fn->Call(context, fn, 0, nullptr);
-                // now we must free the persistent handle as it is single operation
-                // this performs automatically from shared_ptr
+            se->lockedContext([callback, se](Local<Context> &context) {
+                callback->invoke();
             });
         });
     });
 }
 
 void JsInitTimers(const v8::FunctionCallbackInfo<v8::Value> &args) {
-    Scripter::unwrap(args, [&](auto se, v8::Isolate* isolate, auto context) {
+    Scripter::unwrap(args, [&](auto se, v8::Isolate *isolate, auto context) {
         se->log("CALLED TIMERS INIT");
         if (se->timersReady()) {
             se->log_e("SR timers already initialized");
@@ -98,15 +88,9 @@ void JsInitTimers(const v8::FunctionCallbackInfo<v8::Value> &args) {
     });
 }
 
-void JsWaitExit(const v8::FunctionCallbackInfo<v8::Value> &args) {
-    Scripter::unwrap(args, [&](auto se, auto isolate, auto context) {
-        se->setWaitExit();
-    });
-}
-
 void JsExit(const v8::FunctionCallbackInfo<v8::Value> &args) {
-    Scripter::unwrap(args, [&](shared_ptr<Scripter> se, auto isolate, auto context) {
-        se->exit(args[0]->Uint32Value(context).FromJust());
+    Scripter::unwrapArgs(args, [](ArgsContext& ac) {
+        ac.scripter->exit(ac.asLong(0));
     });
 }
 

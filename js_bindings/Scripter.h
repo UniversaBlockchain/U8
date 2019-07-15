@@ -23,9 +23,13 @@ using namespace v8;
 
 class ArgsContext;
 
+extern ThreadPool jsThreadPool;
+extern ThreadPool executor;
 
 class Scripter : public std::enable_shared_from_this<Scripter>, public Logging {
 public:
+    typedef function<void(Local<Context>&)> ContextCallback;
+
 
     // ------------------- helpers -------------------------------
     Local<String> v8String(string x, NewStringType t = NewStringType::kNormal) {
@@ -48,7 +52,7 @@ public:
      * @return block returned value or 1000 if std::exception was thrown, or 2000 if any other exception was thrown
      *         by the block.
      */
-    static int Application(const char *argv0, function<int(shared_ptr<Scripter>)> block);
+    static int Application(const char *argv0, function<int(shared_ptr<Scripter>)>&& block);
 
     /**
      * Sets up V8 environment for the process. Must be called once before any V8 and/or Scripter operation.
@@ -84,12 +88,7 @@ public:
      */
     string evaluate(const string &code, bool needsReturn = true, ScriptOrigin *origin = nullptr);
 
-    int runAsMain(const string &sourceScript, const vector<string> &&args, ScriptOrigin *origin = nullptr);
-
-    int runAsMain(const string &script, const vector<string> &&args, string fileName) {
-        ScriptOrigin origin(v8String(fileName));
-        return runAsMain(script, move(args), &origin);
-    }
+    int runAsMain(string sourceScript, const vector<string> &&args, string fileName);
 
     template<typename T>
     string getString(MaybeLocal<T> value) {
@@ -127,32 +126,26 @@ public:
      *
      * @param block to execute
      */
-    template<typename F>
-    auto lockedContext(F block) {
-        v8::Locker locker(pIsolate);
-        Isolate::Scope iscope(pIsolate);
-        v8::HandleScope handle_scope(pIsolate);
-        Local<Context> cxt = context.Get(pIsolate);
-        v8::Context::Scope context_scope(cxt);
-        return block(cxt);
+    inline void lockedContext(ContextCallback&& block) {
+        callbacks.put(block);
     }
 
     /**
-     * Execute block in the foreign thread from the JS pool. To use
-     * from async handlers, other threads and like, to not to block calling thread.
+     *
+     * Deprecated. Executes async block in the VM thread. Use lockedContext that does exactly same but has less
+     * confusing name.
      *
      * @param block to execute
+     *
+     * @deprecated this methpd
      */
     template<typename F>
-    void inPool(F block) {
-        jsThreadPool([=]() {
-            v8::Locker locker(pIsolate);
-            Isolate::Scope iscope(pIsolate);
-            v8::HandleScope handle_scope(pIsolate);
-            Local<Context> cxt = context.Get(pIsolate);
-            v8::Context::Scope context_scope(cxt);
-            block(cxt);
-        });
+    void inPool(F&& block) {
+        lockedContext(block);
+    }
+
+    void inParallel(function<void()>&& block) {
+        jsThreadPool.execute(block);
     }
 
     /**
@@ -202,29 +195,20 @@ public:
     /**
      * Turn "wait exit" more on (may not be effective except with runAsMain)
      */
-    void setWaitExit() { waitExit = true; }
-
-    bool getWaitExit() { return waitExit; }
-
     bool getExitCode() { return exitCode; }
 
     /**
-     * depending on waitExit mode. If setWaitExit() was called (js: waitExit()),
-     * stops waitExit waiting (in runAsMain) and stores exit code that is available with
-     * getExitCode(). Note that it may not be effective until the runMain() is in progress.
-     *
-     * If the setWaitExit was not yet called, it immediately exits the calling application with the specifoed
-     * exit code.
+     * causes scripter main loop to exit with a code. All queued callbacks that are already in queue will be
+     * executed.
      *
      * @param code exit code to report.
      */
     void exit(int code) {
-        if (waitExit) {
+        // in such a way we pass control to the main loop so it will wake and check exit condition:
+        lockedContext([=](auto unused) {
+            isActive = false;
             exitCode = code;
-            waitExitPromise.set_value();
-        } else {
-            ::exit(code);
-        }
+        });
     }
 
     /**
@@ -259,9 +243,6 @@ private:
     // prevent double initialize() call - it is dangerous
     bool initialized = false;
 
-    std::promise<void> waitExitPromise;
-    int exitCode = 0;
-    bool waitExit = false;
 
     // we should not put this code in the constructor as it uses shared_from_this()
     void initialize();
@@ -283,6 +264,10 @@ private:
     v8::Isolate::CreateParams create_params;
 
     v8::Persistent<v8::Context> context;
+
+    volatile bool isActive = true;
+    int exitCode = 0;
+    Queue<ContextCallback> callbacks;
 
     // do not construct it manually
     explicit Scripter();
@@ -331,6 +316,10 @@ public:
 
     int32_t asInt(int index) {
         return args[index]->Int32Value(context).FromJust();
+    }
+
+    long asLong(int index) {
+        return args[index]->IntegerValue(context).FromJust();
     }
 
     string asString(int index) {
@@ -430,7 +419,6 @@ public:
 class FunctionHandler : public ScripterHolder {
 private:
     Persistent<Function> _pfunction;
-    Isolate *_isolate;
     shared_ptr<Scripter> _scripter;
 
 public:
@@ -469,9 +457,13 @@ public:
      * @param args to pass to the callback
      */
     void invoke(int argsCount, Local<Value> *args) {
-        _scripter->lockedContext([=](Local<Context> cxt) {
+        _scripter->inContext([=](Local<Context> cxt) {
             call(cxt, argsCount, args);
         });
+    }
+
+    void invoke() {
+        invoke(0, nullptr);
     }
 
     MaybeLocal<Value> call(Local<Context> &cxt, Local<Value> &&singleArg) {
@@ -479,7 +471,7 @@ public:
     }
 
     FunctionHandler(ArgsContext &ac, unsigned index)
-            : _pfunction(ac.isolate, ac.as<Function>(index)), _isolate(ac.isolate), _scripter(ac.scripter),
+            : _pfunction(ac.isolate, ac.as<Function>(index)), _scripter(ac.scripter),
               ScripterHolder(ac) {}
 
     ~FunctionHandler() { _pfunction.Reset(); }
