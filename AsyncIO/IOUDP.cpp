@@ -21,14 +21,19 @@ namespace asyncio {
 
     IOUDP::~IOUDP() {
         if (ioUDPSoc && !closed) {
-            close([&](ssize_t result) {
+            uv_sem_t sem;
+            uv_sem_init(&sem, 0);
+            close([this,&sem](ssize_t result) {
                 //printf("---AUTO_CLOSING_UDP---\n");
                 freeRequest();
 
                 if (ownLoop)
                     delete aloop;
-            });
 
+                uv_sem_post(&sem);
+            });
+            uv_sem_wait(&sem);
+            uv_sem_destroy(&sem);
         } else {
             freeRequest();
 
