@@ -12,6 +12,12 @@
 
 namespace network {
 
+struct HttpServerRequestHolder {
+    HttpServerRequest* pReq;
+    mg_connection *nc;
+};
+
+
 HttpServerRequest::HttpServerRequest(mg_connection* con, http_message *hm, std::shared_ptr<mg_mgr> mgr, const std::string& endpoint, const std::string& path) {
     con_ = con;
     queryString_ = std::string(hm->query_string.p, hm->query_string.len);
@@ -47,15 +53,17 @@ void HttpServerRequest::setAnswerBody(const std::string& text) {
 }
 
 void HttpServerRequest::sendAnswerFromAnotherThread() {
-    long addr = (long)this;
+    HttpServerRequestHolder holder;
+    holder.pReq = this;
+    holder.nc = this->con_;
     mg_broadcast(mgr_.get(), [](mg_connection *nc, int ev, void *ev_data){
-        long addr = *((long*)ev_data);
-        HttpServerRequest* pReq = (HttpServerRequest*) addr;
-        if (nc == pReq->con_) {
+        HttpServerRequestHolder* holder = (HttpServerRequestHolder*)ev_data;
+        if (nc == holder->nc) {
+            HttpServerRequest* pReq = holder->pReq;
             pReq->sendAnswer();
             delete pReq;
         }
-    }, (void*)(&addr), sizeof(addr));
+    }, (void*)(&holder), sizeof(holder));
 }
 
 void HttpServerRequest::sendAnswer() {
