@@ -212,7 +212,7 @@ TEST_CASE("CreateNodeToMany") {
     });
     for (int i = 1; i <= numNodes; ++i) {
         const int iAdapter = i;
-        env.adapters[iAdapter]->setReceiveCallback([&](const byte_vector& packet, const NodeInfo& fromNode) {
+        env.adapters[iAdapter]->setReceiveCallback([&receiveCounter,messageBody,&env,iAdapter,answerBody](const byte_vector& packet, const NodeInfo& fromNode) {
             ++receiveCounter;
             REQUIRE(messageBody == string(packet.begin(), packet.end()));
             env.adapters[iAdapter]->send(0, byte_vector(answerBody.begin(), answerBody.end()));
