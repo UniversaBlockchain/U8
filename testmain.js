@@ -115,7 +115,7 @@ async function testES() {
 
 require('unit_tests/crypto_test')
 // require('unit_tests/network_test');
-// require('unit_tests/file_tests');
+require('unit_tests/file_tests');
 // require('unit_tests/contract_test')
 // require('unit_tests/deltas_test')
 // require('unit_tests/role_test')
@@ -132,7 +132,7 @@ require('unit_tests/crypto_test')
 // require('unit_tests/ledger_test')
 // require('unit_tests/itemcache_test')
 // require('unit_tests/udp_test')
-// require('unit_tests/collection_test')
+require('unit_tests/collection_test')
 // require('unit_tests/services/environment_test')
 // require('unit_tests/services/slot_test')
 // require('unit_tests/services/follower_test')

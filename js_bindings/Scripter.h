@@ -28,7 +28,7 @@ extern ThreadPool executor;
 
 class Scripter : public std::enable_shared_from_this<Scripter>, public Logging {
 public:
-    typedef function<void(Local<Context>&)> ContextCallback;
+    typedef function<void(Local<Context> &)> ContextCallback;
 
 
     // ------------------- helpers -------------------------------
@@ -52,7 +52,7 @@ public:
      * @return block returned value or 1000 if std::exception was thrown, or 2000 if any other exception was thrown
      *         by the block.
      */
-    static int Application(const char *argv0, function<int(shared_ptr<Scripter>)>&& block);
+    static int Application(const char *argv0, function<int(shared_ptr<Scripter>)> &&block);
 
     /**
      * Sets up V8 environment for the process. Must be called once before any V8 and/or Scripter operation.
@@ -126,7 +126,7 @@ public:
      *
      * @param block to execute
      */
-    inline void lockedContext(ContextCallback&& block) {
+    inline void lockedContext(ContextCallback &&block) {
         callbacks.put(block);
     }
 
@@ -140,12 +140,8 @@ public:
      * @deprecated this methpd
      */
     template<typename F>
-    void inPool(F&& block) {
+    void inPool(F &&block) {
         lockedContext(block);
-    }
-
-    void inParallel(function<void()>&& block) {
-        jsThreadPool.execute(block);
     }
 
     /**
@@ -306,13 +302,9 @@ public:
         return args[index].As<T>();
     }
 
-    shared_ptr<BufferHandler> asBuffer(unsigned index) {
-        return make_shared<BufferHandler>(*this, index);
-    }
+    shared_ptr<BufferHandler> asBuffer(unsigned index);
 
-    shared_ptr<FunctionHandler> asFunction(unsigned index) {
-        return make_shared<FunctionHandler>(*this, index);
-    }
+    shared_ptr<FunctionHandler> asFunction(unsigned index);
 
     int32_t asInt(int index) {
         return args[index]->Int32Value(context).FromJust();
@@ -380,51 +372,68 @@ class ScripterHolder {
 public:
     ScripterHolder(ArgsContext &ac) : _scripter(ac.scripter) {}
 
-    Scripter *scripter() { return _scripter.get(); }
+    Scripter *scripter() const { return _scripter.get(); }
 
-    Isolate *isolate() { return _scripter->isolate(); }
+    Isolate *isolate() const { return _scripter->isolate(); }
 
     template<typename F>
-    inline auto lockedContext(F block) { _scripter->lockedContext(block); }
+    inline auto lockedContext(F block) const { _scripter->lockedContext(block); }
 
 protected:
     shared_ptr<Scripter> _scripter;
 };
 
+/**
+ * Utility class to pass data from Javascript TypedArray to the sync process. It fixes
+ * the array from garbage collection until it is no more used.
+ * We recommend getting it from ArgsContext#asBuffer(int).
+ */
 class BufferHandler : public ScripterHolder {
 private:
-    Persistent<TypedArray> _pbuffer;
+    shared_ptr<Persistent<ArrayBuffer>> _pbuffer;
     void *_data;
     size_t _size;
 public:
     BufferHandler(ArgsContext &ac, unsigned index) : ScripterHolder(ac) {
-        auto local = ac.as<TypedArray>(index);
-        _pbuffer.Reset(ac.isolate, local);
-        auto contents = local->Buffer()->GetContents();
+        auto buffer = ac.as<Uint8Array>(index)->Buffer();
+        _pbuffer = make_shared<Persistent<ArrayBuffer>>(ac.isolate, buffer);
+        auto contents = buffer->GetContents();
         _data = contents.Data();
         _size = contents.ByteLength();
     }
 
     ~BufferHandler() {
-        _pbuffer.Reset();
-        _data = nullptr;
-        _size = 0;
+        // the stupd trick: we need to avoid referencing field of destructing object
+        // strangely, we can't force copying field in the list, so:
+        auto x = _pbuffer;
+        // now persistent handle will survive destruction and will be freed later:
+        _scripter->lockedContext([x](auto unused) { x->Reset(); });
     }
 
+    /**
+     * @return address of the buffer's first byte
+     */
     inline auto data() const { return _data; }
 
+    /**
+     * @return size of the #data() buffer, in bytes.
+     */
     inline auto size() const { return _size; }
 };
 
+/**
+ * Utility class to conveniently hold the Javascript function handle across async operation. Do not forget
+ * to enter Scripter#lockedContext() first before invoking/calling it! Use
+ * ArgsContext#asFunction(int) to get an instance conveniently.
+ */
 class FunctionHandler : public ScripterHolder {
 private:
-    Persistent<Function> _pfunction;
-    shared_ptr<Scripter> _scripter;
+    shared_ptr<Persistent<Function>> _pfunction;
 
 public:
 
-    MaybeLocal<Value> call(Local<Context> &cxt, int argsCount, Local<Value> *args) {
-        auto fn = _pfunction.Get(cxt->GetIsolate());
+    MaybeLocal<Value> call(Local<Context> &cxt, int argsCount, Local<Value> *args) const {
+        auto fn = _pfunction->Get(cxt->GetIsolate());
         if (fn->IsFunction()) {
             return fn->Call(cxt, fn, argsCount, args);
         } else {
@@ -435,48 +444,58 @@ public:
         }
     }
 
-    MaybeLocal<Value> call(Local<Context> &cxt, int argsCount, const Local<Value> *args) {
+    MaybeLocal<Value> call(Local<Context> &cxt, int argsCount, const Local<Value> *args) const {
         return call(cxt, argsCount, const_cast<Local<Value> *>(args));
     }
 
     /**
-     * Performs call in a locked context of a contained scripter. Useful when the only action in the locked
-     * context is calling the callback.
+     * Performs call with a single argument.
      *
      * @param singleArg to pass to callback
      */
-    void invoke(Local<Value> &&singleArg) {
+    void invoke(Local<Value> &&singleArg) const {
         Local<Value> x[] = {singleArg};
         invoke(1, x);
     }
 
     /**
-     * Performs call in a locked context of a contained scripter. Useful when the only action in the locked
-     * context is calling the callback.
+     * Performs call with array of argumments.
+     *
      * @param argsCount number of arguments
      * @param args to pass to the callback
      */
-    void invoke(int argsCount, Local<Value> *args) {
+    void invoke(int argsCount, Local<Value> *args) const {
         _scripter->inContext([=](Local<Context> cxt) {
             call(cxt, argsCount, args);
         });
     }
 
-    void invoke() {
+    void invoke() const {
         invoke(0, nullptr);
     }
 
-    MaybeLocal<Value> call(Local<Context> &cxt, Local<Value> &&singleArg) {
+    MaybeLocal<Value> call(Local<Context> &cxt, Local<Value> &&singleArg) const {
         return call(cxt, 1, &singleArg);
     }
 
     FunctionHandler(ArgsContext &ac, unsigned index)
-            : _pfunction(ac.isolate, ac.as<Function>(index)), _scripter(ac.scripter),
-              ScripterHolder(ac) {}
+            : ScripterHolder(ac) {
+        _pfunction = make_shared<Persistent<Function>>(ac.isolate, ac.as<Function>(index));
+    }
 
-    ~FunctionHandler() { _pfunction.Reset(); }
+    ~FunctionHandler() {
+        auto x = _pfunction;
+        _scripter->lockedContext([x](auto unused) { x->Reset(); });
+    }
 };
 
+inline shared_ptr<BufferHandler> ArgsContext::asBuffer(unsigned index) {
+    return make_shared<BufferHandler>(*this, index);
+}
+
+inline shared_ptr<FunctionHandler> ArgsContext::asFunction(unsigned index) {
+    return make_shared<FunctionHandler>(*this, index);
+}
 
 template<typename F>
 void Scripter::unwrapArgs(
