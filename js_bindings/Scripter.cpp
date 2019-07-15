@@ -44,7 +44,7 @@ void Scripter::closeV8(std::unique_ptr<v8::Platform> &platform) {
     platform.release();
 }
 
-int Scripter::Application(const char *argv0, function<int(shared_ptr<Scripter>)>&& block) {
+int Scripter::Application(const char *argv0, function<int(shared_ptr<Scripter>)> &&block) {
     try {
         auto platform = initV8(argv0);
         auto se = New();
@@ -112,8 +112,8 @@ Scripter::Scripter() : Logging("SCR") {
 }
 
 static void JsThrowScripterException(const FunctionCallbackInfo<Value> &args) {
-    Scripter::unwrapArgs(args, [](ArgsContext& ac) {
-        switch(ac.asInt(0)) {
+    Scripter::unwrapArgs(args, [](ArgsContext &ac) {
+        switch (ac.asInt(0)) {
             case 0:
                 ac.scripter->throwError(ac.asString(1).c_str());
                 break;
@@ -123,8 +123,16 @@ static void JsThrowScripterException(const FunctionCallbackInfo<Value> &args) {
             case 2:
                 throw std::logic_error(ac.asString(1));
                 break;
-//           case 3:
-//               break;
+            case 3: {
+                TryCatch tryCatch(ac.isolate);
+                cout << "we will create a string... ";
+                auto s = String::NewFromUtf8(ac.isolate, "test constant string");
+                cout << ac.scripter->getString(s) << " ==\n";
+                auto e = Exception::Error(s);
+                cout << "exception object created";
+//                ac.setReturnValue(e);
+                break;
+            }
             default:
                 throw std::invalid_argument("unknown error type parameter");
         }
@@ -266,6 +274,7 @@ string Scripter::evaluate(const string &src, bool needsReturn, ScriptOrigin *ori
 }
 
 int Scripter::runAsMain(string sourceScript, const vector<string> &&args, string fileName) {
+    v8::Isolate::Scope isolateScope(pIsolate);
     inContext([&](Local<Context> &context) {
         ScriptOrigin origin(v8String(fileName));
         auto global = context->Global();
@@ -304,7 +313,7 @@ int Scripter::runAsMain(string sourceScript, const vector<string> &&args, string
             ContextCallback c = callbacks.get();
             TryCatch tryCatch(pIsolate);
             c(cxt);
-            if( tryCatch.HasCaught() ) {
+            if (tryCatch.HasCaught()) {
                 cerr << "Uncaught exception: " << getString(tryCatch.Exception()) << endl;
             }
         }
