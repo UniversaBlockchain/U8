@@ -372,7 +372,7 @@ TEST_CASE("Reconnect") {
     long reconnectTime = getCurrentTimeMillis() - reconnectStartTime;
     REQUIRE(payloadA == received2);
     cout << "reconnect time: " << reconnectTime << " ms" << endl;
-    REQUIRE(reconnectTime < 200);
+    REQUIRE(reconnectTime < 400);
 }
 
 TEST_CASE("LostPackets") {
