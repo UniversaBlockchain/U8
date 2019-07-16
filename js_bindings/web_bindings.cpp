@@ -319,21 +319,15 @@ public:
     }
     void close() {
         timer_.stop();
-        se_ = nullptr;
         delete udpAdapterPtr_;
         udpAdapterPtr_ = nullptr;
     }
     void send(int destNodeNumber, const byte_vector& payload) {
         udpAdapterPtr_->send(destNodeNumber, payload);
     }
-    void setReceiveCallback(Persistent<Function>* pcb, shared_ptr<Scripter> se) {
-        if (pcb_ != nullptr) {
-            pcb_->Reset();
-            delete pcb_;
-        }
-        pcb_ = pcb;
-        se_ = se;
-        udpAdapterPtr_->setReceiveCallback([=](const byte_vector &packet, const NodeInfo &fromNode) {
+    void setReceiveCallback(shared_ptr<FunctionHandler> receiveCallback) {
+        receiveCallback_ = receiveCallback;
+        udpAdapterPtr_->setReceiveCallback([this](const byte_vector &packet, const NodeInfo &fromNode) {
             atomic<bool> needSend(false);
             {
                 lock_guard lock(mutex_);
@@ -349,34 +343,26 @@ public:
 private:
     void sendAllFromBuf() {
         lock_guard lock(mutex_);
-        if ((se_ != nullptr) && (buf_.size() > 0)) {
+        if ((receiveCallback_ != nullptr) && (buf_.size() > 0)) {
             auto bufCopy = buf_;
             buf_.clear();
-            se_->inPool([=](Local<Context> &context) {
-                if (se_ == nullptr)
-                    return;
-                auto fn = pcb_->Get(context->GetIsolate());
-                if (fn->IsNull()) {
-                    se_->throwError("null callback in setReceiveCallback");
-                } else {
-                    Local<Array> arr = Array::New(se_->isolate(), bufCopy.size() * 2);
-                    for (int i = 0; i < bufCopy.size(); ++i) {
-                        auto &p = bufCopy[i].first;
-                        auto ab = ArrayBuffer::New(se_->isolate(), p.size());
-                        memcpy(ab->GetContents().Data(), &p[0], p.size());
-                        arr->Set(i * 2, Uint8Array::New(ab, 0, p.size()));
-                        arr->Set(i * 2 + 1, Integer::New(se_->isolate(), bufCopy[i].second));
-                    }
-                    Local<Value> result = arr;
-                    auto unused = fn->Call(context, fn, 1, &result);
+            receiveCallback_->lockedContext([this,bufCopy{std::move(bufCopy)}](Local<Context> &cxt){
+                Local<Array> arr = Array::New(cxt->GetIsolate(), bufCopy.size() * 2);
+                for (int i = 0; i < bufCopy.size(); ++i) {
+                    auto &p = bufCopy[i].first;
+                    auto ab = ArrayBuffer::New(cxt->GetIsolate(), p.size());
+                    memcpy(ab->GetContents().Data(), &p[0], p.size());
+                    arr->Set(i * 2, Uint8Array::New(ab, 0, p.size()));
+                    arr->Set(i * 2 + 1, Integer::New(cxt->GetIsolate(), bufCopy[i].second));
                 }
+                Local<Value> result = arr;
+                receiveCallback_->invoke(arr);
             });
         }
     }
 private:
     UDPAdapter* udpAdapterPtr_ = nullptr;
-    Persistent<Function>* pcb_ = nullptr;
-    shared_ptr<Scripter> se_ = nullptr;
+    shared_ptr<FunctionHandler> receiveCallback_ = nullptr;
     vector<pair<byte_vector,int>> buf_;
     TimerThread timer_;
     std::mutex mutex_;
@@ -398,25 +384,25 @@ void udpAdapter_send(const FunctionCallbackInfo<Value> &args) {
 }
 
 void udpAdapter_setReceiveCallback(const FunctionCallbackInfo<Value> &args) {
-    Scripter::unwrap(args, [&](const shared_ptr<Scripter> se, auto isolate, auto context) {
-        if (args.Length() == 1) {
-            auto udpAdapter = unwrap<UDPAdapterWrapper>(args.This());
-            Persistent<Function> *pcb = new Persistent<Function>(isolate, args[0].As<Function>());
-            udpAdapter->setReceiveCallback(pcb, se);
+    Scripter::unwrapArgs(args, [](ArgsContext &ac) {
+        if (ac.args.Length() == 1) {
+            auto udpAdapter = unwrap<UDPAdapterWrapper>(ac.args.This());
+            auto receiveCallback = ac.asFunction(0);
+            udpAdapter->setReceiveCallback(receiveCallback);
             return;
         }
-        se->throwError("invalid arguments");
+        ac.throwError("invalid arguments");
     });
 }
 
 void udpAdapter_close(const FunctionCallbackInfo<Value> &args) {
-    Scripter::unwrap(args, [&](const shared_ptr<Scripter> se, auto isolate, auto context) {
-        if (args.Length() == 0) {
-            auto udpAdapter = unwrap<UDPAdapterWrapper>(args.This());
+    Scripter::unwrapArgs(args, [](ArgsContext &ac) {
+        if (ac.args.Length() == 0) {
+            auto udpAdapter = unwrap<UDPAdapterWrapper>(ac.args.This());
             udpAdapter->close();
             return;
         }
-        se->throwError("invalid arguments");
+        ac.throwError("invalid arguments");
     });
 }
 

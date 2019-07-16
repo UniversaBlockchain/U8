@@ -63,7 +63,7 @@ const PrivateKey = crypto.PrivateKey = class extends crypto.PrivateKeyImpl {
             data = utf8Encode(data);
         }
         if (data instanceof Uint8Array)
-            return new Promise((resolve) => this.__sign(data, hashType, (val)=>{resolve(val);}));
+            return new Promise((resolve) => this.__sign(data, hashType, resolve));
         else
             throw new Error("Wrong data type: " + typeof (data));
     }
@@ -76,7 +76,7 @@ const PrivateKey = crypto.PrivateKey = class extends crypto.PrivateKeyImpl {
      * @throws crypto.Exception if the cipherText seems to be corrupted and can not be properly decrypted
      */
     async decrypt(cipherText) {
-        return new Promise( (resolve, reject) => this.__decrypt(cipherText, (val)=>{resolve(val);}, () =>{
+        return new Promise( (resolve, reject) => this.__decrypt(cipherText, resolve, () =>{
             reject(new crypto.Exception("PrivateKey decryption failed"));
         }));
     }
@@ -151,14 +151,14 @@ const PublicKey = crypto.PublicKey = class extends crypto.PublicKeyImpl {
             data = utf8Encode(data);
         }
         if (data instanceof Uint8Array)
-            return new Promise(resolve => this.__verify(data, signature, hashType, (val)=>{resolve(val);}));
+            return new Promise(resolve => this.__verify(data, signature, hashType, resolve));
         else
             throw new Error("Wrong data type: " + typeof (data));
     }
 
     async encrypt(plainText) {
         let data = typeof(plainText) == 'string' ? utf8Encode(plainText) : plainText;
-        return new Promise( resolve => this.__encrypt(data, (val)=>{resolve(val);}));
+        return new Promise( resolve => this.__encrypt(data, resolve));
     }
 
     get packed() {
