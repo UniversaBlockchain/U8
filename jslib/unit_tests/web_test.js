@@ -184,7 +184,7 @@ unit.test("big payload", async () => {
         await sleep(50);
     }
 
-    console.log("hash ok: " + hashOk);
+    console.logPut("hash ok: " + hashOk);
     assert(hashOk);
 
 

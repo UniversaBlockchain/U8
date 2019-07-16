@@ -355,8 +355,7 @@ private:
                     arr->Set(i * 2, Uint8Array::New(ab, 0, p.size()));
                     arr->Set(i * 2 + 1, Integer::New(cxt->GetIsolate(), bufCopy[i].second));
                 }
-                Local<Value> result = arr;
-                receiveCallback_->invoke(arr);
+                receiveCallback_->invoke(std::move(arr));
             });
         }
     }
@@ -582,22 +581,12 @@ public:
         });
     }
 
-    void setBufferedCallback(Persistent<Function>* pcb, shared_ptr<Scripter> se) {
-        if (pcb_ != nullptr) {
-            pcb_->Reset();
-            delete pcb_;
-        }
-        pcb_ = pcb;
-        se_ = se;
+    void setBufferedCallback(shared_ptr<FunctionHandler> httpCallback) {
+        httpCallback_ = httpCallback;
     }
 
-    void setBufferedSecureCallback(Persistent<Function>* pcb, shared_ptr<Scripter> se) {
-        if (pcbSecure_ != nullptr) {
-            pcbSecure_->Reset();
-            delete pcbSecure_;
-        }
-        pcbSecure_ = pcb;
-        seSecure_ = se;
+    void setBufferedSecureCallback(shared_ptr<FunctionHandler> httpSecureCallback) {
+        httpSecureCallback_ = httpSecureCallback;
     }
 
     void initSecureProtocol(byte_vector nodePrivateKeyPacked) {
@@ -622,46 +611,36 @@ public:
 private:
     void sendAllFromBuf() {
         lock_guard lock(mutex_);
-        if ((se_ != nullptr) && (buf_.size() > 0)) {
+        if ((httpCallback_ != nullptr) && (buf_.size() > 0)) {
             auto bufCopy = buf_;
             buf_.clear();
-            se_->inPool([=](Local<Context> &context) {
-                auto fn = pcb_->Get(context->GetIsolate());
-                if (fn->IsNull()) {
-                    se_->throwError("null callback in sendAllFromBuf");
-                } else {
-                    HttpServerRequestBuf* buf = new HttpServerRequestBuf();
-                    for (int i = 0; i < bufCopy.size(); ++i)
-                        buf->addHttpServerRequest(bufCopy[i]);
-                    Local<Value> res[1] = {wrap(HttpServerRequestBufTpl, se_->isolate(), buf)};
-                    auto unused = fn->Call(context, fn, 1, res);
-                    // delete buf from HttpServerRequestBuf::sendAnswer
-                }
+            httpCallback_->lockedContext([this,bufCopy{std::move(bufCopy)}](Local<Context> &cxt){
+                HttpServerRequestBuf* buf = new HttpServerRequestBuf();
+                for (int i = 0; i < bufCopy.size(); ++i)
+                    buf->addHttpServerRequest(bufCopy[i]);
+                Local<Value> res = wrap(HttpServerRequestBufTpl, httpCallback_->isolate(), buf);
+                httpCallback_->invoke(move(res));
+                // delete buf from HttpServerRequestBuf::sendAnswer
             });
         }
     }
     void sendAllFromSecureBuf() {
         lock_guard lock(mutex_);
-        if ((seSecure_ != nullptr) && (bufSecure_.size() > 0)) {
+        if ((httpSecureCallback_ != nullptr) && (bufSecure_.size() > 0)) {
             auto bufCopy = bufSecure_;
             bufSecure_.clear();
-            seSecure_->inPool([=](Local<Context> &context) {
-                auto fn = pcbSecure_->Get(context->GetIsolate());
-                if (fn->IsNull()) {
-                    seSecure_->throwError("null callback in sendAllFromSecureBuf");
-                } else {
-                    HttpServerSecureRequestBuf* buf = new HttpServerSecureRequestBuf();
+            httpSecureCallback_->lockedContext([this,bufCopy{std::move(bufCopy)}](Local<Context> &cxt){
+                HttpServerSecureRequestBuf* buf = new HttpServerSecureRequestBuf();
+                for (int i = 0; i < bufCopy.size(); ++i)
+                    buf->addHttpServerSecureRequest(bufCopy[i].paramsBin, bufCopy[i].session);
+                buf->resizeAnswersBuf();
+                buf->setAnswersReadyCallback([bufCopy,buf](){
                     for (int i = 0; i < bufCopy.size(); ++i)
-                        buf->addHttpServerSecureRequest(bufCopy[i].paramsBin, bufCopy[i].session);
-                    buf->resizeAnswersBuf();
-                    buf->setAnswersReadyCallback([bufCopy,buf](){
-                        for (int i = 0; i < bufCopy.size(); ++i)
-                            bufCopy[i].ansCallback(buf->getAnswer(i));
-                        delete buf;
-                    });
-                    Local<Value> res[1] = {wrap(HttpServerRequestSecureBufTpl, seSecure_->isolate(), buf)};
-                    auto unused = fn->Call(context, fn, 1, res);
-                }
+                        bufCopy[i].ansCallback(buf->getAnswer(i));
+                    delete buf;
+                });
+                Local<Value> res = wrap(HttpServerRequestSecureBufTpl, httpSecureCallback_->isolate(), buf);
+                httpSecureCallback_->invoke(move(res));
             });
         }
     }
@@ -671,35 +650,33 @@ private:
     std::vector<HttpServerRequest*> buf_;
     std::vector<SecureEndpointParams> bufSecure_;
     std::mutex mutex_;
-    Persistent<Function>* pcb_ = nullptr;
-    shared_ptr<Scripter> se_ = nullptr;
-    Persistent<Function>* pcbSecure_ = nullptr;
-    shared_ptr<Scripter> seSecure_ = nullptr;
+    shared_ptr<FunctionHandler> httpCallback_ = nullptr;
+    shared_ptr<FunctionHandler> httpSecureCallback_ = nullptr;
     TimerThread timer_;
     const int bufSize_;
 };
 
 void httpServer_setBufferedCallback(const FunctionCallbackInfo<Value> &args) {
-    Scripter::unwrap(args, [&](const shared_ptr<Scripter> se, auto isolate, auto context) {
-        if (args.Length() == 1) {
-            auto httpServer = unwrap<HttpServerBuffered>(args.This());
-            Persistent<Function> *pcb = new Persistent<Function>(isolate, args[0].As<Function>());
-            httpServer->setBufferedCallback(pcb, se);
+    Scripter::unwrapArgs(args, [](ArgsContext &ac) {
+        if (ac.args.Length() == 1) {
+            auto httpServer = unwrap<HttpServerBuffered>(ac.args.This());
+            auto httpCallback = ac.asFunction(0);
+            httpServer->setBufferedCallback(httpCallback);
             return;
         }
-        se->throwError("invalid arguments");
+        ac.throwError("invalid arguments");
     });
 }
 
 void httpServer_setBufferedSecureCallback(const FunctionCallbackInfo<Value> &args) {
-    Scripter::unwrap(args, [&](const shared_ptr<Scripter> se, auto isolate, auto context) {
-        if (args.Length() == 1) {
-            auto httpServer = unwrap<HttpServerBuffered>(args.This());
-            Persistent<Function> *pcb = new Persistent<Function>(isolate, args[0].As<Function>());
-            httpServer->setBufferedSecureCallback(pcb, se);
+    Scripter::unwrapArgs(args, [](ArgsContext &ac) {
+        if (ac.args.Length() == 1) {
+            auto httpServer = unwrap<HttpServerBuffered>(ac.args.This());
+            auto httpSecureCallback = ac.asFunction(0);
+            httpServer->setBufferedSecureCallback(httpSecureCallback);
             return;
         }
-        se->throwError("invalid arguments");
+        ac.throwError("invalid arguments");
     });
 }
 
