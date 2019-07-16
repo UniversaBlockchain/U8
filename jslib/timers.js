@@ -150,4 +150,4 @@ function clearTimeout(entry) {
     entry.cancel();
 }
 
-module.exports = {sleep, timeout, setTimeout, clearTimeout, currentMillis, now, version: "0.2"};
+module.exports = {sleep, timeout, setTimeout, clearTimeout, currentMillis, now, version: "1.0"};
