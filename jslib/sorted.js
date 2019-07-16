@@ -142,3 +142,4 @@ class SortedArray {
 
 exports.binarySearch = binarySearch;
 exports.SortedArray = SortedArray;
+exports.FastPriorityQueue = require('FastPriorityQueue');

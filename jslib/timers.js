@@ -3,14 +3,14 @@
 
 // This is a main C++ entry point for async delays. It is available only once
 // and the js library does it, so client scripts can not access it dynamically anymore.
+
+import {FastPriorityQueue} from "sorted";
+
 let timerHandler = __bios_initTimers();
 
 
-// const {SortedArray} = {...require("sorted")};
-// import {arraysEqual} from "tools";
-import {SortedArray} from 'sorted';
-
-let entries = new SortedArray([], (a, b) => b.fireAt - a.fireAt);
+// let entries = new SortedArray([], (a, b) => b.fireAt - a.fireAt);
+let entries = new FastPriorityQueue((a, b) => a.fireAt < b.fireAt);
 
 class TimeoutError extends Error {
 }
@@ -49,12 +49,11 @@ class TimeoutEntry {
 }
 
 function processQueue() {
-    let now = new Date().getTime();
     while (true) {
-        let e = entries.last;
-        if (!e || e.fireAt > now)
+        let e = entries.peek();
+        if (!e || e.fireAt > new Date().getTime())
             break;
-        entries.removeLast();
+        entries.poll();
         e.callback();
     }
     resetCallback();
@@ -80,11 +79,12 @@ function currentMillis() {
 
 function resetCallback() {
     // console.log("reset callback, entries: "+entries.map(x => ""+x+"\n"))
-    let last = entries.last;
+    let last = entries.peek();
     // console.log("last "+last);
     if (last) {
         let closest = last.fireAt;
         let left = closest - now();
+        // if( left <= processQueue())
         // console.log(`left to ${last.callback}: ${left}`)
         timerHandler(left, processQueue);
     }
