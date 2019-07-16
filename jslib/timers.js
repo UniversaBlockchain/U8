@@ -39,7 +39,8 @@ class TimeoutEntry {
 
     cancel() {
         entries.remove(this);
-        resetCallback();
+        if (this == entries.peek())
+            resetCallback();
         if (this.reject) this.reject(new TimeoutError("timeout cancelled"));
     }
 
@@ -84,9 +85,10 @@ function resetCallback() {
     if (last) {
         let closest = last.fireAt;
         let left = closest - now();
-        // if( left <= processQueue())
-        // console.log(`left to ${last.callback}: ${left}`)
-        timerHandler(left, processQueue);
+        if (left <= 0)
+            processQueue();
+        else
+            timerHandler(left, processQueue);
     }
     // console.log("TMQ:" + (currentMillis()));
     // entries.forEach(x => console.log(`--- ${x.callback} at ${x.fireAt - now()}`))
@@ -118,12 +120,12 @@ function timeout(millis, callback, reject) {
  * @param cancellable set to true to have {cancel()} method in the returned promise (less effective)
  * @returns {Promise<void>} that resolves after millis
  */
-function sleep(millis,cancellable=false) {
+function sleep(millis, cancellable = false) {
     let entry;
     let promise = new Promise((resolve, reject) => {
         entry = timeout(millis, resolve, reject)
     });
-    if(cancellable)
+    if (cancellable)
         promise.cancel = () => entry.cancel();
     return promise;
 }
