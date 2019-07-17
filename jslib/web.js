@@ -311,33 +311,6 @@ network.HttpServer = class {
         this.secureReqBufs = [];
 
         this.httpServer_.__setBufferedCallback(async (reqBuf) => {
-            this.reqBufs.push(reqBuf);
-        });
-        this.httpServer_.__setBufferedSecureCallback(async (reqBuf) => {
-            this.secureReqBufs.push(reqBuf);
-        });
-
-        this.addTimer(10, async () => {
-            await this.processReqBufs();
-            await this.processSecureReqBufs();
-        });
-
-    }
-
-    addTimer(delay, block) {
-        let i = this.timers_.length;
-        let f = () => {
-            block();
-            this.timers_[i] = trs.timeout(delay, f);
-        };
-        this.timers_[i] = trs.timeout(delay, f);
-    }
-
-    async processReqBufs() {
-        let reqBufs = this.reqBufs;
-        this.reqBufs = [];
-        for (let k = 0; k < reqBufs.length; ++k) {
-            let reqBuf = reqBufs[k];
             let length = reqBuf.getBufLength();
             let promises = [];
             for (let i = 0; i < length; ++i) {
@@ -352,14 +325,9 @@ network.HttpServer = class {
                 }
             }
             await Promise.all(promises);
-        }
-    }
+        });
 
-    async processSecureReqBufs() {
-        let secureReqBufs = this.secureReqBufs;
-        this.secureReqBufs = [];
-        for (let k = 0; k < secureReqBufs.length; ++k) {
-            let reqBuf = secureReqBufs[k];
+        this.httpServer_.__setBufferedSecureCallback(async (reqBuf) => {
             let length = reqBuf.getBufLength();
             let promises = [];
             for (let i = 0; i < length; ++i) {
@@ -383,7 +351,7 @@ network.HttpServer = class {
             for (let i = 0; i < length; ++i) {
                 reqBuf.setAnswer(i, Boss.dump(DefaultBiMapper.getInstance().serialize(results[i])));
             }
-        }
+        });
     }
 
     processSecureCommand(params, clientPublicKey) {
