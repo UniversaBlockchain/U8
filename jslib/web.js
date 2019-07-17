@@ -1,7 +1,6 @@
 import {MemoiseMixin} from 'tools'
 import * as io from "io";
 import * as t from "tools";
-import * as trs from 'timers'
 import {PublicKey} from "crypto";
 const Boss = require('boss.js');
 const yaml = require('yaml');
@@ -306,10 +305,6 @@ network.HttpServer = class {
         this.endpoints_ = new Map();
         this.secureEndpoints_ = new Map();
 
-        this.timers_ = [];
-        this.reqBufs = [];
-        this.secureReqBufs = [];
-
         this.httpServer_.__setBufferedCallback(async (reqBuf) => {
             let length = reqBuf.getBufLength();
             let promises = [];
@@ -384,11 +379,6 @@ network.HttpServer = class {
 
     async stopServer() {
         this.httpServer_.__stopServer();
-        for (let i = 0; i < this.timers_.length; ++i)
-            trs.clearTimeout(this.timers_[i]);
-
-        //wait for delayed timer callbacks
-        await sleep(300);
         this.httpServer_ = null;
     }
 
