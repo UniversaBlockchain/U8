@@ -17,11 +17,12 @@ class PgDriverPool extends db.SqlDriverPool {
     constructor(pool) {
         super();
         this.pool = pool;
+        this.isClosed = false;
     }
 
     withConnection(callback) {
         this.pool._withConnection(async (con)=>{
-            await callback(new PgDriverConnection(con));
+            await callback(new PgDriverConnection(con,this));
         });
     }
 
@@ -34,6 +35,7 @@ class PgDriverPool extends db.SqlDriverPool {
     }
 
     close() {
+        this.isClosed = true;
         this.pool._close();
     }
 
@@ -84,12 +86,15 @@ class PgDriverPool extends db.SqlDriverPool {
 }
 
 class PgDriverConnection extends db.SqlDriverConnection {
-    constructor(con) {
+    constructor(con,pool) {
         super();
         this.con = con;
+        this.pool = pool;
     }
 
     executeQuery(onSuccess, onError, queryString, ...params) {
+        if (this.pool.isClosed)
+            return;
         this.con._executeQuery(async (qr)=>{
             await onSuccess(new PgDriverResultSet(qr));
             qr._release();
@@ -99,6 +104,8 @@ class PgDriverConnection extends db.SqlDriverConnection {
     }
 
     executeUpdate(onSuccess, onError, queryString, ...params) {
+        if (this.pool.isClosed)
+            return;
         this.con._executeUpdate(async (affectedRows)=>{
             await onSuccess(affectedRows);
         }, async (errText)=>{
@@ -112,6 +119,8 @@ class PgDriverConnection extends db.SqlDriverConnection {
      * It is used for migrations applying.
      */
     execSql(onSuccess, onError, sql) {
+        if (this.pool.isClosed)
+            return;
         this.con._exec(() => {
             onSuccess();
         }, (errText) => {
@@ -120,6 +129,8 @@ class PgDriverConnection extends db.SqlDriverConnection {
     }
 
     release() {
+        if (this.pool.isClosed)
+            return;
         this.con._release();
     }
 }
