@@ -845,22 +845,12 @@ public:
         });
     }
 
-    void setBufferedCallback(Persistent<Function>* pcb, shared_ptr<Scripter> se) {
-        if (pcb_ != nullptr) {
-            pcb_->Reset();
-            delete pcb_;
-        }
-        pcb_ = pcb;
-        se_ = se;
+    void setBufferedCallback(shared_ptr<FunctionHandler> bufferedCallback) {
+        bufferedCallback_ = bufferedCallback;
     }
 
-    void setBufferedCommandCallback(Persistent<Function>* pcb, shared_ptr<Scripter> se) {
-        if (pcbCommand_ != nullptr) {
-            pcbCommand_->Reset();
-            delete pcbCommand_;
-        }
-        pcbCommand_ = pcb;
-        seCommand_ = se;
+    void setBufferedCommandCallback(shared_ptr<FunctionHandler> bufferedCommandCallback) {
+        bufferedCommandCallback_ = bufferedCommandCallback;
     }
 
     void start(const byte_vector& clientPrivateKeyPacked, const byte_vector& nodePublicKeyPacked, const std::function<void()>& onComplete) {
@@ -880,65 +870,51 @@ public:
 private:
     void sendAllFromBuf() {
         lock_guard lock(mutex_);
-        if ((se_ != nullptr) && (buf_.size() > 0)) {
+        if ((bufferedCallback_ != nullptr) && (buf_.size() > 0)) {
             auto bufCopy = buf_;
             buf_.clear();
-            se_->inPool([=](Local<Context> &context) {
-                auto fn = pcb_->Get(context->GetIsolate());
-                if (fn->IsNull()) {
-                    se_->throwError("null callback in setBufferedCallback");
-                } else {
-                    Local<Array> arr = Array::New(se_->isolate(), bufCopy.size()*3);
-                    for (int i = 0; i < bufCopy.size(); ++i) {
-                        auto ab = ArrayBuffer::New(se_->isolate(), bufCopy[i].body.size());
-                        memcpy(ab->GetContents().Data(), &bufCopy[i].body[0], bufCopy[i].body.size());
-                        arr->Set(i * 3 + 0, Integer::New(se_->isolate(), bufCopy[i].reqId));
-                        arr->Set(i * 3 + 1, Integer::New(se_->isolate(), bufCopy[i].respStatus));
-                        arr->Set(i * 3 + 2, Uint8Array::New(ab, 0, bufCopy[i].body.size()));
-                    }
-                    Local<Value> result = arr;
-                    auto unused = fn->Call(context, fn, 1, &result);
+            bufferedCallback_->lockedContext([this,bufCopy{std::move(bufCopy)}](Local<Context> &cxt){
+                Local<Array> arr = Array::New(bufferedCallback_->isolate(), bufCopy.size()*3);
+                for (int i = 0; i < bufCopy.size(); ++i) {
+                    auto ab = ArrayBuffer::New(bufferedCallback_->isolate(), bufCopy[i].body.size());
+                    memcpy(ab->GetContents().Data(), &bufCopy[i].body[0], bufCopy[i].body.size());
+                    arr->Set(i * 3 + 0, Integer::New(bufferedCallback_->isolate(), bufCopy[i].reqId));
+                    arr->Set(i * 3 + 1, Integer::New(bufferedCallback_->isolate(), bufCopy[i].respStatus));
+                    arr->Set(i * 3 + 2, Uint8Array::New(ab, 0, bufCopy[i].body.size()));
                 }
+                bufferedCallback_->invoke(std::move(arr));
             });
         }
     }
 
     void sendAllFromBufCommand() {
         lock_guard lock(mutex_);
-        if ((seCommand_ != nullptr) && (bufCommand_.size() > 0)) {
+        if ((bufferedCommandCallback_ != nullptr) && (bufCommand_.size() > 0)) {
             auto bufCopy = bufCommand_;
             bufCommand_.clear();
-            seCommand_->inPool([=](Local<Context> &context) {
-                auto fn = pcbCommand_->Get(context->GetIsolate());
-                if (fn->IsNull()) {
-                    seCommand_->throwError("null callback in setBufferedCommandCallback");
-                } else {
-                    Local<Array> arr = Array::New(seCommand_->isolate(), bufCopy.size()*2);
-                    for (int i = 0; i < bufCopy.size(); ++i) {
-                        auto ab = ArrayBuffer::New(seCommand_->isolate(), bufCopy[i].decrypted.size());
-                        memcpy(ab->GetContents().Data(), &bufCopy[i].decrypted[0], bufCopy[i].decrypted.size());
-                        arr->Set(i * 2 + 0, Integer::New(se_->isolate(), bufCopy[i].reqId));
-                        arr->Set(i * 2 + 1, Uint8Array::New(ab, 0, bufCopy[i].decrypted.size()));
-                    }
-                    Local<Value> result = arr;
-                    auto unused = fn->Call(context, fn, 1, &result);
+            bufferedCommandCallback_->lockedContext([this,bufCopy{std::move(bufCopy)}](Local<Context> &cxt){
+                Local<Array> arr = Array::New(bufferedCommandCallback_->isolate(), bufCopy.size()*2);
+                for (int i = 0; i < bufCopy.size(); ++i) {
+                    auto ab = ArrayBuffer::New(bufferedCommandCallback_->isolate(), bufCopy[i].decrypted.size());
+                    memcpy(ab->GetContents().Data(), &bufCopy[i].decrypted[0], bufCopy[i].decrypted.size());
+                    arr->Set(i * 2 + 0, Integer::New(bufferedCommandCallback_->isolate(), bufCopy[i].reqId));
+                    arr->Set(i * 2 + 1, Uint8Array::New(ab, 0, bufCopy[i].decrypted.size()));
                 }
+                bufferedCommandCallback_->invoke(std::move(arr));
             });
         }
     }
 
 private:
     HttpClient* httpClient_;
-    Persistent<Function>* pcb_ = nullptr;
-    shared_ptr<Scripter> se_ = nullptr;
+    shared_ptr<FunctionHandler> bufferedCallback_;
     std::vector<HttpClientAnswer> buf_;
     std::mutex mutex_;
     const int bufSize_ = 1;
     TimerThread timer_;
     ThreadPool startPool_;
     std::vector<HttpClientCommandAnswer> bufCommand_;
-    Persistent<Function>* pcbCommand_ = nullptr;
-    shared_ptr<Scripter> seCommand_ = nullptr;
+    shared_ptr<FunctionHandler> bufferedCommandCallback_;
 };
 
 void httpClient_sendGetRequest(const FunctionCallbackInfo<Value> &args) {
@@ -978,62 +954,53 @@ void httpClient_command(const FunctionCallbackInfo<Value> &args) {
 }
 
 void httpClient_setBufferedCallback(const FunctionCallbackInfo<Value> &args) {
-    Scripter::unwrap(args, [&](const shared_ptr<Scripter> se, auto isolate, auto context) {
-        if (args.Length() == 1) {
-            auto httpServer = unwrap<HttpClientBuffered>(args.This());
-            Persistent<Function> *pcb = new Persistent<Function>(isolate, args[0].As<Function>());
-            httpServer->setBufferedCallback(pcb, se);
+    Scripter::unwrapArgs(args, [](ArgsContext &ac) {
+        if (ac.args.Length() == 1) {
+            auto httpServer = unwrap<HttpClientBuffered>(ac.args.This());
+            auto bufferedCallback = ac.asFunction(0);
+            httpServer->setBufferedCallback(bufferedCallback);
             return;
         }
-        se->throwError("invalid arguments");
+        ac.throwError("invalid arguments");
     });
 }
 
 void httpClient_setBufferedCommandCallback(const FunctionCallbackInfo<Value> &args) {
-    Scripter::unwrap(args, [&](const shared_ptr<Scripter> se, auto isolate, auto context) {
-        if (args.Length() == 1) {
-            auto httpServer = unwrap<HttpClientBuffered>(args.This());
-            Persistent<Function> *pcb = new Persistent<Function>(isolate, args[0].As<Function>());
-            httpServer->setBufferedCommandCallback(pcb, se);
+    Scripter::unwrapArgs(args, [](ArgsContext &ac) {
+        if (ac.args.Length() == 1) {
+            auto httpServer = unwrap<HttpClientBuffered>(ac.args.This());
+            auto bufferedCommandCallback = ac.asFunction(0);
+            httpServer->setBufferedCommandCallback(bufferedCommandCallback);
             return;
         }
-        se->throwError("invalid arguments");
+        ac.throwError("invalid arguments");
     });
 }
 
 void httpClient_start(const FunctionCallbackInfo<Value> &args) {
-    Scripter::unwrap(args, [&](const shared_ptr<Scripter> se, auto isolate, auto context) {
-        if (args.Length() == 3) {
-            auto httpClient = unwrap<HttpClientBuffered>(args.This());
+    Scripter::unwrapArgs(args, [](ArgsContext &ac) {
+        if (ac.args.Length() == 3) {
+            auto httpClient = unwrap<HttpClientBuffered>(ac.args.This());
 
-            auto contents0 = args[0].As<TypedArray>()->Buffer()->GetContents();
+            auto contents0 = ac.args[0].As<TypedArray>()->Buffer()->GetContents();
             byte_vector bv0(contents0.ByteLength());
             memcpy(&bv0[0], contents0.Data(), contents0.ByteLength());
 
-            auto contents1 = args[1].As<TypedArray>()->Buffer()->GetContents();
+            auto contents1 = ac.args[1].As<TypedArray>()->Buffer()->GetContents();
             byte_vector bv1(contents1.ByteLength());
             memcpy(&bv1[0], contents1.Data(), contents1.ByteLength());
 
-            auto fn = args[2].As<Function>();
-            if (fn->IsNull() || fn->IsUndefined()) {
-                se->throwError("null callback in HttpClient.start");
-                return;
-            }
-            Persistent<Function> *pcb = new Persistent<Function>(se->isolate(), fn);
+            auto onReady = ac.asFunction(2);
 
             httpClient->start(bv0, bv1, [=](){
-                se->inPool([=](auto context) {
-                    Isolate *isolate = context->GetIsolate();
-                    auto fn = pcb->Get(isolate);
-                    auto unused = fn->Call(context, fn, 0, nullptr);
-                    pcb->Reset();
-                    delete pcb;
+                onReady->lockedContext([=](Local<Context> &cxt){
+                    onReady->invoke();
                 });
             });
 
             return;
         }
-        se->throwError("invalid arguments");
+        ac.throwError("invalid arguments");
     });
 }
 
