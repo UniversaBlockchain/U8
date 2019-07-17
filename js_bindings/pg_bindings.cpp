@@ -13,222 +13,147 @@ static Persistent<FunctionTemplate> QueryResultTemplate;
 // PGPool methods
 
 void JsPGPoolConnect(const FunctionCallbackInfo<Value> &args) {
-    Scripter::unwrapArgs(args, [&](ArgsContext &ac) {
-
-        auto scripter = ac.scripter;
-        if (args.Length() != 2)
-            scripter->throwError("invalid number of arguments");
-
-        auto pool = unwrap<db::PGPool>(args.This());
-
-        pair<bool, string> result = pool->connect(ac.asInt(0), ac.asString(1));
-        string s("");
-        if (!result.first)
-            s = result.second;
-        ac.setReturnValue(ac.v8String(s));
+    Scripter::unwrapArgs(args, [](ArgsContext &ac) {
+        if (ac.args.Length() == 2) {
+            auto pool = unwrap<db::PGPool>(ac.args.This());
+            pair<bool, string> result = pool->connect(ac.asInt(0), ac.asString(1));
+            string s("");
+            if (!result.first)
+                s = result.second;
+            ac.setReturnValue(ac.v8String(s));
+            return;
+        }
+        ac.throwError("invalid number of arguments");
     });
 }
 
 void JsPGPoolWithConnection(const FunctionCallbackInfo<Value> &args) {
-    Scripter::unwrapArgs(args, [&](ArgsContext &ac) {
-
-        auto scripter = ac.scripter;
-        if (args.Length() != 1)
-            scripter->throwError("invalid number of arguments");
-
-        auto pool = unwrap<db::PGPool>(args.This());
-
-        auto fn = ac.as<Function>(0);
-        if (fn->IsNull() || fn->IsUndefined()) {
-            scripter->throwError("null callback in PGPool::withConnection");
+    Scripter::unwrapArgs(args, [](ArgsContext &ac) {
+        if (ac.args.Length() == 1) {
+            auto pool = unwrap<db::PGPool>(ac.args.This());
+            auto onReady = ac.asFunction(0);
+            pool->withConnection([=](shared_ptr<db::BusyConnection> conn) {
+                onReady->lockedContext([=](Local<Context> &cxt){
+                    onReady->invoke(wrap(BusyConnectionTemplate, onReady->isolate(), conn.get()));
+                });
+            });
             return;
         }
-        Persistent<Function> *pcb = new Persistent<Function>(ac.isolate, fn);
-
-        pool->withConnection([=](shared_ptr<db::BusyConnection> conn) {
-            // here we are in another thread
-            scripter->inPool([=](auto context) {
-                Isolate *isolate = context->GetIsolate();
-                auto fn = pcb->Get(isolate);
-                Local<Value> res[1] {wrap(BusyConnectionTemplate, isolate, conn.get())};
-                auto unused = fn->Call(context, fn, 1, res);
-                pcb->Reset();
-                delete pcb;
-                //pool->releaseConnection(conn);
-            });
-        });
+        ac.throwError("invalid number of arguments");
     });
 }
 
 void JsPGPoolTotalConnections(const FunctionCallbackInfo<Value> &args) {
-    Scripter::unwrapArgs(args, [&](ArgsContext &ac) {
-
-        auto scripter = ac.scripter;
-        if (args.Length() != 0)
-            scripter->throwError("invalid number of arguments");
-
-        auto pool = unwrap<db::PGPool>(args.This());
-
-        unsigned int result = pool->totalConnections();
-        ac.setReturnValue(result);
+    Scripter::unwrapArgs(args, [](ArgsContext &ac) {
+        if (ac.args.Length() == 0) {
+            auto pool = unwrap<db::PGPool>(ac.args.This());
+            unsigned int result = pool->totalConnections();
+            ac.setReturnValue(result);
+            return;
+        }
+        ac.throwError("invalid number of arguments");
     });
 }
 
 void JsPGPoolAvailableConnections(const FunctionCallbackInfo<Value> &args) {
-    Scripter::unwrapArgs(args, [&](ArgsContext &ac) {
-
-    auto scripter = ac.scripter;
-    if (args.Length() != 0)
-        scripter->throwError("invalid number of arguments");
-
-        auto pool = unwrap<db::PGPool>(args.This());
-
-        unsigned int result = pool->availableConnections();
-        ac.setReturnValue(result);
+    Scripter::unwrapArgs(args, [](ArgsContext &ac) {
+        if (ac.args.Length() == 0) {
+            auto pool = unwrap<db::PGPool>(ac.args.This());
+            unsigned int result = pool->availableConnections();
+            ac.setReturnValue(result);
+            return;
+        }
+        ac.throwError("invalid number of arguments");
     });
 }
 
 void JsPGPoolClose(const FunctionCallbackInfo<Value> &args) {
-    Scripter::unwrapArgs(args, [&](ArgsContext &ac) {
-        auto scripter = ac.scripter;
-        if (args.Length() != 0)
-            scripter->throwError("invalid number of arguments");
-
-        auto pool = unwrap<db::PGPool>(args.This());
-        pool->close();
+    Scripter::unwrapArgs(args, [](ArgsContext &ac) {
+        if (ac.args.Length() == 0) {
+            auto pool = unwrap<db::PGPool>(ac.args.This());
+            pool->close();
+            return;
+        }
+        ac.throwError("invalid number of arguments");
     });
 }
 
 // BusyConnection methods
 
 void JsBusyConnectionExecuteQuery(const FunctionCallbackInfo<Value> &args) {
-    Scripter::unwrapArgs(args, [&](ArgsContext &ac) {
+    Scripter::unwrapArgs(args, [](ArgsContext &ac) {
+        if (ac.args.Length() == 4) {
+            auto onSuccess = ac.asFunction(0);
+            auto onError = ac.asFunction(1);
+            auto queryString = ac.asString(2);
 
-        auto scripter = ac.scripter;
-        if (args.Length() != 4)
-            scripter->throwError("invalid number of arguments");
-
-        auto onSuccess = ac.as<Function>(0);
-        if (onSuccess->IsNull() || onSuccess->IsUndefined()) {
-            scripter->throwError("null onSuccess in JsBusyConnectionExecuteQuery");
-            return;
-        }
-        Persistent<Function> *onSuccessPcb = new Persistent<Function>(ac.isolate, onSuccess);
-        auto onError = ac.as<Function>(1);
-        if (onError->IsNull() || onError->IsUndefined()) {
-            scripter->throwError("null onError in JsBusyConnectionExecuteQuery");
-            return;
-        }
-        Persistent<Function> *onErrorPcb = new Persistent<Function>(ac.isolate, onError);
-        auto queryString = ac.asString(2);
-
-        vector<any> params;
-        auto arr = v8::Handle<v8::Array>::Cast(args[3]);
-        for (size_t i = 0, count = arr->Length(); i < count; ++i) {
-            if (arr->Get(i)->IsTypedArray()) {
-                auto contents = v8::Handle<v8::Uint8Array>::Cast(arr->Get(i))->Buffer()->GetContents();
-                byte_vector bv(contents.ByteLength());
-                memcpy(&bv[0], contents.Data(), contents.ByteLength());
-                params.push_back(bv);
-            } else {
-                params.push_back(scripter->getString(arr->Get(i)));
+            vector<any> params;
+            auto arr = v8::Handle<v8::Array>::Cast(ac.args[3]);
+            for (size_t i = 0, count = arr->Length(); i < count; ++i) {
+                if (arr->Get(i)->IsTypedArray()) {
+                    auto contents = v8::Handle<v8::Uint8Array>::Cast(arr->Get(i))->Buffer()->GetContents();
+                    byte_vector bv(contents.ByteLength());
+                    memcpy(&bv[0], contents.Data(), contents.ByteLength());
+                    params.push_back(bv);
+                } else {
+                    params.push_back(ac.scripter->getString(arr->Get(i)));
+                }
             }
+
+            auto con = unwrap<db::BusyConnection>(ac.args.This());
+
+            con->executeQueryArrStr([=](db::QueryResult &&qr) {
+                db::QueryResult *pqr = new db::QueryResult();
+                pqr->moveFrom(std::move(qr));
+                onSuccess->lockedContext([=](Local<Context> &cxt) {
+                    onSuccess->invoke(wrap(QueryResultTemplate, cxt->GetIsolate(), pqr));
+                });
+            }, [=](const string &err) {
+                onError->lockedContext([=](Local<Context> &cxt){
+                    onError->invoke(onError->scripter()->v8String(err));
+                });
+            }, queryString, params);
+            return;
         }
-
-        auto con = unwrap<db::BusyConnection>(args.This());
-
-        con->executeQueryArrStr([=](db::QueryResult&& qr){
-            db::QueryResult* pqr = new db::QueryResult();
-            pqr->moveFrom(std::move(qr));
-            scripter->inPool([=](auto context) {
-                Isolate *isolate = context->GetIsolate();
-                auto fn = onSuccessPcb->Get(isolate);
-                Local<Value> res[1] {wrap(QueryResultTemplate, isolate, pqr)};
-                auto unused = fn->Call(context, fn, 1, res);
-                onSuccessPcb->Reset();
-                onErrorPcb->Reset();
-                delete onSuccessPcb;
-                delete onErrorPcb;
-                //delete pqr;
-            });
-        }, [=](const string& err){
-            scripter->inPool([=](auto context) {
-                Isolate *isolate = context->GetIsolate();
-                auto fn = onErrorPcb->Get(isolate);
-                Local<Value> result = scripter->v8String(err);
-                auto unused = fn->Call(context, fn, 1, &result);
-                onSuccessPcb->Reset();
-                onErrorPcb->Reset();
-                delete onSuccessPcb;
-                delete onErrorPcb;
-            });
-        }, queryString, params);
-
-
+        ac.throwError("invalid number of arguments");
     });
 }
 
 void JsBusyConnectionExecuteUpdate(const FunctionCallbackInfo<Value> &args) {
-    Scripter::unwrapArgs(args, [&](ArgsContext &ac) {
+    Scripter::unwrapArgs(args, [](ArgsContext &ac) {
+        if (ac.args.Length() == 4) {
+            auto onSuccess = ac.asFunction(0);
+            auto onError = ac.asFunction(1);
+            auto queryString = ac.asString(2);
 
-        auto scripter = ac.scripter;
-        if (args.Length() != 4)
-            scripter->throwError("invalid number of arguments");
-
-        auto onSuccess = ac.as<Function>(0);
-        if (onSuccess->IsNull() || onSuccess->IsUndefined()) {
-            scripter->throwError("null onSuccess in JsBusyConnectionExecuteQuery");
-            return;
-        }
-        Persistent<Function> *onSuccessPcb = new Persistent<Function>(ac.isolate, onSuccess);
-        auto onError = ac.as<Function>(1);
-        if (onError->IsNull() || onError->IsUndefined()) {
-            scripter->throwError("null onError in JsBusyConnectionExecuteQuery");
-            return;
-        }
-        Persistent<Function> *onErrorPcb = new Persistent<Function>(ac.isolate, onError);
-        auto queryString = ac.asString(2);
-
-        vector<any> params;
-        auto arr = v8::Handle<v8::Array>::Cast(args[3]);
-        for (size_t i = 0, count = arr->Length(); i < count; ++i) {
-            if (arr->Get(i)->IsTypedArray()) {
-                auto contents = v8::Handle<v8::Uint8Array>::Cast(arr->Get(i))->Buffer()->GetContents();
-                byte_vector bv(contents.ByteLength());
-                memcpy(&bv[0], contents.Data(), contents.ByteLength());
-                params.push_back(bv);
-            } else {
-                params.push_back(scripter->getString(arr->Get(i)));
+            vector<any> params;
+            auto arr = v8::Handle<v8::Array>::Cast(ac.args[3]);
+            for (size_t i = 0, count = arr->Length(); i < count; ++i) {
+                if (arr->Get(i)->IsTypedArray()) {
+                    auto contents = v8::Handle<v8::Uint8Array>::Cast(arr->Get(i))->Buffer()->GetContents();
+                    byte_vector bv(contents.ByteLength());
+                    memcpy(&bv[0], contents.Data(), contents.ByteLength());
+                    params.push_back(bv);
+                } else {
+                    params.push_back(ac.scripter->getString(arr->Get(i)));
+                }
             }
+
+            auto con = unwrap<db::BusyConnection>(ac.args.This());
+
+            con->executeUpdateArrStr([=](int affectedRows) {
+                onSuccess->lockedContext([=](Local<Context> &cxt){
+                    onSuccess->invoke(Number::New(cxt->GetIsolate(), affectedRows));
+                });
+            }, [=](const string &err) {
+                onError->lockedContext([=](Local<Context> &cxt){
+                    onError->invoke(ac.scripter->v8String(err));
+                });
+            }, queryString, params);
+
+            return;
         }
-
-        auto con = unwrap<db::BusyConnection>(args.This());
-
-        con->executeUpdateArrStr([=](int affectedRows){
-            scripter->inPool([=](auto context) {
-                Isolate *isolate = context->GetIsolate();
-                auto fn = onSuccessPcb->Get(isolate);
-                Local<v8::Value> prm = Number::New(ac.isolate, affectedRows);
-                auto unused = fn->Call(context, fn, 1, &prm);
-                onSuccessPcb->Reset();
-                onErrorPcb->Reset();
-                delete onSuccessPcb;
-                delete onErrorPcb;
-            });
-        }, [=](const string& err){
-            scripter->inPool([=](auto context) {
-                Isolate *isolate = context->GetIsolate();
-                auto fn = onErrorPcb->Get(isolate);
-                Local<Value> result = scripter->v8String(err);
-                auto unused = fn->Call(context, fn, 1, &result);
-                onSuccessPcb->Reset();
-                onErrorPcb->Reset();
-                delete onSuccessPcb;
-                delete onErrorPcb;
-            });
-        }, queryString, params);
-
-
+        ac.throwError("invalid number of arguments");
     });
 }
 

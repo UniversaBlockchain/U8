@@ -1,7 +1,7 @@
 import {expect, unit, assert, assertSilent} from 'test'
 import * as db from 'pg_driver'
 import {HashId} from 'crypto'
-import {randomBytes} from 'tools'
+import {randomBytes, RateCounter} from 'tools'
 
 unit.test("pg_test: hello", async () => {
     try {
@@ -202,7 +202,7 @@ unit.test("pg_test: tables", async () => {
     pool.close();
 });
 
-unit.test("insert and get new id", async () => {
+unit.test("pg_test: insert and get new id", async () => {
     await recreateTestTable();
     let pool = createPool(4);
 
@@ -230,7 +230,7 @@ unit.test("insert and get new id", async () => {
     pool.close();
 });
 
-unit.test("insert, select and update bytea", async () => {
+unit.test("pg_test: insert, select and update bytea", async () => {
     await recreateTestTable();
     let pool = createPool(4);
     let hashId1 = crypto.HashId.of(randomBytes(16));
@@ -321,7 +321,7 @@ unit.test("insert, select and update bytea", async () => {
     pool.close();
 });
 
-unit.test("insert, select and update integer and bigint", async () => {
+unit.test("pg_test: insert, select and update integer and bigint", async () => {
     await recreateTestTable();
     let pool = createPool(4);
     let created_at_1 = Number((new Date().getTime()/1000).toFixed(0));
@@ -418,7 +418,7 @@ unit.test("insert, select and update integer and bigint", async () => {
     pool.close();
 });
 
-unit.test("insert, select and update text, boolean, double", async () => {
+unit.test("pg_test: insert, select and update text, boolean, double", async () => {
     await recreateTestTable();
     let pool = createPool(4);
     let text1 = "text value 1";
@@ -518,7 +518,7 @@ unit.test("insert, select and update text, boolean, double", async () => {
     pool.close();
 });
 
-unit.test("performance: insert line-by-line vs multi insert", async () => {
+unit.test("pg_test: performance: insert line-by-line vs multi insert", async () => {
     let ROWS_COUNT = 400;
     let BUF_SIZE = 20;
     let testResult = "";
@@ -595,7 +595,7 @@ unit.test("performance: insert line-by-line vs multi insert", async () => {
     pool.close();
 });
 
-unit.test("performance: select line-by-line vs array in 'where'", async () => {
+unit.test("pg_test: performance: select line-by-line vs array in 'where'", async () => {
     let ROWS_COUNT = 5000;
     let INSERT_BUF_SIZE = 20;
     let SELECTS_COUNT = ROWS_COUNT/10;
@@ -693,7 +693,7 @@ unit.test("performance: select line-by-line vs array in 'where'", async () => {
     pool.close();
 });
 
-unit.test("performance: multithreading", async () => {
+unit.test("pg_test: performance: multithreading", async () => {
     let ROWS_COUNT = 1000;
     let INSERT_BUF_SIZE = 100;
     let SELECTS_COUNT = ROWS_COUNT/50;
@@ -771,7 +771,85 @@ unit.test("performance: multithreading", async () => {
     pool.close();
 });
 
-/*unit.test("check pg connections restore, needs to run it manually", async () => {
+unit.test("pg_test: performance: withConnection", async () => {
+    let pool = createPool(64);
+    let sendCounter = 0;
+    let readyCounter = 0;
+    let rate = new t.RateCounter("withConnection");
+
+    let countToSend = 2000;
+    //countToSend = 2000000000;
+
+    let stopHeartbeat = false;
+    let heartbeat = new Promise(async resolve => {
+        while(!stopHeartbeat) {
+            await sleep(1000);
+            rate.show();
+        }
+        resolve();
+    });
+
+    for (let i = 0; i < countToSend; ++i) {
+        ++sendCounter;
+        pool.withConnection(async con => {
+            await sleep(1);
+            ++readyCounter;
+            rate.inc();
+            con.release();
+        });
+        if (sendCounter - readyCounter > 1000)
+            await sleep(10);
+    }
+
+    stopHeartbeat = true;
+    await heartbeat;
+    while (readyCounter < sendCounter)
+        await sleep(10);
+});
+
+unit.test("pg_test: performance: withConnection-executeQuery", async () => {
+    let pool = createPool(64);
+    let sendCounter = 0;
+    let readyCounter = 0;
+    let rate = new t.RateCounter("executeQuery");
+
+    let countToSend = 2000;
+    //countToSend = 2000000000;
+
+    let stopHeartbeat = false;
+    let heartbeat = new Promise(async resolve => {
+        while(!stopHeartbeat) {
+            await sleep(1000);
+            rate.show();
+        }
+        resolve();
+    });
+
+    for (let i = 0; i < countToSend; ++i) {
+        ++sendCounter;
+        pool.withConnection(con => {
+            con.executeQuery(async r => {
+                await sleep(1);
+                //console.log(r.getRows(0)[0][0]);
+                ++readyCounter;
+                rate.inc();
+                con.release();
+            }, e => {
+                console.error("error: " + e);
+                con.release();
+            }, "SELECT COUNT(*) FROM ledger");
+        });
+        if (sendCounter - readyCounter > 1000)
+            await sleep(10);
+    }
+
+    stopHeartbeat = true;
+    await heartbeat;
+    while (readyCounter < sendCounter)
+        await sleep(10);
+});
+
+/*unit.test("pg_test: check pg connections restore, needs to run it manually", async () => {
     // For success testing, restart pg daemon manually several times during this test running.
     // If all requests completed, the test should finish.
     // If some request have lost - the test will hangs.

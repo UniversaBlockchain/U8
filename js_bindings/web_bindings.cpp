@@ -618,7 +618,7 @@ private:
                 HttpServerRequestBuf* buf = new HttpServerRequestBuf();
                 for (int i = 0; i < bufCopy.size(); ++i)
                     buf->addHttpServerRequest(bufCopy[i]);
-                Local<Value> res = wrap(HttpServerRequestBufTpl, httpCallback_->isolate(), buf);
+                Local<Value> res = wrap(HttpServerRequestBufTpl, cxt->GetIsolate(), buf);
                 httpCallback_->invoke(move(res));
                 // delete buf from HttpServerRequestBuf::sendAnswer
             });
@@ -639,7 +639,7 @@ private:
                         bufCopy[i].ansCallback(buf->getAnswer(i));
                     delete buf;
                 });
-                Local<Value> res = wrap(HttpServerRequestSecureBufTpl, httpSecureCallback_->isolate(), buf);
+                Local<Value> res = wrap(HttpServerRequestSecureBufTpl, cxt->GetIsolate(), buf);
                 httpSecureCallback_->invoke(move(res));
             });
         }
@@ -874,12 +874,12 @@ private:
             auto bufCopy = buf_;
             buf_.clear();
             bufferedCallback_->lockedContext([this,bufCopy{std::move(bufCopy)}](Local<Context> &cxt){
-                Local<Array> arr = Array::New(bufferedCallback_->isolate(), bufCopy.size()*3);
+                Local<Array> arr = Array::New(cxt->GetIsolate(), bufCopy.size()*3);
                 for (int i = 0; i < bufCopy.size(); ++i) {
-                    auto ab = ArrayBuffer::New(bufferedCallback_->isolate(), bufCopy[i].body.size());
+                    auto ab = ArrayBuffer::New(cxt->GetIsolate(), bufCopy[i].body.size());
                     memcpy(ab->GetContents().Data(), &bufCopy[i].body[0], bufCopy[i].body.size());
-                    arr->Set(i * 3 + 0, Integer::New(bufferedCallback_->isolate(), bufCopy[i].reqId));
-                    arr->Set(i * 3 + 1, Integer::New(bufferedCallback_->isolate(), bufCopy[i].respStatus));
+                    arr->Set(i * 3 + 0, Integer::New(cxt->GetIsolate(), bufCopy[i].reqId));
+                    arr->Set(i * 3 + 1, Integer::New(cxt->GetIsolate(), bufCopy[i].respStatus));
                     arr->Set(i * 3 + 2, Uint8Array::New(ab, 0, bufCopy[i].body.size()));
                 }
                 bufferedCallback_->invoke(std::move(arr));
@@ -893,11 +893,11 @@ private:
             auto bufCopy = bufCommand_;
             bufCommand_.clear();
             bufferedCommandCallback_->lockedContext([this,bufCopy{std::move(bufCopy)}](Local<Context> &cxt){
-                Local<Array> arr = Array::New(bufferedCommandCallback_->isolate(), bufCopy.size()*2);
+                Local<Array> arr = Array::New(cxt->GetIsolate(), bufCopy.size()*2);
                 for (int i = 0; i < bufCopy.size(); ++i) {
-                    auto ab = ArrayBuffer::New(bufferedCommandCallback_->isolate(), bufCopy[i].decrypted.size());
+                    auto ab = ArrayBuffer::New(cxt->GetIsolate(), bufCopy[i].decrypted.size());
                     memcpy(ab->GetContents().Data(), &bufCopy[i].decrypted[0], bufCopy[i].decrypted.size());
-                    arr->Set(i * 2 + 0, Integer::New(bufferedCommandCallback_->isolate(), bufCopy[i].reqId));
+                    arr->Set(i * 2 + 0, Integer::New(cxt->GetIsolate(), bufCopy[i].reqId));
                     arr->Set(i * 2 + 1, Uint8Array::New(ab, 0, bufCopy[i].decrypted.size()));
                 }
                 bufferedCommandCallback_->invoke(std::move(arr));
