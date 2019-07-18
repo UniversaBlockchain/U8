@@ -32,7 +32,7 @@ unit.test("stress_test_3", async () => {
         for (let i = 0; i < 1000000; ++i) {
             ++sendCounter;
             promises.push(new Promise(resolve => {
-                    pubkey.__verify(utf8Encode("data"), utf8Encode("signature"), crypto.SHA3_256, async (val) => {
+                    pubkey.__verify(utf8Encode("data"), utf8Encode("signature"), crypto.SHA3_256, (val) => {
                         // await sleep(10);
                         ++readyCounter;
                         let dt = new Date().getTime() - t0;
@@ -46,8 +46,8 @@ unit.test("stress_test_3", async () => {
                     })
                 })
             );
-            // if (sendCounter - readyCounter > 1000)
-            //     await sleep(10);
+            if (sendCounter - readyCounter > 1000)
+                await sleep(10);
         }
         await Promise.all(promises);
         console.log("============ " + k + " ============");
@@ -307,7 +307,7 @@ unit.test("stress_test_3", async () => {
     let asyncHeavyWork = async () => {
         let data = t.randomString(64);
         let fakeSig = t.randomString(64);
-        let sig = await asyncHeavyWork_key.publicKey.verify(data, fakeSig.bytes);
+        let sig = await asyncHeavyWork_key.publicKey.verify(data, utf8Encode(fakeSig));
         heavyWorkRate.inc();
     };
 
