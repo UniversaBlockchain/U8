@@ -10,7 +10,8 @@ class NameCache {
 
     constructor(maxAge) {
         this.maxAge = maxAge;
-        this.cleanerExecutor = new ExecutorWithFixedPeriod(() => this.cleanUp(), 5000).run();
+        this.cleanerExecutor = new ExecutorWithFixedPeriod(() => this.cleanUp(), 5000);
+        this.cleanerExecutor.run();
         this.records = new Map();
     }
 

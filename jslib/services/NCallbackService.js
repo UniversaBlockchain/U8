@@ -44,7 +44,8 @@ class NCallbackService extends CallbackService {
         // start synchronization
         //executorService.scheduleWithFixedDelay(() => this.synchronizeFollowerCallbacks(), 60, config.followerCallbackSynchronizationInterval);
 
-        //this.executorService = new ExecutorWithFixedPeriod(() => this.synchronizeFollowerCallbacks(), [60000 + config.followerCallbackSynchronizationInterval]).run();
+        //this.executorService = new ExecutorWithFixedPeriod(() => this.synchronizeFollowerCallbacks(), [60000 + config.followerCallbackSynchronizationInterval]);
+        //this.executorService.run();
     }
 
     /**

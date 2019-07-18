@@ -109,8 +109,10 @@ class ParcelProcessor {
         this.node.report("parcel processor for: " + this.parcelId + " :: pulseProcessing, state " +
             this.processingState.val, VerboseLevel.BASE);
 
-        if (this.processingState.canContinue && this.processSchedule == null)
-            this.processSchedule = new ScheduleExecutor(async () => await this.process(), 0, this.node.executorService).run();
+        if (this.processingState.canContinue && this.processSchedule == null) {
+            this.processSchedule = new ScheduleExecutor(async () => await this.process(), 0, this.node.executorService);
+            this.processSchedule.run();
+        }
     }
 
     /**
@@ -314,8 +316,10 @@ class ParcelProcessor {
         if (this.processingState.canContinue || !this.processingState.isProcessedToConsensus) {
             this.processingState = ParcelProcessingState.DOWNLOADING;
 
-            if (this.parcel == null && this.downloader == null)
-                this.downloader = new ScheduleExecutor(async () => await this.download(), 0, this.node.executorService).run();
+            if (this.parcel == null && this.downloader == null) {
+                this.downloader = new ScheduleExecutor(async () => await this.download(), 0, this.node.executorService);
+                this.downloader.run();
+            }
         }
     }
 

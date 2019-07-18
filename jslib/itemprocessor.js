@@ -148,8 +148,10 @@ class ItemProcessor {
         if (this.processingState.canContinue && !this.processingState.isProcessedToConsensus) {
             this.processingState = ItemProcessingState.DOWNLOADING;
 
-            if (this.item == null && this.downloader == null)
-                this.downloader = new ScheduleExecutor(async () => await this.download(), 0, this.node.executorService).run();
+            if (this.item == null && this.downloader == null) {
+                this.downloader = new ScheduleExecutor(async () => await this.download(), 0, this.node.executorService);
+                this.downloader.run();
+            }
         }
     }
 
@@ -589,10 +591,12 @@ class ItemProcessor {
             " :: pulseStartPolling, state " + this.processingState.val + " itemState: " + this.record.state.val,
             VerboseLevel.BASE);
 
-        if (this.processingState.canContinue && !this.processingState.isProcessedToConsensus && this.poller == null)
+        if (this.processingState.canContinue && !this.processingState.isProcessedToConsensus && this.poller == null) {
             // at this point the item is with us, so we can start
             this.poller = new ExecutorWithDynamicPeriod(async () => await this.sendStartPollingNotification(), Config.pollTimeMillis,
-                this.node.executorService).run();
+                this.node.executorService);
+            this.poller.run();
+        }
     }
 
     async sendStartPollingNotification() {
@@ -1149,9 +1153,11 @@ class ItemProcessor {
 
         this.processingState = ItemProcessingState.SENDING_CONSENSUS;
 
-        if (this.consensusReceivedChecker == null)
+        if (this.consensusReceivedChecker == null) {
             this.consensusReceivedChecker = new ExecutorWithDynamicPeriod(() => this.sendNewConsensusNotification(),
-                Config.consensusReceivedCheckTime, this.node.executorService).run();
+                Config.consensusReceivedCheckTime, this.node.executorService);
+            this.consensusReceivedChecker.run();
+        }
     }
 
     sendNewConsensusNotification() {

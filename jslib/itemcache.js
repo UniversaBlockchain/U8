@@ -8,7 +8,8 @@ class ItemCache {
     constructor(maxAge) {
         this.records = new t.GenericMap();
         this.maxAge = maxAge;
-        this.cleanerExecutor = new ExecutorWithFixedPeriod(() => this.cleanUp(), 5000).run();
+        this.cleanerExecutor = new ExecutorWithFixedPeriod(() => this.cleanUp(), 5000);
+        this.cleanerExecutor.run();
     }
 
     cleanUp() {

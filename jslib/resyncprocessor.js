@@ -41,7 +41,8 @@ class ResyncProcessor {
         this.node.report("ResyncProcessor.startResync(itemId=" + this.itemId + ")", VerboseLevel.BASE);
 
         this.resyncExpiresAt = Math.floor(Date.now() / 1000) + Config.maxResyncTime;
-        this.resyncExpirationTimer = new ScheduleExecutor(() => this.resyncEnded(), Config.maxResyncTime * 1000, this.node.executorService).run();
+        this.resyncExpirationTimer = new ScheduleExecutor(() => this.resyncEnded(), Config.maxResyncTime * 1000, this.node.executorService);
+        this.resyncExpirationTimer.run();
 
         this.resyncingItem = new ResyncingItem(this.itemId, await this.node.ledger.getRecord(this.itemId), this.node);
         this.resyncingItem.finishEvent.then(() => this.onFinishResync());
@@ -49,7 +50,8 @@ class ResyncProcessor {
         this.obtainedAnswersFromNodes.clear();
         this.voteItself();
 
-        this.resyncer = new ExecutorWithDynamicPeriod(() => this.pulseResync(), Config.resyncTime, this.node.executorService).run();
+        this.resyncer = new ExecutorWithDynamicPeriod(() => this.pulseResync(), Config.resyncTime, this.node.executorService);
+        this.resyncer.run();
 
         return this;
     }

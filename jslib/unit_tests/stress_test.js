@@ -531,7 +531,8 @@ unit.test("stress_test_3", async () => {
         timersRate.show();
         ledgerRate.show();
         heavyWorkRate.show();
-    }, 2000).run();
+    }, 2000);
+    showCounters.run();
 
     // run
     console.log("\nrun test...");

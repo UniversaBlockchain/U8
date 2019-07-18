@@ -118,7 +118,8 @@ class Node {
                 this.statsCollector = null;
                 this.pulseCollectStats();
             }
-        }, this.config.statsIntervalSmall * 1000, this.executorService).run();
+        }, this.config.statsIntervalSmall * 1000, this.executorService);
+        this.statsCollector.run();
     }
 
     async provideStats(showDays) {
@@ -143,7 +144,8 @@ class Node {
     }
 
     pulseStartSanitation() {
-        this.sanitator = new ExecutorWithDynamicPeriod(async () => await this.startSanitation(), [2000, 500], this.executorService).run();
+        this.sanitator = new ExecutorWithDynamicPeriod(async () => await this.startSanitation(), [2000, 500], this.executorService);
+        this.sanitator.run();
     }
 
     async startSanitation() {

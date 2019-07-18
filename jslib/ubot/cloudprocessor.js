@@ -152,7 +152,8 @@ class ProcessSendStartingContract extends ProcessBase {
         this.pulse();
         this.currentTask = new ExecutorWithFixedPeriod(() => {
             this.pulse();
-        }, UBotConfig.send_starting_contract_period).run();
+        }, UBotConfig.send_starting_contract_period);
+        this.currentTask.run();
     }
 
     pulse() {
@@ -245,7 +246,8 @@ class ProcessStartExec extends ProcessBase {
             await this.evalUbotAsm();
             this.pr.logger.log("  method result: " + this.output);
             this.onReady();
-        }, 0).run();
+        }, 0);
+        this.currentTask.run();
     }
 
     parseUbotAsmFromString(str) {
@@ -331,7 +333,8 @@ class UBotAsmProcess_writeSingleStorage extends ProcessBase {
         this.pulse();
         this.currentTask = new ExecutorWithFixedPeriod(() => {
             this.pulse();
-        }, UBotConfig.single_storage_vote_period).run();
+        }, UBotConfig.single_storage_vote_period);
+        this.currentTask.run();
     }
 
     pulse() {
