@@ -147,7 +147,7 @@ void JsBusyConnectionExecuteUpdate(const FunctionCallbackInfo<Value> &args) {
                 });
             }, [=](const string &err) {
                 onError->lockedContext([=](Local<Context> &cxt){
-                    onError->invoke(ac.scripter->v8String(err));
+                    onError->invoke(onError->scripter()->v8String(err));
                 });
             }, queryString, params);
 
@@ -158,73 +158,48 @@ void JsBusyConnectionExecuteUpdate(const FunctionCallbackInfo<Value> &args) {
 }
 
 void JsBusyConnectionExec(const FunctionCallbackInfo<Value> &args) {
-    Scripter::unwrapArgs(args, [&](ArgsContext &ac) {
+    Scripter::unwrapArgs(args, [](ArgsContext &ac) {
+        if (ac.args.Length() == 3) {
+            auto onSuccess = ac.asFunction(0);
+            auto onError = ac.asFunction(1);
+            auto queryString = ac.asString(2);
 
-        auto scripter = ac.scripter;
-        if (args.Length() != 3)
-            scripter->throwError("invalid number of arguments");
+            auto con = unwrap<db::BusyConnection>(ac.args.This());
 
-        auto onSuccess = ac.as<Function>(0);
-        if (onSuccess->IsNull() || onSuccess->IsUndefined()) {
-            scripter->throwError("null onSuccess in JsBusyConnectionExecuteQuery");
-            return;
-        }
-        Persistent<Function> *onSuccessPcb = new Persistent<Function>(ac.isolate, onSuccess);
-        auto onError = ac.as<Function>(1);
-        if (onError->IsNull() || onError->IsUndefined()) {
-            scripter->throwError("null onError in JsBusyConnectionExecuteQuery");
-            return;
-        }
-        Persistent<Function> *onErrorPcb = new Persistent<Function>(ac.isolate, onError);
-        auto queryString = ac.asString(2);
-
-        auto con = unwrap<db::BusyConnection>(args.This());
-
-        con->exec(queryString, [=](db::QueryResultsArr &qra){
-            bool isSuccess = true;
-            std::string errorText = "";
-            for (auto &qr : qra) {
-                if (qr.isError()) {
-                    isSuccess = false;
-                    errorText = qr.getErrorText();
-                    break;
+            con->exec(queryString, [=](db::QueryResultsArr &qra) {
+                bool isSuccess = true;
+                std::string errorText = "";
+                for (auto &qr : qra) {
+                    if (qr.isError()) {
+                        isSuccess = false;
+                        errorText = qr.getErrorText();
+                        break;
+                    }
                 }
-            }
-            if (isSuccess) {
-                scripter->inPool([=](auto context) {
-                    Isolate *isolate = context->GetIsolate();
-                    auto fn = onSuccessPcb->Get(isolate);
-                    auto unused = fn->Call(context, fn, 0, nullptr);
-                    onSuccessPcb->Reset();
-                    onErrorPcb->Reset();
-                    delete onSuccessPcb;
-                    delete onErrorPcb;
-                });
-            } else {
-                scripter->inPool([=](auto context) {
-                    Isolate *isolate = context->GetIsolate();
-                    auto fn = onErrorPcb->Get(isolate);
-                    Local<Value> result = scripter->v8String(errorText);
-                    auto unused = fn->Call(context, fn, 1, &result);
-                    onSuccessPcb->Reset();
-                    onErrorPcb->Reset();
-                    delete onSuccessPcb;
-                    delete onErrorPcb;
-                });
-            }
-        });
+                if (isSuccess) {
+                    onSuccess->lockedContext([=](Local<Context> &cxt) {
+                        onSuccess->invoke();
+                    });
+                } else {
+                    onError->lockedContext([=](Local<Context> &cxt) {
+                        onError->invoke(onError->scripter()->v8String(errorText));
+                    });
+                }
+            });
+            return;
+        }
+        ac.throwError("invalid number of arguments");
     });
 }
 
 void JsBusyConnectionRelease(const FunctionCallbackInfo<Value> &args) {
-    Scripter::unwrapArgs(args, [&](ArgsContext &ac) {
-
-        auto scripter = ac.scripter;
-        if (args.Length() != 0)
-            scripter->throwError("invalid number of arguments");
-
-        auto con = unwrap<db::BusyConnection>(args.This());
-        con->release();
+    Scripter::unwrapArgs(args, [](ArgsContext &ac) {
+        if (ac.args.Length() == 0) {
+            auto con = unwrap<db::BusyConnection>(ac.args.This());
+            con->release();
+            return;
+        }
+        ac.throwError("invalid number of arguments");
     });
 }
 
@@ -266,78 +241,72 @@ void JsInitBusyConnection(Isolate *isolate, const Local<ObjectTemplate> &global)
 }
 
 void JsQueryResultGetRowsCount(const FunctionCallbackInfo<Value> &args) {
-    Scripter::unwrapArgs(args, [&](ArgsContext &ac) {
-
-        auto scripter = ac.scripter;
-        if (args.Length() != 0)
-            scripter->throwError("invalid number of arguments");
-
-        auto pqr = unwrap<db::QueryResult>(args.This());
-
-        unsigned int result = pqr->getRowsCount();
-        ac.setReturnValue(result);
+    Scripter::unwrapArgs(args, [](ArgsContext &ac) {
+        if (ac.args.Length() == 0) {
+            auto pqr = unwrap<db::QueryResult>(ac.args.This());
+            int result = pqr->getRowsCount();
+            ac.setReturnValue(result);
+            return;
+        }
+        ac.throwError("invalid number of arguments");
     });
 }
 
 void JsQueryResultGetColsCount(const FunctionCallbackInfo<Value> &args) {
-    Scripter::unwrapArgs(args, [&](ArgsContext &ac) {
-
-        auto scripter = ac.scripter;
-        if (args.Length() != 0)
-            scripter->throwError("invalid number of arguments");
-
-        auto pqr = unwrap<db::QueryResult>(args.This());
-
-        unsigned int result = pqr->getColsCount();
-        ac.setReturnValue(result);
+    Scripter::unwrapArgs(args, [](ArgsContext &ac) {
+        if (ac.args.Length() == 0) {
+            auto pqr = unwrap<db::QueryResult>(ac.args.This());
+            int result = pqr->getColsCount();
+            ac.setReturnValue(result);
+            return;
+        }
+        ac.throwError("invalid number of arguments");
     });
 }
 
 void JsQueryResultGetAffectedRows(const FunctionCallbackInfo<Value> &args) {
-    Scripter::unwrapArgs(args, [&](ArgsContext &ac) {
-
-        auto scripter = ac.scripter;
-        if (args.Length() != 0)
-            scripter->throwError("invalid number of arguments");
-
-        auto pqr = unwrap<db::QueryResult>(args.This());
-
-        unsigned int result = pqr->getAffectedRows();
-        ac.setReturnValue(result);
+    Scripter::unwrapArgs(args, [](ArgsContext &ac) {
+        if (ac.args.Length() == 0) {
+            auto pqr = unwrap<db::QueryResult>(ac.args.This());
+            int result = pqr->getAffectedRows();
+            ac.setReturnValue(result);
+            return;
+        }
+        ac.throwError("invalid number of arguments");
     });
 }
 
 void JsQueryResultGetColNames(const FunctionCallbackInfo<Value> &args) {
-    Scripter::unwrapArgs(args, [&](ArgsContext &ac) {
-        auto scripter = ac.scripter;
-        if (args.Length() != 0)
-            scripter->throwError("invalid number of arguments");
+    Scripter::unwrapArgs(args, [](ArgsContext &ac) {
+        if (ac.args.Length() == 0) {
+            auto pqr = unwrap<db::QueryResult>(ac.args.This());
+            auto colNames = pqr->getColNames();
 
-        auto pqr = unwrap<db::QueryResult>(args.This());
-        auto colNames = pqr->getColNames();
-
-        Local<Value> res[colNames.size()];
-        for (int i = 0; i < colNames.size(); ++i)
-            res[i] = ac.v8String(colNames[i]);
-        Local<Array> result = Array::New(args.GetIsolate(), res, colNames.size());
-        ac.setReturnValue(result);
+            Local<Value> res[colNames.size()];
+            for (int i = 0; i < colNames.size(); ++i)
+                res[i] = ac.v8String(colNames[i]);
+            Local<Array> result = Array::New(ac.args.GetIsolate(), res, colNames.size());
+            ac.setReturnValue(result);
+            return;
+        }
+        ac.throwError("invalid number of arguments");
     });
 }
 
 void JsQueryResultGetColTypes(const FunctionCallbackInfo<Value> &args) {
-    Scripter::unwrapArgs(args, [&](ArgsContext &ac) {
-        auto scripter = ac.scripter;
-        if (args.Length() != 0)
-            scripter->throwError("invalid number of arguments");
+    Scripter::unwrapArgs(args, [](ArgsContext &ac) {
+        if (ac.args.Length() == 0) {
+            auto pqr = unwrap<db::QueryResult>(ac.args.This());
+            auto colTypes = pqr->getColTypes();
 
-        auto pqr = unwrap<db::QueryResult>(args.This());
-        auto colTypes = pqr->getColTypes();
-
-        Local<Value> res[colTypes.size()];
-        for (int i = 0; i < colTypes.size(); ++i)
-            res[i] = ac.v8String(colTypes[i]);
-        Local<Array> result = Array::New(args.GetIsolate(), res, colTypes.size());
-        ac.setReturnValue(result);
+            Local<Value> res[colTypes.size()];
+            for (int i = 0; i < colTypes.size(); ++i)
+                res[i] = ac.v8String(colTypes[i]);
+            Local<Array> result = Array::New(ac.args.GetIsolate(), res, colTypes.size());
+            ac.setReturnValue(result);
+            return;
+        }
+        ac.throwError("invalid number of arguments");
     });
 }
 
@@ -379,44 +348,42 @@ Local<Value> getJsValueFromPgResult(ArgsContext &ac, const byte_vector& data, co
 }
 
 void JsQueryResultGetRows(const FunctionCallbackInfo<Value> &args) {
-    Scripter::unwrapArgs(args, [&](ArgsContext &ac) {
-        auto scripter = ac.scripter;
-        if (args.Length() != 1)
-            scripter->throwError("invalid number of arguments");
+    Scripter::unwrapArgs(args, [](ArgsContext &ac) {
+        if (ac.args.Length() == 1) {
+            auto maxRows = ac.asInt(0);
+            auto pqr = unwrap<db::QueryResult>(ac.args.This());
+            auto rows = pqr->getRows(maxRows);
 
-        auto maxRows = ac.asInt(0);
-
-        auto pqr = unwrap<db::QueryResult>(args.This());
-        auto rows = pqr->getRows(maxRows);
-
-        if (rows.size() == 0) {
-            Local<Value> res[0];
-            Local<Array> result = Array::New(args.GetIsolate(), res, rows.size());
-            ac.setReturnValue(result);
-        } else {
-            auto colTypes = pqr->getColTypes();
-            auto colsCount = rows[0].size();
-            Local<Value> res[rows.size() * colsCount];
-            for (int iRow = 0; iRow < rows.size(); ++iRow) {
-                for (int iCol = 0; iCol < colsCount; ++iCol) {
-                    res[iRow*colsCount+iCol] = getJsValueFromPgResult(ac, rows[iRow][iCol], colTypes[iCol]);
+            if (rows.size() == 0) {
+                Local<Value> res[0];
+                Local<Array> result = Array::New(ac.args.GetIsolate(), res, rows.size());
+                ac.setReturnValue(result);
+            } else {
+                auto colTypes = pqr->getColTypes();
+                auto colsCount = rows[0].size();
+                Local<Value> res[rows.size() * colsCount];
+                for (int iRow = 0; iRow < rows.size(); ++iRow) {
+                    for (int iCol = 0; iCol < colsCount; ++iCol) {
+                        res[iRow * colsCount + iCol] = getJsValueFromPgResult(ac, rows[iRow][iCol], colTypes[iCol]);
+                    }
                 }
+                Local<Array> result = Array::New(ac.args.GetIsolate(), res, rows.size() * colsCount);
+                ac.setReturnValue(result);
             }
-            Local<Array> result = Array::New(args.GetIsolate(), res, rows.size()*colsCount);
-            ac.setReturnValue(result);
-
+            return;
         }
+        ac.throwError("invalid number of arguments");
     });
 }
 
 void JsQueryResultRelease(const FunctionCallbackInfo<Value> &args) {
-    Scripter::unwrapArgs(args, [&](ArgsContext &ac) {
-        auto scripter = ac.scripter;
-        if (args.Length() != 0)
-            scripter->throwError("invalid number of arguments");
-
-        auto pqr = unwrap<db::QueryResult>(args.This());
-        delete pqr;
+    Scripter::unwrapArgs(args, [](ArgsContext &ac) {
+        if (ac.args.Length() == 0) {
+            auto pqr = unwrap<db::QueryResult>(ac.args.This());
+            delete pqr;
+            return;
+        }
+        ac.throwError("invalid number of arguments");
     });
 }
 
