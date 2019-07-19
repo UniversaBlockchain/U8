@@ -18,6 +18,7 @@ using namespace crypto;
 
 static Persistent<FunctionTemplate> publicKeyTpl;
 static Persistent<FunctionTemplate> privateKeyTpl;
+static Persistent<FunctionTemplate> hashIdTpl;
 
 static void privateKeySign(const FunctionCallbackInfo<Value> &args) {
     Scripter::unwrapArgs(args, [&](ArgsContext &ac) {
@@ -99,7 +100,7 @@ static void privateKeyGenerate(const FunctionCallbackInfo<Value> &args) {
                 jsThreadPool([=]() {
                     auto key = new PrivateKey(strength);
                     onReady->lockedContext([=](Local<Context> &cxt) {
-                        onReady->call(cxt, wrap(privateKeyTpl, onReady->isolate(), key));
+                        onReady->call(cxt, wrap(privateKeyTpl, onReady->isolate(), key, true));
                     });
                 });
                 return;
@@ -251,6 +252,22 @@ static void hashIdGetBase64String(const FunctionCallbackInfo<Value> &args) {
     });
 }
 
+static void hashIdOf(const FunctionCallbackInfo<Value> &args) {
+    Scripter::unwrapArgs(args, [](ArgsContext &ac) {
+        if (ac.args.Length() == 2) {
+            auto pData = ac.asBuffer(0);
+            auto onReady = ac.asFunction(1);
+            jsThreadPool([=]() {
+                auto h = new HashId(HashId::of(pData->data(), pData->size()));
+                onReady->lockedContext([=](Local<Context> &cxt){
+                    onReady->invoke(wrap(hashIdTpl, onReady->isolate(), h, true));
+                });
+            });
+            return;
+        }
+        ac.throwError("invalid arguments");
+    });
+}
 
 Local<FunctionTemplate> initPrivateKey(Isolate *isolate) {
     Local<FunctionTemplate> tpl = bindCppClass<PrivateKey>(
@@ -383,6 +400,10 @@ Local<FunctionTemplate> initHashId(Isolate *isolate) {
     auto prototype = tpl->PrototypeTemplate();
     prototype->Set(isolate, "__getDigest", FunctionTemplate::New(isolate, hashIdGetDigest));
     prototype->Set(isolate, "__getBase64String", FunctionTemplate::New(isolate, hashIdGetBase64String));
+
+    tpl->Set(isolate, "__of", FunctionTemplate::New(isolate, hashIdOf));
+
+    hashIdTpl.Reset(isolate, tpl);
     return tpl;
 }
 

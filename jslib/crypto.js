@@ -256,9 +256,34 @@ const HashId = crypto.HashId = class extends crypto.HashIdImpl {
      * @returns {crypto.HashId}
      */
     static of(data) {
+        return this.of_sync(data);
+    }
+
+    /**
+     * Single-threaded implementation for "of"
+     * @param {Uint8Array|string} data to calculate hashId of
+     * @returns {crypto.HashId}
+     */
+    static of_sync(data) {
         if (typeof (data) == 'string')
             data = utf8Encode(data);
         return new crypto.HashId(false, data);
+    }
+
+    /**
+     * Multi-threaded implementation for "of"
+     * @param {Uint8Array|string} data to calculate hashId of
+     * @returns {Promise<HashId>}
+     */
+    static of_async(data) {
+        return new Promise((resolve, reject) => {
+            if (typeof (data) == 'string')
+                data = utf8Encode(data);
+            crypto.HashIdImpl.__of(data, (res) => {
+                res.__proto__ = crypto.HashId.prototype;
+                resolve(res);
+            });
+        });
     }
 
     /**

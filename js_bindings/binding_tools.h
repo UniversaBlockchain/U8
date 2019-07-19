@@ -228,10 +228,11 @@ inline Local<Uint8Array> vectorToV8(Isolate* isolate, const byte_vector& data) {
  * @param objectTemplate persistent link to the object template
  * @param isolate
  * @param cppObject pointer to object to wrap
+ * @param setWeak true for applying SimpleFinalizer
  * @return wrapped object or undefined.
  */
 template<typename T>
-Local<Value> wrap(Persistent<FunctionTemplate>& objectTemplate, Isolate *isolate, T *cppObject) {
+Local<Value> wrap(Persistent<FunctionTemplate>& objectTemplate, Isolate *isolate, T *cppObject, bool setWeak = false) {
     auto tpl = objectTemplate.Get(isolate);
     auto objMaybeLocal = tpl->InstanceTemplate()->NewInstance(isolate->GetCurrentContext());
     Local<Object> obj;
@@ -242,6 +243,8 @@ Local<Value> wrap(Persistent<FunctionTemplate>& objectTemplate, Isolate *isolate
             return Undefined(isolate);
         } else {
             obj->SetInternalField(0, External::New(isolate, cppObject));
+            if (setWeak)
+                SimpleFinalizer(obj, cppObject);
             return obj;
         }
     } else {
