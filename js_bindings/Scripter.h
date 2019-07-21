@@ -23,8 +23,7 @@ using namespace v8;
 
 class ArgsContext;
 
-extern ThreadPool jsThreadPool;
-extern ThreadPool executor;
+extern AutoThreadPool jsThreadPool;
 
 class Scripter : public std::enable_shared_from_this<Scripter>, public Logging {
 public:
@@ -35,6 +34,8 @@ public:
     Local<String> v8String(string x, NewStringType t = NewStringType::kNormal) {
         return String::NewFromUtf8(pIsolate, x.c_str(), t).ToLocalChecked();
     }
+
+    Local<Integer> v8Int(int value) { return Integer::New(pIsolate, value); }
 
     Local<String> v8String(const char *cstr, NewStringType t = NewStringType::kNormal) {
         return String::NewFromUtf8(pIsolate, cstr, t).ToLocalChecked();

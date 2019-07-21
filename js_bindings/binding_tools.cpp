@@ -5,5 +5,4 @@
 
 #include "binding_tools.h"
 
-ThreadPool jsThreadPool(128);
-ThreadPool executor(128);
+AutoThreadPool jsThreadPool(128);

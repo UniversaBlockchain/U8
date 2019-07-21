@@ -5,7 +5,7 @@
 #include <atomic>
 #include <chrono>
 #include "catch2.h"
-#include "../tools/ThreadPool.cpp"
+#include "../tools/ThreadPool.h"
 #include "../tools/Semaphore.h"
 
 TEST_CASE("ThreadPool") {

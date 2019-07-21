@@ -105,6 +105,14 @@ function assert(condition, text = "assertion failed") {
 
 const {sleep, timeout, setTimeout, clearTimeout} = {...require('timers')};
 
+const platform = {
+  hardwareConcurrency: __hardware_concurrency
+};
+
+Object.freeze(platform);
+
+
+
 // crypto is a global module and needs global initialization:
 require('crypto');
 

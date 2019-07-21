@@ -10,6 +10,7 @@
 #include <optional>
 #include "../tools/tools.h"
 #include "../tools/ThreadPool.h"
+#include "../tools/AutoThreadPool.h"
 #include "Scripter.h"
 
 using namespace v8;
@@ -257,6 +258,6 @@ Local<Value> wrap(Persistent<FunctionTemplate>& objectTemplate, Isolate *isolate
 /**
  * Threadpool to use with time-consuming operation in C++/JS bindings
  */
-extern ThreadPool jsThreadPool;
+extern AutoThreadPool jsThreadPool;
 
 #endif //U8_BINDING_TOOLS_H

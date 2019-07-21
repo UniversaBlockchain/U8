@@ -6,12 +6,12 @@
 
 #include "ThreadPool.h"
 
-ThreadPool::ThreadPool(size_t maxThreads, size_t maxQueueSize)
+FixedThreadPool::FixedThreadPool(size_t maxThreads, size_t maxQueueSize)
         : queue(maxQueueSize), maxThreads(maxThreads) {
     for (size_t i = 0; i < maxThreads; i++) addWorker();
 }
 
-void ThreadPool::addWorker() {
+void FixedThreadPool::addWorker() {
     if (maxThreads && threads.size() < maxThreads)
         threads.push_back(new thread([this]() {
             while (true) {
@@ -31,7 +31,7 @@ void ThreadPool::addWorker() {
         }));
 }
 
-ThreadPool::~ThreadPool() {
+FixedThreadPool::~FixedThreadPool() {
     // We need to close it before everything else to make worker thread exit
     queue.close();
     for( auto t: threads ) {
@@ -40,7 +40,7 @@ ThreadPool::~ThreadPool() {
     }
 }
 
-void ThreadPool::addWorkers(size_t count) {
+void FixedThreadPool::addWorkers(size_t count) {
     maxThreads += count;
     for (size_t i = 0; i < count; i++)
         addWorker();

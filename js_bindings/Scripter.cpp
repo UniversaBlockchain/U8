@@ -164,6 +164,8 @@ void Scripter::initialize() {
     global->Set(v8String("utf8Encode"), functionTemplate(JsStringToTypedArray));
     global->Set(v8String("$0"), v8String(ARGV0));
 
+    global->Set(v8String("__hardware_concurrency"), v8Int(std::thread::hardware_concurrency()));
+
     JsInitIOFile(pIsolate, global);
     JsInitIODir(pIsolate, global);
     JsInitIOTCP(pIsolate, global);
