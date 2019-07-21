@@ -6,6 +6,8 @@
 
 #include "AutoThreadPool.h"
 
+AutoThreadPool AutoThreadPool::defaultPool;
+
 AutoThreadPool::AutoThreadPool(size_t maxQueueSize)
         : queue(maxQueueSize), requiredThreads(thread::hardware_concurrency()) {
     for (size_t i = 0; i < requiredThreads; i++) addWorker();

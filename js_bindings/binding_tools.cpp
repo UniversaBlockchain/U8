@@ -5,4 +5,4 @@
 
 #include "binding_tools.h"
 
-AutoThreadPool jsThreadPool(128);
+AutoThreadPool& jsThreadPool = AutoThreadPool::defaultPool;

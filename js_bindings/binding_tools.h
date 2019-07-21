@@ -258,6 +258,6 @@ Local<Value> wrap(Persistent<FunctionTemplate>& objectTemplate, Isolate *isolate
 /**
  * Threadpool to use with time-consuming operation in C++/JS bindings
  */
-extern AutoThreadPool jsThreadPool;
+extern AutoThreadPool& jsThreadPool;
 
 #endif //U8_BINDING_TOOLS_H

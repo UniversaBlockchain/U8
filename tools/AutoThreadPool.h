@@ -30,7 +30,7 @@ using namespace std;
  * This way you should execute only non-blocking code, computations and so on. Instead, to perform some blocking operation,
  * sucj as I/O. you should explicitly tell the pool you are blocking:
  *
- *  * \code
+ *  \code
  *  pool( [=]() {
  *      Blocking;
  *      // now it is safe:
@@ -64,6 +64,7 @@ public:
     class Blocker {
     public:
         Blocker();
+
         ~Blocker();
 
     private:
@@ -135,6 +136,7 @@ public:
      */
     size_t countThreads() const { return threads.size(); }
 
+    static AutoThreadPool defaultPool;
 private:
     atomic_uint requiredThreads;
     mutex mxWorkers;
@@ -144,6 +146,30 @@ private:
     void addWorker();
 };
 
+/**
+ * This macro tells AuthThreadPool that the code below it will use blocking operation (such as sleep,
+ * traditional I/O operation ans like. It works in the calling block scope only where and below all blocking
+ * operations should be placed. See AuthThreadPool for sample.
+ */
 #define Blocking AutoThreadPool::Blocker __blocking_guard;
+
+/**
+ * Execute block of code in the default async executor (AuthThreadPool::defaultPool instance).
+ *
+ * \code
+ * pool( [=]() {
+ *      Blocking;
+ *      // now it is safe:
+ *      cout << "executed in a separated thread";
+ * });
+ * \endcode
+
+ * @tparam Function block type
+ * @param f block to execute
+ */
+template<typename Function>
+inline void async(Function &&f) {
+    AutoThreadPool::defaultPool(f);
+}
 
 #endif
