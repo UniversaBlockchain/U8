@@ -7,6 +7,7 @@
 #include "catch2.h"
 #include "../tools/ThreadPool.h"
 #include "../tools/Semaphore.h"
+#include "../tools/latch.h"
 
 TEST_CASE("ThreadPool") {
     SECTION("fixed") {
@@ -60,5 +61,36 @@ TEST_CASE("ThreadPool") {
         dt = getCurrentTimeMillis() - t0;
         REQUIRE(dt <= long(time*1.1));
         REQUIRE(dt >= long(time*0.9));
+    }
+
+    SECTION("check rvalue lambda") {
+        static int copyCounter = 0;
+        static int moveCounter = 0;
+        class RValueTestClass {
+        public:
+            RValueTestClass() = default;
+            RValueTestClass(const RValueTestClass& copyFrom) {
+                ++copyCounter;
+            }
+            RValueTestClass(RValueTestClass&& moveFrom) {
+                ++moveCounter;
+            }
+            void printSomething() const {
+                cout << "printSomething" << endl;
+            }
+        };
+
+        FixedThreadPool pool(1);
+        Latch blocker(1);
+        RValueTestClass t;
+        pool([&blocker,t{move(t)}](){
+            t.printSomething();
+            blocker.countDown();
+        });
+        blocker.wait();
+        cout << "copyCounter: " << copyCounter << endl;
+        cout << "moveCounter: " << moveCounter << endl;
+        REQUIRE(copyCounter == 0);
+        REQUIRE(moveCounter == 2);
     }
 }

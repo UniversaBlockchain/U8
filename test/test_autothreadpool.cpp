@@ -78,4 +78,34 @@ TEST_CASE("AutoThreadPool") {
         blockers.wait();
         REQUIRE(pool.countThreads() == N);
     }
+
+    SECTION("check rvalue lambda") {
+        static int copyCounter = 0;
+        static int moveCounter = 0;
+        class RValueTestClass {
+        public:
+            RValueTestClass() = default;
+            RValueTestClass(const RValueTestClass& copyFrom) {
+                ++copyCounter;
+            }
+            RValueTestClass(RValueTestClass&& moveFrom) {
+                ++moveCounter;
+            }
+            void printSomething() const {
+                cout << "printSomething" << endl;
+            }
+        };
+
+        Latch blocker(1);
+        RValueTestClass t;
+        async([&blocker,t{move(t)}](){
+            t.printSomething();
+            blocker.countDown();
+        });
+        blocker.wait();
+        cout << "copyCounter: " << copyCounter << endl;
+        cout << "moveCounter: " << moveCounter << endl;
+        REQUIRE(copyCounter == 0);
+        REQUIRE(moveCounter == 3);
+    }
 }
