@@ -9,6 +9,7 @@
 #include <functional>
 #include <thread>
 #include <map>
+#include <atomic>
 #include "Queue.h"
 #include "tools.h"
 
