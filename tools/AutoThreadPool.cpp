@@ -8,6 +8,8 @@
 
 AutoThreadPool AutoThreadPool::defaultPool;
 
+static const auto MAX_THREADS = 256;
+
 AutoThreadPool::AutoThreadPool(size_t maxQueueSize)
         : queue(maxQueueSize), requiredThreads(thread::hardware_concurrency()) {
     for (size_t i = 0; i < requiredThreads; i++) addWorker();
@@ -16,38 +18,40 @@ AutoThreadPool::AutoThreadPool(size_t maxQueueSize)
 static thread_local AutoThreadPool *current_pool = nullptr;
 
 void AutoThreadPool::addWorker() {
-    auto t = new thread([this]() {
-        current_pool = this;
-        while (true) {
-            try {
-                queue.get()();
-            }
-            catch (const QueueClosedException &x) {
-                break;
-            }
-            catch (const exception &e) {
-                cerr << "error in threadpool worker: " << e.what() << endl;
-            }
-            catch (...) {
-                cerr << "unknown error in threadpool worker" << endl;
-            }
-            // we might need to exit this thread. firts, fast check is done without mutex which is
-            // much cheaper:
-            if (threads.size() > requiredThreads) {
-                // well, now we do it _with_ the mutex to properly handle threads map
-                // concurrently:
-                unique_lock lock(mxWorkers);
+    if( threads.size() < MAX_THREADS ) {
+        auto t = new thread([this]() {
+            current_pool = this;
+            while (true) {
+                try {
+                    queue.get()();
+                }
+                catch (const QueueClosedException &x) {
+                    break;
+                }
+                catch (const exception &e) {
+                    cerr << "error in threadpool worker: " << e.what() << endl;
+                }
+                catch (...) {
+                    cerr << "unknown error in threadpool worker" << endl;
+                }
+                // we might need to exit this thread. firts, fast check is done without mutex which is
+                // much cheaper:
                 if (threads.size() > requiredThreads) {
-                    threads.erase(this_thread::get_id());
-                    return;
+                    // well, now we do it _with_ the mutex to properly handle threads map
+                    // concurrently:
+                    unique_lock lock(mxWorkers);
+                    if (threads.size() > requiredThreads) {
+                        threads.erase(this_thread::get_id());
+                        return;
+                    }
                 }
             }
+        });
+        {
+            // notice the lock: we access threads concurrently:
+            unique_lock lock(mxWorkers);
+            threads[t->get_id()] = t;
         }
-    });
-    {
-        // notice the lock: we access threads concurrently:
-        unique_lock lock(mxWorkers);
-        threads[t->get_id()] = t;
     }
 }
 
@@ -55,6 +59,7 @@ AutoThreadPool::~AutoThreadPool() {
     // We need to close it before everything else to make worker thread exit
     queue.close();
     for (const auto &[_, t]: threads) {
+        cout << "deleting thread " << t->get_id() << endl;
         t->join();
         delete t;
     }
