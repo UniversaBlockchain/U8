@@ -8,6 +8,7 @@
 #include "../tools/latch.h"
 #include "../tools/AutoThreadPool.h"
 #include "../tools/FixedThreadPool.h"
+#include "../tools/Semaphore.h"
 
 using namespace std;
 
@@ -77,6 +78,26 @@ TEST_CASE("AutoThreadPool") {
         // and now there should be no extra threads anymore
         blockers.wait();
         REQUIRE(pool.countThreads() == N);
+    }
+
+    SECTION("many short blocking") {
+        // it's a stress test, should just don't crash
+        // please, disable -fsanitize for better thread recreation speed
+
+        int N = 200000;
+        atomic<int> counter = 0;
+        Semaphore sem;
+
+        for( int i=0; i<N; i++ ) {
+            async([&,i]() {
+                Blocking;
+                this_thread::sleep_for(5ns);
+                if (++counter >= N)
+                    sem.notify();
+            });
+        }
+        if (!sem.wait(20s))
+            REQUIRE(false); // timeout
     }
 
     SECTION("check rvalue lambda") {
