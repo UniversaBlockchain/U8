@@ -8,7 +8,7 @@
 
 AutoThreadPool AutoThreadPool::defaultPool;
 
-static const auto MAX_THREADS = 128;
+static const auto MAX_THREADS = 256;
 
 AutoThreadPool::AutoThreadPool(size_t maxQueueSize)
         : queue(maxQueueSize), requiredThreads(thread::hardware_concurrency()) {
