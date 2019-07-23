@@ -169,7 +169,7 @@ private:
  * @param f block to execute
  */
 template<typename Function>
-inline void async(Function &&f) {
+inline void runAsync(Function &&f) {
     AutoThreadPool::defaultPool(f);
 }
 

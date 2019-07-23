@@ -8,7 +8,7 @@
 
 AutoThreadPool AutoThreadPool::defaultPool;
 
-static const auto MAX_THREADS = 256;
+static const auto MAX_THREADS = 128;
 
 AutoThreadPool::AutoThreadPool(size_t maxQueueSize)
         : queue(maxQueueSize), requiredThreads(thread::hardware_concurrency()) {
@@ -18,7 +18,8 @@ AutoThreadPool::AutoThreadPool(size_t maxQueueSize)
 static thread_local AutoThreadPool *current_pool = nullptr;
 
 void AutoThreadPool::addWorker() {
-    if( threads.size() < MAX_THREADS ) {
+    unique_lock lock(mxWorkers);
+    if (threads.size() < MAX_THREADS) {
         auto t = new thread([this]() {
             current_pool = this;
             while (true) {
@@ -36,22 +37,19 @@ void AutoThreadPool::addWorker() {
                 }
                 // we might need to exit this thread. firts, fast check is done without mutex which is
                 // much cheaper:
-                if (threads.size() > requiredThreads) {
-                    // well, now we do it _with_ the mutex to properly handle threads map
-                    // concurrently:
-                    unique_lock lock(mxWorkers);
-                    if (threads.size() > requiredThreads) {
-                        threads.erase(this_thread::get_id());
-                        return;
-                    }
-                }
+//                if (threads.size() > requiredThreads) {
+//                    // well, now we do it _with_ the mutex to properly handle threads map
+//                    // concurrently:
+//                    unique_lock lock(mxWorkers);
+//                    if (threads.size() > requiredThreads+4) {
+//                        threads.erase(this_thread::get_id());
+//                        printf("exiting worker thread %lu\n", threads.size());
+//                        return;
+//                    }
+//                }
             }
         });
-        {
-            // notice the lock: we access threads concurrently:
-            unique_lock lock(mxWorkers);
-            threads[t->get_id()] = t;
-        }
+        threads[t->get_id()] = t;
     }
 }
 

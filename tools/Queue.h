@@ -52,7 +52,7 @@ public:
         if (!_closed) {
             queue.emplace_back(move(value));
             _size++;
-            if (_size == 1) cv_empty.notify_all();
+            cv_empty.notify_one();
         } else
             throw QueueClosedException();
 
@@ -73,7 +73,7 @@ public:
         if (!_closed) {
             queue.emplace_back(value);
             _size++;
-            if (_size == 1) cv_empty.notify_all();
+            cv_empty.notify_one();
         } else
             throw QueueClosedException();
     }
@@ -92,7 +92,7 @@ public:
             auto result = move(queue.front());
             queue.pop_front();
             _size--;
-            if (_capacity && _size == _capacity - 1)
+            if (_capacity)
                 cv_full.notify_one();
             return result;
         } else
