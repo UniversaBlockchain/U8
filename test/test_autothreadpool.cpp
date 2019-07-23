@@ -130,4 +130,57 @@ TEST_CASE("AutoThreadPool") {
 //        REQUIRE(copyCounter == 0);
 //        REQUIRE(moveCounter == 3);
 //    }
+
+    SECTION("check rvalue lambda ext") {
+        static int copyCounter = 0;
+        static int moveCounter = 0;
+        class RValueTestClass {
+        public:
+            RValueTestClass() = default;
+            RValueTestClass(const RValueTestClass& copyFrom) {
+                ++copyCounter;
+            }
+            RValueTestClass(RValueTestClass&& moveFrom) {
+                ++moveCounter;
+            }
+            void printSomething() const {
+                cout << "printSomething" << endl;
+            }
+        };
+
+        class SomePool {
+        public:
+            typedef function<void()> callable;
+            void execute(callable&& block) {
+                q.put(move(block));
+                q.get()();
+            }
+            void operator()(callable&& block) {
+                execute(move(block));
+            }
+        private:
+            Queue<callable> q;
+        };
+        SomePool somePool;
+
+        auto foo = [](auto& pool, int requiredCopyCounter, int requiredMoveCounter) {
+            Latch blocker(1);
+            copyCounter = 0;
+            moveCounter = 0;
+            RValueTestClass t;
+            pool([&blocker, t{move(t)}]() {
+                t.printSomething();
+                blocker.countDown();
+            });
+            blocker.wait();
+            cout << "copyCounter: " << copyCounter << endl;
+            cout << "moveCounter: " << moveCounter << endl;
+            REQUIRE(copyCounter == requiredCopyCounter);
+            REQUIRE(moveCounter == requiredMoveCounter);
+        };
+
+        foo(somePool, 0, 2);
+        foo(AutoThreadPool::defaultPool, 0, 2);
+    }
+
 }
