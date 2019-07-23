@@ -337,8 +337,8 @@ namespace network {
         bool isClosed_ = false;
         bool testMode_ = false;
 
-        ThreadPool senderPool_;
-        ThreadPool receiverPool_;
+        FixedThreadPool senderPool_;
+        FixedThreadPool receiverPool_;
 
         friend class Retransmitter;
     };

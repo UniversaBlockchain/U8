@@ -12,6 +12,7 @@
 #include "../crypto/PublicKey.h"
 #include "../crypto/base64.h"
 #include "../serialization/BossSerializer.h"
+#include "../tools/AutoThreadPool.h"
 
 using namespace std;
 using namespace network;
@@ -70,12 +71,11 @@ TEST_CASE("http_hello") {
                 throw std::invalid_argument("unknown command: " + command);
         }
     };
-    ThreadPool poolForSecureCallbacks(4);
-    httpServer.addSecureCallback([&secureProcessor,&poolForSecureCallbacks](
+    httpServer.addSecureCallback([&secureProcessor](
             const byte_vector& paramsBin,
             std::shared_ptr<HttpServerSession> session,
             std::function<void(const byte_vector& ansBin)>&& sendAnswer){
-        poolForSecureCallbacks.execute([paramsBin,&secureProcessor,sendAnswer{std::move(sendAnswer)}](){
+        runAsync([paramsBin,&secureProcessor,sendAnswer{std::move(sendAnswer)}](){
             byte_vector paramsCopy(paramsBin);
             UObject paramsUnpackedObj = BossSerializer::deserialize(UBytes(std::move(paramsCopy)));
             UBinder params = UBinder::asInstance(paramsUnpackedObj);
@@ -144,12 +144,11 @@ TEST_CASE("http_secure_endpoints") {
                 throw std::invalid_argument("unknown command: " + command);
         }
     };
-    ThreadPool poolForSecureCallbacks(4);
-    httpServer.addSecureCallback([&secureProcessor,&poolForSecureCallbacks](
+    httpServer.addSecureCallback([&secureProcessor](
             const byte_vector& paramsBin,
             std::shared_ptr<HttpServerSession> session,
             std::function<void(const byte_vector& ansBin)>&& sendAnswer){
-        poolForSecureCallbacks.execute([paramsBin,&secureProcessor,sendAnswer{std::move(sendAnswer)}](){
+        runAsync([paramsBin,&secureProcessor,sendAnswer{std::move(sendAnswer)}](){
             byte_vector paramsCopy(paramsBin);
             UObject paramsUnpackedObj = BossSerializer::deserialize(UBytes(std::move(paramsCopy)));
             UBinder params = UBinder::asInstance(paramsUnpackedObj);

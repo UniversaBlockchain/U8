@@ -23,8 +23,6 @@ using namespace v8;
 
 class ArgsContext;
 
-extern AutoThreadPool& jsThreadPool;
-
 class Scripter : public std::enable_shared_from_this<Scripter>, public Logging {
 public:
     typedef function<void(Local<Context> &)> ContextCallback;

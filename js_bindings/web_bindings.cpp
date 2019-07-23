@@ -777,7 +777,7 @@ struct HttpClientCommandAnswer {
 
 class HttpClientBuffered {
 public:
-    HttpClientBuffered(const std::string& rootUrl, int poolSize, int bufSize): bufSize_(bufSize), startPool_(1) {
+    HttpClientBuffered(const std::string& rootUrl, int poolSize, int bufSize): bufSize_(bufSize) {
         httpClient_ = new HttpClient(rootUrl, poolSize);
         timer_.scheduleAtFixedRate([this](){
             sendAllFromBuf();
@@ -854,7 +854,7 @@ public:
     }
 
     void start(const byte_vector& clientPrivateKeyPacked, const byte_vector& nodePublicKeyPacked, const std::function<void()>& onComplete) {
-        startPool_.execute([this,clientPrivateKeyPacked,nodePublicKeyPacked,onComplete](){
+        runAsync([this,clientPrivateKeyPacked,nodePublicKeyPacked,onComplete](){
             httpClient_->start(crypto::PrivateKey(clientPrivateKeyPacked), crypto::PublicKey(nodePublicKeyPacked));
             onComplete();
         });
@@ -912,7 +912,6 @@ private:
     std::mutex mutex_;
     const int bufSize_ = 1;
     TimerThread timer_;
-    ThreadPool startPool_;
     std::vector<HttpClientCommandAnswer> bufCommand_;
     shared_ptr<FunctionHandler> bufferedCommandCallback_;
 };

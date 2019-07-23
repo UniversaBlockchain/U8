@@ -16,7 +16,7 @@
 #include "HashId.h"
 #include "KeyAddress.h"
 #include "Safe58.h"
-#include "../tools/ThreadPool.h"
+#include "../tools/AutoThreadPool.h"
 #include "SymmetricKey.h"
 #include "../AsyncIO/IOUDP.h"
 
@@ -383,9 +383,8 @@ void testKeysConcurrency() {
     std::atomic<long> counter(0);
     ConditionVar cv;
     long total_tasks_count = 8000;
-    ThreadPool pool(50);
     for (int i = 0; i < total_tasks_count; ++i) {
-        pool([&](){
+        runAsync([&](){
             vector<unsigned char> encrypted;
             vector<unsigned char> decrypted;
             publicKey.encrypt(body, encrypted);

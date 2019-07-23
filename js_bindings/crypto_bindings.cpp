@@ -30,7 +30,7 @@ static void privateKeySign(const FunctionCallbackInfo<Value> &args) {
                 auto isolate = ac.isolate;
                 auto ht = (HashType) ac.asInt(1);
                 auto onReady = ac.asFunction(2);// new Persistent<Function>(ac.isolate, ac.as<Function>(2));
-                jsThreadPool([=]() {
+                runAsync([=]() {
                     auto signature = key->sign(data->data(), data->size(), ht);
                     onReady->lockedContext([=](Local<Context> cxt) {
                         Local<Value> result = vectorToV8(isolate, signature);
@@ -55,7 +55,7 @@ static void privateKeyDecrypt(const FunctionCallbackInfo<Value> &args) {
                 auto onReady = ac.asFunction(1);
                 auto onError = ac.asFunction(2);
                 auto scripter = ac.scripter;
-                jsThreadPool([=]() {
+                runAsync([=]() {
                     string errorString;
                     try {
                         auto plain = key->decrypt(data->data(), data->size());
@@ -97,7 +97,7 @@ static void privateKeyGenerate(const FunctionCallbackInfo<Value> &args) {
                 ac.throwError("strength must be at least 2048");
             else {
                 auto onReady = ac.asFunction(1);
-                jsThreadPool([=]() {
+                runAsync([=]() {
                     auto key = new PrivateKey(strength);
                     onReady->lockedContext([=](Local<Context> &cxt) {
                         onReady->call(cxt, wrap(privateKeyTpl, onReady->isolate(), key, true));
@@ -130,7 +130,7 @@ static void publicKeyVerify(const FunctionCallbackInfo<Value> &args) {
             if (psig->data() && pdata->data()) {
                 auto ht = (HashType) ac.asInt(2);
                 auto onReady = ac.asFunction(3);
-                jsThreadPool([=]() {
+                runAsync([=]() {
                     bool result = key->verify(psig->data(), psig->size(), pdata->data(), pdata->size(), ht);
                     onReady->lockedContext([=](Local<Context> &cxt) {
                         onReady->invoke(Boolean::New(cxt->GetIsolate(), result));
@@ -152,7 +152,7 @@ static void publicKeyEncrypt(const FunctionCallbackInfo<Value> &args) {
                 auto isolate = ac.isolate;
                 auto onReady = ac.asFunction(1);
                 shared_ptr<Scripter> scripter = ac.scripter;
-                jsThreadPool([=]() {
+                runAsync([=]() {
                     auto result = key->encrypt(data->data(), data->size());
                     scripter->lockedContext([=](Local<Context> cxt) {
                         Local<Value> res = vectorToV8(isolate, result);
@@ -257,7 +257,7 @@ static void hashIdOf(const FunctionCallbackInfo<Value> &args) {
         if (ac.args.Length() == 2) {
             auto pData = ac.asBuffer(0);
             auto onReady = ac.asFunction(1);
-            jsThreadPool([=]() {
+            runAsync([=]() {
                 auto h = new HashId(HashId::of(pData->data(), pData->size()));
                 onReady->lockedContext([=](Local<Context> &cxt){
                     onReady->invoke(wrap(hashIdTpl, onReady->isolate(), h, true));

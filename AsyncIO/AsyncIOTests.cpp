@@ -12,6 +12,7 @@
 #include "IOTCP.h"
 #include "IOTLS.h"
 #include "AsyncIOTests.h"
+#include "../tools/AutoThreadPool.h"
 
 using namespace std;
 
@@ -578,18 +579,17 @@ void testAsyncFile() {
     uv_sem_init(&stop[0], 0);
 
     auto fc = std::make_shared<asyncio::IOFile>();
-    ThreadPool asyncAutoClosingPool(1);
 
-    fc->open("TestFile0.bin", O_RDWR, 0, [&asyncAutoClosingPool,fc{std::move(fc)}](ssize_t result) mutable {
+    fc->open("TestFile0.bin", O_RDWR, 0, [fc{std::move(fc)}](ssize_t result) mutable {
         ASSERT(!asyncio::isError(result));
         printf("File open\n");
 
-        fc->read(1000, [&asyncAutoClosingPool,fc{std::move(fc)}](const asyncio::byte_vector& data, ssize_t result) mutable {
+        fc->read(1000, [fc{std::move(fc)}](const asyncio::byte_vector& data, ssize_t result) mutable {
             ASSERT(!asyncio::isError(result));
             printf("Read %ld bytes\n", result);
 
-            fc->write(data, [&asyncAutoClosingPool,fc{std::move(fc)}](ssize_t result) mutable {
-                asyncAutoClosingPool([fc{std::move(fc)},result]() mutable {
+            fc->write(data, [fc{std::move(fc)}](ssize_t result) mutable {
+                runAsync([fc{std::move(fc)},result]() mutable {
                     ASSERT(!asyncio::isError(result));
                     printf("Wrote %ld bytes\n", result);
 

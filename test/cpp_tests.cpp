@@ -11,7 +11,7 @@
 #include "../tools/tools.h"
 #include "../tools/Queue.h"
 #include "../tools/vprintf.h"
-#include "../tools/ThreadPool.h"
+#include "../tools/AutoThreadPool.h"
 #include "../tools/Semaphore.h"
 
 TEST_CASE("Queue") {
@@ -110,17 +110,15 @@ TEST_CASE("Queue") {
 TEST_CASE("Semaphore") {
     std::shared_ptr<Semaphore> sem = std::make_shared<Semaphore>();
     atomic<long> counter(0);
-    ThreadPool writerPool(2);
-    ThreadPool readerPool(2);
 
     const int WEIGHT = 100000;
 
     for (int i = 0; i < 10; ++i) {
-        writerPool.execute([sem]() {
+        runAsync([sem]() {
             for (int c = 0; c < WEIGHT; ++c)
                 sem->notify();
         });
-        readerPool.execute([sem, &counter]() {
+        runAsync([sem, &counter]() {
             do {
                 if (sem->wait(10ms))
                     ++counter;

@@ -34,7 +34,7 @@ public:
 private:
     int id_;
     HttpClient& parentRef_;
-    ThreadPool worker_;
+    FixedThreadPool worker_;
     std::shared_ptr<mg_mgr> mgr_;
     std::atomic<bool> exitFlag_ = false;
     std::function<void(int,byte_vector&&)> callback_;
@@ -101,11 +101,11 @@ private:
     std::queue<std::shared_ptr<HttpClientWorker>> pool_;
     std::mutex poolMutex_;
     std::condition_variable poolCV_;
-    ThreadPool poolControlThread_;
+    FixedThreadPool poolControlThread_;
     std::unordered_map<int, std::shared_ptr<HttpClientWorker>> usedWorkers_;
     std::shared_ptr<HttpClientSession> session_;
     std::string rootUrl_;
-    ThreadPool commandPool_;
+    FixedThreadPool commandPool_;
 
 };
 

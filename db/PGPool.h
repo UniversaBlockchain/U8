@@ -204,7 +204,7 @@ namespace db {
     private:
         std::shared_ptr<PGconn> con_;
         PGPool* parent_;
-        ThreadPool worker_;
+        FixedThreadPool worker_;
         int conId_;
     };
 
@@ -286,7 +286,7 @@ namespace db {
         std::queue<std::shared_ptr<BusyConnection>> connPool_;
         std::mutex poolMutex_;
         std::condition_variable poolCV_;
-        ThreadPool poolControlThread_;
+        FixedThreadPool poolControlThread_;
         //std::atomic<size_t> usedConnectionsCount_;
         std::unordered_map<int, std::shared_ptr<BusyConnection>> usedConnections_;
         std::unordered_map<int, string> pgTypes_;

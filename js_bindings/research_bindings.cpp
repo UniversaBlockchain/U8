@@ -79,7 +79,7 @@ static void memoryUser_fillAsync(const FunctionCallbackInfo<Value> &args) {
             auto minBytesToUse = ac.asInt(0);
             auto onReady = ac.asFunction(1);
             auto scripter = ac.scripter;
-            jsThreadPool([=]() {
+            runAsync([=]() {
                 memoryUser->fill(minBytesToUse);
                 bool noResult = true;
                 scripter->lockedContext([=](auto& cxt) {
@@ -124,7 +124,7 @@ static void memoryUser_checkAsync(const FunctionCallbackInfo<Value> &args) {
             auto memoryUser = unwrap<T>(ac.args.This());
             auto onReady = ac.asFunction(0);
             auto scripter = ac.scripter;
-            jsThreadPool([=]() {
+            runAsync([=]() {
                 bool res = memoryUser->check();
                 scripter->lockedContext([=](auto& cxt) {
                     onReady->invoke(Boolean::New(cxt->GetIsolate(), res));
