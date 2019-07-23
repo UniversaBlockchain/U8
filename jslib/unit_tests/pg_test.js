@@ -766,8 +766,8 @@ unit.test("pg_test: performance: multithreading", async () => {
     let dt = new Date().getTime() - t1;
     testResult += ", total time: " + dt + " ms ...";
     console.logPut(testResult);
-    assert(dt > 300*0.7);
-    assert(dt < 300*1.3);
+    assert(dt > 300*0.5);
+    assert(dt < 300*1.5);
     pool.close();
 });
 

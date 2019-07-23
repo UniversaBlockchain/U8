@@ -6,6 +6,7 @@
 #include "../types/UBinder.h"
 #include "../serialization/BossSerializer.h"
 #include "../tools/Semaphore.h"
+#include "../tools/AutoThreadPool.h"
 #include "../crypto/base64.h"
 
 namespace network {
@@ -110,8 +111,7 @@ void HttpClientWorker::sendRawRequest(const std::string& url, const std::string&
 }
 
 HttpClient::HttpClient(const std::string& rootUrl, size_t poolSize)
-  : poolControlThread_(1)
-  , commandPool_(poolSize) {
+  : poolControlThread_(1) {
     poolSize_ = poolSize;
     rootUrl_ = rootUrl;
     for (int i = 0; i < poolSize_; ++i) {
@@ -274,23 +274,19 @@ void HttpClient::command(const byte_vector& callBin, const std::function<void(by
 }
 
 void HttpClient::execCommand(const byte_vector& callBin, std::function<void(byte_vector&&)>&& onComplete) {
-    commandPool_.execute([this, callBin, onComplete{std::move(onComplete)}](){
+    runAsync([this, callBin, onComplete{std::move(onComplete)}](){
         if (!session_ || !session_->sessionKey)
             throw std::runtime_error("Session does not created or session key is not got yet.");
         UBinder cmdParams = UBinder::of(
                 "command", "command",
                 "params", UBytes(session_->sessionKey->encrypt(callBin)),
                 "session_id", session_->sessionId);
-        Semaphore sem;
-        byte_vector decrypted;
-        sendRawRequest("/command", "POST", BossSerializer::serialize(cmdParams).get(), [this,&decrypted,&sem](int respCode, byte_vector&& respBody){
+        sendRawRequest("/command", "POST", BossSerializer::serialize(cmdParams).get(), [this,onComplete{onComplete}](int respCode, byte_vector&& respBody){
             UBinder ansBinder = UBinder::asInstance(BossSerializer::deserialize(UBytes(std::move(respBody))));
             UBinder responseBinder = ansBinder.getBinder("response");
-            decrypted = session_->sessionKey->decrypt(UBytes::asInstance(responseBinder.get("result")).get());
-            sem.notify();
+            byte_vector decrypted = session_->sessionKey->decrypt(UBytes::asInstance(responseBinder.get("result")).get());
+            onComplete(std::move(decrypted));
         });
-        sem.wait();
-        onComplete(std::move(decrypted));
     });
 }
 

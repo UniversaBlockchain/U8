@@ -105,7 +105,6 @@ private:
     std::unordered_map<int, std::shared_ptr<HttpClientWorker>> usedWorkers_;
     std::shared_ptr<HttpClientSession> session_;
     std::string rootUrl_;
-    FixedThreadPool commandPool_;
 
 };
 
