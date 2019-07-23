@@ -35,7 +35,7 @@ namespace asyncio {
                 result = uv_run(&loop, UV_RUN_NOWAIT);
 
                 if ((result <= oldResult) && empty)
-                    std::this_thread::sleep_for(1us);
+                    std::this_thread::sleep_for(5ms);
             }
         });
     };
