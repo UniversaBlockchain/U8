@@ -40,7 +40,7 @@ TEST_CASE("ThreadPool") {
         ThreadPool pool(1);
         REQUIRE(pool.countThreads() == 1l);
         int limit = 4;
-        int time = 50;
+        int time = 80;
         Semaphore sem;
         long t0 = getCurrentTimeMillis();
         for (int i = 0; i < limit; i++)
@@ -48,8 +48,8 @@ TEST_CASE("ThreadPool") {
         for (int i = 0; i < limit; i++)
             sem.wait();
         long dt = getCurrentTimeMillis() - t0;
-        REQUIRE(dt <= long(limit*time*1.1));
-        REQUIRE(dt >= long(limit*time*0.9));
+        REQUIRE(dt <= long(limit*time*1.3));
+        REQUIRE(dt >= long(limit*time*0.7));
 
         pool.addWorkers(3);
         REQUIRE(pool.countThreads() == 4l);
@@ -59,8 +59,8 @@ TEST_CASE("ThreadPool") {
         for (int i = 0; i < limit; i++)
             sem.wait();
         dt = getCurrentTimeMillis() - t0;
-        REQUIRE(dt <= long(time*1.1));
-        REQUIRE(dt >= long(time*0.9));
+        REQUIRE(dt <= long(time*1.3));
+        REQUIRE(dt >= long(time*0.7));
     }
 
     SECTION("check rvalue lambda") {
