@@ -27,7 +27,9 @@ long bm(F block) {
 
 TEST_CASE("AutoThreadPool") {
     SECTION("process blocking") {
-        AutoThreadPool& pool = AutoThreadPool::defaultPool;
+        //default pool could grow by this point if any other test is using Blocking;
+        //so we are creating new one and testing it.
+        AutoThreadPool pool;
         unsigned int N = thread::hardware_concurrency();
         REQUIRE(pool.countThreads() == N);
 
@@ -49,7 +51,7 @@ TEST_CASE("AutoThreadPool") {
 
         // blocking task should not spoil the pool:
         for( int i=0; i<nBlockers; i++ ) {
-            runAsync([&]() {
+            pool([&]() {
                 Blocking;
                 blockersStarted.countDown();
                 this_thread::sleep_for(500ms);
@@ -58,7 +60,7 @@ TEST_CASE("AutoThreadPool") {
         }
 
         for (unsigned i = 0; i < N; i++)
-            runAsync([&]() {
+            pool([&]() {
                 fn();
                 remaining.countDown();
             });

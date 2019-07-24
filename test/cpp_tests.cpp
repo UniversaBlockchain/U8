@@ -113,27 +113,29 @@ TEST_CASE("Semaphore") {
     std::shared_ptr<Semaphore> sem = std::make_shared<Semaphore>();
     atomic<long> counter(0);
 
+    const int N = 40;
     const int WEIGHT = 100000;
 
-    for (int i = 0; i < 10; ++i) {
+    for (int i = 0; i < N; ++i) {
         runAsync([sem]() {
             for (int c = 0; c < WEIGHT; ++c)
                 sem->notify();
         });
         runAsync([sem, &counter]() {
+            Blocking;
             do {
                 if (sem->wait(10ms))
                     ++counter;
-            } while (counter < WEIGHT * 10);
+            } while (counter < WEIGHT * N);
         });
     }
 
     do {
         this_thread::sleep_for(100ms);
         //printf("counter: %li, count_=%i\n", long(counter), sem.count());
-    } while (counter < WEIGHT * 10);
+    } while (counter < WEIGHT * N);
 
-    REQUIRE(long(counter) == WEIGHT*10);
+    REQUIRE(long(counter) == WEIGHT*N);
     REQUIRE(sem->count() == 0);
 }
 
