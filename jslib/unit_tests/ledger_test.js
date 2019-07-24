@@ -44,6 +44,30 @@ unit.test("ledger_test: hello", async () => {
     await ledger.close();
 });
 
+unit.test("ledger_test: findOrCreate should return isJustCreated", async () => {
+    let ledger = await createTestLedger();
+    let hashId1 = HashId.of(randomBytes(64));
+    let hashId2 = HashId.of(randomBytes(64));
+    let hashId3 = HashId.of(randomBytes(64));
+    let hashId4 = HashId.of(randomBytes(64));
+
+    await ledger.findOrCreate(hashId1, ItemState.LOCKED_FOR_CREATION, 3);
+    await ledger.findOrCreate(hashId2, ItemState.LOCKED_FOR_CREATION, 3);
+
+    let promises = [];
+    promises.push(ledger.findOrCreate(hashId1, ItemState.LOCKED_FOR_CREATION, 3));
+    promises.push(ledger.findOrCreate(hashId2, ItemState.LOCKED_FOR_CREATION, 3));
+    promises.push(ledger.findOrCreate(hashId3, ItemState.LOCKED_FOR_CREATION, 3));
+    promises.push(ledger.findOrCreate(hashId4, ItemState.LOCKED_FOR_CREATION, 3));
+    let stateRecords = await Promise.all(promises);
+    assert(stateRecords[0].isJustCreated !== false);
+    assert(stateRecords[1].isJustCreated !== false);
+    assert(stateRecords[2].isJustCreated === true);
+    assert(stateRecords[3].isJustCreated === true);
+
+    await ledger.close();
+});
+
 unit.test("ledger_test: ledgerBenchmark", async () => {
     let ledger = await createTestLedger();
     console.log();

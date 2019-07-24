@@ -41,7 +41,7 @@ class Ledger {
 
         this.bufParams = {
             findOrCreate_insert: {enabled: true, bufSize: 200, delayMillis: 40, buf: new Map(), bufInProc: new Map(), ts: new Date().getTime()},
-            findOrCreate_select: {enabled: true, bufSize: 400, delayMillis: 40, buf: new Map(), ts: new Date().getTime()},
+            findOrCreate_select: {enabled: false, bufSize: 400, delayMillis: 40, buf: new Map(), ts: new Date().getTime()},
         };
 
         this.timers_ = [];
@@ -239,11 +239,11 @@ class Ledger {
      * @param {ItemState} newState - new item will be created with this state.
      *        Only PENDING and LOCKED_FOR_CREATION states are allowed
      * @param {Number} locked_by_id - use it with LOCKED_FOR_CREATION state
-     * @return {StateRecord} found or created {@link StateRecord}.
+     * @return {Promise<StateRecord>} found or created {@link StateRecord}.
      */
     findOrCreate(itemId, newState = ItemState.PENDING, locked_by_id = 0) {
-        return this.findOrCreate_buffered_insert(itemId, newState, locked_by_id).then(() => {
-            return this.findOrCreate_buffered_select(itemId);
+        return this.findOrCreate_buffered_insert(itemId, newState, locked_by_id).then((inserted_id) => {
+            return this.findOrCreate_buffered_select(itemId, inserted_id);
         }).catch(reason => {
             console.error(reason);
         });
@@ -315,7 +315,7 @@ class Ledger {
                 item[1].push(resolver);
                 item[2].push(rejecter);
             } else {
-                buf.set(itemId.base64, [itemId, [resolver], [rejecter], newState, locked_by_id]);
+                buf.set(itemId.base64, [itemId, [resolver], [rejecter], newState, locked_by_id, null]);
             }
 
             this.findOrCreate_buffered_insert_processBuf();
@@ -323,14 +323,17 @@ class Ledger {
         } else {
             return new Promise((resolve, reject) => {
                 this.dbPool_.withConnection(con => {
-                    con.executeUpdate(qr => {
+                    con.executeQuery(qr => {
                             con.release();
-                            resolve();
+                            if (qr.getRowsCount() === 1)
+                                resolve(qr.getRows(1)[0][0]);
+                            else
+                                resolve(null);
                         }, e => {
                             con.release();
                             reject(e);
                         },
-                        "INSERT INTO ledger(hash, state, created_at, expires_at, locked_by_id) VALUES (?,?,?,?,?) ON CONFLICT (hash) DO NOTHING;",
+                        "INSERT INTO ledger(hash, state, created_at, expires_at, locked_by_id) VALUES (?,?,?,?,?) ON CONFLICT (hash) DO NOTHING RETURNING id;",
                         itemId.digest,
                         newState.ordinal,
                         Math.floor(new Date().getTime()/1000),
@@ -374,18 +377,24 @@ class Ledger {
                         params.push(Math.floor(new Date().getTime()/1000) + Config.maxElectionsTime + Math.floor(Math.random()*10));
                         params.push(item[4]);
                     }
-                    let queryString = "INSERT INTO ledger(hash, state, created_at, expires_at, locked_by_id) VALUES "+queryValues.join(",")+" ON CONFLICT (hash) DO NOTHING;";
-                    con.executeUpdate(affectedRows => {
+                    let queryString = "INSERT INTO ledger(hash, state, created_at, expires_at, locked_by_id) VALUES "+queryValues.join(",")+" ON CONFLICT (hash) DO NOTHING RETURNING hash,id;";
+                    con.executeQuery(qr => {
                         con.release();
+                        let rows = qr.getRows(0);
+                        for (let i = 0; i < rows.length; ++i) {
+                            let hashId = crypto.HashId.withDigest(rows[i][0]);
+                            if (map.has(hashId.base64))
+                                map.get(hashId.base64)[5] = rows[i][1];
+                        }
                         for (let [k,v] of map) {
                             this.bufParams.findOrCreate_insert.bufInProc.delete(k);
-                            v[1].forEach(v => v()); // call resolvers
+                            v[1].forEach(resolver => resolver(v[5])); // call resolvers
                         }
                     }, e => {
                         con.release();
                         for (let [k,v] of map) {
                             this.bufParams.findOrCreate_insert.bufInProc.delete(k);
-                            v[2].forEach(v => v(e)); // call rejecters
+                            v[2].forEach(rejecter => rejecter(e)); // call rejecters
                         }
                     }, queryString, ...params);
                 });
@@ -402,7 +411,7 @@ class Ledger {
         }
     }
 
-    findOrCreate_buffered_select(itemId) {
+    findOrCreate_buffered_select(itemId, inserted_id) {
         if (this.bufParams.findOrCreate_select.enabled) {
             let resolver, rejecter;
             let promise = new Promise((resolve, reject) => {resolver = resolve; rejecter = reject;});
@@ -411,7 +420,7 @@ class Ledger {
                 item[1].push(resolver);
                 item[2].push(rejecter);
             } else {
-                this.bufParams.findOrCreate_select.buf.set(itemId.base64, [itemId, [resolver], [rejecter]]);
+                this.bufParams.findOrCreate_select.buf.set(itemId.base64, [itemId, [resolver], [rejecter], inserted_id]);
             }
             this.findOrCreate_buffered_select_processBuf();
             return promise;
@@ -421,6 +430,8 @@ class Ledger {
                     con.executeQuery(qr => {
                             let row = qr.getRows(1)[0];
                             let record = StateRecord.initFrom(this, row);
+                            if (record.recordId === inserted_id)
+                                record.isJustCreated = true;
                             con.release();
                             resolve(record);
                         }, e => {
@@ -465,9 +476,14 @@ class Ledger {
                         let names = qr.getColNamesMap();
                         con.release();
                         for (let j = 0; j < rows.length; ++j) {
-                            let resolversArr = map.get(crypto.HashId.withDigest(rows[j][names["hash"]]).base64)[1];
-                            for (let k = 0; k < resolversArr.length; ++k)
-                                resolversArr[k](StateRecord.initFrom(this, rows[j])); // call resolver
+                            let bufItem = map.get(crypto.HashId.withDigest(rows[j][names["hash"]]).base64);
+                            let resolversArr = bufItem[1];
+                            for (let k = 0; k < resolversArr.length; ++k) {
+                                let sr = StateRecord.initFrom(this, rows[j]);
+                                if (sr.recordId === bufItem[3])
+                                    sr.isJustCreated = true;
+                                resolversArr[k](sr); // call resolver
+                            }
                         }
                     }, e => {
                         con.release();

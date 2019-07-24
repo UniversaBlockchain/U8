@@ -117,10 +117,18 @@ class StateRecord {
         if (this.state !== ItemState.PENDING)
             throw new ex.IllegalStateError("wrong state to lockForCreate: " + this.state.val);
 
-        if (await this.ledger.getRecord(idToCreate) != null)
-            return null;
+        // if (await this.ledger.getRecord(idToCreate) != null)
+        //     return null;
+        //
+        // return await this.ledger.findOrCreate(idToCreate, ItemState.LOCKED_FOR_CREATION, this.recordId);
 
-        return await this.ledger.findOrCreate(idToCreate, ItemState.LOCKED_FOR_CREATION, this.recordId);
+        let r = await this.ledger.findOrCreate(idToCreate, ItemState.LOCKED_FOR_CREATION, this.recordId);
+        if (r.isJustCreated !== true)
+            return null;
+        if (r.state === ItemState.LOCKED_FOR_CREATION && r.lockedByRecordId === this.recordId)
+            return r;
+
+        return null;
     }
 
     async unlock(connection = undefined) {
