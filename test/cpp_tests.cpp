@@ -13,6 +13,8 @@
 #include "../tools/vprintf.h"
 #include "../tools/AutoThreadPool.h"
 #include "../tools/Semaphore.h"
+#include "../tools/TimerThread.h"
+#include "../tools/latch.h"
 
 TEST_CASE("Queue") {
     SECTION("blocking operations: unlimited capacity") {
@@ -139,4 +141,40 @@ TEST_CASE("Check_V8_version") {
     printf("V8_VERSION: %i.%i\n", V8_MAJOR_VERSION, V8_MINOR_VERSION);
     REQUIRE(V8_MAJOR_VERSION == 7);
     REQUIRE(V8_MINOR_VERSION == 4);
+}
+
+TEST_CASE("TimerThread_FixedRate") {
+    TimerThread timer;
+    long DT = 250;
+
+    Latch latch(4);
+    atomic<long> t0 = getCurrentTimeMillis();
+    timer.scheduleAtFixedRate([DT,&t0,&latch](){
+        long dt = getCurrentTimeMillis() - t0;
+        t0 = getCurrentTimeMillis();
+        //cout << getCurrentTimeMillis()%10000 << ", dt = " << dt << endl;
+        REQUIRE(double(dt) > double(DT)*0.8);
+        REQUIRE(double(dt) < double(DT)*1.2 + 20);
+        this_thread::sleep_for(chrono::milliseconds(DT/2));
+        latch.countDown();
+    }, DT, DT);
+    latch.wait();
+}
+
+TEST_CASE("TimerThread_FixedDelay") {
+    TimerThread timer;
+    long DT = 250;
+
+    Latch latch(4);
+    atomic<long> t0 = getCurrentTimeMillis();
+    timer.scheduleWithFixedDelay([DT,&t0,&latch](){
+        this_thread::sleep_for(chrono::milliseconds(DT/2));
+        long dt = getCurrentTimeMillis() - t0;
+        t0 = getCurrentTimeMillis();
+        //cout << getCurrentTimeMillis()%10000 << ", dt = " << dt << endl;
+        REQUIRE(double(dt) > double(DT)*0.8 + double(DT)/2.0);
+        REQUIRE(double(dt) < double(DT)*1.2 + 20 + double(DT)/2.0);
+        latch.countDown();
+    }, DT, DT);
+    latch.wait();
 }
