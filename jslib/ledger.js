@@ -41,7 +41,7 @@ class Ledger {
 
         this.bufParams = {
             findOrCreate_insert: {enabled: true, bufSize: 200, delayMillis: 40, buf: new Map(), bufInProc: new Map(), ts: new Date().getTime()},
-            findOrCreate_select: {enabled: false, bufSize: 400, delayMillis: 40, buf: new Map(), ts: new Date().getTime()},
+            findOrCreate_select: {enabled: true, bufSize: 400, delayMillis: 40, buf: new Map(), ts: new Date().getTime()},
         };
 
         this.timers_ = [];
