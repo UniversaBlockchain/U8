@@ -8,75 +8,109 @@
 
 AutoThreadPool AutoThreadPool::defaultPool;
 
-static const auto MAX_THREADS = 256;
-
 AutoThreadPool::AutoThreadPool(size_t maxQueueSize)
-        : queue(maxQueueSize), requiredThreads(thread::hardware_concurrency()) {
-    for (size_t i = 0; i < requiredThreads; i++) addWorker();
+        : queue(maxQueueSize), coreThreadCount(thread::hardware_concurrency()), requiredThreadCount(coreThreadCount),
+          maxThreadCount(1024) {
+    for (size_t i = 0; i < coreThreadCount; i++) {
+        unique_lock lock(mxWorkers);
+        createThread();
+    }
 }
 
 static thread_local AutoThreadPool *current_pool = nullptr;
 
-void AutoThreadPool::addWorker() {
-    unique_lock lock(mxWorkers);
-    if (threads.size() < MAX_THREADS) {
-        auto t = new thread([this]() {
-            current_pool = this;
-            while (true) {
-                try {
-                    queue.get()();
-                }
-                catch (const QueueClosedException &x) {
-                    break;
-                }
-                catch (const exception &e) {
-                    cerr << "error in threadpool worker: " << e.what() << endl;
-                }
-                catch (...) {
-                    cerr << "unknown error in threadpool worker" << endl;
-                }
-                // we might need to exit this thread. firts, fast check is done without mutex which is
-                // much cheaper:
-//                if (threads.size() > requiredThreads) {
-//                    // well, now we do it _with_ the mutex to properly handle threads map
-//                    // concurrently:
-//                    unique_lock lock(mxWorkers);
-//                    if (threads.size() > requiredThreads+4) {
-//                        threads.erase(this_thread::get_id());
-//                        printf("exiting worker thread %lu\n", threads.size());
-//                        return;
-//                    }
-//                }
+void AutoThreadPool::createThread() {
+    // we are acllaed under mutex lock already:
+    activeThreadCount++;
+    threads.insert(new thread([this]() {
+        current_pool = this;
+        while (true) {
+            try {
+                queue.get()();
             }
-        });
-        threads[t->get_id()] = t;
-    }
+            catch (const QueueClosedException &x) {
+                break;
+            }
+            catch (const exception &e) {
+                cerr << "error in threadpool worker: " << e.what() << endl;
+            }
+            catch (...) {
+                cerr << "unknown error in threadpool worker" << endl;
+            }
+            // check we need parking
+            {
+                unique_lock lock(mxWorkers);
+                if (activeThreadCount > requiredThreadCount) {
+                    // Park this thread
+                    activeThreadCount--;
+                    parkedThreadCount++;
+                    cvPark.wait(lock);
+                    parkedThreadCount--;
+                    activeThreadCount++;
+                }
+            }
+        }
+    }));
 }
 
 AutoThreadPool::~AutoThreadPool() {
     // We need to close it before everything else to make worker thread exit
     queue.close();
-    for (const auto &[_, t]: threads) {
-        cout << "deleting thread " << t->get_id() << endl;
+    // unpark all parking threads to let them exit normally
+    {
+        unique_lock lock(mxWorkers);
+        // as the queue is already closed, they will just exit run loop
+        cvPark.notify_all();
+    }
+    for (const auto &t: threads) {
+//        cout << "deleting thread " << t->get_id() << endl;
         t->join();
         delete t;
     }
 }
 
+void AutoThreadPool::addActiveThread() {
+    unique_lock lock(mxWorkers);
+    requiredThreadCount++;
+    // there could be unused parked threads
+    if (parkedThreadCount > 0) {
+        // wake a parked thread
+        cvPark.notify_one();
+    } else {
+        // try to add one more thread
+        if (threads.size() < maxThreadCount)
+            createThread();
+        else
+            // not allowed
+            insufficientThreadsHit = true;
+    }
+}
+
+static thread_local unsigned blockgingModeCount = 0;
+
+void AutoThreadPool::setBlocking(bool yes) {
+    if (yes) {
+        if (blockgingModeCount++ == 0) addActiveThread();
+    } else {
+        if (--blockgingModeCount == 0) {
+            unique_lock lock(mxWorkers);
+            if( requiredThreadCount > coreThreadCount )
+                requiredThreadCount--;
+        }
+    }
+
+}
+
+
 AutoThreadPool::Blocker::Blocker() {
     // we cache it as thread_local storage is much more expensive
     pool = current_pool;
-    // we need to increment it _before_ creating the worker, or some thread can be killed due to race condition
-    pool->requiredThreads++;
-    // we want only to slow down this thread, as it is going to be blocked anyway, so we create it there
-    // rather than check creation condition on each task enqueuing
-    pool->addWorker();
-    // Great: now pool has one more thread and required threads number matches it.
+    if( pool ) pool->setBlocking(true);
 }
 
 AutoThreadPool::Blocker::~Blocker() {
     // great: we decrease number of threads and workers will exit their loop as need.
-    pool->requiredThreads--;
+    pool->setBlocking(false);
 }
 
 

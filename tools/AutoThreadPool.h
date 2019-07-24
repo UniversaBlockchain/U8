@@ -8,7 +8,7 @@
 
 #include <functional>
 #include <thread>
-#include <map>
+#include <set>
 #include <atomic>
 #include "Queue.h"
 #include "tools.h"
@@ -16,7 +16,8 @@
 using namespace std;
 
 /**
- * Automatic thread pool using system parallelism factor and explicit blocking code markup.
+ * Automatic thread pool using system parallelism factor and explicit blocking code markup. It tries to maintain
+ * optimal number of cuncurrent active threads to prevent unnecessary preemption.
  *
  * Use it simply:
  * \code
@@ -133,18 +134,68 @@ public:
     size_t queueSize() const { return queue.size(); }
 
     /**
-     * @return number of threads in this pool
+     * @return number of threads in this pool, parked and active
      */
     size_t countThreads() const { return threads.size(); }
 
+    /**
+     * count active threads. Active threads perform taks execution loop and potentially cause preemption
+     * if their number is greater than hardware_concurrency() unless they are waiting something.
+     * @return number of active threads
+     */
+    size_t countActiveThreads() const { return activeThreadCount; }
+
+    /**
+     * Parked threads are allocated but currencly not used threads that do not cause preemption and do not slow
+     * down task execution. Parked threads will be automatically reused with Blocking calls.
+     * @return number of parked threads
+     */
+    size_t countParkedThreads() const { return parkedThreadCount; }
+
+    /**
+     * Required threads are caluclated accorgin to the current need of parallelism calculated by the Blocking
+     * usage. It can be greater than countThreads() or countActivceThreads() if the maximum nmber of allowed threads
+     * in the pool is too low.
+     *
+     * @return current number of required threads
+     */
+    size_t countRequiredThreads() const { return requiredThreadCount; }
+
+
+    /**
+     * Flags that almost once there were not enough threads to fulfill all requests. It generally means that
+     * we should increase maximum number of threads
+     * @return true if maximum number of threds should be increased.
+     */
+    bool insufficientThreads() const { return insufficientThreadsHit; }
+
     static AutoThreadPool defaultPool;
 private:
-    atomic_uint requiredThreads;
-    mutex mxWorkers;
-    Queue<callable> queue;
-    map<thread::id, thread *> threads;
+    uint maxThreadCount;
+    uint parkedThreadCount = 0;
+    uint coreThreadCount;
+    uint requiredThreadCount;
+    uint activeThreadCount = 0;
 
-    void addWorker();
+    mutex mxWorkers;
+    condition_variable cvPark;
+
+    Queue<callable> queue;
+    set<thread *> threads;
+
+    /** Mark current thread (current thread) as performing blocking operations. It is safe to call it more than
+     * once, the pool will count and balance calls outcome determinig actual status
+     * is automatically dropped.
+     *
+     * @param yes true if the thread will block execution, false if not
+     */
+    void setBlocking(bool yes);
+
+    void createThread();
+
+    void addActiveThread();
+
+    bool insufficientThreadsHit = false;
 };
 
 /**
@@ -158,9 +209,9 @@ private:
  * Execute block of code in the default async executor (AuthThreadPool::defaultPool instance).
  *
  * \code
- * pool( [=]() {
+ * runAsync( [=]() {
  *      Blocking;
- *      // now it is safe:
+ *      // now it is safe - actually, printstream wants a mutex.
  *      cout << "executed in a separated thread";
  * });
  * \endcode
@@ -170,6 +221,26 @@ private:
  */
 template<typename Function>
 inline void runAsync(Function &&f) {
+    AutoThreadPool::defaultPool(move(f));
+}
+
+/**
+ * Execute block of code in the default async executor (AuthThreadPool::defaultPool instance).
+ *
+ * auto block = [=]() {
+ *      Blocking;
+ *      // now it is safe - actually, printstream wants a mutex.
+ *      cout << "executed in a separated thread";
+ * });
+ *
+ * runAsync(block)
+ * \endcode
+
+ * @tparam Function block type
+ * @param f block to execute
+ */
+template<typename Function>
+inline void runAsync(Function &f) {
     AutoThreadPool::defaultPool(f);
 }
 

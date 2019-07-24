@@ -69,7 +69,7 @@ public:
      */
     void execute(callable &&block) {
         try {
-            queue.put(block);
+            queue.put(move(block));
         } catch (const QueueClosedException &e) {
             cerr << "ThreadPool: execute on closed pool\n";
         }
@@ -91,7 +91,7 @@ public:
      * schedule a taks: execute a block in first available thread of the pool
      * @param block labmda to execute.
      */
-    void operator()(callable &&block) { execute(block); }
+    void operator()(callable &&block) { execute(move(block)); }
 
     /**
      * schedule a taks: execute a block in first available thread of the pool
