@@ -374,7 +374,7 @@ namespace network {
                 byte_vector sign = UBytes::asInstance(dataList.at(1)).get();
                 if (session.remoteNodeInfo.getPublicKey().verify(sign, data, crypto::HashType::SHA512)) {
                     UArray nackPacketIdList = bossLoadArray(data);
-                    int nackPacketId = UInt::asInstance(nackPacketIdList.at(0)).get();
+                    int nackPacketId = (int)UInt::asInstance(nackPacketIdList.at(0)).get();
                     if (session.retransmitMap.find(nackPacketId) != session.retransmitMap.end()) {
                         session.startHandshake();
                         restartHandshakeIfNeeded(session, getCurrentTimeMillis());

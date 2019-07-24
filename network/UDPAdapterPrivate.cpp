@@ -70,7 +70,9 @@ namespace network {
         maxRetransmitDelay /= UDPAdapter::RETRANSMIT_MAX_ATTEMPTS;
         maxRetransmitDelay *= UDPAdapter::RETRANSMIT_TIME;
         maxRetransmitDelay += UDPAdapter::RETRANSMIT_TIME/2;
-        nextRetransmitTimeMillis = getCurrentTimeMillis() + randomValue % maxRetransmitDelay;
+        maxRetransmitDelay = randomValue % maxRetransmitDelay;
+        maxRetransmitDelay = std::max((long)UDPAdapter::RETRANSMIT_TIME, maxRetransmitDelay);
+        nextRetransmitTimeMillis = getCurrentTimeMillis() + maxRetransmitDelay;
     }
 
     Retransmitter::Retransmitter(const NodeInfo& newRemoteNodeInfo)
