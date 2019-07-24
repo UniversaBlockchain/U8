@@ -56,7 +56,7 @@ void AutoThreadPool::createThread() {
 AutoThreadPool::~AutoThreadPool() {
     // We need to close it before everything else to make worker thread exit
     queue.close();
-    // unpark all parking threads to let them exit normally
+    // unpark all parked threads to let them exit normally
     {
         unique_lock lock(mxWorkers);
         // as the queue is already closed, they will just exit run loop
@@ -69,7 +69,7 @@ AutoThreadPool::~AutoThreadPool() {
     }
 }
 
-void AutoThreadPool::addActiveThread() {
+inline void AutoThreadPool::addActiveThread() {
     unique_lock lock(mxWorkers);
     requiredThreadCount++;
     // there could be unused parked threads
@@ -110,7 +110,7 @@ AutoThreadPool::Blocker::Blocker() {
 
 AutoThreadPool::Blocker::~Blocker() {
     // great: we decrease number of threads and workers will exit their loop as need.
-    pool->setBlocking(false);
+    if( pool ) pool->setBlocking(false);
 }
 
 
