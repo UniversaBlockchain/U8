@@ -12,6 +12,7 @@
 #include "../types/UBytes.h"
 #include "../types/UBool.h"
 #include "../types/TestComplexObject.h"
+#include "../types/complex/UHashId.h"
 
 // Serialization object templates
 template <typename T> UObject BaseSerializer::serializeObject(T o, std::string typeName) {
@@ -78,7 +79,8 @@ UObject BaseSerializer::skipBaseTypes(const UObject& o) {
 
 // Macros for all complex types serialization/deserialization
 #define complexTypes(functionName) \
-    functionName(TestComplexObject, "TestComplexObject")
+    functionName(TestComplexObject, "TestComplexObject"); \
+    functionName(UHashId, "HashId");
     // TODO: add other complex types
 
 UObject BaseSerializer::serialize(const UObject& o) {

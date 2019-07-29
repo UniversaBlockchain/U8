@@ -10,5 +10,6 @@ void testBaseSerialization();
 void testDeserializeUnknown();
 void testBoss();
 void testBossStreamMode();
+void testUHashId();
 
 #endif //U8_SERIALIZATIONTEST_H

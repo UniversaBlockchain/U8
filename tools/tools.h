@@ -18,6 +18,10 @@ inline std::string bytesToString(const byte_vector& bv) {
     return std::string(bv.begin(), bv.end());
 }
 
+inline byte_vector stringToBytes(const std::string& s) {
+    return byte_vector(s.begin(), s.end());
+}
+
 inline bool file_exists(const std::string &name) {
     struct stat buffer;
     return (stat(name.c_str(), &buffer) == 0);

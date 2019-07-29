@@ -10,6 +10,10 @@
 #include "../types/UDouble.h"
 #include "../types/UDateTime.h"
 #include "../types/TestComplexObject.h"
+#include "../types/complex/UHashId.h"
+#include "../tools/tools.h"
+#include "../crypto/HashId.h"
+#include "../crypto/base64.h"
 
 #define ASSERT(expr)                                      \
  do {                                                     \
@@ -28,6 +32,7 @@ void allSerializationTests() {
     testDeserializeUnknown();
     testBoss();
     testBossStreamMode();
+    testUHashId();
 }
 
 void testBaseSerialization() {
@@ -368,4 +373,29 @@ void testBossStreamMode() {
     ASSERT(UString::asInstance(obj).get() == "test string #8");
 
     printf("testBossStreamMode()...done\n\n");
+}
+
+void testUHashId() {
+    printf("testUHashId()...\n");
+    using std::cout, std::endl;
+
+    byte_vector binFromJava = base64_decodeToBytes("HhdTY29tcG9zaXRlM7xAl4F/B8H+DedzoERRN6gRH9PwPrMcY3tLGBKATgkctqpyhVQhHN+rG3/oJp60N42VXC0j0vtX9qborFDQCBes4jNfX3R5cGUzSGFzaElkFx28QBVhk4xkDobzVK4Jg2v9g0d4nxc/gnsjl+7Oge65zPJpATFMOhnoPgker5pVBqKOGclRq+0YU7MbEmEtuekj0d8tNRcdvECePVw+quqmmlXgMkvgsQa0qlGo6NJuOr2CQwJQnjiXO1v/mKYR0W+FiBWUuqjTkQw1OxqX1OXRi3I38pVdgNsKLTU=");
+    crypto::HashId hashId0 = crypto::HashId::withDigest(base64_decodeToBytes("l4F/B8H+DedzoERRN6gRH9PwPrMcY3tLGBKATgkctqpyhVQhHN+rG3/oJp60N42VXC0j0vtX9qborFDQCBes4g"));
+    crypto::HashId hashId1 = crypto::HashId::withDigest(base64_decodeToBytes("FWGTjGQOhvNUrgmDa/2DR3ifFz+CeyOX7s6B7rnM8mkBMUw6Geg+CR6vmlUGoo4ZyVGr7RhTsxsSYS256SPR3w"));
+    crypto::HashId hashId2 = crypto::HashId::withDigest(base64_decodeToBytes("nj1cPqrqpppV4DJL4LEGtKpRqOjSbjq9gkMCUJ44lztb/5imEdFvhYgVlLqo05EMNTsal9Tl0YtyN/KVXYDbCg"));
+    UObject obj = BossSerializer::deserialize(UBytes(move(binFromJava)));
+    UArray arr = UArray::asInstance(obj);
+    ASSERT(arr.size() == 3);
+    ASSERT(hashId0 == UHashId::asInstance(arr[0]).getHashId());
+    ASSERT(hashId1 == UHashId::asInstance(arr[1]).getHashId());
+    ASSERT(hashId2 == UHashId::asInstance(arr[2]).getHashId());
+    byte_vector cppSerializedBin = BossSerializer::serialize(arr).get();
+    UObject obj2 = BossSerializer::deserialize(UBytes(move(cppSerializedBin)));
+    UArray arr2 = UArray::asInstance(obj2);
+    ASSERT(arr2.size() == 3);
+    ASSERT(hashId0 == UHashId::asInstance(arr2[0]).getHashId());
+    ASSERT(hashId1 == UHashId::asInstance(arr2[1]).getHashId());
+    ASSERT(hashId2 == UHashId::asInstance(arr2[2]).getHashId());
+
+    printf("testUHashId()...done\n\n");
 }
