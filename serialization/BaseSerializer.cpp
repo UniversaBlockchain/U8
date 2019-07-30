@@ -13,6 +13,8 @@
 #include "../types/UBool.h"
 #include "../types/TestComplexObject.h"
 #include "../types/complex/UHashId.h"
+#include "../types/complex/UListRole.h"
+#include "../types/complex/USimpleRole.h"
 
 // Serialization object templates
 template <typename T> UObject BaseSerializer::serializeObject(T o, std::string typeName) {
@@ -80,7 +82,9 @@ UObject BaseSerializer::skipBaseTypes(const UObject& o) {
 // Macros for all complex types serialization/deserialization
 #define complexTypes(functionName) \
     functionName(TestComplexObject, "TestComplexObject"); \
-    functionName(UHashId, "HashId");
+    functionName(UHashId, "HashId"); \
+    functionName(UListRole, "ListRole"); \
+    functionName(USimpleRole, "SimpleRole");
     // TODO: add other complex types
 
 UObject BaseSerializer::serialize(const UObject& o) {
@@ -143,9 +147,9 @@ UObject BaseSerializer::deserialize(const UObject& o) {
     }
 
     // Binder
+    std::string type;
     if (UBinder::isInstance(o)) {
         const UBinder& binder = UBinder::asInstance(o);
-        std::string type;
         const std::string _type = binder.getStringOrDefault("__type", "");
 
         if (_type.empty()) {
@@ -169,5 +173,5 @@ UObject BaseSerializer::deserialize(const UObject& o) {
         complexTypes(deserializeComplex)
     }
 
-    throw std::invalid_argument(std::string("Unknown object type for deserialization: ") + typeid(o).name());
+    throw std::invalid_argument(std::string("Unknown object type for deserialization: ") + typeid(o).name() + ", type=" + type);
 }

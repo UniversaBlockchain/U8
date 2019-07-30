@@ -11,5 +11,6 @@ void testDeserializeUnknown();
 void testBoss();
 void testBossStreamMode();
 void testUHashId();
+void testUListRole();
 
 #endif //U8_SERIALIZATIONTEST_H

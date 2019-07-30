@@ -49,6 +49,7 @@ file(GLOB LIBRARY_SRC
     tools/*.h tools/*.cpp
     types/*.h types/*.cpp
     types/complex/*.h types/complex/*.cpp
+    universa_core/*.h universa_core/*.cpp
 )
 add_custom_target(cxxlibs ALL DEPENDS download_libs.stamp)
 add_library(u8_lib STATIC ${LIBRARY_SRC})
