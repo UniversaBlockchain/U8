@@ -15,6 +15,7 @@
 #include "../types/complex/UHashId.h"
 #include "../types/complex/UListRole.h"
 #include "../types/complex/USimpleRole.h"
+#include "../types/complex/UKeyAddress.h"
 
 // Serialization object templates
 template <typename T> UObject BaseSerializer::serializeObject(T o, std::string typeName) {
@@ -84,7 +85,8 @@ UObject BaseSerializer::skipBaseTypes(const UObject& o) {
     functionName(TestComplexObject, "TestComplexObject"); \
     functionName(UHashId, "HashId"); \
     functionName(UListRole, "ListRole"); \
-    functionName(USimpleRole, "SimpleRole");
+    functionName(USimpleRole, "SimpleRole"); \
+    functionName(UKeyAddress, "KeyAddress");
     // TODO: add other complex types
 
 UObject BaseSerializer::serialize(const UObject& o) {

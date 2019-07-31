@@ -14,7 +14,7 @@ private:
     class UHashIdData : public UData {
     public:
         UHashIdData();
-        UHashIdData(const crypto::HashId &id);
+        UHashIdData(const crypto::HashId &val);
         ~UHashIdData() = default;
 
         std::shared_ptr<crypto::HashId> hashId;
@@ -22,7 +22,7 @@ private:
 
 public:
     UHashId();
-    UHashId(const crypto::HashId &id);
+    UHashId(const crypto::HashId &val);
 
     static bool isInstance(const UObject& object);
     static UHashId& asInstance(UObject& object);
@@ -31,7 +31,7 @@ public:
     UBinder decompose();
     void compose(const UBinder& data);
 
-    crypto::HashId getHashId();
+    crypto::HashId& getHashId();
 };
 
 #endif //U8_UHASHID_H

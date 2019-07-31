@@ -7,6 +7,7 @@
 #include "../UBytes.h"
 #include "../UString.h"
 #include "../UArray.h"
+#include "../complex/UKeyAddress.h"
 
 USimpleRole::USimpleRoleData::USimpleRoleData() {
 }
@@ -61,7 +62,18 @@ void USimpleRole::compose(const UBinder& data) {
     //TODO: requiredAllConstraints, requiredAnyConstraints
     //...
 
-    //TODO: keyAddresses, keyRecords
+    role.keyAddresses.clear();
+    UArray addressesArr = data.getArray("addresses");
+    if (!addressesArr.isNull()) {
+        UObject obj = BaseSerializer::deserialize(addressesArr);
+        UArray arr = UArray::asInstance(obj);
+        for (auto it = arr.begin(), itEnd = arr.end(); it != itEnd; ++it) {
+            UKeyAddress uKeyAddress = UKeyAddress::asInstance(*it);
+            role.keyAddresses.insert(std::make_shared<crypto::KeyAddress>(uKeyAddress.getKeyAddress().getPacked()));
+        }
+    }
+
+    //TODO: keyRecords
     //...
 
     this->data<USimpleRoleData>().simpleRole = role;

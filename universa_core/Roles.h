@@ -6,7 +6,8 @@
 #define U8_ROLES_H
 
 #include <set>
-#include "string"
+#include <string>
+#include "../crypto/KeyAddress.h"
 
 struct RequiredMode {
     static const std::string& ALL_OF() {static std::string val = "ALL_OF"; return val;}
@@ -36,7 +37,8 @@ public:
 
 class SimpleRole: public Role {
 public:
-    //TODO: keyAddresses (set)
+    std::set<std::shared_ptr<crypto::KeyAddress>> keyAddresses;
+
     //TODO: keyRecords (map)
 };
 

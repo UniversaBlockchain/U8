@@ -8,14 +8,14 @@
 UHashId::UHashIdData::UHashIdData() {
 }
 
-UHashId::UHashIdData::UHashIdData(const crypto::HashId &id) {
-    hashId = std::make_shared<crypto::HashId>(id);
+UHashId::UHashIdData::UHashIdData(const crypto::HashId &val) {
+    hashId = std::make_shared<crypto::HashId>(val);
 }
 
 UHashId::UHashId(): UObject(std::make_shared<UHashIdData>()) {
 }
 
-UHashId::UHashId(const crypto::HashId &id): UObject(std::make_shared<UHashIdData>(id)) {
+UHashId::UHashId(const crypto::HashId &val): UObject(std::make_shared<UHashIdData>(val)) {
 }
 
 bool UHashId::isInstance(const UObject &object) {
@@ -45,6 +45,6 @@ void UHashId::compose(const UBinder& data) {
             crypto::HashId::withDigest(UBytes::asInstance(data.get("composite3")).get()));
 }
 
-crypto::HashId UHashId::getHashId() {
+crypto::HashId& UHashId::getHashId() {
     return *data<UHashIdData>().hashId.get();
 }
