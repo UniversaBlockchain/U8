@@ -5,18 +5,21 @@
 #ifndef U8_USIMPLEROLE_H
 #define U8_USIMPLEROLE_H
 
+#include "URole.h"
 #include "../UObject.h"
 #include "../UBinder.h"
 #include "../../universa_core/Roles.h"
 
-class USimpleRole: public UObject {
+class USimpleRole: public URole {
 private:
-    class USimpleRoleData : public UData {
+    class USimpleRoleData : public URoleData {
     public:
         USimpleRoleData();
         USimpleRoleData(const SimpleRole &val);
-        ~USimpleRoleData() = default;
+        ~USimpleRoleData() override = default;
 
+        Role& getRole() override {return simpleRole;}
+        std::shared_ptr<Role> makeRoleSharedPtr() override {return std::make_shared<SimpleRole>(simpleRole);}
         SimpleRole simpleRole;
     };
 

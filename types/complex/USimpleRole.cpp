@@ -16,10 +16,10 @@ USimpleRole::USimpleRoleData::USimpleRoleData(const SimpleRole &val) {
     simpleRole = val;
 }
 
-USimpleRole::USimpleRole(): UObject(std::make_shared<USimpleRoleData>()) {
+USimpleRole::USimpleRole(): URole(std::make_shared<USimpleRoleData>()) {
 }
 
-USimpleRole::USimpleRole(const SimpleRole &val): UObject(std::make_shared<USimpleRoleData>(val)) {
+USimpleRole::USimpleRole(const SimpleRole &val): URole(std::make_shared<USimpleRoleData>(val)) {
 }
 
 bool USimpleRole::isInstance(const UObject &object) {
@@ -55,12 +55,9 @@ UBinder USimpleRole::decompose() {
 }
 
 void USimpleRole::compose(const UBinder& data) {
-    SimpleRole role;
-    role.name = data.getString("name");
-    role.comment = data.getStringOrDefault("comment", "");
+    URole::compose(data);
 
-    //TODO: requiredAllConstraints, requiredAnyConstraints
-    //...
+    SimpleRole& role = getSimpleRole();
 
     role.keyAddresses.clear();
     UArray addressesArr = data.getArray("addresses");
@@ -75,8 +72,6 @@ void USimpleRole::compose(const UBinder& data) {
 
     //TODO: keyRecords
     //...
-
-    this->data<USimpleRoleData>().simpleRole = role;
 }
 
 SimpleRole& USimpleRole::getSimpleRole() {

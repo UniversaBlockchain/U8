@@ -22,6 +22,7 @@ struct ListRoleMode {
 
 class Role {
 public:
+    virtual ~Role() = default;
     std::string name;
     std::string comment;
     std::set<std::string> requiredAllConstraints;
@@ -31,7 +32,7 @@ public:
 class ListRole: public Role {
 public:
     std::string mode;
-    std::set<Role> roles;
+    std::set<std::shared_ptr<Role>> roles;
     int quorumSize = 0;
 };
 

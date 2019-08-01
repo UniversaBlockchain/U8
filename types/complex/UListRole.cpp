@@ -15,10 +15,10 @@ UListRole::UListRoleData::UListRoleData(const ListRole &val) {
     listRole = val;
 }
 
-UListRole::UListRole(): UObject(std::make_shared<UListRoleData>()) {
+UListRole::UListRole(): URole(std::make_shared<UListRoleData>()) {
 }
 
-UListRole::UListRole(const ListRole &val): UObject(std::make_shared<UListRoleData>(val)) {
+UListRole::UListRole(const ListRole &val): URole(std::make_shared<UListRoleData>(val)) {
 }
 
 bool UListRole::isInstance(const UObject &object) {
@@ -57,22 +57,18 @@ UBinder UListRole::decompose() {
 }
 
 void UListRole::compose(const UBinder& data) {
-    ListRole role;
-    role.name = data.getString("name");
-    role.comment = data.getStringOrDefault("comment", "");
+    URole::compose(data);
 
-    //TODO: requiredAllConstraints, requiredAnyConstraints
-    //...
+    ListRole& role = getListRole();
 
     role.quorumSize = (int)data.getIntOrDefault("quorumSize", 0);
     role.mode = data.getStringOrDefault("mode", "");
 
-    //TODO: roles
     UObject rolesObj = BaseSerializer::deserialize(data.getArray("roles"));
     UArray rolesArr = UArray::asInstance(rolesObj);
-    printf("rolesArr.size: %zu\n", rolesArr.size());
-
-    this->data<UListRoleData>().listRole = role;
+    role.roles.clear();
+    for (auto it = rolesArr.begin(), itEnd = rolesArr.end(); it != itEnd; ++it)
+        role.roles.insert(URole::asInstance(*it).makeRoleSharedPtr());
 }
 
 ListRole& UListRole::getListRole() {
