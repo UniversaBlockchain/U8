@@ -9,6 +9,7 @@
 #include "../UObject.h"
 #include "../UBinder.h"
 #include "../../universa_core/Roles.h"
+#include "../../universa_core/KeyRecord.h"
 
 class USimpleRole: public URole {
 private:

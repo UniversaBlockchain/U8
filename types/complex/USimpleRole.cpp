@@ -8,6 +8,7 @@
 #include "../UString.h"
 #include "../UArray.h"
 #include "../complex/UKeyAddress.h"
+#include "../complex/UKeyRecord.h"
 
 USimpleRole::USimpleRoleData::USimpleRoleData() {
 }
@@ -70,8 +71,16 @@ void USimpleRole::compose(const UBinder& data) {
         }
     }
 
-    //TODO: keyRecords
-    //...
+    role.keyRecords.clear();
+    UArray keyRecordsArr = data.getArray("keys");
+    if (!keyRecordsArr.isNull()) {
+        UObject obj = BaseSerializer::deserialize(keyRecordsArr);
+        UArray arr = UArray::asInstance(obj);
+        for (auto it = arr.begin(), itEnd = arr.end(); it != itEnd; ++it) {
+            UKeyRecord uKeyRecord = UKeyRecord::asInstance(*it);
+            role.keyRecords.insert(std::make_shared<KeyRecord>(uKeyRecord.getKeyRecord()));
+        }
+    }
 }
 
 SimpleRole& USimpleRole::getSimpleRole() {

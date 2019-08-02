@@ -6,7 +6,10 @@
 #define U8_ROLES_H
 
 #include <set>
+#include <map>
 #include <string>
+#include "KeyRecord.h"
+#include "../tools/tools.h"
 #include "../crypto/KeyAddress.h"
 
 struct RequiredMode {
@@ -39,8 +42,7 @@ public:
 class SimpleRole: public Role {
 public:
     std::set<std::shared_ptr<crypto::KeyAddress>> keyAddresses;
-
-    //TODO: keyRecords (map)
+    std::set<std::shared_ptr<KeyRecord>> keyRecords;
 };
 
 #endif //U8_ROLES_H
