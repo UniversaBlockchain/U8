@@ -293,6 +293,10 @@ network.HttpServerRequest = class {
         return this.queryParamsMap_;
     }
 
+    get multipartParams() {
+        return this.memoise('__multipartParams', () => this.reqBuf_.getMultipartParams(this.indx_));
+    }
+
     get method() {
         return this.memoise('__getMethod', () => this.reqBuf_.getMethod(this.indx_));
     }
@@ -463,6 +467,81 @@ network.HttpClient = class {
         let reqId = this.getReqId();
         this.callbacks_.set(reqId, block);
         this.httpClient_.__sendGetRequestUrl(reqId, url);
+    }
+
+    checkBoundary(boundary, formParams, files) {
+        for (let paramName in formParams) {
+            if (typeof formParams[paramName] !== "function") {
+                let paramValue = formParams[paramName].toString();
+                if (paramValue.indexOf(boundary) !== -1)
+                    return false;
+            }
+        }
+        for (let paramName in files) {
+            if (typeof files[paramName] !== "function") {
+                let binData = files[paramName];
+                let strData = utf8Decode(binData);
+                if (strData.indexOf(boundary) !== -1)
+                    return false;
+            }
+        }
+        return true;
+    }
+
+    generateBoundary(formParams, files) {
+        let counter = 0;
+        do {
+            let boundary = t.randomString(32);
+            if (this.checkBoundary(boundary, formParams, files))
+                return boundary;
+        } while (++counter < 10);
+        throw new Error("failed to create http multipart boundary");
+    }
+
+    /**
+     * @param url {String} full url to server endpoint
+     * @param method {String} GET, POST, etc
+     * @param formParams {Object} where key is param name, value is String param value
+     * @param files {Object} where key is param name, value is binary of file contents
+     * @param block onComplete callback
+     */
+    sendMultipartRequestUrl(url, method, formParams, files, block) {
+        let boundary = this.generateBoundary(formParams, files);
+        let extHeaders = "User-Agent: Universa U8 API Client\r\n";
+        extHeaders += "connection: close\r\n";
+        extHeaders += "Content-Type: multipart/form-data; boundary="+boundary+"\r\n";
+
+        let bodyStr = "";
+
+        for (let paramName in formParams) {
+            if (typeof formParams[paramName] !== "function") {
+                bodyStr += "--" + boundary + "\r\n";
+                bodyStr += "Content-Disposition: form-data; name=\""+paramName+"\"\r\n";
+                bodyStr += "\r\n";
+                bodyStr += formParams[paramName].toString();
+                bodyStr += "\r\n";
+            }
+        }
+
+        let fileCounter = 0;
+        for (let paramName in files) {
+            if (typeof files[paramName] !== "function") {
+                let binData = files[paramName];
+                let strData = utf8Decode(binData);
+                bodyStr += "--" + boundary + "\r\n";
+                bodyStr += "Content-Disposition: form-data; name=\""+paramName+"\"; filename=\"file_"+fileCounter+"\"\r\n";
+                bodyStr += "Content-Type: application/octet-stream\r\n";
+                bodyStr += "\r\n";
+                bodyStr += strData;
+                bodyStr += "\r\n";
+                ++fileCounter;
+            }
+        }
+        bodyStr += "--" + boundary + "--\r\n";
+
+        let reqId = this.getReqId();
+        this.callbacks_.set(reqId, block);
+        this.httpClient_.__sendRawRequestUrl(reqId, url, method, extHeaders, utf8Encode(bodyStr));
     }
 
     command(name, params, onComplete, onError) {

@@ -74,7 +74,7 @@ void HttpClientWorker::sendBinRequest(const std::string& url, const std::string&
         std::string boundary = "==boundary==" + randomString(48);
         std::string extHeaders = "";
         extHeaders += "Content-Type: multipart/form-data; boundary=" + boundary + "\r\n";
-        extHeaders += "User-Agent: Universa JAVA API Client\r\n";
+        extHeaders += "User-Agent: Universa U8 API Client\r\n";
         extHeaders += "connection: close\r\n";
         string bodyPrefixStr = "";
         bodyPrefixStr += "--" + boundary + "\r\n";
@@ -103,6 +103,38 @@ void HttpClientWorker::sendBinRequest(const std::string& url, const std::string&
                 clientWorker->exitFlag_ = true;
             }
         }, opts, url.c_str(), extHeaders.c_str(), (const char*)&body[0], (int)body.size(), method.c_str());
+        while (!exitFlag_) {
+            mg_mgr_poll(mgr_.get(), 100);
+        }
+        parentRef_.releaseWorker(id_);
+    });
+}
+
+void HttpClientWorker::sendRawRequest(const std::string& url, const std::string& method, const std::string& extHeaders, const byte_vector& reqBody, std::function<void(int,byte_vector&&)>&& callback) {
+    callback_ = std::move(callback);
+    worker_([this,url,method,reqBody,extHeaders](){
+        exitFlag_ = false;
+        mg_connect_opts opts;
+        memset(&opts, 0, sizeof(opts));
+        opts.user_data = this;
+
+        mg_connect_http_opt1(mgr_.get(), [](mg_connection *nc, int ev, void *ev_data){
+            HttpClientWorker* clientWorker = (HttpClientWorker*)nc->user_data;
+            if (ev == MG_EV_HTTP_REPLY) {
+                http_message *hm = (http_message*)ev_data;
+                byte_vector bv(hm->body.len);
+                memcpy(&bv[0], hm->body.p, hm->body.len);
+                clientWorker->callback_(hm->resp_code, std::move(bv));
+                clientWorker->callback_ = stub;
+                nc->flags |= MG_F_CLOSE_IMMEDIATELY;
+            } else if (ev == MG_EV_CONNECT) {
+                if (*(int *) ev_data != 0) {
+                    clientWorker->exitFlag_ = true;
+                }
+            } else if (ev == MG_EV_CLOSE) {
+                clientWorker->exitFlag_ = true;
+            }
+        }, opts, url.c_str(), extHeaders.c_str(), (const char*)&reqBody[0], (int)reqBody.size(), method.c_str());
         while (!exitFlag_) {
             mg_mgr_poll(mgr_.get(), 100);
         }
@@ -180,6 +212,19 @@ void HttpClient::sendBinRequest(const std::string& url, const std::string& metho
         auto client = getUnusedWorker();
         std::string fullUrl = makeFullUrl(url);
         client->sendBinRequest(fullUrl, method, reqBody, std::move(callback));
+    });
+}
+
+void HttpClient::sendRawRequestUrl(const std::string& url, const std::string& method, const std::string& extHeaders, const byte_vector& reqBody, const std::function<void(int,byte_vector&&)>& callback) {
+    std::function<void(int,byte_vector&&)> callbackCopy = callback;
+    sendRawRequestUrl(url, method, extHeaders, reqBody, std::move(callbackCopy));
+}
+
+void HttpClient::sendRawRequestUrl(const std::string& url, const std::string& method, const std::string& extHeaders, const byte_vector& reqBody, std::function<void(int,byte_vector&&)>&& callback) {
+    poolControlThread_.execute([callback{std::move(callback)}, url, method, extHeaders, reqBody, this]() mutable {
+        auto client = getUnusedWorker();
+        std::string fullUrl = makeFullUrl(url);
+        client->sendRawRequest(fullUrl, method, extHeaders, reqBody, std::move(callback));
     });
 }
 

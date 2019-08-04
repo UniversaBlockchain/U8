@@ -469,6 +469,9 @@ public:
     std::string getQueryString(int idx) {
         return buf_.at(idx)->getQueryString();
     }
+    std::unordered_map<std::string, byte_vector> getMultipartParams(int idx) {
+        return buf_.at(idx)->parseMultipartData();
+    }
     std::string getMethod(int idx) {
         return buf_.at(idx)->getMethod();
     }
@@ -827,6 +830,25 @@ public:
         });
     }
 
+    void sendRawRequestUrl(int reqId, const std::string& url, const std::string& method, const std::string& extHeaders, byte_vector&& reqBody) {
+        httpClient_->sendRawRequestUrl(url, method, extHeaders, reqBody, [this,reqId](int respStatus, byte_vector&& body) {
+            atomic<bool> needSend(false);
+            {
+                lock_guard lock(mutex_);
+                HttpClientAnswer ans;
+                ans.reqId = reqId;
+                ans.respStatus = respStatus;
+                ans.body = std::move(body);
+                buf_.emplace_back(ans);
+                if (buf_.size() >= bufSize_)
+                    needSend = true;
+            }
+            if (needSend) {
+                sendAllFromBuf();
+            }
+        });
+    }
+
     void command(int reqId, const byte_vector& callBin) {
         httpClient_->command(callBin, [this,reqId](byte_vector&& decrypted){
             atomic<bool> needSend(false);
@@ -938,6 +960,26 @@ void httpClient_sendGetRequestUrl(const FunctionCallbackInfo<Value> &args) {
     });
 }
 
+void httpClient_sendRawRequestUrl(const FunctionCallbackInfo<Value> &args) {
+    Scripter::unwrapArgs(args, [](ArgsContext &ac) {
+        if (ac.args.Length() == 5) {
+            auto httpClient = unwrap<HttpClientBuffered>(ac.args.This());
+            auto contents = ac.args[4].As<TypedArray>()->Buffer()->GetContents();
+            byte_vector bv(contents.ByteLength());
+            memcpy(&bv[0], contents.Data(), contents.ByteLength());
+            httpClient->sendRawRequestUrl(
+                ac.asInt(0),      // reqId
+                ac.asString(1),   // url
+                ac.asString(2),   // method
+                ac.asString(3),   // extHeaders
+                move(bv)          // reqBody
+            );
+            return;
+        }
+        ac.throwError("invalid arguments");
+    });
+}
+
 void httpClient_command(const FunctionCallbackInfo<Value> &args) {
     Scripter::unwrapArgs(args, [](ArgsContext &ac) {
         if (ac.args.Length() == 2) {
@@ -1040,6 +1082,7 @@ Local<FunctionTemplate> initHttpClient(Isolate *isolate) {
     auto prototype = tpl->PrototypeTemplate();
     prototype->Set(isolate, "__sendGetRequest", FunctionTemplate::New(isolate, httpClient_sendGetRequest));
     prototype->Set(isolate, "__sendGetRequestUrl", FunctionTemplate::New(isolate, httpClient_sendGetRequestUrl));
+    prototype->Set(isolate, "__sendRawRequestUrl", FunctionTemplate::New(isolate, httpClient_sendRawRequestUrl));
     prototype->Set(isolate, "__command", FunctionTemplate::New(isolate, httpClient_command));
     prototype->Set(isolate, "__setBufferedCallback", FunctionTemplate::New(isolate, httpClient_setBufferedCallback));
     prototype->Set(isolate, "__setBufferedCommandCallback", FunctionTemplate::New(isolate, httpClient_setBufferedCommandCallback));
@@ -1158,6 +1201,28 @@ void HttpServerRequestBuf_getQueryString(const FunctionCallbackInfo<Value> &args
     });
 }
 
+void HttpServerRequestBuf_getMultipartParams(const FunctionCallbackInfo<Value> &args) {
+    Scripter::unwrapArgs(args, [](ArgsContext &ac) {
+        if (ac.args.Length() == 1) {
+            auto httpServerRequestBuf = unwrap<HttpServerRequestBuf>(ac.args.This());
+            auto map = httpServerRequestBuf->getMultipartParams(ac.asInt(0));
+
+            auto ab = ArrayBuffer::New(ac.isolate, 0);
+            for (auto& it: map) {
+                auto &p = it.second;
+                auto b = ArrayBuffer::New(ac.isolate, p.size());
+                memcpy(b->GetContents().Data(), &p[0], p.size());
+                ab->Set(String::NewFromUtf8(ac.isolate, it.first.data()), Uint8Array::New(b, 0, p.size()));
+                //ab->Set(String::NewFromUtf8(ac.isolate, it.first.data()), Integer::New(ac.isolate, 33));
+            }
+
+            ac.setReturnValue(ab);
+            return;
+        }
+        ac.throwError("invalid arguments");
+    });
+}
+
 void HttpServerRequestBuf_getMethod(const FunctionCallbackInfo<Value> &args) {
     Scripter::unwrapArgs(args, [](ArgsContext &ac) {
         if (ac.args.Length() == 1) {
@@ -1195,6 +1260,7 @@ void JsInitHttpServerRequest(Isolate *isolate, const Local<ObjectTemplate> &glob
     prototype->Set(isolate, "getPath", FunctionTemplate::New(isolate, HttpServerRequestBuf_getPath));
     prototype->Set(isolate, "getBufLength", FunctionTemplate::New(isolate, HttpServerRequestBuf_getBufLength));
     prototype->Set(isolate, "getQueryString", FunctionTemplate::New(isolate, HttpServerRequestBuf_getQueryString));
+    prototype->Set(isolate, "getMultipartParams", FunctionTemplate::New(isolate, HttpServerRequestBuf_getMultipartParams));
     prototype->Set(isolate, "getMethod", FunctionTemplate::New(isolate, HttpServerRequestBuf_getMethod));
     prototype->Set(isolate, "getRequestBody", FunctionTemplate::New(isolate, HttpServerRequestBuf_getRequestBody));
 

@@ -193,6 +193,55 @@ unit.test("big payload", async () => {
     await httpServer.stopServer();
 });
 
+unit.test("http test multipart", async () => {
+    let httpServer = new network.HttpServer("0.0.0.0", 8080, 1, 20);
+    httpServer.addEndpoint("/method1", (request) => {
+        request.setHeader("Content-Type", "text/html");
+        return {"ans": "answer from /method1"};
+    });
+    httpServer.addEndpoint("/method2", (request) => {
+        let a = utf8Decode(request.multipartParams.a);
+        let b = utf8Decode(request.multipartParams.b);
+        let file1 = utf8Decode(request.multipartParams.file1);
+        let file2 = utf8Decode(request.multipartParams.file2);
+        request.setHeader("Content-Type", "text/html");
+        return {"ans": a+b+file1+file2};
+    });
+    httpServer.startServer();
+
+    let url = "http://localhost:8080";
+    let httpClient = new network.HttpClient("", 32, 128);
+
+    let resolver;
+    let promise = new Promise(resolve => {resolver = resolve;});
+    httpClient.sendGetRequestUrl(url+"/method1", (respCode, body) => {
+        //console.log("method1 answer: [" + respCode + "]: " + JSON.stringify(Boss.load(body)));
+        resolver();
+    });
+    await promise;
+
+    promise = new Promise(resolve => {resolver = resolve;});
+    let aValueData = 11;
+    let bValueData = "bbb";
+    let file1data = utf8Encode("1234567");
+    let file2data = utf8Encode(t.randomString(10));
+    httpClient.sendMultipartRequestUrl(url+"/method2", "POST", {
+        a: aValueData,
+        b: bValueData
+    }, {
+        file1: file1data,
+        file2: file2data
+    }, (respCode, body) => {
+        //console.log("method2 answer: [" + respCode + "]: " + JSON.stringify(Boss.load(body)));
+        assert(Boss.load(body).response.ans === "11bbb1234567"+utf8Decode(file2data));
+        resolver();
+    });
+    await promise;
+
+    await httpClient.stop();
+    await httpServer.stopServer();
+});
+
 /*unit.test("web_test: many clients", async () => {
     for (let i = 0; i < 20000; i++) {
         console.log(i);
