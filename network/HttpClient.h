@@ -28,7 +28,7 @@ class HttpClientWorker {
 public:
     HttpClientWorker(int newId, HttpClient& parent);
     void sendGetRequest(const std::string& url, std::function<void(int,byte_vector&&)>&& callback);
-    void sendRawRequest(const std::string& url, const std::string& method, const byte_vector& reqBody, std::function<void(int,byte_vector&&)>&& callback);
+    void sendBinRequest(const std::string& url, const std::string& method, const byte_vector& reqBody, std::function<void(int,byte_vector&&)>&& callback);
     int getId() {return id_;}
     void stop() {exitFlag_ = true;};
 private:
@@ -60,8 +60,8 @@ public:
     void sendGetRequestUrl(const std::string& path, const std::function<void(int,byte_vector&&)>& callback);
     void sendGetRequestUrl(const std::string& path, std::function<void(int,byte_vector&&)>&& callback);
 
-    void sendRawRequest(const std::string& url, const std::string& method, const byte_vector& reqBody, const std::function<void(int,byte_vector&&)>& callback);
-    void sendRawRequest(const std::string& url, const std::string& method, const byte_vector& reqBody, std::function<void(int,byte_vector&&)>&& callback);
+    void sendBinRequest(const std::string& url, const std::string& method, const byte_vector& reqBody, const std::function<void(int,byte_vector&&)>& callback);
+    void sendBinRequest(const std::string& url, const std::string& method, const byte_vector& reqBody, std::function<void(int,byte_vector&&)>&& callback);
 
     /**
      * Authenticate self to the remote party. Blocks until the handshake is done. It is important to start() connection

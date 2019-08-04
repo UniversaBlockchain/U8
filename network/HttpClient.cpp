@@ -63,7 +63,7 @@ string randomString(int length) {
     return res;
 }
 
-void HttpClientWorker::sendRawRequest(const std::string& url, const std::string& method, const byte_vector& reqBody, std::function<void(int,byte_vector&&)>&& callback) {
+void HttpClientWorker::sendBinRequest(const std::string& url, const std::string& method, const byte_vector& reqBody, std::function<void(int,byte_vector&&)>&& callback) {
     callback_ = std::move(callback);
     worker_([this,url,method,reqBody](){
         exitFlag_ = false;
@@ -170,16 +170,16 @@ void HttpClient::sendGetRequestUrl(const std::string& url, std::function<void(in
     });
 }
 
-void HttpClient::sendRawRequest(const std::string& url, const std::string& method, const byte_vector& reqBody, const std::function<void(int,byte_vector&&)>& callback) {
+void HttpClient::sendBinRequest(const std::string& url, const std::string& method, const byte_vector& reqBody, const std::function<void(int,byte_vector&&)>& callback) {
     std::function<void(int,byte_vector&&)> callbackCopy = callback;
-    sendRawRequest(url, method, reqBody, std::move(callbackCopy));
+    sendBinRequest(url, method, reqBody, std::move(callbackCopy));
 }
 
-void HttpClient::sendRawRequest(const std::string& url, const std::string& method, const byte_vector& reqBody, std::function<void(int,byte_vector&&)>&& callback) {
+void HttpClient::sendBinRequest(const std::string& url, const std::string& method, const byte_vector& reqBody, std::function<void(int,byte_vector&&)>&& callback) {
     poolControlThread_.execute([callback{std::move(callback)}, url, method, reqBody, this]() mutable {
         auto client = getUnusedWorker();
         std::string fullUrl = makeFullUrl(url);
-        client->sendRawRequest(fullUrl, method, reqBody, std::move(callback));
+        client->sendBinRequest(fullUrl, method, reqBody, std::move(callback));
     });
 }
 
@@ -195,7 +195,7 @@ void HttpClient::start(const crypto::PrivateKey& clientKey, const crypto::Public
         UBinder params = UBinder::of("client_key", UBytes(crypto::PublicKey(clientKey).pack()));
         byte_vector paramsBin = BossSerializer::serialize(params).get();
         byte_vector server_nonce;
-        sendRawRequest("/connect", "POST", paramsBin, [this,&sem,&server_nonce](int respCode, byte_vector&& respBody){
+        sendBinRequest("/connect", "POST", paramsBin, [this,&sem,&server_nonce](int respCode, byte_vector&& respBody){
             UBytes ub(std::move(respBody));
             UObject uObject = BossSerializer::deserialize(ub);
             UBinder binderWrap = UBinder::asInstance(uObject);
@@ -218,7 +218,7 @@ void HttpClient::start(const crypto::PrivateKey& clientKey, const crypto::Public
                 "session_id", session_->sessionId)).get();
         byte_vector dataRcv;
         byte_vector sigRcv;
-        sendRawRequest("/get_token", "POST", paramsBin, [&sem,&dataRcv,&sigRcv](int respCode, byte_vector&& respBody) {
+        sendBinRequest("/get_token", "POST", paramsBin, [&sem,&dataRcv,&sigRcv](int respCode, byte_vector&& respBody) {
             UBinder binder = UBinder::asInstance(BossSerializer::deserialize(UBytes(std::move(respBody)))).getBinder("response");
             dataRcv = UBytes::asInstance(binder.get("data")).get();
             sigRcv = UBytes::asInstance(binder.get("signature")).get();
@@ -281,7 +281,7 @@ void HttpClient::execCommand(const byte_vector& callBin, std::function<void(byte
                 "command", "command",
                 "params", UBytes(session_->sessionKey->encrypt(callBin)),
                 "session_id", session_->sessionId);
-        sendRawRequest("/command", "POST", BossSerializer::serialize(cmdParams).get(), [this,onComplete{onComplete}](int respCode, byte_vector&& respBody){
+        sendBinRequest("/command", "POST", BossSerializer::serialize(cmdParams).get(), [this,onComplete{onComplete}](int respCode, byte_vector&& respBody){
             UBinder ansBinder = UBinder::asInstance(BossSerializer::deserialize(UBytes(std::move(respBody))));
             UBinder responseBinder = ansBinder.getBinder("response");
             byte_vector decrypted = session_->sessionKey->decrypt(UBytes::asInstance(responseBinder.get("result")).get());
