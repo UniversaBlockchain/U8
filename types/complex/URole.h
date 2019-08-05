@@ -18,6 +18,8 @@ protected:
 
         virtual Role& getRole() = 0;
         virtual std::shared_ptr<Role> makeRoleSharedPtr() = 0;
+
+        Local<Object> serializeToV8(Isolate* isolate) override;
     };
 
 public:

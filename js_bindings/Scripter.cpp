@@ -14,6 +14,7 @@
 #include "pg_bindings.h"
 #include "web_bindings.h"
 #include "research_bindings.h"
+#include "boss_bindings.h"
 
 static const char *ARGV0 = nullptr;
 
@@ -177,6 +178,7 @@ void Scripter::initialize() {
     JsInitPGPool(pIsolate, global);
     JsInitNetwork(pIsolate, global);
     JsInitResearchBindings(pIsolate, global);
+    JsInitBossBindings(pIsolate, global);
 
     // Save context and wrap weak self:
     context.Reset(pIsolate, v8::Context::New(pIsolate, nullptr, global));

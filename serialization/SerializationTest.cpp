@@ -420,7 +420,7 @@ void testUListRole() {
             cout << "    ka: " << ka->toString() << endl;
     }
 
-    //TODO: work in progress
+    //TODO: check and test implementation UPrivateKey, UKeyRecord
 
     printf("testUListRole()...done\n\n");
 }

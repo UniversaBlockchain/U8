@@ -6,6 +6,9 @@
 #define UNITOOLS_UOBJECT_H
 
 #include <memory>
+#include <v8.h>
+
+using namespace v8;
 
 
 template<typename A, typename B> inline bool isInstanceOf(B *ptr) {
@@ -33,6 +36,10 @@ public:
     UData(bool empty) {
         this->empty = empty;
     }
+
+    virtual Local<Object> serializeToV8(Isolate* isolate) {
+        return Object::New(isolate);
+    };
 
 private:
     bool empty = false;
@@ -70,6 +77,10 @@ public:
     UObject() : ptr(std::make_shared<UData>(true)) {
 
     };
+
+    Local<Object> serializeToV8(Isolate* isolate) const {
+        return ptr.get()->serializeToV8(isolate);
+    }
 
 };
 

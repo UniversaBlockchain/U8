@@ -49,3 +49,9 @@ Role& URole::getRole() {
 std::shared_ptr<Role> URole::makeRoleSharedPtr() {
     return data<URoleData>().makeRoleSharedPtr();
 }
+
+Local<Object> URole::URoleData::serializeToV8(Isolate* isolate) {
+    auto res = UData::serializeToV8(isolate);
+    getRole().serializeToV8(isolate, res);
+    return res;
+}
