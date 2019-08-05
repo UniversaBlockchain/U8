@@ -19,7 +19,7 @@ class MainInit {
 public:
     MainInit() {
         initCrypto();
-        asyncio::initAndRunLoop();
+        asyncio::initAndRunLoop(5ms);
     }
 } mainInit_g;
 

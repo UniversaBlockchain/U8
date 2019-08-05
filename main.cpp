@@ -33,7 +33,7 @@ int main(int argc, const char **argv) {
 
     signal(SIGSEGV, handler);   // install our handler
     crypto::initCrypto();
-    asyncio::initAndRunLoop();
+    asyncio::initAndRunLoop(5ms);
 
     if (argc == 2 && strcmp(argv[1], "--selftest") == 0) {
         testCryptoAll();

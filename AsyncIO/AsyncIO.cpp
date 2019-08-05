@@ -12,14 +12,16 @@ namespace asyncio {
     uv_async_t exitHandle;
     uv_async_t alarmHandle;
     uv_thread_t thread_loop;
+    std::chrono::microseconds asyncLoopPeriod;
 
     //===========================================================================================
     // Main functions implementation
     //===========================================================================================
 
-    ioLoop* initAndRunLoop() {
+    ioLoop* initAndRunLoop(std::chrono::microseconds period) {
 
         umask(000);
+        asyncLoopPeriod = period;
 
         if (!asyncLoop) {
             asyncLoop = (uv_loop_t*) malloc(sizeof(uv_loop_t));

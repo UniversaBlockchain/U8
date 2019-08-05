@@ -39,6 +39,11 @@ namespace asyncio {
     extern uv_async_t alarmHandle;
 
     /**
+     * Period for check asynchronous loop queue.
+     */
+    extern std::chrono::microseconds asyncLoopPeriod;
+
+    /**
      * Asynchronous request for file operations.
      */
     typedef uv_fs_t ioHandle;
@@ -84,8 +89,10 @@ namespace asyncio {
     /**
      * Init and run main asynchronous loop.
      * Must be called before asynchronous method calls.
+     *
+     * @param period for check asynchronous loop queue.
      */
-    ioLoop* initAndRunLoop();
+    ioLoop* initAndRunLoop(std::chrono::microseconds period = 5ms);
 
     /**
      * Get handle of main asynchronous loop.
