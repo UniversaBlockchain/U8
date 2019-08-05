@@ -466,7 +466,8 @@ class Constraint extends bs.BiSerializable {
                             leftOperandContract = checkedContract;
 
                     if (leftOperandContract == null)
-                        throw new ex.IllegalArgumentError("Not found referenced contract for constraint: " + leftOperand.substring(0, firstPointPos));
+                        return false;
+                        //throw new ex.IllegalArgumentError("Not found referenced contract for constraint: " + leftOperand.substring(0, firstPointPos));
 
                     leftOperand = leftOperand.substring(firstPointPos + 1);
                 } else
@@ -494,7 +495,8 @@ class Constraint extends bs.BiSerializable {
                                 leftOperandContract = checkedContract;
 
                         if (leftOperandContract == null)
-                            throw new ex.IllegalArgumentError("Not found referenced contract for constraint: " + leftOperand);
+                            return false;
+                            //throw new ex.IllegalArgumentError("Not found referenced contract for constraint: " + leftOperand);
                     }
                 } else if (leftOperand === "now")
                     left = new Date();
@@ -544,13 +546,30 @@ class Constraint extends bs.BiSerializable {
                 right = rightOperandContract.get(rightOperand);
 
             if (leftExpression != null) {
-                left = this.evaluateExpression(leftExpression, refContract, contracts, iteration);
+                try {
+                    left = this.evaluateExpression(leftExpression, refContract, contracts, iteration);
+                } catch (e) {
+                    if (e instanceof ex.IllegalArgumentError && ~e.toString().indexOf("Not found referenced contract for constraint"))
+                        return false;
+                    else
+                        throw e;
+                }
+
                 typeOfLeftOperand = compareOperandType.FIELD;
                 if (left instanceof BigDecimal)
                     isBigDecimalConversion = true;
             }
+
             if (rightExpression != null) {
-                right = this.evaluateExpression(rightExpression, refContract, contracts, iteration);
+                try {
+                    right = this.evaluateExpression(rightExpression, refContract, contracts, iteration);
+                } catch (e) {
+                    if (e instanceof ex.IllegalArgumentError && ~e.toString().indexOf("Not found referenced contract for constraint"))
+                        return false;
+                    else
+                        throw e;
+                }
+
                 typeOfRightOperand = compareOperandType.FIELD;
                 if (right instanceof BigDecimal)
                     isBigDecimalConversion = true;
@@ -794,7 +813,10 @@ class Constraint extends bs.BiSerializable {
 
                         break;
                     case CAN_PLAY:
-                        if (right == null || !(right instanceof roles.Role))
+                        if (right == null)
+                            return false;
+
+                        if (!(right instanceof roles.Role))
                             throw new ex.IllegalArgumentError("Expected role in condition in right operand: " + rightOperand);
 
                         let keys;

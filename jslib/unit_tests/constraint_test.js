@@ -493,6 +493,10 @@ unit.test("constraint test: checkConstraintsBetweenContracts", async () => {
     assert(!refContract1.constraints.get("ref_cont_inherit").matchingItems.has(contract2));
     assert(!refContract1.constraints.get("ref_cont_inherit").matchingItems.has(contract3));
 
+    assert(refContract1.constraints.get("ref_null").matchingItems.size === 0);
+
+    assert(refContract1.constraints.get("ref_cont_null").matchingItems.size === 0);
+
     assert(refContract2.constraints.get("ref_cont3").matchingItems.has(contract1));
     assert(refContract2.constraints.get("ref_cont3").matchingItems.has(contract2));
     assert(refContract2.constraints.get("ref_cont3").matchingItems.has(refContract2));
@@ -536,6 +540,10 @@ unit.test("constraint test: checkConstraintsBetweenContractsAPILevel4", async ()
     assert(refContract1.constraints.get("ref_cont_inherit").matchingItems.has(refContract1));
     assert(!refContract1.constraints.get("ref_cont_inherit").matchingItems.has(contract2));
     assert(!refContract1.constraints.get("ref_cont_inherit").matchingItems.has(contract3));
+
+    assert(refContract1.constraints.get("ref_null").matchingItems.size === 0);
+
+    assert(refContract1.constraints.get("ref_cont_null").matchingItems.size === 0);
 
     assert(refContract2.constraints.get("ref_cont3").matchingItems.has(contract1));
     assert(refContract2.constraints.get("ref_cont3").matchingItems.has(contract2));
