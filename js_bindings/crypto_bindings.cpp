@@ -19,6 +19,7 @@ using namespace crypto;
 static Persistent<FunctionTemplate> publicKeyTpl;
 static Persistent<FunctionTemplate> privateKeyTpl;
 static Persistent<FunctionTemplate> hashIdTpl;
+static Persistent<FunctionTemplate> keyAddressTpl;
 
 static void privateKeySign(const FunctionCallbackInfo<Value> &args) {
     Scripter::unwrapArgs(args, [&](ArgsContext &ac) {
@@ -368,6 +369,8 @@ Local<FunctionTemplate> initKeyAddress(Isolate *isolate) {
     prototype->Set(isolate, "toString", FunctionTemplate::New(isolate, keyAddressToString));
     prototype->Set(isolate, "getPacked", FunctionTemplate::New(isolate, keyAddressGetPacked));
     prototype->Set(isolate, "match", FunctionTemplate::New(isolate, keyAddressMatch));
+
+    keyAddressTpl.Reset(isolate, tpl);
     return tpl;
 }
 
@@ -557,4 +560,8 @@ void JsInitCrypto(Isolate *isolate, const Local<ObjectTemplate> &global) {
 
 v8::Local<v8::Value> wrapHashId(v8::Isolate* isolate, crypto::HashId* hashId) {
     return wrap(hashIdTpl, isolate, hashId, true);
+}
+
+v8::Local<v8::Value> wrapKeyAddres(v8::Isolate* isolate, crypto::KeyAddress* keyAddress) {
+    return wrap(keyAddressTpl, isolate, keyAddress, true);
 }

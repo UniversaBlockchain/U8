@@ -8,6 +8,7 @@
 #include "../UObject.h"
 #include "../UBinder.h"
 #include "../../crypto/KeyAddress.h"
+#include "../../js_bindings/crypto_bindings.h"
 
 class UKeyAddress: public UObject {
 private:
@@ -16,6 +17,11 @@ private:
         UKeyAddressData();
         UKeyAddressData(const crypto::KeyAddress &val);
         ~UKeyAddressData() = default;
+
+        Local<Object> serializeToV8(Isolate* isolate) override {
+            auto res = wrapKeyAddres(isolate, new crypto::KeyAddress(*keyAddress.get()));
+            return Local<Object>::Cast(res);
+        }
 
         std::shared_ptr<crypto::KeyAddress> keyAddress;
     };
