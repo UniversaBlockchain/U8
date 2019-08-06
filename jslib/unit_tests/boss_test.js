@@ -43,10 +43,15 @@ unit.test("boss_test: array of HashId", async () => {
 });
 
 unit.test("boss_test: array of KeyAddress", async () => {
+    let arrPk = [];
     let arr0 = [];
-    let pk = tk.TestKeys.getKey();
-    for (let i = 0; i < 100; ++i)
-        arr0.push((i % 2 === 0) ? pk.shortAddress : pk.longAddress);
+    for (let i = 0; i < 10; ++i)
+        arr0.push(new Promise(async resolve => {
+            let pk = await crypto.PrivateKey.generate(2048);
+            arrPk[i] = pk.publicKey;
+            resolve((i % 2 === 0) ? pk.shortAddress : pk.longAddress);
+        }));
+    arr0 = await Promise.all(arr0);
     let bin = Boss.dump(BossBiMapper.getInstance().serialize(arr0));
     let t0 = new Date().getTime();
     let arr = BossBiMapper.getInstance().deserialize(await Boss.asyncLoad(bin));
@@ -56,7 +61,25 @@ unit.test("boss_test: array of KeyAddress", async () => {
     for (let i = 0; i < arr.length; ++i) {
         assertSilent(arr[i].constructor.name === "KeyAddress");
         assertSilent(arr[i].__proto__ === crypto.KeyAddress.prototype);
-        assertSilent(arr[i].match(pk.publicKey));
+        assertSilent(arr[i].match(arrPk[i]));
         assertSilent(arr[i].toString() === arr0[i].toString());
+    }
+});
+
+unit.test("boss_test: array of PublicKeys", async () => {
+    let arr0 = [];
+    for (let i = 0; i < 10; ++i)
+        arr0.push(new Promise(async resolve => resolve((await crypto.PrivateKey.generate(2048)).publicKey)));
+    arr0 = await Promise.all(arr0);
+    let bin = Boss.dump(BossBiMapper.getInstance().serialize(arr0));
+    let t0 = new Date().getTime();
+    let arr = BossBiMapper.getInstance().deserialize(await Boss.asyncLoad(bin));
+    //let arr = BossBiMapper.getInstance().deserialize(Boss.load(bin));
+    let dt = new Date().getTime() - t0;
+    console.logPut("dt = " + dt + " ");
+    for (let i = 0; i < arr.length; ++i) {
+        assertSilent(arr[i].constructor.name === "PublicKeyImpl");
+        assertSilent(arr[i].__proto__ === crypto.PublicKey.prototype);
+        assertSilent(btoa(arr[i].fingerprints) === btoa(arr0[i].fingerprints));
     }
 });

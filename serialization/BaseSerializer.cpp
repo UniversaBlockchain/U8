@@ -86,11 +86,11 @@ UObject BaseSerializer::skipBaseTypes(const UObject& o) {
 #define complexTypes(functionName) \
     functionName(TestComplexObject, "TestComplexObject"); \
     functionName(UHashId, "HashId"); \
-    functionName(UKeyAddress, "KeyAddress");
+    functionName(UKeyAddress, "KeyAddress"); \
+    functionName(UPublicKey, "RSAPublicKey");
 //    functionName(UListRole, "ListRole"); \
 //    functionName(USimpleRole, "SimpleRole"); \
 //    functionName(UKeyRecord, "KeyRecord"); \
-//    functionName(UPublicKey, "PublicKey");
     // TODO: add other complex types
 
 UObject BaseSerializer::serialize(const UObject& o) {

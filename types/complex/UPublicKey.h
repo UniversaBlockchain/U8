@@ -8,6 +8,7 @@
 #include "../UObject.h"
 #include "../UBinder.h"
 #include "../../crypto/PublicKey.h"
+#include "../../js_bindings/crypto_bindings.h"
 
 class UPublicKey: public UObject {
 private:
@@ -15,7 +16,12 @@ private:
     public:
         UPublicKeyData();
         UPublicKeyData(const crypto::PublicKey &val);
-        ~UPublicKeyData() = default;
+        ~UPublicKeyData() override = default;
+
+        Local<Object> serializeToV8(Isolate* isolate) override {
+            auto res = wrapPublicKey(isolate, new crypto::PublicKey(*publicKey.get()));
+            return Local<Object>::Cast(res);
+        }
 
         std::shared_ptr<crypto::PublicKey> publicKey;
     };

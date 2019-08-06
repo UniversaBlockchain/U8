@@ -19,7 +19,7 @@ private:
         ~UKeyAddressData() = default;
 
         Local<Object> serializeToV8(Isolate* isolate) override {
-            auto res = wrapKeyAddres(isolate, new crypto::KeyAddress(*keyAddress.get()));
+            auto res = wrapKeyAddress(isolate, new crypto::KeyAddress(*keyAddress.get()));
             return Local<Object>::Cast(res);
         }
 

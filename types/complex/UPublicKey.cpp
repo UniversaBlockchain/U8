@@ -42,7 +42,7 @@ UBinder UPublicKey::decompose() {
 
 void UPublicKey::compose(const UBinder& data) {
     this->data<UPublicKeyData>().publicKey = std::make_shared<crypto::PublicKey>(
-            UBytes::asInstance(data.get("composite3")).get());
+            UBytes::asInstance(data.get("packed")).get());
 }
 
 crypto::PublicKey& UPublicKey::getPublicKey() {

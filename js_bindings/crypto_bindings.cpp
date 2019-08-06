@@ -562,6 +562,10 @@ v8::Local<v8::Value> wrapHashId(v8::Isolate* isolate, crypto::HashId* hashId) {
     return wrap(hashIdTpl, isolate, hashId, true);
 }
 
-v8::Local<v8::Value> wrapKeyAddres(v8::Isolate* isolate, crypto::KeyAddress* keyAddress) {
+v8::Local<v8::Value> wrapKeyAddress(v8::Isolate* isolate, crypto::KeyAddress* keyAddress) {
     return wrap(keyAddressTpl, isolate, keyAddress, true);
+}
+
+v8::Local<v8::Value> wrapPublicKey(v8::Isolate* isolate, crypto::PublicKey* publicKey) {
+    return wrap(publicKeyTpl, isolate, publicKey, true);
 }
