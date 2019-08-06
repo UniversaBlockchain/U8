@@ -555,4 +555,6 @@ void JsInitCrypto(Isolate *isolate, const Local<ObjectTemplate> &global) {
     global->Set(isolate, "btoa", FunctionTemplate::New(isolate, JsB2A));
 }
 
-
+v8::Local<v8::Value> wrapHashId(v8::Isolate* isolate, crypto::HashId* hashId) {
+    return wrap(hashIdTpl, isolate, hashId, true);
+}

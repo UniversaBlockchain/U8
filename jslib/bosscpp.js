@@ -1,7 +1,11 @@
 let roles = require("roles");
 
 function updateObjectProto(obj) {
-    if (obj.constructor.name !== "Object")
+    if (obj.constructor.name === "HashIdImpl") {
+        obj.__proto__ = crypto.HashId.prototype;
+        return;
+    }
+    if (obj.constructor.name !== "Object" && obj.constructor.name !== "Array")
         return;
     if (obj.__eval_v8ser != null) {
         eval(obj.__eval_v8ser);
