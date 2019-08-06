@@ -11,10 +11,13 @@
 class UDouble : public UObject {
 private:
     class UDoubleData : public UData {
-        public:
-            UDoubleData(double v);
+    public:
+        UDoubleData(double v);
+        ~UDoubleData() override = default;
 
-            ~UDoubleData() = default;
+        Local<Object> serializeToV8(Isolate* isolate) override {
+            return Local<Object>::Cast(Number::New(isolate, value));
+        }
 
         double value;
     };

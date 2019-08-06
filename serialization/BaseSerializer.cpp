@@ -85,12 +85,12 @@ UObject BaseSerializer::skipBaseTypes(const UObject& o) {
 // Macros for all complex types serialization/deserialization
 #define complexTypes(functionName) \
     functionName(TestComplexObject, "TestComplexObject"); \
-    functionName(UHashId, "HashId"); \
-    functionName(UListRole, "ListRole"); \
-    functionName(USimpleRole, "SimpleRole"); \
-    functionName(UKeyAddress, "KeyAddress"); \
-    functionName(UKeyRecord, "KeyRecord"); \
-    functionName(UPublicKey, "PublicKey");
+//    functionName(UHashId, "HashId"); \
+//    functionName(UListRole, "ListRole"); \
+//    functionName(USimpleRole, "SimpleRole"); \
+//    functionName(UKeyAddress, "KeyAddress"); \
+//    functionName(UKeyRecord, "KeyRecord"); \
+//    functionName(UPublicKey, "PublicKey");
     // TODO: add other complex types
 
 UObject BaseSerializer::serialize(const UObject& o) {

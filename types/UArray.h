@@ -14,11 +14,19 @@ class UArray : public UObject {
 
 private:
     class UArrayData : public UData {
-        public:
-            UArrayData(std::initializer_list<UObject> ilist);
-            UArrayData();
-            ~UArrayData();
-            std::vector<UObject> array;
+    public:
+        UArrayData(std::initializer_list<UObject> ilist);
+        UArrayData();
+        ~UArrayData() override;
+
+        Local<Object> serializeToV8(Isolate *isolate) override {
+            auto res = Array::New(isolate);
+            for (auto it: array)
+                res->Set(res->Length(), it.serializeToV8(isolate));
+            return res;
+        };
+
+        std::vector<UObject> array;
     };
 
 public:

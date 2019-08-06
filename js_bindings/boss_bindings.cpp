@@ -16,8 +16,7 @@ void JsBossAsyncLoad(const v8::FunctionCallbackInfo<v8::Value> &args) {
                 memcpy(&bin[0], buffer->data(), buffer->size());
                 UObject obj = BossSerializer::deserialize(UBytes(move(bin)));
                 onReady->lockedContext([=](Local<Context> &cxt) {
-                    auto ab = obj.serializeToV8(onReady->isolate());
-                    onReady->invoke(ab);
+                    onReady->invoke(obj.serializeToV8(onReady->isolate()));
                 });
             });
             return;

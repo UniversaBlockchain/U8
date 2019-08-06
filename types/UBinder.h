@@ -17,11 +17,19 @@ class UBinder : public UObject {
 
 private:
     class UBinderData : public UData {
-        public:
-            UBinderData(std::initializer_list<std::map<std::string,UObject>::value_type> ilist);
-            UBinderData();
-            ~UBinderData();
-            std::map<std::string,UObject> binder;
+    public:
+        UBinderData(std::initializer_list<std::map<std::string, UObject>::value_type> ilist);
+        UBinderData();
+        ~UBinderData() override;
+
+        Local<Object> serializeToV8(Isolate *isolate) override {
+            auto res = Object::New(isolate);
+            for (auto it: binder)
+                res->Set(String::NewFromUtf8(isolate, it.first.data()), it.second.serializeToV8(isolate));
+            return res;
+        };
+
+        std::map<std::string, UObject> binder;
     };
 
     template <typename T> const T& get(const std::string& key) const;

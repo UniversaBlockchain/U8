@@ -12,10 +12,14 @@
 class UString : public UObject {
 private:
     class UStringData : public UData {
-        public:
-            UStringData(const std::string& v);
+    public:
+        UStringData(const std::string &v);
+        ~UStringData() override = default;
 
-            ~UStringData() = default;
+        Local<Object> serializeToV8(Isolate *isolate) override {
+            auto res = Local<Object>::Cast(String::NewFromUtf8(isolate, value.data()));
+            return res;
+        };
 
         std::string value;
     };

@@ -7,17 +7,22 @@
 
 #include <memory>
 #include <vector>
+#include <cstring>
 #include "UObject.h"
 
 class UBytes : public UObject {
 private:
     class UBytesData : public UData {
-        public:
-            UBytesData(const unsigned char* v, unsigned int size);
-            UBytesData();
+    public:
+        UBytesData(const unsigned char *v, unsigned int size);
+        UBytesData();
+        ~UBytesData() override = default;
 
-            ~UBytesData() {
-            };
+        Local<Object> serializeToV8(Isolate *isolate) override {
+            auto ab = ArrayBuffer::New(isolate, value.size());
+            memcpy(ab->GetContents().Data(), &value[0], value.size());
+            return Uint8Array::New(ab, 0, value.size());
+        };
 
         std::vector<unsigned char> value;
     };

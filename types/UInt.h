@@ -11,10 +11,13 @@
 class UInt : public UObject {
 private:
     class UIntData : public UData {
-        public:
-            UIntData(int64_t v);
+    public:
+        UIntData(int64_t v);
+        ~UIntData() override = default;
 
-            ~UIntData() = default;
+        Local<Object> serializeToV8(Isolate* isolate) override {
+            return Local<Object>::Cast(Number::New(isolate, value));
+        }
 
         int64_t value;
     };

@@ -11,10 +11,13 @@
 class UBool : public UObject {
 private:
     class UBoolData : public UData {
-        public:
-            UBoolData(bool v);
+    public:
+        UBoolData(bool v);
+        ~UBoolData() = default;
 
-            ~UBoolData() = default;
+        Local<Object> serializeToV8(Isolate* isolate) override {
+            return Local<Object>::Cast(Boolean::New(isolate, value));
+        }
 
         bool value;
     };
