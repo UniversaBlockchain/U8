@@ -8,6 +8,7 @@
 #include <set>
 #include <map>
 #include <string>
+#include <v8.h>
 #include "ISerializableV8.h"
 #include "KeyRecord.h"
 #include "../tools/tools.h"
