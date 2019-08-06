@@ -693,6 +693,139 @@ unit.test("pg_test: performance: select line-by-line vs array in 'where'", async
     pool.close();
 });
 
+unit.test("pg_test: performance: update line-by-line vs multi update", async () => {
+    let ROWS_COUNT = 400;
+    let BUF_SIZE = 20;
+    let testResult = "";
+    let pool = createPool(4);
+    let readyCounter = 0;
+    let resolver;
+    let promise = new Promise((resolve, reject) => {
+        resolver = resolve;
+    });
+
+    let hashes = [];
+    for (let i = 0; i < ROWS_COUNT; ++i)
+        hashes.push(crypto.HashId.of(randomBytes(16)).digest);
+
+    let hashes_old = [];
+    for (let i = 0; i < ROWS_COUNT; ++i)
+        hashes_old.push(crypto.HashId.of(randomBytes(16)).digest);
+
+    await recreateTestTable();
+
+    // fill table
+    for (let i = 0; i < ROWS_COUNT; ++i) {
+        pool.withConnection(con => {
+            con.executeUpdate(affectedRows => {
+                    readyCounter += 1;
+                    con.release();
+                    if (readyCounter >= ROWS_COUNT)
+                        resolver();
+                }, e => {
+                    con.release();
+                    throw Error(e);
+                }, "INSERT INTO table1(hash,state,locked_by_id,created_at,expires_at) VALUES (?, ?, 0, ?, ?)",
+                hashes_old[i], 4, (new Date().getTime()/1000).toFixed(0),
+                (new Date().getTime()/1000 + 31536000).toFixed(0));
+        });
+    }
+    await promise;
+
+    readyCounter = 0;
+    promise = new Promise((resolve, reject) => {
+        resolver = resolve;
+    });
+
+    let t0 = new Date().getTime();
+    for (let i = 0; i < ROWS_COUNT; ++i) {
+        pool.withConnection(con => {
+            con.executeUpdate(affectedRows => {
+                    readyCounter += 1;
+                    con.release();
+                    if (readyCounter >= ROWS_COUNT)
+                        resolver();
+                }, e => {
+                    con.release();
+                    throw Error(e);
+                }, "UPDATE table1 SET hash = ?, state = ?, locked_by_id = ?, created_at = ?, expires_at = ? WHERE hash = ?",
+                hashes[i], 3, 100, (new Date().getTime()/1000 + 10000).toFixed(0),
+                (new Date().getTime()/1000 + 41536000).toFixed(0), hashes_old[i]);
+        });
+    }
+    await promise;
+    let dt = new Date().getTime() - t0;
+    testResult += "line by line: " + dt + " ms";
+
+    await recreateTestTable();
+
+    // fill table
+    readyCounter = 0;
+    promise = new Promise((resolve, reject) => {
+        resolver = resolve;
+    });
+
+    for (let i = 0; i < ROWS_COUNT; ++i) {
+        pool.withConnection(con => {
+            con.executeUpdate(affectedRows => {
+                    readyCounter += 1;
+                    con.release();
+                    if (readyCounter >= ROWS_COUNT)
+                        resolver();
+                }, e => {
+                    con.release();
+                    throw Error(e);
+                }, "INSERT INTO table1(hash,state,locked_by_id,created_at,expires_at) VALUES (?, ?, 0, ?, ?)",
+                hashes_old[i], 4, (new Date().getTime()/1000).toFixed(0),
+                (new Date().getTime()/1000 + 31536000).toFixed(0));
+        });
+    }
+    await promise;
+
+    readyCounter = 0;
+    promise = new Promise((resolve, reject) => {
+        resolver = resolve;
+    });
+
+    let t1 = new Date().getTime();
+    for (let i = 0; i < ROWS_COUNT/BUF_SIZE; ++i) {
+        pool.withConnection(con => {
+            let query = "UPDATE table1 SET hash = t.hash, state = t.state, locked_by_id = t.locked_by_id, " +
+                "created_at = t.created_at, expires_at = t.expires_at FROM (VALUES ";
+            let params = [];
+            for (let j = 0; j < BUF_SIZE; ++j) {
+                let buf = "(?::bytea,?::integer,?::integer,?::integer,?::bigint,?::bytea)";
+                params.push(hashes[i * BUF_SIZE + j]);
+                params.push(2);
+                params.push(200);
+                params.push((new Date().getTime()/1000 + 20000).toFixed(0));
+                params.push((new Date().getTime()/1000 + 51536000).toFixed(0));
+                params.push(hashes_old[i * BUF_SIZE + j]);
+                if (j > 0)
+                    query += ",";
+                query += buf;
+            }
+            query += ") AS t(hash, state, locked_by_id, created_at, expires_at, hash_old) WHERE table1.hash = t.hash_old";
+            con.executeUpdate(affectedRows => {
+                readyCounter += affectedRows;
+                con.release();
+                if (readyCounter >= ROWS_COUNT)
+                    resolver();
+            }, e => {
+                console.log("ERROR: " + e.toString());
+                con.release();
+                throw Error(e);
+            }, query, ...params);
+        });
+    }
+    await promise;
+    dt = new Date().getTime() - t1;
+    testResult += ", multi insert: " + dt + " ms ...";
+
+    console.logPut(testResult);
+    pool.close();
+});
+
 unit.test("pg_test: performance: multithreading", async () => {
     let ROWS_COUNT = 1000;
     let INSERT_BUF_SIZE = 100;
