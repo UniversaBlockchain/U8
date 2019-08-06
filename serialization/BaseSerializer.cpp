@@ -177,6 +177,8 @@ UObject BaseSerializer::deserialize(const UObject& o) {
 
         // Complex types
         complexTypes(deserializeComplex)
+
+        return binder;
     }
 
     throw std::invalid_argument(std::string("Unknown object type for deserialization: ") + typeid(o).name() + ", type=" + type);
