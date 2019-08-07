@@ -64,7 +64,7 @@ unit.test("transactionPack packing test", async () => {
 
     await c1.seal();
 
-    let bb = c1.getPackedTransaction();
+    let bb = await c1.getPackedTransaction();
 
     let c2 = cnt.Contract.fromPackedTransaction(bb);
 

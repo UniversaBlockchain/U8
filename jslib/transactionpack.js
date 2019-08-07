@@ -161,9 +161,9 @@ class TransactionPack {
         return serializer.serialize(res);
     }
 
-    pack() {
+    async pack() {
         if(this.packedBinary === null) {
-            this.packedBinary = Boss.dump(BossBiMapper.getInstance().serialize(this));
+            this.packedBinary = await Boss.dump(BossBiMapper.getInstance().serialize(this));
         }
         return this.packedBinary;
     }

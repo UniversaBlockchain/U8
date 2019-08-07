@@ -539,7 +539,7 @@ class Contract extends bs.BiSerializable {
         this.quantiser = new Quantiser();
     }
 
-    setOwnBinary(result) {
+    async setOwnBinary(result) {
         let tpBackup = null;
         if(this.transactionPack != null && this.transactionPack.contract === this) {
             tpBackup = this.transactionPack;
@@ -550,7 +550,7 @@ class Contract extends bs.BiSerializable {
         } else {
             delete  result.salt;
         }
-        this.sealedBinary = Boss.dump(result);
+        this.sealedBinary = await Boss.dump(result);
         this.id = crypto.HashId.of(this.sealedBinary);
         if(tpBackup == null) {
             this.transactionPack = null;
@@ -757,7 +757,7 @@ class Contract extends bs.BiSerializable {
             }
         );
 
-        let contractBytes = Boss.dump(forPack);
+        let contractBytes = await Boss.dump(forPack);
 
         let signatures = [];
         let result = {
@@ -766,7 +766,7 @@ class Contract extends bs.BiSerializable {
             data: contractBytes,
             signatures: signatures
         };
-        this.setOwnBinary(result);
+        await this.setOwnBinary(result);
 
         await this.addSignatureToSeal(this.keysToSignWith);
 
@@ -946,7 +946,7 @@ class Contract extends bs.BiSerializable {
             this.sealedByKeys.set(publicKey, es);
         }
 
-        this.setOwnBinary(data);
+        await this.setOwnBinary(data);
     }
 
     equals(to) {
@@ -2191,7 +2191,7 @@ class Contract extends bs.BiSerializable {
      *
      * @return {number[]} packed binary form.
      */
-    getPackedTransaction() {
+    async getPackedTransaction() {
         if (this.transactionPack == null)
             this.transactionPack = new TransactionPack(this);
         return this.transactionPack.pack();

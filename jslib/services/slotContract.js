@@ -234,9 +234,9 @@ class SlotContract extends NSmartContract {
      *
      * @param {Contract} c is revision of tracking {@link Contract}.
      */
-    putTrackingContract(c) {
+    async putTrackingContract(c) {
         this.trackingContracts.unshift(c);
-        this.packedTrackingContracts.unshift(c.getPackedTransaction());
+        this.packedTrackingContracts.unshift(await c.getPackedTransaction());
 
         this.updateTrackingContracts();
     }
@@ -374,10 +374,10 @@ class SlotContract extends NSmartContract {
         newContractIds.forEach(id => me.createContractSubscription(id, newExpires));
     }
 
-    onContractSubscriptionEvent(event) {
+    async onContractSubscriptionEvent(event) {
         if (event instanceof ApprovedEvent) {
             // recreate subscription:
-            this.putTrackingContract(event.getNewRevision());
+            await this.putTrackingContract(event.getNewRevision());
             this.saveTrackingContractsToState();
 
             // and save new

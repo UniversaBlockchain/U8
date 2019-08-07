@@ -352,7 +352,7 @@ network.HttpServer = class {
             }
             let results = await Promise.all(promises);
             for (let i = 0; i < length; ++i) {
-                reqBuf.setAnswer(i, Boss.dump(DefaultBiMapper.getInstance().serialize(results[i])));
+                reqBuf.setAnswer(i, await Boss.dump(DefaultBiMapper.getInstance().serialize(results[i])));
             }
         });
     }
@@ -399,12 +399,12 @@ network.HttpServer = class {
         this.httpServer_.__addEndpoint(endpoint);
         this.endpoints_.set(endpoint, async (request)=>{
             try {
-                request.setAnswerBody(Boss.dump({
+                request.setAnswerBody(await Boss.dump({
                     "result": "ok",
                     "response": await block(request)
                 }));
             } catch (e) {
-                request.setAnswerBody(Boss.dump({
+                request.setAnswerBody(await Boss.dump({
                     "result": "error",
                     "error": e.message,
                     "errorClass": e.constructor.name
@@ -544,8 +544,8 @@ network.HttpClient = class {
         this.httpClient_.__sendRawRequestUrl(reqId, url, method, extHeaders, utf8Encode(bodyStr));
     }
 
-    command(name, params, onComplete, onError) {
-        let paramsBin = Boss.dump(DefaultBiMapper.getInstance().serialize({"command": name, "params": params}));
+    async command(name, params, onComplete, onError) {
+        let paramsBin = await Boss.dump(DefaultBiMapper.getInstance().serialize({"command": name, "params": params}));
         let reqId = this.getReqId();
         this.callbacks_.set(reqId, (decrypted) => {
             let binder = DefaultBiMapper.getInstance().deserialize(Boss.load(decrypted));

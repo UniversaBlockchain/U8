@@ -21,7 +21,7 @@ unit.test("slot_test: goodSlotContract", async () => {
 
     assert(slotContract instanceof SlotContract);
 
-    slotContract.putTrackingContract(simpleContract);
+    await slotContract.putTrackingContract(simpleContract);
     slotContract.nodeInfoProvider = tt.createNodeInfoProvider();
     slotContract.newItems.add(paymentDecreased);
 
@@ -59,7 +59,7 @@ unit.test("slot_test: goodSlotContractFromDSL", async () => {
 
     assert(slotContract instanceof SlotContract);
 
-    slotContract.putTrackingContract(simpleContract);
+    await slotContract.putTrackingContract(simpleContract);
     slotContract.nodeInfoProvider = tt.createNodeInfoProvider();
     slotContract.newItems.add(paymentDecreased);
 
@@ -97,7 +97,7 @@ unit.test("slot_test: serializeSlotContract", async () => {
 
     assert(slotContract instanceof SlotContract);
 
-    slotContract.putTrackingContract(simpleContract);
+    await slotContract.putTrackingContract(simpleContract);
     slotContract.nodeInfoProvider = tt.createNodeInfoProvider();
     slotContract.newItems.add(paymentDecreased);
 
@@ -167,7 +167,7 @@ unit.test("slot_test: keepRevisions", async () => {
 
     assert(slotContract instanceof SlotContract);
 
-    slotContract.putTrackingContract(simpleContract);
+    await slotContract.putTrackingContract(simpleContract);
     slotContract.nodeInfoProvider = tt.createNodeInfoProvider();
     slotContract.setKeepRevisions(2);
     slotContract.newItems.add(paymentDecreased);
@@ -188,7 +188,7 @@ unit.test("slot_test: keepRevisions", async () => {
     let simpleContract2 = simpleContract.createRevision([key]);
     await simpleContract2.seal(true);
 
-    slotContract.putTrackingContract(simpleContract2);
+    await slotContract.putTrackingContract(simpleContract2);
 
     await slotContract.seal(true);
     assert(await slotContract.check());
@@ -208,7 +208,7 @@ unit.test("slot_test: keepRevisions", async () => {
 
     await simpleContract3.seal(true);
 
-    slotContract.putTrackingContract(simpleContract3);
+    await slotContract.putTrackingContract(simpleContract3);
 
     await slotContract.seal(true);
     assert(await slotContract.check());

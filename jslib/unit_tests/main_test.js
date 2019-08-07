@@ -169,11 +169,11 @@ unit.test("main_test: sendHttpRequests", async () => {
     let contract = Contract.fromPrivateKey(tk.TestKeys.getKey());
     await contract.seal();
 
-    await main.ledger.saveContractInStorage(contract.id, contract.getPackedTransaction(), contract.getExpiresAt(), contract.getOrigin(), 0);
+    await main.ledger.saveContractInStorage(contract.id, await contract.getPackedTransaction(), contract.getExpiresAt(), contract.getOrigin(), 0);
 
-    httpClient.sendGetRequest("/contracts/" + contract.id.base64, (respCode, body) => {
+    httpClient.sendGetRequest("/contracts/" + contract.id.base64, async (respCode, body) => {
         assert(respCode === 200);
-        assert(contract.getPackedTransaction().equals(body));
+        assert(await contract.getPackedTransaction().equals(body));
 
         fire[1]();
     });

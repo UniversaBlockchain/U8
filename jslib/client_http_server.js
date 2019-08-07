@@ -104,12 +104,12 @@ class ClientHTTPServer extends network.HttpServer {
             if (this.envCache != null) {
                 let nie = this.envCache.get(id);
                 if (nie != null)
-                    data = Boss.dump(nie);
+                    data = await Boss.dump(nie);
             }
 
             let nie = await this.node.ledger.getEnvironment(id);
             if (nie != null)
-                data = Boss.dump(nie);
+                data = await Boss.dump(nie);
 
             if (data != null) {
                 // contracts are immutable: cache forever
@@ -139,8 +139,8 @@ class ClientHTTPServer extends network.HttpServer {
             };
 
             if (request.queryParamsMap.get("sign")) {
-                result.nodesPacked = Boss.dump(nodes);
-                result.signature = await ExtendedSignature.sign(this.nodeKey, Boss.dump(nodes));
+                result.nodesPacked = await Boss.dump(nodes);
+                result.signature = await ExtendedSignature.sign(this.nodeKey, await Boss.dump(nodes));
                 delete result.nodes;
             }
 
@@ -166,7 +166,7 @@ class ClientHTTPServer extends network.HttpServer {
                     });
                 });
 
-            let packedData = Boss.dump({
+            let packedData = await Boss.dump({
                 version: NODE_VERSION,
                 number: this.node.number,
                 nodes: nodes
@@ -277,7 +277,7 @@ class ClientHTTPServer extends network.HttpServer {
         if (nr != null) {
             let env = await this.node.ledger.getEnvironment(nr.environmentId);
             if (env != null)
-                return {packedContract: env.contract.getPackedTransaction()};
+                return {packedContract: await env.contract.getPackedTransaction()};
         }
 
         return {};
@@ -309,7 +309,7 @@ class ClientHTTPServer extends network.HttpServer {
             let record = await this.node.ledger.getRecord(itemId);
             await this.node.ledger.putKeptItem(record, item);
 
-            return {packedContract: item.getPackedTransaction()};
+            return {packedContract: await item.getPackedTransaction()};
         }
 
         return {};
@@ -698,7 +698,7 @@ class ClientHTTPServer extends network.HttpServer {
         return res;
     }
 
-    proxy(params, clientKey) {
+    async proxy(params, clientKey) {
         this.checkNode(clientKey, true);
 
         let url = t.getOrThrow(params, "url");
@@ -711,7 +711,7 @@ class ClientHTTPServer extends network.HttpServer {
                 let err = {response: "Access denied. Command 'command' is not allowed with 'proxy', use 'proxyCommand' instead."};
                 return {
                     responseCode: 403,
-                    result: Boss.dump({result: "error", response: err})
+                    result: await Boss.dump({result: "error", response: err})
                 };
             } else {
                 //TODO: BasicHttpClient.requestRaw
@@ -727,7 +727,7 @@ class ClientHTTPServer extends network.HttpServer {
             let err = {response: "Access denied. Url '" + url + "' is not found in network topology."};
             return {
                 responseCode: 403,
-                result: Boss.dump({result: "error", response: err})
+                result: await Boss.dump({result: "error", response: err})
             };
         }
     }

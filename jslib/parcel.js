@@ -104,10 +104,10 @@ class Parcel extends bs.BiSerializable {
         return null;
     }
 
-    serialize(serializer) {
+    async serialize(serializer) {
         return {
-            "payload": this.payload.pack(),
-            "payment": this.payment.pack(),
+            "payload": await this.payload.pack(),
+            "payment": await this.payment.pack(),
             "hashId": serializer.serialize(this.hashId)
         };
     }
@@ -125,9 +125,9 @@ class Parcel extends bs.BiSerializable {
      *
      * @return {Uint8Array} a packed binary
      */
-    pack() {
+    async pack() {
         if (this.packedBinary == null)
-            this.packedBinary = Boss.dump(BossBiMapper.getInstance().serialize(this));
+            this.packedBinary = await Boss.dump(BossBiMapper.getInstance().serialize(this));
         return this.packedBinary;
     }
 

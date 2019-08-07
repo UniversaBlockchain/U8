@@ -4,7 +4,7 @@ let _boss = require("boss.min");
 let _bosscpp = require("bosscpp");
 
 module.exports = {
-    dump(data) {
+    async dump(data) {
         return new _boss().dump(data);
     },
 

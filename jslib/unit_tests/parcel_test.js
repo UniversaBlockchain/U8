@@ -96,8 +96,8 @@ unit.test("parcel_test: serializeDeserialize", async () => {
 unit.test("parcel_test: packUnpack", async () => {
     let [parcel, parcelFromFile] = await createTestParcels();
 
-    let desParcel = Parcel.unpack(parcel.pack());
-    let desParcelFromFile = Parcel.unpack(parcelFromFile.pack());
+    let desParcel = Parcel.unpack(await parcel.pack());
+    let desParcelFromFile = Parcel.unpack(await parcelFromFile.pack());
 
     parcelAssertions(parcel, desParcel);
     parcelAssertions(parcelFromFile, desParcelFromFile);

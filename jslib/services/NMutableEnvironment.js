@@ -101,7 +101,7 @@ class NMutableEnvironment extends NImmutableEnvironment {
 
     async save(connection = undefined) {
         await this.ledger.updateEnvironment(this.id, this.contract.getExtendedType(), this.contract.id,
-            Boss.dump(this.kvStore), this.contract.getPackedTransaction(), connection);
+            await Boss.dump(this.kvStore), await this.contract.getPackedTransaction(), connection);
 
         await Promise.all(Array.from(this.subscriptionsToDestroy).map(
             async(sub) => await this.ledger.removeEnvironmentSubscription(sub.id, connection)

@@ -71,13 +71,13 @@ async function testContract() {
 
     let privateBytes = await (await io.openRead("../test/pregenerated_key.private.unikey")).allBytes();
     let privateKey = new crypto.PrivateKey(privateBytes);
-    let es = ExtendedSignature.verify(privateKey.publicKey,ExtendedSignature.sign(privateKey,sealed),sealed)
+    let es = await ExtendedSignature.verify(privateKey.publicKey, await ExtendedSignature.sign(privateKey,sealed),sealed);
     assert(es !== null);
 
     let c = Contract.fromPrivateKey(privateKey);
     await c.seal();
     c.transactionPack = new TransactionPack(c);
-    let tp = c.transactionPack.pack();
+    let tp = await c.transactionPack.pack();
 
     let c2 = TransactionPack.unpack(tp).contract;
     await c2.check();

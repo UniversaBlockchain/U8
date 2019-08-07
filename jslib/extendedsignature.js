@@ -35,14 +35,14 @@ class ExtendedSignature {
         if(typeof savePublicKey === "undefined")
             savePublicKey = true;
 
-        let targetSignature = ExtendedSignature.createTargetSignature(privateKey.publicKey,data,savePublicKey);
+        let targetSignature = await ExtendedSignature.createTargetSignature(privateKey.publicKey,data,savePublicKey);
 
         return ExtendedSignature.of(targetSignature,
             await privateKey.sign(targetSignature, crypto.SHA512),
             await privateKey.sign(targetSignature, crypto.SHA3_384));
     }
 
-    static createTargetSignature(publicKey, data, savePublicKey) {
+    static async createTargetSignature(publicKey, data, savePublicKey) {
         let result = {
             key: publicKey.fingerprints,
             sha512: crypto.digest(crypto.SHA512,data),
@@ -53,11 +53,11 @@ class ExtendedSignature {
         if (savePublicKey)
             result.pub_key = publicKey.packed;
 
-        return Boss.dump(result);
+        return await Boss.dump(result);
     }
 
-    static of(targetSignature, sign, sign3) {
-        return Boss.dump({ exts: targetSignature, sign: sign, sign3: sign3});
+    static async of(targetSignature, sign, sign3) {
+        return await Boss.dump({ exts: targetSignature, sign: sign, sign3: sign3});
     }
 
     static async verify(key, signature, data) {

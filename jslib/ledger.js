@@ -1045,7 +1045,7 @@ class Ledger {
             let nsc = environment.contract;
             await this.removeEnvironment(nsc.id);
             let envId = await this.saveEnvironmentToStorage(nsc.getExtendedType(), nsc.id,
-                Boss.dump(environment.getMutable().kvStore), nsc.getPackedTransaction());
+                await Boss.dump(environment.getMutable().kvStore), await nsc.getPackedTransaction());
 
             await Promise.all(Array.from(environment.nameRecords()).map(async(nr)=> {
                 nr.environmentId = envId;
@@ -1315,13 +1315,13 @@ class Ledger {
      * @param {Date} keepTill - Time keep till.
      * @return {Promise<void> | void}
      */
-    putItem(record, item, keepTill) {
+    async putItem(record, item, keepTill) {
         if (!item instanceof Contract)
             return;
 
         return this.simpleUpdate("insert into items(id,packed,keepTill) values(?,?,?);", null,
             record.recordId,
-            item.getPackedTransaction(),
+            await item.getPackedTransaction(),
             Math.floor(keepTill.getTime() / 1000));
     }
 
@@ -1349,7 +1349,7 @@ class Ledger {
      * @param {db.SqlDriverConnection} con - Transaction connection. Optional.
      * @return {Promise<void> | void}
      */
-    putKeptItem(record, item, con = undefined) {
+    async putKeptItem(record, item, con = undefined) {
         if (!item instanceof Contract)
             return;
 
@@ -1358,7 +1358,7 @@ class Ledger {
             record.recordId,
             item.getOrigin().digest,
             item.parent != null ? item.parent.digest : null,
-            item.getPackedTransaction()
+            await item.getPackedTransaction()
         );
     }
 
@@ -1671,7 +1671,7 @@ class Ledger {
 
         if (nim == null) {
             let envId = await this.saveEnvironmentToStorage(smartContract.getExtendedType(), smartContract.id,
-                Boss.dump({}), smartContract.getPackedTransaction(), con);
+                await Boss.dump({}), await smartContract.getPackedTransaction(), con);
             nim = await this.getEnvironment(envId, con);
         } else
             nim.contract = smartContract;

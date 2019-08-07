@@ -156,9 +156,9 @@ class NImmutableEnvironment extends ImmutableEnvironment {
         return new this.NMutableEnvironment(this);
     }
 
-    serialize(serializer) {
+    async serialize(serializer) {
         return {
-            contract : this.contract.getPackedTransaction(),
+            contract : await this.contract.getPackedTransaction(),
             createdAt : serializer.serialize(this.createdAt),
             subscriptions : serializer.serialize(Array.from(this.subscriptionsSet)),
             storages : serializer.serialize(Array.from(this.storagesSet)),

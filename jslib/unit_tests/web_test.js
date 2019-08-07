@@ -121,7 +121,7 @@ unit.test("http secure endpoints", async () => {
     let t0 = new Date().getTime();
     let counter0 = 0;
     for (let i = 0; i < countToSend; ++i) {
-        httpClient.command("unsRate", {}, async (resp) => {
+        await httpClient.command("unsRate", {}, async (resp) => {
             //console.log(JSON.stringify(resp));
             ++receiveCounter;
             await sleep(1);
@@ -174,7 +174,7 @@ unit.test("big payload", async () => {
     let testData = t.randomBytes(10000);
 
     let hashOk = null;
-    httpClient.command("testEndpoint", {testData: testData}, async (resp) => {
+    await httpClient.command("testEndpoint", {testData: testData}, async (resp) => {
         hashOk = t.valuesEqual(resp.hash,crypto.HashId.of(testData));
     }, error => {
         console.log("exception: " + error);
