@@ -25,7 +25,7 @@ unit.test("boss_test: hello", async () => {
     }
 });
 
-unit.test("boss_test: array of HashId", async () => {
+unit.test("boss_test: asyncLoad array of HashId", async () => {
     let arr0 = [];
     for (let i = 0; i < 100; ++i)
         arr0.push(await crypto.HashId.of(t.randomString(64)));
@@ -42,7 +42,7 @@ unit.test("boss_test: array of HashId", async () => {
     }
 });
 
-unit.test("boss_test: array of KeyAddress", async () => {
+unit.test("boss_test: asyncLoad array of KeyAddress", async () => {
     let arrPk = [];
     let arr0 = [];
     for (let i = 0; i < 10; ++i)
@@ -66,7 +66,7 @@ unit.test("boss_test: array of KeyAddress", async () => {
     }
 });
 
-unit.test("boss_test: array of PublicKeys", async () => {
+unit.test("boss_test: asyncLoad array of PublicKeys", async () => {
     let arr0 = [];
     for (let i = 0; i < 10; ++i)
         arr0.push(new Promise(async resolve => resolve((await crypto.PrivateKey.generate(2048)).publicKey)));
@@ -82,4 +82,19 @@ unit.test("boss_test: array of PublicKeys", async () => {
         assertSilent(arr[i].__proto__ === crypto.PublicKey.prototype);
         assertSilent(btoa(arr[i].fingerprints) === btoa(arr0[i].fingerprints));
     }
+});
+
+unit.test("boss_test: asyncDump array of HashId", async () => {
+    let arr0 = [];
+    for (let i = 0; i < 100; ++i)
+        arr0.push(await crypto.HashId.of(t.randomString(64)));
+    let ser = BossBiMapper.getInstance().serialize(arr0);
+    ser = ["dfd", "333444455555", "qwerty123456"];
+    let t0 = new Date().getTime();
+    let bin = await Boss.asyncDump(ser);
+    //let bin = Boss.dump(ser);
+    let dt = new Date().getTime() - t0;
+    console.log("bin.length: " + bin.length);
+    console.log("load: " + Boss.load(bin));
+    console.logPut("dt = " + dt + " ");
 });

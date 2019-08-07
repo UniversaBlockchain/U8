@@ -12,6 +12,10 @@ module.exports = {
         return new _boss().load(data);
     },
 
+    asyncDump(data) {
+        return new Promise(resolve => __boss_asyncDump(data, resolve));
+    },
+
     asyncLoad(data) {
         return new Promise(resolve => __boss_asyncLoad(data, (res) => {
             _bosscpp.updateObjectProto(res);
