@@ -382,6 +382,83 @@ unit.test("main_test: register item", async () => {
     await ts.shutdown();
 });
 
+unit.test("main_test: register item with sub-items", async () => {
+    let key = new PrivateKey(await io.fileGetContentsAsBytes("../test/keys/reconfig_key.private.unikey"));
+
+    let ts = await new TestSpace(key).create(NOLOG);
+
+    for (let i = 0; i < 4; i++) {
+        ts.nodes[i].setVerboseLevel(VerboseLevel.DETAILED);
+        ts.nodes[i].setUDPVerboseLevel(VerboseLevel.DETAILED);
+    }
+
+    let k = tk.TestKeys.getKey();
+    let item = Contract.fromPrivateKey(k);
+
+    for (let i = 0; i < 10; i++)
+        item.newItems.add(Contract.fromPrivateKey(k));
+
+    await item.seal(true);
+
+    await ts.node.node.registerItem(item);
+    let ir = await ts.node.node.waitItem(item.id, WAIT_TIMEOUT);
+    assert(ir.state === ItemState.APPROVED);
+
+    for (let i = 0; i < 4; i++) {
+        ir = await ts.nodes[i].node.waitItem(item.id, WAIT_TIMEOUT);
+        assert(ir.state === ItemState.APPROVED);
+
+        assert((await ts.nodes[i].ledger.getRecord(item.id)).state === ItemState.APPROVED);
+
+        if (i !== 0) {
+            ir = await ts.nodes[0].node.network.getItemState(ts.nodes[i].node.myInfo, item.id);
+            assert(ir.state === ItemState.APPROVED);
+        }
+    }
+
+    let fire = [];
+    let events = [];
+    for (let i = 0; i < 4; i++)
+        events.push(new Promise((resolve) => {fire.push(resolve)}));
+
+    for (let i = 0; i < 4; i++)
+        ts.clients[i].command("getState", {itemId: item.id}, (result) => fire[i](result), () => fire[i](null));
+
+    (await Promise.all(events)).forEach(ir => {
+        assert(ir != null);
+        assert(ir.itemResult.state === ItemState.APPROVED);
+    });
+
+    for (let subItem of item.newItems) {
+        for (let i = 0; i < 4; i++) {
+            ir = await ts.nodes[i].node.waitItem(subItem.id, WAIT_TIMEOUT);
+            assert(ir.state === ItemState.APPROVED);
+
+            assert((await ts.nodes[i].ledger.getRecord(subItem.id)).state === ItemState.APPROVED);
+
+            if (i !== 0) {
+                ir = await ts.nodes[0].node.network.getItemState(ts.nodes[i].node.myInfo, subItem.id);
+                assert(ir.state === ItemState.APPROVED);
+            }
+        }
+
+        let fire = [];
+        let events = [];
+        for (let i = 0; i < 4; i++)
+            events.push(new Promise((resolve) => {fire.push(resolve)}));
+
+        for (let i = 0; i < 4; i++)
+            ts.clients[i].command("getState", {itemId: subItem.id}, (result) => fire[i](result), () => fire[i](null));
+
+        (await Promise.all(events)).forEach(ir => {
+            assert(ir != null);
+            assert(ir.itemResult.state === ItemState.APPROVED);
+        });
+    }
+
+    await ts.shutdown();
+});
+
 unit.test("main_test: register bad item", async () => {
     let key = new PrivateKey(await io.fileGetContentsAsBytes("../test/keys/reconfig_key.private.unikey"));
 

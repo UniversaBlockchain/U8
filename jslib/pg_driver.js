@@ -133,6 +133,17 @@ class PgDriverConnection extends db.SqlDriverConnection {
             return;
         this.con._release();
     }
+
+    toString() {
+        return crypto.HashId.of(t.randomBytes(64));
+    }
+
+    stringId() {
+        if (this.stringId_ == null)
+            this.stringId_ = this.toString();
+
+        return this.stringId_;
+    }
 }
 
 class PgDriverResultSet extends db.SqlDriverResultSet {

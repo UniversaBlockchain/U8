@@ -160,14 +160,14 @@ class StateRecord {
             throw new ex.IllegalStateError("attempt to revoke record from wrong state: " + this.state.val);
     }
 
-    async approve(connection = undefined, newExpiresAt = undefined, force = false) {
+    async approve(connection = undefined, newExpiresAt = undefined, force = false, buffering = false) {
         if (this.state.isPending || this.state === ItemState.LOCKED_FOR_CREATION ||
             (force && (this.state === ItemState.UNDEFINED || this.state === ItemState.LOCKED || this.state === ItemState.APPROVED))) {
 
             this.state = ItemState.APPROVED;
             if (newExpiresAt !== undefined)
                 this.expiresAt = newExpiresAt;
-            await this.save(connection);
+            await this.save(connection, buffering);
         } else
             throw new ex.IllegalStateError("attempt to approve record from wrong state: " + this.state.val);
     }
@@ -225,10 +225,10 @@ class StateRecord {
         return this;
     }
 
-    save(con) {
+    save(con, buffering = false) {
         if (this.saveNotification != null)
             this.saveNotification(this);
-        return this.ledger.save(this, con);
+        return this.ledger.save(this, con, buffering);
     }
 
     destroy(con) {

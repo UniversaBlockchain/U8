@@ -692,12 +692,21 @@ class ItemProcessor {
         if (!this.processingState.canContinue)
             return;
 
-        for (let newItem of commitingItem.newItems) {
-            await this.node.lock.synchronize(newItem.id, async () => {
-                // The record may not exist due to ledger desync too, so we create it if need
-                let r = await this.node.ledger.simpleFindOrCreate(newItem.id, ItemState.PENDING, 0, con);
+        let ids = [];
+        for (let newItem of commitingItem.newItems)
+            ids.push(newItem.id);
 
-                await r.approve(con, newItem.getExpiresAt());
+        // The record may not exist due to ledger desync too, so we create it if need
+        let rs = await this.node.ledger.arrayFindOrCreate(ids, ItemState.PENDING, 0, con);
+        let i = 0;
+
+        for (let newItem of commitingItem.newItems) {
+            //TODO: synchronize all items in transaction
+            await this.node.lock.synchronize(newItem.id, async () => {
+                let r = rs[i];
+                i++;
+
+                await r.approve(con, newItem.getExpiresAt(), false, true);
 
                 //save newItem to DB in Permanet mode
                 if (this.node.config.permanetMode)
@@ -822,6 +831,8 @@ class ItemProcessor {
                 let commitBlock = async(con) => {
                     // first, commit all new items
                     await this.downloadAndCommitNewItemsOf(this.item, con);
+
+                    await this.node.ledger.arraySave(con);
 
                     // then, commit all revokes
                     await this.downloadAndCommitRevokesOf(this.item, con);

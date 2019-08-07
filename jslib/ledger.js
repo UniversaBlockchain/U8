@@ -44,6 +44,8 @@ class Ledger {
             findOrCreate_select: {enabled: true, bufSize: 400, delayMillis: 40, buf: new Map(), ts: new Date().getTime()},
         };
 
+        this.mapSave = new t.GenericMap();
+
         this.timers_ = [];
         if (this.bufParams.findOrCreate_insert.enabled)
             this.addTimer(this.bufParams.findOrCreate_insert.delayMillis, this.findOrCreate_buffered_insert_processBuf.bind(this));
@@ -298,8 +300,112 @@ class Ledger {
         });
     }
 
+    /**
+     * Create new records for a given ids array and set it to the <b>newState</b> state. Normally, it is used to create
+     * new root documents. If the record exists, it returns it. If the record does not exists, it creates new one with
+     * <b>newState</b> state.
+     *
+     * @param {Array<HashId>} itemIds - array of HashId to register, or null if it is already in use.
+     * @param {ItemState} newState - new item will be created with this state.
+     *        Only PENDING and LOCKED_FOR_CREATION states are allowed
+     * @param {Number} locked_by_id - use it with LOCKED_FOR_CREATION state
+     * @param {db.SqlDriverConnection} connection - Transaction connection for save record. Optional.
+     * @return {Promise<Array<StateRecord>>} array of records.
+     */
+    arrayFindOrCreate(itemIds, newState = ItemState.PENDING, locked_by_id = 0, connection = null) {
+        if (itemIds.length === 0)
+            return [];
+
+        return new Promise(async (resolve0, reject0) => {
+            let queryInsert = "INSERT INTO ledger(hash, state, created_at, expires_at, locked_by_id) VALUES ";
+            let querySelect = "SELECT * FROM ledger WHERE hash IN (";
+            let paramsInsert = [];
+            let paramsSelect = [];
+
+            let first = true;
+            for (let itemId of itemIds) {
+                paramsInsert.push(itemId.digest);
+                paramsInsert.push(newState.ordinal);
+                paramsInsert.push(Math.floor(new Date().getTime() / 1000));
+                paramsInsert.push(Math.floor(new Date().getTime() / 1000) + Config.maxElectionsTime + Math.floor(Math.random() * 10));
+                paramsInsert.push(locked_by_id);
+
+                paramsSelect.push(itemId.digest);
+
+                if (!first) {
+                    queryInsert += ",";
+                    querySelect += ",";
+                }
+                queryInsert += "(?,?,?,?,?)";
+                querySelect += "?";
+                first = false;
+            }
+
+            queryInsert += " ON CONFLICT (hash) DO NOTHING;";
+            querySelect += ") LIMIT " + paramsSelect.length + ";";
+
+            let f = async con => {
+                let promise1 = new Promise((resolve, reject) => {
+                    con.executeUpdate(qr => {
+                            resolve();
+                        }, e => {
+                            if (connection == null)
+                                con.release();
+                            reject(e);
+                        },
+                        queryInsert,
+                        ...paramsInsert
+                    );
+                });
+                await promise1;
+
+                let promise2 = new Promise((resolve, reject) => {
+                    con.executeQuery(qr => {
+                            let rows = qr.getRows(0);
+                            let records = [];
+
+                            for (let j = 0; j < rows.length; j++)
+                                records.push(StateRecord.initFrom(this, rows[j]));
+
+                            //sort result records
+                            if (records.length > 1)
+                                for (let i = 0; i < records.length - 1; i++)
+                                    if (!records[i].id.equals(itemIds[i]))
+                                        for (let j = i + 1; j < records.length; j++)
+                                            if (records[j].id.equals(itemIds[i])) {
+                                                // swap records
+                                                let swap = records[i];
+                                                records[i] = records[j];
+                                                records[j] = swap;
+
+                                                break;
+                                            }
+
+                            if (connection == null)
+                                con.release();
+                            resolve(records);
+                        }, e => {
+                            if (connection == null)
+                                con.release();
+                            reject(e);
+                        },
+                        querySelect,
+                        ...paramsSelect
+                    );
+                });
+
+                return await promise2;
+            };
+
+            if (connection == null)
+                this.dbPool_.withConnection(async con => resolve0(await f(con)));
+            else
+                resolve0(await f(connection));
+        });
+    }
+
     findOrCreate_buffered_insert(itemId, newState, locked_by_id) {
-        if ((newState != ItemState.PENDING) && (newState != ItemState.LOCKED_FOR_CREATION))
+        if ((newState !== ItemState.PENDING) && (newState !== ItemState.LOCKED_FOR_CREATION))
             throw new ex.IllegalStateError("can't create new item with state " + newState.val);
 
         if (this.bufParams.findOrCreate_insert.enabled) {
@@ -587,9 +693,10 @@ class Ledger {
      *
      * @param {StateRecord} record - StateRecord to save.
      * @param {db.SqlDriverConnection} connection - Transaction connection for save record. Optional.
-     * @return {Promise<StateRecord>} resolved when record saved.
+     * @param {boolean} buffering - Buffering mode in transaction. Optional.
+     * @return {Promise<StateRecord> | StateRecord} resolved when record saved.
      */
-    save(record, connection = undefined) {
+    save(record, connection = undefined, buffering = false) {
         if (record.ledger == null) {
             record.ledger = this;
         } else if (record.ledger !== this)
@@ -600,6 +707,22 @@ class Ledger {
 
         this.putToCache(record);
 
+        if (connection != null && buffering) {
+            let buf = this.mapSave.get(connection);
+            if (buf == null) {
+                buf = [];
+                this.mapSave.set(connection, buf);
+            }
+
+            buf.push(record.state.ordinal);
+            buf.push(Math.floor(record.createdAt.getTime() / 1000));
+            buf.push(Math.floor(record.expiresAt.getTime() / 1000));
+            buf.push(record.lockedByRecordId);
+            buf.push(record.recordId);
+
+            return record;
+        }
+
         return this.simpleUpdate("update ledger set state=?, created_at=?, expires_at=?, locked_by_id=? where id=?",
             connection,
             record.state.ordinal,
@@ -607,6 +730,44 @@ class Ledger {
             Math.floor(record.expiresAt.getTime() / 1000),
             record.lockedByRecordId,
             record.recordId);
+    }
+
+    /**
+     * Save a bufferized records (in transaction) into the ledger.
+     *
+     * @param {db.SqlDriverConnection} connection - Transaction connection for save record.
+     * @return {Promise<undefined> | undefined}
+     */
+    arraySave(connection) {
+        if (connection == null)
+            return;
+
+        let buf = this.mapSave.get(connection);
+        if (buf == null || buf.length < 5)
+            return;
+
+        this.mapSave.delete(connection);
+
+        return new Promise(async (resolve, reject) => {
+            let query = "UPDATE ledger SET state = t.state, created_at = t.created_at, expires_at = t.expires_at, " +
+                "locked_by_id = t.locked_by_id FROM (VALUES ";
+
+            for (let j = 0; j < buf.length / 5; ++j) {
+                if (j > 0)
+                    query += ",";
+                query += "(?::integer,?::integer,?::bigint,?::integer,?::integer)";
+            }
+            query += ") AS t(state, created_at, expires_at, locked_by_id, id) WHERE ledger.id = t.id";
+
+            connection.executeUpdate(qr => {
+                    resolve();
+                }, e => {
+                    reject(e);
+                },
+                query,
+                ...buf
+            );
+        });
     }
 
     /**
