@@ -3,7 +3,6 @@
 //
 
 #include "boss_bindings.h"
-#include "../universa_core/ISerializableV8.h"
 #include "../serialization/BossSerializer.h"
 #include "../types/TypesFactory.h"
 #include "../types/UArray.h"

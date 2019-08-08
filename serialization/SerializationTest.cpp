@@ -14,7 +14,6 @@
 #include "../tools/tools.h"
 #include "../crypto/HashId.h"
 #include "../crypto/base64.h"
-#include "../types/complex/URole.h"
 
 #define ASSERT(expr)                                      \
  do {                                                     \
@@ -34,7 +33,6 @@ void allSerializationTests() {
     testBoss();
     testBossStreamMode();
     testUHashId();
-    testUListRole();
 }
 
 void testBaseSerialization() {
@@ -400,27 +398,4 @@ void testUHashId() {
     ASSERT(hashId2 == UHashId::asInstance(arr2[2]).getHashId());
 
     printf("testUHashId()...done\n\n");
-}
-
-void testUListRole() {
-    printf("testUListRole()...\n");
-    using std::cout, std::endl;
-
-    byte_vector binFromJava = base64_decodeToBytes("LyNtb2RlG0FMTCtyb2xlcx4vS2FkZHJlc3Nlcw4XM19fdHlwZVNLZXlBZGRyZXNzQ3VhZGRyZXNzvCUQsXaZqpBDI3SuGBgebTR66dRKYPpSkInEp7jHCEtCInmrXhB+I2tleXMGVVNTaW1wbGVSb2xlI25hbWUTcjI7YW5vbklkc30vPRYXVV1lvCUQz7FDcou+Z6evO9X1uvKOaArPdCEczcePfWYFMYHMAYdf/5kKF1VdZbwlEGZQocH3UGgDQ/ZLXiUpUzJ0UfhyZxcC4NazcjhNoM1zo22hWnV9VYWNE3IznX0vPQ4XVV1lvDUQe8EJz220Si5SPqgBAS0DtyXN3sNAbO3hQ3X8GH/fXeN/2h3ZEs3anQ8rlIpIIPx53OJ3V3V9VYWNE3IxnX1VQ0xpc3RSb2xljRNsclNxdW9ydW1TaXplAA==");
-    UObject obj = BossSerializer::deserialize(UBytes(move(binFromJava)));
-    Role& role = URole::asInstance(obj).getRole();
-    cout << "role.name: " << role.name << endl;
-    auto& lr = (ListRole&) role;
-    for (auto ir : lr.roles) {
-        Role &r = *ir;
-        cout << "  r.name: " << r.name << endl;
-        auto &sr = dynamic_cast<SimpleRole &>(r);
-        cout << "    keyAddresses.size: " << sr.keyAddresses.size() << endl;
-        for (auto &ka : sr.keyAddresses)
-            cout << "    ka: " << ka->toString() << endl;
-    }
-
-    //TODO: check and test implementation UPrivateKey, UKeyRecord
-
-    printf("testUListRole()...done\n\n");
 }

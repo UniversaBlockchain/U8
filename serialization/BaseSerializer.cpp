@@ -13,10 +13,7 @@
 #include "../types/UBool.h"
 #include "../types/TestComplexObject.h"
 #include "../types/complex/UHashId.h"
-#include "../types/complex/UListRole.h"
-#include "../types/complex/USimpleRole.h"
 #include "../types/complex/UKeyAddress.h"
-#include "../types/complex/UKeyRecord.h"
 #include "../types/complex/UPublicKey.h"
 
 // Serialization object templates
@@ -88,9 +85,6 @@ UObject BaseSerializer::skipBaseTypes(const UObject& o) {
     functionName(UHashId, "HashId"); \
     functionName(UKeyAddress, "KeyAddress"); \
     functionName(UPublicKey, "RSAPublicKey");
-//    functionName(UListRole, "ListRole"); \
-//    functionName(USimpleRole, "SimpleRole"); \
-//    functionName(UKeyRecord, "KeyRecord"); \
     // TODO: add other complex types
 
 UObject BaseSerializer::serialize(const UObject& o) {
