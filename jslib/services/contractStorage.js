@@ -22,9 +22,9 @@ class ContractStorage {
     /**
      * Get contract.
      *
-     * @return {Contract} the unpacked stored contract. Note that this instance could be cached/shared among subscribers.
+     * @return {Promise<Contract>} the unpacked stored contract. Note that this instance could be cached/shared among subscribers.
      */
-    getContract() {
+    async getContract() {
         throw new Error("not implemented");
     }
 

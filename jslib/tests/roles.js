@@ -22,7 +22,7 @@ async function main() {
 
     let roleLink = new roles.RoleLink("name1","name2");
 
-    let s1 = dbm.DefaultBiMapper.getInstance().serialize(roleLink);
+    let s1 = await dbm.DefaultBiMapper.getInstance().serialize(roleLink);
     console.log(JSON.stringify(s1));
 
 

@@ -32,12 +32,12 @@ class KeyRecord extends bs.BiSerializable {
         }
     }
 
-    deserialize(data, deserializer) {
-        this.key = deserializer.deserialize(data.key);
+    async deserialize(data, deserializer) {
+        this.key = await deserializer.deserialize(data.key);
     }
 
-    serialize(serializer) {
-        return {key:serializer.serialize(this.key)};
+    async serialize(serializer) {
+        return {key: await serializer.serialize(this.key)};
     }
 
     equals(to) {

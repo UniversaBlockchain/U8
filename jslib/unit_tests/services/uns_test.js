@@ -143,14 +143,14 @@ unit.test("uns_test: serializeUnsContract", async () => {
     await unsContract.seal(true);
     assert(await unsContract.check());
 
-    let b = BossBiMapper.getInstance().serialize(unsContract);
-    let b2 = DefaultBiMapper.getInstance().serialize(unsContract);
+    let b = await BossBiMapper.getInstance().serialize(unsContract);
+    let b2 = await DefaultBiMapper.getInstance().serialize(unsContract);
 
-    let desContract = BossBiMapper.getInstance().deserialize(b);
-    let desContract2 = DefaultBiMapper.getInstance().deserialize(b2);
+    let desContract = await BossBiMapper.getInstance().deserialize(b);
+    let desContract2 = await DefaultBiMapper.getInstance().deserialize(b2);
 
-    tt.assertSameContracts(desContract, unsContract);
-    tt.assertSameContracts(desContract2, unsContract);
+    await tt.assertSameContracts(desContract, unsContract);
+    await tt.assertSameContracts(desContract2, unsContract);
 
     assert(NSmartContract.SmartContractType.UNS1 === desContract.definition.extendedType);
     assert(NSmartContract.SmartContractType.UNS1 === desContract.get("definition.extended_type"));
@@ -185,7 +185,7 @@ unit.test("uns_test: serializeUnsContract", async () => {
     assert(desContract2.getUnsName(reducedName).findUnsRecordByAddress(new crypto.KeyAddress(randomPrivKey.publicKey, 0, true)) !== -1);
     assert(desContract2.getUnsName(reducedName).findUnsRecordByAddress(new crypto.KeyAddress(randomPrivKey.publicKey, 0, false)) !== -1);
 
-    let copiedUns = unsContract.copy();
+    let copiedUns = await unsContract.copy();
 
     assert(NSmartContract.SmartContractType.UNS1 === copiedUns.definition.extendedType);
     assert(NSmartContract.SmartContractType.UNS1 === copiedUns.get("definition.extended_type"));
@@ -213,7 +213,7 @@ async function createUnsPayment() {
     let ownerKey = new crypto.PrivateKey(await io.fileGetContentsAsBytes("../test/keys/test_payment_owner.private.unikey"));
 
     let unsU = await tt.createFreshU(100000000, [ownerKey.publicKey]);
-    let paymentDecreased = unsU.createRevision([ownerKey]);
+    let paymentDecreased = await unsU.createRevision([ownerKey]);
 
     paymentDecreased.state.data.transaction_units = unsU.state.data.transaction_units - 2000;
     await paymentDecreased.seal(true);

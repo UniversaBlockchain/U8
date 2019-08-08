@@ -316,7 +316,7 @@ class Node {
     async getFullEnvironment(environmentId) {
         let ime = await this.getEnvironment(environmentId);
         ime.nameCache = this.nameCache;
-        let contract = ime.getContract();
+        let contract = ime.contract;
         contract.nodeInfoProvider = this.nodeInfoProvider;
         let me = ime.getMutable();
 
@@ -520,7 +520,7 @@ class Node {
 
         this.report("item state for: " + itemId.toString() + " is " + ir.state.val, VerboseLevel.BASE);
 
-        ir = ir.copy();
+        ir = await ir.copy();
 
         let record = this.informer.takeFor(itemId);
         if (record != null)

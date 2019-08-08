@@ -717,9 +717,9 @@ class ItemProcessor {
 
                         if (newItem.state.revision === 1) {
                             // and call onCreated
-                            newExtraResult.onCreatedResult = this.item.onCreated(me);
+                            newExtraResult.onCreatedResult = await this.item.onCreated(me);
                         } else {
-                            newExtraResult.onUpdateResult = this.item.onUpdated(me);
+                            newExtraResult.onUpdateResult = await this.item.onUpdated(me);
 
                             new ScheduleExecutor(async () => await this.node.callbackService.synchronizeFollowerCallbacks(me.id),
                                 1000, this.node.executorService).run();
@@ -859,9 +859,9 @@ class ItemProcessor {
 
                             if (this.item.state.revision === 1) {
                                 // and call onCreated
-                                this.extra.onCreatedResult = this.item.onCreated(me);
+                                this.extra.onCreatedResult = await this.item.onCreated(me);
                             } else {
-                                this.extra.onUpdateResult = this.item.onUpdated(me);
+                                this.extra.onUpdateResult = await this.item.onUpdated(me);
 
                                 //TODO: callbackService
                                 //new ScheduleExecutor(() => this.node.callbackService.synchronizeFollowerCallbacks(me.id),
@@ -985,7 +985,7 @@ class ItemProcessor {
                 await this.node.lock.synchronize("callbackService", async () => {
                     let ime = await this.node.getEnvironment(environmentId, con);
                     ime.nameCache = this.node.nameCache;
-                    let contract = ime.getContract();
+                    let contract = ime.contract;
                     contract.nodeInfoProvider = this.node.nodeInfoProvider;
                     let me = ime.getMutable();
 
@@ -993,8 +993,9 @@ class ItemProcessor {
                         if (lookingId != null && sub.getContractId() != null && lookingId.equals(sub.getContractId())) {
                             if (updatingState === ItemState.APPROVED) {
                                 let event = new ApprovedEvent();
+                                let packedItem = await updatingItem.getPackedTransaction();
                                 event.getNewRevision = () => updatingItem;
-                                event.getPackedTransaction = () => updatingItem.getPackedTransaction();
+                                event.getPackedTransaction = () => packedItem;
                                 event.getEnvironment = () => me;
                                 event.getSubscription = () => sub;
 

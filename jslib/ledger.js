@@ -130,7 +130,7 @@ class Ledger {
     simpleQuery(sql, processValue, connection = undefined, ...params) {
         return new Promise((resolve, reject) => {
             let query = con => {
-                con.executeQuery(qr => {
+                con.executeQuery(async (qr) => {
                         let row = qr.getRows(1)[0];
                         if (connection == null)
                             con.release();
@@ -140,7 +140,7 @@ class Ledger {
                             value = row[0];
 
                         if (processValue != null)
-                            resolve(processValue(value));
+                            resolve(await processValue(value));
                         else
                             resolve(value);
                     }, e => {
@@ -1056,7 +1056,7 @@ class Ledger {
                 await this.saveSubscriptionInStorage(css.getHashId(), css.isChainSubscription(), css.expiresAt(), envId)));
 
             await Promise.all(Array.from(environment.storages()).map(async(cst) =>
-                await this.saveContractInStorage(cst.getContract().id, cst.getPackedContract(), cst.expiresAt(), cst.getContract().getOrigin(), envId)));
+                await this.saveContractInStorage((await cst.getContract()).id, cst.getPackedContract(), cst.expiresAt(), (await cst.getContract()).getOrigin(), envId)));
 
             let fs = environment.getFollowerService();
             if (fs != null)
@@ -1302,7 +1302,7 @@ class Ledger {
      */
     getItem(record) {
         return this.simpleQuery("select packed from items where id = ?",
-            x => (x != null) ? Contract.fromPackedTransaction(x) : null,
+            async (x) => (x != null) ? await Contract.fromPackedTransaction(x) : null,
             null,
             record.recordId);
     }
@@ -1621,7 +1621,7 @@ class Ledger {
     async getEnvironment(environmentId, con = undefined) {
         let smkv = await this.getSmartContractForEnvironmentId(environmentId, con);
         let nContractHashId = crypto.HashId.withDigest(smkv.hashDigest);
-        let contract = NSmartContract.fromPackedTransaction(smkv.pack);
+        let contract = await NSmartContract.fromPackedTransaction(smkv.pack);
         let findNContract = (contract.transactionPack != null) ? contract.transactionPack.subItems.get(nContractHashId) : null;
         contract = (findNContract == null) ? contract : findNContract;
         let kvStorage = Boss.load(smkv.kvStorage);

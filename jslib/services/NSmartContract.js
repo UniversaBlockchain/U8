@@ -36,8 +36,8 @@ class NSmartContract extends Contract {
      *
      * @return {NSmartContract} extracted smart contract.
      */
-    static fromSealedBinary(sealed, pack) {
-        return Contract.fromSealedBinary(sealed, pack, new NSmartContract());
+    static async fromSealedBinary(sealed, pack) {
+        return await Contract.fromSealedBinary(sealed, pack, new NSmartContract());
     }
 
     /**

@@ -153,23 +153,23 @@ class UnsRecord extends bs.BiSerializable {
                  (shortAddress == null && entry.getShortAddress() == null)));
     }
 
-    serialize(serializer) {
+    async serialize(serializer) {
         let data = {};
         if (this.unsAddresses.length > 0)
-            data.addresses = serializer.serialize(this.unsAddresses);
+            data.addresses = await serializer.serialize(this.unsAddresses);
 
         if (this.unsOrigin != null)
-            data.origin = serializer.serialize(this.unsOrigin);
+            data.origin = await serializer.serialize(this.unsOrigin);
 
         return data;
     }
 
-    deserialize(data, deserializer) {
+    async deserialize(data, deserializer) {
         if (data.hasOwnProperty("addresses"))
-            this.unsAddresses = deserializer.deserialize(data.addresses);
+            this.unsAddresses = await deserializer.deserialize(data.addresses);
 
         if (data.hasOwnProperty("origin"))
-            this.unsOrigin = deserializer.deserialize(data.origin);
+            this.unsOrigin = await deserializer.deserialize(data.origin);
     }
 }
 

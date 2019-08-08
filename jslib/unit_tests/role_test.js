@@ -23,7 +23,7 @@ unit.test("role refs", () => {
 });
 
 
-unit.test("role serialization", () => {
+unit.test("role serialization", async () => {
     let role = new roles.Role("name");
 
     role.requiredAnyConstraints.add("ref1");
@@ -32,9 +32,9 @@ unit.test("role serialization", () => {
     role.requiredAllConstraints.add("ref3");
 
 
-    let s = role.serialize(dbm.DefaultBiMapper.getInstance());
+    let s = await role.serialize(dbm.DefaultBiMapper.getInstance());
 
     let role2 = new roles.Role();
-    role2.deserialize(s,dbm.DefaultBiMapper.getInstance());
+    await role2.deserialize(s, dbm.DefaultBiMapper.getInstance());
     assert(t.valuesEqual(role,role2))
 });

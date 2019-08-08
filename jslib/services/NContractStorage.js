@@ -12,19 +12,19 @@ class NContractStorage extends ContractStorage {
         this.packedContract = packedContract;
         this.expiresAt = expiresAt;
         this.id = 0;
-
-        try {
-            this.trackingContract = Contract.fromPackedTransaction(packedContract);
-        } catch (e) {
-            throw new ex.IllegalArgumentError("NContractStorage unable to unpack TP " + e.message);
-        }
     }
 
     getExpiresAt() {
         return this.expiresAt;
     }
 
-    getContract() {
+    async getContract() {
+        try {
+            this.trackingContract = await Contract.fromPackedTransaction(this.packedContract);
+        } catch (e) {
+            throw new ex.IllegalArgumentError("NContractStorage unable to unpack TP " + e.message);
+        }
+
         return this.trackingContract;
     }
 
@@ -32,16 +32,16 @@ class NContractStorage extends ContractStorage {
         return this.packedContract;
     }
 
-    deserialize(data, deserializer) {
+    async deserialize(data, deserializer) {
         this.packedContract = data.packedContract;
-        this.trackingContract = Contract.fromPackedTransaction(this.packedContract);
-        this.expiresAt = deserializer.deserialize(data.expiresAt);
+        this.trackingContract = await Contract.fromPackedTransaction(this.packedContract);
+        this.expiresAt = await deserializer.deserialize(data.expiresAt);
     }
 
-    serialize(serializer) {
+    async serialize(serializer) {
         return {
-            packedContract : serializer.serialize(this.packedContract),
-            expiresAt : serializer.serialize(this.expiresAt)
+            packedContract : await serializer.serialize(this.packedContract),
+            expiresAt : await serializer.serialize(this.expiresAt)
         };
     }
 

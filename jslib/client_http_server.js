@@ -45,7 +45,7 @@ class ClientHTTPServer extends network.HttpServer {
                 if (this.cache != null) {
                     let c = this.cache.get(id);
                     if (c != null)
-                        data = c.getPackedTransaction();
+                        data = await c.getPackedTransaction();
                 }
 
                 if (data == null)
@@ -78,7 +78,7 @@ class ClientHTTPServer extends network.HttpServer {
                 if (this.parcelCache != null) {
                     let p = this.parcelCache.get(id);
                     if (p != null)
-                        data = p.pack();
+                        data = await p.pack();
                 }
             }
 
@@ -387,7 +387,7 @@ class ClientHTTPServer extends network.HttpServer {
         {
             let contract = null;
             try {
-                contract = Contract.fromPackedTransaction(t.getOrThrow(params, "packedItem"));
+                contract = await Contract.fromPackedTransaction(t.getOrThrow(params, "packedItem"));
             } catch (err) {
                 this.logger.log("approve ERROR: " + err.message);
                 return {itemResult : ClientHTTPServer.itemResultOfError(Errors.COMMAND_FAILED,"approve", err.message)};
@@ -405,7 +405,7 @@ class ClientHTTPServer extends network.HttpServer {
         }
 
         try {
-            return {itemResult : await this.node.registerItem(Contract.fromPackedTransaction(t.getOrThrow(params, "packedItem")))}; //TODO: node
+            return {itemResult : await this.node.registerItem(await Contract.fromPackedTransaction(t.getOrThrow(params, "packedItem")))}; //TODO: node
         } catch (err) {
             this.logger.log("approve ERROR: " + err.message);
             return {itemResult : ClientHTTPServer.itemResultOfError(Errors.COMMAND_FAILED,"approve", err.message)};
@@ -416,7 +416,7 @@ class ClientHTTPServer extends network.HttpServer {
         this.checkNode(clientKey);
 
         try {
-            return {result : await this.node.registerParcel(Parcel.unpack(t.getOrThrow(params, "packedItem")))}; //TODO: node
+            return {result : await this.node.registerParcel(await Parcel.unpack(t.getOrThrow(params, "packedItem")))}; //TODO: node
         } catch (err) {
             this.logger.log("approveParcel ERROR: " + err.message);
             return {result : ClientHTTPServer.itemResultOfError(Errors.COMMAND_FAILED,"approveParcel", err.message)};
@@ -440,7 +440,7 @@ class ClientHTTPServer extends network.HttpServer {
                 k++;
                 this.logger.log("Request to start registration:" + k);
 
-                results.push(await this.node.registerItem(Contract.fromPackedTransaction(item)));  //TODO: node
+                results.push(await this.node.registerItem(await Contract.fromPackedTransaction(item)));  //TODO: node
             } catch (err) {
                 this.logger.log(err.stack);
                 this.logger.log("startApproval ERROR: " + err.message);
@@ -611,7 +611,7 @@ class ClientHTTPServer extends network.HttpServer {
         let slotBin = await this.node.ledger.getSmartContractById(crypto.HashId.withDigest(slot_id));
 
         if (slotBin != null) {
-            let slotContract = Contract.fromPackedTransaction(slotBin);
+            let slotContract = await Contract.fromPackedTransaction(slotBin);
             return {slot_state: slotContract.state.data};
         }
 
@@ -634,7 +634,7 @@ class ClientHTTPServer extends network.HttpServer {
 
         let slotBin = await this.node.ledger.getSmartContractById(crypto.HashId.withDigest(slot_id));
         if (slotBin != null) {
-            let slotContract = Contract.fromPackedTransaction(slotBin);
+            let slotContract = await Contract.fromPackedTransaction(slotBin);
             if (contract_id != null) {
                 let contractHashId = crypto.HashId.withDigest(contract_id);
                 contract = await this.node.ledger.getContractInStorage(contractHashId);
@@ -648,7 +648,7 @@ class ClientHTTPServer extends network.HttpServer {
                 else if (storedRevisions.length > 1) {
                     let latestRevision = 0;
                     for (let bin of storedRevisions) {
-                        let c = Contract.fromPackedTransaction(bin);
+                        let c = await Contract.fromPackedTransaction(bin);
                         if (latestRevision < c.state.revision) {
                             latestRevision = c.state.revision;
                             contract = bin;
@@ -680,7 +680,7 @@ class ClientHTTPServer extends network.HttpServer {
         let followerBin = await this.node.ledger.getSmartContractById(crypto.HashId.withDigest(follower_id));
 
         if (followerBin != null) {
-            let followerContract = Contract.fromPackedTransaction(followerBin);
+            let followerContract = await Contract.fromPackedTransaction(followerBin);
             return {follower_state: followerContract.state.data};
         }
 

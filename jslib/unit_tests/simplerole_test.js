@@ -14,12 +14,10 @@ unit.test("simple role serialization", async () => {
 
     role.requiredAnyConstraints.add("ref1");
 
-
-
-    let s = role.serialize(dbm.DefaultBiMapper.getInstance());
+    let s = await role.serialize(dbm.DefaultBiMapper.getInstance());
 
     let role2 = new roles.SimpleRole();
-    role2.deserialize(s,dbm.DefaultBiMapper.getInstance());
+    await role2.deserialize(s, dbm.DefaultBiMapper.getInstance());
     assert(t.valuesEqual(role,role2))
 });
 

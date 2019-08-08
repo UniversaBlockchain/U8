@@ -19,14 +19,14 @@ class BiAdapter {
         this.type = type;
     }
 
-    deserialize(data, deserializer) {
+    async deserialize(data, deserializer) {
         let o = new this.type();
-        o.deserialize(data,deserializer);
+        await o.deserialize(data,deserializer);
         return o;
     }
 
-    serialize(object, serializer) {
-        return object.serialize(serializer);
+    async serialize(object, serializer) {
+        return await object.serialize(serializer);
     }
 
     getTag() {
@@ -44,7 +44,7 @@ class BiMapper {
         this.adapters = new Map();
     }
 
-    deserialize(data) {
+    async deserialize(data) {
         if(data == null || typeof data === "undefined")
             return null;
 
@@ -58,19 +58,19 @@ class BiMapper {
             if (type !== undefined) {
     //          console.log(JSON.stringify(data));
                 let adapter = this.adapters.get(type);
-                return adapter.deserialize(data, this);
+                return await adapter.deserialize(data, this);
             }
 
             let result = {};
             for(let key of Object.keys(data)) {
-                result[key] = this.deserialize(data[key]);
+                result[key] = await this.deserialize(data[key]);
             }
             return result;
 
         } else if(data instanceof Array) {
             let result = new Array();
             for(let element of data) {
-                result.push(this.deserialize(element));
+                result.push(await this.deserialize(element));
             }
             return result;
         } else {
@@ -78,26 +78,26 @@ class BiMapper {
         }
     }
 
-    serialize(object) {
+    async serialize(object) {
         if(object == null || typeof object === "undefined")
             return null;
         const proto = Object.getPrototypeOf(object);
 
         if(this.adapters.has(proto)) {
             const adapter = this.adapters.get(proto);
-            let result = adapter.serialize(object,this);
+            let result = await adapter.serialize(object,this);
             result.__type = adapter.getTag();
             return result;
         } else if(proto === Object.prototype) {
             let result = {};
             for(let key of Object.keys(object)) {
-                result[key] = this.serialize(object[key]);
+                result[key] = await this.serialize(object[key]);
             }
             return result;
         } else if(object instanceof Array || object instanceof Set || object instanceof t.GenericSet) {
             let result = [];
             for(let element of object) {
-                result.push(this.serialize(element));
+                result.push(await this.serialize(element));
             }
             return result;
         } else {

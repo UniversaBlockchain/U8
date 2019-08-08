@@ -18,7 +18,7 @@ unit.test("split join permission serialization", async () => {
     let role2 = new roles.SimpleRole("name",k.publicKey.longAddress);
 
     let sjp = new perm.SplitJoinPermission(role,{field_name:"amount",min_value:"0.0001",min_unit: "0.0001",join_match_fields: ["state.origin","definition.data.key1"]});
-    let sjp2 = dbm.DefaultBiMapper.getInstance().deserialize(dbm.DefaultBiMapper.getInstance().serialize(sjp));
+    let sjp2 = await dbm.DefaultBiMapper.getInstance().deserialize(await dbm.DefaultBiMapper.getInstance().serialize(sjp));
     let sjp3 = new perm.RevokePermission(role,{field_name:"amount",min_value:"0.0001",min_unit: "0.0001",join_match_fields: ["state.origin","definition.data.key2"]});
     assert(t.valuesEqual(sjp,sjp2));
     assert(!t.valuesEqual(sjp,sjp3));
@@ -39,13 +39,13 @@ unit.test("split join permission split", async () => {
 
     await c.seal(true);
 
-    let c2_1 = c.createRevision([k]);
-    let c2_2 = c.createRevision([k2]);
-    let c2_3 = c.createRevision([k]);
+    let c2_1 = await c.createRevision([k]);
+    let c2_2 = await c.createRevision([k2]);
+    let c2_3 = await c.createRevision([k]);
 
-    c2_1.split(1)[0].state.data.amount = "500";
-    c2_2.split(1)[0].state.data.amount = "500";
-    c2_3.split(1)[0].state.data.amount = "600";
+    (await c2_1.split(1))[0].state.data.amount = "500";
+    (await c2_2.split(1))[0].state.data.amount = "500";
+    (await c2_3.split(1))[0].state.data.amount = "600";
 
     c2_1.state.data.amount = "500";
     c2_2.state.data.amount = "500";
@@ -70,9 +70,9 @@ unit.test("split join permission split no permission", async () => {
 
     await c.seal(true);
 
-    let c2_1 = c.createRevision([k]);
+    let c2_1 = await c.createRevision([k]);
 
-    c2_1.split(1)[0].state.data.amount = "500";
+    (await c2_1.split(1))[0].state.data.amount = "500";
 
     c2_1.state.data.amount = "500";
 
@@ -103,9 +103,9 @@ unit.test("split join permission join", async () => {
 
     await c2.seal(true);
 
-    let c_1 = c1.createRevision([k]);
-    let c_2 = c1.createRevision([k2]);
-    let c_3 = c1.createRevision([k]);
+    let c_1 = await c1.createRevision([k]);
+    let c_2 = await c1.createRevision([k2]);
+    let c_3 = await c1.createRevision([k]);
 
     c_1.revokingItems.add(c2);
     c_2.revokingItems.add(c2);
@@ -143,7 +143,7 @@ unit.test("split join permission join no permission", async () => {
 
     await c2.seal(true);
 
-    let c_1 = c1.createRevision([k]);
+    let c_1 = await c1.createRevision([k]);
 
     c_1.revokingItems.add(c2);
 
@@ -193,9 +193,9 @@ unit.test("split join permission join no matching", async () => {
     await c4.seal(true);
 
 
-    let c_1 = c1.createRevision([k]);
-    let c_2 = c1.createRevision([k]);
-    let c_3 = c1.createRevision([k]);
+    let c_1 = await c1.createRevision([k]);
+    let c_2 = await c1.createRevision([k]);
+    let c_3 = await c1.createRevision([k]);
 
     c_1.revokingItems.add(c2);
     c_1.state.data.amount = "2000";
@@ -248,13 +248,13 @@ unit.test("split join permission split/join", async () => {
 
 
 
-    let c_1 = c1.createRevision([k]);
-    let c_2 = c1.createRevision([k2]);
-    let c_3 = c1.createRevision([k,k2]);
+    let c_1 = await c1.createRevision([k]);
+    let c_2 = await c1.createRevision([k2]);
+    let c_3 = await c1.createRevision([k,k2]);
 
     c_1.revokingItems.add(c2);
     c_1.revokingItems.add(c3);
-    c_1.split(1)[0].state.data.amount = "500";
+    (await c_1.split(1))[0].state.data.amount = "500";
     c_1.state.data.amount = "2500";
     await c_1.seal(true);
     assert(!await c_1.check());
@@ -262,14 +262,14 @@ unit.test("split join permission split/join", async () => {
 
     c_2.revokingItems.add(c2);
     c_2.revokingItems.add(c3);
-    c_2.split(1)[0].state.data.amount = "500";
+    (await c_2.split(1))[0].state.data.amount = "500";
     c_2.state.data.amount = "2500";
     await c_2.seal(true);
     assert(!await c_2.check());
 
     c_3.revokingItems.add(c2);
     c_3.revokingItems.add(c3);
-    c_3.split(1)[0].state.data.amount = "500";
+    (await c_3.split(1))[0].state.data.amount = "500";
     c_3.state.data.amount = "2500";
     await c_3.seal(true);
     assert(await c_3.check());

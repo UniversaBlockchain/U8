@@ -33,7 +33,7 @@ async function checkCreateParcel(contract_file_payload, contract_file_payment, c
 
     let parcel = await cs.createParcel(payload, payment, 20, [privateKey]);
 
-    tt.assertSameContracts(parcel.getPayloadContract(), payload);
+    await tt.assertSameContracts(parcel.getPayloadContract(), payload);
 
     assert(parcel.getPaymentContract().state.branchId === payment.state.branchId);
     assert(parcel.getPaymentContract().definition.data.equals(payment.definition.data));
@@ -53,7 +53,7 @@ async function checkCreateParcelFotTestNet(contract_file_payload) {
 
     let parcel = await cs.createParcel(payload, payment, 20, [privateKey], true);
 
-    tt.assertSameContracts(parcel.getPayloadContract(), payload);
+    await tt.assertSameContracts(parcel.getPayloadContract(), payload);
 
     assert(parcel.getPaymentContract().state.data.transaction_units === 100);
     assert(parcel.getPaymentContract().state.data.test_transaction_units === 10000 - 20);
@@ -72,7 +72,7 @@ async function checkCreatePayingParcel(contract_file_payload, contract_file_paym
 
     let parcel = await cs.createPayingParcel(payload.transactionPack, payment, 20, 30, [privateKey]);
 
-    tt.assertSameContracts(parcel.getPayloadContract(), payload);
+    await tt.assertSameContracts(parcel.getPayloadContract(), payload);
 
     assert(parcel.getPaymentContract().state.branchId === payment.state.branchId);
     assert(parcel.getPaymentContract().definition.data.equals(payment.definition.data));
@@ -94,7 +94,7 @@ async function checkCreatePayingParcelFotTestNet(contract_file_payload) {
 
     let parcel = await cs.createPayingParcel(payload.transactionPack, payment, 20, 30, [privateKey], true);
 
-    tt.assertSameContracts(parcel.getPayloadContract(), payload);
+    await tt.assertSameContracts(parcel.getPayloadContract(), payload);
 
     assert(parcel.getPaymentContract().state.data.transaction_units === 100);
     assert(parcel.getPaymentContract().state.data.test_transaction_units === 10000 - 20);
@@ -253,7 +253,7 @@ unit.test("contractsservice_test: goodAttachDataToNotary", async () => {
     assert(files["ReferencedConditions_contract2_yml"]["file_name"] === "ReferencedConditions_contract2.yml");
     assert(files["ReferencedConditions_contract2_yml"]["file_description"] === "ReferencedConditions_contract2.yml - description");
 
-    let notaryDeserialized = DefaultBiMapper.getInstance().deserialize(BossBiMapper.getInstance().serialize(notaryContract));
+    let notaryDeserialized = await DefaultBiMapper.getInstance().deserialize(await BossBiMapper.getInstance().serialize(notaryContract));
     assert(notaryContract.definition.data.equals(notaryDeserialized.definition.data));
 
     // checking by ContractsService.checkAttachNotaryContract

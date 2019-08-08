@@ -98,7 +98,7 @@ class Constraint extends bs.BiSerializable {
         this.comment = null;
     }
 
-    deserialize(data, deserializer) {
+    async deserialize(data, deserializer) {
 
         if(data.hasOwnProperty("name"))
             this.name = data.name;
@@ -121,37 +121,37 @@ class Constraint extends bs.BiSerializable {
             this.transactional_id = "";
 
         if(data.hasOwnProperty("contract_id") && data.contract_id != null)
-            this.contract_id = deserializer.deserialize(data.contract_id);
+            this.contract_id = await deserializer.deserialize(data.contract_id);
         else
             this.contract_id = null;
 
         if(data.hasOwnProperty("origin") && data.origin != null)
-            this.origin = deserializer.deserialize(data.origin);
+            this.origin = await deserializer.deserialize(data.origin);
         else
             this.origin = null;
 
         if(data.hasOwnProperty("signed_by") && data.signed_by != null)
-            this.signed_by = deserializer.deserialize(data.signed_by);
+            this.signed_by = await deserializer.deserialize(data.signed_by);
         else
             this.signed_by = [];
 
         if(data.hasOwnProperty("roles") && data.roles != null)
-            this.roles = deserializer.deserialize(data.roles);
+            this.roles = await deserializer.deserialize(data.roles);
         else
             this.roles = [];
 
         if(data.hasOwnProperty("fields") && data.fields != null)
-            this.fields = deserializer.deserialize(data.fields);
+            this.fields = await deserializer.deserialize(data.fields);
         else
             this.fields = [];
 
         if(data.hasOwnProperty("where") && data.where != null)
-            this.conditions = deserializer.deserialize(data.where);
+            this.conditions = await deserializer.deserialize(data.where);
         else
             this.conditions = {};
     }
 
-    serialize(serializer) {
+    async serialize(serializer) {
 
         let data = {
             name : this.name,
@@ -173,13 +173,13 @@ class Constraint extends bs.BiSerializable {
         if (this.comment != null)
             data.comment = this.comment;
 
-        return serializer.serialize(data);
+        return await serializer.serialize(data);
     }
 
-    copy() {
+    async copy() {
         let bbm = BossBiMapper.getInstance();
 
-        return bbm.deserialize(bbm.serialize(this));
+        return await bbm.deserialize(await bbm.serialize(this));
     }
 
     equals(to) {

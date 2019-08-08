@@ -31,7 +31,7 @@ async function createTestParcels() {
     return [parcel, parcelFromFile];
 }
 
-function parcelAssertions(parcel1, parcel2) {
+async function parcelAssertions(parcel1, parcel2) {
     assert(parcel1.hashId.equals(parcel2.hashId));
 
     assert(parcel1.payload.contract.id.equals(parcel2.payload.contract.id));
@@ -42,39 +42,39 @@ function parcelAssertions(parcel1, parcel2) {
     assert(parcel1.payment.subItems.size === parcel2.payment.subItems.size);
     assert(parcel1.payment.referencedItems.size === parcel2.payment.referencedItems.size);
 
-    tt.assertSameContracts(parcel1.payload.contract, parcel2.payload.contract);
-    tt.assertSameContracts(parcel1.payment.contract, parcel2.payment.contract);
+    await tt.assertSameContracts(parcel1.payload.contract, parcel2.payload.contract);
+    await tt.assertSameContracts(parcel1.payment.contract, parcel2.payment.contract);
 
     for (let k of parcel1.payload.subItems.keys())
-        tt.assertSameContracts(parcel1.payload.subItems.get(k), parcel2.payload.subItems.get(k));
+        await tt.assertSameContracts(parcel1.payload.subItems.get(k), parcel2.payload.subItems.get(k));
 
     for (let k of parcel1.payload.referencedItems.keys())
-        tt.assertSameContracts(parcel1.payload.referencedItems.get(k), parcel2.payload.referencedItems.get(k));
+        await tt.assertSameContracts(parcel1.payload.referencedItems.get(k), parcel2.payload.referencedItems.get(k));
 
     for (let k of parcel1.payment.subItems.keys())
-        tt.assertSameContracts(parcel1.payment.subItems.get(k), parcel2.payment.subItems.get(k));
+        await tt.assertSameContracts(parcel1.payment.subItems.get(k), parcel2.payment.subItems.get(k));
 
     for (let k of parcel1.payment.referencedItems.keys())
-        tt.assertSameContracts(parcel1.payment.referencedItems.get(k), parcel2.payment.referencedItems.get(k));
+        await tt.assertSameContracts(parcel1.payment.referencedItems.get(k), parcel2.payment.referencedItems.get(k));
 }
 
 unit.test("parcel_test: serializeDeserialize", async () => {
     let [parcel, parcelFromFile] = await createTestParcels();
 
-    let p1 = BossBiMapper.getInstance().serialize(parcel);
-    let p2 = DefaultBiMapper.getInstance().serialize(parcel);
-    let pf1 = BossBiMapper.getInstance().serialize(parcelFromFile);
-    let pf2 = DefaultBiMapper.getInstance().serialize(parcelFromFile);
+    let p1 = await BossBiMapper.getInstance().serialize(parcel);
+    let p2 = await DefaultBiMapper.getInstance().serialize(parcel);
+    let pf1 = await BossBiMapper.getInstance().serialize(parcelFromFile);
+    let pf2 = await DefaultBiMapper.getInstance().serialize(parcelFromFile);
 
-    let desParcel1 = BossBiMapper.getInstance().deserialize(p1);
-    let desParcel2 = DefaultBiMapper.getInstance().deserialize(p2);
-    let desParcelFromFile1 = BossBiMapper.getInstance().deserialize(pf1);
-    let desParcelFromFile2 = DefaultBiMapper.getInstance().deserialize(pf2);
+    let desParcel1 = await BossBiMapper.getInstance().deserialize(p1);
+    let desParcel2 = await DefaultBiMapper.getInstance().deserialize(p2);
+    let desParcelFromFile1 = await BossBiMapper.getInstance().deserialize(pf1);
+    let desParcelFromFile2 = await DefaultBiMapper.getInstance().deserialize(pf2);
 
-    parcelAssertions(parcel, desParcel1);
-    parcelAssertions(parcel, desParcel2);
-    parcelAssertions(parcelFromFile, desParcelFromFile1);
-    parcelAssertions(parcelFromFile, desParcelFromFile2);
+    await parcelAssertions(parcel, desParcel1);
+    await parcelAssertions(parcel, desParcel2);
+    await parcelAssertions(parcelFromFile, desParcelFromFile1);
+    await parcelAssertions(parcelFromFile, desParcelFromFile2);
 
     assert(desParcel1.payload.subItems.size === 1);
     assert(desParcel1.payload.contract.newItems.size === 1);
@@ -96,11 +96,11 @@ unit.test("parcel_test: serializeDeserialize", async () => {
 unit.test("parcel_test: packUnpack", async () => {
     let [parcel, parcelFromFile] = await createTestParcels();
 
-    let desParcel = Parcel.unpack(await parcel.pack());
-    let desParcelFromFile = Parcel.unpack(await parcelFromFile.pack());
+    let desParcel = await Parcel.unpack(await parcel.pack());
+    let desParcelFromFile = await Parcel.unpack(await parcelFromFile.pack());
 
-    parcelAssertions(parcel, desParcel);
-    parcelAssertions(parcelFromFile, desParcelFromFile);
+    await parcelAssertions(parcel, desParcel);
+    await parcelAssertions(parcelFromFile, desParcelFromFile);
 
     assert(desParcel.payload.subItems.size === 1);
     assert(desParcel.payload.contract.newItems.size === 1);

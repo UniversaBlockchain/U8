@@ -122,14 +122,14 @@ unit.test("follower_test: serializeFollowerContract", async () => {
     await followerContract.seal(true);
     assert(await followerContract.check());
 
-    let b = BossBiMapper.getInstance().serialize(followerContract);
-    let b2 = DefaultBiMapper.getInstance().serialize(followerContract);
+    let b = await BossBiMapper.getInstance().serialize(followerContract);
+    let b2 = await DefaultBiMapper.getInstance().serialize(followerContract);
 
-    let desContract = BossBiMapper.getInstance().deserialize(b);
-    let desContract2 = DefaultBiMapper.getInstance().deserialize(b2);
+    let desContract = await BossBiMapper.getInstance().deserialize(b);
+    let desContract2 = await DefaultBiMapper.getInstance().deserialize(b2);
 
-    tt.assertSameContracts(desContract, followerContract);
-    tt.assertSameContracts(desContract2, followerContract);
+    await tt.assertSameContracts(desContract, followerContract);
+    await tt.assertSameContracts(desContract2, followerContract);
 
     assert(NSmartContract.SmartContractType.FOLLOWER1 === desContract.definition.extendedType);
     assert(NSmartContract.SmartContractType.FOLLOWER1 === desContract2.definition.extendedType);
@@ -158,9 +158,9 @@ unit.test("follower_test: serializeFollowerContract", async () => {
     assert(desContract2.isOriginTracking(simpleContract.getOrigin()));
     assert(desContract2.isCallbackURLUsed("http://localhost:7777/follow.callback"));
 
-    let copiedContract = followerContract.copy();
+    let copiedContract = await followerContract.copy();
 
-    tt.assertSameContracts(followerContract, copiedContract);
+    await tt.assertSameContracts(followerContract, copiedContract);
 
     assert(copiedContract instanceof FollowerContract);
 
@@ -220,7 +220,7 @@ unit.test("follower_test: followerContractNewRevision", async () => {
     await simpleContract2.seal(true);
     assert(await simpleContract2.check());
 
-    let newRevFollowerContract = followerContract.createRevision([key]);
+    let newRevFollowerContract = await followerContract.createRevision([key]);
 
     assert(newRevFollowerContract instanceof FollowerContract);
 

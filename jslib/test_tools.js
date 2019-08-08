@@ -76,7 +76,7 @@ async function createFreshU(amount, ownerKeys, withTestU = false) {
     return u;
 }
 
-function assertSameContracts(c1, c2) {
+async function assertSameContracts(c1, c2) {
     // check issuer
     assertSilent(c1.roles.issuer != null);
     assertSilent(c2.roles.issuer != null);
@@ -115,8 +115,8 @@ function assertSameContracts(c1, c2) {
     assertSilent(c1.state.getBranchRevision() === c2.state.getBranchRevision());
 
     assertSilent(c1.state.data.equals(c2.state.data) ||
-        BossBiMapper.getInstance().serialize(c1.state.data).equals(BossBiMapper.getInstance().serialize(c2.state.data)) ||
-        DefaultBiMapper.getInstance().serialize(c1.state.data).equals(DefaultBiMapper.getInstance().serialize(c2.state.data)));
+        (await BossBiMapper.getInstance().serialize(c1.state.data)).equals(await BossBiMapper.getInstance().serialize(c2.state.data)) ||
+        (await DefaultBiMapper.getInstance().serialize(c1.state.data)).equals(await DefaultBiMapper.getInstance().serialize(c2.state.data)));
 
     // check constraints
     assertSilent(Array.from(c1.constraints.values()).every(c => c.equals(c2.findConstraintByName(c.name))));

@@ -168,7 +168,7 @@ class NCallbackService extends CallbackService {
             else
                 return null;
 
-            let data = Boss.dump(call);
+            let data = await Boss.dump(call);
 
             let CRLF = "\r\n"; // Line separator required by multipart/form-data.
             let boundary = "==boundary==" + t.randomString(48);
@@ -278,7 +278,7 @@ class CallbackProcessor {
         this.environmentId = environmentId;
         this.callbackService = callbackService;
         this.delay = 1;
-        this.packedItem = item.getPackedTransaction();
+        this.item = item;
 
         this.isItemSended = false;
         this.executor = null;
@@ -408,7 +408,7 @@ class CallbackProcessor {
                 let signature = null;
                 try {
                     if (this.state === ItemState.APPROVED)
-                        signature = this.callbackService.requestFollowerCallback(this, this.callbackURL, this.packedItem);
+                        signature = this.callbackService.requestFollowerCallback(this, this.callbackURL, await this.item.getPackedTransaction());
                     else if (this.state === ItemState.REVOKED)
                         signature = this.callbackService.requestFollowerCallback(this, this.callbackURL, this.itemId.digest);
                 } catch (err) {

@@ -59,28 +59,28 @@ DefaultBiMapper.registerAdapter(datetimeAdapter);
 
 
 let keyaddressAdapter = new bs.BiAdapter("KeyAddress",crypto.KeyAddress);
-keyaddressAdapter.serialize = function(o,s) {
+keyaddressAdapter.serialize = async function(o,s) {
     return {
-        uaddress : s.serialize(o.packed)
+        uaddress : await s.serialize(o.packed)
     };
 };
 
-keyaddressAdapter.deserialize = function(data,d) {
-    return new crypto.KeyAddress(d.deserialize(data.uaddress));
+keyaddressAdapter.deserialize = async function(data,d) {
+    return new crypto.KeyAddress(await d.deserialize(data.uaddress));
 };
 
 DefaultBiMapper.registerAdapter(keyaddressAdapter);
 
 
 let publickeyAdapter = new bs.BiAdapter("RSAPublicKey",crypto.PublicKey);
-publickeyAdapter.serialize = function(o,s) {
+publickeyAdapter.serialize = async function(o,s) {
     return {
-        packed : s.serialize(o.packed)
+        packed : await s.serialize(o.packed)
     };
 };
 
-publickeyAdapter.deserialize = function(data,d) {
-    return new crypto.PublicKey(d.deserialize(data.packed));
+publickeyAdapter.deserialize = async function(data,d) {
+    return new crypto.PublicKey(await d.deserialize(data.packed));
 };
 
 DefaultBiMapper.registerAdapter(publickeyAdapter);
@@ -88,28 +88,28 @@ DefaultBiMapper.registerAdapter(publickeyAdapter);
 
 
 let privatekeyAdapter = new bs.BiAdapter("RSAPrivateKey",crypto.PrivateKey);
-privatekeyAdapter.serialize = function(o,s) {
+privatekeyAdapter.serialize = async function(o,s) {
     return {
-        packed : s.serialize(o.packed)
+        packed : await s.serialize(o.packed)
     };
 };
 
-privatekeyAdapter.deserialize = function(data,d) {
-    return new crypto.PrivateKey(d.deserialize(data.packed));
+privatekeyAdapter.deserialize = async function(data,d) {
+    return new crypto.PrivateKey(await d.deserialize(data.packed));
 };
 
 DefaultBiMapper.registerAdapter(privatekeyAdapter);
 
 
 let hashidAdapter = new bs.BiAdapter("HashId",crypto.HashId);
-hashidAdapter.serialize = function(o,s) {
+hashidAdapter.serialize = async function(o,s) {
     return {
-        composite3 : s.serialize(o.digest)
+        composite3 : await s.serialize(o.digest)
     };
 };
 
-hashidAdapter.deserialize = function(data,d) {
-    return crypto.HashId.withDigest(d.deserialize(data.composite3));
+hashidAdapter.deserialize = async function(data,d) {
+    return crypto.HashId.withDigest(await d.deserialize(data.composite3));
 };
 
 DefaultBiMapper.registerAdapter(hashidAdapter);

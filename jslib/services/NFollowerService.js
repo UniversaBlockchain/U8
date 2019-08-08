@@ -87,10 +87,10 @@ class NFollowerService extends FollowerService {
         this.startedCallbacks = data.startedCallbacks;
     }
 
-    serialize(serializer) {
+    async serialize(serializer) {
         return {
-            expiresAt : serializer.serialize(this.expiresAt),
-            mutedAt : serializer.serialize(this.mutedAt),
+            expiresAt : await serializer.serialize(this.expiresAt),
+            mutedAt : await serializer.serialize(this.mutedAt),
             spent : this.spent,
             startedCallbacks : this.startedCallbacks
         };

@@ -17,7 +17,7 @@ unit.test("revoke permission serialization", async () => {
     let role2 = new roles.SimpleRole("name",k.publicKey.longAddress);
 
     let rp = new perm.RevokePermission(role);
-    let rp2 = dbm.DefaultBiMapper.getInstance().deserialize(dbm.DefaultBiMapper.getInstance().serialize(rp));
+    let rp2 = await dbm.DefaultBiMapper.getInstance().deserialize(await dbm.DefaultBiMapper.getInstance().serialize(rp));
     let rp3 = new perm.RevokePermission(role2);
     assert(t.valuesEqual(rp,rp2));
     assert(!t.valuesEqual(rp,rp3));

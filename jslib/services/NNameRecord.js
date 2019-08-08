@@ -90,14 +90,14 @@ class NNameRecord extends NameRecord {
         this.entries = new t.GenericSet(deserializer.deserialize(data.entries));
     }
 
-    serialize(serializer) {
+    async serialize(serializer) {
         return {
-            name : serializer.serialize(this.name),
-            nameReduced : serializer.serialize(this.nameReduced),
-            description : serializer.serialize(this.description),
-            url : serializer.serialize(this.url),
-            expiresAt : serializer.serialize(this.expiresAt),
-            entries : serializer.serialize(Array.from(this.entries))
+            name : await serializer.serialize(this.name),
+            nameReduced : await serializer.serialize(this.nameReduced),
+            description : await serializer.serialize(this.description),
+            url : await serializer.serialize(this.url),
+            expiresAt : await serializer.serialize(this.expiresAt),
+            entries : await serializer.serialize(Array.from(this.entries))
         };
     }
 

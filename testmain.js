@@ -19,13 +19,13 @@ async function testReadLines() {
 
 const Boss = require('boss.js');
 
-function testBoss() {
+async function testBoss() {
 
     //UNCOMMENT TO MAKE BOSS WORK
     //delete Object.prototype.equals;
 
     let src = {hello: 'world', data: [1, 2, 3]};
-    let packed = Boss.dump(src);
+    let packed = await Boss.dump(src);
     assert(JSON.stringify(Boss.load(packed)) == JSON.stringify(src));
     let reader = new Boss.Reader(packed);
     console.log(JSON.stringify(reader.read()));
@@ -62,7 +62,7 @@ async function testContract() {
     let input = await io.openRead("../test/ttt.unicon");
     let sealed = await input.allBytes();
 
-    let contract = TransactionPack.unpack(sealed).contract;
+    let contract = await TransactionPack.unpack(sealed).contract;
     logContractTree(contract,"root");
     await contract.check();
     console.log(JSON.stringify(contract.errors));
@@ -79,7 +79,7 @@ async function testContract() {
     c.transactionPack = new TransactionPack(c);
     let tp = await c.transactionPack.pack();
 
-    let c2 = TransactionPack.unpack(tp).contract;
+    let c2 = await TransactionPack.unpack(tp).contract;
     await c2.check();
     console.log(JSON.stringify(c2.errors));
     assert(c2.errors.length === 0);
@@ -91,7 +91,7 @@ async function testContract2() {
     let input = await io.openRead("../test/sc.unicon");
     let sealed = await input.allBytes();
 
-    let contract = TransactionPack.unpack(sealed).contract;
+    let contract = await TransactionPack.unpack(sealed).contract;
     logContractTree(contract, "root");
     await contract.check();
     console.log(JSON.stringify(contract.errors));

@@ -361,8 +361,8 @@ class NetworkV2 extends Network {
             //connection.setRequestProperty("Connection", "close");
             //connection.setConnectTimeout(4000);
             //connection.setReadTimeout(maxTimeout);
-            this.httpClient.sendGetRequestUrl(URL, (respCode, body) => {
-                let item = (respCode === 200) ? TransactionPack.unpack(body, true).contract : null;
+            this.httpClient.sendGetRequestUrl(URL, async (respCode, body) => {
+                let item = (respCode === 200) ? await TransactionPack.unpack(body, true).contract : null;
                 event.fire(item);
             });
 
@@ -433,8 +433,8 @@ class NetworkV2 extends Network {
             //connection.setRequestProperty("Connection", "close");
             //connection.setConnectTimeout(4000);
             //connection.setReadTimeout(maxTimeout);
-            this.httpClient.sendGetRequestUrl(URL, (respCode, body) => {
-                let parcel = (respCode === 200) ? Parcel.unpack(body) : null;
+            this.httpClient.sendGetRequestUrl(URL, async (respCode, body) => {
+                let parcel = (respCode === 200) ? await Parcel.unpack(body) : null;
                 event.fire(parcel);
             });
 
@@ -473,7 +473,7 @@ class NetworkV2 extends Network {
         let event = new Promise((resolve) => {fire = resolve});
         let err = null;
 
-        client.command("getState", {itemId: id}, (result) => fire(result), (error) => {
+        await client.command("getState", {itemId: id}, (result) => fire(result), (error) => {
             err = error;
             fire(null);
         });

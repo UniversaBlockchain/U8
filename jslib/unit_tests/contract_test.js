@@ -24,16 +24,16 @@ unit.test("contract copy test", async () => {
 
     await c1.seal(true);
 
-    let c2 = c1.copy();
+    let c2 = await c1.copy();
 
-    let s1 = bbm.BossBiMapper.getInstance().serialize(c1);
-    let s2 = bbm.BossBiMapper.getInstance().serialize(c2);
+    let s1 = await bbm.BossBiMapper.getInstance().serialize(c1);
+    let s2 = await bbm.BossBiMapper.getInstance().serialize(c2);
 
     assert(t.valuesEqual(s1,s2));
     assert(d.Delta.between(null,s1,s2) == null);
 
-    let ds1 = dbm.DefaultBiMapper.getInstance().serialize(c1);
-    let ds2 = dbm.DefaultBiMapper.getInstance().serialize(c2);
+    let ds1 = await dbm.DefaultBiMapper.getInstance().serialize(c1);
+    let ds2 = await dbm.DefaultBiMapper.getInstance().serialize(c2);
 
     assert(t.valuesEqual(ds1,ds2));
     assert(d.Delta.between(null,ds1,ds2) == null);
@@ -49,9 +49,9 @@ unit.test("contract packing test", async () => {
 
     let bb = await c1.seal();
 
-    let c2 = cnt.Contract.fromSealedBinary(bb);
+    let c2 = await cnt.Contract.fromSealedBinary(bb);
 
-    tt.assertSameContracts(c1, c2);
+    await tt.assertSameContracts(c1, c2);
 });
 
 unit.test("transactionPack packing test", async () => {
@@ -66,9 +66,9 @@ unit.test("transactionPack packing test", async () => {
 
     let bb = await c1.getPackedTransaction();
 
-    let c2 = cnt.Contract.fromPackedTransaction(bb);
+    let c2 = await cnt.Contract.fromPackedTransaction(bb);
 
-    tt.assertSameContracts(c1, c2);
+    await tt.assertSameContracts(c1, c2);
 });
 
 unit.test("unpack contract from fromPackedTransaction", async () => {
@@ -81,7 +81,7 @@ unit.test("unpack contract from fromPackedTransaction", async () => {
 
     let bb = await c1.seal();
 
-    let c2 = cnt.Contract.fromPackedTransaction(bb);
+    let c2 = await cnt.Contract.fromPackedTransaction(bb);
 
-    tt.assertSameContracts(c1, c2);
+    await tt.assertSameContracts(c1, c2);
 });

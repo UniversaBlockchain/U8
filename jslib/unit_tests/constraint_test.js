@@ -13,7 +13,7 @@ const PrivateKey = require('crypto').PrivateKey;
 
 const ROOT_PATH = "../test/constraints/";
 
-unit.test("constraint copy test", () => {
+unit.test("constraint copy test", async () => {
 
     let c1 = new Constraint(Contract.fromPrivateKey(TestKeys.getKey()));
     c1.name = "c1";
@@ -22,18 +22,18 @@ unit.test("constraint copy test", () => {
     conds[Constraint.conditionsModeType.all_of] = ["this.state.data.n1 == 1", "ref.definition.data.s1 == \"string1\""];
     c1.setConditions(conds);
 
-    let c2 = c1.copy();
+    let c2 = await c1.copy();
 
     c2.baseContract = null;
 
-    let s1 = BossBiMapper.getInstance().serialize(c1);
-    let s2 = BossBiMapper.getInstance().serialize(c2);
+    let s1 = await BossBiMapper.getInstance().serialize(c1);
+    let s2 = await BossBiMapper.getInstance().serialize(c2);
 
     assert(t.valuesEqual(s1,s2));
     assert(d.Delta.between(null,s1,s2) == null);
 
-    let ds1 = DefaultBiMapper.getInstance().serialize(c1);
-    let ds2 = DefaultBiMapper.getInstance().serialize(c2);
+    let ds1 = await DefaultBiMapper.getInstance().serialize(c1);
+    let ds2 = await DefaultBiMapper.getInstance().serialize(c2);
 
     assert(t.valuesEqual(ds1,ds2));
     assert(d.Delta.between(null,ds1,ds2) == null);
@@ -336,7 +336,7 @@ unit.test("constraint test: checkConstraints", async () => {
 
     await contract2.seal();
 
-    let contract3 = contract2.createRevision([key]);
+    let contract3 = await contract2.createRevision([key]);
     await contract3.seal();
 
     // signature to check can_play operator
@@ -359,7 +359,7 @@ unit.test("constraint test: checkConstraints", async () => {
     tpack.subItems.set(contract3.id, contract3);
     tpack.referencedItems.set(contract3.id, contract3);
 
-    //contract1 = new Contract.fromSealedBinary(contract1.sealedBinary, tpack);
+    //contract1 = await Contract.fromSealedBinary(contract1.sealedBinary, tpack);
 
     await contract1.check();
 
@@ -417,7 +417,7 @@ unit.test("constraint test: checkConstraintsAPILevel4", async () => {
 
     await contract2.seal();
 
-    let contract3 = contract2.createRevision([key]);
+    let contract3 = await contract2.createRevision([key]);
     await contract3.seal();
 
     // signature to check can_play operator
@@ -440,7 +440,7 @@ unit.test("constraint test: checkConstraintsAPILevel4", async () => {
     tpack.subItems.set(contract3.id, contract3);
     tpack.referencedItems.set(contract3.id, contract3);
 
-    //contract1 = new Contract.fromSealedBinary(contract1.sealedBinary, tpack);
+    //contract1 = await Contract.fromSealedBinary(contract1.sealedBinary, tpack);
 
     await contract1.check();
 
@@ -475,8 +475,8 @@ unit.test("constraint test: checkConstraintsBetweenContracts", async () => {
     tpack.subItems.set(contract3.id, contract3);
     tpack.referencedItems.set(contract3.id, contract3);
 
-    let refContract1 = Contract.fromSealedBinary(contract1.sealedBinary, tpack);
-    let refContract2 = Contract.fromSealedBinary(contract3.sealedBinary, tpack);
+    let refContract1 = await Contract.fromSealedBinary(contract1.sealedBinary, tpack);
+    let refContract2 = await Contract.fromSealedBinary(contract3.sealedBinary, tpack);
 
     await refContract1.check();
     await refContract2.check();
@@ -523,8 +523,8 @@ unit.test("constraint test: checkConstraintsBetweenContractsAPILevel4", async ()
     tpack.subItems.set(contract3.id, contract3);
     tpack.referencedItems.set(contract3.id, contract3);
 
-    let refContract1 = Contract.fromSealedBinary(contract1.sealedBinary, tpack);
-    let refContract2 = Contract.fromSealedBinary(contract3.sealedBinary, tpack);
+    let refContract1 = await Contract.fromSealedBinary(contract1.sealedBinary, tpack);
+    let refContract2 = await Contract.fromSealedBinary(contract3.sealedBinary, tpack);
 
     await refContract1.check();
     await refContract2.check();

@@ -45,11 +45,11 @@ class NNameRecordEntry extends NameRecordEntry {
             this.longAddress = null;
     }
 
-    serialize(serializer) {
+    async serialize(serializer) {
         return {
-            origin : serializer.serialize(this.origin),
-            shortAddress : serializer.serialize(this.shortAddress),
-            longAddress : serializer.serialize(this.longAddress)
+            origin : await serializer.serialize(this.origin),
+            shortAddress : await serializer.serialize(this.shortAddress),
+            longAddress : await serializer.serialize(this.longAddress)
         };
     }
 

@@ -54,24 +54,24 @@ class ItemResult {
         return res;
     }
 
-    deserialize(data, deserializer) {
+    async deserialize(data, deserializer) {
         this.state = ItemState.byVal.get(data.state);
         this.haveCopy = data.haveCopy;
 
         if(data.hasOwnProperty("createdAt")) {
-            this.createdAt = deserializer.deserialize(data.createdAt);
+            this.createdAt = await deserializer.deserialize(data.createdAt);
         } else {
             this.createdAt = null;
         }
 
         if(data.hasOwnProperty("expiresAt")) {
-            this.expiresAt = deserializer.deserialize(data.expiresAt);
+            this.expiresAt = await deserializer.deserialize(data.expiresAt);
         } else {
             this.expiresAt = null;
         }
 
         if(data.hasOwnProperty("errors")) {
-            this.errors = deserializer.deserialize(data.errors);
+            this.errors = await deserializer.deserialize(data.errors);
         } else {
             this.errors = [];
         }
@@ -83,28 +83,28 @@ class ItemResult {
         }
 
         if(data.hasOwnProperty("lockedById")) {
-            this.lockedById = deserializer.deserialize(data.lockedById);
+            this.lockedById = await deserializer.deserialize(data.lockedById);
         } else {
             this.lockedById = null;
         }
 
         if(data.hasOwnProperty("extra")) {
-            this.extra = deserializer.deserialize(data.extra);
+            this.extra = await deserializer.deserialize(data.extra);
         } else {
             this.extra = {};
         }
     }
 
-    serialize(serializer) {
+    async serialize(serializer) {
         return {
-            state:this.state.val,
-            createdAt:serializer.serialize(this.createdAt),
-            expiresAt:serializer.serialize(this.expiresAt),
-            errors:serializer.serialize(this.errors),
-            isTestnet:this.isTestnet,
-            lockedById:serializer.serialize(this.lockedById),
-            extra:serializer.serialize(this.extra),
-            haveCopy:this.haveCopy
+            state: this.state.val,
+            createdAt: await serializer.serialize(this.createdAt),
+            expiresAt: await serializer.serialize(this.expiresAt),
+            errors: await serializer.serialize(this.errors),
+            isTestnet: this.isTestnet,
+            lockedById: await serializer.serialize(this.lockedById),
+            extra: await serializer.serialize(this.extra),
+            haveCopy: this.haveCopy
         }
     }
 

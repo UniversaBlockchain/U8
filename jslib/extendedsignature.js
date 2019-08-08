@@ -37,7 +37,7 @@ class ExtendedSignature {
 
         let targetSignature = await ExtendedSignature.createTargetSignature(privateKey.publicKey,data,savePublicKey);
 
-        return ExtendedSignature.of(targetSignature,
+        return await ExtendedSignature.of(targetSignature,
             await privateKey.sign(targetSignature, crypto.SHA512),
             await privateKey.sign(targetSignature, crypto.SHA3_384));
     }

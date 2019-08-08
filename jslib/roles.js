@@ -114,7 +114,7 @@ class Role extends bs.BiSerializable {
         return false;
     }
 
-    deserialize(data, deserializer) {
+    async deserialize(data, deserializer) {
         this.name = data.name;
 
         if(data.hasOwnProperty("comment"))
@@ -126,29 +126,28 @@ class Role extends bs.BiSerializable {
             let required = data.required;
             if(required != null) {
                 if(required.hasOwnProperty(RequiredMode.ALL_OF)) {
-                    let array = deserializer.deserialize(required[RequiredMode.ALL_OF]);
+                    let array = await deserializer.deserialize(required[RequiredMode.ALL_OF]);
                     array.forEach(item => this.requiredAllConstraints.add(item))
                 }
 
                 if(required.hasOwnProperty(RequiredMode.ANY_OF)) {
-                    let array = deserializer.deserialize(required[RequiredMode.ANY_OF]);
+                    let array = await deserializer.deserialize(required[RequiredMode.ANY_OF]);
                     array.forEach(item => this.requiredAnyConstraints.add(item))
                 }
             }
         }
     }
 
-    serialize(serializer) {
+    async serialize(serializer) {
         let res = {name:this.name};
         if(this.requiredAnyConstraints.size + this.requiredAllConstraints.size > 0) {
             let required = {};
-            if(this.requiredAnyConstraints.size > 0) {
-                required[RequiredMode.ANY_OF] = serializer.serialize(this.requiredAnyConstraints);
-            }
+            if (this.requiredAnyConstraints.size > 0)
+                required[RequiredMode.ANY_OF] = await serializer.serialize(this.requiredAnyConstraints);
 
-            if(this.requiredAllConstraints.size > 0) {
-                required[RequiredMode.ALL_OF] = serializer.serialize(this.requiredAllConstraints);
-            }
+            if (this.requiredAllConstraints.size > 0)
+                required[RequiredMode.ALL_OF] = await serializer.serialize(this.requiredAllConstraints);
+
             res.required = required;
         }
         return res;
@@ -283,13 +282,13 @@ class RoleLink extends Role {
         return this.contract.roles[this.roleName].containConstraint(name);
     }
 
-    deserialize(data, deserializer) {
-        Object.getPrototypeOf(RoleLink.prototype).deserialize.call(this,data,deserializer);
+    async deserialize(data, deserializer) {
+        await Object.getPrototypeOf(RoleLink.prototype).deserialize.call(this,data,deserializer);
         this.roleName = data.target_name;
     }
 
-    serialize(serializer) {
-        let data = Object.getPrototypeOf(RoleLink.prototype).serialize.call(this,serializer);
+    async serialize(serializer) {
+        let data = await Object.getPrototypeOf(RoleLink.prototype).serialize.call(this,serializer);
         data.target_name = this.roleName;
         return data;
     }
@@ -440,8 +439,8 @@ class ListRole extends Role {
         return contain;
     }
 
-    deserialize(data, deserializer) {
-        Object.getPrototypeOf(ListRole.prototype).deserialize.call(this,data,deserializer);
+    async deserialize(data, deserializer) {
+        await Object.getPrototypeOf(ListRole.prototype).deserialize.call(this,data,deserializer);
 
         this.quorumSize = data.quorumSize;
 
@@ -456,15 +455,15 @@ class ListRole extends Role {
 
         let roles = data.roles;
         for(let r of roles) {
-            this.roles.push(deserializer.deserialize(r));
+            this.roles.push(await deserializer.deserialize(r));
         }
     }
 
-    serialize(serializer) {
-        let data = Object.getPrototypeOf(ListRole.prototype).serialize.call(this,serializer);
+    async serialize(serializer) {
+        let data = await Object.getPrototypeOf(ListRole.prototype).serialize.call(this,serializer);
         data.quorumSize = this.quorumSize;
         data.mode = ListRoleMode[this.mode];
-        data.roles = serializer.serialize(this.roles);
+        data.roles = await serializer.serialize(this.roles);
         return data;
     }
 
@@ -622,28 +621,28 @@ class SimpleRole extends Role {
         return true;
     }
 
-    deserialize(data, deserializer) {
-        Object.getPrototypeOf(SimpleRole.prototype).deserialize.call(this,data,deserializer);
+    async deserialize(data, deserializer) {
+        await Object.getPrototypeOf(SimpleRole.prototype).deserialize.call(this,data,deserializer);
 
-        for(let key of deserializer.deserialize(data.keys)) {
+        for(let key of await deserializer.deserialize(data.keys)) {
             this.keyRecords.set(key.key,new KeyRecord(key.key));
         }
 
-        for(let address of deserializer.deserialize(data.addresses)) {
+        for(let address of await deserializer.deserialize(data.addresses)) {
             this.keyAddresses.add(address);
         }
 
     }
 
-    serialize(serializer) {
-        let data = Object.getPrototypeOf(SimpleRole.prototype).serialize.call(this,serializer);
+    async serialize(serializer) {
+        let data = await Object.getPrototypeOf(SimpleRole.prototype).serialize.call(this,serializer);
 
         let array = [];
         for (let v of this.keyRecords.values())
             array.push(v);
 
-        data.keys = serializer.serialize(array);
-        data.addresses = serializer.serialize(this.keyAddresses);
+        data.keys = await serializer.serialize(array);
+        data.addresses = await serializer.serialize(this.keyAddresses);
 
         return data;
     }

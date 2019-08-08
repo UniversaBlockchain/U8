@@ -134,26 +134,26 @@ class UnsName extends bs.BiSerializable {
             this.unsRecords.splice(index, 1);
     }
 
-    serialize(serializer) {
+    async serialize(serializer) {
         let data = {};
 
         data[UnsName.NAME_FIELD_NAME] = this.unsName;
         data[UnsName.DESCRIPTION_FIELD_NAME] = this.unsDescription;
         data[UnsName.URL_FIELD_NAME] = this.unsURL;
-        data[UnsName.ENTRIES_FIELD_NAME] = serializer.serialize(this.unsRecords);
+        data[UnsName.ENTRIES_FIELD_NAME] = await serializer.serialize(this.unsRecords);
 
         if (this.unsReducedName != null)
-            data[UnsName.NAME_REDUCED_FIELD_NAME] = serializer.serialize(this.unsReducedName);
+            data[UnsName.NAME_REDUCED_FIELD_NAME] = await serializer.serialize(this.unsReducedName);
 
         return data;
     }
 
-    deserialize(data, deserializer) {
+    async deserialize(data, deserializer) {
         this.unsReducedName = data[UnsName.NAME_REDUCED_FIELD_NAME];
         this.unsName = data[UnsName.NAME_FIELD_NAME];
         this.unsDescription = data[UnsName.DESCRIPTION_FIELD_NAME];
         this.unsURL = data[UnsName.URL_FIELD_NAME];
-        this.unsRecords = deserializer.deserialize(data[UnsName.ENTRIES_FIELD_NAME]);
+        this.unsRecords = await deserializer.deserialize(data[UnsName.ENTRIES_FIELD_NAME]);
     }
 }
 

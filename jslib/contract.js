@@ -44,28 +44,28 @@ class Transactional extends bs.BiSerializable {
         this.data = {};
     }
 
-    serialize(serializer) {
+    async serialize(serializer) {
 
         let of = {
             id: this.id,
-            constraints : serializer.serialize(this.constraints),
+            constraints : await serializer.serialize(this.constraints),
             data : this.data,
         };
 
         if (this.validUntil != null)
             of.valid_until = this.validUntil;
 
-        return serializer.serialize(of);
+        return await serializer.serialize(of);
     }
 
-    deserialize(data, deserializer) {
+    async deserialize(data, deserializer) {
         if(data != null) {
             this.id = data.id;
 
             if (data.hasOwnProperty("constraints"))
-                this.constraints = new t.GenericSet(deserializer.deserialize(data.constraints));
+                this.constraints = new t.GenericSet(await deserializer.deserialize(data.constraints));
             else if (data.hasOwnProperty("references"))
-                this.constraints = new t.GenericSet(deserializer.deserialize(data.references));
+                this.constraints = new t.GenericSet(await deserializer.deserialize(data.references));
             else
                 this.constraints = new t.GenericSet();
 
@@ -147,7 +147,7 @@ class State extends bs.BiSerializable {
         this.branchId = this.revision + ":" + number;
     }
 
-    serialize(serializer) {
+    async serialize(serializer) {
         let of = {
             created_at: this.createdAt,
             revision: this.revision,
@@ -163,15 +163,15 @@ class State extends bs.BiSerializable {
             of.expires_at = this.expiresAt;
 
         if (this.constraints != null)
-            of.constraints = serializer.serialize(this.constraints);
+            of.constraints = await serializer.serialize(this.constraints);
 
-        return serializer.serialize(of);
+        return await serializer.serialize(of);
     }
 
-    deserialize(data, deserializer) {
-        this.createdAt = deserializer.deserialize(data.created_at);
+    async deserialize(data, deserializer) {
+        this.createdAt = await deserializer.deserialize(data.created_at);
         if(data.hasOwnProperty("expires_at"))
-            this.expiresAt = deserializer.deserialize(data.expires_at);
+            this.expiresAt = await deserializer.deserialize(data.expires_at);
         else
             this.expiresAt = null;
 
@@ -180,17 +180,17 @@ class State extends bs.BiSerializable {
             throw new ex.IllegalArgumentError("illegal revision number: " + this.revision);
 
         if (data.hasOwnProperty("constraints"))
-            this.constraints = new t.GenericSet(deserializer.deserialize(data.constraints));
+            this.constraints = new t.GenericSet(await deserializer.deserialize(data.constraints));
         else if (data.hasOwnProperty("references"))
-            this.constraints = new t.GenericSet(deserializer.deserialize(data.references));
+            this.constraints = new t.GenericSet(await deserializer.deserialize(data.references));
         else
             this.constraints = new t.GenericSet();
 
-        let r = this.contract.registerRole(deserializer.deserialize(data.owner))
+        let r = this.contract.registerRole(await deserializer.deserialize(data.owner))
         if(r.name !== "owner")
             throw new ex.IllegalArgumentError("bad owner role name");
 
-        r = this.contract.registerRole(deserializer.deserialize(data.created_by))
+        r = this.contract.registerRole(await deserializer.deserialize(data.created_by))
         if(r.name !== "creator")
             throw new ex.IllegalArgumentError("bad creator role name");
 
@@ -207,13 +207,13 @@ class State extends bs.BiSerializable {
 
 
         if(data.hasOwnProperty("parent") && data.parent != null)
-            this.parent = deserializer.deserialize(data.parent);
+            this.parent = await deserializer.deserialize(data.parent);
         else
             this.parent = null;
 
 
         if(data.hasOwnProperty("origin") && data.origin != null)
-            this.origin = deserializer.deserialize(data.origin);
+            this.origin = await deserializer.deserialize(data.origin);
         else
             this.origin = null;
     }
@@ -316,7 +316,7 @@ class Definition extends bs.BiSerializable {
         return t.valuesEqual(this.constraints,to.constraints);
     }
 
-    serialize(serializer) {
+    async serialize(serializer) {
 
         let pb = {};
         for (let plist of this.permissions.values()) {
@@ -325,7 +325,7 @@ class Definition extends bs.BiSerializable {
                     throw new ex.IllegalArgumentError("permission without id: " + perm);
                 if (pb.hasOwnProperty(perm.id))
                     throw new ex.IllegalArgumentError("permission: duplicate permission id found: " + perm);
-                pb[perm.id] = serializer.serialize(perm);
+                pb[perm.id] = await serializer.serialize(perm);
             }
         }
 
@@ -340,22 +340,22 @@ class Definition extends bs.BiSerializable {
             of.expires_at = this.expiresAt;
 
         if (this.constraints != null)
-            of.constraints = serializer.serialize(this.constraints);
+            of.constraints = await serializer.serialize(this.constraints);
 
         if (this.extendedType != null)
             of.extended_type = this.extendedType;
 
-        return serializer.serialize(of);
+        return await serializer.serialize(of);
     }
 
-    deserialize(data, deserializer) {
-        let r = this.contract.registerRole(deserializer.deserialize(data.issuer));
+    async deserialize(data, deserializer) {
+        let r = this.contract.registerRole(await deserializer.deserialize(data.issuer));
         if(r.name !== "issuer")
             throw new ex.IllegalArgumentError("issuer creator role name");
 
-        this.createdAt = deserializer.deserialize(data.created_at);
+        this.createdAt = await deserializer.deserialize(data.created_at);
         if(data.hasOwnProperty("expires_at")) {
-            this.expiresAt = deserializer.deserialize(data.expires_at);
+            this.expiresAt = await deserializer.deserialize(data.expires_at);
         } else {
             this.expiresAt = null;
         }
@@ -373,13 +373,13 @@ class Definition extends bs.BiSerializable {
         }
 
         if (data.hasOwnProperty("constraints"))
-            this.constraints = new t.GenericSet(deserializer.deserialize(data.constraints));
+            this.constraints = new t.GenericSet(await deserializer.deserialize(data.constraints));
         else if (data.hasOwnProperty("references"))
-            this.constraints = new t.GenericSet(deserializer.deserialize(data.references));
+            this.constraints = new t.GenericSet(await deserializer.deserialize(data.references));
         else
             this.constraints = new t.GenericSet();
 
-        let perms = deserializer.deserialize(data.permissions);
+        let perms = await deserializer.deserialize(data.permissions);
         for(let pid of Object.keys(perms)) {
             perms[pid].id = pid;
             this.addPermission(perms[pid]);
@@ -749,7 +749,7 @@ class Contract extends bs.BiSerializable {
             newIds.push(ni.id);
         }
 
-        let forPack = BossBiMapper.getInstance().serialize(
+        let forPack = await BossBiMapper.getInstance().serialize(
             {
                 "contract" : this,
                 "revoking" : revokingIds,
@@ -807,25 +807,24 @@ class Contract extends bs.BiSerializable {
     return sealedBinary;*/
     }
 
-    serialize(serializer) {
+    async serialize(serializer) {
         let binder = {
             api_level: this.apiLevel,
-            definition : this.definition.serialize(serializer),
-            state : this.state.serialize(serializer)
+            definition : await this.definition.serialize(serializer),
+            state : await this.state.serialize(serializer)
         };
 
 
-        if(this.transactional != null)
-            binder.transactional = this.transactional.serialize(serializer);
+        if (this.transactional != null)
+            binder.transactional = await this.transactional.serialize(serializer);
 
         //    console.log(JSON.stringify(binder));
 
         return binder;
     }
 
-    deserialize(data, deserializer) {
+    async deserialize(data, deserializer) {
         //console.log(JSON.stringify(data));
-
 
         let l = data.api_level;
         if (l > MAX_API_LEVEL)
@@ -833,15 +832,14 @@ class Contract extends bs.BiSerializable {
 
         if (this.definition == null)
             this.definition = new Definition(this);
-        this.definition.deserialize(data.definition, deserializer);
+        await this.definition.deserialize(data.definition, deserializer);
 
-
-        this.state.deserialize(data.state, deserializer);
+        await this.state.deserialize(data.state, deserializer);
 
         if (data.hasOwnProperty("transactional")) {
             if (this.transactional == null)
                 this.transactional = new Transactional();
-            this.transactional.deserialize(data.transactional, deserializer);
+            await this.transactional.deserialize(data.transactional, deserializer);
         } else {
             this.transactional = null;
         }
@@ -1045,7 +1043,7 @@ class Contract extends bs.BiSerializable {
             if (this.state.origin == null)
                 this.checkRootContract();
             else
-                this.checkChangedContract();
+                await this.checkChangedContract();
 
         } catch (e) {
             if(t.THROW_EXCEPTIONS)
@@ -1467,7 +1465,7 @@ class Contract extends bs.BiSerializable {
         }
     }
 
-    checkChangedContract() {
+    async checkChangedContract() {
         this.updateContext();
         let parent;
         // if exist siblings for contract (more then itself)
@@ -1490,7 +1488,7 @@ class Contract extends bs.BiSerializable {
                 this.errors.push(new ErrorRecord(Errors.BAD_VALUE, "state.parent", "illegal parent reference"));
 
             let delta = new ContractDelta(parent, this);
-            delta.check();
+            await delta.check();
 
             this.checkRevokePermissions(delta.revokingItems);
         }
@@ -1827,10 +1825,10 @@ class Contract extends bs.BiSerializable {
         this.isNeedVerifySealedKeys = false;
     }
 
-    copy() {
+    async copy() {
         let bbm = BossBiMapper.getInstance();
 
-        return bbm.deserialize(bbm.serialize(this));
+        return await bbm.deserialize(await bbm.serialize(this));
 
     }
 
@@ -1840,8 +1838,8 @@ class Contract extends bs.BiSerializable {
      * @param {Iterable<crypto.PrivateKey> | null} keys - Creator keys for new revision.
      * @returns {Contract} new revision of a contract.
      */
-    createRevision(keys = null) {
-        let newRevision = this.copy();
+    async createRevision(keys = null) {
+        let newRevision = await this.copy();
 
         newRevision.state.revision = this.state.revision + 1;
         newRevision.state.createdAt = new Date();
@@ -1882,7 +1880,7 @@ class Contract extends bs.BiSerializable {
      * @param count {number} - Count of contracts to split from current.
      * @returns {Array<Contract>} of contracts split.
      */
-    split(count) {
+    async split(count) {
         // we can split only the new revision and only once this time
         if (this.state.getBranchRevision() === this.state.revision)
             throw new ex.IllegalStateError("this revision is already split");
@@ -1896,7 +1894,7 @@ class Contract extends bs.BiSerializable {
         let results = [];
         for (let i = 0; i < count; i++) {
             // we can't create revision as this is already a new revision, so we copy self:
-            let c = this.copy();
+            let c = await this.copy();
             // keys are not COPIED by default
             this.keysToSignWith.forEach(k => c.keysToSignWith.add(k));
             // save branch information
@@ -1921,8 +1919,8 @@ class Contract extends bs.BiSerializable {
      *
      * @return {Contract} new sibling contract with the extracted value.
      */
-     splitValue(fieldName, valueToExtract)  {
-        let sibling = this.split(1)[0];
+     async splitValue(fieldName, valueToExtract)  {
+        let sibling = (await this.split(1))[0];
 
         if (typeof this.state.data[fieldName] !== "string")
             throw new ex.IllegalArgumentError("splitValue: illegal amount in field state.data." + fieldName);
@@ -2072,7 +2070,7 @@ class Contract extends bs.BiSerializable {
      * @param contract - init contract (example, NSmartContract). Optional.
      * @returns {Contract | NSmartContract | SlotContract | UnsContract | FollowerContract} extracted contract
      */
-    static fromSealedBinary(sealed, transactionPack = null, contract = undefined) {
+    static async fromSealedBinary(sealed, transactionPack = null, contract = undefined) {
         let result = (contract === undefined) ? new Contract() : contract;
         if (transactionPack == null)
             transactionPack = new TransactionPack(result);
@@ -2089,26 +2087,26 @@ class Contract extends bs.BiSerializable {
         result.apiLevel = data.version;
         let contractBytes = data.data;
         let payload = Boss.load(contractBytes,null);
-        result.deserialize(payload.contract,BossBiMapper.getInstance());
+        await result.deserialize(payload.contract, BossBiMapper.getInstance());
 
         if(result.apiLevel < 3) {
             if(payload.hasOwnProperty("revoking"))
                 for(let packed of payload.revoking) {
-                    let c = Contract.fromSealedBinary(packed,transactionPack);
+                    let c = await Contract.fromSealedBinary(packed,transactionPack);
                     result.revokingItems.add(c);
                     transactionPack.addSubItem(c);
                 }
 
             if(payload.hasOwnProperty("new"))
                 for(let packed of payload.new) {
-                    let c = Contract.fromSealedBinary(packed,transactionPack);
+                    let c = await Contract.fromSealedBinary(packed,transactionPack);
                     result.newItems.add(c);
                     transactionPack.addSubItem(c);
                 }
         } else {
             if(payload.hasOwnProperty("revoking"))
                 for(let b of payload.revoking) {
-                    let hid = BossBiMapper.getInstance().deserialize(b);
+                    let hid = await BossBiMapper.getInstance().deserialize(b);
                     let r = transactionPack.subItems.get(hid);
                     if(r != null) {
                         result.revokingItems.add(r);
@@ -2120,7 +2118,7 @@ class Contract extends bs.BiSerializable {
 
             if(payload.hasOwnProperty("new"))
                 for(let b of payload.new) {
-                    let hid = BossBiMapper.getInstance().deserialize(b);
+                    let hid = await BossBiMapper.getInstance().deserialize(b);
                     let r = transactionPack.subItems.get(hid);
                     if(r != null) {
                         result.newItems.add(r);
@@ -2151,7 +2149,7 @@ class Contract extends bs.BiSerializable {
         let data = await input.allAsString();
         await input.close();
 
-        let root = DefaultBiMapper.getInstance().deserialize(yaml.load(data));
+        let root = await DefaultBiMapper.getInstance().deserialize(yaml.load(data));
 
         let c = (contract === undefined) ? new Contract() : contract;
         return c.initializeWithDsl(root);
@@ -2179,8 +2177,8 @@ class Contract extends bs.BiSerializable {
      * @param packedItem some packed from of the universa contract
      * @return {Contract} unpacked contract
      */
-    static fromPackedTransaction(packedItem) {
-        let tp = TransactionPack.unpack(packedItem);
+    static async fromPackedTransaction(packedItem) {
+        let tp = await TransactionPack.unpack(packedItem);
         return tp.contract;
     }
 
@@ -2194,7 +2192,7 @@ class Contract extends bs.BiSerializable {
     async getPackedTransaction() {
         if (this.transactionPack == null)
             this.transactionPack = new TransactionPack(this);
-        return this.transactionPack.pack();
+        return await this.transactionPack.pack();
     }
 
     /**

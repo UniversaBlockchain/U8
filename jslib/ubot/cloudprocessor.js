@@ -141,10 +141,10 @@ class ProcessSendStartingContract extends ProcessBase {
         this.pr.pool.push(me);
     }
 
-    start() {
+    async start() {
         this.pr.logger.log("start ProcessSendStartingContract");
 
-        this.pr.executableContract = Contract.fromPackedTransaction(this.pr.startingContract.transactional.data.executableContract);
+        this.pr.executableContract = await Contract.fromPackedTransaction(this.pr.startingContract.transactional.data.executableContract);
 
         this.selectPool();
 
@@ -195,11 +195,11 @@ class ProcessDownloadStartingContract extends ProcessBase {
         this.pr.ubot.network.sendGetRequestToUbot(
             this.pr.respondToNotification.from,
             "/getStartingContract/" + this.pr.poolId.base64,
-            (respCode, body) => {
+            async (respCode, body) => {
                 if (respCode == 200) {
                     let ans = Boss.load(body);
-                    this.pr.startingContract = Contract.fromPackedTransaction(ans.contractBin);
-                    this.pr.executableContract = Contract.fromPackedTransaction(this.pr.startingContract.transactional.data.executableContract);
+                    this.pr.startingContract = await Contract.fromPackedTransaction(ans.contractBin);
+                    this.pr.executableContract = await Contract.fromPackedTransaction(this.pr.startingContract.transactional.data.executableContract);
                     this.pr.pool = [];
                     ans.selectedPool.forEach(i => this.pr.pool.push(this.pr.ubot.network.netConfig.getInfo(i)));
                     this.pr.ubot.network.deliver(this.pr.respondToNotification.from,
@@ -268,7 +268,7 @@ class ProcessStartExec extends ProcessBase {
         switch (op) {
             case "calc2x2":
                 this.pr.logger.log("          op " + op);
-                this.var0 = Boss.dump({val: 4});
+                this.var0 = await Boss.dump({val: 4});
                 break;
             case "finish":
                 this.pr.logger.log("          op " + op);

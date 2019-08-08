@@ -12,12 +12,10 @@ unit.test("link role serialization", async () => {
     let role = new roles.RoleLink("name1","name2");
     role.requiredAnyConstraints.add("ref1");
 
-
-
-    let s = role.serialize(dbm.DefaultBiMapper.getInstance());
+    let s = await role.serialize(dbm.DefaultBiMapper.getInstance());
 
     let role2 = new roles.RoleLink();
-    role2.deserialize(s,dbm.DefaultBiMapper.getInstance());
+    await role2.deserialize(s, dbm.DefaultBiMapper.getInstance());
     assert(t.valuesEqual(role,role2))
 });
 
