@@ -98,3 +98,20 @@ unit.test("boss_test: asyncDump array of HashId", async () => {
     console.log("load: " + Boss.load(bin));
     console.logPut("dt = " + dt + " ");
 });
+
+// unit.test("boss_test: bench escrow", async () => {
+//     //let bin = await io.fileGetContentsAsBytes("/tmp/escrow.tx.unicon");
+//     //let bin = await io.fileGetContentsAsBytes("/tmp/loan.tx.unicon");
+//     let bin = await io.fileGetContentsAsBytes("/tmp/bossTestPackedTransaction");
+//     console.log("bin size: " + bin.length);
+//     let t0 = new Date().getTime();
+//     //for (let i = 0; i < 1; ++i) {
+//     let nestedLoadMap = {referencedItems:{data:null}, subItems:{data:null}, contract:{data:null}};
+//     //let tp = await BossBiMapper.getInstance().deserialize(await Boss.asyncLoad(bin, nestedLoadMap));
+//     let tp = await Boss.asyncLoad(bin, nestedLoadMap);
+//     //let tp = await Boss.asyncLoad(bin);
+//     //let tp = await BossBiMapper.getInstance().deserialize(Boss.load(bin));
+//     //}
+//     let dt = new Date().getTime() - t0;
+//     console.log("dt = " + dt);
+// });

@@ -5,6 +5,7 @@
 #include "TypesFactory.h"
 #include "UArray.h"
 #include "UString.h"
+#include "UBinder.h"
 #include <unordered_map>
 #include <functional>
 
@@ -22,6 +23,22 @@ static std::unordered_map<std::string, std::function<UObject(Isolate* isolate, L
         fprintf(stderr, "Boss TypesFactory error: unable to process object 'Array'\n");
         return UArray();
     }},
+    {"Object", [](Isolate* isolate, Local<Object> obj){
+        UBinder res;
+        Local<Array> keysArr = obj->GetOwnPropertyNames(isolate->GetCurrentContext()).ToLocalChecked();
+        auto length = keysArr->Length();
+        for (auto i = 0; i < length; ++i) {
+            Local<Value> key = keysArr->Get(i);
+            if (key->IsString()) {
+                Local<String> skey = key->ToString(isolate);
+                Local<Value> val = obj->Get(skey);
+                auto str = String::Utf8Value(isolate, key);
+                std::string s(*str);
+                res.set(s, v8ValueToUObject(isolate, val));
+            }
+        }
+        return res;
+    }},
 };
 
 static std::unordered_map<std::string, std::function<UObject(Isolate* isolate, Local<Value> v8value)>> v8ValueToUObjectFactory {
@@ -34,6 +51,13 @@ static std::unordered_map<std::string, std::function<UObject(Isolate* isolate, L
             }
             fprintf(stderr, "Boss TypesFactory error: unable to process value 'string'\n");
             return UString("");
+        }},
+        {"object", [](Isolate* isolate, Local<Value> v8value){
+            if (v8value->IsNull()) {
+                return UObject();
+            }
+            fprintf(stderr, "Boss TypesFactory error: unable to process value 'object'\n");
+            return UObject();
         }},
 };
 

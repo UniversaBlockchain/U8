@@ -16,8 +16,8 @@ module.exports = {
         return new Promise(resolve => __boss_asyncDump(data, resolve));
     },
 
-    asyncLoad(data) {
-        return new Promise(resolve => __boss_asyncLoad(data, (res) => {
+    asyncLoad(data, nestedLoadMap = null) {
+        return new Promise(resolve => __boss_asyncLoad(data, nestedLoadMap, (res) => {
             _bosscpp.updateObjectProto(res);
             resolve(res);
         }));

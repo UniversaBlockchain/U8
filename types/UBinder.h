@@ -24,7 +24,7 @@ private:
 
         Local<Object> serializeToV8(Isolate *isolate) override {
             auto res = Object::New(isolate);
-            for (auto it: binder)
+            for (auto& it: binder)
                 res->Set(String::NewFromUtf8(isolate, it.first.data()), it.second.serializeToV8(isolate));
             return res;
         };

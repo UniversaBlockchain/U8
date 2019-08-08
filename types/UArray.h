@@ -21,7 +21,7 @@ private:
 
         Local<Object> serializeToV8(Isolate *isolate) override {
             auto res = Array::New(isolate);
-            for (auto it: array)
+            for (auto& it: array)
                 res->Set(res->Length(), it.serializeToV8(isolate));
             return res;
         };
