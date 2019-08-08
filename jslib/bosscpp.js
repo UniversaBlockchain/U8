@@ -11,7 +11,8 @@ function updateObjectProto(obj) {
     if (obj.constructor.name !== "Object" && obj.constructor.name !== "Array")
         return;
     for (let k in obj)
-        updateObjectProto(obj[k]);
+        if (typeof obj[k] === "object")
+            updateObjectProto(obj[k]);
 }
 
 module.exports = {updateObjectProto};
