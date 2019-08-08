@@ -1624,7 +1624,7 @@ class Ledger {
         let contract = await NSmartContract.fromPackedTransaction(smkv.pack);
         let findNContract = (contract.transactionPack != null) ? contract.transactionPack.subItems.get(nContractHashId) : null;
         contract = (findNContract == null) ? contract : findNContract;
-        let kvStorage = Boss.load(smkv.kvStorage);
+        let kvStorage = await Boss.load(smkv.kvStorage);
 
         let contractSubscriptions = await this.getContractSubscriptions(environmentId, con);
         let contractStorages = await this.getContractStorages(environmentId, con);

@@ -8,7 +8,7 @@ module.exports = {
         return new _boss().dump(data);
     },
 
-    load(data) {
+    async load(data) {
         return new _boss().load(data);
     },
 

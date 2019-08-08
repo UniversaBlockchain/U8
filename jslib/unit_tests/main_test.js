@@ -180,9 +180,9 @@ unit.test("main_test: sendHttpRequests", async () => {
         fire[1]();
     });
 
-    httpClient.sendGetRequest("/network", (respCode, body) => {
+    httpClient.sendGetRequest("/network", async (respCode, body) => {
         assert(respCode === 200);
-        let result = Boss.load(body);
+        let result = await Boss.load(body);
         assert(result.result === "ok");
 
         assert(result.response.version === VERSION);
@@ -194,15 +194,15 @@ unit.test("main_test: sendHttpRequests", async () => {
 
     httpClient.sendGetRequest("/topology", async (respCode, body) => {
         assert(respCode === 200);
-        let result = Boss.load(body);
+        let result = await Boss.load(body);
         assert(result.result === "ok");
 
-        let data = Boss.load(result.response.packed_data);
+        let data = await Boss.load(result.response.packed_data);
         assert(data.version === VERSION);
         assert(data.hasOwnProperty("number"));
         assert(data.hasOwnProperty("nodes"));
 
-        let key = ExtendedSignature.extractPublicKey(result.response.signature);
+        let key = await ExtendedSignature.extractPublicKey(result.response.signature);
         assert(key != null);
         assert(await ExtendedSignature.verify(key, result.response.signature, result.response.packed_data) != null);
 

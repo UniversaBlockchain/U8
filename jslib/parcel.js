@@ -139,7 +139,7 @@ class Parcel extends bs.BiSerializable {
      */
     static async unpack(pack) {
 
-        let x = await BossBiMapper.getInstance().deserialize(Boss.load(pack));
+        let x = await BossBiMapper.getInstance().deserialize(await Boss.load(pack));
 
         if (x instanceof Parcel) {
             x.packedBinary = pack;

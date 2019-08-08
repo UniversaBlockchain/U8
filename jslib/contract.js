@@ -914,7 +914,7 @@ class Contract extends bs.BiSerializable {
 
         keys.forEach(k => this.keysToSignWith.add(k));
 
-        let data = Boss.load(this.sealedBinary);
+        let data = await Boss.load(this.sealedBinary);
         let contractBytes = data.data;
         for (let key of keys) {
             let signature = await ExtendedSignature.sign(key, contractBytes);
@@ -934,7 +934,7 @@ class Contract extends bs.BiSerializable {
         if(this.sealedBinary == null)
             throw new ex.IllegalArgumentError("failed to add signature: sealed binary does not exist");
 
-        let data = Boss.load(this.sealedBinary);
+        let data = await Boss.load(this.sealedBinary);
         //console.log(Object.getPrototypeOf(data.signatures).constructor.name);
         data.signatures.push(signature);
 
@@ -1779,15 +1779,13 @@ class Contract extends bs.BiSerializable {
             return;
         }
 
-        let data = Boss.load(this.sealedBinary);
+        let data = await Boss.load(this.sealedBinary);
         if (data.type !== "unicapsule")
             throw new ex.IllegalArgumentError("wrong object type, unicapsule required");
-
 
         let contractBytes = data.data;
 
         let keys = new t.GenericMap();
-
 
         for(let roleName of Object.keys(this.roles)) {
             roles.RoleExtractor.extractKeys(this.roles[roleName]).forEach(key=>keys.set(key.fingerprints,key));
@@ -1804,9 +1802,9 @@ class Contract extends bs.BiSerializable {
         // verify signatures
         for (let signature of  data.signatures) {
 
-            let key = ExtendedSignature.extractPublicKey(signature);
+            let key = await ExtendedSignature.extractPublicKey(signature);
             if (key == null) {
-                let keyId = ExtendedSignature.extractKeyId(signature);
+                let keyId = await ExtendedSignature.extractKeyId(signature);
                 key = keys.get(keyId);
             }
 
@@ -1829,7 +1827,6 @@ class Contract extends bs.BiSerializable {
         let bbm = BossBiMapper.getInstance();
 
         return await bbm.deserialize(await bbm.serialize(this));
-
     }
 
     /**
@@ -2079,14 +2076,14 @@ class Contract extends bs.BiSerializable {
         result.id = crypto.HashId.of(sealed);
         result.transactionPack = transactionPack;
         result.isNeedVerifySealedKeys = true;
-        let data = Boss.load(sealed);
+        let data = await Boss.load(sealed);
         if(data.type !== "unicapsule") {
             throw new ex.IllegalArgumentError("wrong object type, unicapsule required");
         }
 
         result.apiLevel = data.version;
         let contractBytes = data.data;
-        let payload = Boss.load(contractBytes,null);
+        let payload = await Boss.load(contractBytes, null);
         await result.deserialize(payload.contract, BossBiMapper.getInstance());
 
         if(result.apiLevel < 3) {

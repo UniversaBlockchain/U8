@@ -169,7 +169,7 @@ class TransactionPack {
     }
 
     static async unpack(bytes) {
-        let x = Boss.load(bytes);
+        let x = await Boss.load(bytes);
 
         let res = await BossBiMapper.getInstance().deserialize(x);
         if (res instanceof TransactionPack)
@@ -187,9 +187,9 @@ async function ContractDependencies(binary) {
     res.id = crypto.HashId.of(binary);
     res.binary = binary;
     res.dependencies = new t.GenericSet();
-    let data = Boss.load(binary);
+    let data = await Boss.load(binary);
     let contractBytes = data.data;
-    let serializedContract = Boss.load(contractBytes);
+    let serializedContract = await Boss.load(contractBytes);
     res.extendedType = serializedContract.contract.definition.hasOwnProperty("extended_type") ?
         serializedContract.contract.definition.extended_type : null;
     let apiLevel = data.version;

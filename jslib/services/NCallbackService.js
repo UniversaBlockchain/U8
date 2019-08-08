@@ -200,7 +200,7 @@ class NCallbackService extends CallbackService {
             //connection.setReadTimeout(5000);
             //connection.setRequestProperty("Content-Type", "multipart/form-data; boundary=" + boundary);
             //connection.setRequestProperty("User-Agent", "Universa Node");
-            this.httpClient.sendGetRequestUrl(callbackURL, (respCode, body) => {
+            this.httpClient.sendGetRequestUrl(callbackURL, async (respCode, body) => {
                 if (respCode === 200) {
                     if (body == null || body.length === 0) {
                         event.fire(null);
@@ -208,7 +208,7 @@ class NCallbackService extends CallbackService {
                     }
 
                     // get receipt from answer
-                    let res = Boss.load(body);
+                    let res = await Boss.load(body);
                     if (!res.hasOwnProperty("receipt")) {
                         event.fire(null);
                         return;

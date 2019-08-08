@@ -197,7 +197,7 @@ class ProcessDownloadStartingContract extends ProcessBase {
             "/getStartingContract/" + this.pr.poolId.base64,
             async (respCode, body) => {
                 if (respCode == 200) {
-                    let ans = Boss.load(body);
+                    let ans = await Boss.load(body);
                     this.pr.startingContract = await Contract.fromPackedTransaction(ans.contractBin);
                     this.pr.executableContract = await Contract.fromPackedTransaction(this.pr.startingContract.transactional.data.executableContract);
                     this.pr.pool = [];

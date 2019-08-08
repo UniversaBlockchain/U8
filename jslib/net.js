@@ -397,8 +397,8 @@ class NetworkV2 extends Network {
             //connection.setRequestProperty("Connection", "close");
             //connection.setConnectTimeout(4000);
             //connection.setReadTimeout(maxTimeout);
-            this.httpClient.sendGetRequestUrl(URL, (respCode, body) => {
-                let env = (respCode === 200) ? Boss.load(body) : null;
+            this.httpClient.sendGetRequestUrl(URL, async (respCode, body) => {
+                let env = (respCode === 200) ? await Boss.load(body) : null;
                 event.fire(env);
             });
 

@@ -16,7 +16,6 @@ async function testReadLines() {
     }
 }
 
-
 const Boss = require('boss.js');
 
 async function testBoss() {
@@ -26,7 +25,7 @@ async function testBoss() {
 
     let src = {hello: 'world', data: [1, 2, 3]};
     let packed = await Boss.dump(src);
-    assert(JSON.stringify(Boss.load(packed)) == JSON.stringify(src));
+    assert(JSON.stringify(await Boss.load(packed)) == JSON.stringify(src));
     let reader = new Boss.Reader(packed);
     console.log(JSON.stringify(reader.read()));
     console.log(JSON.stringify(reader.read()));
@@ -36,7 +35,6 @@ async function testBoss() {
 }
 
 import {expect, unit} from 'test'
-
 
 function logContractTree(contract,prefix) {
     if(!prefix)
@@ -57,8 +55,6 @@ function logContractTree(contract,prefix) {
 }
 
 async function testContract() {
-
-
     let input = await io.openRead("../test/ttt.unicon");
     let sealed = await input.allBytes();
 
@@ -104,14 +100,12 @@ async function testES() {
     console.log(bytes.length);
     console.log(signature.length);
 
-    let key = ExtendedSignature.extractPublicKey(signature);
+    let key = await ExtendedSignature.extractPublicKey(signature);
     console.log(key);
 
-    let es = ExtendedSignature.verify(key,signature,bytes);
+    let es = await ExtendedSignature.verify(key, signature, bytes);
     assert(es != null);
 }
-
-
 
 require('unit_tests/boss_test')
 require('unit_tests/crypto_test')
@@ -148,7 +142,6 @@ require('unit_tests/main_test')
 // require('unit_tests/stress_test')
 
 async function main() {
-
     //testBoss();
 
     // testBoss();
@@ -166,5 +159,4 @@ async function main() {
     // await sleep(100);
     // console.log("hello async");
     await unit.perform();
-
 }
