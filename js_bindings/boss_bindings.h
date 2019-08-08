@@ -12,4 +12,7 @@ using namespace std;
 
 void JsInitBossBindings(Isolate *isolate, const Local<ObjectTemplate> &global);
 
+shared_ptr<Persistent<Object>> getHashIdPrototype();
+shared_ptr<Persistent<Object>> getPublicKeyPrototype();
+
 #endif //U8_BOSS_BINDINGS_H

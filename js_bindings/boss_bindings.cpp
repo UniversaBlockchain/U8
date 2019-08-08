@@ -88,7 +88,35 @@ void JsBossAsyncLoad(const v8::FunctionCallbackInfo<v8::Value> &args) {
     });
 }
 
+static shared_ptr<Persistent<Object>> hashId_prototype;
+static shared_ptr<Persistent<Object>> publicKey_prototype;
+
+shared_ptr<Persistent<Object>> getHashIdPrototype() {
+    return hashId_prototype;
+}
+
+shared_ptr<Persistent<Object>> getPublicKeyPrototype() {
+    return publicKey_prototype;
+}
+
+void JsBossAddPrototype(const v8::FunctionCallbackInfo<v8::Value> &args) {
+    Scripter::unwrapArgs(args, [](ArgsContext &ac) {
+        if (ac.args.Length() == 2) {
+            string prototypeName = ac.asString(0);
+            Local<Object> obj = ac.args[1]->ToObject(ac.isolate);
+            auto prototype = make_shared<Persistent<Object>>(ac.isolate, obj);
+            if (prototypeName == "HashId")
+                hashId_prototype = prototype;
+            else if (prototypeName == "PublicKey")
+                publicKey_prototype = prototype;
+            return;
+        }
+        ac.throwError("invalid arguments");
+    });
+}
+
 void JsInitBossBindings(Isolate *isolate, const Local<ObjectTemplate> &global) {
     global->Set(String::NewFromUtf8(isolate, "__boss_asyncDump"), FunctionTemplate::New(isolate, JsBossAsyncDump));
     global->Set(String::NewFromUtf8(isolate, "__boss_asyncLoad"), FunctionTemplate::New(isolate, JsBossAsyncLoad));
+    global->Set(String::NewFromUtf8(isolate, "__boss_addPrototype"), FunctionTemplate::New(isolate, JsBossAddPrototype));
 }

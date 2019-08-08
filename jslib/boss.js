@@ -1,7 +1,8 @@
 'use strict';
 
 let _boss = require("boss.min");
-let _bosscpp = require("bosscpp");
+
+let isCppProrotypesInitialized = false;
 
 module.exports = {
     dump(data) {
@@ -17,10 +18,12 @@ module.exports = {
     },
 
     asyncLoad(data, nestedLoadMap = null) {
-        return new Promise(resolve => __boss_asyncLoad(data, nestedLoadMap, (res) => {
-            _bosscpp.updateObjectProto(res);
-            resolve(res);
-        }));
+        if (!isCppProrotypesInitialized) {
+            __boss_addPrototype("HashId", crypto.HashId.prototype);
+            __boss_addPrototype("PublicKey", crypto.PublicKey.prototype);
+            isCppProrotypesInitialized = true;
+        }
+        return new Promise(resolve => __boss_asyncLoad(data, nestedLoadMap, resolve));
     },
 
     Reader: _boss.reader,

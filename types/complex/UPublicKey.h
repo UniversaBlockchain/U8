@@ -9,6 +9,7 @@
 #include "../UBinder.h"
 #include "../../crypto/PublicKey.h"
 #include "../../js_bindings/crypto_bindings.h"
+#include "../../js_bindings/boss_bindings.h"
 
 class UPublicKey: public UObject {
 private:
@@ -20,7 +21,9 @@ private:
 
         Local<Object> serializeToV8(Isolate* isolate) override {
             auto res = wrapPublicKey(isolate, new crypto::PublicKey(*publicKey.get()));
-            return Local<Object>::Cast(res);
+            auto obj = Local<Object>::Cast(res);
+            auto unused = obj->SetPrototype(isolate->GetCurrentContext(), getPublicKeyPrototype()->Get(isolate));
+            return obj;
         }
 
         std::shared_ptr<crypto::PublicKey> publicKey;

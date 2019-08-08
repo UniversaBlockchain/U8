@@ -9,6 +9,7 @@
 #include "../UBinder.h"
 #include "../../crypto/HashId.h"
 #include "../../js_bindings/crypto_bindings.h"
+#include "../../js_bindings/boss_bindings.h"
 
 class UHashId: public UObject {
 private:
@@ -20,7 +21,9 @@ private:
 
         Local<Object> serializeToV8(Isolate* isolate) override {
             auto res = wrapHashId(isolate, new crypto::HashId(*hashId.get()));
-            return Local<Object>::Cast(res);
+            auto obj = Local<Object>::Cast(res);
+            auto unused = obj->SetPrototype(isolate->GetCurrentContext(), getHashIdPrototype()->Get(isolate));
+            return obj;
         }
 
         std::shared_ptr<crypto::HashId> hashId;
