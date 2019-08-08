@@ -14,5 +14,6 @@ void JsInitBossBindings(Isolate *isolate, const Local<ObjectTemplate> &global);
 
 shared_ptr<Persistent<Object>> getHashIdPrototype();
 shared_ptr<Persistent<Object>> getPublicKeyPrototype();
+shared_ptr<Persistent<Object>> getPrivateKeyPrototype();
 
 #endif //U8_BOSS_BINDINGS_H

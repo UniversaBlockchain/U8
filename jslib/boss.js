@@ -21,6 +21,7 @@ module.exports = {
         if (!isCppProrotypesInitialized) {
             __boss_addPrototype("HashId", crypto.HashId.prototype);
             __boss_addPrototype("PublicKey", crypto.PublicKey.prototype);
+            __boss_addPrototype("PrivateKey", crypto.PrivateKey.prototype);
             isCppProrotypesInitialized = true;
         }
         return new Promise(resolve => __boss_asyncLoad(data, nestedLoadMap, resolve));

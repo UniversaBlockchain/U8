@@ -90,6 +90,7 @@ void JsBossAsyncLoad(const v8::FunctionCallbackInfo<v8::Value> &args) {
 
 static shared_ptr<Persistent<Object>> hashId_prototype;
 static shared_ptr<Persistent<Object>> publicKey_prototype;
+static shared_ptr<Persistent<Object>> privateKey_prototype;
 
 shared_ptr<Persistent<Object>> getHashIdPrototype() {
     return hashId_prototype;
@@ -97,6 +98,10 @@ shared_ptr<Persistent<Object>> getHashIdPrototype() {
 
 shared_ptr<Persistent<Object>> getPublicKeyPrototype() {
     return publicKey_prototype;
+}
+
+shared_ptr<Persistent<Object>> getPrivateKeyPrototype() {
+    return privateKey_prototype;
 }
 
 void JsBossAddPrototype(const v8::FunctionCallbackInfo<v8::Value> &args) {
@@ -109,6 +114,8 @@ void JsBossAddPrototype(const v8::FunctionCallbackInfo<v8::Value> &args) {
                 hashId_prototype = prototype;
             else if (prototypeName == "PublicKey")
                 publicKey_prototype = prototype;
+            else if (prototypeName == "PrivateKey")
+                privateKey_prototype = prototype;
             return;
         }
         ac.throwError("invalid arguments");

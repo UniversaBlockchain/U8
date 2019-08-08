@@ -569,3 +569,7 @@ v8::Local<v8::Value> wrapKeyAddress(v8::Isolate* isolate, crypto::KeyAddress* ke
 v8::Local<v8::Value> wrapPublicKey(v8::Isolate* isolate, crypto::PublicKey* publicKey) {
     return wrap(publicKeyTpl, isolate, publicKey, true);
 }
+
+v8::Local<v8::Value> wrapPrivateKey(v8::Isolate* isolate, crypto::PrivateKey* privateKey) {
+    return wrap(privateKeyTpl, isolate, privateKey, true);
+}

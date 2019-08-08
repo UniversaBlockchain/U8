@@ -94,6 +94,24 @@ unit.test("boss_test: asyncLoad array of PublicKeys", async () => {
     }
 });
 
+unit.test("boss_test: asyncLoad array of PrivateKeys", async () => {
+    let arr0 = [];
+    for (let i = 0; i < 10; ++i)
+        arr0.push(new Promise(async resolve => resolve((await crypto.PrivateKey.generate(2048)))));
+    arr0 = await Promise.all(arr0);
+    let bin = Boss.dump(BossBiMapper.getInstance().serialize(arr0));
+    let t0 = new Date().getTime();
+    let arr = BossBiMapper.getInstance().deserialize(await Boss.asyncLoad(bin));
+    //let arr = BossBiMapper.getInstance().deserialize(Boss.load(bin));
+    let dt = new Date().getTime() - t0;
+    console.logPut("dt = " + dt + " ");
+    for (let i = 0; i < arr.length; ++i) {
+        assertSilent(arr[i].constructor.name === "PrivateKeyImpl");
+        assertSilent(arr[i].__proto__ === crypto.PrivateKey.prototype);
+        assertSilent(btoa(arr[i].publicKey.fingerprints) === btoa(arr0[i].publicKey.fingerprints));
+    }
+});
+
 unit.test("boss_test: asyncLoad array of Date", async () => {
     let arr0 = [];
     for (let i = 0; i < 100; ++i) {
