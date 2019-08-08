@@ -94,6 +94,25 @@ unit.test("boss_test: asyncLoad array of PublicKeys", async () => {
     }
 });
 
+unit.test("boss_test: asyncLoad array of Date", async () => {
+    let arr0 = [];
+    for (let i = 0; i < 100; ++i) {
+        arr0.push(new Date(new Date().getTime() + i*1000 + Math.floor(Math.random()*1000)));
+    }
+    let bin = Boss.dump(BossBiMapper.getInstance().serialize(arr0));
+    let t0 = new Date().getTime();
+    let arr = BossBiMapper.getInstance().deserialize(await Boss.asyncLoad(bin));
+    //let arr = BossBiMapper.getInstance().deserialize(Boss.load(bin));
+    let dt = new Date().getTime() - t0;
+    console.logPut("dt = " + dt + " ");
+    for (let i = 0; i < arr.length; ++i) {
+        assertSilent(arr[i].constructor.name === "Date");
+        assertSilent(arr[i].__proto__ === Date.prototype);
+        assertSilent(arr[i].toString() === arr0[i].toString());
+        assertSilent(arr[i].getTime() === Math.floor(arr0[i].getTime()/1000)*1000);
+    }
+});
+
 unit.test("boss_test: asyncDump array of HashId", async () => {
     let arr0 = [];
     for (let i = 0; i < 100; ++i)

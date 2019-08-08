@@ -15,10 +15,13 @@ typedef std::chrono::time_point<std::chrono::high_resolution_clock> TimePoint;
 class UDateTime : public UObject {
 private:
     class UDateTimeData : public UData {
-        public:
-            UDateTimeData(const TimePoint& v);
+    public:
+        UDateTimeData(const TimePoint &v);
+        ~UDateTimeData() override = default;
 
-            ~UDateTimeData() = default;
+        Local<Object> serializeToV8(Isolate* isolate) override {
+            return Local<Object>::Cast(Date::New(isolate->GetCurrentContext(), double(value.time_since_epoch().count()*1e-6)).ToLocalChecked());
+        }
 
         TimePoint value;
     };
