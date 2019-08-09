@@ -79,8 +79,8 @@ class FollowerContract extends NSmartContract {
      * @param {TransactionPack} pack - The transaction pack to resolve dependencies again.
      * @return {FollowerContract} extracted follower contract.
      */
-    static fromSealedBinary(sealed, pack) {
-        let c = Contract.fromSealedBinary(sealed, pack, new FollowerContract());
+    static async fromSealedBinary(sealed, pack) {
+        let c = await Contract.fromSealedBinary(sealed, pack, new FollowerContract());
 
         c.deserializeForFollower();
         return c;
@@ -425,8 +425,8 @@ class FollowerContract extends NSmartContract {
         this.state.data[FollowerContract.CALLBACK_KEYS_FIELD_NAME] = callbacks;
     }
 
-    deserialize(data, deserializer) {
-        super.deserialize(data, deserializer);
+    async deserialize(data, deserializer) {
+        await super.deserialize(data, deserializer);
 
         this.deserializeForFollower();
     }

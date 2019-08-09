@@ -156,24 +156,24 @@ class NImmutableEnvironment extends ImmutableEnvironment {
         return new this.NMutableEnvironment(this);
     }
 
-    serialize(serializer) {
+    async serialize(serializer) {
         return {
-            contract : this.contract.getPackedTransaction(),
-            createdAt : serializer.serialize(this.createdAt),
-            subscriptions : serializer.serialize(Array.from(this.subscriptionsSet)),
-            storages : serializer.serialize(Array.from(this.storagesSet)),
-            nameRecords : serializer.serialize(Array.from(this.nameRecordsSet)),
-            kvStore : serializer.serialize(this.kvStore)
+            contract : await this.contract.getPackedTransaction(),
+            createdAt : await serializer.serialize(this.createdAt),
+            subscriptions : await serializer.serialize(Array.from(this.subscriptionsSet)),
+            storages : await serializer.serialize(Array.from(this.storagesSet)),
+            nameRecords : await serializer.serialize(Array.from(this.nameRecordsSet)),
+            kvStore : await serializer.serialize(this.kvStore)
         };
     }
 
-    deserialize(data, deserializer) {
-        this.createdAt = deserializer.deserialize(data.createdAt);
-        this.subscriptionsSet = new t.GenericSet(deserializer.deserialize(data.subscriptions));
-        this.storagesSet = new t.GenericSet(deserializer.deserialize(data.storages));
-        this.nameRecordsSet = new t.GenericSet(deserializer.deserialize(data.nameRecords));
-        this.contract = Contract.fromPackedTransaction(data.contract);
-        this.kvStore = deserializer.deserialize(data.kvStore);
+    async deserialize(data, deserializer) {
+        this.createdAt = await deserializer.deserialize(data.createdAt);
+        this.subscriptionsSet = new t.GenericSet(await deserializer.deserialize(data.subscriptions));
+        this.storagesSet = new t.GenericSet(await deserializer.deserialize(data.storages));
+        this.nameRecordsSet = new t.GenericSet(await deserializer.deserialize(data.nameRecords));
+        this.contract = await Contract.fromPackedTransaction(data.contract);
+        this.kvStore = await deserializer.deserialize(data.kvStore);
     }
 }
 

@@ -96,18 +96,19 @@ void testDeserializeUnknown() {
     ASSERT(UBinder::asInstance(obj).getBinder("complex").getString("__type") == "TestComplexObject");
     UBinder::asInstance(obj).getBinder("complex").set("__type", "UnknownType");
 
-    bool errorDeserialize = false;
-    try {
+    //bool errorDeserialize = false;
+    //try {
         auto des = BaseSerializer::deserialize(obj);
-    } catch (std::invalid_argument invalid_argument) {
-        printf("%s\n", invalid_argument.what());
-        std::string expected = "Unknown object type for deserialization";
-        errorDeserialize = true;
+    //} catch (std::invalid_argument invalid_argument) {
+    //    printf("%s\n", invalid_argument.what());
+    //    std::string expected = "Unknown object type for deserialization";
+    //    errorDeserialize = true;
 
-        ASSERT(std::string(invalid_argument.what()).compare(0, expected.size(), expected) == 0);
-    }
+    //    ASSERT(std::string(invalid_argument.what()).compare(0, expected.size(), expected) == 0);
+    //}
 
-    ASSERT(errorDeserialize);
+    //ASSERT(errorDeserialize);
+    ASSERT(UBinder::isInstance(des));
 
     printf("testDeserializeUnknown()...done\n\n");
 }

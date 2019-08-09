@@ -37,11 +37,11 @@ unit.test("hello web", async () => {
         //return {"ping": "pong", "val": some_undefined_var_for_exception_throwing};
         return {"ping": "pong"};
     });
-    httpServer.addEndpoint("/connect1", (request) => {
+    httpServer.addEndpoint("/connect1", async (request) => {
         request.setHeader("Content-Type", "text/html");
         console.log("js /connect");
         console.log("js /connect method: " + request.method);
-        console.log("js /connect requestBody: " + Boss.load(request.requestBody));
+        console.log("js /connect requestBody: " + await Boss.load(request.requestBody));
         return {"ping": "pong"};
     });
     let unsRateDbg = 333;
@@ -121,7 +121,7 @@ unit.test("http secure endpoints", async () => {
     let t0 = new Date().getTime();
     let counter0 = 0;
     for (let i = 0; i < countToSend; ++i) {
-        httpClient.command("unsRate", {}, async (resp) => {
+        await httpClient.command("unsRate", {}, async (resp) => {
             //console.log(JSON.stringify(resp));
             ++receiveCounter;
             await sleep(1);
@@ -166,15 +166,13 @@ unit.test("big payload", async () => {
     });
     httpServer.startServer();
 
-
     let httpClient = new network.HttpClient("http://localhost:8080", 32, 64);
     await httpClient.start(clientKey, new crypto.PublicKey(nodeKey));
-
 
     let testData = t.randomBytes(10000);
 
     let hashOk = null;
-    httpClient.command("testEndpoint", {testData: testData}, async (resp) => {
+    await httpClient.command("testEndpoint", {testData: testData}, async (resp) => {
         hashOk = t.valuesEqual(resp.hash,crypto.HashId.of(testData));
     }, error => {
         console.log("exception: " + error);
@@ -187,8 +185,6 @@ unit.test("big payload", async () => {
     console.logPut("hash ok: " + hashOk);
     assert(hashOk);
 
-
-
     await httpClient.stop();
     await httpServer.stopServer();
 });
@@ -199,6 +195,7 @@ unit.test("http test multipart", async () => {
         request.setHeader("Content-Type", "text/html");
         return {"ans": "answer from /method1"};
     });
+
     httpServer.addEndpoint("/method2", (request) => {
         let a = utf8Decode(request.multipartParams.a);
         let b = utf8Decode(request.multipartParams.b);
@@ -207,6 +204,7 @@ unit.test("http test multipart", async () => {
         request.setHeader("Content-Type", "text/html");
         return {"ans": a+b+file1+file2};
     });
+
     httpServer.startServer();
 
     let url = "http://localhost:8080";
@@ -225,15 +223,16 @@ unit.test("http test multipart", async () => {
     let bValueData = "bbb";
     let file1data = utf8Encode("1234567");
     let file2data = utf8Encode(t.randomString(10));
+
     httpClient.sendMultipartRequestUrl(url+"/method2", "POST", {
         a: aValueData,
         b: bValueData
     }, {
         file1: file1data,
         file2: file2data
-    }, (respCode, body) => {
+    }, async (respCode, body) => {
         //console.log("method2 answer: [" + respCode + "]: " + JSON.stringify(Boss.load(body)));
-        assert(Boss.load(body).response.ans === "11bbb1234567"+utf8Decode(file2data));
+        assert((await Boss.load(body)).response.ans === "11bbb1234567" + utf8Decode(file2data));
         resolver();
     });
     await promise;

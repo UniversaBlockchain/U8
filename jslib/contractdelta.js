@@ -19,10 +19,10 @@ class ContractDelta {
 
     }
 
-    check() {
+    async check() {
         try {
-            let s1 = BossBiMapper.getInstance().serialize(this.existing);
-            let s2 = BossBiMapper.getInstance().serialize(this.changed)
+            let s1 = await BossBiMapper.getInstance().serialize(this.existing);
+            let s2 = await BossBiMapper.getInstance().serialize(this.changed);
 
             let rootDelta = Delta.between(null,s1, s2);
             this.stateDelta = rootDelta.changes.state;

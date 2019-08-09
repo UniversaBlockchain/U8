@@ -79,10 +79,10 @@ class SlotContract extends NSmartContract {
      * @param {TransactionPack} pack the transaction pack to resolve dependencies again.
      * @return {SlotContract} extracted slot contract.
      */
-    static fromSealedBinary(sealed, pack) {
-        let c = Contract.fromSealedBinary(sealed, pack, new SlotContract());
+    static async fromSealedBinary(sealed, pack) {
+        let c = await Contract.fromSealedBinary(sealed, pack, new SlotContract());
 
-        c.deserializeForSlot();
+        await c.deserializeForSlot();
         return c;
     }
 
@@ -139,16 +139,16 @@ class SlotContract extends NSmartContract {
         this.definition.addPermission(modifyDataPermission);
     }
 
-    deserialize(data, deserializer) {
-        super.deserialize(data, deserializer);
+    async deserialize(data, deserializer) {
+        await super.deserialize(data, deserializer);
 
-        this.deserializeForSlot(deserializer);
+        await this.deserializeForSlot(deserializer);
     }
 
     /**
      * Extract values from deserialized object for slot fields.
      */
-    deserializeForSlot(deserializer) {
+    async deserializeForSlot(deserializer) {
         // extract keep_revisions value
         let numRevisions = this.state.data[SlotContract.KEEP_REVISIONS_FIELD_NAME];
         if (numRevisions > 0)
@@ -161,12 +161,12 @@ class SlotContract extends NSmartContract {
 
         // extract and sort by revision number
         let contracts = [];
-        let trackingHashesAsBase64 = deserializer.deserialize(this.state.data[SlotContract.TRACKING_CONTRACT_FIELD_NAME]);
+        let trackingHashesAsBase64 = await deserializer.deserialize(this.state.data[SlotContract.TRACKING_CONTRACT_FIELD_NAME]);
 
         for (let k of Object.keys(trackingHashesAsBase64)) {
             let packed = trackingHashesAsBase64[k];
             if (packed != null) {
-                let c = Contract.fromPackedTransaction(packed);
+                let c = await Contract.fromPackedTransaction(packed);
                 if (c != null)
                     contracts.push(c);
                 else
@@ -175,25 +175,26 @@ class SlotContract extends NSmartContract {
         }
 
         contracts.sort((a, b) => a.state.revision - b.state.revision);
-        contracts.forEach(c => {
+        for (let c of contracts) {
             this.trackingContracts.unshift(c);
-            this.packedTrackingContracts.unshift(c.getPackedTransaction());
-        });
+            this.packedTrackingContracts.unshift(await c.getPackedTransaction());
+        }
     }
 
     /**
      * Override seal method to recalculate holding at the state.data values
      */
-    seal(isTransactionRoot = false) {
-        this.saveTrackingContractsToState();
+    async seal(isTransactionRoot = false) {
+        await this.saveTrackingContractsToState();
         this.calculatePrepaidKilobytesForDays(true);
 
-        return super.seal(isTransactionRoot);
+        return await super.seal(isTransactionRoot);
     }
 
-    saveTrackingContractsToState() {
+    async saveTrackingContractsToState() {
         let forState = {};
-        this.trackingContracts.forEach(tc => forState[tc.id.base64] = tc.getPackedTransaction());
+        for (let tc of this.trackingContracts)
+            forState[tc.id.base64] = await tc.getPackedTransaction();
         this.state.data[SlotContract.TRACKING_CONTRACT_FIELD_NAME] = forState;
     }
 
@@ -234,9 +235,9 @@ class SlotContract extends NSmartContract {
      *
      * @param {Contract} c is revision of tracking {@link Contract}.
      */
-    putTrackingContract(c) {
+    async putTrackingContract(c) {
         this.trackingContracts.unshift(c);
-        this.packedTrackingContracts.unshift(c.getPackedTransaction());
+        this.packedTrackingContracts.unshift(await c.getPackedTransaction());
 
         this.updateTrackingContracts();
     }
@@ -338,7 +339,7 @@ class SlotContract extends NSmartContract {
      *
      * @param {MutableEnvironment} me is {@link MutableEnvironment} object with some data.
      */
-    updateSubscriptions(me) {
+    async updateSubscriptions(me) {
         // recalculate storing info without saving to state to get valid storing data
         this.calculatePrepaidKilobytesForDays(false);
 
@@ -350,16 +351,17 @@ class SlotContract extends NSmartContract {
         let newContractIds = new t.GenericSet(newContracts.keys());
 
         // update storages
-        me.storages().forEach(storage => {
-            let id = storage.getContract().id;
+        for (let storage of me.storages()) {
+            let id = (await storage.getContract()).id;
             if (newContracts.has(id)) {
                 me.setStorageExpiresAt(storage, newExpires);
                 newContracts.delete(id);
             } else
                 me.destroyStorage(storage);
-        });
+        };
 
-        Array.from(newContracts.values()).forEach(tc => me.createContractStorage(tc.getPackedTransaction(), newExpires));
+        for (let tc of newContracts.values())
+            me.createContractStorage(await tc.getPackedTransaction(), newExpires);
 
         // update subscriptions
         me.subscriptions().forEach(sub => {
@@ -374,14 +376,14 @@ class SlotContract extends NSmartContract {
         newContractIds.forEach(id => me.createContractSubscription(id, newExpires));
     }
 
-    onContractSubscriptionEvent(event) {
+    async onContractSubscriptionEvent(event) {
         if (event instanceof ApprovedEvent) {
             // recreate subscription:
-            this.putTrackingContract(event.getNewRevision());
-            this.saveTrackingContractsToState();
+            await this.putTrackingContract(event.getNewRevision());
+            await this.saveTrackingContractsToState();
 
             // and save new
-            this.updateSubscriptions(event.getEnvironment());
+            await this.updateSubscriptions(event.getEnvironment());
         }
     }
 
@@ -515,8 +517,8 @@ class SlotContract extends NSmartContract {
      * @param {MutableEnvironment} me is {@link MutableEnvironment} object with some data.
      * @return {Object} object contains operation status.
      */
-    onCreated(me) {
-        this.updateSubscriptions(me);
+    async onCreated(me) {
+        await this.updateSubscriptions(me);
 
         return {status : "ok"};
     }
@@ -527,8 +529,8 @@ class SlotContract extends NSmartContract {
      * @param {MutableEnvironment} me is {@link MutableEnvironment} object with some data.
      * @return {Object} object contains operation status.
      */
-    onUpdated(me) {
-        this.updateSubscriptions(me);
+    async onUpdated(me) {
+        await this.updateSubscriptions(me);
 
         return {status : "ok"};
     }

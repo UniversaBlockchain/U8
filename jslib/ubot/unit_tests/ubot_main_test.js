@@ -163,7 +163,7 @@ unit.test("ubot_main_test: executeCloudMethod", async () => {
 
     let startingContract = Contract.fromPrivateKey(userPrivKey);
     startingContract.createTransactionalSection();
-    startingContract.transactional.data.executableContract = executableContract.getPackedTransaction();
+    startingContract.transactional.data.executableContract = await executableContract.getPackedTransaction();
     startingContract.state.data.methodName = "ubotAsm";
     startingContract.state.data.executableContractId = executableContract.id.digest;
     await startingContract.seal(true);
@@ -171,8 +171,8 @@ unit.test("ubot_main_test: executeCloudMethod", async () => {
     console.log("executableContract.id: " + executableContract.id);
     console.log("startingContract.id: " + startingContract.id);
 
-    let startingContractBin = startingContract.getPackedTransaction();
-    client.command("executeCloudMethod", {contract: startingContractBin}, resp=>{
+    let startingContractBin = await startingContract.getPackedTransaction();
+    await client.command("executeCloudMethod", {contract: startingContractBin}, resp=>{
         console.log("resp: " + JSON.stringify(resp));
     }, err=>{
         console.log("err: " + err);

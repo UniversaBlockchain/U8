@@ -168,7 +168,7 @@ class NCallbackService extends CallbackService {
             else
                 return null;
 
-            let data = Boss.dump(call);
+            let data = await Boss.dump(call);
 
             let CRLF = "\r\n"; // Line separator required by multipart/form-data.
             let boundary = "==boundary==" + t.randomString(48);
@@ -200,7 +200,7 @@ class NCallbackService extends CallbackService {
             //connection.setReadTimeout(5000);
             //connection.setRequestProperty("Content-Type", "multipart/form-data; boundary=" + boundary);
             //connection.setRequestProperty("User-Agent", "Universa Node");
-            this.httpClient.sendGetRequestUrl(callbackURL, (respCode, body) => {
+            this.httpClient.sendGetRequestUrl(callbackURL, async (respCode, body) => {
                 if (respCode === 200) {
                     if (body == null || body.length === 0) {
                         event.fire(null);
@@ -208,7 +208,7 @@ class NCallbackService extends CallbackService {
                     }
 
                     // get receipt from answer
-                    let res = Boss.load(body);
+                    let res = await Boss.load(body);
                     if (!res.hasOwnProperty("receipt")) {
                         event.fire(null);
                         return;
@@ -278,7 +278,7 @@ class CallbackProcessor {
         this.environmentId = environmentId;
         this.callbackService = callbackService;
         this.delay = 1;
-        this.packedItem = item.getPackedTransaction();
+        this.item = item;
 
         this.isItemSended = false;
         this.executor = null;
@@ -408,7 +408,7 @@ class CallbackProcessor {
                 let signature = null;
                 try {
                     if (this.state === ItemState.APPROVED)
-                        signature = this.callbackService.requestFollowerCallback(this, this.callbackURL, this.packedItem);
+                        signature = this.callbackService.requestFollowerCallback(this, this.callbackURL, await this.item.getPackedTransaction());
                     else if (this.state === ItemState.REVOKED)
                         signature = this.callbackService.requestFollowerCallback(this, this.callbackURL, this.itemId.digest);
                 } catch (err) {

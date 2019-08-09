@@ -334,7 +334,7 @@ network.HttpServer = class {
             let length = reqBuf.getBufLength();
             let promises = [];
             for (let i = 0; i < length; ++i) {
-                let params = DefaultBiMapper.getInstance().deserialize(Boss.load(reqBuf.getParamsBin(i)));
+                let params = await DefaultBiMapper.getInstance().deserialize(await Boss.load(reqBuf.getParamsBin(i)));
                 let clientPublicKey = new crypto.PublicKey(reqBuf.getPublicKeyBin(i));
                 switch (params.command) {
                     case "hello":
@@ -347,17 +347,17 @@ network.HttpServer = class {
                         throw new Error("sample error");
                         break;
                     default:
-                        promises.push(this.processSecureCommand(params, clientPublicKey));
+                        promises.push(await this.processSecureCommand(params, clientPublicKey));
                 }
             }
             let results = await Promise.all(promises);
             for (let i = 0; i < length; ++i) {
-                reqBuf.setAnswer(i, Boss.dump(DefaultBiMapper.getInstance().serialize(results[i])));
+                reqBuf.setAnswer(i, await Boss.dump(await DefaultBiMapper.getInstance().serialize(results[i])));
             }
         });
     }
 
-    processSecureCommand(params, clientPublicKey) {
+    async processSecureCommand(params, clientPublicKey) {
         try {
             if (this.secureEndpoints_.has(params.command))
                 return new Promise(async resolve=>{
@@ -373,7 +373,7 @@ network.HttpServer = class {
                 throw new ErrorRecord(Errors.UNKNOWN_COMMAND, "command", "unknown: " + params.command);
             }
         } catch (e) {
-            return {error: DefaultBiMapper.getInstance().serialize(e)};
+            return {error: await DefaultBiMapper.getInstance().serialize(e)};
         }
     }
 
@@ -399,12 +399,12 @@ network.HttpServer = class {
         this.httpServer_.__addEndpoint(endpoint);
         this.endpoints_.set(endpoint, async (request)=>{
             try {
-                request.setAnswerBody(Boss.dump({
+                request.setAnswerBody(await Boss.dump({
                     "result": "ok",
                     "response": await block(request)
                 }));
             } catch (e) {
-                request.setAnswerBody(Boss.dump({
+                request.setAnswerBody(await Boss.dump({
                     "result": "error",
                     "error": e.message,
                     "errorClass": e.constructor.name
@@ -544,18 +544,18 @@ network.HttpClient = class {
         this.httpClient_.__sendRawRequestUrl(reqId, url, method, extHeaders, utf8Encode(bodyStr));
     }
 
-    command(name, params, onComplete, onError) {
-        let paramsBin = Boss.dump(DefaultBiMapper.getInstance().serialize({"command": name, "params": params}));
+    async command(name, params, onComplete, onError) {
+        let paramsBin = await Boss.dump(await DefaultBiMapper.getInstance().serialize({"command": name, "params": params}));
         let reqId = this.getReqId();
-        this.callbacks_.set(reqId, (decrypted) => {
-            let binder = DefaultBiMapper.getInstance().deserialize(Boss.load(decrypted));
+        this.callbacks_.set(reqId, async (decrypted) => {
+            let binder = await DefaultBiMapper.getInstance().deserialize(await Boss.load(decrypted));
             let result = binder.result;
             if (result) {
                 onComplete(result);
             } else {
                 let errorRecord = new ErrorRecord(Errors.FAILURE, "", "unprocessablereply");
                 if (binder.error)
-                    errorRecord = DefaultBiMapper.getInstance().deserialize(binder.error);
+                    errorRecord = await DefaultBiMapper.getInstance().deserialize(binder.error);
                 let clientError = ClientError.initFromErrorRecord(errorRecord);
                 onError(clientError);
             }

@@ -15,7 +15,7 @@ unit.test("modify data permission serialization", async () => {
     role.keyAddresses.add(k.publicKey.shortAddress);
 
     let mdp = new perm.ModifyDataPermission(role,{fields:{f1:null,f2:["123","asd123"]}});
-    let mdp2 = dbm.DefaultBiMapper.getInstance().deserialize(dbm.DefaultBiMapper.getInstance().serialize(mdp));
+    let mdp2 = await dbm.DefaultBiMapper.getInstance().deserialize(await dbm.DefaultBiMapper.getInstance().serialize(mdp));
     let mdp3 = new perm.ModifyDataPermission(role,{fields:{f1:null,f2:["13","asd123"]}});
     assert(t.valuesEqual(mdp,mdp2));
     assert(!t.valuesEqual(mdp,mdp3));
@@ -39,8 +39,8 @@ unit.test("modify data permission check whitelist", async () => {
 
 
 
-    let c2_1 = c1.createRevision([k]);
-    let c2_2 = c1.createRevision([k2]);
+    let c2_1 = await c1.createRevision([k]);
+    let c2_2 = await c1.createRevision([k2]);
 
 
     c2_1.state.data.f1 = "Bye";
@@ -73,9 +73,9 @@ unit.test("modify data permission check listed", async () => {
 
 
 
-    let c2_1 = c1.createRevision([k]);
-    let c2_2 = c1.createRevision([k]);
-    let c2_3 = c1.createRevision([k]);
+    let c2_1 = await c1.createRevision([k]);
+    let c2_2 = await c1.createRevision([k]);
+    let c2_3 = await c1.createRevision([k]);
 
 
     c2_1.state.data.f2 = "123";

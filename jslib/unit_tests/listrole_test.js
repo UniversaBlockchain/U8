@@ -18,10 +18,10 @@ unit.test("list role serialization", async () => {
 
 
 
-    let s = role.serialize(dbm.DefaultBiMapper.getInstance());
+    let s = await role.serialize(dbm.DefaultBiMapper.getInstance());
 
     let role2 = new roles.ListRole();
-    role2.deserialize(s,dbm.DefaultBiMapper.getInstance());
+    await role2.deserialize(s, dbm.DefaultBiMapper.getInstance());
     assert(t.valuesEqual(role,role2))
 });
 

@@ -104,18 +104,18 @@ class Parcel extends bs.BiSerializable {
         return null;
     }
 
-    serialize(serializer) {
+    async serialize(serializer) {
         return {
-            "payload": this.payload.pack(),
-            "payment": this.payment.pack(),
-            "hashId": serializer.serialize(this.hashId)
+            "payload": await this.payload.pack(),
+            "payment": await this.payment.pack(),
+            "hashId": await serializer.serialize(this.hashId)
         };
     }
 
-    deserialize(data, deserializer) {
-        this.payload = TransactionPack.unpack(data.payload);
-        this.payment = TransactionPack.unpack(data.payment);
-        this.hashId = deserializer.deserialize(data.hashId);
+    async deserialize(data, deserializer) {
+        this.payload = await TransactionPack.unpack(data.payload);
+        this.payment = await TransactionPack.unpack(data.payment);
+        this.hashId = await deserializer.deserialize(data.hashId);
 
         this.prepareForNode();
     }
@@ -125,9 +125,9 @@ class Parcel extends bs.BiSerializable {
      *
      * @return {Uint8Array} a packed binary
      */
-    pack() {
+    async pack() {
         if (this.packedBinary == null)
-            this.packedBinary = Boss.dump(BossBiMapper.getInstance().serialize(this));
+            this.packedBinary = await Boss.dump(await BossBiMapper.getInstance().serialize(this));
         return this.packedBinary;
     }
 
@@ -137,9 +137,9 @@ class Parcel extends bs.BiSerializable {
      * @param {Uint8Array} pack - Is binary that was packed by {@link Parcel#pack()}.
      * @return {Parcel} unpacked parcel.
      */
-    static unpack(pack) {
+    static async unpack(pack) {
 
-        let x = BossBiMapper.getInstance().deserialize(Boss.load(pack));
+        let x = await BossBiMapper.getInstance().deserialize(await Boss.load(pack));
 
         if (x instanceof Parcel) {
             x.packedBinary = pack;

@@ -32,9 +32,9 @@ class Permission extends bs.BiSerializable {
         return this.role.isAllowedForKeys(keys);
     }
 
-    deserialize(data, deserializer) {
+    async deserialize(data, deserializer) {
         this.name = data.name;
-        this.role = deserializer.deserialize(data.role);
+        this.role = await deserializer.deserialize(data.role);
         this.params = data;
 
         for (let key in data) {
@@ -47,13 +47,13 @@ class Permission extends bs.BiSerializable {
 
     }
 
-    serialize(serializer) {
+    async serialize(serializer) {
 
         let result = {
-            name:this.name,
-            role:serializer.serialize(this.role)
+            name: this.name,
+            role: await serializer.serialize(this.role)
         };
-        if(this.params != null) {
+        if (this.params != null) {
             for (let key of Object.keys(this.params)) {
                 result[key] = this.params[key];
             }
@@ -152,7 +152,7 @@ class ChangeNumberPermission extends Permission {
         }
     }
 
-    serialize(serializer) {
+    async serialize(serializer) {
         this.params = {
             field_name : this.fieldName,
             max_step : this.maxStep,
@@ -160,11 +160,11 @@ class ChangeNumberPermission extends Permission {
             max_value : this.maxValue,
             min_value : this.minValue
         };
-        return Object.getPrototypeOf(ChangeNumberPermission.prototype).serialize.call(this,serializer);
+        return await Object.getPrototypeOf(ChangeNumberPermission.prototype).serialize.call(this,serializer);
     }
 
-    deserialize(data, deserializer) {
-        Object.getPrototypeOf(ChangeNumberPermission.prototype).deserialize.call(this,data,deserializer);
+    async deserialize(data, deserializer) {
+        await Object.getPrototypeOf(ChangeNumberPermission.prototype).deserialize.call(this,data,deserializer);
         this.initFromParams();
     }
 
@@ -243,14 +243,14 @@ class ModifyDataPermission extends Permission {
         this.fields = this.params.fields;
     }
 
-    serialize(serializer) {
-        let data =  Object.getPrototypeOf(ModifyDataPermission.prototype).serialize.call(this,serializer);
-        data.fields = serializer.serialize(this.fields);
+    async serialize(serializer) {
+        let data =  await Object.getPrototypeOf(ModifyDataPermission.prototype).serialize.call(this,serializer);
+        data.fields = await serializer.serialize(this.fields);
         return data;
     }
 
-    deserialize(data, deserializer) {
-        Object.getPrototypeOf(ModifyDataPermission.prototype).deserialize.call(this,data,deserializer);
+    async deserialize(data, deserializer) {
+        await Object.getPrototypeOf(ModifyDataPermission.prototype).deserialize.call(this,data,deserializer);
         this.initFromParams();
     }
 
@@ -369,18 +369,18 @@ class SplitJoinPermission extends Permission {
         }
     }
 
-    serialize(serializer) {
+    async serialize(serializer) {
         this.params = {
             field_name : this.fieldName,
             min_unit : this.minUnit,
             min_value : this.minValue,
             join_match_fields : this.mergeFields
         };
-        return Object.getPrototypeOf(ChangeNumberPermission.prototype).serialize.call(this,serializer);
+        return await Object.getPrototypeOf(ChangeNumberPermission.prototype).serialize.call(this,serializer);
     }
 
-    deserialize(data, deserializer) {
-        Object.getPrototypeOf(ChangeNumberPermission.prototype).deserialize.call(this,data,deserializer);
+    async deserialize(data, deserializer) {
+        await Object.getPrototypeOf(ChangeNumberPermission.prototype).deserialize.call(this,data,deserializer);
         this.initFromParams();
     }
 

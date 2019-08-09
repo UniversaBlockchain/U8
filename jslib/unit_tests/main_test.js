@@ -169,18 +169,20 @@ unit.test("main_test: sendHttpRequests", async () => {
     let contract = Contract.fromPrivateKey(tk.TestKeys.getKey());
     await contract.seal();
 
-    await main.ledger.saveContractInStorage(contract.id, contract.getPackedTransaction(), contract.getExpiresAt(), contract.getOrigin(), 0);
+    await main.ledger.saveContractInStorage(contract.id, await contract.getPackedTransaction(), contract.getExpiresAt(), contract.getOrigin(), 0);
+
+    let packed = await contract.getPackedTransaction();
 
     httpClient.sendGetRequest("/contracts/" + contract.id.base64, (respCode, body) => {
         assert(respCode === 200);
-        assert(contract.getPackedTransaction().equals(body));
+        assert(packed.equals(body));
 
         fire[1]();
     });
 
-    httpClient.sendGetRequest("/network", (respCode, body) => {
+    httpClient.sendGetRequest("/network", async (respCode, body) => {
         assert(respCode === 200);
-        let result = Boss.load(body);
+        let result = await Boss.load(body);
         assert(result.result === "ok");
 
         assert(result.response.version === VERSION);
@@ -192,15 +194,15 @@ unit.test("main_test: sendHttpRequests", async () => {
 
     httpClient.sendGetRequest("/topology", async (respCode, body) => {
         assert(respCode === 200);
-        let result = Boss.load(body);
+        let result = await Boss.load(body);
         assert(result.result === "ok");
 
-        let data = Boss.load(result.response.packed_data);
+        let data = await Boss.load(result.response.packed_data);
         assert(data.version === VERSION);
         assert(data.hasOwnProperty("number"));
         assert(data.hasOwnProperty("nodes"));
 
-        let key = ExtendedSignature.extractPublicKey(result.response.signature);
+        let key = await ExtendedSignature.extractPublicKey(result.response.signature);
         assert(key != null);
         assert(await ExtendedSignature.verify(key, result.response.signature, result.response.packed_data) != null);
 
@@ -372,7 +374,7 @@ unit.test("main_test: register item", async () => {
         events.push(new Promise((resolve) => {fire.push(resolve)}));
 
     for (let i = 0; i < 4; i++)
-        ts.clients[i].command("getState", {itemId: item.id}, (result) => fire[i](result), () => fire[i](null));
+        await ts.clients[i].command("getState", {itemId: item.id}, (result) => fire[i](result), () => fire[i](null));
 
     (await Promise.all(events)).forEach(ir => {
         assert(ir != null);
@@ -504,7 +506,7 @@ unit.test("main_test: register bad item", async () => {
         events.push(new Promise((resolve) => {fire.push(resolve)}));
 
     for (let i = 0; i < 4; i++)
-        ts.clients[i].command("getState", {itemId: item.id}, (result) => fire[i](result), () => fire[i](null));
+        await ts.clients[i].command("getState", {itemId: item.id}, (result) => fire[i](result), () => fire[i](null));
 
     (await Promise.all(events)).forEach(ir => {
         assert(ir != null);
@@ -574,8 +576,8 @@ unit.test("main_test: register parcel", async () => {
             }));
 
         for (let i = 0; i < 4; i++) {
-            ts.clients[i].command("getState", {itemId: item.id}, (result) => fire[i * 2](result), () => fire[i * 2](null));
-            ts.clients[i].command("getState", {itemId: parcel.getPaymentContract().id}, (result) => fire[i * 2 + 1](result), () => fire[i * 2 + 1](null));
+            await ts.clients[i].command("getState", {itemId: item.id}, (result) => fire[i * 2](result), () => fire[i * 2](null));
+            await ts.clients[i].command("getState", {itemId: parcel.getPaymentContract().id}, (result) => fire[i * 2 + 1](result), () => fire[i * 2 + 1](null));
         }
 
         (await Promise.all(events)).forEach(ir => {
@@ -655,7 +657,7 @@ unit.test("main_test: register parcel with bad payload", async () => {
             }));
 
         for (let i = 0; i < 4; i++) {
-            ts.clients[i].command("getState", {itemId: item.id}, (result) => fire[i](result), () => fire[i](null));
+            await ts.clients[i].command("getState", {itemId: item.id}, (result) => fire[i](result), () => fire[i](null));
         }
 
         (await Promise.all(events)).forEach(ir => {
@@ -671,7 +673,7 @@ unit.test("main_test: register parcel with bad payload", async () => {
             }));
 
         for (let i = 0; i < 4; i++) {
-            ts.clients[i].command("getState", {itemId: parcel.getPaymentContract().id}, (result) => fire[i](result), () => fire[i](null));
+            await ts.clients[i].command("getState", {itemId: parcel.getPaymentContract().id}, (result) => fire[i](result), () => fire[i](null));
         }
 
         (await Promise.all(events)).forEach(ir => {
@@ -743,7 +745,7 @@ unit.test("main_test: register parcel with bad payment", async () => {
             }));
 
         for (let i = 0; i < 4; i++) {
-            ts.clients[i].command("getState", {itemId: item.id}, (result) => fire[i](result), () => fire[i](null));
+            await ts.clients[i].command("getState", {itemId: item.id}, (result) => fire[i](result), () => fire[i](null));
         }
 
         (await Promise.all(events)).forEach(ir => {
@@ -759,7 +761,7 @@ unit.test("main_test: register parcel with bad payment", async () => {
             }));
 
         for (let i = 0; i < 4; i++) {
-            ts.clients[i].command("getState", {itemId: parcel.getPaymentContract().id}, (result) => fire[i](result), () => fire[i](null));
+            await ts.clients[i].command("getState", {itemId: parcel.getPaymentContract().id}, (result) => fire[i](result), () => fire[i](null));
         }
 
         (await Promise.all(events)).forEach(ir => {
@@ -820,7 +822,7 @@ unit.test("main_test: node stats", async () => {
         let fire = null;
         let event = new Promise(resolve => fire = resolve);
 
-        ts.client.command("getStats", {showDays: 2}, (result) => fire(result), () => fire(null));
+        await ts.client.command("getStats", {showDays: 2}, (result) => fire(result), () => fire(null));
 
         let firstResult = await event;
         assert(firstResult != null);

@@ -24,7 +24,7 @@ class UBotHttpServer extends network.HttpServer {
 
     async onExecuteCloudMethod(params, clientKey) {
         try {
-            let contract = Contract.fromPackedTransaction(params.contract);
+            let contract = await Contract.fromPackedTransaction(params.contract);
             this.ubot.executeCloudMethod(contract);
         } catch (e) {
             console.log("err: " + e.stack);
@@ -32,15 +32,15 @@ class UBotHttpServer extends network.HttpServer {
         return {status:"ok"};
     }
 
-    onGetStartingContract(request) {
+    async onGetStartingContract(request) {
         let paramIndex = request.path.indexOf("/", 1) + 1;
         let encodedString = request.path.substring(paramIndex);
         let hashId = HashId.withBase64Digest(encodedString);
         let contract = this.ubot.getStartingContract(hashId);
         if (contract != null) {
-            let contractBin = contract.getPackedTransaction();
+            let contractBin = await contract.getPackedTransaction();
             let selectedPool = this.ubot.getSelectedPoolNumbers(hashId);
-            let answerBin = Boss.dump({contractBin: contractBin, selectedPool: selectedPool});
+            let answerBin = await Boss.dump({contractBin: contractBin, selectedPool: selectedPool});
             request.setAnswerBody(answerBin);
         } else {
             request.setStatusCode(204);

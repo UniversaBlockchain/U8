@@ -71,10 +71,10 @@ class UnsContract extends NSmartContract {
      *
      * @return {UnsContract} extracted UNS contract.
      */
-    static fromSealedBinary(sealed, pack) {
-        let c = Contract.fromSealedBinary(sealed, pack, new UnsContract());
+    static async fromSealedBinary(sealed, pack) {
+        let c = await Contract.fromSealedBinary(sealed, pack, new UnsContract());
 
-        c.deserializeForUns();
+        await c.deserializeForUns();
         return c;
     }
 
@@ -108,17 +108,17 @@ class UnsContract extends NSmartContract {
         return this;
     }
 
-    deserialize(data, deserializer) {
-        super.deserialize(data, deserializer);
+    async deserialize(data, deserializer) {
+        await super.deserialize(data, deserializer);
 
-        this.deserializeForUns(deserializer);
+        await this.deserializeForUns(deserializer);
     }
 
     /**
      * Extract values from deserialized object for UNS fields.
      */
-    deserializeForUns(deserializer) {
-        this.storedNames = deserializer.deserialize(t.getOrDefault(this.state.data, UnsContract.NAMES_FIELD_NAME, null));
+    async deserializeForUns(deserializer) {
+        this.storedNames = await deserializer.deserialize(t.getOrDefault(this.state.data, UnsContract.NAMES_FIELD_NAME, null));
 
         this.paidU = t.getOrDefault(this.state.data, UnsContract.PAID_U_FIELD_NAME, 0);
         this.prepaidNamesForDays = t.getOrDefault(this.state.data, UnsContract.PREPAID_ND_FIELD_NAME, 0);

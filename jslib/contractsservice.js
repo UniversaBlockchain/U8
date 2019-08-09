@@ -65,8 +65,8 @@ async function createRevocation(c, ...keys) {
  * @return {Contract} working contract that should be register in the Universa to finish procedure.
  */
 async function createSplit(c, amount, fieldName, keys, andSetCreator = false) {
-    let splitFrom = c.createRevision();
-    let splitTo = splitFrom.splitValue(fieldName, amount);
+    let splitFrom = await c.createRevision();
+    let splitTo = await splitFrom.splitValue(fieldName, amount);
 
     for (let key of keys)
         splitFrom.keysToSignWith.add(key);
@@ -95,7 +95,7 @@ async function createSplit(c, amount, fieldName, keys, andSetCreator = false) {
  * @return {Contract} working contract that should be register in the Universa to finish procedure.
  */
 async function createJoin(contract1, contract2, fieldName, keys) {
-    let joinTo = contract1.createRevision();
+    let joinTo = await contract1.createRevision();
 
     if (contract1.state.data[fieldName] == null || contract2.state.data[fieldName] == null)
         throw new ex.IllegalArgumentError("createJoin: not found field state.data." + fieldName);
@@ -132,7 +132,7 @@ async function createSplitJoin(contractsToJoin, amountsToSplit, addressesToSplit
     for (let c of contractsToJoin) {
         if (contract == null) {
             contract = c;
-            contract = contract.createRevision(ownerKeys);
+            contract = await contract.createRevision(ownerKeys);
         } else
             contract.revokingItems.add(c);
 
@@ -142,7 +142,7 @@ async function createSplitJoin(contractsToJoin, amountsToSplit, addressesToSplit
         sum = sum.add(new BigDecimal(c.state.data[fieldName]));
     }
 
-    let parts = contract.split(amountsToSplit.length);
+    let parts = await contract.split(amountsToSplit.length);
     for (let i = 0; i < parts.length; i++) {
         sum = sum.sub(new BigDecimal(amountsToSplit[i]));
         parts[i].registerRole(new roles.SimpleRole("owner", addressesToSplit[i]));
@@ -198,7 +198,7 @@ async function startSwap(contracts1, contracts2, fromKeys, toKeys, createNewRevi
     // create new revisions of contracts and create transactional sections in it
     let newContracts1 = [];
     for (let c of contracts1) {
-        let nc = createNewRevision ? c.createRevision(fromKeys) : c;
+        let nc = createNewRevision ? await c.createRevision(fromKeys) : c;
         nc.createTransactionalSection();
         nc.transactional.id = HashId.of(randomBytes(64)).base64;
 
@@ -207,7 +207,7 @@ async function startSwap(contracts1, contracts2, fromKeys, toKeys, createNewRevi
 
     let newContracts2 = [];
     for (let c of contracts2) {
-        let nc = createNewRevision ? c.createRevision() : c;
+        let nc = createNewRevision ? await c.createRevision() : c;
         if (createNewRevision) {
             // set new creator
             let addresses = Array.from(toKeys).map(k => k.longAddress);
@@ -285,10 +285,10 @@ async function createTwoSignedContract(baseContract, fromKeys, toKeys, createNew
     let twoSignContract;
 
     if (createNewRevision) {
-        twoSignContract = baseContract.createRevision(fromKeys);
+        twoSignContract = await baseContract.createRevision(fromKeys);
         twoSignContract.keysToSignWith.clear();
     } else
-        twoSignContract = baseContract.copy();
+        twoSignContract = await baseContract.copy();
 
     let creatorFrom = new roles.SimpleRole("creator", fromKeys);
     let ownerTo = new roles.SimpleRole("owner", toKeys);
@@ -551,7 +551,7 @@ async function createNotaryContract(issuerKeys, ownerKeys, filePaths = null, fil
             let fileData = {
                 file_name: fileName,
                 __type: "file",
-                hash_id: BossBiMapper.getInstance().serialize(HashId.of(buffer))
+                hash_id: await BossBiMapper.getInstance().serialize(HashId.of(buffer))
             };
 
             if (fileDescriptions != null && fileDescriptions[i] != null && typeof fileDescriptions[i] === "string")
@@ -595,19 +595,20 @@ async function checkAttachNotaryContract(notaryContract, filePaths) {
         let buffer = await io.fileGetContentsAsBytes(normalPath);
         let fileHash = HashId.of(buffer);
 
-        return Object.keys(files).some(key => {
+        for (let key of Object.keys(files)) {
             let file = files[key];
             try {
                 if (!normalPath.endsWith(file.file_name))
-                    return false;
+                    continue;
 
-                let notaryHash = BossBiMapper.getInstance().deserialize(file.hash_id);
+                let notaryHash = await BossBiMapper.getInstance().deserialize(file.hash_id);
 
-                return fileHash.equals(notaryHash);
-            } catch (err) {
-                return false;
-            }
-        });
+                if (fileHash.equals(notaryHash))
+                    return true;
+            } catch (err) {}
+        }
+
+        return false;
 
     } else if (isDir) {
         let results = await Promise.all(Object.keys(files).map(async(key) => {
@@ -622,7 +623,7 @@ async function checkAttachNotaryContract(notaryContract, filePaths) {
                 let buffer = await io.fileGetContentsAsBytes(filePath);
 
                 let fileHash = HashId.of(buffer);
-                let notaryHash = BossBiMapper.getInstance().deserialize(file.hash_id);
+                let notaryHash = await BossBiMapper.getInstance().deserialize(file.hash_id);
 
                 return fileHash.equals(notaryHash);
             } catch (err) {
@@ -929,7 +930,7 @@ async function addConstraintToContract(baseContract, refContract, constrName, co
  */
 async function createParcel(payload, payment, amount, keys, withTestPayment = false) {
 
-    let paymentDecreased = payment.createRevision(keys);
+    let paymentDecreased = await payment.createRevision(keys);
     let payloadPack;
     if (payload instanceof Contract) {
         paymentDecreased.getTransactionalData()["id"] = payload.id.base64;
@@ -987,7 +988,7 @@ async function createParcel(payload, payment, amount, keys, withTestPayment = fa
  */
 async function createPayingParcel(payload, payment, amount, amountSecond, keys, withTestPayment = false) {
 
-    let paymentDecreased = payment.createRevision(keys);
+    let paymentDecreased = await payment.createRevision(keys);
 
     if (withTestPayment)
         paymentDecreased.state.data.test_transaction_units = payment.state.data.test_transaction_units - amount;
@@ -997,7 +998,7 @@ async function createPayingParcel(payload, payment, amount, amountSecond, keys, 
     await paymentDecreased.seal(true);
     let paymentPack = paymentDecreased.transactionPack;
 
-    let paymentDecreasedSecond = paymentDecreased.createRevision(keys);
+    let paymentDecreasedSecond = await paymentDecreased.createRevision(keys);
 
     if (withTestPayment)
         paymentDecreasedSecond.state.data.test_transaction_units = paymentDecreased.state.data.test_transaction_units - amountSecond;
@@ -1339,7 +1340,7 @@ async function completeEscrowContract(escrow) {
             return null;
     }
 
-    let revisionEscrow = escrowInside.createRevision();
+    let revisionEscrow = await escrowInside.createRevision();
     revisionEscrow.state.data.status = "completed";
     await revisionEscrow.seal(true);
 
@@ -1374,7 +1375,7 @@ async function cancelEscrowContract(escrow) {
             return null;
     }
 
-    let revisionEscrow = escrowInside.createRevision();
+    let revisionEscrow = await escrowInside.createRevision();
     revisionEscrow.state.data.status = "canceled";
     await revisionEscrow.seal(true);
 
@@ -1395,7 +1396,7 @@ async function cancelEscrowContract(escrow) {
  * @return {Contract} new revision of payment contract with new owner.
  */
 async function takeEscrowPayment(newOwnerKeys, payment) {
-    let revisionPayment = payment.createRevision(newOwnerKeys);
+    let revisionPayment = await payment.createRevision(newOwnerKeys);
 
     // set new owner
     revisionPayment.registerRole(new roles.SimpleRole("owner", newOwnerKeys));
@@ -1422,7 +1423,7 @@ async function takeEscrowPayment(newOwnerKeys, payment) {
  */
 async function createRateLimitDisablingContract(key, payment, amount, keys) {
 
-    let unlimitContract = payment.createRevision(keys);
+    let unlimitContract = await payment.createRevision(keys);
 
     unlimitContract.createTransactionalSection();
     unlimitContract.transactional.id = HashId.of(randomBytes(64)).base64;

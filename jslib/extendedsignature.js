@@ -35,14 +35,14 @@ class ExtendedSignature {
         if(typeof savePublicKey === "undefined")
             savePublicKey = true;
 
-        let targetSignature = ExtendedSignature.createTargetSignature(privateKey.publicKey,data,savePublicKey);
+        let targetSignature = await ExtendedSignature.createTargetSignature(privateKey.publicKey,data,savePublicKey);
 
-        return ExtendedSignature.of(targetSignature,
+        return await ExtendedSignature.of(targetSignature,
             await privateKey.sign(targetSignature, crypto.SHA512),
             await privateKey.sign(targetSignature, crypto.SHA3_384));
     }
 
-    static createTargetSignature(publicKey, data, savePublicKey) {
+    static async createTargetSignature(publicKey, data, savePublicKey) {
         let result = {
             key: publicKey.fingerprints,
             sha512: crypto.digest(crypto.SHA512,data),
@@ -53,15 +53,15 @@ class ExtendedSignature {
         if (savePublicKey)
             result.pub_key = publicKey.packed;
 
-        return Boss.dump(result);
+        return await Boss.dump(result);
     }
 
-    static of(targetSignature, sign, sign3) {
-        return Boss.dump({ exts: targetSignature, sign: sign, sign3: sign3});
+    static async of(targetSignature, sign, sign3) {
+        return await Boss.dump({ exts: targetSignature, sign: sign, sign3: sign3});
     }
 
     static async verify(key, signature, data) {
-        let src = Boss.load(signature);
+        let src = await Boss.load(signature);
         let es = new ExtendedSignature();
         let isSignValid = await key.verify(src.exts, src.sign, crypto.SHA512);
         let  isSign2Valid = true;
@@ -75,7 +75,7 @@ class ExtendedSignature {
         }
 
         if (isSignValid && isSign2Valid) {
-            let b = Boss.load(src.exts);
+            let b = await Boss.load(src.exts);
             es.keyId = b.key;
             es.createdAt = b.created_at;
             es.signature = signature;
@@ -101,17 +101,17 @@ class ExtendedSignature {
         return null;
     }
 
-    static extractPublicKey(signature) {
+    static async extractPublicKey(signature) {
         try {
-            return new crypto.PublicKey(Boss.load(Boss.load(signature).exts).pub_key);
+            return new crypto.PublicKey((await Boss.load((await Boss.load(signature)).exts)).pub_key);
         } catch ( e) {
             return null;
         }
     }
 
-    static extractKeyId(signature) {
+    static async extractKeyId(signature) {
         try {
-            return Boss.load(Boss.load(signature).exts).key;
+            return (await Boss.load((await Boss.load(signature)).exts)).key;
         } catch ( e) {
             return null;
         }

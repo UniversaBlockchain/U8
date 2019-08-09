@@ -132,7 +132,7 @@ class Ledger {
     simpleQuery(sql, processValue, connection = undefined, ...params) {
         return new Promise((resolve, reject) => {
             let query = con => {
-                con.executeQuery(qr => {
+                con.executeQuery(async (qr) => {
                         let row = qr.getRows(1)[0];
                         if (connection == null)
                             con.release();
@@ -142,7 +142,7 @@ class Ledger {
                             value = row[0];
 
                         if (processValue != null)
-                            resolve(processValue(value));
+                            resolve(await processValue(value));
                         else
                             resolve(value);
                     }, e => {
@@ -1206,7 +1206,7 @@ class Ledger {
             let nsc = environment.contract;
             await this.removeEnvironment(nsc.id);
             let envId = await this.saveEnvironmentToStorage(nsc.getExtendedType(), nsc.id,
-                Boss.dump(environment.getMutable().kvStore), nsc.getPackedTransaction());
+                await Boss.dump(environment.getMutable().kvStore), await nsc.getPackedTransaction());
 
             await Promise.all(Array.from(environment.nameRecords()).map(async(nr)=> {
                 nr.environmentId = envId;
@@ -1217,7 +1217,7 @@ class Ledger {
                 await this.saveSubscriptionInStorage(css.getHashId(), css.isChainSubscription(), css.expiresAt(), envId)));
 
             await Promise.all(Array.from(environment.storages()).map(async(cst) =>
-                await this.saveContractInStorage(cst.getContract().id, cst.getPackedContract(), cst.expiresAt(), cst.getContract().getOrigin(), envId)));
+                await this.saveContractInStorage((await cst.getContract()).id, cst.getPackedContract(), cst.expiresAt(), (await cst.getContract()).getOrigin(), envId)));
 
             let fs = environment.getFollowerService();
             if (fs != null)
@@ -1463,7 +1463,7 @@ class Ledger {
      */
     getItem(record) {
         return this.simpleQuery("select packed from items where id = ?",
-            x => (x != null) ? Contract.fromPackedTransaction(x) : null,
+            async (x) => (x != null) ? await Contract.fromPackedTransaction(x) : null,
             null,
             record.recordId);
     }
@@ -1476,13 +1476,13 @@ class Ledger {
      * @param {Date} keepTill - Time keep till.
      * @return {Promise<void> | void}
      */
-    putItem(record, item, keepTill) {
+    async putItem(record, item, keepTill) {
         if (!item instanceof Contract)
             return;
 
         return this.simpleUpdate("insert into items(id,packed,keepTill) values(?,?,?);", null,
             record.recordId,
-            item.getPackedTransaction(),
+            await item.getPackedTransaction(),
             Math.floor(keepTill.getTime() / 1000));
     }
 
@@ -1510,7 +1510,7 @@ class Ledger {
      * @param {db.SqlDriverConnection} con - Transaction connection. Optional.
      * @return {Promise<void> | void}
      */
-    putKeptItem(record, item, con = undefined) {
+    async putKeptItem(record, item, con = undefined) {
         if (!item instanceof Contract)
             return;
 
@@ -1519,7 +1519,7 @@ class Ledger {
             record.recordId,
             item.getOrigin().digest,
             item.parent != null ? item.parent.digest : null,
-            item.getPackedTransaction()
+            await item.getPackedTransaction()
         );
     }
 
@@ -1782,10 +1782,10 @@ class Ledger {
     async getEnvironment(environmentId, con = undefined) {
         let smkv = await this.getSmartContractForEnvironmentId(environmentId, con);
         let nContractHashId = crypto.HashId.withDigest(smkv.hashDigest);
-        let contract = NSmartContract.fromPackedTransaction(smkv.pack);
+        let contract = await NSmartContract.fromPackedTransaction(smkv.pack);
         let findNContract = (contract.transactionPack != null) ? contract.transactionPack.subItems.get(nContractHashId) : null;
         contract = (findNContract == null) ? contract : findNContract;
-        let kvStorage = Boss.load(smkv.kvStorage);
+        let kvStorage = await Boss.load(smkv.kvStorage);
 
         let contractSubscriptions = await this.getContractSubscriptions(environmentId, con);
         let contractStorages = await this.getContractStorages(environmentId, con);
@@ -1832,7 +1832,7 @@ class Ledger {
 
         if (nim == null) {
             let envId = await this.saveEnvironmentToStorage(smartContract.getExtendedType(), smartContract.id,
-                Boss.dump({}), smartContract.getPackedTransaction(), con);
+                await Boss.dump({}), await smartContract.getPackedTransaction(), con);
             nim = await this.getEnvironment(envId, con);
         } else
             nim.contract = smartContract;

@@ -18,7 +18,7 @@ unit.test("change owner permission serialization", async () => {
     let role2 = new roles.SimpleRole("name",k.publicKey.longAddress);
 
     let cop = new perm.ChangeOwnerPermission(role);
-    let cop2 = dbm.DefaultBiMapper.getInstance().deserialize(dbm.DefaultBiMapper.getInstance().serialize(cop));
+    let cop2 = await dbm.DefaultBiMapper.getInstance().deserialize(await dbm.DefaultBiMapper.getInstance().serialize(cop));
     let cop3 = new perm.ChangeOwnerPermission(role2);
     assert(t.valuesEqual(cop,cop2));
     assert(!t.valuesEqual(cop,cop3));
@@ -33,8 +33,8 @@ unit.test("change owner permission check", async () => {
     let c1 = cnt.Contract.fromPrivateKey(k);
     await c1.seal(true);
     assert(await c1.check());
-    let c2_1 = c1.createRevision([k]);
-    let c2_2 = c1.createRevision([k2]);
+    let c2_1 = await c1.createRevision([k]);
+    let c2_2 = await c1.createRevision([k2]);
 
     let newowner = new roles.SimpleRole("owner",k2.publicKey.longAddress);
     let newowner2 = new roles.SimpleRole("owner",k2.publicKey.shortAddress);
@@ -49,8 +49,8 @@ unit.test("change owner permission check", async () => {
     assert(!await c2_2.check());
 
 
-    let c3_1 = c2_1.createRevision([k2]);
-    let c3_2 = c2_1.createRevision([k]);
+    let c3_1 = await c2_1.createRevision([k2]);
+    let c3_2 = await c2_1.createRevision([k]);
 
 
     c3_1.registerRole(newowner2);

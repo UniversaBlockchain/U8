@@ -5,11 +5,11 @@ let _boss = require("boss.min");
 let isCppProrotypesInitialized = false;
 
 module.exports = {
-    dump(data) {
+    async dump(data) {
         return new _boss().dump(data);
     },
 
-    load(data) {
+    async load(data) {
         return new _boss().load(data);
     },
 

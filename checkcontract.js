@@ -12,7 +12,7 @@ async function main(args) {
     let sealed = await input.allBytes();
     await input.close();
 
-    let contract = TransactionPack.unpack(sealed).contract;
+    let contract = await TransactionPack.unpack(sealed).contract;
     await contract.check();
     console.log(JSON.stringify({ errors: contract.errors, cost: contract.quantiser.quantaSum_, costU: contract.getProcessedCostU()}));
 
