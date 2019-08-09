@@ -44,12 +44,16 @@ unit.test("boss_test: asyncLoad array of HashId", async () => {
 
 unit.test("boss_test: asyncLoad nested array of HashId", async () => {
     let hashId = await crypto.HashId.of(t.randomString(64));
-    let arr0 = {a:[{b:[{c:hashId}]}]};
-    let bin = await Boss.dump(await BossBiMapper.getInstance().serialize(arr0));
+    let arr0 = {a:[{b:[{c:hashId,i:223334444,f:7654321.1234567}]}]};
+    let bin = await Boss.asyncDump(await BossBiMapper.getInstance().serialize(arr0));
     let arr = await BossBiMapper.getInstance().deserialize(await Boss.asyncLoad(bin));
     assertSilent(arr.a[0].b[0].c.__proto__ === crypto.HashId.prototype);
     assertSilent(arr.a[0].b[0].c.constructor.name === "HashIdImpl");
     assertSilent(arr.a[0].b[0].c.base64 === hashId.base64);
+    assertSilent(typeof arr.a[0].b[0].i === "number");
+    assertSilent(arr.a[0].b[0].i === 223334444);
+    assertSilent(typeof arr.a[0].b[0].f === "number");
+    assertSilent(arr.a[0].b[0].f === 7654321.1234567);
 });
 
 unit.test("boss_test: asyncLoad array of KeyAddress", async () => {
@@ -136,13 +140,11 @@ unit.test("boss_test: asyncDump array of HashId", async () => {
     for (let i = 0; i < 100; ++i)
         arr0.push(await crypto.HashId.of(t.randomString(64)));
     let ser = await BossBiMapper.getInstance().serialize(arr0);
-    ser = ["dfd", "333444455555", "qwerty123456"];
     let t0 = new Date().getTime();
     let bin = await Boss.asyncDump(ser);
     //let bin = await Boss.dump(ser);
     let dt = new Date().getTime() - t0;
-    console.log("bin.length: " + bin.length);
-    console.log("load: " + await Boss.load(bin));
+    console.logPut(" bin.length: " + bin.length + "  ");
     console.logPut("dt = " + dt + " ");
 });
 
