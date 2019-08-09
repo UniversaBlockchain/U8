@@ -29,7 +29,7 @@ unit.test("boss_test: asyncLoad array of HashId", async () => {
     let arr0 = [];
     for (let i = 0; i < 100; ++i)
         arr0.push(await crypto.HashId.of(t.randomString(64)));
-    let bin = await Boss.dump(await BossBiMapper.getInstance().serialize(arr0));
+    let bin = await Boss.asyncDump(await BossBiMapper.getInstance().serialize(arr0));
     let t0 = new Date().getTime();
     let arr = await BossBiMapper.getInstance().deserialize(await Boss.asyncLoad(bin));
     //let arr = await BossBiMapper.getInstance().deserialize(await Boss.load(bin));
@@ -66,7 +66,7 @@ unit.test("boss_test: asyncLoad array of KeyAddress", async () => {
             resolve((i % 2 === 0) ? pk.shortAddress : pk.longAddress);
         }));
     arr0 = await Promise.all(arr0);
-    let bin = await Boss.dump(await BossBiMapper.getInstance().serialize(arr0));
+    let bin = await Boss.asyncDump(await BossBiMapper.getInstance().serialize(arr0));
     let t0 = new Date().getTime();
     let arr = await BossBiMapper.getInstance().deserialize(await Boss.asyncLoad(bin));
     //let arr = await BossBiMapper.getInstance().deserialize(await Boss.load(bin));
@@ -85,7 +85,7 @@ unit.test("boss_test: asyncLoad array of PublicKeys", async () => {
     for (let i = 0; i < 10; ++i)
         arr0.push(new Promise(async resolve => resolve((await crypto.PrivateKey.generate(2048)).publicKey)));
     arr0 = await Promise.all(arr0);
-    let bin = await Boss.dump(await BossBiMapper.getInstance().serialize(arr0));
+    let bin = await Boss.asyncDump(await BossBiMapper.getInstance().serialize(arr0));
     let t0 = new Date().getTime();
     let arr = await BossBiMapper.getInstance().deserialize(await Boss.asyncLoad(bin));
     //let arr = await BossBiMapper.getInstance().deserialize(await Boss.load(bin));
@@ -103,7 +103,7 @@ unit.test("boss_test: asyncLoad array of PrivateKeys", async () => {
     for (let i = 0; i < 10; ++i)
         arr0.push(new Promise(async resolve => resolve((await crypto.PrivateKey.generate(2048)))));
     arr0 = await Promise.all(arr0);
-    let bin = await Boss.dump(await BossBiMapper.getInstance().serialize(arr0));
+    let bin = await Boss.asyncDump(await BossBiMapper.getInstance().serialize(arr0));
     let t0 = new Date().getTime();
     let arr = await BossBiMapper.getInstance().deserialize(await Boss.asyncLoad(bin));
     //let arr = await BossBiMapper.getInstance().deserialize(await Boss.load(bin));
