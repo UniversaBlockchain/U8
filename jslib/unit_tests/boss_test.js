@@ -45,8 +45,8 @@ unit.test("boss_test: asyncLoad array of HashId", async () => {
 unit.test("boss_test: asyncLoad nested array of HashId", async () => {
     let hashId = await crypto.HashId.of(t.randomString(64));
     let arr0 = {a:[{b:[{c:hashId}]}]};
-    let bin = Boss.dump(BossBiMapper.getInstance().serialize(arr0));
-    let arr = BossBiMapper.getInstance().deserialize(await Boss.asyncLoad(bin));
+    let bin = await Boss.dump(await BossBiMapper.getInstance().serialize(arr0));
+    let arr = await BossBiMapper.getInstance().deserialize(await Boss.asyncLoad(bin));
     assertSilent(arr.a[0].b[0].c.__proto__ === crypto.HashId.prototype);
     assertSilent(arr.a[0].b[0].c.constructor.name === "HashIdImpl");
     assertSilent(arr.a[0].b[0].c.base64 === hashId.base64);
@@ -99,9 +99,9 @@ unit.test("boss_test: asyncLoad array of PrivateKeys", async () => {
     for (let i = 0; i < 10; ++i)
         arr0.push(new Promise(async resolve => resolve((await crypto.PrivateKey.generate(2048)))));
     arr0 = await Promise.all(arr0);
-    let bin = Boss.dump(BossBiMapper.getInstance().serialize(arr0));
+    let bin = await Boss.dump(await BossBiMapper.getInstance().serialize(arr0));
     let t0 = new Date().getTime();
-    let arr = BossBiMapper.getInstance().deserialize(await Boss.asyncLoad(bin));
+    let arr = await BossBiMapper.getInstance().deserialize(await Boss.asyncLoad(bin));
     //let arr = BossBiMapper.getInstance().deserialize(Boss.load(bin));
     let dt = new Date().getTime() - t0;
     console.logPut("dt = " + dt + " ");
@@ -117,9 +117,9 @@ unit.test("boss_test: asyncLoad array of Date", async () => {
     for (let i = 0; i < 100; ++i) {
         arr0.push(new Date(new Date().getTime() + i*1000 + Math.floor(Math.random()*1000)));
     }
-    let bin = Boss.dump(BossBiMapper.getInstance().serialize(arr0));
+    let bin = await Boss.dump(await BossBiMapper.getInstance().serialize(arr0));
     let t0 = new Date().getTime();
-    let arr = BossBiMapper.getInstance().deserialize(await Boss.asyncLoad(bin));
+    let arr = await BossBiMapper.getInstance().deserialize(await Boss.asyncLoad(bin));
     //let arr = BossBiMapper.getInstance().deserialize(Boss.load(bin));
     let dt = new Date().getTime() - t0;
     console.logPut("dt = " + dt + " ");
@@ -135,14 +135,14 @@ unit.test("boss_test: asyncDump array of HashId", async () => {
     let arr0 = [];
     for (let i = 0; i < 100; ++i)
         arr0.push(await crypto.HashId.of(t.randomString(64)));
-    let ser = BossBiMapper.getInstance().serialize(arr0);
+    let ser = await BossBiMapper.getInstance().serialize(arr0);
     ser = ["dfd", "333444455555", "qwerty123456"];
     let t0 = new Date().getTime();
     let bin = await Boss.asyncDump(ser);
     //let bin = Boss.dump(ser);
     let dt = new Date().getTime() - t0;
     console.log("bin.length: " + bin.length);
-    console.log("load: " + Boss.load(bin));
+    console.log("load: " + await Boss.load(bin));
     console.logPut("dt = " + dt + " ");
 });
 
