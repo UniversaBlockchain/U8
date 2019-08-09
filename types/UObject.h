@@ -38,7 +38,7 @@ public:
     }
 
     virtual Local<Object> serializeToV8(Isolate* isolate) {
-        return Object::New(isolate);
+        return Local<Object>::Cast(Null(isolate));
     };
 
 private:
