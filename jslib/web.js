@@ -8,8 +8,8 @@ const e = require("errors");
 const Errors = e.Errors;
 const ErrorRecord = e.ErrorRecord;
 const ClientError = e.ClientError;
-const DefaultBiMapper = require("defaultbimapper").DefaultBiMapper;
-//const BossBiMapper = require("bossbimapper").BossBiMapper;
+//const DefaultBiMapper = require("defaultbimapper").DefaultBiMapper;
+const BossBiMapper = require("bossbimapper").BossBiMapper;
 
 network.NodeInfo = class {
     constructor() {
@@ -334,7 +334,7 @@ network.HttpServer = class {
             let length = reqBuf.getBufLength();
             let promises = [];
             for (let i = 0; i < length; ++i) {
-                let params = await DefaultBiMapper.getInstance().deserialize(await Boss.load(reqBuf.getParamsBin(i)));
+                let params = await BossBiMapper.getInstance().deserialize(await Boss.load(reqBuf.getParamsBin(i)));
                 let clientPublicKey = new crypto.PublicKey(reqBuf.getPublicKeyBin(i));
                 switch (params.command) {
                     case "hello":
@@ -352,7 +352,7 @@ network.HttpServer = class {
             }
             let results = await Promise.all(promises);
             for (let i = 0; i < length; ++i) {
-                reqBuf.setAnswer(i, await Boss.dump(await DefaultBiMapper.getInstance().serialize(results[i])));
+                reqBuf.setAnswer(i, await Boss.dump(await BossBiMapper.getInstance().serialize(results[i])));
             }
         });
     }
@@ -373,7 +373,7 @@ network.HttpServer = class {
                 throw new ErrorRecord(Errors.UNKNOWN_COMMAND, "command", "unknown: " + params.command);
             }
         } catch (e) {
-            return {error: await DefaultBiMapper.getInstance().serialize(e)};
+            return {error: await BossBiMapper.getInstance().serialize(e)};
         }
     }
 
@@ -545,17 +545,17 @@ network.HttpClient = class {
     }
 
     async command(name, params, onComplete, onError) {
-        let paramsBin = await Boss.dump(await DefaultBiMapper.getInstance().serialize({"command": name, "params": params}));
+        let paramsBin = await Boss.dump(await BossBiMapper.getInstance().serialize({"command": name, "params": params}));
         let reqId = this.getReqId();
         this.callbacks_.set(reqId, async (decrypted) => {
-            let binder = await DefaultBiMapper.getInstance().deserialize(await Boss.load(decrypted));
+            let binder = await BossBiMapper.getInstance().deserialize(await Boss.load(decrypted));
             let result = binder.result;
             if (result) {
                 onComplete(result);
             } else {
                 let errorRecord = new ErrorRecord(Errors.FAILURE, "", "unprocessablereply");
                 if (binder.error)
-                    errorRecord = await DefaultBiMapper.getInstance().deserialize(binder.error);
+                    errorRecord = await BossBiMapper.getInstance().deserialize(binder.error);
                 let clientError = ClientError.initFromErrorRecord(errorRecord);
                 onError(clientError);
             }

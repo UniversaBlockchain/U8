@@ -107,6 +107,13 @@ static std::unordered_map<std::string, std::function<UObject(Isolate* isolate, L
             fprintf(stderr, "Boss TypesFactory error: unable to process value 'object'\n");
             return UObject();
         }},
+        {"undefined", [](Isolate* isolate, Local<Value> v8value){
+            if (v8value->IsUndefined()) {
+                return UObject();
+            }
+            fprintf(stderr, "Boss TypesFactory error: unable to process value 'undefined'\n");
+            return UObject();
+        }},
 };
 
 UObject v8ValueToUObject(v8::Isolate* isolate, v8::Local<Value> v8value) {
