@@ -599,7 +599,7 @@ async function checkAttachNotaryContract(notaryContract, filePaths) {
             let file = files[key];
             try {
                 if (!normalPath.endsWith(file.file_name))
-                    return false;
+                    continue;
 
                 let notaryHash = await BossBiMapper.getInstance().deserialize(file.hash_id);
 

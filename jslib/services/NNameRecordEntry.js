@@ -27,20 +27,20 @@ class NNameRecordEntry extends NameRecordEntry {
         return this.origin;
     }
 
-    deserialize(data, deserializer) {
+    async deserialize(data, deserializer) {
         try {
-            this.origin = deserializer.deserialize(data.origin);
+            this.origin = await deserializer.deserialize(data.origin);
         } catch (e) {
             this.origin = null;
         }
 
         if (data.hasOwnProperty("shortAddress"))
-            this.shortAddress = data.shortAddress;
+            this.shortAddress = await deserializer.deserialize(data.shortAddress);
         else
             this.shortAddress = null;
 
         if (data.hasOwnProperty("longAddress"))
-            this.longAddress = data.longAddress;
+            this.longAddress = await deserializer.deserialize(data.longAddress);
         else
             this.longAddress = null;
     }

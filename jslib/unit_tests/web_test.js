@@ -232,7 +232,7 @@ unit.test("http test multipart", async () => {
         file2: file2data
     }, async (respCode, body) => {
         //console.log("method2 answer: [" + respCode + "]: " + JSON.stringify(Boss.load(body)));
-        assert(await Boss.load(body).response.ans === "11bbb1234567"+utf8Decode(file2data));
+        assert((await Boss.load(body)).response.ans === "11bbb1234567" + utf8Decode(file2data));
         resolver();
     });
     await promise;

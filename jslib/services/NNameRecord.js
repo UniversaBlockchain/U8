@@ -71,7 +71,7 @@ class NNameRecord extends NameRecord {
         return new t.GenericSet(this.entries);
     }
 
-    deserialize(data, deserializer) {
+    async deserialize(data, deserializer) {
         this.name = data.name;
         this.nameReduced = data.nameReduced;
 
@@ -85,9 +85,9 @@ class NNameRecord extends NameRecord {
         else
             this.url = null;
 
-        this.expiresAt = deserializer.deserialize(data.expiresAt);
+        this.expiresAt = await deserializer.deserialize(data.expiresAt);
 
-        this.entries = new t.GenericSet(deserializer.deserialize(data.entries));
+        this.entries = new t.GenericSet(await deserializer.deserialize(data.entries));
     }
 
     async serialize(serializer) {

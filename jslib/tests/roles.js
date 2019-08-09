@@ -31,12 +31,11 @@ async function main() {
     listRole.quorumSize = 1;
     listRole.roles.push(roleLink);
 
-    let s2 = dbm.DefaultBiMapper.getInstance().serialize(listRole);
+    let s2 = await dbm.DefaultBiMapper.getInstance().serialize(listRole);
     console.log(JSON.stringify(s2));
 
-    let dRoleLink = dbm.DefaultBiMapper.getInstance().deserialize(s1);
-    let dListRole = dbm.DefaultBiMapper.getInstance().deserialize(s2);
-
+    let dRoleLink = await dbm.DefaultBiMapper.getInstance().deserialize(s1);
+    let dListRole = await dbm.DefaultBiMapper.getInstance().deserialize(s2);
 
     assert(t.valuesEqual(roleLink,dRoleLink));
     assert(t.valuesEqual(listRole,dListRole));

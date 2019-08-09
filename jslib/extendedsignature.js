@@ -103,7 +103,7 @@ class ExtendedSignature {
 
     static async extractPublicKey(signature) {
         try {
-            return new crypto.PublicKey(await Boss.load(await Boss.load(signature).exts).pub_key);
+            return new crypto.PublicKey((await Boss.load((await Boss.load(signature)).exts)).pub_key);
         } catch ( e) {
             return null;
         }
@@ -111,7 +111,7 @@ class ExtendedSignature {
 
     static async extractKeyId(signature) {
         try {
-            return await Boss.load(await Boss.load(signature).exts).key;
+            return (await Boss.load((await Boss.load(signature)).exts)).key;
         } catch ( e) {
             return null;
         }

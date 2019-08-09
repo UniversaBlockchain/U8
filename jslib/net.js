@@ -362,7 +362,7 @@ class NetworkV2 extends Network {
             //connection.setConnectTimeout(4000);
             //connection.setReadTimeout(maxTimeout);
             this.httpClient.sendGetRequestUrl(URL, async (respCode, body) => {
-                let item = (respCode === 200) ? await TransactionPack.unpack(body, true).contract : null;
+                let item = (respCode === 200) ? (await TransactionPack.unpack(body, true)).contract : null;
                 event.fire(item);
             });
 

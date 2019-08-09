@@ -40,10 +40,10 @@ class NContractSubscription extends ContractSubscription {
             return null;
     }
 
-    deserialize(data, deserializer) {
-        this.hashId = deserializer.deserialize(data.hashId);
+    async deserialize(data, deserializer) {
+        this.hashId = await deserializer.deserialize(data.hashId);
         this.isChainSubscription = data.isChainSubscription;
-        this.expiresAt = deserializer.deserialize(data.expiresAt);
+        this.expiresAt = await deserializer.deserialize(data.expiresAt);
     }
 
     async serialize(serializer) {

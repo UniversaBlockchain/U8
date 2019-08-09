@@ -36,7 +36,7 @@ unit.test("slot_test: goodSlotContract", async () => {
     assert(mdp[0].fields.hasOwnProperty("action"));
 
     assert(simpleContract.id.equals(slotContract.getTrackingContract().id));
-    assert(simpleContract.id.equals(await TransactionPack.unpack(slotContract.getPackedTrackingContract()).contract.id));
+    assert(simpleContract.id.equals((await TransactionPack.unpack(slotContract.getPackedTrackingContract())).contract.id));
 
     let trackingHashesAsBase64 = slotContract.state.data["tracking_contract"];
     for (let [hash, binary] of Object.entries(trackingHashesAsBase64)) {
@@ -75,7 +75,7 @@ unit.test("slot_test: goodSlotContractFromDSL", async () => {
     assert(mdp[0].fields.hasOwnProperty("action"));
 
     assert(simpleContract.id.equals(slotContract.getTrackingContract().id));
-    assert(simpleContract.id.equals(await TransactionPack.unpack(slotContract.getPackedTrackingContract()).contract.id));
+    assert(simpleContract.id.equals((await TransactionPack.unpack(slotContract.getPackedTrackingContract())).contract.id));
 
     let trackingHashesAsBase64 = slotContract.state.data["tracking_contract"];
     for (let [hash, binary] of Object.entries(trackingHashesAsBase64)) {
@@ -124,7 +124,7 @@ unit.test("slot_test: serializeSlotContract", async () => {
     assert(mdp[0].fields.hasOwnProperty("action"));
 
     assert(simpleContract.id.equals(desContract.getTrackingContract().id));
-    assert(simpleContract.id.equals(await TransactionPack.unpack(desContract.getPackedTrackingContract()).contract.id));
+    assert(simpleContract.id.equals((await TransactionPack.unpack(desContract.getPackedTrackingContract())).contract.id));
 
     let trackingHashesAsBase64 = desContract.state.data["tracking_contract"];
     for (let [hash, binary] of Object.entries(trackingHashesAsBase64)) {
@@ -146,7 +146,7 @@ unit.test("slot_test: serializeSlotContract", async () => {
     assert(mdp[0].fields.hasOwnProperty("action"));
 
     assert(simpleContract.id.equals(copiedContract.getTrackingContract().id));
-    assert(simpleContract.id.equals(await TransactionPack.unpack(copiedContract.getPackedTrackingContract()).contract.id));
+    assert(simpleContract.id.equals((await TransactionPack.unpack(copiedContract.getPackedTrackingContract())).contract.id));
 
     trackingHashesAsBase64 = copiedContract.state.data["tracking_contract"];
     for (let [hash, binary] of Object.entries(trackingHashesAsBase64)) {
@@ -177,7 +177,7 @@ unit.test("slot_test: keepRevisions", async () => {
 
     assert(1 === slotContract.trackingContracts.length);
     assert(simpleContract.id.equals(slotContract.getTrackingContract().id));
-    assert(simpleContract.id.equals(await TransactionPack.unpack(slotContract.getPackedTrackingContract()).contract.id));
+    assert(simpleContract.id.equals((await TransactionPack.unpack(slotContract.getPackedTrackingContract())).contract.id));
 
     let trackingHashesAsBase64 = slotContract.state.data["tracking_contract"];
     for (let [hash, binary] of Object.entries(trackingHashesAsBase64)) {
@@ -195,7 +195,7 @@ unit.test("slot_test: keepRevisions", async () => {
 
     assert(2 === slotContract.trackingContracts.length);
     assert(simpleContract2.id.equals(slotContract.getTrackingContract().id));
-    assert(simpleContract2.id.equals(await TransactionPack.unpack(slotContract.getPackedTrackingContract()).contract.id));
+    assert(simpleContract2.id.equals((await TransactionPack.unpack(slotContract.getPackedTrackingContract())).contract.id));
 
     trackingHashesAsBase64 = slotContract.state.data["tracking_contract"];
     for (let [hash, binary] of Object.entries(trackingHashesAsBase64)) {
@@ -215,7 +215,7 @@ unit.test("slot_test: keepRevisions", async () => {
 
     assert(2 === slotContract.trackingContracts.length);
     assert(simpleContract3.id.equals(slotContract.getTrackingContract().id));
-    assert(simpleContract3.id.equals(await TransactionPack.unpack(slotContract.getPackedTrackingContract()).contract.id));
+    assert(simpleContract3.id.equals((await TransactionPack.unpack(slotContract.getPackedTrackingContract())).contract.id));
 
     trackingHashesAsBase64 = slotContract.state.data["tracking_contract"];
 
