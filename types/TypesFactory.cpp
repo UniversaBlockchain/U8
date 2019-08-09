@@ -6,8 +6,14 @@
 #include "UArray.h"
 #include "UString.h"
 #include "UBinder.h"
+#include "UInt.h"
+#include "UDouble.h"
+#include "UDateTime.h"
+#include "UBytes.h"
+#include "../tools/tools.h"
 #include <unordered_map>
 #include <functional>
+#include <cstring>
 
 static std::unordered_map<std::string, std::function<UObject(Isolate* isolate, Local<Object> obj)>> v8ObjectToUObjectFactory {
     {"Array", [](Isolate* isolate, Local<Object> obj){
@@ -39,6 +45,28 @@ static std::unordered_map<std::string, std::function<UObject(Isolate* isolate, L
         }
         return res;
     }},
+    {"Date", [](Isolate* isolate, Local<Object> obj){
+        if (obj->IsDate()) {
+            auto objDate = Local<Date>::Cast(obj);
+            TimePoint tp(std::chrono::seconds(long(objDate->NumberValue(isolate->GetCurrentContext()).FromJust() * 1e+6)));
+            UDateTime res(tp);
+            return (UObject)res;
+        }
+        fprintf(stderr, "Boss TypesFactory error: unable to process object 'Date'\n");
+        return UObject();
+    }},
+    {"Uint8Array", [](Isolate* isolate, Local<Object> obj){
+        if (obj->IsUint8Array()) {
+            auto uint8arr = obj.As<Uint8Array>();
+            auto contents = uint8arr->Buffer()->GetContents();
+            byte_vector bv(contents.ByteLength());
+            memcpy(&bv[0], contents.Data(), contents.ByteLength());
+            UBytes res(std::move(bv));
+            return (UObject)res;
+        }
+        fprintf(stderr, "Boss TypesFactory error: unable to process object 'Uint8Array'\n");
+        return UObject();
+    }},
 };
 
 static std::unordered_map<std::string, std::function<UObject(Isolate* isolate, Local<Value> v8value)>> v8ValueToUObjectFactory {
@@ -51,6 +79,17 @@ static std::unordered_map<std::string, std::function<UObject(Isolate* isolate, L
             }
             fprintf(stderr, "Boss TypesFactory error: unable to process value 'string'\n");
             return UString("");
+        }},
+        {"number", [](Isolate* isolate, Local<Value> v8value){
+            if (v8value->IsInt32()) {
+                UInt res(v8value->Int32Value(isolate->GetCurrentContext()).FromJust());
+                return (UObject)res;
+            } else if (v8value->IsNumber()) {
+                UDouble res(v8value->NumberValue(isolate->GetCurrentContext()).FromJust());
+                return (UObject)res;
+            }
+            fprintf(stderr, "Boss TypesFactory error: unable to process value 'string'\n");
+            return UObject();
         }},
         {"object", [](Isolate* isolate, Local<Value> v8value){
             if (v8value->IsNull()) {
