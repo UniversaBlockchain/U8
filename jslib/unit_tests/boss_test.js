@@ -121,7 +121,7 @@ unit.test("boss_test: asyncLoad array of Date", async () => {
     for (let i = 0; i < 100; ++i) {
         arr0.push(new Date(new Date().getTime() + i*1000 + Math.floor(Math.random()*1000)));
     }
-    let bin = await Boss.dump(await BossBiMapper.getInstance().serialize(arr0));
+    let bin = await Boss.asyncDump(await BossBiMapper.getInstance().serialize(arr0));
     let t0 = new Date().getTime();
     let arr = await BossBiMapper.getInstance().deserialize(await Boss.asyncLoad(bin));
     //let arr = await BossBiMapper.getInstance().deserialize(await Boss.load(bin));

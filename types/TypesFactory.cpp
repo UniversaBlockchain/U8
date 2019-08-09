@@ -48,7 +48,7 @@ static std::unordered_map<std::string, std::function<UObject(Isolate* isolate, L
     {"Date", [](Isolate* isolate, Local<Object> obj){
         if (obj->IsDate()) {
             auto objDate = Local<Date>::Cast(obj);
-            TimePoint tp(std::chrono::seconds(long(objDate->NumberValue(isolate->GetCurrentContext()).FromJust() * 1e+6)));
+            TimePoint tp(std::chrono::seconds(long(objDate->NumberValue(isolate->GetCurrentContext()).FromJust()/1000)));
             UDateTime res(tp);
             return (UObject)res;
         }
