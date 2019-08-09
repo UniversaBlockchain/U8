@@ -10,6 +10,7 @@
 #include "UDouble.h"
 #include "UDateTime.h"
 #include "UBytes.h"
+#include "UBool.h"
 #include "../tools/tools.h"
 #include <unordered_map>
 #include <functional>
@@ -86,6 +87,14 @@ static std::unordered_map<std::string, std::function<UObject(Isolate* isolate, L
                 return (UObject)res;
             } else if (v8value->IsNumber()) {
                 UDouble res(v8value->NumberValue(isolate->GetCurrentContext()).FromJust());
+                return (UObject)res;
+            }
+            fprintf(stderr, "Boss TypesFactory error: unable to process value 'string'\n");
+            return UObject();
+        }},
+        {"boolean", [](Isolate* isolate, Local<Value> v8value){
+            if (v8value->IsBoolean()) {
+                UBool res(v8value->BooleanValue(isolate));
                 return (UObject)res;
             }
             fprintf(stderr, "Boss TypesFactory error: unable to process value 'string'\n");

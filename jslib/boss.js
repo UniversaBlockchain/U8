@@ -7,10 +7,12 @@ let isCppProrotypesInitialized = false;
 module.exports = {
     async dump(data) {
         return new _boss().dump(data);
+        //return this.asyncDump(data);
     },
 
     async load(data) {
         return new _boss().load(data);
+        //return this.asyncLoad(data);
     },
 
     asyncDump(data) {

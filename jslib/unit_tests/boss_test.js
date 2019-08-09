@@ -44,7 +44,7 @@ unit.test("boss_test: asyncLoad array of HashId", async () => {
 
 unit.test("boss_test: asyncLoad nested array of HashId", async () => {
     let hashId = await crypto.HashId.of(t.randomString(64));
-    let arr0 = {a:[{b:[{c:hashId,i:223334444,f:7654321.1234567}]}]};
+    let arr0 = {a:[{b:[{c:hashId, i:223334444, f:7654321.1234567, b0: false, b1: true}]}]};
     let bin = await Boss.asyncDump(await BossBiMapper.getInstance().serialize(arr0));
     let arr = await BossBiMapper.getInstance().deserialize(await Boss.asyncLoad(bin));
     assertSilent(arr.a[0].b[0].c.__proto__ === crypto.HashId.prototype);
@@ -54,6 +54,10 @@ unit.test("boss_test: asyncLoad nested array of HashId", async () => {
     assertSilent(arr.a[0].b[0].i === 223334444);
     assertSilent(typeof arr.a[0].b[0].f === "number");
     assertSilent(arr.a[0].b[0].f === 7654321.1234567);
+    assertSilent(typeof arr.a[0].b[0].b0 === "boolean");
+    assertSilent(arr.a[0].b[0].b0 === false);
+    assertSilent(typeof arr.a[0].b[0].b1 === "boolean");
+    assertSilent(arr.a[0].b[0].b1 === true);
 });
 
 unit.test("boss_test: asyncLoad array of KeyAddress", async () => {
