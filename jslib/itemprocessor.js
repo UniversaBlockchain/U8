@@ -693,12 +693,23 @@ class ItemProcessor {
             return;
 
         let ids = [];
-        for (let newItem of commitingItem.newItems)
+        let hashes = [];
+        for (let newItem of commitingItem.newItems) {
             ids.push(newItem.id);
+
+            // we are looking for updatingItem's parent subscriptions and want to update it
+            if (newItem.state.parent != null)
+                hashes.push(newItem.state.parent);
+
+            // we are looking for updatingItem's subscriptions by origin
+            hashes.push(newItem.getOrigin());
+        }
 
         // The record may not exist due to ledger desync too, so we create it if need
         let rs = await this.node.ledger.arrayFindOrCreate(ids, ItemState.PENDING, 0, con);
         let i = 0;
+
+        let hashesWithSubscriptions = await this.node.ledger.getItemsWithSubscriptions(hashes, con);
 
         for (let newItem of commitingItem.newItems) {
             //TODO: synchronize all items in transaction
@@ -739,7 +750,7 @@ class ItemProcessor {
                 }
 
                 // update new item's smart contracts link to
-                await this.notifyContractSubscribers(newItem, r.state, con);
+                await this.notifyContractSubscribers(newItem, r.state, hashesWithSubscriptions, con);
 
                 let result = ItemResult.fromStateRecord(r);
                 result.extra = newExtraResult;
@@ -783,7 +794,7 @@ class ItemProcessor {
                     }
                 }
 
-                await this.notifyContractSubscribers(revokingItem, r.state, con);
+                await this.notifyContractSubscribers(revokingItem, r.state, null, con);
 
                 let result = ItemResult.fromStateRecord(r);
                 if (this.node.cache.get(r.id) == null)
@@ -891,7 +902,7 @@ class ItemProcessor {
                     }
 
                     // update item's smart contracts link to
-                    await this.notifyContractSubscribers(this.item, this.record.state, con);
+                    await this.notifyContractSubscribers(this.item, this.record.state, null, con);
                 };
 
                 if (this.parcelId != null) {
@@ -960,9 +971,10 @@ class ItemProcessor {
      *
      * @param {Contract} updatingItem - Item that processing.
      * @param {ItemState} updatingState - State that is consensus for processing item.
+     * @param {GenericSet<HashId> | null} hashesWithSubscriptions - Set of HashId that have subscriptions, or null.
      * @param {db.SqlDriverConnection} con - Transaction connection. Optional.
      */
-    async notifyContractSubscribers(updatingItem, updatingState, con = undefined) {
+    async notifyContractSubscribers(updatingItem, updatingState, hashesWithSubscriptions, con = undefined) {
         try {
             let lookingId = null;
             let origin = null;
@@ -982,12 +994,12 @@ class ItemProcessor {
 
             // find all environments that have subscription for item
             let environmentIds = new Set();
-            if (lookingId != null) {
+            if (lookingId != null && (hashesWithSubscriptions == null || hashesWithSubscriptions.has(lookingId))) {
                 let environmentIdsForContractId = await this.node.ledger.getSubscriptionEnviromentIds(lookingId, con);
                 environmentIdsForContractId.forEach(envId => environmentIds.add(envId));
             }
 
-            if (origin != null) {
+            if (origin != null && (hashesWithSubscriptions == null || hashesWithSubscriptions.has(origin))) {
                 let environmentIdsForOrigin = await this.node.ledger.getSubscriptionEnviromentIds(origin, con);
                 environmentIdsForOrigin.forEach(envId => environmentIds.add(envId));
             }

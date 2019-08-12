@@ -305,7 +305,7 @@ class Ledger {
      * new root documents. If the record exists, it returns it. If the record does not exists, it creates new one with
      * <b>newState</b> state.
      *
-     * @param {Array<HashId>} itemIds - array of HashId to register, or null if it is already in use.
+     * @param {Array<HashId>} itemIds - array of HashId to register.
      * @param {ItemState} newState - new item will be created with this state.
      *        Only PENDING and LOCKED_FOR_CREATION states are allowed
      * @param {Number} locked_by_id - use it with LOCKED_FOR_CREATION state
@@ -1916,6 +1916,64 @@ class Ledger {
             subscriptionOnChain,
             Math.floor(expiresAt.getTime() / 1000),
             environmentId);
+    }
+
+    /**
+     * Get item IDs that have subscriptions.
+     *
+     * @param {Array<HashId>} itemIds - array of HashId to check for having subscriptions.
+     * @param {db.SqlDriverConnection} connection - Transaction connection for save record. Optional.
+     * @return {Promise<GenericSet<HashId>> | GenericSet<HashId>} set of HashId that have subscriptions.
+     */
+    getItemsWithSubscriptions(itemIds, connection = null) {
+        if (itemIds.length === 0)
+            return new t.GenericSet();
+
+        return new Promise(async (resolve, reject) => {
+            let query = "SELECT count(environment_id) AS cnt FROM contract_subscription WHERE hash_id IN (";
+            let params = [];
+
+            let first = true;
+            for (let itemId of itemIds) {
+                params.push(itemId.digest);
+
+                if (!first)
+                    query += ",";
+
+                query += "?";
+                first = false;
+            }
+
+            query += ") GROUP BY environment_id, hash_id;";
+
+            let f = con => {
+                con.executeQuery(qr => {
+                        let rows = qr.getRows(0);
+                        let names = qr.getColNamesMap();
+                        let items = new t.GenericSet();
+
+                        for (let j = 0; j < rows.length; j++)
+                            if (rows[j][names["cnt"]] > 0)
+                                items.add(crypto.HashId.withDigest(rows[j][names["hash_id"]]));
+
+                        if (connection == null)
+                            con.release();
+                        resolve(items);
+                    }, e => {
+                        if (connection == null)
+                            con.release();
+                        reject(e);
+                    },
+                    query,
+                    ...params
+                );
+            };
+
+            if (connection == null)
+                this.dbPool_.withConnection(f);
+            else
+                f(connection);
+        });
     }
 
     /**
