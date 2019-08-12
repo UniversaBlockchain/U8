@@ -1,4 +1,6 @@
 import {expect, unit, assert} from 'test'
+import * as tk from 'unit_tests/test_keys'
+const t = require("tools");
 
 unit.test("symmetric keys", () => {
     let plain = "fucked up beyond all recognition";
@@ -98,4 +100,34 @@ unit.test("HashId", () => {
     assert(x.base64 == y.base64);
     let z = crypto.HashId.withBase64Digest(x.base64);
     assert(z.equals(x));
+});
+
+unit.test("ExtendedSignature cpp", async () => {
+    Boss.asyncLoad(null);
+    let privKey = tk.TestKeys.getKey();
+    let pubKey = privKey.publicKey;
+    let dataset = [];
+    let N = 20;
+    for (let i = 0; i < N; ++i) {
+        dataset.push(new Promise(async resolve => {
+            let data = t.randomBytes(10000);
+            let sig = await ExtendedSignature.sign(privKey, data);
+            let badData = data.slice(0);
+            for (let j = 0; j < 100; ++j)
+                badData[j] = j;
+            let row = {data:data, sig:sig, badData:badData};
+            resolve(row);
+        }));
+    }
+    dataset = await Promise.all(dataset);
+    for (let i = 0; i < N; ++i) {
+        let row = dataset[i];
+        let es1js = await ExtendedSignature.jsVerify(pubKey, row.sig, row.data);
+        let es0js = await ExtendedSignature.jsVerify(pubKey, row.sig, row.badData);
+        let es1cpp = await ExtendedSignature.cppVerify(pubKey, row.sig, row.data);
+        let es0cpp = await ExtendedSignature.cppVerify(pubKey, row.sig, row.badData);
+        assert(es1cpp.equals(es1js));
+        assert(es0js === null);
+        assert(es0cpp === null);
+    }
 });

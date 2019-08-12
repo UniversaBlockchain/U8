@@ -61,7 +61,12 @@ class ExtendedSignature {
     }
 
     static async verify(key, signature, data) {
-        let src = await Boss.load(signature);
+        //return this.jsVerify(key, signature, data);
+        return this.cppVerify(key, signature, data);
+    }
+
+    static async jsVerify(key, signature, data) {
+        let src = await Boss.load(signature); // init cpp prototype holders
         let es = new ExtendedSignature();
         let isSignValid = await key.verify(src.exts, src.sign, crypto.SHA512);
         let  isSign2Valid = true;
@@ -71,10 +76,10 @@ class ExtendedSignature {
 
         let  isSign3Valid = true;
         if(src.hasOwnProperty("sign3")) {
-            isSign2Valid = await key.verify(src.exts, src.sign3, crypto.SHA3_384);
+            isSign3Valid = await key.verify(src.exts, src.sign3, crypto.SHA3_384);
         }
 
-        if (isSignValid && isSign2Valid) {
+        if (isSignValid && isSign2Valid && isSign3Valid) {
             let b = await Boss.load(src.exts);
             es.keyId = b.key;
             es.createdAt = b.created_at;
@@ -99,6 +104,14 @@ class ExtendedSignature {
                 return es;
         }
         return null;
+    }
+
+    static async cppVerify(key, signature, data) {
+        return new Promise(resolve => __verify_extendedSignature(key, signature, data, (res) => {
+            if (res != null)
+                res.__proto__ = ExtendedSignature.prototype;
+            resolve(res);
+        }));
     }
 
     static async extractPublicKey(signature) {

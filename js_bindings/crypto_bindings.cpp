@@ -13,6 +13,10 @@
 #include "../crypto/base64.h"
 #include "../crypto/HashId.h"
 #include "../crypto/SymmetricKey.h"
+#include "../serialization/BossSerializer.h"
+#include "../types/UBinder.h"
+#include "../types/UDateTime.h"
+#include "../types/complex/UPublicKey.h"
 
 using namespace crypto;
 
@@ -538,6 +542,78 @@ static void digest(const FunctionCallbackInfo<Value> &args) {
     });
 }
 
+static void JsVerifyExtendedSignature(const FunctionCallbackInfo<Value> &args) {
+    Scripter::unwrapArgs(args, [](ArgsContext &ac) {
+        if (ac.args.Length() == 4) {
+            auto pubKey = unwrap<PublicKey>(Local<Object>::Cast(ac.args[0]));
+            auto sig = ac.asBuffer(1);
+            auto data = ac.asBuffer(2);
+            auto onComplete = ac.asFunction(3);
+            runAsync([pubKey,sig,data,onComplete](){
+                try {
+                    byte_vector bvSig(sig->size());
+                    memcpy(&bvSig[0], sig->data(), sig->size());
+                    UBytes sigUBytes = UBytes(move(bvSig));
+                    UObject src = BossSerializer::deserialize(sigUBytes);
+                    UBinder srcBinder = UBinder::asInstance(src);
+                    byte_vector srcExts = UBytes::asInstance(srcBinder.get("exts")).get();
+                    byte_vector srcSign = UBytes::asInstance(srcBinder.get("sign")).get();
+                    bool isSignValid = pubKey->verify(srcSign, srcExts, HashType::SHA512);
+                    bool isSign2Valid = true;
+                    if (srcBinder.find(string("sign2")) != srcBinder.end()) {
+                        byte_vector srcSign2 = UBytes::asInstance(srcBinder.get("sign2")).get();
+                        isSign2Valid = pubKey->verify(srcSign2, srcExts, HashType::SHA3_256);
+                    }
+                    bool isSign3Valid = true;
+                    if (srcBinder.find(string("sign3")) != srcBinder.end()) {
+                        byte_vector srcSign3 = UBytes::asInstance(srcBinder.get("sign3")).get();
+                        isSign3Valid = pubKey->verify(srcSign3, srcExts, HashType::SHA3_384);
+                    }
+                    if (isSignValid && isSign2Valid && isSign3Valid) {
+                        UBinder es;
+                        UObject bo = BossSerializer::deserialize(UBytes(move(srcExts)));
+                        UBinder b = UBinder::asInstance(bo);
+                        es.set("keyId", UBytes::asInstance(b.get("key")));
+                        es.set("createdAt", UDateTime::asInstance(b.get("created_at")));
+                        es.set("signature", sigUBytes);
+                        if (b.find(string("pub_key")) != b.end()) {
+                            PublicKey publicKey(UBytes::asInstance(b.get("pub_key")).get());
+                            es.set("publicKey", UPublicKey(publicKey));
+                        } else {
+                            es.set("publicKey", UObject());
+                        }
+                        byte_vector hash = UBytes::asInstance(b.get("sha512")).get();
+                        byte_vector dataHash = crypto::Digest(crypto::HashType::SHA512, data->data(),
+                                                              data->size()).getDigest();
+                        bool isHashValid = (hash == dataHash);
+                        bool isHash2Valid = true;
+                        if (b.find(string("sha3_384")) != b.end()) {
+                            byte_vector hash1 = UBytes::asInstance(b.get("sha3_384")).get();
+                            byte_vector dataHash1 = crypto::Digest(crypto::HashType::SHA3_384, data->data(),
+                                                                  data->size()).getDigest();
+                            isHash2Valid = (hash1 == dataHash1);
+                        }
+                        bool isAllOk = isHashValid && isHash2Valid;
+                        onComplete->lockedContext([isAllOk, es, onComplete](Local<Context> cxt) {
+                            if (isAllOk) {
+                                onComplete->invoke(es.serializeToV8(cxt->GetIsolate()));
+                            } else {
+                                onComplete->invoke(UObject().serializeToV8(cxt->GetIsolate()));
+                            }
+                        });
+                    }
+                } catch (const std::exception& e) {
+                    cerr << "JsVerifyExtendedSignature error: " << e.what() << endl;
+                    onComplete->lockedContext([onComplete](Local<Context> cxt) {
+                        onComplete->invoke(UObject().serializeToV8(cxt->GetIsolate()));
+                    });
+                }
+            });
+            return;
+        }
+        ac.throwError("invalid arguments");
+    });
+}
 
 void JsInitCrypto(Isolate *isolate, const Local<ObjectTemplate> &global) {
     auto crypto = ObjectTemplate::New(isolate);
@@ -556,6 +632,8 @@ void JsInitCrypto(Isolate *isolate, const Local<ObjectTemplate> &global) {
 
     global->Set(isolate, "atob", FunctionTemplate::New(isolate, JsA2B));
     global->Set(isolate, "btoa", FunctionTemplate::New(isolate, JsB2A));
+
+    global->Set(isolate, "__verify_extendedSignature", FunctionTemplate::New(isolate, JsVerifyExtendedSignature));
 }
 
 v8::Local<v8::Value> wrapHashId(v8::Isolate* isolate, crypto::HashId* hashId) {
