@@ -20,7 +20,7 @@ const NODES = 10;
 
 const LOG = true;
 
-unit.test("stress_test_3", async () => {
+/*unit.test("stress_test_3", async () => {
     let t0 = new Date().getTime();
     let c0 = 0;
     let sendCounter = 0;
@@ -53,6 +53,50 @@ unit.test("stress_test_3", async () => {
         await Promise.all(promises);
         console.log("============ " + k + " ============");
     }
+});*/
+
+const recursion = 1000;
+const iterations = 10000;
+
+unit.test("async performance", async () => {
+    let it = 0;
+    let func = () => {
+        //crypto.HashId.of_sync(t.randomString(10*1024));
+        let t = 124190481948910843 * 4398240938209483;
+        it++;
+        if (it < recursion)
+            func();
+    };
+
+    let async_func = async () => {
+        //await crypto.HashId.of_async(t.randomString(10*1024));
+        let t = 124190481948910843 * 4398240938209483;
+        it++;
+        if (it < recursion)
+            await async_func();
+    };
+
+    let t0 = new Date().getTime();
+
+    for (let i = 0; i < iterations; i++) {
+        it = 0;
+        func();
+    }
+
+    let dt = new Date().getTime() - t0;
+
+    console.log("Sync: " + dt);
+
+    t0 = new Date().getTime();
+
+    for (let i = 0; i < iterations; i++) {
+        it = 0;
+        await async_func();
+    }
+
+    dt = new Date().getTime() - t0;
+
+    console.log("Async: " + dt);
 });
 
 /*unit.test("stress_test", async () => {
