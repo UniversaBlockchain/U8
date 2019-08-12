@@ -66,7 +66,7 @@ class ExtendedSignature {
     }
 
     static async jsVerify(key, signature, data) {
-        let src = await Boss.load(signature); // init cpp prototype holders
+        let src = await Boss.load(signature);
         let es = new ExtendedSignature();
         let isSignValid = await key.verify(src.exts, src.sign, crypto.SHA512);
         let  isSign2Valid = true;

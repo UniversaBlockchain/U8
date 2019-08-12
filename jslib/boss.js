@@ -2,7 +2,10 @@
 
 let _boss = require("boss.min");
 
-let isCppProrotypesInitialized = false;
+// init cpp prototype holders
+__boss_addPrototype("HashId", crypto.HashId.prototype);
+__boss_addPrototype("PublicKey", crypto.PublicKey.prototype);
+__boss_addPrototype("PrivateKey", crypto.PrivateKey.prototype);
 
 module.exports = {
     async dump(data) {
@@ -20,12 +23,6 @@ module.exports = {
     },
 
     asyncLoad(data, nestedLoadMap = null) {
-        if (!isCppProrotypesInitialized) {
-            __boss_addPrototype("HashId", crypto.HashId.prototype);
-            __boss_addPrototype("PublicKey", crypto.PublicKey.prototype);
-            __boss_addPrototype("PrivateKey", crypto.PrivateKey.prototype);
-            isCppProrotypesInitialized = true;
-        }
         return new Promise(resolve => __boss_asyncLoad(data, nestedLoadMap, resolve));
     },
 

@@ -103,7 +103,6 @@ unit.test("HashId", () => {
 });
 
 unit.test("ExtendedSignature cpp", async () => {
-    Boss.asyncLoad(null);
     let privKey = tk.TestKeys.getKey();
     let pubKey = privKey.publicKey;
     let dataset = [];
