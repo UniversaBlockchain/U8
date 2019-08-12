@@ -23,6 +23,10 @@ private:
             return Local<Object>::Cast(res);
         }
 
+        void dbgPrint(std::string prefix) override {
+            printf("KeyAddress=%s\n", keyAddress->toString().data());
+        }
+
         std::shared_ptr<crypto::KeyAddress> keyAddress;
     };
 

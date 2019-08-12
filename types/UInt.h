@@ -19,6 +19,10 @@ private:
             return Local<Object>::Cast(Number::New(isolate, value));
         }
 
+        void dbgPrint(std::string prefix) override {
+            printf("%li\n", value);
+        }
+
         int64_t value;
     };
 

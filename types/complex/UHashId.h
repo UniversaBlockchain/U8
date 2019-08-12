@@ -26,6 +26,10 @@ private:
             return obj;
         }
 
+        void dbgPrint(std::string prefix) override {
+            printf("HashId=%s\n", (hashId->toBase64().substr(0, 6)+"...").data());
+        }
+
         std::shared_ptr<crypto::HashId> hashId;
     };
 

@@ -24,6 +24,10 @@ private:
             return Uint8Array::New(ab, 0, value.size());
         };
 
+        void dbgPrint(std::string prefix) override {
+            printf("Bytes, len=%zu\n", value.size());
+        }
+
         std::vector<unsigned char> value;
     };
 

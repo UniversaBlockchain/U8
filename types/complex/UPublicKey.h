@@ -26,6 +26,10 @@ private:
             return obj;
         }
 
+        void dbgPrint(std::string prefix) override {
+            printf("PublicKey, shortAddr=%s\n", publicKey->getShortAddress().toString().data());
+        }
+
         std::shared_ptr<crypto::PublicKey> publicKey;
     };
 

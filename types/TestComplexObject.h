@@ -20,6 +20,10 @@ private:
 
         ~UTestComplexObjectData() = default;
 
+        void dbgPrint(std::string prefix) override {
+            printf("TestComplexObject\n");
+        }
+
         std::string name;
         int64_t amount;
     };

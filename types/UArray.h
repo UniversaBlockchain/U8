@@ -26,6 +26,19 @@ private:
             return res;
         };
 
+        void dbgPrint(std::string prefix) override {
+            if (array.size() > 0) {
+                printf("[\n");
+                for (auto &it: array) {
+                    printf("  %s", prefix.data());
+                    it.dbgPrint(prefix + "  ");
+                }
+                printf("%s]\n", prefix.data());
+            } else {
+                printf("[]\n");
+            }
+        }
+
         std::vector<UObject> array;
     };
 

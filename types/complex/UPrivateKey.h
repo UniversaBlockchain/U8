@@ -26,6 +26,10 @@ private:
             return obj;
         }
 
+        void dbgPrint(std::string prefix) override {
+            printf("PrivateKey=<secret>\n");
+        }
+
         std::shared_ptr<crypto::PrivateKey> privateKey;
     };
 

@@ -41,6 +41,10 @@ public:
         return Local<Object>::Cast(Null(isolate));
     };
 
+    virtual void dbgPrint(std::string prefix) {
+        printf("null\n");
+    }
+
 private:
     bool empty = false;
 };
@@ -80,6 +84,10 @@ public:
 
     Local<Object> serializeToV8(Isolate* isolate) const {
         return ptr.get()->serializeToV8(isolate);
+    }
+
+    void dbgPrint(std::string prefix = "") const {
+        ptr.get()->dbgPrint(prefix);
     }
 
 };

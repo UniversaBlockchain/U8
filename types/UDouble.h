@@ -19,6 +19,10 @@ private:
             return Local<Object>::Cast(Number::New(isolate, value));
         }
 
+        void dbgPrint(std::string prefix) override {
+            printf("%f\n", value);
+        }
+
         double value;
     };
 

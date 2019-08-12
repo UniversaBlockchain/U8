@@ -29,6 +29,19 @@ private:
             return res;
         };
 
+        void dbgPrint(std::string prefix) override {
+            if (binder.size() > 0) {
+                printf("{\n");
+                for (auto &it: binder) {
+                    printf("%s  %s: ", prefix.data(), it.first.data());
+                    it.second.dbgPrint(prefix + "  ");
+                }
+                printf("%s}\n", prefix.data());
+            } else {
+                printf("{}\n");
+            }
+        }
+
         std::map<std::string, UObject> binder;
     };
 

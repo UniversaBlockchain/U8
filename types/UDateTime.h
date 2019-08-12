@@ -23,6 +23,10 @@ private:
             return Local<Object>::Cast(Date::New(isolate->GetCurrentContext(), double(value.time_since_epoch().count()*1e-6)).ToLocalChecked());
         }
 
+        void dbgPrint(std::string prefix) override {
+            printf("DateTime=%li\n", value.time_since_epoch().count());
+        }
+
         TimePoint value;
     };
 

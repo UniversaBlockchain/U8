@@ -19,6 +19,10 @@ private:
             return Local<Object>::Cast(Boolean::New(isolate, value));
         }
 
+        void dbgPrint(std::string prefix) override {
+            printf("%s\n", value?"true":"false");
+        }
+
         bool value;
     };
 
