@@ -39,60 +39,17 @@ void doNestedLoad(UObject& obj, const UObject& nestedLoadMap) {
                 if (UBytes::isInstance(obin)) {
                     UBytes& bin = UBytes::asInstance(obin);
                     UObject o = BossSerializer::deserialize(bin);
-
-//                    UBinder dbg0 = UBinder::asInstance(o);
-//                    if (dbg0.find(string("contract")) != dbg0.end()) {
-//                        UBinder dbg1 = UBinder::asInstance(dbg0.get("contract"));
-//                        if (dbg1.find(string("definition")) != dbg1.end()) {
-//                            UBinder dbg2 = UBinder::asInstance(dbg1.get("definition"));
-//                            if (dbg2.find(string("issuer")) != dbg2.end()) {
-//                                UBinder dbg = UBinder::asInstance(dbg2.get("issuer"));
-//                                cout << (dbg.find(string("data")) != dbg.end()) << endl;
-//                                cout << "  ";
-//                                for (auto it : dbg)
-//                                    cout << it.first << " ";
-//                                cout << endl;
-//                            }
-//                        }
-//                    }
-
                     if (!it->second.isNull())
                         doNestedLoad(o, it->second);
-
-//                    dbg0 = UBinder::asInstance(o);
-//                    if (dbg0.find(string("contract")) != dbg0.end()) {
-//                        UBinder dbg1 = UBinder::asInstance(dbg0.get("contract"));
-//                        if (dbg1.find(string("definition")) != dbg1.end()) {
-//                            UBinder dbg2 = UBinder::asInstance(dbg1.get("definition"));
-//                            if (dbg2.find(string("issuer")) != dbg2.end()) {
-//                                UBinder dbg = UBinder::asInstance(dbg2.get("issuer"));
-//                                cout << (dbg.find(string("data")) != dbg.end()) << endl;
-//                                cout << "  ";
-//                                for (auto it : dbg)
-//                                    cout << it.first << " ";
-//                                cout << endl;
-//                            }
-//                        }
-//                    }
-
-                    //binderObj.set(it->first+"_bin", bin);
                     UArray res({o, bin});
                     binderObj.set(it->first, res);
                 } else if (UArray::isInstance(obin)) {
-                    //binderObj.set(it->first+"_bin", UArray::asInstance(obin));
                     UArray& uArr = UArray::asInstance(obin);
                     for (size_t i = 0; i < uArr.size(); ++i) {
                         UObject& oo = uArr[i];
                         if (UBytes::isInstance(oo)) {
                             UBytes& bin = UBytes::asInstance(oo);
                             UObject o = BossSerializer::deserialize(bin);
-
-//                            UBinder dbg = UBinder::asInstance(o);
-//                            cout << (dbg.find(string("data"))!=dbg.end()) << endl;
-//                            for (auto it : dbg)
-//                                cout << it.first << " ";
-//                            cout << endl;
-
                             if (!it->second.isNull())
                                 doNestedLoad(o, it->second);
                             uArr[i] = UArray({o, bin});
