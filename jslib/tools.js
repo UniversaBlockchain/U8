@@ -448,6 +448,57 @@ class RateCounter {
     }
 }
 
+function getObjPropertiesCount(obj) {
+    let sum = 0;
+    for (let k in obj)
+        if (obj.hasOwnProperty(k))
+            sum += 1;
+    return sum;
+}
+
+/**
+ * Sometimes it may be more compact and useful than JSON.stringify
+ */
+function dumpObj(obj, prefix = "") {
+    if (obj && obj.constructor.name === "Object") {
+        if (getObjPropertiesCount(obj) === 0) {
+            console.log("{}");
+        } else {
+            console.log("{");
+            for (let k in obj) {
+                if (obj.hasOwnProperty(k)) {
+                    console.logPut(prefix + "  " + k + ": ");
+                    dumpObj(obj[k], prefix+"  ");
+                }
+            }
+            console.log(prefix+"}");
+        }
+    } else if (obj && obj.constructor.name === "Array") {
+        if (obj.length === 0) {
+            console.log("[]");
+        } else {
+            console.log("[");
+            for (let i = 0; i < obj.length; ++i) {
+                console.logPut("  " + prefix);
+                dumpObj(obj[i], prefix+"  ")
+            }
+            console.log(prefix+"]");
+        }
+    } else if (obj && obj.constructor.name === "Uint8Array") {
+        console.log("Uint8Array, len = " + obj.length);
+    } else if (obj && obj.constructor.name === "String") {
+        console.log('"' + obj.toString() + '"');
+    } else if (obj && obj.constructor.name === "Number") {
+        console.log(obj.toString());
+    } else if (obj && obj.constructor.name === "Boolean") {
+        console.log(obj.toString());
+    }
+    else if (obj)
+        console.log(obj.constructor.name + " => " + obj.toString());
+    else
+        console.log(obj);
+}
+
 module.exports = {arraysEqual, valuesEqual, randomString, MemoiseMixin, PackedEqMixin, DigestEqMixin, GenericMap, GenericSet,
     equals, THROW_EXCEPTIONS, convertToDate, randomBytes, getOrDefault, getOrThrow, addValAndOrdinalMaps, randomChoice,
-    RateCounter};
+    RateCounter, dumpObj};

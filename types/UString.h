@@ -22,7 +22,7 @@ private:
         };
 
         void dbgPrint(std::string prefix) override {
-            printf("%s\n", value.data());
+            printf("\"%s\"\n", value.data());
         }
 
         std::string value;

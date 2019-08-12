@@ -184,12 +184,24 @@ class TransactionPack {
 async function ContractDependencies(binary) {
     let res = {};
 
-    res.id = crypto.HashId.of(binary);
-    res.binary = binary;
-    res.dependencies = new t.GenericSet();
-    let data = await Boss.load(binary);
+    let data;
+    if (binary.constructor.name === "Array") {
+        res.id = crypto.HashId.of(binary[1]);
+        res.binary = binary;//[1];
+        res.dependencies = new t.GenericSet();
+        data = binary[0];
+    } else {
+        res.id = crypto.HashId.of(binary);
+        res.binary = binary;
+        res.dependencies = new t.GenericSet();
+        data = await Boss.load(binary);
+    }
     let contractBytes = data.data;
-    let serializedContract = await Boss.load(contractBytes);
+    let serializedContract;
+    if (contractBytes.constructor.name === "Array")
+        serializedContract = contractBytes[0];
+    else
+        serializedContract = await Boss.load(contractBytes);
     res.extendedType = serializedContract.contract.definition.hasOwnProperty("extended_type") ?
         serializedContract.contract.definition.extended_type : null;
     let apiLevel = data.version;

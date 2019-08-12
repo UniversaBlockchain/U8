@@ -832,9 +832,11 @@ class Contract extends bs.BiSerializable {
 
         if (this.definition == null)
             this.definition = new Definition(this);
-        await this.definition.deserialize(data.definition, deserializer);
+        if (data.definition.constructor.name !== "Definition")
+            await this.definition.deserialize(data.definition, deserializer);
 
-        await this.state.deserialize(data.state, deserializer);
+        if (data.state.constructor.name !== "State")
+            await this.state.deserialize(data.state, deserializer);
 
         if (data.hasOwnProperty("transactional")) {
             if (this.transactional == null)
@@ -2072,18 +2074,32 @@ class Contract extends bs.BiSerializable {
         if (transactionPack == null)
             transactionPack = new TransactionPack(result);
 
-        result.sealedBinary = sealed;
-        result.id = crypto.HashId.of(sealed);
-        result.transactionPack = transactionPack;
-        result.isNeedVerifySealedKeys = true;
-        let data = await Boss.load(sealed);
+        let data;
+        if (sealed.constructor.name === "Array") {
+            result.sealedBinary = sealed[1];
+            result.id = crypto.HashId.of(sealed[1]);
+            result.transactionPack = transactionPack;
+            result.isNeedVerifySealedKeys = true;
+            data = sealed[0];
+        } else {
+            result.sealedBinary = sealed;
+            result.id = crypto.HashId.of(sealed);
+            result.transactionPack = transactionPack;
+            result.isNeedVerifySealedKeys = true;
+            data = await Boss.load(sealed);
+        }
         if(data.type !== "unicapsule") {
             throw new ex.IllegalArgumentError("wrong object type, unicapsule required");
         }
 
         result.apiLevel = data.version;
         let contractBytes = data.data;
-        let payload = await Boss.load(contractBytes, null);
+        let payload;
+        if (contractBytes.constructor.name === "Array")
+            //payload = await Boss.asyncLoad(contractBytes[1], null);//contractBytes[0];
+            payload = contractBytes[0];
+        else
+            payload = await Boss.load(contractBytes, null);
         await result.deserialize(payload.contract, BossBiMapper.getInstance());
 
         if(result.apiLevel < 3) {

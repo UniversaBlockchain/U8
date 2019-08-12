@@ -159,9 +159,12 @@ let loanBin = atob("J0NzdWJJdGVtcy7EcAYvI3NhbHRk61atbBk8Y1o5Cq0lI2RhdGHEMAYfG25l
 
 unit.test("boss_test: pack/unpack escrow", async () => {
     let bin = escrowBin;
-    //let nestedLoadMap = {referencedItems:{data:null}, subItems:{data:null}, contract:{data:null}};
-    //let tp = await BossBiMapper.getInstance().deserialize(await Boss.asyncLoad(bin, nestedLoadMap));
-    let tp = await BossBiMapper.getInstance().deserialize(await Boss.asyncLoad(bin));
+    let nestedLoadMap = {referencedItems:{data:null}, subItems:{data:null}, contract:{data:null}};
+    let obj = await Boss.asyncLoad(bin, nestedLoadMap);
+    //console.log();
+    //t.dumpObj(obj);
+    let tp = await BossBiMapper.getInstance().deserialize(obj);
+    // let tp = await BossBiMapper.getInstance().deserialize(await Boss.asyncLoad(bin));
     let bin2 = await Boss.asyncDump(await BossBiMapper.getInstance().serialize(tp));
     assert(bin.length === bin2.length);
 });
@@ -171,8 +174,8 @@ unit.test("boss_test: pack/unpack loan", async () => {
     //let bin = await io.fileGetContentsAsBytes("/tmp/bossTestPackedTransaction");
     let t0 = new Date().getTime();
     let nestedLoadMap = {referencedItems:{data:null}, subItems:{data:null}, contract:{data:null}};
-    let tp = await BossBiMapper.getInstance().deserialize(await Boss.asyncLoad(bin));
-    //let tp = await BossBiMapper.getInstance().deserialize(await Boss.asyncLoad(bin, nestedLoadMap));
+    //let tp = await BossBiMapper.getInstance().deserialize(await Boss.asyncLoad(bin));
+    let tp = await BossBiMapper.getInstance().deserialize(await Boss.asyncLoad(bin, nestedLoadMap));
     let t1 = new Date().getTime();
     let bin2 = await Boss.asyncDump(await BossBiMapper.getInstance().serialize(tp));
     //let bin2 = await Boss.dump(await BossBiMapper.getInstance().serialize(tp));

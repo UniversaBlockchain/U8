@@ -9,13 +9,13 @@ __boss_addPrototype("PrivateKey", crypto.PrivateKey.prototype);
 
 module.exports = {
     async dump(data) {
-        return new _boss().dump(data);
-        //return this.asyncDump(data);
+        //return new _boss().dump(data);
+        return this.asyncDump(data);
     },
 
     async load(data) {
-        return new _boss().load(data);
-        //return this.asyncLoad(data);
+        //return new _boss().load(data);
+        return this.asyncLoad(data);
     },
 
     asyncDump(data) {
