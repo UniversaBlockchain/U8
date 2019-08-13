@@ -28,6 +28,13 @@ class UBotLedger {
     async close() {
         this.dbPool_.close();
     }
+
+    async writeToStorage(pool_hash_id, executable_contract_id, storage_name, storage_data) {
+        //console.log("pool_hash_id = " + pool_hash_id);
+        //console.log("executable_contract_id = " + executable_contract_id);
+        //console.log("storage_name = " + storage_name);
+        //console.log("storage_data = " + storage_data);
+    }
 }
 
 module.exports = {UBotLedger};

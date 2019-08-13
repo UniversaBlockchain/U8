@@ -4,10 +4,10 @@ const UBotPoolState = require("ubot/cloudprocessor").UBotPoolState;
 const ExecutorService = require("executorservice").ExecutorService;
 
 class UBot {
-    constructor(logger, network) {
+    constructor(logger, network, ledger) {
         //this.logger = logger;
         this.logger = {log: text => logger.log("UBot"+network.myInfo.number+": " + text)};
-
+        this.ledger = ledger;
         this.network = network;
         this.processors = new Map();
         this.executorService = new ExecutorService();
@@ -15,6 +15,7 @@ class UBot {
 
     async shutdown() {
         //this.logger.log("UBot.shutdown()...");
+        this.executorService.shutdown();
     }
 
     executeCloudMethod(contract) {
@@ -28,11 +29,11 @@ class UBot {
 
     /**
      * UBotCloudNotification has received;
-     * @param notify UBotCloudNotification
+     * @param notification UBotCloudNotification
      */
-    onCloudNotify(notification) {
+    async onCloudNotify(notification) {
         if (this.processors.has(notification.poolId.base64)) {
-            this.processors.get(notification.poolId.base64).onNotify(notification);
+            await this.processors.get(notification.poolId.base64).onNotify(notification);
         } else {
             let processor = new CloudProcessor(UBotPoolState.INIT, notification.poolId, this);
             processor.onNotifyInit(notification);

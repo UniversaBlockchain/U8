@@ -43,17 +43,17 @@ class UBotMain {
 
         this.network = new UBotNetwork(this.netConfig, this.myInfo, this.nodeKey, this.logger);
 
-        this.ubot = new UBot(this.logger, this.network);
-
-        this.httpServer = new UBotHttpServer(this.nodeKey, "127.0.0.1", this.myInfo.clientAddress.port, this.logger, this.ubot);
-
         this.ledger = new UBotLedger(this.logger, t.getOrThrow(this.settings, "database"));
         await this.ledger.init();
 
-        this.network.subscribe(notification => {
+        this.ubot = new UBot(this.logger, this.network, this.ledger);
+
+        this.httpServer = new UBotHttpServer(this.nodeKey, "127.0.0.1", this.myInfo.clientAddress.port, this.logger, this.ubot);
+
+        this.network.subscribe(async(notification) => {
             if ((notification instanceof UBotCloudNotification) ||
                 (notification instanceof UBotCloudNotification_asmCommand)) {
-                this.ubot.onCloudNotify(notification);
+                await this.ubot.onCloudNotify(notification);
             } else {
                 // debug case
                 this.logger.log("ubot" + this.myInfo.number + " receive notify: " + notification);
