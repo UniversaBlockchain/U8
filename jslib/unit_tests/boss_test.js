@@ -170,8 +170,8 @@ unit.test("boss_test: pack/unpack escrow", async () => {
 });
 
 unit.test("boss_test: pack/unpack loan", async () => {
-    //let bin = loanBin;
-    let bin = await io.fileGetContentsAsBytes("/tmp/bossTestPackedTransaction");
+    let bin = loanBin;
+    //let bin = await io.fileGetContentsAsBytes("/tmp/bossTestPackedTransaction");
     let t0 = new Date().getTime();
     let nestedLoadMap = {referencedItems:{data:null}, subItems:{data:null}, contract:{data:null}};
     //let tp = await BossBiMapper.getInstance().deserialize(await Boss.asyncLoad(bin));
