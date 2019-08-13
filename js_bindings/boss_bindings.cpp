@@ -33,7 +33,6 @@ void doNestedLoad(UObject& obj, const UObject& nestedLoadMap) {
         UBinder& binderObj = UBinder::asInstance(obj);
         const UBinder& binderMap = UBinder::asInstance(nestedLoadMap);
         for (auto it = binderMap.begin(), itEnd = binderMap.end(); it != itEnd; ++it) {
-            //cout << "  " << it->first << endl;
             if (binderObj.find(it->first) != binderObj.end()) {
                 UObject& obin = binderObj.get(it->first);
                 if (UBytes::isInstance(obin)) {
@@ -72,12 +71,21 @@ void JsBossAsyncLoad(const v8::FunctionCallbackInfo<v8::Value> &args) {
             runAsync([=]() {
                 byte_vector bin(buffer->size());
                 memcpy(&bin[0], buffer->data(), buffer->size());
-//                long t0 = getCurrentTimeMillis();
                 UObject obj = BossSerializer::deserialize(UBytes(move(bin)));
-                doNestedLoad(obj, nestedLoadMap);
-                //obj.dbgPrint();
-//                long dt = getCurrentTimeMillis() - t0;
-//                cout << "cpp dt = " << dt << endl;
+
+//                if (UBinder::isInstance(obj)) {
+//                    UBinder &bnd = UBinder::asInstance(obj);
+//                    if (bnd.getStringOrDefault("__type", "") == string("TransactionPack")) {
+//                        UBinder nlm = UBinder::of(
+//                                "referencedItems", UBinder::of("data", UObject()),
+//                                "subItems", UBinder::of("data", UObject()),
+//                                "contract", UBinder::of("data", UObject())
+//                        );
+//                        doNestedLoad(obj, nlm);
+//                    }
+//                }
+//                doNestedLoad(obj, nestedLoadMap);
+
                 onReady->lockedContext([=](Local<Context> &cxt) {
                     onReady->invoke(obj.serializeToV8(onReady->isolate()));
                 });

@@ -186,18 +186,22 @@ async function ContractDependencies(binary) {
 
     let data;
     if (binary.constructor.name === "Array") {
-        res.id = crypto.HashId.of(binary[1]);
+        // binary[0] contains boss.loaded object, binary[1] contains binary
+        // its for nestedLoadMap mode, do not used now
+        res.id = await crypto.HashId.of_async(binary[1]);
         res.binary = binary;//[1];
         res.dependencies = new t.GenericSet();
         data = binary[0];
     } else {
-        res.id = crypto.HashId.of(binary);
+        res.id = await crypto.HashId.of_async(binary);
         res.binary = binary;
         res.dependencies = new t.GenericSet();
         data = await Boss.load(binary);
     }
     let contractBytes = data.data;
     let serializedContract;
+    // contractBytes[0] contains boss.loaded object, contractBytes[1] contains binary
+    // its for nestedLoadMap mode, do not used now
     if (contractBytes.constructor.name === "Array")
         serializedContract = contractBytes[0];
     else

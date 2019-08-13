@@ -551,7 +551,7 @@ class Contract extends bs.BiSerializable {
             delete  result.salt;
         }
         this.sealedBinary = await Boss.dump(result);
-        this.id = crypto.HashId.of(this.sealedBinary);
+        this.id = await crypto.HashId.of_async(this.sealedBinary);
         if(tpBackup == null) {
             this.transactionPack = null;
         } else {
@@ -2076,14 +2076,16 @@ class Contract extends bs.BiSerializable {
 
         let data;
         if (sealed.constructor.name === "Array") {
+            // sealed[0] contains boss.loaded object, sealed[1] contains binary
+            // its for nestedLoadMap mode, do not used now
             result.sealedBinary = sealed[1];
-            result.id = crypto.HashId.of(sealed[1]);
+            result.id = await crypto.HashId.of_async(sealed[1]);
             result.transactionPack = transactionPack;
             result.isNeedVerifySealedKeys = true;
             data = sealed[0];
         } else {
             result.sealedBinary = sealed;
-            result.id = crypto.HashId.of(sealed);
+            result.id = await crypto.HashId.of_async(sealed);
             result.transactionPack = transactionPack;
             result.isNeedVerifySealedKeys = true;
             data = await Boss.load(sealed);
@@ -2095,8 +2097,9 @@ class Contract extends bs.BiSerializable {
         result.apiLevel = data.version;
         let contractBytes = data.data;
         let payload;
+        // contractBytes[0] contains boss.loaded object, contractBytes[1] contains binary
+        // its for nestedLoadMap mode, do not used now
         if (contractBytes.constructor.name === "Array")
-            //payload = await Boss.asyncLoad(contractBytes[1], null);//contractBytes[0];
             payload = contractBytes[0];
         else
             payload = await Boss.load(contractBytes, null);
