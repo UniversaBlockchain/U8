@@ -79,7 +79,8 @@ void BossSerializer::Writer::put(const UObject& o) {
             writeHeader(TYPE_EXTRA, XT_DONE);
         else {
             unsigned char dbuf[8];
-            buf.reserve(buf.size() + 9);
+            if (buf.capacity() < buf.size() + 9)
+                buf.reserve(buf.size()*2 + 9);
 
             writeHeader(TYPE_EXTRA, XT_DOUBLE);
             memcpy(dbuf, &d, 8);
@@ -93,7 +94,8 @@ void BossSerializer::Writer::put(const UObject& o) {
     } else if (UDateTime::isInstance(o)) {
         TimePoint time = UDateTime::asInstance(o).get();
 
-        buf.reserve(buf.size() + 6);
+        if (buf.capacity() < buf.size() + 6)
+            buf.reserve(buf.size()*2 + 6);
 
         writeHeader(TYPE_EXTRA, XT_TIME);
         writeEncoded((unsigned long) time.time_since_epoch().count() / std::chrono::high_resolution_clock::period::den);
@@ -105,7 +107,8 @@ void BossSerializer::Writer::put(const UObject& o) {
             const std::vector<unsigned char>& bb = bytes.get();
 
             writeHeader(TYPE_BIN, bb.size());
-            buf.reserve(buf.size() + bb.size());
+            if (buf.capacity() < buf.size() + bb.size())
+                buf.reserve(buf.size()*2 + bb.size());
 
             std::copy(bb.data(), bb.data() + bb.size(), std::back_inserter(buf));
         }
@@ -118,7 +121,8 @@ void BossSerializer::Writer::put(const UObject& o) {
             unsigned long size = str.get().size();
 
             writeHeader(TYPE_TEXT, size);
-            buf.reserve(buf.size() + size);
+            if (buf.capacity() < buf.size() + size)
+                buf.reserve(buf.size()*2 + size);
 
             std::copy(data, data + size, std::back_inserter(buf));
         }
@@ -170,7 +174,8 @@ void BossSerializer::Writer::writeHeader(unsigned int code, unsigned long value)
     if (value < 23)
         buf.push_back((unsigned char) (code | ((int) value << 3)));
     else {
-        buf.reserve(buf.size() + 9);
+        if (buf.capacity() < buf.size() + 9)
+            buf.reserve(buf.size()*2 + 9);
 
         unsigned int n = sizeInBytes(value);
         if (n < 9) {
