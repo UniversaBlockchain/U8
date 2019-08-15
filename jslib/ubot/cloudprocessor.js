@@ -13,25 +13,29 @@ const UBotPoolState = {
      * UBot creates new CloudProcessor with this state if it has received UBotCloudNotification, but CloudProcessor
      * with corresponding poolId not found. Then UBot calls method onNotifyInit for new CloudProcessor.
      */
-    INIT                                       : {ordinal: 0},
+    INIT                                       : {val: "INIT", ordinal: 0},
 
     /**
      * At this state CloudProcessor should select ubots for new pool,
      * and periodically send to them udp notifications with invite to download startingContract.
      * Meanwhile, CloudProcessor is waiting for other ubots in pool to downloads startingContract.
      */
-    SEND_STARTING_CONTRACT                     : {ordinal: 1},
+    SEND_STARTING_CONTRACT                     : {val: "SEND_STARTING_CONTRACT", ordinal: 1},
 
     /**
      * CloudProcessor is downloading startingContract from pool starter ubot.
      */
-    DOWNLOAD_STARTING_CONTRACT                 : {ordinal: 2},
+    DOWNLOAD_STARTING_CONTRACT                 : {val: "DOWNLOAD_STARTING_CONTRACT", ordinal: 2},
 
     /**
      * CloudProcessor is executing cloud method.
      */
-    START_EXEC                                 : {ordinal: 3},
+    START_EXEC                                 : {val: "START_EXEC", ordinal: 3},
 
+    /**
+     * CloudProcessor is finished.
+     */
+    FINISHED                                   : {val: "FINISHED", ordinal: 4}
 };
 
 t.addValAndOrdinalMaps(UBotPoolState);
@@ -62,17 +66,20 @@ class CloudProcessor {
                 break;
             case UBotPoolState.DOWNLOAD_STARTING_CONTRACT:
                 this.currentProcess = new ProcessDownloadStartingContract(this, () => {
-                    this.logger.log("CloudProcessor.ProcessDownloadStartingContract.onReady, poolSize = " + this.startingContract.state.data.poolSize);
+                    this.logger.log("CloudProcessor.ProcessDownloadStartingContract.onReady, poolSize = " + this.executableContract.state.data.poolSize);
                     this.changeState(UBotPoolState.START_EXEC);
                 });
                 break;
             case UBotPoolState.START_EXEC:
                 this.currentProcess = new ProcessStartExec(this, () => {
-                    this.logger.log("CloudProcessor.ProcessStartExec.onReady, poolSize = " + this.startingContract.state.data.poolSize);
-                    //this.changeState(UBotPoolState.some_new_state);
+                    this.logger.log("CloudProcessor.ProcessStartExec.onReady, poolSize = " + this.executableContract.state.data.poolSize);
+                    this.changeState(UBotPoolState.FINISHED);
                 });
                 break;
+            case UBotPoolState.FINISHED:
+                return;
         }
+
         this.currentProcess.start();
     }
 
@@ -231,8 +238,7 @@ class ProcessStartExec extends ProcessBase {
         this.currentTask = null;
         this.var0 = null;
         this.output = null;
-        this.currentAsmCmd = null;
-        this.currentAsmCmdIndex = -1;
+        this.commands = [];
     }
 
     start() {
@@ -290,22 +296,18 @@ class ProcessStartExec extends ProcessBase {
     async runUBotAsmCmd(cmdIndex, cmdClass, ...params) {
         return new Promise(resolve => {
             let cmd = new cmdClass(this.pr, ()=>{
-                this.currentAsmCmd = null;
-                this.currentAsmCmdIndex = -1;
                 resolve();
             }, this, cmdIndex);
-            this.currentAsmCmd = cmd;
-            this.currentAsmCmdIndex = cmdIndex;
+            this.commands[cmdIndex] = cmd;
             cmd.init(...params);
             cmd.start();
         });
     }
 
     async onNotify(notification) {
-        if (notification instanceof UBotCloudNotification_asmCommand) {
-            if (notification.cmdIndex === this.currentAsmCmdIndex && this.currentAsmCmd != null)
-                await this.currentAsmCmd.onNotify(notification);
-        }
+        if (notification instanceof UBotCloudNotification_asmCommand)
+            if (this.commands[notification.cmdIndex] != null)
+                await this.commands[notification.cmdIndex].onNotify(notification);
     }
 }
 
@@ -366,31 +368,30 @@ class UBotAsmProcess_writeSingleStorage extends ProcessBase {
                             true
                         )
                     );
-                } else {
+                } else if (!this.currentTask.cancelled) {
                     // this.pr.logger.log("SINGLE_STORAGE_GET_DATA_HASHID ans... " + notification);
                     if (this.binHashId.equals(notification.dataHashId))
                         this.approveCounterSet.add(notification.from.number);
                     else
                         this.declineCounterSet.add(notification.from.number);
 
-                    /////
-                    //todo: check storage consensus, here is temporary debug solution
-                    if (this.approveCounterSet.size + this.declineCounterSet.size >= this.pr.pool.length) {
-                        if (this.approveCounterSet.size >= this.pr.pool.length) {
-                            // ok
-                            await this.pr.ledger.writeToStorage(this.pr.poolId, this.pr.executableContract.id, "default", this.binToWrite);
-                            this.pr.logger.log("UBotAsmProcess_writeSingleStorage... ready, approved");
-                        } else {
-                            // error
-                            this.asmProcessor.val0 = "UBotAsmProcess_writeSingleStorage declined";
-                            this.pr.logger.log("UBotAsmProcess_writeSingleStorage... ready, declined");
-                        }
+                    if (this.approveCounterSet.size >= this.pr.executableContract.state.data.poolQuorum) {
+                        // ok
                         this.currentTask.cancel();
-                        // todo: we need to start consensus transmitter before destroying this UBotAsmProcess_writeSingleStorage
-                        //this.onReady();
+
+                        await this.pr.ledger.writeToSingleStorage(this.pr.poolId, this.pr.executableContract.id, "default", this.binToWrite);
+                        this.pr.logger.log("UBotAsmProcess_writeSingleStorage... ready, approved");
+
+                        this.onReady();
+                        // TODO: distribution single-storage to all ubots here or after closing pool?
+
+                    } else if (this.declineCounterSet.size > this.pr.pool.length - this.pr.executableContract.state.data.poolQuorum) {
+                        // error
+                        this.currentTask.cancel();
+
+                        this.asmProcessor.val0 = "UBotAsmProcess_writeSingleStorage declined";
+                        this.pr.logger.log("UBotAsmProcess_writeSingleStorage... ready, declined");
                     }
-                    //todo: check storage consensus, here is temporary debug solution
-                    /////
                 }
             }
         } else {

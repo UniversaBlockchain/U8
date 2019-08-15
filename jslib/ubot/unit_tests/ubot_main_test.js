@@ -2,6 +2,7 @@ import * as tk from "unit_tests/test_keys";
 import * as db from "pg_driver";
 let io = require("io");
 const UBotMain = require("ubot/ubot_main").UBotMain;
+const UBotPoolState = require("ubot/cloudprocessor").UBotPoolState;
 const cs = require("contractsservice");
 const BigDecimal  = require("big").Big;
 
@@ -152,6 +153,7 @@ unit.test("ubot_main_test: executeCloudMethod", async () => {
 
     let executableContract = Contract.fromPrivateKey(userPrivKey);
     executableContract.state.data.poolSize = 5;
+    executableContract.state.data.poolQuorum = 4;
     executableContract.state.data.ubotAsm = "" +
         //"generateRandomHash;" + // should decline write to single storage, each ubot has random value
         "calc2x2;" + // should approve write to single storage, each ubot has same value
@@ -178,7 +180,19 @@ unit.test("ubot_main_test: executeCloudMethod", async () => {
         console.log("err: " + err);
     });
 
-    await sleep(3000);
+    //waiting pool started...
+    await sleep(1000);
+
+    let pool = [];
+    let proc = ubotMains[0].ubot.processors.get(startingContract.id.base64);
+
+    for (let i = 0; i < proc.pool.length; i++)
+        pool.push(proc.pool[i].number);
+
+    //waiting pool finished...
+    for (let i = 0; i < pool.length; i++)
+        if (ubotMains[pool[i]].ubot.processors.get(startingContract.id.base64).state !== UBotPoolState.FINISHED)
+            await sleep(100);
 
     await shutdownUBots(ubotMains);
 });

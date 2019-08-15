@@ -2,6 +2,7 @@ const t = require("tools");
 const CloudProcessor = require("ubot/cloudprocessor").CloudProcessor;
 const UBotPoolState = require("ubot/cloudprocessor").UBotPoolState;
 const ExecutorService = require("executorservice").ExecutorService;
+const UBotCloudNotification = require("ubot/ubot_notification").UBotCloudNotification;
 
 class UBot {
     constructor(logger, network, ledger) {
@@ -34,11 +35,14 @@ class UBot {
     async onCloudNotify(notification) {
         if (this.processors.has(notification.poolId.base64)) {
             await this.processors.get(notification.poolId.base64).onNotify(notification);
-        } else {
+
+        } else if (notification.type === UBotCloudNotification.types.DOWNLOAD_STARTING_CONTRACT && !notification.isAnswer) {
             let processor = new CloudProcessor(UBotPoolState.INIT, notification.poolId, this);
             processor.onNotifyInit(notification);
             this.processors.set(notification.poolId.base64, processor);
-        }
+
+        } else
+            this.logger.log("Warning: unknown notification. Type = " + notification.type.ordinal + " isAnswer = " + notification.isAnswer);
     }
 
     getStartingContract(hashId) {
