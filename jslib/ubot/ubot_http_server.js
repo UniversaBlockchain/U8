@@ -2,6 +2,10 @@ import * as network from "web";
 const Contract = require("contract").Contract;
 const HashId = require("crypto").HashId;
 const Boss = require('boss.js');
+const UBotPoolState = require("ubot/cloudprocessor").UBotPoolState;
+const e = require("errors");
+const Errors = e.Errors;
+const ErrorRecord = e.ErrorRecord;
 
 class UBotHttpServer extends network.HttpServer {
 
@@ -12,6 +16,7 @@ class UBotHttpServer extends network.HttpServer {
         super.initSecureProtocol(privateKey);
 
         this.addSecureEndpoint("executeCloudMethod", (params, clientKey) => this.onExecuteCloudMethod(params, clientKey));
+        this.addSecureEndpoint("getState", (params, clientKey) => this.getState(params, clientKey));
 
         this.addRawEndpoint("/getStartingContract", request => this.onGetStartingContract(request));
 
@@ -30,6 +35,22 @@ class UBotHttpServer extends network.HttpServer {
             console.log("err: " + e.stack);
         }
         return {status:"ok"};
+    }
+
+    async getState(params, clientKey) {
+      try {
+          let proc = this.ubot.processors.get(params.startingContractId.base64);
+          let result = {state: proc.state.val};
+          if (proc.state === UBotPoolState.FINISHED)
+              result.result = proc.output;
+          return result;
+
+        } catch (err) {
+            this.logger.log(err.stack);
+            this.logger.log("getState ERROR: " + err.message);
+
+            return {errors : [new ErrorRecord(Errors.COMMAND_FAILED, "getState", err.message)]};
+        }
     }
 
     async onGetStartingContract(request) {

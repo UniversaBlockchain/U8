@@ -1,10 +1,13 @@
 import * as tk from "unit_tests/test_keys";
 import * as db from "pg_driver";
-let io = require("io");
+import {expect, assert, unit} from 'test'
+
+const io = require("io");
 const UBotMain = require("ubot/ubot_main").UBotMain;
 const UBotPoolState = require("ubot/cloudprocessor").UBotPoolState;
 const cs = require("contractsservice");
 const BigDecimal  = require("big").Big;
+const Boss = require("boss");
 
 const CONFIG_ROOT = io.getTmpDirPath() + "/ubot_config";
 
@@ -193,6 +196,18 @@ unit.test("ubot_main_test: executeCloudMethod", async () => {
     //waiting pool finished...
     while (!pool.every(ubot => ubotMains[ubot].ubot.processors.get(startingContract.id.base64).state === UBotPoolState.FINISHED))
         await sleep(100);
+
+    let fire = null;
+    let event = new Promise(resolve => fire = resolve);
+
+    await client.command("getState", {startingContractId: startingContract.id}, resp=>{
+        console.log("resp: " + JSON.stringify(resp));
+        fire(resp.result);
+    }, err=>{
+        console.log("err: " + err);
+    });
+
+    assert((await Boss.load(await event)).val === 4);
 
     await shutdownUBots(ubotMains);
 });

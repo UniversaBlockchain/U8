@@ -54,6 +54,7 @@ class CloudProcessor {
         this.pool = [];
         this.respondToNotification = null;
         this.ubotAsm = [];
+        this.output = null;
     }
 
     startProcessingCurrentState() {
@@ -71,8 +72,9 @@ class CloudProcessor {
                 });
                 break;
             case UBotPoolState.START_EXEC:
-                this.currentProcess = new ProcessStartExec(this, () => {
+                this.currentProcess = new ProcessStartExec(this, (output) => {
                     this.logger.log("CloudProcessor.ProcessStartExec.onReady, poolSize = " + this.executableContract.state.data.poolSize);
+                    this.output = output;
                     this.changeState(UBotPoolState.FINISHED);
                 });
                 break;
@@ -251,7 +253,7 @@ class ProcessStartExec extends ProcessBase {
         this.currentTask = new ScheduleExecutor(async () => {
             await this.evalUbotAsm();
             this.pr.logger.log("  method result: " + this.output);
-            this.onReady();
+            this.onReady(this.output);
         }, 0, this.pr.ubot.executorService).run();
     }
 
