@@ -158,8 +158,9 @@ unit.test("ubot_main_test: executeCloudMethod", async () => {
         //"generateRandomHash;" + // should decline write to single storage, each ubot has random value
         "calc2x2;" + // should approve write to single storage, each ubot has same value
         "writeSingleStorage;" +
-        "finish" +
-        "";
+        //"calc2x2;" +
+        //"writeMultiStorage;" +
+        "finish";
     //contract.state.data.methodStorageName = "single";
     await executableContract.seal();
 
@@ -190,9 +191,8 @@ unit.test("ubot_main_test: executeCloudMethod", async () => {
         pool.push(proc.pool[i].number);
 
     //waiting pool finished...
-    for (let i = 0; i < pool.length; i++)
-        if (ubotMains[pool[i]].ubot.processors.get(startingContract.id.base64).state !== UBotPoolState.FINISHED)
-            await sleep(100);
+    while (!pool.every(ubot => ubotMains[ubot].ubot.processors.get(startingContract.id.base64).state === UBotPoolState.FINISHED))
+        await sleep(100);
 
     await shutdownUBots(ubotMains);
 });

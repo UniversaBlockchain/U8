@@ -106,6 +106,8 @@ class UBotCloudNotification_asmCommand extends Notification {
 
     static types = {
         SINGLE_STORAGE_GET_DATA_HASHID:   {ordinal: 0},
+        MULTI_STORAGE_GET_DATA_HASHID:   {ordinal: 1},
+        MULTI_STORAGE_GET_POOL_HASHES:   {ordinal: 2}
     };
 
     constructor(from, poolId, cmdIndex, type, dataHashId, isAnswer) {
