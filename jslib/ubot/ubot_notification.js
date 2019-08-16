@@ -127,9 +127,15 @@ class UBotCloudNotification_asmCommand extends Notification {
         bw.write(this.isAnswer);
         switch (this.type) {
             case UBotCloudNotification_asmCommand.types.SINGLE_STORAGE_GET_DATA_HASHID:
+            case UBotCloudNotification_asmCommand.types.MULTI_STORAGE_GET_DATA_HASHID:
                 if (this.isAnswer)
                     bw.write(this.dataHashId.digest);
                 break;
+            case UBotCloudNotification_asmCommand.types.MULTI_STORAGE_GET_POOL_HASHES:
+                if (this.isAnswer && this.dataHashId instanceof Array) {
+                    bw.write(this.dataHashId.length);
+                    this.dataHashId.forEach(hash => bw.write(hash.digest));
+                }
         }
     }
 
@@ -140,9 +146,17 @@ class UBotCloudNotification_asmCommand extends Notification {
         this.isAnswer = br.read();
         switch (this.type) {
             case UBotCloudNotification_asmCommand.types.SINGLE_STORAGE_GET_DATA_HASHID:
+            case UBotCloudNotification_asmCommand.types.MULTI_STORAGE_GET_DATA_HASHID:
                 if (this.isAnswer)
                     this.dataHashId = crypto.HashId.withDigest(br.read());
                 break;
+            case UBotCloudNotification_asmCommand.types.MULTI_STORAGE_GET_POOL_HASHES:
+                if (this.isAnswer) {
+                    this.dataHashId = [];
+                    let len = br.read();
+                    for (let i = 0; i < len; i++)
+                        this.dataHashId.push(crypto.HashId.withDigest(br.read()));
+                }
         }
     }
 
@@ -165,7 +179,7 @@ class UBotCloudNotification_asmCommand extends Notification {
         if (this.isAnswer !== o.isAnswer)
             return false;
 
-        if (this.dataHashId.poolId !== o.dataHashId.poolId)
+        if (!t.valuesEqual(this.dataHashId, o.dataHashId))
             return false;
 
         if (!t.valuesEqual(this.from, o.from))

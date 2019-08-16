@@ -52,6 +52,7 @@ class CloudProcessor {
         this.ledger = ubot.ledger;
         this.currentProcess = null;
         this.pool = [];
+        this.poolIndexes = new Map();
         this.respondToNotification = null;
         this.ubotAsm = [];
         this.output = null;
@@ -107,11 +108,11 @@ class CloudProcessor {
             this.logger.log("error: CloudProcessor.onNotify -> currentProcess is null, currentProcess = " + this.currentProcess);
     }
 
-    deliverToOtherUBots(notification) {
+    /*deliverToOtherUBots(notification) {
         for (let i = 0; i < this.pool.length; ++i)
             if (this.pool[i].number !== this.ubot.network.myInfo.number)
                 this.ubot.network.deliver(this.pool[i], notification);
-    }
+    }*/
 }
 
 class ProcessBase {
@@ -149,6 +150,7 @@ class ProcessSendStartingContract extends ProcessBase {
         list.splice(myIndex, 1);
         this.pr.pool = t.randomChoice(list, this.pr.executableContract.state.data.poolSize-1);
         this.pr.pool.push(me);
+        this.pr.pool.forEach((info, i) => this.pr.poolIndexes.set(info.number, i));
     }
 
     async start() {
@@ -166,20 +168,22 @@ class ProcessSendStartingContract extends ProcessBase {
     }
 
     pulse() {
-        this.pr.deliverToOtherUBots(
-            new UBotCloudNotification(
-                this.pr.ubot.network.myInfo,
-                this.pr.poolId,
-                UBotCloudNotification.types.DOWNLOAD_STARTING_CONTRACT,
-                false
-            )
-        );
+        for (let i = 0; i < this.pr.pool.length; ++i)
+            if (!this.otherAnswers.has(this.pr.pool[i].number) && this.pr.pool[i].number !== this.pr.ubot.network.myInfo.number)
+                this.pr.ubot.network.deliver(this.pr.pool[i],
+                    new UBotCloudNotification(
+                        this.pr.ubot.network.myInfo,
+                        this.pr.poolId,
+                        UBotCloudNotification.types.DOWNLOAD_STARTING_CONTRACT,
+                        false
+                    )
+                );
     }
 
     onNotify(notification) {
         if (notification.type === UBotCloudNotification.types.DOWNLOAD_STARTING_CONTRACT && notification.isAnswer) {
             this.otherAnswers.add(notification.from.number);
-            if (this.otherAnswers.size >= this.pr.pool.length-1) {
+            if (this.otherAnswers.size >= this.pr.pool.length - 1) {
                 this.currentTask.cancel();
                 this.onReady();
             }
@@ -211,6 +215,7 @@ class ProcessDownloadStartingContract extends ProcessBase {
                     this.pr.executableContract = await Contract.fromPackedTransaction(this.pr.startingContract.transactional.data.executableContract);
                     this.pr.pool = [];
                     ans.selectedPool.forEach(i => this.pr.pool.push(this.pr.ubot.network.netConfig.getInfo(i)));
+                    this.pr.pool.forEach((info, i) => this.pr.poolIndexes.set(info.number, i));
                     this.pr.ubot.network.deliver(this.pr.respondToNotification.from,
                         new UBotCloudNotification(
                             this.pr.ubot.network.myInfo,
@@ -406,34 +411,34 @@ class UBotAsmProcess_writeSingleStorage extends ProcessBase {
     }
 }
 
-class UBotAsmProcess_writeMultiStorage extends ProcessBase {
+class UBotAsmProcess_writeMultiStorage extends UBotAsmProcess_writeSingleStorage {
     constructor(processor, onReady, asmProcessor, cmdIndex) {
-        super(processor, onReady);
-        this.asmProcessor = asmProcessor;
-        this.cmdIndex = cmdIndex;
-        this.binToWrite = null;
-        this.binHashId = null;
-        this.approveCounterSet = new Set();
-        this.declineCounterSet = new Set();
-    }
-
-    init(binToWrite) {
-        this.binToWrite = binToWrite;
-        this.binHashId = crypto.HashId.of(this.binToWrite);
+        super(processor, onReady, asmProcessor, cmdIndex);
+        this.hashes = [];
+        this.otherAnswers = new Set();
+        this.approveCounterOtherSets = [];
+        this.declineCounterOtherSets = [];
+        for (let i = 0; i < this.pr.pool.length; ++i)
+            if (this.pr.pool[i].number !== this.pr.ubot.network.myInfo.number) {
+                this.approveCounterOtherSets.push(new Set());
+                this.declineCounterOtherSets.push(new Set());
+            }
     }
 
     start() {
         this.pr.logger.log("start UBotAsmProcess_writeMultiStorage");
         this.approveCounterSet.add(this.pr.ubot.network.myInfo.number); // vote for itself
-        this.pulse();
+        this.hashes[this.pr.poolIndexes.get(this.pr.ubot.network.myInfo.number)] = this.binHashId;  // add self hash
+
+        this.pulseGetHashes();
         this.currentTask = new ExecutorWithFixedPeriod(() => {
-            this.pulse();
+            this.pulseGetHashes();
         }, UBotConfig.multi_storage_vote_period, this.pr.ubot.executorService).run();
     }
 
-    pulse() {
+    pulseGetHashes() {
         for (let i = 0; i < this.pr.pool.length; ++i)
-            if (!this.approveCounterSet.has(this.pr.pool[i].number) && !this.declineCounterSet.has(this.pr.pool[i].number)) {
+            if (!this.otherAnswers.has(this.pr.pool[i].number) && this.pr.pool[i].number !== this.pr.ubot.network.myInfo.number)
                 this.pr.ubot.network.deliver(this.pr.pool[i],
                     new UBotCloudNotification_asmCommand(
                         this.pr.ubot.network.myInfo,
@@ -444,14 +449,27 @@ class UBotAsmProcess_writeMultiStorage extends ProcessBase {
                         false
                     )
                 );
-            }
+    }
+
+    pulseGetPoolHashes() {
+        for (let i = 0; i < this.pr.pool.length; ++i)
+            if (!this.otherAnswers.has(this.pr.pool[i].number) && this.pr.pool[i].number !== this.pr.ubot.network.myInfo.number)
+                this.pr.ubot.network.deliver(this.pr.pool[i],
+                    new UBotCloudNotification_asmCommand(
+                        this.pr.ubot.network.myInfo,
+                        this.pr.poolId,
+                        this.cmdIndex,
+                        UBotCloudNotification_asmCommand.types.MULTI_STORAGE_GET_POOL_HASHES,
+                        null,
+                        false
+                    )
+                );
     }
 
     async onNotify(notification) {
         if (notification instanceof UBotCloudNotification_asmCommand) {
             if (notification.type === UBotCloudNotification_asmCommand.types.MULTI_STORAGE_GET_DATA_HASHID) {
                 if (!notification.isAnswer) {
-                    // this.pr.logger.log("SINGLE_STORAGE_GET_DATA_HASHID req... " + notification);
                     this.pr.ubot.network.deliver(notification.from,
                         new UBotCloudNotification_asmCommand(
                             this.pr.ubot.network.myInfo,
@@ -462,12 +480,46 @@ class UBotAsmProcess_writeMultiStorage extends ProcessBase {
                             true
                         )
                     );
+                } else {
+                    this.otherAnswers.add(notification.from.number);
+                    this.hashes[this.pr.poolIndexes.get(notification.from.number)] = notification.dataHashId;
+
+                    if (this.otherAnswers.size >= this.pr.pool.length - 1) {
+                        this.currentTask.cancel();
+                        this.otherAnswers.clear();
+                        this.pr.logger.log("UBotAsmProcess_writeMultiStorage: get pool hashes");
+                        this.pulseGetPoolHashes();
+                        this.currentTask = new ExecutorWithFixedPeriod(() => {
+                            this.pulseGetPoolHashes();
+                        }, UBotConfig.multi_storage_vote_period, this.pr.ubot.executorService).run();
+                    }
+                }
+
+            } else if (notification.type === UBotCloudNotification_asmCommand.types.MULTI_STORAGE_GET_POOL_HASHES) {
+                if (!notification.isAnswer) {
+                    this.pr.ubot.network.deliver(notification.from,
+                        new UBotCloudNotification_asmCommand(
+                            this.pr.ubot.network.myInfo,
+                            this.pr.poolId,
+                            this.cmdIndex,
+                            UBotCloudNotification_asmCommand.types.MULTI_STORAGE_GET_DATA_HASHID,
+                            this.hashes,
+                            true
+                        )
+                    );
                 } else if (!this.currentTask.cancelled) {
-                    // this.pr.logger.log("SINGLE_STORAGE_GET_DATA_HASHID ans... " + notification);
-                    if (this.binHashId.equals(notification.dataHashId))
+                    let approveConsensus = false;
+                    let declineConsensus = false;
+
+                    //TODO: to be continued...
+
+                    if (this.hashes.equals(notification.dataHashId))
                         this.approveCounterSet.add(notification.from.number);
                     else
                         this.declineCounterSet.add(notification.from.number);
+
+                    // check self consensus
+                    // ,,,
 
                     if (this.approveCounterSet.size >= this.pr.executableContract.state.data.poolQuorum) {
                         // ok
