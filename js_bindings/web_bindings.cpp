@@ -782,8 +782,8 @@ struct HttpClientCommandAnswer {
 
 class HttpClientBuffered {
 public:
-    HttpClientBuffered(const std::string& rootUrl, int poolSize, int bufSize): bufSize_(bufSize) {
-        httpClient_ = new HttpClient(rootUrl, poolSize);
+    HttpClientBuffered(const std::string& rootUrl, int bufSize): bufSize_(bufSize) {
+        httpClient_ = new HttpClient(rootUrl, 5);
         timer_->scheduleAtFixedRate([this](){
             sendAllFromBuf();
             sendAllFromBufCommand();
@@ -1069,7 +1069,6 @@ Local<FunctionTemplate> initHttpClient(Isolate *isolate) {
                     try {
                         auto res = new HttpClientBuffered(
                             string(*String::Utf8Value(isolate, args[0])),                          // rootUrl
-                            args[1]->Int32Value(isolate->GetCurrentContext()).FromJust(),          // poolSize
                             args[2]->Int32Value(isolate->GetCurrentContext()).FromJust()           // bufSize
                         );
                         return res;

@@ -2,9 +2,9 @@
 #include "../tools/StressTestTools.h"
 
 TEST_CASE("Stress_Queue") {
-    stressQueueTest<QueueMultiGrinder>(13);
+    stressQueueTest<QueueMultiGrinder>(3);
 }
 
 TEST_CASE("Stress_QueueAndPool") {
-    stressQueueTest<QueuePoolGrinder>(13);
+    stressQueueTest<QueuePoolGrinder>(3);
 }

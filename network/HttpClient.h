@@ -24,21 +24,40 @@ namespace network {
 
 class HttpClient;
 
-class HttpClientWorker {
+class HttpClientWorkerAsync;
+
+struct HttpRequestHolder {
+    HttpClientWorkerAsync* workerRef;
+    long reqId;
+    std::string url;
+    std::string method;
+    std::string extHeaders;
+    byte_vector reqBody;
+    std::function<void(int,byte_vector&&)> callback;
+};
+
+class HttpClientWorkerAsync {
 public:
-    HttpClientWorker(int newId, HttpClient& parent);
+    HttpClientWorkerAsync(int newId, HttpClient& parent, int pollPeriodMillis);
+    long saveReq(HttpRequestHolder&& req);
+    void removeReq(long reqId);
+    HttpRequestHolder* getReq(long reqId);
     void sendGetRequest(const std::string& url, std::function<void(int,byte_vector&&)>&& callback);
     void sendBinRequest(const std::string& url, const std::string& method, const byte_vector& reqBody, std::function<void(int,byte_vector&&)>&& callback);
     void sendRawRequest(const std::string& url, const std::string& method, const std::string& extHeaders, const byte_vector& reqBody, std::function<void(int,byte_vector&&)>&& callback);
     int getId() {return id_;}
-    void stop() {exitFlag_ = true;};
+    void stop();
 private:
+    std::mutex reqsBufMutex_;
+    std::list<std::function<void()>> reqsBuf_;
     int id_;
     HttpClient& parentRef_;
-    FixedThreadPool worker_;
+    std::shared_ptr<std::thread> pollThread_;
     std::shared_ptr<mg_mgr> mgr_;
     std::atomic<bool> exitFlag_ = false;
-    std::function<void(int,byte_vector&&)> callback_;
+    std::atomic<long> nextReqId_ = 1;
+    std::mutex reqsMutex_;
+    std::unordered_map<long, HttpRequestHolder> reqs_;
 };
 
 struct HttpClientSession {
@@ -52,7 +71,7 @@ struct HttpClientSession {
 class HttpClient {
 
 public:
-    HttpClient(const std::string& rootUrl, size_t poolSize);
+    HttpClient(const std::string& rootUrl, int pollPeriodMillis);
     virtual ~HttpClient();
 
     void sendGetRequest(const std::string& path, const std::function<void(int,byte_vector&&)>& callback);
@@ -92,24 +111,14 @@ public:
     void command(const byte_vector& callBin, const std::function<void(byte_vector&&)>& onComplete);
 
 private:
-    std::shared_ptr<HttpClientWorker> getUnusedWorker();
-    void releaseWorker(int workerId);
     void execCommand(const byte_vector& callBin, std::function<void(byte_vector&&)>&& onComplete);
     void execCommand(const std::string& name, const UBinder& params, std::function<void(UBinder&&)>&& onComplete);
     std::string makeFullUrl(const std::string& path);
 
-    friend HttpClientWorker;
-
 private:
-    size_t poolSize_;
-    std::queue<std::shared_ptr<HttpClientWorker>> pool_;
-    std::mutex poolMutex_;
-    std::condition_variable poolCV_;
-    FixedThreadPool poolControlThread_;
-    std::unordered_map<int, std::shared_ptr<HttpClientWorker>> usedWorkers_;
+    HttpClientWorkerAsync worker_;
     std::shared_ptr<HttpClientSession> session_;
     std::string rootUrl_;
-
 };
 
 };

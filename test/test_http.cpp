@@ -86,7 +86,7 @@ TEST_CASE("http_hello") {
     httpServer.start();
     httpServer.initSecureProtocol(nodePrivateKey);
 
-    HttpClient httpClient("http://localhost:8080", 20);
+    HttpClient httpClient("http://localhost:8080", 5);
     httpClient.start(crypto::PrivateKey(2048), nodePublicKey);
 
     Semaphore sem;
@@ -160,8 +160,8 @@ TEST_CASE("http_secure_endpoints") {
 
     vector<shared_ptr<HttpClient>> clients;
     for (int i = 0; i < 10; ++i) {
-        shared_ptr<HttpClient> httpClient = make_shared<HttpClient>("http://localhost:8080", 4);
-        //shared_ptr<HttpClient> httpClient = make_shared<HttpClient>("http://192.168.1.146:8080", 4);
+        shared_ptr<HttpClient> httpClient = make_shared<HttpClient>("http://localhost:8080", 5);
+        //shared_ptr<HttpClient> httpClient = make_shared<HttpClient>("http://192.168.1.146:8080", 5);
         httpClient->start(crypto::PrivateKey(2048), nodePublicKey);
         clients.emplace_back(httpClient);
     }

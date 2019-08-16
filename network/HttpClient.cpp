@@ -11,48 +11,6 @@
 
 namespace network {
 
-std::function<void(int,byte_vector&&)> stub = [](int a,byte_vector&& b){};
-
-HttpClientWorker::HttpClientWorker(int newId, HttpClient& parent)
-  : id_(newId)
-  , parentRef_(parent)
-  , worker_(1)
-  , mgr_(new mg_mgr(), [](auto p){mg_mgr_free(p);delete p;})
-  , callback_(stub){
-    mg_mgr_init(mgr_.get(), this);
-};
-
-void HttpClientWorker::sendGetRequest(const std::string& url, std::function<void(int,byte_vector&&)>&& callback) {
-    callback_ = std::move(callback);
-    worker_([this,url](){
-        exitFlag_ = false;
-        mg_connect_opts opts;
-        memset(&opts, 0, sizeof(opts));
-        opts.user_data = this;
-        mg_connect_http_opt1(mgr_.get(), [](mg_connection *nc, int ev, void *ev_data){
-            HttpClientWorker* clientWorker = (HttpClientWorker*)nc->user_data;
-            if (ev == MG_EV_HTTP_REPLY) {
-                http_message *hm = (http_message*)ev_data;
-                byte_vector bv(hm->body.len);
-                memcpy(&bv[0], hm->body.p, hm->body.len);
-                clientWorker->callback_(hm->resp_code, std::move(bv));
-                clientWorker->callback_ = stub;
-                nc->flags |= MG_F_CLOSE_IMMEDIATELY;
-            } else if (ev == MG_EV_CONNECT) {
-                if (*(int *) ev_data != 0) {
-                    clientWorker->exitFlag_ = true;
-                }
-            } else if (ev == MG_EV_CLOSE) {
-                clientWorker->exitFlag_ = true;
-            }
-        }, opts, url.c_str(), nullptr, nullptr, 0, "GET");
-        while (!exitFlag_) {
-            mg_mgr_poll(mgr_.get(), 100);
-        }
-        parentRef_.releaseWorker(id_);
-    });
-}
-
 const std::string idChars = "0123456789_abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
 string randomString(int length) {
     byte_vector randomBytes(length);
@@ -63,13 +21,91 @@ string randomString(int length) {
     return res;
 }
 
-void HttpClientWorker::sendBinRequest(const std::string& url, const std::string& method, const byte_vector& reqBody, std::function<void(int,byte_vector&&)>&& callback) {
-    callback_ = std::move(callback);
-    worker_([this,url,method,reqBody](){
-        exitFlag_ = false;
+HttpClientWorkerAsync::HttpClientWorkerAsync(int newId, HttpClient& parent, int pollPeriodMillis)
+: id_(newId)
+, parentRef_(parent)
+, mgr_(new mg_mgr(), [](auto p){mg_mgr_free(p);delete p;}) {
+    mg_mgr_init(mgr_.get(), this);
+    pollThread_ = std::make_shared<std::thread>([this,pollPeriodMillis](){
+        while (!exitFlag_) {
+            {
+                std::lock_guard lock(reqsBufMutex_);
+                for (auto &reqFunc : reqsBuf_)
+                    reqFunc();
+                reqsBuf_.clear();
+            }
+            mg_mgr_poll(mgr_.get(), pollPeriodMillis);
+        }
+    });
+};
+
+long HttpClientWorkerAsync::saveReq(HttpRequestHolder&& req) {
+    long reqId = nextReqId_;
+    std::lock_guard lock(reqsMutex_);
+    reqs_.insert(std::make_pair(reqId, std::move(req)));
+    ++nextReqId_;
+    if (nextReqId_ >= LONG_MAX)
+        nextReqId_ = 1;
+    return reqId;
+}
+
+void HttpClientWorkerAsync::removeReq(long reqId) {
+    std::lock_guard lock(reqsMutex_);
+    reqs_.erase(reqId);
+}
+
+HttpRequestHolder* HttpClientWorkerAsync::getReq(long reqId) {
+    std::lock_guard lock(reqsMutex_);
+    if (reqs_.find(reqId) != reqs_.end())
+        return &reqs_[reqId];
+    return nullptr;
+}
+
+void HttpClientWorkerAsync::sendGetRequest(const std::string& url, std::function<void(int,byte_vector&&)>&& callback) {
+    std::lock_guard lock(reqsBufMutex_);
+    reqsBuf_.push_back([this,url,callback{std::move(callback)}](){
+        HttpRequestHolder holder;
+        holder.workerRef = this;
+        holder.url = url;
+        holder.callback = std::move(callback);
+        long reqId = saveReq(std::move(holder));
+        auto* ph = getReq(reqId);
+        ph->reqId = reqId;
+
         mg_connect_opts opts;
         memset(&opts, 0, sizeof(opts));
-        opts.user_data = this;
+        opts.user_data = ph;
+        mg_connect_http_opt1(ph->workerRef->mgr_.get(), [](mg_connection *nc, int ev, void *ev_data){
+            HttpRequestHolder* ph = (HttpRequestHolder*)nc->user_data;
+            if (ev == MG_EV_HTTP_REPLY) {
+                http_message *hm = (http_message*)ev_data;
+                byte_vector bv(hm->body.len);
+                memcpy(&bv[0], hm->body.p, hm->body.len);
+                ph->callback(hm->resp_code, std::move(bv));
+                ph->workerRef->removeReq(ph->reqId);
+                nc->flags |= MG_F_CLOSE_IMMEDIATELY;
+            }
+        }, opts, ph->url.c_str(), nullptr, nullptr, 0, "GET");
+    });
+}
+
+void HttpClientWorkerAsync::sendBinRequest(const std::string& url, const std::string& method,
+        const byte_vector& reqBody, std::function<void(int,byte_vector&&)>&& callback) {
+    std::lock_guard lock(reqsBufMutex_);
+    reqsBuf_.push_back([this,url,method,reqBody,callback{std::move(callback)}](){
+        HttpRequestHolder holder;
+        holder.workerRef = this;
+        holder.url = url;
+        holder.method = method;
+        holder.reqBody = reqBody;
+        holder.callback = std::move(callback);
+        long reqId = saveReq(std::move(holder));
+        auto* ph = getReq(reqId);
+        ph->reqId = reqId;
+
+        mg_connect_opts opts;
+        memset(&opts, 0, sizeof(opts));
+        opts.user_data = ph;
 
         std::string boundary = "==boundary==" + randomString(48);
         std::string extHeaders = "";
@@ -82,99 +118,69 @@ void HttpClientWorker::sendBinRequest(const std::string& url, const std::string&
         bodyPrefixStr += "Content-Type: application/octet-stream\r\n";
         bodyPrefixStr += "Content-Transfer-Encoding: binary\r\n\r\n";
         byte_vector body(bodyPrefixStr.begin(), bodyPrefixStr.end());
-        body.insert(body.end(), reqBody.begin(), reqBody.end());
+        body.insert(body.end(), ph->reqBody.begin(), ph->reqBody.end());
         string bodyPostfixStr = "\r\n--" + boundary + "--\r\n";
         byte_vector bodyPostfix(bodyPostfixStr.begin(), bodyPostfixStr.end());
         body.insert(body.end(), bodyPostfix.begin(), bodyPostfix.end());
-        mg_connect_http_opt1(mgr_.get(), [](mg_connection *nc, int ev, void *ev_data){
-            HttpClientWorker* clientWorker = (HttpClientWorker*)nc->user_data;
+        mg_connect_http_opt1(ph->workerRef->mgr_.get(), [](mg_connection *nc, int ev, void *ev_data){
+            HttpRequestHolder* ph = (HttpRequestHolder*)nc->user_data;
             if (ev == MG_EV_HTTP_REPLY) {
                 http_message *hm = (http_message*)ev_data;
                 byte_vector bv(hm->body.len);
                 memcpy(&bv[0], hm->body.p, hm->body.len);
-                clientWorker->callback_(hm->resp_code, std::move(bv));
-                clientWorker->callback_ = stub;
+                ph->callback(hm->resp_code, std::move(bv));
+                ph->workerRef->removeReq(ph->reqId);
                 nc->flags |= MG_F_CLOSE_IMMEDIATELY;
-            } else if (ev == MG_EV_CONNECT) {
-                if (*(int *) ev_data != 0) {
-                    clientWorker->exitFlag_ = true;
-                }
-            } else if (ev == MG_EV_CLOSE) {
-                clientWorker->exitFlag_ = true;
             }
-        }, opts, url.c_str(), extHeaders.c_str(), (const char*)&body[0], (int)body.size(), method.c_str());
-        while (!exitFlag_) {
-            mg_mgr_poll(mgr_.get(), 100);
-        }
-        parentRef_.releaseWorker(id_);
+        }, opts, ph->url.c_str(), extHeaders.c_str(), (const char*)&body[0], (int)body.size(), ph->method.c_str());
     });
 }
 
-void HttpClientWorker::sendRawRequest(const std::string& url, const std::string& method, const std::string& extHeaders, const byte_vector& reqBody, std::function<void(int,byte_vector&&)>&& callback) {
-    callback_ = std::move(callback);
-    worker_([this,url,method,reqBody,extHeaders](){
-        exitFlag_ = false;
+void HttpClientWorkerAsync::sendRawRequest(const std::string& url, const std::string& method,
+        const std::string& extHeaders, const byte_vector& reqBody, std::function<void(int,byte_vector&&)>&& callback) {
+    std::lock_guard lock(reqsBufMutex_);
+    reqsBuf_.push_back([this,url,method,extHeaders,reqBody,callback{std::move(callback)}](){
+        HttpRequestHolder holder;
+        holder.workerRef = this;
+        holder.url = url;
+        holder.method = method;
+        holder.extHeaders = extHeaders;
+        holder.reqBody = reqBody;
+        holder.callback = std::move(callback);
+        long reqId = saveReq(std::move(holder));
+        auto* ph = getReq(reqId);
+        ph->reqId = reqId;
+
         mg_connect_opts opts;
         memset(&opts, 0, sizeof(opts));
-        opts.user_data = this;
+        opts.user_data = ph;
 
-        mg_connect_http_opt1(mgr_.get(), [](mg_connection *nc, int ev, void *ev_data){
-            HttpClientWorker* clientWorker = (HttpClientWorker*)nc->user_data;
+        mg_connect_http_opt1(ph->workerRef->mgr_.get(), [](mg_connection *nc, int ev, void *ev_data){
+            HttpRequestHolder* ph = (HttpRequestHolder*)nc->user_data;
             if (ev == MG_EV_HTTP_REPLY) {
                 http_message *hm = (http_message*)ev_data;
                 byte_vector bv(hm->body.len);
                 memcpy(&bv[0], hm->body.p, hm->body.len);
-                clientWorker->callback_(hm->resp_code, std::move(bv));
-                clientWorker->callback_ = stub;
+                ph->callback(hm->resp_code, std::move(bv));
+                ph->workerRef->removeReq(ph->reqId);
                 nc->flags |= MG_F_CLOSE_IMMEDIATELY;
-            } else if (ev == MG_EV_CONNECT) {
-                if (*(int *) ev_data != 0) {
-                    clientWorker->exitFlag_ = true;
-                }
-            } else if (ev == MG_EV_CLOSE) {
-                clientWorker->exitFlag_ = true;
             }
-        }, opts, url.c_str(), extHeaders.c_str(), (const char*)&reqBody[0], (int)reqBody.size(), method.c_str());
-        while (!exitFlag_) {
-            mg_mgr_poll(mgr_.get(), 100);
-        }
-        parentRef_.releaseWorker(id_);
+        }, opts, ph->url.c_str(), ph->extHeaders.c_str(), (const char*)&ph->reqBody[0], (int)ph->reqBody.size(), ph->method.c_str());
     });
 }
 
-HttpClient::HttpClient(const std::string& rootUrl, size_t poolSize)
-  : poolControlThread_(1) {
-    poolSize_ = poolSize;
+void HttpClientWorkerAsync::stop() {
+    exitFlag_ = true;
+    pollThread_->join();
+};
+
+HttpClient::HttpClient(const std::string& rootUrl, int pollPeriodMillis)
+  : worker_(1, *this, pollPeriodMillis) {
     rootUrl_ = rootUrl;
-    for (int i = 0; i < poolSize_; ++i) {
-        std::shared_ptr<HttpClientWorker> client = make_shared<HttpClientWorker>(i,*this);
-        pool_.push(client);
-    }
 }
 
 HttpClient::~HttpClient() {
-    std::unique_lock lock(poolMutex_);
-    for (auto &it: usedWorkers_)
-        it.second->stop();
-    while (pool_.size() < poolSize_)
-        poolCV_.wait(lock);
-}
-
-std::shared_ptr<HttpClientWorker> HttpClient::getUnusedWorker() {
-    std::unique_lock lock(poolMutex_);
-    while (pool_.empty())
-        poolCV_.wait(lock);
-    auto client = pool_.front();
-    pool_.pop();
-    usedWorkers_[client->getId()] = client;
-    return client;
-}
-
-void HttpClient::releaseWorker(int workerId) {
-    std::lock_guard guard(poolMutex_);
-    pool_.push(usedWorkers_[workerId]);
-    usedWorkers_.erase(workerId);
-    poolCV_.notify_one();
+    worker_.stop();
 }
 
 void HttpClient::sendGetRequest(const std::string& path, const std::function<void(int,byte_vector&&)>& callback) {
@@ -183,11 +189,8 @@ void HttpClient::sendGetRequest(const std::string& path, const std::function<voi
 }
 
 void HttpClient::sendGetRequest(const std::string& path, std::function<void(int,byte_vector&&)>&& callback) {
-    poolControlThread_.execute([callback{std::move(callback)}, path, this]() mutable {
-        auto client = getUnusedWorker();
-        std::string fullUrl = makeFullUrl(path);
-        client->sendGetRequest(fullUrl, std::move(callback));
-    });
+    std::string fullUrl = makeFullUrl(path);
+    worker_.sendGetRequest(fullUrl, std::move(callback));
 }
 
 void HttpClient::sendGetRequestUrl(const std::string& url, const std::function<void(int,byte_vector&&)>& callback) {
@@ -196,10 +199,7 @@ void HttpClient::sendGetRequestUrl(const std::string& url, const std::function<v
 }
 
 void HttpClient::sendGetRequestUrl(const std::string& url, std::function<void(int,byte_vector&&)>&& callback) {
-    poolControlThread_.execute([callback{std::move(callback)}, url, this]() mutable {
-        auto client = getUnusedWorker();
-        client->sendGetRequest(url, std::move(callback));
-    });
+    worker_.sendGetRequest(url, std::move(callback));
 }
 
 void HttpClient::sendBinRequest(const std::string& url, const std::string& method, const byte_vector& reqBody, const std::function<void(int,byte_vector&&)>& callback) {
@@ -208,11 +208,8 @@ void HttpClient::sendBinRequest(const std::string& url, const std::string& metho
 }
 
 void HttpClient::sendBinRequest(const std::string& url, const std::string& method, const byte_vector& reqBody, std::function<void(int,byte_vector&&)>&& callback) {
-    poolControlThread_.execute([callback{std::move(callback)}, url, method, reqBody, this]() mutable {
-        auto client = getUnusedWorker();
-        std::string fullUrl = makeFullUrl(url);
-        client->sendBinRequest(fullUrl, method, reqBody, std::move(callback));
-    });
+    std::string fullUrl = makeFullUrl(url);
+    worker_.sendBinRequest(fullUrl, method, reqBody, std::move(callback));
 }
 
 void HttpClient::sendRawRequestUrl(const std::string& url, const std::string& method, const std::string& extHeaders, const byte_vector& reqBody, const std::function<void(int,byte_vector&&)>& callback) {
@@ -221,11 +218,8 @@ void HttpClient::sendRawRequestUrl(const std::string& url, const std::string& me
 }
 
 void HttpClient::sendRawRequestUrl(const std::string& url, const std::string& method, const std::string& extHeaders, const byte_vector& reqBody, std::function<void(int,byte_vector&&)>&& callback) {
-    poolControlThread_.execute([callback{std::move(callback)}, url, method, extHeaders, reqBody, this]() mutable {
-        auto client = getUnusedWorker();
-        std::string fullUrl = makeFullUrl(url);
-        client->sendRawRequest(fullUrl, method, extHeaders, reqBody, std::move(callback));
-    });
+    std::string fullUrl = makeFullUrl(url);
+    worker_.sendRawRequest(fullUrl, method, extHeaders, reqBody, std::move(callback));
 }
 
 void HttpClient::start(const crypto::PrivateKey& clientKey, const crypto::PublicKey& nodeKey) {
