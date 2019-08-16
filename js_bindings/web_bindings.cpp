@@ -307,7 +307,7 @@ Local<FunctionTemplate> initNetConfig(Isolate *isolate) {
 class UDPAdapterWrapper {
 public:
     UDPAdapterWrapper() {
-        timer_.scheduleAtFixedRate([this](){
+        timer_->scheduleAtFixedRate([this](){
             sendAllFromBuf();
         }, 20, 20);
     }
@@ -318,7 +318,8 @@ public:
         udpAdapterPtr_ = new UDPAdapter(ownPrivateKey, ownNodeNumber, netConfig, [](const byte_vector &packet, const NodeInfo &fromNode){});
     }
     void close() {
-        timer_.stop();
+        timer_->stop();
+        timer_ = nullptr;
         delete udpAdapterPtr_;
         udpAdapterPtr_ = nullptr;
     }
@@ -363,7 +364,7 @@ private:
     UDPAdapter* udpAdapterPtr_ = nullptr;
     shared_ptr<FunctionHandler> receiveCallback_ = nullptr;
     vector<pair<byte_vector,int>> buf_;
-    TimerThread timer_;
+    shared_ptr<TimerThread> timer_ = make_shared<TimerThread>();
     std::mutex mutex_;
 };
 
@@ -558,7 +559,7 @@ public:
     HttpServerBuffered(std::string host, int port, int poolSize, int bufSize)
      : bufSize_(bufSize) {
         srv_ = new HttpServer(host, port, poolSize);
-        timer_.scheduleAtFixedRate([this](){
+        timer_->scheduleAtFixedRate([this](){
             sendAllFromBuf();
             sendAllFromSecureBuf();
         }, 20, 20);
@@ -603,7 +604,8 @@ public:
 
     void stop() {
         if (srv_ != nullptr) {
-            timer_.stop();
+            timer_->stop();
+            timer_ = nullptr;
             srv_->stop();
             srv_->join();
         }
@@ -655,7 +657,7 @@ private:
     std::mutex mutex_;
     shared_ptr<FunctionHandler> httpCallback_ = nullptr;
     shared_ptr<FunctionHandler> httpSecureCallback_ = nullptr;
-    TimerThread timer_;
+    shared_ptr<TimerThread> timer_ = make_shared<TimerThread>();
     const int bufSize_;
 };
 
@@ -782,7 +784,7 @@ class HttpClientBuffered {
 public:
     HttpClientBuffered(const std::string& rootUrl, int poolSize, int bufSize): bufSize_(bufSize) {
         httpClient_ = new HttpClient(rootUrl, poolSize);
-        timer_.scheduleAtFixedRate([this](){
+        timer_->scheduleAtFixedRate([this](){
             sendAllFromBuf();
             sendAllFromBufCommand();
         }, 20, 20);
@@ -883,8 +885,10 @@ public:
     }
 
     void stop() {
-        if (httpClient_ != nullptr)
-            timer_.stop();
+        if (httpClient_ != nullptr) {
+            timer_->stop();
+            timer_ = nullptr;
+        }
         delete httpClient_;
         httpClient_ = nullptr;
     }
@@ -933,7 +937,7 @@ private:
     std::vector<HttpClientAnswer> buf_;
     std::mutex mutex_;
     const int bufSize_ = 1;
-    TimerThread timer_;
+    shared_ptr<TimerThread> timer_ = make_shared<TimerThread>();
     std::vector<HttpClientCommandAnswer> bufCommand_;
     shared_ptr<FunctionHandler> bufferedCommandCallback_;
 };

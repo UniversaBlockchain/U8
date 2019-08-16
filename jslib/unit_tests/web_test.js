@@ -241,6 +241,21 @@ unit.test("http test multipart", async () => {
     await httpServer.stopServer();
 });
 
+unit.test("http recreate server", async () => {
+    let foo = async () => {
+        let httpServer = new network.HttpServer("0.0.0.0", 8080, 1, 20);
+        let nodeKey = new crypto.PrivateKey(atob("JgAcAQABvID6D5ZdM9EKrZSztm/R/RcywM4K8Z4VBtX+NZp2eLCWtfAgGcBCQLtNz4scH7dPBerkkxckW6+9CLlnu/tgOxvzS6Z1Ec51++fVP9gaWbBQe9/dSg7xVPg5p9ibhfTB+iRXyevCkNj0hrlLyXl1BkPjN9+lZfXJsp9OnGIJ/AaAb7yA99E65gvZnbb3/oA3rG0pM45af6ppZKe2HeiAK+fcXm5KTQzfTce45f/mJ0jsDmFf1HFosS4waXSAz0ZfcssjPeoF3PuXfJLtM8czJ55+Nz6NMCbzrSk6zkKssGBieYFOb4eG2AdtfjTrpcSSHBgJpsbcmRx4bZNfBAZPqT+Sd20="));
+        httpServer.initSecureProtocol(nodeKey);
+        httpServer.startServer();
+        await httpServer.stopServer();
+    };
+    for (let i = 0; i < 10; ++i) {
+        if (i > 50)
+            console.log("i = " + i);
+        await foo();
+    }
+});
+
 /*unit.test("web_test: many clients", async () => {
     for (let i = 0; i < 20000; i++) {
         console.log(i);
