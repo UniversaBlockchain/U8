@@ -174,7 +174,7 @@ class NCallbackService extends CallbackService {
             let boundary = "==boundary==" + t.randomString(48);
 
             if (this.httpClient == null)
-                this.httpClient = new HttpClient("", 4, 4096);
+                this.httpClient = new HttpClient("");
 
             let beginRequest = "";
             // Send binary file.

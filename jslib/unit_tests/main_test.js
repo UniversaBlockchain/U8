@@ -49,7 +49,7 @@ class TestSpace {
 
         this.clients = [];
         for (let i = 0; i < 4; i++) {
-            let client = new HttpClient(this.nodes[i].myInfo.publicUrlString(), 4, 256);
+            let client = new HttpClient(this.nodes[i].myInfo.publicUrlString());
             await client.start(this.myKey, this.nodes[i].myInfo.publicKey);
             this.clients.push(client);
         }
@@ -153,7 +153,7 @@ unit.test("main_test: startNode", async () => {
 unit.test("main_test: sendHttpRequests", async () => {
     let main = await new Main("--test", "--config", "../test/config/test_node_config_v2/node1", "--nolog").run();
 
-    let httpClient = new HttpClient("localhost:" + main.myInfo.clientAddress.port, 4, 4096);
+    let httpClient = new HttpClient("localhost:" + main.myInfo.clientAddress.port);
 
     let fire = [];
     let events = [];

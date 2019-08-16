@@ -19,7 +19,7 @@ class UBotNetwork {
         this.adapter.setReceiveCallback((packet, fromNode) => this.onReceived(packet, fromNode));
 
         // this.httpClient is used for connection to all other ubots, so it's does not matter which rootUrl we use
-        this.httpClient = new HttpClient(this.myInfo.serverUrlString(), 20, 20);
+        this.httpClient = new HttpClient(this.myInfo.serverUrlString());
     }
 
     async shutdown() {

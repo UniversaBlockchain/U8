@@ -58,7 +58,7 @@ unit.test("hello web", async () => {
     //countToSend = 200000000;
     let receiveCounter = 0;
 
-    let httpClient = new network.HttpClient("http://localhost:8080", 32, 128);
+    let httpClient = new network.HttpClient("http://localhost:8080");
     await httpClient.start(clientKey, new crypto.PublicKey(nodeKey));
 
     let t00 = new Date().getTime();
@@ -113,8 +113,8 @@ unit.test("http secure endpoints", async () => {
     //countToSend = 200000000;
     let receiveCounter = 0;
 
-    let httpClient = new network.HttpClient("http://localhost:8080", 32, 64);
-    //let httpClient = new network.HttpClient("http://192.168.1.146:8080", 64, 64);
+    let httpClient = new network.HttpClient("http://localhost:8080");
+    //let httpClient = new network.HttpClient("http://192.168.1.146:8080");
     await httpClient.start(clientKey, new crypto.PublicKey(nodeKey));
 
     let t00 = new Date().getTime();
@@ -166,7 +166,7 @@ unit.test("big payload", async () => {
     });
     httpServer.startServer();
 
-    let httpClient = new network.HttpClient("http://localhost:8080", 32, 64);
+    let httpClient = new network.HttpClient("http://localhost:8080");
     await httpClient.start(clientKey, new crypto.PublicKey(nodeKey));
 
     let testData = t.randomBytes(10000);
@@ -208,7 +208,7 @@ unit.test("http test multipart", async () => {
     httpServer.startServer();
 
     let url = "http://localhost:8080";
-    let httpClient = new network.HttpClient("", 32, 128);
+    let httpClient = new network.HttpClient("");
 
     let resolver;
     let promise = new Promise(resolve => {resolver = resolve;});
@@ -265,7 +265,7 @@ unit.test("http recreate server", async () => {
         httpServer.initSecureProtocol(nodeKey);
         httpServer.startServer();
 
-        let client = new network.HttpClient("http://localhost:8080", 64, 64);
+        let client = new network.HttpClient("http://localhost:8080");
         await client.start(clientKey, nodeKey.publicKey);
 
         await httpServer.stopServer();

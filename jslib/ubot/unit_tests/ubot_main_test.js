@@ -150,7 +150,7 @@ unit.test("ubot_main_test: executeCloudMethod", async () => {
 
     console.log("\ntest send...");
     let url = "http://localhost:"+ubotMains[0].myInfo.clientAddress.port;
-    let client = new network.HttpClient(url, 20, 20);
+    let client = new network.HttpClient(url);
     await client.start(tk.TestKeys.getKey(), ubotMains[0].myInfo.publicKey, null);
     let userPrivKey = tk.TestKeys.getKey();
 

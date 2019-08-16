@@ -221,7 +221,7 @@ unit.test("async performance", async () => {
                 return {rb: request.requestBody.length, rm: request.method};
             });
 
-            let httpClient = new network.HttpClient("http://localhost:" + (8080 + i), 1, 64);
+            let httpClient = new network.HttpClient("http://localhost:" + (8080 + i));
 
             if (CRYPT) {
                 httpServer.initSecureProtocol(nodeKey);
@@ -233,7 +233,7 @@ unit.test("async performance", async () => {
 
                 httpServer.startServer();
 
-                let httpSecClient = new network.HttpClient("http://localhost:" + (8080 + i), 1, 64);
+                let httpSecClient = new network.HttpClient("http://localhost:" + (8080 + i));
 
                 await httpSecClient.start(clientKey, new crypto.PublicKey(nodeKey));
 
@@ -428,7 +428,7 @@ unit.test("async performance", async () => {
                 return {rb: request.requestBody.length, rm: request.method};
             });
 
-            let httpClient = new network.HttpClient("http://localhost:" + (8080 + i), 30, 128);
+            let httpClient = new network.HttpClient("http://localhost:" + (8080 + i));
 
 
             if (ENABLE_HTTPS) {

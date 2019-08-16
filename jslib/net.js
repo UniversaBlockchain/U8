@@ -352,7 +352,7 @@ class NetworkV2 extends Network {
             let URL = nodeInfo.serverUrlString() + "/contracts/" + itemId.base64;
 
             if (this.httpClient == null)
-                this.httpClient = new HttpClient("", 4, 4096);
+                this.httpClient = new HttpClient("");
 
             let event = new AsyncEvent(this.executorService);
 
@@ -388,7 +388,7 @@ class NetworkV2 extends Network {
             let URL = nodeInfo.serverUrlString() + "/environments/" + itemId.base64;
 
             if (this.httpClient == null)
-                this.httpClient = new HttpClient("", 4, 4096);
+                this.httpClient = new HttpClient("");
 
             let event = new AsyncEvent(this.executorService);
 
@@ -424,7 +424,7 @@ class NetworkV2 extends Network {
             let URL = nodeInfo.serverUrlString() + "/parcels/" + itemId.base64;
 
             if (this.httpClient == null)
-                this.httpClient = new HttpClient("", 4, 4096);
+                this.httpClient = new HttpClient("");
 
             let event = new AsyncEvent(this.executorService);
 
@@ -459,7 +459,7 @@ class NetworkV2 extends Network {
         await this.lock.synchronize("cachedClients", async () => {
             client = this.cachedClients.get(nodeInfo);
             if (client == null) {
-                client = new HttpClient(nodeInfo.publicUrlString(), 4, 256);
+                client = new HttpClient(nodeInfo.publicUrlString());
                 await client.start(this.myKey, nodeInfo.publicKey, null);
 
                 this.cachedClients.set(nodeInfo, client);
