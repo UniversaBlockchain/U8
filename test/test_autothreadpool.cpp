@@ -35,7 +35,7 @@ TEST_CASE("AutoThreadPool") {
 
         // long running task
         auto fn = []() {
-            long x = 0;
+            volatile long x = 0;
             for( long i =0; i < 300000000; i++ )
                 x = (((x << 1) + i) * 17) ^ 0x3fe1;
             return x;
