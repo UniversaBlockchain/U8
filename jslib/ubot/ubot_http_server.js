@@ -6,11 +6,12 @@ const UBotPoolState = require("ubot/cloudprocessor").UBotPoolState;
 const e = require("errors");
 const Errors = e.Errors;
 const ErrorRecord = e.ErrorRecord;
+const UBotConfig = require("ubot/ubot_config").UBotConfig;
 
 class UBotHttpServer extends network.HttpServer {
 
     constructor(privateKey, host, port, logger, ubot) {
-        super(host, port, 32);
+        super(host, port, UBotConfig.http_server_pool_size);
         this.logger = logger;
         this.ubot = ubot;
         super.initSecureProtocol(privateKey);
