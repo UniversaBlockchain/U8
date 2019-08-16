@@ -31,8 +31,11 @@ class UBotHttpServer extends network.HttpServer {
         try {
             let contract = await Contract.fromPackedTransaction(params.contract);
             this.ubot.executeCloudMethod(contract);
-        } catch (e) {
-            console.log("err: " + e.stack);
+        } catch (err) {
+            this.logger.log(err.stack);
+            this.logger.log("executeCloudMethod ERROR: " + err.message);
+
+            return {errors : [new ErrorRecord(Errors.COMMAND_FAILED, "executeCloudMethod", err.message)]};
         }
         return {status:"ok"};
     }
@@ -43,6 +46,8 @@ class UBotHttpServer extends network.HttpServer {
           let result = {state: proc.state.val};
           if (proc.state === UBotPoolState.FINISHED)
               result.result = proc.output;
+          if (proc.state === UBotPoolState.FAILED)
+              result.errors = proc.errors;
           return result;
 
         } catch (err) {

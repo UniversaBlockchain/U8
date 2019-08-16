@@ -35,7 +35,12 @@ const UBotPoolState = {
     /**
      * CloudProcessor is finished.
      */
-    FINISHED                                   : {val: "FINISHED", ordinal: 4}
+    FINISHED                                   : {val: "FINISHED", ordinal: 4},
+
+    /**
+     * CloudProcessor is failed.
+     */
+    FAILED                                     : {val: "FAILED", ordinal: 5}
 };
 
 t.addValAndOrdinalMaps(UBotPoolState);
@@ -56,6 +61,7 @@ class CloudProcessor {
         this.respondToNotification = null;
         this.ubotAsm = [];
         this.output = null;
+        this.errors = [];
     }
 
     startProcessingCurrentState() {
@@ -80,6 +86,7 @@ class CloudProcessor {
                 });
                 break;
             case UBotPoolState.FINISHED:
+            case UBotPoolState.FAILED:
                 return;
         }
 
@@ -93,8 +100,13 @@ class CloudProcessor {
     }
 
     onNotifyInit(notification) {
-        if (this.state !== UBotPoolState.INIT)
+        if (this.state !== UBotPoolState.INIT) {
             this.logger.log("error: CloudProcessor.onNotifyInit() -> state != INIT");
+            this.errors.push(new ErrorRecord(Errors.BADSTATE, "CloudProcessor.onNotifyInit", "state != INIT"));
+            this.changeState(UBotPoolState.FAILED);
+            return;
+        }
+
         this.respondToNotification = notification;
         if (notification.type === UBotCloudNotification.types.DOWNLOAD_STARTING_CONTRACT) {
             this.changeState(UBotPoolState.DOWNLOAD_STARTING_CONTRACT);
@@ -104,8 +116,11 @@ class CloudProcessor {
     async onNotify(notification) {
         if (this.currentProcess != null)
             await this.currentProcess.onNotify(notification);
-        else
+        else {
             this.logger.log("error: CloudProcessor.onNotify -> currentProcess is null, currentProcess = " + this.currentProcess);
+            this.errors.push(new ErrorRecord(Errors.BAD_VALUE, "CloudProcessor.onNotify", "currentProcess is null"));
+            this.changeState(UBotPoolState.FAILED);
+        }
     }
 
     /*deliverToOtherUBots(notification) {
@@ -300,7 +315,8 @@ class ProcessStartExec extends ProcessBase {
             //    break;
             default:
                 this.pr.logger.log("error: ubotAsm code '" + op + "' not found");
-                break;
+                this.pr.errors.push(new ErrorRecord(Errors.UNKNOWN_COMMAND, "ubotAsm", "ubotAsm code '" + op + "' not found"));
+                this.pr.changeState(UBotPoolState.FAILED);
         }
     }
 
@@ -390,7 +406,15 @@ class UBotAsmProcess_writeSingleStorage extends ProcessBase {
                         // ok
                         this.currentTask.cancel();
 
-                        await this.pr.ledger.writeToSingleStorage(this.pr.poolId, this.pr.executableContract.id, "default", this.binToWrite);
+                        try {
+                            await this.pr.ledger.writeToSingleStorage(this.pr.poolId, this.pr.executableContract.id, "default", this.binToWrite);
+                        } catch (err) {
+                            this.pr.logger.log("error: UBotAsmProcess_writeSingleStorage");
+                            this.pr.errors.push(new ErrorRecord(Errors.FAILURE, "UBotAsmProcess_writeSingleStorage", "error writing to single storage"));
+                            this.pr.changeState(UBotPoolState.FAILED);
+                            return;
+                        }
+
                         this.pr.logger.log("UBotAsmProcess_writeSingleStorage... ready, approved");
 
                         this.onReady();
@@ -402,6 +426,9 @@ class UBotAsmProcess_writeSingleStorage extends ProcessBase {
 
                         this.asmProcessor.val0 = "UBotAsmProcess_writeSingleStorage declined";
                         this.pr.logger.log("UBotAsmProcess_writeSingleStorage... ready, declined");
+
+                        this.pr.errors.push(new ErrorRecord(Errors.FAILURE, "UBotAsmProcess_writeSingleStorage", "writing to single storage declined"));
+                        this.pr.changeState(UBotPoolState.FAILED);
                     }
                 }
             }
@@ -525,7 +552,14 @@ class UBotAsmProcess_writeMultiStorage extends UBotAsmProcess_writeSingleStorage
                         // ok
                         this.currentTask.cancel();
 
-                        await this.pr.ledger.writeToSingleStorage(this.pr.poolId, this.pr.executableContract.id, "default", this.binToWrite);
+                        try {
+                            await this.pr.ledger.writeToSingleStorage(this.pr.poolId, this.pr.executableContract.id, "default", this.binToWrite);
+                        } catch (err) {
+                            this.pr.logger.log("error: UBotAsmProcess_writeMultiStorage");
+                            this.pr.errors.push(new ErrorRecord(Errors.FAILURE, "UBotAsmProcess_writeMultiStorage", "error writing to multi storage"));
+                            this.pr.changeState(UBotPoolState.FAILED);
+                            return;
+                        }
                         this.pr.logger.log("UBotAsmProcess_writeMultiStorage... ready, approved");
 
                         this.onReady();
@@ -537,6 +571,9 @@ class UBotAsmProcess_writeMultiStorage extends UBotAsmProcess_writeSingleStorage
 
                         this.asmProcessor.val0 = "UBotAsmProcess_writeMultiStorage declined";
                         this.pr.logger.log("UBotAsmProcess_writeMultiStorage... ready, declined");
+
+                        this.pr.errors.push(new ErrorRecord(Errors.FAILURE, "UBotAsmProcess_writeMultiStorage", "writing to multi storage declined"));
+                        this.pr.changeState(UBotPoolState.FAILED);
                     }
                 }
             }
