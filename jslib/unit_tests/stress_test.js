@@ -210,7 +210,7 @@ unit.test("async performance", async () => {
 
     let HTTP_init = async () => {
         for (let i = 0; i < NODES; i++) {
-            let httpServer = new network.HttpServer("0.0.0.0", 8080 + i, 1, 64);
+            let httpServer = new network.HttpServer("0.0.0.0", 8080 + i, 1);
             let nodeKey = new crypto.PrivateKey(atob("JgAcAQABvID6D5ZdM9EKrZSztm/R/RcywM4K8Z4VBtX+NZp2eLCWtfAgGcBCQLtNz4scH7dPBerkkxckW6+9CLlnu/tgOxvzS6Z1Ec51++fVP9gaWbBQe9/dSg7xVPg5p9ibhfTB+iRXyevCkNj0hrlLyXl1BkPjN9+lZfXJsp9OnGIJ/AaAb7yA99E65gvZnbb3/oA3rG0pM45af6ppZKe2HeiAK+fcXm5KTQzfTce45f/mJ0jsDmFf1HFosS4waXSAz0ZfcssjPeoF3PuXfJLtM8czJ55+Nz6NMCbzrSk6zkKssGBieYFOb4eG2AdtfjTrpcSSHBgJpsbcmRx4bZNfBAZPqT+Sd20="));
             let clientKey = await crypto.PrivateKey.generate(2048);
 
@@ -416,7 +416,7 @@ unit.test("async performance", async () => {
     let https_receiveCounter = 0;
     let http_init = async () => {
         for (let i = 0; i < NODE_COUNT; i++) {
-            let httpServer = new network.HttpServer("0.0.0.0", 8080 + i, 1, 10);
+            let httpServer = new network.HttpServer("0.0.0.0", 8080 + i, 1);
             let nodeKey = new crypto.PrivateKey(atob("JgAcAQABvID6D5ZdM9EKrZSztm/R/RcywM4K8Z4VBtX+NZp2eLCWtfAgGcBCQLtNz4scH7dPBerkkxckW6+9CLlnu/tgOxvzS6Z1Ec51++fVP9gaWbBQe9/dSg7xVPg5p9ibhfTB+iRXyevCkNj0hrlLyXl1BkPjN9+lZfXJsp9OnGIJ/AaAb7yA99E65gvZnbb3/oA3rG0pM45af6ppZKe2HeiAK+fcXm5KTQzfTce45f/mJ0jsDmFf1HFosS4waXSAz0ZfcssjPeoF3PuXfJLtM8czJ55+Nz6NMCbzrSk6zkKssGBieYFOb4eG2AdtfjTrpcSSHBgJpsbcmRx4bZNfBAZPqT+Sd20="));
             let clientKey = tk.TestKeys.getKey();
 

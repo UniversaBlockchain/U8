@@ -10,7 +10,7 @@ const ErrorRecord = e.ErrorRecord;
 class UBotHttpServer extends network.HttpServer {
 
     constructor(privateKey, host, port, logger, ubot) {
-        super(host, port, 32, 32);
+        super(host, port, 32);
         this.logger = logger;
         this.ubot = ubot;
         super.initSecureProtocol(privateKey);

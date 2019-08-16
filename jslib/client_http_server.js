@@ -18,7 +18,7 @@ const ItemState = require('itemstate').ItemState;
 class ClientHTTPServer extends network.HttpServer {
 
     constructor(privateKey, port, logger) {
-        super("0.0.0.0", port, 32, 4096);
+        super("0.0.0.0", port, 32);
         this.node = null;
         this.logger = logger;
         this.nodeKey = privateKey;

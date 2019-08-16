@@ -308,7 +308,8 @@ network.HttpServerRequest = class {
 Object.assign(network.HttpServerRequest.prototype, MemoiseMixin);
 
 network.HttpServer = class {
-    constructor(host, port, poolSize, bufSize) {
+    constructor(host, port, poolSize) {
+        let bufSize = Math.max(8, poolSize);
         this.httpServer_ = new network.HttpServerImpl(host, port, poolSize, bufSize);
         this.endpoints_ = new Map();
         this.secureEndpoints_ = new Map();
