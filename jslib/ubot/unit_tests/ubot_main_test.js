@@ -161,10 +161,10 @@ unit.test("ubot_main_test: executeCloudMethod", async () => {
         //"generateRandomHash;" + // should decline write to single storage, each ubot has random value
         "calc2x2;" + // should approve write to single storage, each ubot has same value
         "writeSingleStorage;" +
-        //"calc2x2;" +
-        //"writeMultiStorage;" +
+        "calc2x2;" +
+        "writeMultiStorage;" +
         "finish";
-    //contract.state.data.methodStorageName = "single";
+
     await executableContract.seal();
 
     let startingContract = Contract.fromPrivateKey(userPrivKey);
