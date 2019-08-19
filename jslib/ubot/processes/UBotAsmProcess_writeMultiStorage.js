@@ -76,7 +76,7 @@ class UBotAsmProcess_writeMultiStorage extends UBotAsmProcess_writeSingleStorage
                             true
                         )
                     );
-                } else {
+                } else if (!this.hashesReady) {
                     this.otherAnswers.add(notification.from.number);
                     this.hashes[this.pr.poolIndexes.get(notification.from.number)] = notification.dataHashId;
 

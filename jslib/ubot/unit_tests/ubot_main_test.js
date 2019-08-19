@@ -5,6 +5,7 @@ import {expect, assert, unit} from 'test'
 const io = require("io");
 const UBotMain = require("ubot/ubot_main").UBotMain;
 const UBotPoolState = require("ubot/ubot_pool_state").UBotPoolState;
+const Errors = require("errors").Errors;
 const cs = require("contractsservice");
 const BigDecimal  = require("big").Big;
 const Boss = require("boss");
@@ -158,10 +159,9 @@ unit.test("ubot_main_test: executeCloudMethod", async () => {
     executableContract.state.data.poolSize = 5;
     executableContract.state.data.poolQuorum = 4;
     executableContract.state.data.ubotAsm = "" +
-        //"generateRandomHash;" + // should decline write to single storage, each ubot has random value
         "calc2x2;" + // should approve write to single storage, each ubot has same value
         "writeSingleStorage;" +
-        "calc2x2;" +
+        //"generateRandomHash;" + // should approve write to multi storage, each ubot has random value
         "writeMultiStorage;" +
         "finish";
 
@@ -207,6 +207,7 @@ unit.test("ubot_main_test: executeCloudMethod", async () => {
         fire(resp.result);
     }, err=>{
         console.log("err: " + err);
+        fire(null);
     });
 
     assert((await Boss.load(await event)).val === 4);
@@ -229,8 +230,7 @@ unit.test("ubot_main_test: errorOutput", async () => {
     executableContract.state.data.poolSize = 5;
     executableContract.state.data.poolQuorum = 6;
     executableContract.state.data.ubotAsm = "" +
-        //"generateRandomHash;" + // should decline write to single storage, each ubot has random value
-        "calc2x2;" + // should approve write to single storage, each ubot has same value
+        "calc2x2;" +
         "writeSingleStorage;" +
         "finish";
 
@@ -276,11 +276,12 @@ unit.test("ubot_main_test: errorOutput", async () => {
         fire(resp);
     }, err=>{
         console.log("err: " + err);
+        fire(null);
     });
 
     let errors = (await event).errors;
     assert(errors.length === 1);
-    assert(errors[0].error === "FAILURE");
+    assert(errors[0].error === Errors.FAILURE);
     assert(errors[0].objectName === "UBotAsmProcess_writeSingleStorage");
     assert(errors[0].message === "writing to single storage declined");
 
