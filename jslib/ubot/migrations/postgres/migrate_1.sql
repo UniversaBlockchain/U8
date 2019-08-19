@@ -5,7 +5,7 @@ create table pool_storage(
     storage_name text not null,
     storage_type int not null,
     single_storage_data bytea,
-    UNIQUE (pool_hash_id, storage_name)
+    UNIQUE (pool_hash_id, storage_name, storage_type)
 );
 
 create table pool_storage_multi(
@@ -15,3 +15,6 @@ create table pool_storage_multi(
     storage_data bytea not null,
     UNIQUE (pool_storage_id, ubot_number)
 );
+
+create unique index ix_pool_storage_hashes on pool_storage(pool_hash_id, storage_name, storage_type);
+create unique index ix_pool_storage_multi_ids on pool_storage_multi(pool_storage_id);

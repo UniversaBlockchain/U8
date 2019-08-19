@@ -94,8 +94,8 @@ class UBotLedger {
     async writeToSingleStorage(pool_hash_id, executable_contract_id, storage_name, storage_data) {
         return this.simpleQuery(
             "INSERT INTO pool_storage (pool_hash_id, executable_contract_id, storage_name, storage_type, single_storage_data) " +
-            " VALUES (?,?,?,?,?) ON CONFLICT (pool_hash_id, storage_name) DO UPDATE SET executable_contract_id=EXCLUDED.executable_contract_id, " +
-            "storage_type=EXCLUDED.storage_type, single_storage_data=EXCLUDED.single_storage_data RETURNING id",
+            " VALUES (?,?,?,?,?) ON CONFLICT (pool_hash_id, storage_name, storage_type) DO UPDATE SET " +
+            "single_storage_data=EXCLUDED.single_storage_data RETURNING id",
             x => {
                 if (x == null)
                     throw new UBotLedgerException("writeToSingleStorage failed: returning null");
@@ -113,21 +113,35 @@ class UBotLedger {
     async writeToMultiStorage(pool_hash_id, executable_contract_id, storage_name, storage_data, ubot_number) {
         return this.dbPool_.transaction(async(con) => {
             let id = await this.simpleQuery(
-                "INSERT INTO pool_storage (pool_hash_id, executable_contract_id, storage_name, storage_type, single_storage_data) " +
-                " VALUES (?,?,?,?,NULL) ON CONFLICT (pool_hash_id, storage_name) DO UPDATE SET executable_contract_id=EXCLUDED.executable_contract_id, " +
-                "storage_type=EXCLUDED.storage_type, single_storage_data=EXCLUDED.single_storage_data RETURNING id",
+                "SELECT id FROM pool_storage WHERE pool_hash_id = ? AND storage_name = ? AND storage_type = ?",
                 x => {
                     if (x == null)
-                        throw new UBotLedgerException("writeToMultiStorage failed: returning null");
+                        return null;
                     else
                         return Number(x);
                 },
                 con,
                 pool_hash_id.digest,
-                executable_contract_id.digest,
                 storage_name,
                 UBotStorageType.MULTI.ordinal
             );
+
+            if (id == null)
+                id = await this.simpleQuery(
+                    "INSERT INTO pool_storage (pool_hash_id, executable_contract_id, storage_name, storage_type, single_storage_data) " +
+                    " VALUES (?,?,?,?,NULL) ON CONFLICT (pool_hash_id, storage_name, storage_type) DO NOTHING RETURNING id",
+                    x => {
+                        if (x == null)
+                            throw new UBotLedgerException("writeToMultiStorage failed: returning null");
+                        else
+                            return Number(x);
+                    },
+                    con,
+                    pool_hash_id.digest,
+                    executable_contract_id.digest,
+                    storage_name,
+                    UBotStorageType.MULTI.ordinal
+                );
 
             await this.simpleUpdate(
                 "INSERT INTO pool_storage_multi (pool_storage_id, ubot_number, storage_data) VALUES (?,?,?) " +
