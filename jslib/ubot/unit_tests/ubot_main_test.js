@@ -194,8 +194,10 @@ unit.test("ubot_main_test: executeCloudMethod", async () => {
         pool.push(proc.pool[i].number);
 
     //waiting pool finished...
-    while (!pool.every(ubot => ubotMains[ubot].ubot.processors.get(startingContract.id.base64).state === UBotPoolState.FINISHED))
+    while (!pool.every(ubot => !ubotMains[ubot].ubot.processors.get(startingContract.id.base64).state.canContinue))
         await sleep(100);
+
+    assert(pool.every(ubot => ubotMains[ubot].ubot.processors.get(startingContract.id.base64).state === UBotPoolState.FINISHED));
 
     let fire = null;
     let event = new Promise(resolve => fire = resolve);

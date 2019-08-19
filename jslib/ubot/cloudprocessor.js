@@ -3,6 +3,8 @@ const ScheduleExecutor = require("executorservice").ScheduleExecutor;
 const ExecutorWithFixedPeriod = require("executorservice").ExecutorWithFixedPeriod;
 const ex = require("exceptions");
 const t = require("tools");
+const ErrorRecord = require("errors").ErrorRecord;
+const Errors = require("errors").Errors;
 const UBotCloudNotification = require("ubot/ubot_notification").UBotCloudNotification;
 const UBotCloudNotification_asmCommand = require("ubot/ubot_notification").UBotCloudNotification_asmCommand;
 const Boss = require('boss.js');
@@ -13,35 +15,59 @@ const UBotPoolState = {
      * UBot creates new CloudProcessor with this state if it has received UBotCloudNotification, but CloudProcessor
      * with corresponding poolId not found. Then UBot calls method onNotifyInit for new CloudProcessor.
      */
-    INIT                                       : {val: "INIT", ordinal: 0},
+    INIT                                       : {val: "INIT", canContinue: true, ordinal: 0},
 
     /**
      * At this state CloudProcessor should select ubots for new pool,
      * and periodically send to them udp notifications with invite to download startingContract.
      * Meanwhile, CloudProcessor is waiting for other ubots in pool to downloads startingContract.
      */
-    SEND_STARTING_CONTRACT                     : {val: "SEND_STARTING_CONTRACT", ordinal: 1},
+    SEND_STARTING_CONTRACT                     : {val: "SEND_STARTING_CONTRACT", canContinue: true, ordinal: 1},
 
     /**
      * CloudProcessor is downloading startingContract from pool starter ubot.
      */
-    DOWNLOAD_STARTING_CONTRACT                 : {val: "DOWNLOAD_STARTING_CONTRACT", ordinal: 2},
+    DOWNLOAD_STARTING_CONTRACT                 : {val: "DOWNLOAD_STARTING_CONTRACT", canContinue: true, ordinal: 2},
 
     /**
      * CloudProcessor is executing cloud method.
      */
-    START_EXEC                                 : {val: "START_EXEC", ordinal: 3},
+    START_EXEC                                 : {val: "START_EXEC", canContinue: true, ordinal: 3},
 
     /**
      * CloudProcessor is finished.
      */
-    FINISHED                                   : {val: "FINISHED", ordinal: 4},
+    FINISHED                                   : {val: "FINISHED", canContinue: false, ordinal: 4, nextStates: []},
 
     /**
      * CloudProcessor is failed.
      */
-    FAILED                                     : {val: "FAILED", ordinal: 5}
+    FAILED                                     : {val: "FAILED", canContinue: false, ordinal: 5, nextStates: []}
 };
+
+/**
+ * CloudProcessor available next states
+ */
+UBotPoolState.INIT.nextStates = [
+    UBotPoolState.SEND_STARTING_CONTRACT.ordinal,
+    UBotPoolState.DOWNLOAD_STARTING_CONTRACT.ordinal,
+    UBotPoolState.FAILED.ordinal,
+];
+
+UBotPoolState.SEND_STARTING_CONTRACT.nextStates = [
+    UBotPoolState.START_EXEC.ordinal,
+    UBotPoolState.FAILED.ordinal,
+];
+
+UBotPoolState.DOWNLOAD_STARTING_CONTRACT.nextStates = [
+    UBotPoolState.START_EXEC.ordinal,
+    UBotPoolState.FAILED.ordinal,
+];
+
+UBotPoolState.START_EXEC.nextStates = [
+    UBotPoolState.FINISHED.ordinal,
+    UBotPoolState.FAILED.ordinal,
+];
 
 t.addValAndOrdinalMaps(UBotPoolState);
 
@@ -94,9 +120,11 @@ class CloudProcessor {
     }
 
     changeState(newState) {
-        // here we can check transition from state to newState
-        this.state = newState;
-        this.startProcessingCurrentState();
+        if (~this.state.nextStates.indexOf(newState.ordinal)) {
+            this.state = newState;
+            this.startProcessingCurrentState();
+        } else
+            this.logger.log("Error change state " + this.state.val + " to " + newState.val);
     }
 
     onNotifyInit(notification) {
@@ -115,7 +143,14 @@ class CloudProcessor {
 
     async onNotify(notification) {
         if (this.currentProcess != null)
-            await this.currentProcess.onNotify(notification);
+            try {
+                await this.currentProcess.onNotify(notification);
+            } catch (err) {
+                this.logger.log(err.stack);
+                this.logger.log("error CloudProcessor.onNotify: " + err.message);
+                this.errors.push(new ErrorRecord(Errors.FAILURE, "CloudProcessor.onNotify", err.message));
+                this.changeState(UBotPoolState.FAILED);
+            }
         else {
             this.logger.log("error: CloudProcessor.onNotify -> currentProcess is null, currentProcess = " + this.currentProcess);
             this.errors.push(new ErrorRecord(Errors.BAD_VALUE, "CloudProcessor.onNotify", "currentProcess is null"));
@@ -440,6 +475,7 @@ class UBotAsmProcess_writeMultiStorage extends UBotAsmProcess_writeSingleStorage
     constructor(processor, onReady, asmProcessor, cmdIndex) {
         super(processor, onReady, asmProcessor, cmdIndex);
         this.hashes = [];
+        this.hashesReady = false;
         this.otherAnswers = new Set();
         this.approveCounterFromOthersSets = [];
         this.declineCounterFromOthersSets = [];
@@ -510,6 +546,7 @@ class UBotAsmProcess_writeMultiStorage extends UBotAsmProcess_writeSingleStorage
                     this.hashes[this.pr.poolIndexes.get(notification.from.number)] = notification.dataHashId;
 
                     if (this.otherAnswers.size >= this.pr.pool.length - 1) {
+                        this.hashesReady = true;
                         this.currentTask.cancel();
                         this.otherAnswers.clear();
                         this.pr.logger.log("UBotAsmProcess_writeMultiStorage: get pool hashes");
@@ -522,16 +559,17 @@ class UBotAsmProcess_writeMultiStorage extends UBotAsmProcess_writeSingleStorage
 
             } else if (notification.type === UBotCloudNotification_asmCommand.types.MULTI_STORAGE_GET_POOL_HASHES) {
                 if (!notification.isAnswer) {
-                    this.pr.ubot.network.deliver(notification.from,
-                        new UBotCloudNotification_asmCommand(
-                            this.pr.ubot.network.myInfo,
-                            this.pr.poolId,
-                            this.cmdIndex,
-                            UBotCloudNotification_asmCommand.types.MULTI_STORAGE_GET_POOL_HASHES,
-                            this.hashes,
-                            true
-                        )
-                    );
+                    if (this.hashesReady)
+                        this.pr.ubot.network.deliver(notification.from,
+                            new UBotCloudNotification_asmCommand(
+                                this.pr.ubot.network.myInfo,
+                                this.pr.poolId,
+                                this.cmdIndex,
+                                UBotCloudNotification_asmCommand.types.MULTI_STORAGE_GET_POOL_HASHES,
+                                this.hashes,
+                                true
+                            )
+                        );
                 } else if (!this.currentTask.cancelled) {
                     for (let i = 0; i < this.pr.pool.length; i++) {
                         if (this.hashes[i].equals(notification.dataHashId[i]))
