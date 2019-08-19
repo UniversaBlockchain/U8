@@ -1,79 +1,10 @@
-const UBotConfig = require("ubot/ubot_config").UBotConfig;
 const ProcessSendStartingContract = require("ubot/processes/ProcessSendStartingContract").ProcessSendStartingContract;
 const ProcessDownloadStartingContract = require("ubot/processes/ProcessDownloadStartingContract").ProcessDownloadStartingContract;
 const ProcessStartExec = require("ubot/processes/ProcessStartExec").ProcessStartExec;
-const ScheduleExecutor = require("executorservice").ScheduleExecutor;
-const ExecutorWithFixedPeriod = require("executorservice").ExecutorWithFixedPeriod;
-const ex = require("exceptions");
-const t = require("tools");
 const ErrorRecord = require("errors").ErrorRecord;
 const Errors = require("errors").Errors;
 const UBotCloudNotification = require("ubot/ubot_notification").UBotCloudNotification;
-const UBotCloudNotification_asmCommand = require("ubot/ubot_notification").UBotCloudNotification_asmCommand;
-const Boss = require('boss.js');
-
-const UBotPoolState = {
-
-    /**
-     * UBot creates new CloudProcessor with this state if it has received UBotCloudNotification, but CloudProcessor
-     * with corresponding poolId not found. Then UBot calls method onNotifyInit for new CloudProcessor.
-     */
-    INIT                                       : {val: "INIT", canContinue: true, ordinal: 0},
-
-    /**
-     * At this state CloudProcessor should select ubots for new pool,
-     * and periodically send to them udp notifications with invite to download startingContract.
-     * Meanwhile, CloudProcessor is waiting for other ubots in pool to downloads startingContract.
-     */
-    SEND_STARTING_CONTRACT                     : {val: "SEND_STARTING_CONTRACT", canContinue: true, ordinal: 1},
-
-    /**
-     * CloudProcessor is downloading startingContract from pool starter ubot.
-     */
-    DOWNLOAD_STARTING_CONTRACT                 : {val: "DOWNLOAD_STARTING_CONTRACT", canContinue: true, ordinal: 2},
-
-    /**
-     * CloudProcessor is executing cloud method.
-     */
-    START_EXEC                                 : {val: "START_EXEC", canContinue: true, ordinal: 3},
-
-    /**
-     * CloudProcessor is finished.
-     */
-    FINISHED                                   : {val: "FINISHED", canContinue: false, ordinal: 4, nextStates: []},
-
-    /**
-     * CloudProcessor is failed.
-     */
-    FAILED                                     : {val: "FAILED", canContinue: false, ordinal: 5, nextStates: []}
-};
-
-/**
- * CloudProcessor available next states
- */
-UBotPoolState.INIT.nextStates = [
-    UBotPoolState.SEND_STARTING_CONTRACT.ordinal,
-    UBotPoolState.DOWNLOAD_STARTING_CONTRACT.ordinal,
-    UBotPoolState.FAILED.ordinal,
-];
-
-UBotPoolState.SEND_STARTING_CONTRACT.nextStates = [
-    UBotPoolState.START_EXEC.ordinal,
-    UBotPoolState.FAILED.ordinal,
-];
-
-UBotPoolState.DOWNLOAD_STARTING_CONTRACT.nextStates = [
-    UBotPoolState.START_EXEC.ordinal,
-    UBotPoolState.FAILED.ordinal,
-];
-
-UBotPoolState.START_EXEC.nextStates = [
-    UBotPoolState.FINISHED.ordinal,
-    UBotPoolState.FAILED.ordinal,
-];
-
-t.addValAndOrdinalMaps(UBotPoolState);
-
+const UBotPoolState = require("ubot/ubot_pool_state").UBotPoolState;
 
 class CloudProcessor {
     constructor(initialState, poolId, ubot) {
@@ -168,4 +99,4 @@ class CloudProcessor {
     }*/
 }
 
-module.exports = {UBotPoolState, CloudProcessor};
+module.exports = {CloudProcessor};

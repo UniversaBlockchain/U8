@@ -2,7 +2,7 @@ import * as network from "web";
 const Contract = require("contract").Contract;
 const HashId = require("crypto").HashId;
 const Boss = require('boss.js');
-const UBotPoolState = require("ubot/cloudprocessor").UBotPoolState;
+const UBotPoolState = require("ubot/ubot_pool_state").UBotPoolState;
 const e = require("errors");
 const Errors = e.Errors;
 const ErrorRecord = e.ErrorRecord;

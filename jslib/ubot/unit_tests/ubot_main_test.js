@@ -4,7 +4,7 @@ import {expect, assert, unit} from 'test'
 
 const io = require("io");
 const UBotMain = require("ubot/ubot_main").UBotMain;
-const UBotPoolState = require("ubot/cloudprocessor").UBotPoolState;
+const UBotPoolState = require("ubot/ubot_pool_state").UBotPoolState;
 const cs = require("contractsservice");
 const BigDecimal  = require("big").Big;
 const Boss = require("boss");
@@ -232,8 +232,6 @@ unit.test("ubot_main_test: errorOutput", async () => {
         //"generateRandomHash;" + // should decline write to single storage, each ubot has random value
         "calc2x2;" + // should approve write to single storage, each ubot has same value
         "writeSingleStorage;" +
-        "calc2x2;" +
-        "writeMultiStorage;" +
         "finish";
 
     await executableContract.seal();
@@ -280,9 +278,11 @@ unit.test("ubot_main_test: errorOutput", async () => {
         console.log("err: " + err);
     });
 
-    assert((await event).errors[0].error === "FAILURE");
-    assert((await event).errors[0].objectName === "UBotAsmProcess_writeSingleStorage");
-    assert((await event).errors[0].message === "writing to single storage declined");
+    let errors = (await event).errors;
+    assert(errors.length === 1);
+    assert(errors[0].error === "FAILURE");
+    assert(errors[0].objectName === "UBotAsmProcess_writeSingleStorage");
+    assert(errors[0].message === "writing to single storage declined");
 
     await shutdownUBots(ubotMains);
 });

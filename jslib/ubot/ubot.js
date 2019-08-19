@@ -1,6 +1,5 @@
-const t = require("tools");
 const CloudProcessor = require("ubot/cloudprocessor").CloudProcessor;
-const UBotPoolState = require("ubot/cloudprocessor").UBotPoolState;
+const UBotPoolState = require("ubot/ubot_pool_state").UBotPoolState;
 const ExecutorService = require("executorservice").ExecutorService;
 const UBotCloudNotification = require("ubot/ubot_notification").UBotCloudNotification;
 
