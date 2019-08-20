@@ -110,12 +110,13 @@ class UBotCloudNotification_asmCommand extends Notification {
         MULTI_STORAGE_GET_POOL_HASHES:   {ordinal: 2}
     };
 
-    constructor(from, poolId, cmdIndex, type, dataHashId, isAnswer) {
+    constructor(from, poolId, cmdIndex, type, dataHashId, isAnswer, dataUbotInPool = -1) {
         super(from);
         this.poolId = poolId;
         this.cmdIndex = cmdIndex;
         this.type = type;
         this.dataHashId = dataHashId;
+        this.dataUbotInPool = dataUbotInPool;
         this.isAnswer = isAnswer;
         this.typeCode = CODE_UBOT_CLOUD_NOTIFICATION_ASM_CMD;
     }
@@ -132,10 +133,10 @@ class UBotCloudNotification_asmCommand extends Notification {
                     bw.write(this.dataHashId.digest);
                 break;
             case UBotCloudNotification_asmCommand.types.MULTI_STORAGE_GET_POOL_HASHES:
-                if (this.isAnswer && this.dataHashId instanceof Array) {
-                    bw.write(this.dataHashId.length);
-                    this.dataHashId.forEach(hash => bw.write(hash.digest));
-                }
+                bw.write(this.dataUbotInPool);
+
+                if (this.isAnswer)
+                    bw.write(this.dataHashId.digest);
         }
     }
 
@@ -151,12 +152,10 @@ class UBotCloudNotification_asmCommand extends Notification {
                     this.dataHashId = crypto.HashId.withDigest(br.read());
                 break;
             case UBotCloudNotification_asmCommand.types.MULTI_STORAGE_GET_POOL_HASHES:
-                if (this.isAnswer) {
-                    this.dataHashId = [];
-                    let len = br.read();
-                    for (let i = 0; i < len; i++)
-                        this.dataHashId.push(crypto.HashId.withDigest(br.read()));
-                }
+                this.dataUbotInPool = br.read();
+
+                if (this.isAnswer)
+                    this.dataHashId = crypto.HashId.withDigest(br.read());
         }
     }
 

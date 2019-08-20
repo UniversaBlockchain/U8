@@ -48,6 +48,40 @@ class UBotAsmProcess_writeSingleStorage extends ProcessBase {
             }
     }
 
+    async vote(notification) {
+        if (this.binHashId.equals(notification.dataHashId))
+            this.approveCounterSet.add(notification.from.number);
+        else
+            this.declineCounterSet.add(notification.from.number);
+
+        if (this.approveCounterSet.size >= this.pr.executableContract.state.data.poolQuorum) {
+            // ok
+            this.currentTask.cancel();
+
+            try {
+                await this.pr.ledger.writeToSingleStorage(this.pr.poolId, this.pr.executableContract.id, "default", this.binToWrite);
+            } catch (err) {
+                this.pr.logger.log("error: UBotAsmProcess_writeSingleStorage");
+                this.pr.errors.push(new ErrorRecord(Errors.FAILURE, "UBotAsmProcess_writeSingleStorage", "error writing to single storage"));
+                this.pr.changeState(UBotPoolState.FAILED);
+                return;
+            }
+
+            this.pr.logger.log("UBotAsmProcess_writeSingleStorage... ready, approved");
+
+            this.onReady();
+            // TODO: distribution single-storage to all ubots here or after closing pool?
+
+        } else if (this.declineCounterSet.size > this.pr.pool.length - this.pr.executableContract.state.data.poolQuorum) {
+            // error
+            this.currentTask.cancel();
+
+            this.pr.logger.log("UBotAsmProcess_writeSingleStorage... ready, declined");
+            this.pr.errors.push(new ErrorRecord(Errors.FAILURE, "UBotAsmProcess_writeSingleStorage", "writing to single storage declined"));
+            this.pr.changeState(UBotPoolState.FAILED);
+        }
+    }
+
     async onNotify(notification) {
         if (notification instanceof UBotCloudNotification_asmCommand) {
             if (notification.type === UBotCloudNotification_asmCommand.types.SINGLE_STORAGE_GET_DATA_HASHID) {
@@ -63,40 +97,8 @@ class UBotAsmProcess_writeSingleStorage extends ProcessBase {
                             true
                         )
                     );
-                } else if (!this.currentTask.cancelled) {
-                    // this.pr.logger.log("SINGLE_STORAGE_GET_DATA_HASHID ans... " + notification);
-                    if (this.binHashId.equals(notification.dataHashId))
-                        this.approveCounterSet.add(notification.from.number);
-                    else
-                        this.declineCounterSet.add(notification.from.number);
-
-                    if (this.approveCounterSet.size >= this.pr.executableContract.state.data.poolQuorum) {
-                        // ok
-                        this.currentTask.cancel();
-
-                        try {
-                            await this.pr.ledger.writeToSingleStorage(this.pr.poolId, this.pr.executableContract.id, "default", this.binToWrite);
-                        } catch (err) {
-                            this.pr.logger.log("error: UBotAsmProcess_writeSingleStorage");
-                            this.pr.errors.push(new ErrorRecord(Errors.FAILURE, "UBotAsmProcess_writeSingleStorage", "error writing to single storage"));
-                            this.pr.changeState(UBotPoolState.FAILED);
-                            return;
-                        }
-
-                        this.pr.logger.log("UBotAsmProcess_writeSingleStorage... ready, approved");
-
-                        this.onReady();
-                        // TODO: distribution single-storage to all ubots here or after closing pool?
-
-                    } else if (this.declineCounterSet.size > this.pr.pool.length - this.pr.executableContract.state.data.poolQuorum) {
-                        // error
-                        this.currentTask.cancel();
-
-                        this.pr.logger.log("UBotAsmProcess_writeSingleStorage... ready, declined");
-                        this.pr.errors.push(new ErrorRecord(Errors.FAILURE, "UBotAsmProcess_writeSingleStorage", "writing to single storage declined"));
-                        this.pr.changeState(UBotPoolState.FAILED);
-                    }
-                }
+                } else if (!this.currentTask.cancelled)
+                    await this.vote(notification);
             }
         } else {
             this.pr.logger.log("warning: UBotAsmProcess_writeSingleStorage - wrong notification received");

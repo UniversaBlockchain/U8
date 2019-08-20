@@ -22,9 +22,13 @@ class UBotAsmProcess_writeMultiStorage extends UBotAsmProcess_writeSingleStorage
 
     start() {
         this.pr.logger.log("start UBotAsmProcess_writeMultiStorage");
-        for (let i = 0; i < this.pr.pool.length; ++i)
-            this.approveCounterFromOthersSets[i].add(this.pr.ubot.network.myInfo.number); // vote for itself
-        this.hashes[this.pr.poolIndexes.get(this.pr.ubot.network.myInfo.number)] = this.binHashId;  // add self hash
+        for (let i = 0; i < this.pr.pool.length; ++i) {
+            // votes for itself
+            this.approveCounterFromOthersSets[i].add(this.pr.ubot.network.myInfo.number);
+            this.approveCounterFromOthersSets[i].add(this.pr.pool[i].number);
+        }
+        // add self hash
+        this.hashes[this.pr.poolIndexes.get(this.pr.ubot.network.myInfo.number)] = this.binHashId;
 
         this.pulseGetHashes();
         this.currentTask = new ExecutorWithFixedPeriod(() => {
@@ -34,7 +38,7 @@ class UBotAsmProcess_writeMultiStorage extends UBotAsmProcess_writeSingleStorage
 
     pulseGetHashes() {
         for (let i = 0; i < this.pr.pool.length; ++i)
-            if (!this.otherAnswers.has(this.pr.pool[i].number) && this.pr.pool[i].number !== this.pr.ubot.network.myInfo.number)
+            if (this.pr.pool[i].number !== this.pr.ubot.network.myInfo.number && !this.otherAnswers.has(this.pr.pool[i].number))
                 this.pr.ubot.network.deliver(this.pr.pool[i],
                     new UBotCloudNotification_asmCommand(
                         this.pr.ubot.network.myInfo,
@@ -47,19 +51,81 @@ class UBotAsmProcess_writeMultiStorage extends UBotAsmProcess_writeSingleStorage
                 );
     }
 
-    pulseGetPoolHashes() {
+    pulseGetPoolHashes(first = false) {
         for (let i = 0; i < this.pr.pool.length; ++i)
-            if (!this.otherAnswers.has(this.pr.pool[i].number) && this.pr.pool[i].number !== this.pr.ubot.network.myInfo.number)
-                this.pr.ubot.network.deliver(this.pr.pool[i],
-                    new UBotCloudNotification_asmCommand(
-                        this.pr.ubot.network.myInfo,
-                        this.pr.poolId,
-                        this.cmdIndex,
-                        UBotCloudNotification_asmCommand.types.MULTI_STORAGE_GET_POOL_HASHES,
-                        null,
-                        false
-                    )
-                );
+            if (this.pr.pool[i].number !== this.pr.ubot.network.myInfo.number) {
+                if (first)
+                    this.pr.ubot.network.deliver(this.pr.pool[i],
+                        new UBotCloudNotification_asmCommand(
+                            this.pr.ubot.network.myInfo,
+                            this.pr.poolId,
+                            this.cmdIndex,
+                            UBotCloudNotification_asmCommand.types.MULTI_STORAGE_GET_POOL_HASHES,
+                            null,
+                            false
+                        )
+                    );
+                else
+                    for (let j = 0; j < this.pr.pool.length; ++j)
+                        if (!this.approveCounterFromOthersSets[j].has(this.pr.pool[i].number) &&
+                            !this.declineCounterFromOthersSets[j].has(this.pr.pool[i].number))
+                            this.pr.ubot.network.deliver(this.pr.pool[i],
+                                new UBotCloudNotification_asmCommand(
+                                    this.pr.ubot.network.myInfo,
+                                    this.pr.poolId,
+                                    this.cmdIndex,
+                                    UBotCloudNotification_asmCommand.types.MULTI_STORAGE_GET_POOL_HASHES,
+                                    null,
+                                    false,
+                                    j
+                                )
+                            );
+            }
+    }
+
+    async vote(notification) {
+        if (this.hashes[notification.dataUbotInPool].equals(notification.dataHashId))
+            this.approveCounterFromOthersSets[notification.dataUbotInPool].add(notification.from.number);
+        else
+            this.declineCounterFromOthersSets[notification.dataUbotInPool].add(notification.from.number);
+
+        if (this.approveCounterFromOthersSets[notification.dataUbotInPool].size >= this.pr.executableContract.state.data.poolQuorum)
+            this.approveCounterSet.add(notification.dataUbotInPool);
+        else if (this.declineCounterFromOthersSets[notification.dataUbotInPool].size > this.pr.pool.length - this.pr.executableContract.state.data.poolQuorum)
+            this.declineCounterSet.add(notification.dataUbotInPool);
+
+        if (this.approveCounterSet.size >= this.pr.executableContract.state.data.poolQuorum &&
+            this.approveCounterSet.has(this.pr.poolIndexes.get(this.pr.ubot.network.myInfo.number)) &&
+            this.approveCounterFromOthersSets.every((approveSet, i) =>
+                approveSet.size + this.declineCounterFromOthersSets[i].size === this.pr.pool.length)) {
+
+            // ok
+            this.currentTask.cancel();
+
+            try {
+                await this.pr.ledger.writeToMultiStorage(this.pr.poolId, this.pr.executableContract.id,
+                    "default", this.binToWrite, this.pr.ubot.network.myInfo.number);
+            } catch (err) {
+                this.pr.logger.log("error: UBotAsmProcess_writeMultiStorage");
+                this.pr.errors.push(new ErrorRecord(Errors.FAILURE, "UBotAsmProcess_writeMultiStorage", "error writing to multi-storage"));
+                this.pr.changeState(UBotPoolState.FAILED);
+                return;
+            }
+            this.pr.logger.log("UBotAsmProcess_writeMultiStorage... ready, approved");
+
+            this.onReady();
+            // TODO: distribution multi-storage to all ubots here or after closing pool?
+
+        } else if (this.declineCounterSet.size > this.pr.pool.length - this.pr.executableContract.state.data.poolQuorum ||
+            this.declineCounterSet.has(this.pr.poolIndexes.get(this.pr.ubot.network.myInfo.number))) {
+
+            // error
+            this.currentTask.cancel();
+
+            this.pr.logger.log("UBotAsmProcess_writeMultiStorage... ready, declined");
+            this.pr.errors.push(new ErrorRecord(Errors.FAILURE, "UBotAsmProcess_writeMultiStorage", "writing to multi-storage declined"));
+            this.pr.changeState(UBotPoolState.FAILED);
+        }
     }
 
     async onNotify(notification) {
@@ -83,9 +149,8 @@ class UBotAsmProcess_writeMultiStorage extends UBotAsmProcess_writeSingleStorage
                     if (this.otherAnswers.size >= this.pr.pool.length - 1) {
                         this.hashesReady = true;
                         this.currentTask.cancel();
-                        this.otherAnswers.clear();
                         this.pr.logger.log("UBotAsmProcess_writeMultiStorage: get pool hashes");
-                        this.pulseGetPoolHashes();
+                        this.pulseGetPoolHashes(true);
                         this.currentTask = new ExecutorWithFixedPeriod(() => {
                             this.pulseGetPoolHashes();
                         }, UBotConfig.multi_storage_vote_period, this.pr.ubot.executorService).run();
@@ -94,62 +159,35 @@ class UBotAsmProcess_writeMultiStorage extends UBotAsmProcess_writeSingleStorage
 
             } else if (notification.type === UBotCloudNotification_asmCommand.types.MULTI_STORAGE_GET_POOL_HASHES) {
                 if (!notification.isAnswer) {
-                    if (this.hashesReady)
+                    if (notification.dataUbotInPool === -1) {
+                        for (let i = 0; i < this.pr.pool.length; i++)
+                            if (this.pr.poolIndexes.get(this.pr.ubot.network.myInfo.number) !== i && this.hashes[i] != null)
+                                this.pr.ubot.network.deliver(notification.from,
+                                    new UBotCloudNotification_asmCommand(
+                                        this.pr.ubot.network.myInfo,
+                                        this.pr.poolId,
+                                        this.cmdIndex,
+                                        UBotCloudNotification_asmCommand.types.MULTI_STORAGE_GET_POOL_HASHES,
+                                        this.hashes[i],
+                                        true,
+                                        i
+                                    )
+                                );
+                    } else if (this.hashes[notification.dataUbotInPool] != null)
                         this.pr.ubot.network.deliver(notification.from,
                             new UBotCloudNotification_asmCommand(
                                 this.pr.ubot.network.myInfo,
                                 this.pr.poolId,
                                 this.cmdIndex,
                                 UBotCloudNotification_asmCommand.types.MULTI_STORAGE_GET_POOL_HASHES,
-                                this.hashes,
-                                true
+                                this.hashes[notification.dataUbotInPool],
+                                true,
+                                notification.dataUbotInPool
                             )
                         );
-                } else if (!this.currentTask.cancelled) {
-                    for (let i = 0; i < this.pr.pool.length; i++) {
-                        if (this.hashes[i].equals(notification.dataHashId[i]))
-                            this.approveCounterFromOthersSets[i].add(notification.from.number);
-                        else
-                            this.declineCounterFromOthersSets[i].add(notification.from.number);
 
-                        if (this.approveCounterFromOthersSets[i].size >= this.pr.executableContract.state.data.poolQuorum)
-                            this.approveCounterSet.add(i);
-                        else if (this.declineCounterFromOthersSets[i].size > this.pr.pool.length - this.pr.executableContract.state.data.poolQuorum)
-                            this.declineCounterSet.add(i);
-                    }
-
-                    if (this.approveCounterSet.size >= this.pr.executableContract.state.data.poolQuorum &&
-                        this.approveCounterSet.has(this.pr.poolIndexes.get(this.pr.ubot.network.myInfo.number)) &&
-                        this.approveCounterFromOthersSets[0].size + this.declineCounterFromOthersSets[0].size === this.pr.pool.length) {
-
-                        // ok
-                        this.currentTask.cancel();
-
-                        try {
-                            await this.pr.ledger.writeToMultiStorage(this.pr.poolId, this.pr.executableContract.id,
-                                "default", this.binToWrite, this.pr.ubot.network.myInfo.number);
-                        } catch (err) {
-                            this.pr.logger.log("error: UBotAsmProcess_writeMultiStorage");
-                            this.pr.errors.push(new ErrorRecord(Errors.FAILURE, "UBotAsmProcess_writeMultiStorage", "error writing to multi-storage"));
-                            this.pr.changeState(UBotPoolState.FAILED);
-                            return;
-                        }
-                        this.pr.logger.log("UBotAsmProcess_writeMultiStorage... ready, approved");
-
-                        this.onReady();
-                        // TODO: distribution multi-storage to all ubots here or after closing pool?
-
-                    } else if (this.declineCounterSet.size > this.pr.pool.length - this.pr.executableContract.state.data.poolQuorum ||
-                        this.declineCounterSet.has(this.pr.poolIndexes.get(this.pr.ubot.network.myInfo.number))) {
-
-                        // error
-                        this.currentTask.cancel();
-
-                        this.pr.logger.log("UBotAsmProcess_writeMultiStorage... ready, declined");
-                        this.pr.errors.push(new ErrorRecord(Errors.FAILURE, "UBotAsmProcess_writeMultiStorage", "writing to multi-storage declined"));
-                        this.pr.changeState(UBotPoolState.FAILED);
-                    }
-                }
+                } else if (!this.currentTask.cancelled)
+                    await this.vote(notification);
             }
         } else {
             this.pr.logger.log("warning: UBotAsmProcess_writeMultiStorage - wrong notification received");
