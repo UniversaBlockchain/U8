@@ -7,6 +7,14 @@ __boss_addPrototype("HashId", crypto.HashId.prototype);
 __boss_addPrototype("PublicKey", crypto.PublicKey.prototype);
 __boss_addPrototype("PrivateKey", crypto.PrivateKey.prototype);
 
+const mainNestedLoadMap = {
+    TransactionPack: {
+        referencedItems: {data: null},
+        subItems: {data: null},
+        contract: {data: null}
+    }
+};
+
 module.exports = {
     async dump(data) {
         //return new _boss().dump(data);
@@ -15,7 +23,7 @@ module.exports = {
 
     async load(data) {
         //return new _boss().load(data);
-        return this.asyncLoad(data);
+        return this.asyncLoad(data, mainNestedLoadMap);
     },
 
     asyncDump(data) {

@@ -2080,16 +2080,15 @@ class Contract extends bs.BiSerializable {
             // its for nestedLoadMap mode, do not used now
             result.sealedBinary = sealed[1];
             result.id = await crypto.HashId.of_async(sealed[1]);
-            result.transactionPack = transactionPack;
-            result.isNeedVerifySealedKeys = true;
             data = sealed[0];
         } else {
             result.sealedBinary = sealed;
             result.id = await crypto.HashId.of_async(sealed);
-            result.transactionPack = transactionPack;
-            result.isNeedVerifySealedKeys = true;
             data = await Boss.load(sealed);
         }
+        result.transactionPack = transactionPack;
+        result.isNeedVerifySealedKeys = true;
+
         if(data.type !== "unicapsule") {
             throw new ex.IllegalArgumentError("wrong object type, unicapsule required");
         }
