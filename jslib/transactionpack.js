@@ -55,7 +55,7 @@ class TransactionPack {
         }
 
         if(data.hasOwnProperty("referencedItems")) {
-            for(let referencedBinary of await deserializer.deserialize(data.referencedItems)) {
+            for(let referencedBinary of data.referencedItems) {
                 let c = await Contract.fromSealedBinary(referencedBinary, this);
                 this.referencedItems.set(c.id, c);
             }
@@ -63,7 +63,7 @@ class TransactionPack {
 
         let missingIds = new t.GenericSet();
         let allDeps = [];
-        for(let subitemBinary of await deserializer.deserialize(data.subItems)) {
+        for(let subitemBinary of data.subItems) {
             let deps = await ContractDependencies(subitemBinary);
             allDeps.push(deps);
             missingIds.add(deps.id);
@@ -96,8 +96,6 @@ class TransactionPack {
                 throw new ex.IllegalStateError("circle deps in contracts tree");
         }
 
-        let bin = await deserializer.deserialize(data.contract);
-
         if (data.extended_type != null) {
             // dynamic import
             if (this.NSmartContract == null)
@@ -106,24 +104,24 @@ class TransactionPack {
             if (this.NSmartContract.SmartContractType.hasOwnProperty(data.extended_type)) {
                 switch (data.extended_type) {
                     case this.NSmartContract.SmartContractType.N_SMART_CONTRACT:
-                        this.contract = await this.NSmartContract.fromSealedBinary(bin, this);
+                        this.contract = await this.NSmartContract.fromSealedBinary(data.contract, this);
                         break;
 
                     case this.NSmartContract.SmartContractType.SLOT1:
-                        this.contract = await SlotContract.fromSealedBinary(bin, this);
+                        this.contract = await SlotContract.fromSealedBinary(data.contract, this);
                         break;
 
                     case this.NSmartContract.SmartContractType.UNS1:
-                        this.contract = await UnsContract.fromSealedBinary(bin, this);
+                        this.contract = await UnsContract.fromSealedBinary(data.contract, this);
                         break;
 
                     case this.NSmartContract.SmartContractType.FOLLOWER1:
-                        this.contract = await FollowerContract.fromSealedBinary(bin, this);
+                        this.contract = await FollowerContract.fromSealedBinary(data.contract, this);
                         break;
                 }
             }
         } else
-            this.contract = await Contract.fromSealedBinary(bin, this);
+            this.contract = await Contract.fromSealedBinary(data.contract, this);
     }
 
     async serialize(serializer) {

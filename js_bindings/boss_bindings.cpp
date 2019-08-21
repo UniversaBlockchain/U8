@@ -73,18 +73,22 @@ void JsBossAsyncLoad(const v8::FunctionCallbackInfo<v8::Value> &args) {
                 memcpy(&bin[0], buffer->data(), buffer->size());
                 UObject obj = BossSerializer::deserialize(UBytes(move(bin)));
 
-                if (UBinder::isInstance(obj)) {
+                if (!nestedLoadMap.isNull() && UBinder::isInstance(obj) && UBinder::isInstance(nestedLoadMap)) {
                     UBinder &bnd = UBinder::asInstance(obj);
-                    if (bnd.getStringOrDefault("__type", "") == string("TransactionPack")) {
-                        UBinder nlm = UBinder::of(
-                                "referencedItems", UBinder::of("data", UObject()),
-                                "subItems", UBinder::of("data", UObject()),
-                                "contract", UBinder::of("data", UObject())
-                        );
+                    UObject nlm = UBinder::asInstance(nestedLoadMap).get(bnd.getStringOrDefault("__type", ""));
+
+                    if (!nlm.isNull())
                         doNestedLoad(obj, nlm);
-                    }
+
+//                    if (bnd.getStringOrDefault("__type", "") == string("TransactionPack")) {
+//                        UBinder nlm = UBinder::of(
+//                                "referencedItems", UBinder::of("data", UObject()),
+//                                "subItems", UBinder::of("data", UObject()),
+//                                "contract", UBinder::of("data", UObject())
+//                        );
+//                        doNestedLoad(obj, nlm);
+//                    }
                 }
-//                doNestedLoad(obj, nestedLoadMap);
 
                 onReady->lockedContext([=](Local<Context> &cxt) {
                     onReady->invoke(obj.serializeToV8(onReady->isolate()));
