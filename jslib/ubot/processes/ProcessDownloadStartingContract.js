@@ -23,6 +23,7 @@ class ProcessDownloadStartingContract extends ProcessBase {
                     let ans = await Boss.load(body);
                     this.pr.startingContract = await Contract.fromPackedTransaction(ans.contractBin);
                     this.pr.executableContract = await Contract.fromPackedTransaction(this.pr.startingContract.transactional.data.executableContract);
+                    this.pr.initPoolAndQuorum();
                     this.pr.pool = [];
                     ans.selectedPool.forEach(i => this.pr.pool.push(this.pr.ubot.network.netConfig.getInfo(i)));
                     this.pr.pool.forEach((info, i) => this.pr.poolIndexes.set(info.number, i));

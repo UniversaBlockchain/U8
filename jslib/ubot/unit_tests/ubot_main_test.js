@@ -156,12 +156,25 @@ unit.test("ubot_main_test: executeCloudMethod", async () => {
     let userPrivKey = tk.TestKeys.getKey();
 
     let executableContract = Contract.fromPrivateKey(userPrivKey);
-    executableContract.state.data.poolSize = 5;
-    executableContract.state.data.poolQuorum = 4;
-    executableContract.state.data.ubotAsm = "" +
-        "calc2x2;" + // should approve write to single storage, each ubot has same value
-        "writeSingleStorage;" +
-        "finish";
+
+    executableContract.state.data.cloud_methods = {
+        ubotAsm: {
+            pool: {size: 5},
+            quorum: {size: 4},
+            writesTo: [{storage_name: "default"}],
+            ubotAsm:
+                "calc2x2;" + // should approve write to single storage, each ubot has same value
+                "writeSingleStorage;" +
+                "finish"
+        }
+    };
+
+    executableContract.state.data.cloud_storages = {
+        default: {
+            pool: {size: 5},
+            quorum: {size: 4}
+        }
+    };
 
     await executableContract.seal();
 
@@ -225,12 +238,25 @@ unit.test("ubot_main_test: generateRandomHash", async () => {
     let userPrivKey = tk.TestKeys.getKey();
 
     let executableContract = Contract.fromPrivateKey(userPrivKey);
-    executableContract.state.data.poolSize = 5;
-    executableContract.state.data.poolQuorum = 4;
-    executableContract.state.data.ubotAsm = "" +
-        "generateRandomHash;" + // should approve write to multi storage, each ubot has random value
-        "writeMultiStorage;" +
-        "finish";
+
+    executableContract.state.data.cloud_methods = {
+        ubotAsm: {
+            pool: {size: 5},
+            quorum: {size: 4},
+            writesTo: [{storage_name: "default"}],
+            ubotAsm:
+                "generateRandomHash;" + // should approve write to multi storage, each ubot has random value
+                "writeMultiStorage;" +
+                "finish"
+        }
+    };
+
+    executableContract.state.data.cloud_storages = {
+        default: {
+            pool: {size: 5},
+            quorum: {size: 4}
+        }
+    };
 
     await executableContract.seal();
 
@@ -295,12 +321,25 @@ unit.test("ubot_main_test: errorOutput", async () => {
     let userPrivKey = tk.TestKeys.getKey();
 
     let executableContract = Contract.fromPrivateKey(userPrivKey);
-    executableContract.state.data.poolSize = 5;
-    executableContract.state.data.poolQuorum = 6;
-    executableContract.state.data.ubotAsm = "" +
-        "calc2x2;" +
-        "writeSingleStorage;" +
-        "finish";
+
+    executableContract.state.data.cloud_methods = {
+        ubotAsm: {
+            pool: {size: 5},
+            quorum: {size: 6},
+            writesTo: [{storage_name: "default"}],
+            ubotAsm:
+                "calc2x2;" + // should approve write to single storage, each ubot has same value
+                "writeSingleStorage;" +
+                "finish"
+        }
+    };
+
+    executableContract.state.data.cloud_storages = {
+        default: {
+            pool: {size: 5},
+            quorum: {size: 6}
+        }
+    };
 
     await executableContract.seal();
 
@@ -355,3 +394,40 @@ unit.test("ubot_main_test: errorOutput", async () => {
 
     await shutdownUBots(ubotMains);
 });
+
+//    executableContract.state.data.cloud_methods = {
+//         getRandom: {
+//             pool: {size: 5},
+//             quorum: {size: 4},
+//             readsFrom: [{storage_name: "internal"}],
+//             writesTo: [{storage_name: "result"}]
+//             ubotAsm:
+//                 "call step1;"
+//                 "call step2;"
+//                 "getRecords internal;"
+//                 "aggregateRandom;"
+//                 "mov_to var1;"
+//                 "newObj;"
+//                 "insertObj random;"
+//                 "writeSingleStorage result;" +
+//                 "finish"
+//         },
+//         step1: {
+//             writesTo: [{storage_name: "internal", multistorage_verify_method: "step1_verify"}]
+//         },
+//         step2: {
+//             readsFrom: [{storage_name: "internal"}],
+//             writesTo: [{storage_name: "internal", multistorage_verify_method: "step2_verify"}]
+//         }
+//     };
+
+//    executableContract.state.data.cloud_storages = {
+//         internal: {
+//             pool: {size: 5},
+//             quorum: {size: 4}
+//         },
+//         result: {
+//             pool: {size: 5},
+//             quorum: {size: 4}
+//         }
+//     };

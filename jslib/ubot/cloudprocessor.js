@@ -22,6 +22,9 @@ class CloudProcessor {
         this.ubotAsm = [];
         this.output = null;
         this.errors = [];
+        this.methodName = null;
+        this.poolSize = 0;
+        this.quorumSize = 0;
     }
 
     startProcessingCurrentState() {
@@ -34,13 +37,13 @@ class CloudProcessor {
                 break;
             case UBotPoolState.DOWNLOAD_STARTING_CONTRACT:
                 this.currentProcess = new ProcessDownloadStartingContract(this, () => {
-                    this.logger.log("CloudProcessor.ProcessDownloadStartingContract.onReady, poolSize = " + this.executableContract.state.data.poolSize);
+                    this.logger.log("CloudProcessor.ProcessDownloadStartingContract.onReady, poolSize = " + this.poolSize);
                     this.changeState(UBotPoolState.START_EXEC);
                 });
                 break;
             case UBotPoolState.START_EXEC:
                 this.currentProcess = new ProcessStartExec(this, (output) => {
-                    this.logger.log("CloudProcessor.ProcessStartExec.onReady, poolSize = " + this.executableContract.state.data.poolSize);
+                    this.logger.log("CloudProcessor.ProcessStartExec.onReady, poolSize = " + this.poolSize);
                     this.output = output;
                     this.changeState(UBotPoolState.FINISHED);
                 });
@@ -90,6 +93,12 @@ class CloudProcessor {
             this.errors.push(new ErrorRecord(Errors.BAD_VALUE, "CloudProcessor.onNotify", "currentProcess is null"));
             this.changeState(UBotPoolState.FAILED);
         }
+    }
+
+    initPoolAndQuorum() {
+        this.methodName = this.startingContract.state.data.methodName;
+        this.poolSize = this.executableContract.state.data.cloud_methods[this.methodName].pool.size;
+        this.quorumSize = this.executableContract.state.data.cloud_methods[this.methodName].quorum.size;
     }
 
     /*deliverToOtherUBots(notification) {

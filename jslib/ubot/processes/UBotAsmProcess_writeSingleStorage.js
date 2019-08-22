@@ -7,7 +7,7 @@ const UBotPoolState = require("ubot/ubot_pool_state").UBotPoolState;
 const UBotCloudNotification_asmCommand = require("ubot/ubot_notification").UBotCloudNotification_asmCommand;
 
 class UBotAsmProcess_writeSingleStorage extends ProcessBase {
-    constructor(processor, onReady, asmProcessor, cmdIndex) {
+    constructor(processor, onReady, asmProcessor, cmdIndex, storageName = "default") {
         super(processor, onReady);
         this.asmProcessor = asmProcessor;
         this.cmdIndex = cmdIndex;
@@ -15,6 +15,15 @@ class UBotAsmProcess_writeSingleStorage extends ProcessBase {
         this.binHashId = null;
         this.approveCounterSet = new Set();
         this.declineCounterSet = new Set();
+
+        this.storageName = storageName;
+        if (this.pr.executableContract.state.data.cloud_storages.hasOwnProperty(this.storageName)) {
+            this.poolSize = this.pr.executableContract.state.data.cloud_storages[this.storageName].pool.size;
+            this.quorumSize = this.pr.executableContract.state.data.cloud_storages[this.storageName].quorum.size;
+        } else {
+            this.poolSize = this.pr.poolSize;
+            this.quorumSize = this.pr.quorumSize;
+        }
     }
 
     init(binToWrite) {
@@ -54,12 +63,12 @@ class UBotAsmProcess_writeSingleStorage extends ProcessBase {
         else
             this.declineCounterSet.add(notification.from.number);
 
-        if (this.approveCounterSet.size >= this.pr.executableContract.state.data.poolQuorum) {
+        if (this.approveCounterSet.size >= this.quorumSize) {
             // ok
             this.currentTask.cancel();
 
             try {
-                await this.pr.ledger.writeToSingleStorage(this.pr.poolId, this.pr.executableContract.id, "default", this.binToWrite);
+                await this.pr.ledger.writeToSingleStorage(this.pr.poolId, this.pr.executableContract.id, this.storageName, this.binToWrite);
             } catch (err) {
                 this.pr.logger.log("error: UBotAsmProcess_writeSingleStorage");
                 this.pr.errors.push(new ErrorRecord(Errors.FAILURE, "UBotAsmProcess_writeSingleStorage", "error writing to single storage"));
@@ -72,7 +81,7 @@ class UBotAsmProcess_writeSingleStorage extends ProcessBase {
             this.onReady();
             // TODO: distribution single-storage to all ubots here or after closing pool?
 
-        } else if (this.declineCounterSet.size > this.pr.pool.length - this.pr.executableContract.state.data.poolQuorum) {
+        } else if (this.declineCounterSet.size > this.pr.pool.length - this.quorumSize) {
             // error
             this.currentTask.cancel();
 

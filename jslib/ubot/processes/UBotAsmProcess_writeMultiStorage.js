@@ -7,7 +7,7 @@ const UBotPoolState = require("ubot/ubot_pool_state").UBotPoolState;
 const UBotCloudNotification_asmCommand = require("ubot/ubot_notification").UBotCloudNotification_asmCommand;
 
 class UBotAsmProcess_writeMultiStorage extends UBotAsmProcess_writeSingleStorage {
-    constructor(processor, onReady, asmProcessor, cmdIndex) {
+    constructor(processor, onReady, asmProcessor, cmdIndex, storageName = "default") {
         super(processor, onReady, asmProcessor, cmdIndex);
         this.hashes = [];
         this.hashesReady = false;
@@ -17,6 +17,15 @@ class UBotAsmProcess_writeMultiStorage extends UBotAsmProcess_writeSingleStorage
         for (let i = 0; i < this.pr.pool.length; ++i) {
             this.approveCounterFromOthersSets.push(new Set());
             this.declineCounterFromOthersSets.push(new Set());
+        }
+
+        this.storageName = storageName;
+        if (this.pr.executableContract.state.data.cloud_storages.hasOwnProperty(this.storageName)) {
+            this.poolSize = this.pr.executableContract.state.data.cloud_storages[this.storageName].pool.size;
+            this.quorumSize = this.pr.executableContract.state.data.cloud_storages[this.storageName].quorum.size;
+        } else {
+            this.poolSize = this.pr.poolSize;
+            this.quorumSize = this.pr.quorumSize;
         }
     }
 
@@ -89,12 +98,12 @@ class UBotAsmProcess_writeMultiStorage extends UBotAsmProcess_writeSingleStorage
         else
             this.declineCounterFromOthersSets[notification.dataUbotInPool].add(notification.from.number);
 
-        if (this.approveCounterFromOthersSets[notification.dataUbotInPool].size >= this.pr.executableContract.state.data.poolQuorum)
+        if (this.approveCounterFromOthersSets[notification.dataUbotInPool].size >= this.quorumSize)
             this.approveCounterSet.add(notification.dataUbotInPool);
-        else if (this.declineCounterFromOthersSets[notification.dataUbotInPool].size > this.pr.pool.length - this.pr.executableContract.state.data.poolQuorum)
+        else if (this.declineCounterFromOthersSets[notification.dataUbotInPool].size > this.pr.pool.length - this.quorumSize)
             this.declineCounterSet.add(notification.dataUbotInPool);
 
-        if (this.approveCounterSet.size >= this.pr.executableContract.state.data.poolQuorum &&
+        if (this.approveCounterSet.size >= this.quorumSize &&
             this.approveCounterSet.has(this.pr.poolIndexes.get(this.pr.ubot.network.myInfo.number)) &&
             this.approveCounterFromOthersSets.every((approveSet, i) =>
                 approveSet.size + this.declineCounterFromOthersSets[i].size === this.pr.pool.length)) {
@@ -104,7 +113,7 @@ class UBotAsmProcess_writeMultiStorage extends UBotAsmProcess_writeSingleStorage
 
             try {
                 await this.pr.ledger.writeToMultiStorage(this.pr.poolId, this.pr.executableContract.id,
-                    "default", this.binToWrite, this.pr.ubot.network.myInfo.number);
+                    this.storageName, this.binToWrite, this.pr.ubot.network.myInfo.number);
             } catch (err) {
                 this.pr.logger.log("error: UBotAsmProcess_writeMultiStorage");
                 this.pr.errors.push(new ErrorRecord(Errors.FAILURE, "UBotAsmProcess_writeMultiStorage", "error writing to multi-storage"));
@@ -116,7 +125,7 @@ class UBotAsmProcess_writeMultiStorage extends UBotAsmProcess_writeSingleStorage
             this.onReady();
             // TODO: distribution multi-storage to all ubots here or after closing pool?
 
-        } else if (this.declineCounterSet.size > this.pr.pool.length - this.pr.executableContract.state.data.poolQuorum ||
+        } else if (this.declineCounterSet.size > this.pr.pool.length - this.quorumSize ||
             this.declineCounterSet.has(this.pr.poolIndexes.get(this.pr.ubot.network.myInfo.number))) {
 
             // error

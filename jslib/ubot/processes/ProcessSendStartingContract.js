@@ -21,7 +21,7 @@ class ProcessSendStartingContract extends ProcessBase {
             }
         let me = list[myIndex];
         list.splice(myIndex, 1);
-        this.pr.pool = t.randomChoice(list, this.pr.executableContract.state.data.poolSize-1);
+        this.pr.pool = t.randomChoice(list, this.pr.poolSize - 1);
         this.pr.pool.push(me);
         this.pr.pool.forEach((info, i) => this.pr.poolIndexes.set(info.number, i));
     }
@@ -31,6 +31,7 @@ class ProcessSendStartingContract extends ProcessBase {
 
         this.pr.executableContract = await Contract.fromPackedTransaction(this.pr.startingContract.transactional.data.executableContract);
 
+        this.pr.initPoolAndQuorum();
         this.selectPool();
 
         // periodically send notifications

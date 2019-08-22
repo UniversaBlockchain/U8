@@ -14,6 +14,8 @@ class ProcessStartExec extends ProcessBase {
         super(processor, onReady);
         this.currentTask = null;
         this.var0 = null;
+        this.var1 = null;
+        this.var2 = null;
         this.output = null;
         this.commands = [];
     }
@@ -23,7 +25,7 @@ class ProcessStartExec extends ProcessBase {
 
         this.pr.logger.log("  methodName: " + this.pr.startingContract.state.data.methodName);
         this.pr.logger.log("  executableContractId: " + crypto.HashId.withDigest(this.pr.startingContract.state.data.executableContractId));
-        this.pr.ubotAsm = this.parseUbotAsmFromString(this.pr.executableContract.state.data.ubotAsm);
+        this.pr.ubotAsm = this.parseUbotAsmFromString(this.pr.executableContract.state.data.cloud_methods[this.pr.methodName].ubotAsm);
 
         this.currentTask = new ScheduleExecutor(async () => {
             await this.evalUbotAsm();
