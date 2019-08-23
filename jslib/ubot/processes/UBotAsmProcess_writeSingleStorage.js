@@ -57,6 +57,17 @@ class UBotAsmProcess_writeSingleStorage extends ProcessBase {
             }
     }
 
+    generateRecordID() {
+        let poolId = this.pr.poolId.digest;
+        let binHashId = this.binHashId.digest;
+        let concat = new Uint8Array(poolId.length + binHashId.length);
+        concat.set(poolId, 0);
+        concat.set(binHashId, poolId.length);
+        //TODO: add previous_record_id
+
+        return crypto.HashId.of(concat);
+    }
+
     async vote(notification) {
         if (this.binHashId.equals(notification.dataHashId))
             this.approveCounterSet.add(notification.from.number);
@@ -67,17 +78,20 @@ class UBotAsmProcess_writeSingleStorage extends ProcessBase {
             // ok
             this.currentTask.cancel();
 
+            let recordId = this.generateRecordID();
             try {
-                await this.pr.ledger.writeToSingleStorage(this.pr.poolId, this.pr.executableContract.id, this.storageName, this.binToWrite);
+                await this.pr.ledger.writeToSingleStorage(this.pr.executableContract.id, this.storageName, this.binToWrite, recordId);
             } catch (err) {
-                this.pr.logger.log("error: UBotAsmProcess_writeSingleStorage");
-                this.pr.errors.push(new ErrorRecord(Errors.FAILURE, "UBotAsmProcess_writeSingleStorage", "error writing to single storage"));
+                this.pr.logger.log("error: UBotAsmProcess_writeSingleStorage: " + err.message);
+                this.pr.errors.push(new ErrorRecord(Errors.FAILURE, "UBotAsmProcess_writeSingleStorage",
+                    "error writing to single storage: " + err.message));
                 this.pr.changeState(UBotPoolState.FAILED);
                 return;
             }
 
             this.pr.logger.log("UBotAsmProcess_writeSingleStorage... ready, approved");
 
+            this.pr.var0 = recordId.digest;
             this.onReady();
             // TODO: distribution single-storage to all ubots here or after closing pool?
 

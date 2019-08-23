@@ -1,20 +1,31 @@
-create table pool_storage(
+create table storage(
     id bigserial primary key,
-    pool_hash_id bytea not null,
     executable_contract_id bytea not null,
     storage_name text not null,
     storage_type int not null,
-    single_storage_data bytea,
-    UNIQUE (pool_hash_id, storage_name, storage_type)
+    UNIQUE (executable_contract_id, storage_name, storage_type)
 );
 
-create table pool_storage_multi(
-    id bigserial primary key,
-    pool_storage_id bigint references pool_storage(id) on delete cascade,
+create table single_records(
+    record_id bytea not null,
+    storage_id bigint references storage(id) on delete cascade,
+    storage_data bytea,
+    hash bytea,
+    storage_ubots bytea,
+    UNIQUE (record_id, storage_id)
+);
+
+create table multi_records(
+    record_id bytea not null,
+    storage_id bigint references storage(id) on delete cascade,
     ubot_number int not null,
-    storage_data bytea not null,
-    UNIQUE (pool_storage_id, ubot_number)
+    storage_data bytea,
+    hash bytea,
+    storage_ubots bytea,
+    UNIQUE (record_id, storage_id)
 );
 
-create unique index ix_pool_storage_hashes on pool_storage(pool_hash_id, storage_name, storage_type);
-create unique index ix_pool_storage_multi_ids on pool_storage_multi(pool_storage_id);
+create unique index ix_single_records on single_records(storage_id);
+create unique index ix_single_record on single_records(record_id, storage_id);
+create unique index ix_multi_records on multi_records(storage_id);
+create unique index ix_multi_record on multi_records(record_id, storage_id);

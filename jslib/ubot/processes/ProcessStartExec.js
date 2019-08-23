@@ -15,9 +15,9 @@ class ProcessStartExec extends ProcessBase {
         this.currentTask = null;
         this.var0 = null;
         this.var1 = null;
-        this.var2 = null;
         this.output = null;
         this.commands = [];
+        this.cmdIndex = 0;
     }
 
     start() {
@@ -25,7 +25,7 @@ class ProcessStartExec extends ProcessBase {
 
         this.pr.logger.log("  methodName: " + this.pr.startingContract.state.data.methodName);
         this.pr.logger.log("  executableContractId: " + crypto.HashId.withDigest(this.pr.startingContract.state.data.executableContractId));
-        this.pr.ubotAsm = this.parseUbotAsmFromString(this.pr.executableContract.state.data.cloud_methods[this.pr.methodName].ubotAsm);
+        this.pr.ubotAsm = ProcessStartExec.parseUbotAsmFromString(this.pr.executableContract.state.data.cloud_methods[this.pr.methodName].ubotAsm);
 
         this.currentTask = new ScheduleExecutor(async () => {
             await this.evalUbotAsm();
@@ -34,7 +34,7 @@ class ProcessStartExec extends ProcessBase {
         }, 0, this.pr.ubot.executorService).run();
     }
 
-    parseUbotAsmFromString(str) {
+    static parseUbotAsmFromString(str) {
         let res = str.replace(/\r|\n/g, "");
         res = res.split(";");
         res = res.filter(cmd => cmd !== "");
@@ -42,16 +42,19 @@ class ProcessStartExec extends ProcessBase {
     }
 
     async evalUbotAsm() {
-        for (let i = 0; i < this.pr.ubotAsm.length; ++i) {
-            let op = this.pr.ubotAsm[i];
-            await this.evalUbotAsmOp(i, op);
+        while (this.cmdIndex < this.pr.ubotAsm.length) {
+            await this.evalUbotAsmOp(this.cmdIndex, this.pr.ubotAsm[this.cmdIndex]);
+            this.cmdIndex++;
         }
     }
 
     async evalUbotAsmOp(cmdIndex, op) {
         this.pr.logger.log("          op " + op);
 
-        switch (op) {
+        let ops = op.split(' ');
+        let param = (ops.length > 1) ? ops[1] : null;
+
+        switch (ops[0]) {
             case "calc2x2":
                 this.var0 = await Boss.dump({val: 4});
                 break;
@@ -60,7 +63,11 @@ class ProcessStartExec extends ProcessBase {
                 break;
             case "ifTrue":
                 if (this.var0)
-                    //TODO
+                    this.cmdIndex += param;
+                break;
+            case "ifFalse":
+                if (!this.var0)
+                    this.cmdIndex += param;
                 break;
             case "equal":
                 this.var0 = t.valuesEqual(this.var0, this.var1);

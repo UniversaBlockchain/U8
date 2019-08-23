@@ -164,7 +164,9 @@ unit.test("ubot_main_test: executeCloudMethod", async () => {
             writesTo: [{storage_name: "default"}],
             ubotAsm:
                 "calc2x2;" + // should approve write to single storage, each ubot has same value
+                "moveTo var1;" +
                 "writeSingleStorage;" +
+                "moveFrom var1;" +
                 "finish"
         }
     };
@@ -246,7 +248,9 @@ unit.test("ubot_main_test: generateRandomHash", async () => {
             writesTo: [{storage_name: "default"}],
             ubotAsm:
                 "generateRandomHash;" + // should approve write to multi storage, each ubot has random value
+                "moveTo var1;" +
                 "writeMultiStorage;" +
+                "moveFrom var1;" +
                 "finish"
         }
     };
@@ -329,7 +333,9 @@ unit.test("ubot_main_test: errorOutput", async () => {
             writesTo: [{storage_name: "default"}],
             ubotAsm:
                 "calc2x2;" + // should approve write to single storage, each ubot has same value
+                "moveTo var1;" +
                 "writeSingleStorage;" +
+                "moveFrom var1;" +
                 "finish"
         }
     };
@@ -400,24 +406,81 @@ unit.test("ubot_main_test: errorOutput", async () => {
 //             pool: {size: 5},
 //             quorum: {size: 4},
 //             readsFrom: [{storage_name: "internal"}],
-//             writesTo: [{storage_name: "result"}]
+//             writesTo: [{storage_name: "result"}],
 //             ubotAsm:
-//                 "call step1;"
-//                 "call step2;"
-//                 "getRecords internal;"
-//                 "aggregateRandom;"
-//                 "mov_to var1;"
-//                 "newObj;"
-//                 "insertObj random;"
+//                 "call step1;" +
+//                 "call step2;" +
+//                 "getRecords internal;" +
+//                 "aggregateRandom;" +
+//                 "moveTo var1;" +
+//                 "newObj;" +
+//                 "insertObj random;" +
 //                 "writeSingleStorage result;" +
+//                 "moveFrom var1;" +
 //                 "finish"
 //         },
 //         step1: {
-//             writesTo: [{storage_name: "internal", multistorage_verify_method: "step1_verify"}]
+//             writesTo: [{storage_name: "internal", multistorage_verify_method: "step1_verify"}],
+//             ubotAsm:
+//                 "generateRandomHash;"
+//                 "moveTo var2;" +
+//                 "getHash;" +
+//                 "moveTo var1;" +
+//                 "newObj;" +
+//                 "insertObj hash;" +
+//                 "writeMultiStorage internal;" +
+//                 "putLocalStorage recordId;" +
+//                 "moveFrom var2;" +
+//                 "putLocalStorage random;" +
+//                 "finish"
 //         },
 //         step2: {
 //             readsFrom: [{storage_name: "internal"}],
-//             writesTo: [{storage_name: "internal", multistorage_verify_method: "step2_verify"}]
+//             writesTo: [{storage_name: "internal", multistorage_verify_method: "step2_verify"}],
+//             ubotAsm:
+//                 "getLocalStorage random;" +
+//                 "moveTo var2;" +
+//                 "getHash;" +
+//                 "moveTo var1;" +
+//                 "newObj;" +
+//                 "moveTo var3;" +
+//                 "insertObj hash;" +
+//                 "moveFrom var2;" +
+//                 "moveFrom var3;" +
+//                 "insertObj random;" +
+//                 "moveTo var1;" +
+//                 "getLocalStorage recordId;" +
+//                 "replaceMultiStorage internal;" +
+//                 "finish"
+//         },
+//         step1_verify: {
+//             ubotAsm:
+//                 "hasOwnProperty hash;" +
+//                 "ifTrue 1;" +
+//                 "finish;" +
+//                 "null;" +
+//                 "equal;" +
+//                 "finish"
+//         }
+//         step2_verify: {
+//             ubotAsm:
+//                 "moveTo var3;" +
+//                 "getObj hash;" +
+//                 "moveTo var2;" +
+//                 "moveFrom var1;" +
+//                 "getObj hash;" +
+//                 "moveTo var1;" +
+//                 "moveFrom var2;" +
+//                 "equal;" +
+//                 "ifTrue 1;" +
+//                 "finish;" +
+//                 "moveFrom var3;" +
+//                 "getObj random;" +
+//                 "getHash;" +
+//                 "moveTo var1;" +
+//                 "moveFrom var2;" +
+//                 "equal;" +
+//                 "finish"
 //         }
 //     };
 

@@ -92,6 +92,23 @@ class UBotAsmProcess_writeMultiStorage extends UBotAsmProcess_writeSingleStorage
             }
     }
 
+    generateRecordID() {
+        let poolId = this.pr.poolId.digest;
+        let binHashId = this.binHashId.digest;
+        let ubotNumber = this.pr.ubot.network.myInfo.number;
+        let concat = new Uint8Array(poolId.length + binHashId.length + 4);
+
+        for (let i = 0 ; i < 4; i++) {
+            concat[i] = ubotNumber % 256;
+            ubotNumber >>= 8;
+        }
+        concat.set(poolId, 4);
+        concat.set(binHashId, poolId.length + 4);
+        //TODO: add previous_record_id
+
+        return crypto.HashId.of(concat);
+    }
+
     async vote(notification) {
         if (this.hashes[notification.dataUbotInPool].equals(notification.dataHashId))
             this.approveCounterFromOthersSets[notification.dataUbotInPool].add(notification.from.number);
@@ -111,17 +128,20 @@ class UBotAsmProcess_writeMultiStorage extends UBotAsmProcess_writeSingleStorage
             // ok
             this.currentTask.cancel();
 
+            let recordId = this.generateRecordID();
             try {
-                await this.pr.ledger.writeToMultiStorage(this.pr.poolId, this.pr.executableContract.id,
-                    this.storageName, this.binToWrite, this.pr.ubot.network.myInfo.number);
+                await this.pr.ledger.writeToMultiStorage(this.pr.executableContract.id, this.storageName, this.binToWrite,
+                    recordId, this.pr.ubot.network.myInfo.number);
             } catch (err) {
-                this.pr.logger.log("error: UBotAsmProcess_writeMultiStorage");
-                this.pr.errors.push(new ErrorRecord(Errors.FAILURE, "UBotAsmProcess_writeMultiStorage", "error writing to multi-storage"));
+                this.pr.logger.log("error: UBotAsmProcess_writeMultiStorage: " + err.message);
+                this.pr.errors.push(new ErrorRecord(Errors.FAILURE, "UBotAsmProcess_writeMultiStorage",
+                    "error writing to multi-storage: " + err.message));
                 this.pr.changeState(UBotPoolState.FAILED);
                 return;
             }
             this.pr.logger.log("UBotAsmProcess_writeMultiStorage... ready, approved");
 
+            this.pr.var0 = recordId.digest;
             this.onReady();
             // TODO: distribution multi-storage to all ubots here or after closing pool?
 
