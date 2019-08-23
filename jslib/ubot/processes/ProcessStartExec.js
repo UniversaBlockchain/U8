@@ -49,25 +49,68 @@ class ProcessStartExec extends ProcessBase {
     }
 
     async evalUbotAsmOp(cmdIndex, op) {
+        this.pr.logger.log("          op " + op);
+
         switch (op) {
             case "calc2x2":
-                this.pr.logger.log("          op " + op);
                 this.var0 = await Boss.dump({val: 4});
                 break;
+            case "null":
+                this.var0 = null;
+                break;
+            case "ifTrue":
+                if (this.var0)
+                    //TODO
+                break;
+            case "equal":
+                this.var0 = t.valuesEqual(this.var0, this.var1);
+                break;
             case "finish":
-                this.pr.logger.log("          op " + op);
                 this.output = this.var0;
                 break;
+            case "moveTo":
+                this[param] = this.var0;
+                break;
+            case "moveFrom":
+                this.var0 = this[param];
+                break;
+            case "newObj":
+                this.var0 = {};
+                break;
+            case "insertObj":
+                if(this.var0 instanceof Object)
+                    this.var0[param] = this.var1;
+                else {
+                    this.pr.logger.log("Error: this.var0 is not an Object class " + this.var0);
+                    throw new ex.IllegalArgumentError("Error: this.var0 is not an Object class " + this.var0);
+                }
+                break;
+            case "getObj":
+                if(this.var0 instanceof Object)
+                    this.var0 = this.var0[param];
+                else {
+                    this.pr.logger.log("Error: this.var0 is not an Object class " + this.var0);
+                    throw new ex.IllegalArgumentError("Error: this.var0 is not an Object class " + this.var0);
+                }
+                break;
+            case "hasOwnProperty":
+                if(this.var0 instanceof Object)
+                    this.var0 = this.var0.hasOwnProperty(param);
+                else {
+                    this.pr.logger.log("Error: this.var0 is not an Object class " + this.var0);
+                    throw new ex.IllegalArgumentError("Error: this.var0 is not an Object class " + this.var0);
+                }
+                break;
+            case "getHash":
+                this.var0 = crypto.HashId.of(this.var0).digest;
+                break;
             case "generateRandomHash":
-                this.pr.logger.log("          op " + op);
                 this.var0 = crypto.HashId.of(t.randomBytes(64)).digest;
                 break;
             case "writeSingleStorage":
-                this.pr.logger.log("          op work in progress: " + op);
                 await this.runUBotAsmCmd(cmdIndex, UBotAsmProcess_writeSingleStorage, this.var0);
                 break;
             case "writeMultiStorage":
-                this.pr.logger.log("          op work in progress: " + op);
                 await this.runUBotAsmCmd(cmdIndex, UBotAsmProcess_writeMultiStorage, this.var0);
                 break;
             default:
