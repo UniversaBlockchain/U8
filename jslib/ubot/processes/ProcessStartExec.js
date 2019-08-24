@@ -111,6 +111,14 @@ class ProcessStartExec extends ProcessBase {
             case "getHash":
                 this.var0 = crypto.HashId.of(this.var0).digest;
                 break;
+            case "putLocalStorage":
+                this.pr.localStorage.set(param, this.var0);
+                break;
+            case "getLocalStorage":
+                this.var0 = this.pr.localStorage.get(param);
+                if(this.var0 === 'undefined')
+                     this.var0 = null;
+                break;
             case "generateRandomHash":
                 this.var0 = crypto.HashId.of(t.randomBytes(64)).digest;
                 break;

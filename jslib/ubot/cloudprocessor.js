@@ -25,6 +25,7 @@ class CloudProcessor {
         this.methodName = null;
         this.poolSize = 0;
         this.quorumSize = 0;
+        this.localStorage = new Map();
     }
 
     startProcessingCurrentState() {
