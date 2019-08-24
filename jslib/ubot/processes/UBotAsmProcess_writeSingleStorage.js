@@ -7,7 +7,7 @@ const UBotPoolState = require("ubot/ubot_pool_state").UBotPoolState;
 const UBotCloudNotification_asmCommand = require("ubot/ubot_notification").UBotCloudNotification_asmCommand;
 
 class UBotAsmProcess_writeSingleStorage extends ProcessBase {
-    constructor(processor, onReady, asmProcessor, cmdIndex, storageName = "default") {
+    constructor(processor, onReady, asmProcessor, cmdIndex) {
         super(processor, onReady);
         this.asmProcessor = asmProcessor;
         this.cmdIndex = cmdIndex;
@@ -15,8 +15,13 @@ class UBotAsmProcess_writeSingleStorage extends ProcessBase {
         this.binHashId = null;
         this.approveCounterSet = new Set();
         this.declineCounterSet = new Set();
+    }
 
-        this.storageName = storageName;
+    init(binToWrite, storageData) {
+        this.binToWrite = binToWrite;
+        this.binHashId = crypto.HashId.of(this.binToWrite);
+
+        this.storageName = storageData.storage_name;
         if (this.pr.executableContract.state.data.cloud_storages.hasOwnProperty(this.storageName)) {
             this.poolSize = this.pr.executableContract.state.data.cloud_storages[this.storageName].pool.size;
             this.quorumSize = this.pr.executableContract.state.data.cloud_storages[this.storageName].quorum.size;
@@ -24,12 +29,6 @@ class UBotAsmProcess_writeSingleStorage extends ProcessBase {
             this.poolSize = this.pr.poolSize;
             this.quorumSize = this.pr.quorumSize;
         }
-    }
-
-    init(binToWrite) {
-        // this.pr.logger.log("UBotAsmProcess_writeSingleStorage.init: " + binToWrite);
-        this.binToWrite = binToWrite;
-        this.binHashId = crypto.HashId.of(this.binToWrite);
     }
 
     start() {
@@ -93,7 +92,7 @@ class UBotAsmProcess_writeSingleStorage extends ProcessBase {
 
             this.pr.var0 = recordId.digest;
             this.onReady();
-            // TODO: distribution single-storage to all ubots here or after closing pool?
+            // TODO: distribution single-storage to all ubots after closing pool...
 
         } else if (this.declineCounterSet.size > this.pr.pool.length - this.quorumSize) {
             // error

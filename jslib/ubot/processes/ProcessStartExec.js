@@ -18,6 +18,8 @@ class ProcessStartExec extends ProcessBase {
         this.output = null;
         this.commands = [];
         this.cmdIndex = 0;
+        this.readsFrom = new Map();
+        this.writesTo = new Map();
     }
 
     start() {
@@ -25,6 +27,9 @@ class ProcessStartExec extends ProcessBase {
 
         this.pr.logger.log("  methodName: " + this.pr.startingContract.state.data.methodName);
         this.pr.logger.log("  executableContractId: " + crypto.HashId.withDigest(this.pr.startingContract.state.data.executableContractId));
+
+        this.initStorages(this.pr.executableContract.state.data.cloud_methods[this.pr.methodName]);
+
         this.pr.ubotAsm = ProcessStartExec.parseUbotAsmFromString(this.pr.executableContract.state.data.cloud_methods[this.pr.methodName].ubotAsm);
 
         this.currentTask = new ScheduleExecutor(async () => {
@@ -32,6 +37,16 @@ class ProcessStartExec extends ProcessBase {
             this.pr.logger.log("  method result: " + this.output);
             this.onReady(this.output);
         }, 0, this.pr.ubot.executorService).run();
+    }
+
+    initStorages(methodData) {
+        if (methodData.readsFrom != null && methodData.readsFrom instanceof Array)
+            for (let rf of methodData.readsFrom)
+                this.readsFrom.set(rf.storage_name, rf);
+
+        if (methodData.writesTo != null && methodData.writesTo instanceof Array)
+            for (let wt of methodData.writesTo)
+                this.writesTo.set(wt.storage_name, wt);
     }
 
     static parseUbotAsmFromString(str) {
@@ -53,6 +68,8 @@ class ProcessStartExec extends ProcessBase {
 
         let ops = op.split(' ');
         let param = (ops.length > 1) ? ops[1] : null;
+        let storageName;
+        let storageData;
 
         switch (ops[0]) {
             case "calc2x2":
@@ -88,24 +105,27 @@ class ProcessStartExec extends ProcessBase {
                 if(this.var0 instanceof Object)
                     this.var0[param] = this.var1;
                 else {
-                    this.pr.logger.log("Error: this.var0 is not an Object class " + this.var0);
-                    throw new ex.IllegalArgumentError("Error: this.var0 is not an Object class " + this.var0);
+                    this.pr.logger.log("Error: this.var0 is not an Object class");
+                    this.pr.errors.push(new ErrorRecord(Errors.BAD_VALUE, "insertObj", "Error: this.var0 is not an Object class"));
+                    this.pr.changeState(UBotPoolState.FAILED);
                 }
                 break;
             case "getObj":
                 if(this.var0 instanceof Object)
                     this.var0 = this.var0[param];
                 else {
-                    this.pr.logger.log("Error: this.var0 is not an Object class " + this.var0);
-                    throw new ex.IllegalArgumentError("Error: this.var0 is not an Object class " + this.var0);
+                    this.pr.logger.log("Error: this.var0 is not an Object class");
+                    this.pr.errors.push(new ErrorRecord(Errors.BAD_VALUE, "getObj", "Error: this.var0 is not an Object class"));
+                    this.pr.changeState(UBotPoolState.FAILED);
                 }
                 break;
             case "hasOwnProperty":
                 if(this.var0 instanceof Object)
                     this.var0 = this.var0.hasOwnProperty(param);
                 else {
-                    this.pr.logger.log("Error: this.var0 is not an Object class " + this.var0);
-                    throw new ex.IllegalArgumentError("Error: this.var0 is not an Object class " + this.var0);
+                    this.pr.logger.log("Error: this.var0 is not an Object class");
+                    this.pr.errors.push(new ErrorRecord(Errors.BAD_VALUE, "hasOwnProperty", "Error: this.var0 is not an Object class"));
+                    this.pr.changeState(UBotPoolState.FAILED);
                 }
                 break;
             case "getHash":
@@ -116,17 +136,35 @@ class ProcessStartExec extends ProcessBase {
                 break;
             case "getLocalStorage":
                 this.var0 = this.pr.localStorage.get(param);
-                if(this.var0 === 'undefined')
+                if (this.var0 === undefined)
                      this.var0 = null;
                 break;
             case "generateRandomHash":
                 this.var0 = crypto.HashId.of(t.randomBytes(64)).digest;
                 break;
             case "writeSingleStorage":
-                await this.runUBotAsmCmd(cmdIndex, UBotAsmProcess_writeSingleStorage, this.var0);
+                storageName = (param != null) ? param : "default";
+                storageData = this.writesTo.get(storageName);
+                if (storageData != null)
+                    await this.runUBotAsmCmd(cmdIndex, UBotAsmProcess_writeSingleStorage, this.var0, storageData);
+                else {
+                    this.pr.logger.log("Can`t write to single-storage: " + storageName);
+                    this.pr.errors.push(new ErrorRecord(Errors.FORBIDDEN, "writeSingleStorage",
+                        "Can`t write to single-storage: " + storageName));
+                    this.pr.changeState(UBotPoolState.FAILED);
+                }
                 break;
             case "writeMultiStorage":
-                await this.runUBotAsmCmd(cmdIndex, UBotAsmProcess_writeMultiStorage, this.var0);
+                storageName = (param != null) ? param : "default";
+                storageData = this.writesTo.get(storageName);
+                if (storageData != null)
+                    await this.runUBotAsmCmd(cmdIndex, UBotAsmProcess_writeMultiStorage, this.var0, storageData);
+                else {
+                    this.pr.logger.log("Can`t write to multi-storage: " + storageName);
+                    this.pr.errors.push(new ErrorRecord(Errors.FORBIDDEN, "writeMultiStorage",
+                        "Can`t write to multi-storage: " + storageName));
+                    this.pr.changeState(UBotPoolState.FAILED);
+                }
                 break;
             default:
                 this.pr.logger.log("error: ubotAsm code '" + op + "' not found");

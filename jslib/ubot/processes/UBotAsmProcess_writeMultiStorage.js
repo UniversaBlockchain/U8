@@ -7,7 +7,7 @@ const UBotPoolState = require("ubot/ubot_pool_state").UBotPoolState;
 const UBotCloudNotification_asmCommand = require("ubot/ubot_notification").UBotCloudNotification_asmCommand;
 
 class UBotAsmProcess_writeMultiStorage extends UBotAsmProcess_writeSingleStorage {
-    constructor(processor, onReady, asmProcessor, cmdIndex, storageName = "default") {
+    constructor(processor, onReady, asmProcessor, cmdIndex) {
         super(processor, onReady, asmProcessor, cmdIndex);
         this.hashes = [];
         this.hashesReady = false;
@@ -18,15 +18,11 @@ class UBotAsmProcess_writeMultiStorage extends UBotAsmProcess_writeSingleStorage
             this.approveCounterFromOthersSets.push(new Set());
             this.declineCounterFromOthersSets.push(new Set());
         }
+    }
 
-        this.storageName = storageName;
-        if (this.pr.executableContract.state.data.cloud_storages.hasOwnProperty(this.storageName)) {
-            this.poolSize = this.pr.executableContract.state.data.cloud_storages[this.storageName].pool.size;
-            this.quorumSize = this.pr.executableContract.state.data.cloud_storages[this.storageName].quorum.size;
-        } else {
-            this.poolSize = this.pr.poolSize;
-            this.quorumSize = this.pr.quorumSize;
-        }
+    init(binToWrite, storageData) {
+        super.init(binToWrite, storageData);
+        this.verifyMethod = storageData.multistorage_verify_method;
     }
 
     start() {
@@ -141,9 +137,12 @@ class UBotAsmProcess_writeMultiStorage extends UBotAsmProcess_writeSingleStorage
             }
             this.pr.logger.log("UBotAsmProcess_writeMultiStorage... ready, approved");
 
+            // TODO: distribution multi-storage in pool
+            //console.error(this.verifyMethod);
+
             this.pr.var0 = recordId.digest;
             this.onReady();
-            // TODO: distribution multi-storage to all ubots here or after closing pool?
+            // TODO: distribution multi-storage to all ubots after closing pool...
 
         } else if (this.declineCounterSet.size > this.pr.pool.length - this.quorumSize ||
             this.declineCounterSet.has(this.pr.poolIndexes.get(this.pr.ubot.network.myInfo.number))) {
