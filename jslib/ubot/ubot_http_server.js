@@ -20,6 +20,8 @@ class UBotHttpServer extends network.HttpServer {
         this.addSecureEndpoint("getState", (params, clientKey) => this.getState(params, clientKey));
 
         this.addRawEndpoint("/getStartingContract", request => this.onGetStartingContract(request));
+        this.addRawEndpoint("/getSingleStorageResult", request => this.onGetStorageResult(request, false));
+        this.addRawEndpoint("/getMultiStorageResult", request => this.onGetStorageResult(request, true));
 
         super.startServer();
     }
@@ -75,6 +77,19 @@ class UBotHttpServer extends network.HttpServer {
         request.sendAnswer();
     }
 
+    async onGetStorageResult(request, multi) {
+        let paramIndex = request.path.indexOf("/", 1) + 1;
+        let encodedString = request.path.substring(paramIndex);
+        let hash = HashId.withBase64Digest(encodedString);
+
+        let result = await this.ubot.getStorageResult(hash, multi);
+        if (result != null)
+            request.setAnswerBody(result);
+        else
+            request.setStatusCode(204);
+
+        request.sendAnswer();
+    }
 }
 
 module.exports = {UBotHttpServer};

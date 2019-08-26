@@ -6,6 +6,10 @@ class UBotConfig {
 
     static single_storage_vote_period = 1000; // ms
     static multi_storage_vote_period = 1000; // ms
+    static multi_storage_download_periods = [0, 1000, 1000, 2000, 4000]; // ms
+
+    static maxResultCacheAge = 20*60; //20 minutes
+    static maxResultDownloadAttempts = 5;
 }
 
 module.exports = {UBotConfig};

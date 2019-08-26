@@ -9,10 +9,11 @@ const UBotPoolState = require("ubot/ubot_pool_state").UBotPoolState;
 const UBotCloudNotification_asmCommand = require("ubot/ubot_notification").UBotCloudNotification_asmCommand;
 const Boss = require('boss.js');
 
+const notSupportedCommandsInMultiVerify = ["call", "writeSingleStorage", "writeMultiStorage", "replaceSingleStorage", "replaceMultiStorage"];
+
 class ProcessStartExec extends ProcessBase {
     constructor(processor, onReady) {
         super(processor, onReady);
-        this.currentTask = null;
         this.var0 = null;
         this.var1 = null;
         this.output = null;
@@ -22,17 +23,21 @@ class ProcessStartExec extends ProcessBase {
         this.writesTo = new Map();
     }
 
-    start() {
+    start(methodName = null, multiVerifyMethod = false) {
+        if (methodName == null)
+            methodName = this.pr.methodName;
+        this.multiVerifyMethod = multiVerifyMethod;
+
         this.pr.logger.log("start ProcessStartExec");
 
-        this.pr.logger.log("  methodName: " + this.pr.startingContract.state.data.methodName);
+        this.pr.logger.log("  methodName: " + methodName);
         this.pr.logger.log("  executableContractId: " + crypto.HashId.withDigest(this.pr.startingContract.state.data.executableContractId));
 
-        this.initStorages(this.pr.executableContract.state.data.cloud_methods[this.pr.methodName]);
+        this.initStorages(this.pr.executableContract.state.data.cloud_methods[methodName]);
 
-        this.pr.ubotAsm = ProcessStartExec.parseUbotAsmFromString(this.pr.executableContract.state.data.cloud_methods[this.pr.methodName].ubotAsm);
+        this.pr.ubotAsm = ProcessStartExec.parseUbotAsmFromString(this.pr.executableContract.state.data.cloud_methods[methodName].ubotAsm);
 
-        this.currentTask = new ScheduleExecutor(async () => {
+        new ScheduleExecutor(async () => {
             await this.evalUbotAsm();
             this.pr.logger.log("  method result: " + this.output);
             this.onReady(this.output);
@@ -71,6 +76,13 @@ class ProcessStartExec extends ProcessBase {
         let storageName;
         let storageData;
 
+        if (this.multiVerifyMethod && ~notSupportedCommandsInMultiVerify.indexOf(ops[0])) {
+            this.pr.logger.log("Error: don`t support command in multi-verify method: " + ops[0]);
+            this.pr.errors.push(new ErrorRecord(Errors.NOT_SUPPORTED, "multi-verify method",
+                "Error: don`t support command in multi-verify method: " + ops[0]));
+            this.pr.changeState(UBotPoolState.FAILED);
+        }
+
         switch (ops[0]) {
             case "calc2x2":
                 this.var0 = await Boss.dump({val: 4});
@@ -80,17 +92,18 @@ class ProcessStartExec extends ProcessBase {
                 break;
             case "ifTrue":
                 if (this.var0)
-                    this.cmdIndex += param;
+                    this.cmdIndex += Number(param);
                 break;
             case "ifFalse":
                 if (!this.var0)
-                    this.cmdIndex += param;
+                    this.cmdIndex += Number(param);
                 break;
             case "equal":
                 this.var0 = t.valuesEqual(this.var0, this.var1);
                 break;
             case "finish":
                 this.output = this.var0;
+                this.cmdIndex = this.pr.ubotAsm.length;
                 break;
             case "moveTo":
                 this[param] = this.var0;
@@ -146,7 +159,7 @@ class ProcessStartExec extends ProcessBase {
                 storageName = (param != null) ? param : "default";
                 storageData = this.writesTo.get(storageName);
                 if (storageData != null)
-                    await this.runUBotAsmCmd(cmdIndex, UBotAsmProcess_writeSingleStorage, this.var0, storageData);
+                    await this.runUBotAsmCmd(cmdIndex, UBotAsmProcess_writeSingleStorage, await Boss.dump(this.var0), storageData);
                 else {
                     this.pr.logger.log("Can`t write to single-storage: " + storageName);
                     this.pr.errors.push(new ErrorRecord(Errors.FORBIDDEN, "writeSingleStorage",
@@ -158,7 +171,7 @@ class ProcessStartExec extends ProcessBase {
                 storageName = (param != null) ? param : "default";
                 storageData = this.writesTo.get(storageName);
                 if (storageData != null)
-                    await this.runUBotAsmCmd(cmdIndex, UBotAsmProcess_writeMultiStorage, this.var0, storageData);
+                    await this.runUBotAsmCmd(cmdIndex, UBotAsmProcess_writeMultiStorage, await Boss.dump(this.var0), storageData);
                 else {
                     this.pr.logger.log("Can`t write to multi-storage: " + storageName);
                     this.pr.errors.push(new ErrorRecord(Errors.FORBIDDEN, "writeMultiStorage",
@@ -174,13 +187,13 @@ class ProcessStartExec extends ProcessBase {
     }
 
     async runUBotAsmCmd(cmdIndex, cmdClass, ...params) {
-        return new Promise(resolve => {
+        return new Promise(async (resolve) => {
             let cmd = new cmdClass(this.pr, ()=>{
                 resolve();
             }, this, cmdIndex);
             this.commands[cmdIndex] = cmd;
             cmd.init(...params);
-            cmd.start();
+            await cmd.start();
         });
     }
 

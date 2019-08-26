@@ -21,6 +21,9 @@ class UBotAsmProcess_writeSingleStorage extends ProcessBase {
         this.binToWrite = binToWrite;
         this.binHashId = crypto.HashId.of(this.binToWrite);
 
+        // put result to cache
+        this.pr.ubot.resultCache.put(this.binHashId, this.binToWrite);
+
         this.storageName = storageData.storage_name;
         if (this.pr.executableContract.state.data.cloud_storages.hasOwnProperty(this.storageName)) {
             this.poolSize = this.pr.executableContract.state.data.cloud_storages[this.storageName].pool.size;
@@ -79,7 +82,8 @@ class UBotAsmProcess_writeSingleStorage extends ProcessBase {
 
             let recordId = this.generateRecordID();
             try {
-                await this.pr.ledger.writeToSingleStorage(this.pr.executableContract.id, this.storageName, this.binToWrite, recordId);
+                await this.pr.ledger.writeToSingleStorage(this.pr.executableContract.id, this.storageName,
+                    this.binToWrite, this.binHashId, recordId);
             } catch (err) {
                 this.pr.logger.log("error: UBotAsmProcess_writeSingleStorage: " + err.message);
                 this.pr.errors.push(new ErrorRecord(Errors.FAILURE, "UBotAsmProcess_writeSingleStorage",

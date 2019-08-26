@@ -25,7 +25,9 @@ create table multi_records(
     UNIQUE (record_id, storage_id)
 );
 
-create unique index ix_single_records on single_records(storage_id);
+create index ix_single_records on single_records(storage_id);
 create unique index ix_single_record on single_records(record_id, storage_id);
-create unique index ix_multi_records on multi_records(storage_id);
+create index ix_single_hash on single_records(hash);
+create index ix_multi_records on multi_records(storage_id);
 create unique index ix_multi_record on multi_records(record_id, storage_id);
+create index ix_multi_hash on multi_records(hash);

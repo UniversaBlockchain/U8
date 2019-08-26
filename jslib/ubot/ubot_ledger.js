@@ -91,17 +91,42 @@ class UBotLedger {
         });
     }
 
+    async getSingleStorageDataByHash(hash) {
+        return this.simpleQuery(
+            "SELECT storage_data FROM single_records WHERE hash = ? LIMIT 1",
+            null,
+            null,
+            hash.digest);
+    }
+
+    async getMultiStorageDataByHash(hash) {
+        return this.simpleQuery(
+            "SELECT storage_data FROM multi_records WHERE hash = ? LIMIT 1",
+            null,
+            null,
+            hash.digest);
+    }
+
     async findOrCreateStorage(executable_contract_id, storage_name, storage_type) {
-        await this.simpleUpdate(
-            "INSERT INTO storage (executable_contract_id, storage_name, storage_type) VALUES (?,?,?) " +
-            "ON CONFLICT (executable_contract_id, storage_name, storage_type) DO NOTHING",
+        let id = await this.simpleQuery(
+            "SELECT id FROM storage WHERE executable_contract_id = ? AND storage_name = ? AND storage_type = ?",
+            x => {
+                if (x == null)
+                    return null;
+                else
+                    return Number(x);
+            },
             null,
             executable_contract_id.digest,
             storage_name,
             storage_type.ordinal);
 
-        return this.simpleQuery(
-            "SELECT id FROM storage WHERE executable_contract_id = ? AND storage_name = ? AND storage_type = ?",
+        if (id != null)
+            return id;
+
+        return await this.simpleQuery(
+            "INSERT INTO storage (executable_contract_id, storage_name, storage_type) VALUES (?,?,?) " +
+            "ON CONFLICT (executable_contract_id, storage_name, storage_type) DO NOTHING RETURNING id",
             x => {
                 if (x == null)
                     throw new UBotLedgerException("findOrCreateStorage failed: returning null");
@@ -114,11 +139,11 @@ class UBotLedger {
             storage_type.ordinal);
     }
 
-    async writeToSingleStorage(executable_contract_id, storage_name, storage_data, record_id) {
+    async writeToSingleStorage(executable_contract_id, storage_name, storage_data, hash, record_id) {
         let id = await this.findOrCreateStorage(executable_contract_id, storage_name, UBotStorageType.SINGLE);
 
         return this.simpleQuery(
-            "INSERT INTO single_records (record_id, storage_id, storage_data) VALUES (?,?,?) " +
+            "INSERT INTO single_records (record_id, storage_id, storage_data, hash) VALUES (?,?,?,?) " +
             "ON CONFLICT (record_id, storage_id) DO NOTHING RETURNING record_id",
             x => {
                 if (x == null)
@@ -129,14 +154,15 @@ class UBotLedger {
             null,
             record_id.digest,
             id,
-            storage_data);
+            storage_data,
+            hash.digest);
     }
 
-    async writeToMultiStorage(executable_contract_id, storage_name, storage_data, record_id, ubot_number) {
+    async writeToMultiStorage(executable_contract_id, storage_name, storage_data, hash, record_id, ubot_number) {
         let id = await this.findOrCreateStorage(executable_contract_id, storage_name, UBotStorageType.MULTI);
 
         return this.simpleQuery(
-            "INSERT INTO multi_records (record_id, storage_id, storage_data, ubot_number) VALUES (?,?,?,?) " +
+            "INSERT INTO multi_records (record_id, storage_id, storage_data, hash, ubot_number) VALUES (?,?,?,?,?) " +
             "ON CONFLICT (record_id, storage_id) DO NOTHING RETURNING record_id",
             x => {
                 if (x == null)
@@ -148,6 +174,7 @@ class UBotLedger {
             record_id.digest,
             id,
             storage_data,
+            hash.digest,
             ubot_number);
     }
 }

@@ -2,6 +2,8 @@ const CloudProcessor = require("ubot/cloudprocessor").CloudProcessor;
 const UBotPoolState = require("ubot/ubot_pool_state").UBotPoolState;
 const ExecutorService = require("executorservice").ExecutorService;
 const UBotCloudNotification = require("ubot/ubot_notification").UBotCloudNotification;
+const UBotConfig = require("ubot/ubot_config").UBotConfig;
+const UBotResultCache = require("ubot/ubot_result_cache").UBotResultCache;
 
 class UBot {
     constructor(logger, network, ledger) {
@@ -10,11 +12,13 @@ class UBot {
         this.ledger = ledger;
         this.network = network;
         this.processors = new Map();
+        this.resultCache = new UBotResultCache(UBotConfig.maxResultCacheAge);
         this.executorService = new ExecutorService();
     }
 
     async shutdown() {
         //this.logger.log("UBot.shutdown()...");
+        this.resultCache.shutdown();
         this.executorService.shutdown();
     }
 
@@ -63,6 +67,18 @@ class UBot {
         return null;
     }
 
+    async getStorageResult(hash, multi) {
+        let result = this.resultCache.get(hash);
+        if (result != null)
+            return result;
+
+        if (multi)
+            result = await this.ledger.getMultiStorageDataByHash(hash);
+        else
+            result = await this.ledger.getSingleStorageDataByHash(hash);
+
+        return result;
+    }
 }
 
 module.exports = {UBot};
