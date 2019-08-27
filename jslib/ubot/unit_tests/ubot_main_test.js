@@ -496,7 +496,7 @@ unit.test("ubot_main_test: multi-verify method", async () => {
     await shutdownUBots(ubotMains);
 });
 
-/*unit.test("ubot_main_test: executeCommands", async () => {
+/*unit.test("ubot_main_test: secureRandom", async () => {
     const ubotsCount = 8;
     //await dropAllTables(8);
     let ubotMains = await createUBots(ubotsCount);

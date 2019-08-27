@@ -144,6 +144,21 @@ class ProcessStartExec extends ProcessBase {
             case "getHash":
                 this.var0 = crypto.HashId.of(this.var0).digest;
                 break;
+            case "aggregateRandom":
+                if (this.var0 instanceof Map) {
+                    let concat = new Uint8Array(this.var0.size * 96);
+                    let offset = 0;
+                    for (let value of this.var0.values()) {
+                        concat.set(value, offset);
+                        offset += value.length;
+                    }
+                    this.var0 = crypto.HashId.of(concat).digest;
+                } else {
+                    this.pr.logger.log("Error: this.var0 is not an Map class");
+                    this.pr.errors.push(new ErrorRecord(Errors.BAD_VALUE, "aggregateRandom", "Error: this.var0 is not an Map class"));
+                    this.pr.changeState(UBotPoolState.FAILED);
+                }
+                break;
             case "putLocalStorage":
                 this.pr.localStorage.set(param, this.var0);
                 break;
