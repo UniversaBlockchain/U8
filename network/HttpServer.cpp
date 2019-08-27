@@ -287,7 +287,7 @@ void HttpServer::initSecureProtocol(const crypto::PrivateKey& nodePrivateKey) {
                 UBytes clientNonceBytes = UBytes::asInstance(clientNonceObj);
                 byte_vector clientNonce = clientNonceBytes.get();
                 session->version = params.getIntOrDefault("client_version", 1);
-                session->version = std::min(session->version, HttpServer::SERVER_VERSION);
+                session->version = std::min(int(session->version), HttpServer::SERVER_VERSION);
                 if (serverNonce != session->serverNonce) {
                     req->setStatusCode(500);
                     UBinder ans = UBinder::of("result", "error","response", "server_nonce does not match");

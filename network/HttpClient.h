@@ -66,6 +66,7 @@ struct HttpClientSession {
     shared_ptr<crypto::SymmetricKey> sessionKey;
     int64_t sessionId;
     shared_ptr<crypto::PublicKey> nodePublicKey;
+    atomic<int> version = 1;
 };
 
 class HttpClient {
@@ -119,6 +120,9 @@ private:
     HttpClientWorkerAsync worker_;
     std::shared_ptr<HttpClientSession> session_;
     std::string rootUrl_;
+
+public:
+    static const int CLIENT_VERSION;
 };
 
 };

@@ -11,6 +11,8 @@
 
 namespace network {
 
+const int HttpClient::CLIENT_VERSION = 2;
+
 const std::string idChars = "0123456789_abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
 string randomString(int length) {
     byte_vector randomBytes(length);
@@ -234,7 +236,8 @@ void HttpClient::start(const crypto::PrivateKey& clientKey, const crypto::Public
         UBinder params = UBinder::of("client_key", UBytes(crypto::PublicKey(clientKey).pack()));
         byte_vector paramsBin = BossSerializer::serialize(params).get();
         byte_vector server_nonce;
-        sendBinRequest("/connect", "POST", paramsBin, [this,&sem,&server_nonce](int respCode, byte_vector&& respBody){
+        atomic<int> server_version(1);
+        sendBinRequest("/connect", "POST", paramsBin, [this,&sem,&server_nonce,&server_version](int respCode, byte_vector&& respBody){
             UBytes ub(std::move(respBody));
             UObject uObject = BossSerializer::deserialize(ub);
             UBinder binderWrap = UBinder::asInstance(uObject);
@@ -243,13 +246,20 @@ void HttpClient::start(const crypto::PrivateKey& clientKey, const crypto::Public
             session_->sessionId = std::stol(strSessionId);
             UBytes serverNonceUb = UBytes::asInstance(binder.get("server_nonce"));
             server_nonce = serverNonceUb.get();
+            server_version = binder.getIntOrDefault("server_version", 1);
+            session_->version = std::min(int(server_version), HttpClient::CLIENT_VERSION);
             sem.notify();
         });
         sem.wait();
         byte_vector client_nonce(47);
         sprng_read(&client_nonce[0], client_nonce.size(), NULL);
         byte_vector client_nonce_copy = client_nonce;
-        byte_vector data = BossSerializer::serialize(UBinder::of("client_nonce", UBytes(std::move(client_nonce_copy)), "server_nonce", UBytes(std::move(server_nonce)))).get();
+        byte_vector data = BossSerializer::serialize(UBinder::of(
+                "client_nonce", UBytes(std::move(client_nonce_copy)),
+                "server_nonce", UBytes(std::move(server_nonce)),
+                "server_version", int(server_version),
+                "client_version", HttpClient::CLIENT_VERSION
+                )).get();
         byte_vector sig = clientKey.sign(data, crypto::HashType::SHA512);
         paramsBin = BossSerializer::serialize(UBinder::of(
                 "signature", UBytes(std::move(sig)),
@@ -318,12 +328,16 @@ void HttpClient::execCommand(const byte_vector& callBin, std::function<void(byte
             throw std::runtime_error("Session does not created or session key is not got yet.");
         UBinder cmdParams = UBinder::of(
                 "command", "command",
-                "params", UBytes(session_->sessionKey->encrypt(callBin)),
+                "params", session_->version >= 2 ?
+                    UBytes(session_->sessionKey->etaEncrypt(callBin)) :
+                    UBytes(session_->sessionKey->encrypt(callBin)),
                 "session_id", session_->sessionId);
         sendBinRequest("/command", "POST", BossSerializer::serialize(cmdParams).get(), [this,onComplete{onComplete}](int respCode, byte_vector&& respBody){
             UBinder ansBinder = UBinder::asInstance(BossSerializer::deserialize(UBytes(std::move(respBody))));
             UBinder responseBinder = ansBinder.getBinder("response");
-            byte_vector decrypted = session_->sessionKey->decrypt(UBytes::asInstance(responseBinder.get("result")).get());
+            byte_vector decrypted = session_->version >= 2 ?
+                session_->sessionKey->etaDecrypt(UBytes::asInstance(responseBinder.get("result")).get()) :
+                session_->sessionKey->decrypt(UBytes::asInstance(responseBinder.get("result")).get());
             onComplete(std::move(decrypted));
         });
     });

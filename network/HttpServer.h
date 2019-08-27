@@ -85,7 +85,7 @@ public:
     byte_vector encryptedAnswer;
     int64_t sessionId;
     std::mutex connectMutex;
-    int version;
+    atomic<int> version = 1;
 };
 
 class HttpServer {
