@@ -7,14 +7,16 @@ const UBotPoolState = require("ubot/ubot_pool_state").UBotPoolState;
 const UBotCloudNotification_asmCommand = require("ubot/ubot_notification").UBotCloudNotification_asmCommand;
 
 class UBotAsmProcess_writeSingleStorage extends ProcessBase {
-    constructor(processor, onReady, asmProcessor, cmdIndex) {
+    constructor(processor, onReady, asmProcessor, cmdStack) {
         super(processor, onReady);
         this.asmProcessor = asmProcessor;
-        this.cmdIndex = cmdIndex;
+        this.cmdStack = cmdStack;
         this.binToWrite = null;
         this.binHashId = null;
         this.approveCounterSet = new Set();
         this.declineCounterSet = new Set();
+        this.poolSize = 0;
+        this.quorumSize = 0;
     }
 
     init(binToWrite, storageData) {
@@ -26,8 +28,23 @@ class UBotAsmProcess_writeSingleStorage extends ProcessBase {
 
         this.storageName = storageData.storage_name;
         if (this.pr.executableContract.state.data.cloud_storages.hasOwnProperty(this.storageName)) {
-            this.poolSize = this.pr.executableContract.state.data.cloud_storages[this.storageName].pool.size;
-            this.quorumSize = this.pr.executableContract.state.data.cloud_storages[this.storageName].quorum.size;
+            if (this.pr.executableContract.state.data.cloud_storages[this.storageName].hasOwnProperty("pool"))
+                this.poolSize = this.pr.executableContract.state.data.cloud_storages[this.storageName].pool.size;
+            else
+                this.poolSize = this.pr.poolSize;
+
+            if (this.pr.executableContract.state.data.cloud_storages[this.storageName].hasOwnProperty("quorum"))
+                this.quorumSize = this.pr.executableContract.state.data.cloud_storages[this.storageName].quorum.size;
+            else
+                this.quorumSize = this.pr.quorumSize;
+
+            if (this.poolSize > this.pr.poolSize || this.quorumSize > this.pr.quorumSize) {
+                this.pr.logger.log("Error: insufficient pool or quorum to use storage '" + this.storageName + "'");
+                this.pr.errors.push(new ErrorRecord(Errors.FAILURE, "UBotAsmProcess_writeStorage",
+                    "insufficient pool or quorum to use storage '" + this.storageName + "'"));
+                this.pr.changeState(UBotPoolState.FAILED);
+            }
+
         } else {
             this.poolSize = this.pr.poolSize;
             this.quorumSize = this.pr.quorumSize;
@@ -50,7 +67,7 @@ class UBotAsmProcess_writeSingleStorage extends ProcessBase {
                     new UBotCloudNotification_asmCommand(
                         this.pr.ubot.network.myInfo,
                         this.pr.poolId,
-                        this.cmdIndex,
+                        this.cmdStack,
                         UBotCloudNotification_asmCommand.types.SINGLE_STORAGE_GET_DATA_HASHID,
                         null,
                         false
@@ -117,7 +134,7 @@ class UBotAsmProcess_writeSingleStorage extends ProcessBase {
                         new UBotCloudNotification_asmCommand(
                             this.pr.ubot.network.myInfo,
                             this.pr.poolId,
-                            this.cmdIndex,
+                            this.cmdStack,
                             UBotCloudNotification_asmCommand.types.SINGLE_STORAGE_GET_DATA_HASHID,
                             this.binHashId,
                             true

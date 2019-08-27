@@ -1,6 +1,7 @@
 const ProcessBase = require("ubot/processes/ProcessBase").ProcessBase;
 const UBotAsmProcess_writeSingleStorage = require("ubot/processes/UBotAsmProcess_writeSingleStorage").UBotAsmProcess_writeSingleStorage;
 const UBotAsmProcess_writeMultiStorage = require("ubot/processes/UBotAsmProcess_writeMultiStorage").UBotAsmProcess_writeMultiStorage;
+const UBotAsmProcess_call = require("ubot/processes/UBotAsmProcess_call").UBotAsmProcess_call;
 const ScheduleExecutor = require("executorservice").ScheduleExecutor;
 const t = require("tools");
 const ErrorRecord = require("errors").ErrorRecord;
@@ -12,8 +13,9 @@ const Boss = require('boss.js');
 const notSupportedCommandsInMultiVerify = ["call", "writeSingleStorage", "writeMultiStorage", "replaceSingleStorage", "replaceMultiStorage"];
 
 class ProcessStartExec extends ProcessBase {
-    constructor(processor, onReady) {
+    constructor(processor, onReady, cmdStack = []) {
         super(processor, onReady);
+        this.ubotAsm = [];
         this.var0 = null;
         this.var1 = null;
         this.output = null;
@@ -21,6 +23,7 @@ class ProcessStartExec extends ProcessBase {
         this.cmdIndex = 0;
         this.readsFrom = new Map();
         this.writesTo = new Map();
+        this.cmdStack = cmdStack;
     }
 
     start(methodName = null, multiVerifyMethod = false) {
@@ -35,7 +38,7 @@ class ProcessStartExec extends ProcessBase {
 
         this.initStorages(this.pr.executableContract.state.data.cloud_methods[methodName]);
 
-        this.pr.ubotAsm = ProcessStartExec.parseUbotAsmFromString(this.pr.executableContract.state.data.cloud_methods[methodName].ubotAsm);
+        this.ubotAsm = ProcessStartExec.parseUbotAsmFromString(this.pr.executableContract.state.data.cloud_methods[methodName].ubotAsm);
 
         new ScheduleExecutor(async () => {
             await this.evalUbotAsm();
@@ -62,8 +65,8 @@ class ProcessStartExec extends ProcessBase {
     }
 
     async evalUbotAsm() {
-        while (this.cmdIndex < this.pr.ubotAsm.length) {
-            await this.evalUbotAsmOp(this.cmdIndex, this.pr.ubotAsm[this.cmdIndex]);
+        while (this.cmdIndex < this.ubotAsm.length) {
+            await this.evalUbotAsmOp(this.cmdIndex, this.ubotAsm[this.cmdIndex]);
             this.cmdIndex++;
         }
     }
@@ -103,7 +106,7 @@ class ProcessStartExec extends ProcessBase {
                 break;
             case "finish":
                 this.output = this.var0;
-                this.cmdIndex = this.pr.ubotAsm.length;
+                this.cmdIndex = this.ubotAsm.length;
                 break;
             case "moveTo":
                 this[param] = this.var0;
@@ -143,6 +146,9 @@ class ProcessStartExec extends ProcessBase {
                 break;
             case "getHash":
                 this.var0 = crypto.HashId.of(this.var0).digest;
+                break;
+            case "call":
+                this.var0 = await this.runUBotAsmCmd(cmdIndex, UBotAsmProcess_call, param);
                 break;
             case "aggregateRandom":
                 if (this.var0 instanceof Map) {
@@ -202,10 +208,13 @@ class ProcessStartExec extends ProcessBase {
     }
 
     async runUBotAsmCmd(cmdIndex, cmdClass, ...params) {
+        let newStack = this.cmdStack.slice();
+        newStack.push(cmdIndex);
+
         return new Promise(async (resolve) => {
-            let cmd = new cmdClass(this.pr, ()=>{
-                resolve();
-            }, this, cmdIndex);
+            let cmd = new cmdClass(this.pr, (result) => {
+                resolve(result);
+            }, this, newStack);
             this.commands[cmdIndex] = cmd;
             cmd.init(...params);
             await cmd.start();
@@ -214,8 +223,12 @@ class ProcessStartExec extends ProcessBase {
 
     async onNotify(notification) {
         if (notification instanceof UBotCloudNotification_asmCommand)
-            if (this.commands[notification.cmdIndex] != null)
-                await this.commands[notification.cmdIndex].onNotify(notification);
+            if (notification.cmdStack.length > 0 && this.commands[notification.cmdStack[0]] != null) {
+                // shift command index from stack
+                let cmdIndex = notification.cmdStack.shift();
+
+                await this.commands[cmdIndex].onNotify(notification);
+            }
     }
 }
 

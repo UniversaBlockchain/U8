@@ -19,7 +19,6 @@ class CloudProcessor {
         this.pool = [];
         this.poolIndexes = new Map();
         this.respondToNotification = null;
-        this.ubotAsm = [];
         this.output = null;
         this.errors = [];
         this.methodName = null;

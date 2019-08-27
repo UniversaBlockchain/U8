@@ -9,8 +9,8 @@ const UBotCloudNotification_asmCommand = require("ubot/ubot_notification").UBotC
 const Boss = require('boss.js');
 
 class UBotAsmProcess_writeMultiStorage extends UBotAsmProcess_writeSingleStorage {
-    constructor(processor, onReady, asmProcessor, cmdIndex) {
-        super(processor, onReady, asmProcessor, cmdIndex);
+    constructor(processor, onReady, asmProcessor, cmdStack) {
+        super(processor, onReady, asmProcessor, cmdStack);
         this.hashes = [];
         this.hashesReady = false;
         this.otherAnswers = new Set();
@@ -61,7 +61,7 @@ class UBotAsmProcess_writeMultiStorage extends UBotAsmProcess_writeSingleStorage
                     new UBotCloudNotification_asmCommand(
                         this.pr.ubot.network.myInfo,
                         this.pr.poolId,
-                        this.cmdIndex,
+                        this.cmdStack,
                         UBotCloudNotification_asmCommand.types.MULTI_STORAGE_GET_DATA_HASHID,
                         null,
                         false
@@ -77,7 +77,7 @@ class UBotAsmProcess_writeMultiStorage extends UBotAsmProcess_writeSingleStorage
                         new UBotCloudNotification_asmCommand(
                             this.pr.ubot.network.myInfo,
                             this.pr.poolId,
-                            this.cmdIndex,
+                            this.cmdStack,
                             UBotCloudNotification_asmCommand.types.MULTI_STORAGE_GET_POOL_HASHES,
                             null,
                             false
@@ -91,7 +91,7 @@ class UBotAsmProcess_writeMultiStorage extends UBotAsmProcess_writeSingleStorage
                                 new UBotCloudNotification_asmCommand(
                                     this.pr.ubot.network.myInfo,
                                     this.pr.poolId,
-                                    this.cmdIndex,
+                                    this.cmdStack,
                                     UBotCloudNotification_asmCommand.types.MULTI_STORAGE_GET_POOL_HASHES,
                                     null,
                                     false,
@@ -267,7 +267,7 @@ class UBotAsmProcess_writeMultiStorage extends UBotAsmProcess_writeSingleStorage
                         new UBotCloudNotification_asmCommand(
                             this.pr.ubot.network.myInfo,
                             this.pr.poolId,
-                            this.cmdIndex,
+                            this.cmdStack,
                             UBotCloudNotification_asmCommand.types.MULTI_STORAGE_GET_DATA_HASHID,
                             this.binHashId,
                             true
@@ -297,7 +297,7 @@ class UBotAsmProcess_writeMultiStorage extends UBotAsmProcess_writeSingleStorage
                                     new UBotCloudNotification_asmCommand(
                                         this.pr.ubot.network.myInfo,
                                         this.pr.poolId,
-                                        this.cmdIndex,
+                                        this.cmdStack,
                                         UBotCloudNotification_asmCommand.types.MULTI_STORAGE_GET_POOL_HASHES,
                                         this.hashes[i],
                                         true,
@@ -309,7 +309,7 @@ class UBotAsmProcess_writeMultiStorage extends UBotAsmProcess_writeSingleStorage
                             new UBotCloudNotification_asmCommand(
                                 this.pr.ubot.network.myInfo,
                                 this.pr.poolId,
-                                this.cmdIndex,
+                                this.cmdStack,
                                 UBotCloudNotification_asmCommand.types.MULTI_STORAGE_GET_POOL_HASHES,
                                 this.hashes[notification.dataUbotInPool],
                                 true,

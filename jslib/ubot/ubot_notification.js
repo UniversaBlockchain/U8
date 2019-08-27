@@ -110,10 +110,10 @@ class UBotCloudNotification_asmCommand extends Notification {
         MULTI_STORAGE_GET_POOL_HASHES:   {ordinal: 2}
     };
 
-    constructor(from, poolId, cmdIndex, type, dataHashId, isAnswer, dataUbotInPool = -1) {
+    constructor(from, poolId, cmdStack, type, dataHashId, isAnswer, dataUbotInPool = -1) {
         super(from);
         this.poolId = poolId;
-        this.cmdIndex = cmdIndex;
+        this.cmdStack = cmdStack;
         this.type = type;
         this.dataHashId = dataHashId;
         this.dataUbotInPool = dataUbotInPool;
@@ -123,7 +123,11 @@ class UBotCloudNotification_asmCommand extends Notification {
 
     writeTo(bw) {
         bw.write(this.poolId.digest);
-        bw.write(this.cmdIndex);
+
+        bw.write(this.cmdStack.length);
+        for (let cmd of this.cmdStack)
+            bw.write(cmd);
+
         bw.write(this.type.ordinal);
         bw.write(this.isAnswer);
         switch (this.type) {
@@ -142,7 +146,12 @@ class UBotCloudNotification_asmCommand extends Notification {
 
     readFrom(br) {
         this.poolId = crypto.HashId.withDigest(br.read());
-        this.cmdIndex = br.read();
+
+        this.cmdStack = [];
+        let cmdStackLen = br.read();
+        for (let i = 0; i < cmdStackLen; i++)
+            this.cmdStack.push(br.read());
+
         this.type = UBotCloudNotification_asmCommand.types.byOrdinal.get(br.read());
         this.isAnswer = br.read();
         switch (this.type) {
@@ -169,7 +178,7 @@ class UBotCloudNotification_asmCommand extends Notification {
         if (this.type.poolId !== o.type.poolId)
             return false;
 
-        if (this.cmdIndex !== o.cmdIndex)
+        if (!t.valuesEqual(this.cmdStack, o.cmdStack))
             return false;
 
         if (this.type.ordinal !== o.type.ordinal)
@@ -188,7 +197,7 @@ class UBotCloudNotification_asmCommand extends Notification {
     toString() {
         return "[UBotCloudNotification_asmCommand from node: " + this.from.number +
             ", poolId: " + this.poolId +
-            ", cmdIndex: " + this.cmdIndex +
+            ", cmdStack: " + JSON.stringify(this.cmdStack) +
             ", type: " + this.type.val +
             ", isAnswer: " + this.isAnswer + "]";
     }
