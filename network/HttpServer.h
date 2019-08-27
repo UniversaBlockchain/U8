@@ -85,6 +85,7 @@ public:
     byte_vector encryptedAnswer;
     int64_t sessionId;
     std::mutex connectMutex;
+    int version;
 };
 
 class HttpServer {
@@ -120,6 +121,9 @@ private:
     std::minstd_rand minstdRand_;
     long nextSessionId_;
     std::function<void(const byte_vector& params, std::shared_ptr<HttpServerSession> session, std::function<void(const byte_vector& ansBin)>&&)> secureCallback_;
+
+public:
+    static const int SERVER_VERSION;
 
 };
 

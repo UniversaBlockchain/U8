@@ -12,6 +12,8 @@
 
 namespace network {
 
+const int HttpServer::SERVER_VERSION = 2;
+
 struct HttpServerRequestHolder {
     HttpServerRequest* pReq;
     mg_connection *nc;
@@ -246,6 +248,7 @@ void HttpServer::initSecureProtocol(const crypto::PrivateKey& nodePrivateKey) {
                 "result", "ok",
                 "response", UBinder::of(
                     "server_nonce", UBytes(std::move(serverNonceCopy)),
+                    "server_version", UInt(SERVER_VERSION),
                     "session_id", std::to_string(session->sessionId)
                 )
             );
@@ -283,6 +286,8 @@ void HttpServer::initSecureProtocol(const crypto::PrivateKey& nodePrivateKey) {
                 UObject clientNonceObj = params.get("client_nonce");
                 UBytes clientNonceBytes = UBytes::asInstance(clientNonceObj);
                 byte_vector clientNonce = clientNonceBytes.get();
+                session->version = params.getIntOrDefault("client_version", 1);
+                session->version = std::min(session->version, HttpServer::SERVER_VERSION);
                 if (serverNonce != session->serverNonce) {
                     req->setStatusCode(500);
                     UBinder ans = UBinder::of("result", "error","response", "server_nonce does not match");
@@ -340,9 +345,13 @@ void HttpServer::inSession(
         UObject paramsObj = binder.get("params");
         UBytes paramsBytes = UBytes::asInstance(paramsObj);
         byte_vector paramsBin = paramsBytes.get();
-        byte_vector paramsBinDecrypted = session->sessionKey->decrypt(paramsBin);
+        byte_vector paramsBinDecrypted = (session->version >= 2) ?
+                session->sessionKey->etaDecrypt(paramsBin) :
+                session->sessionKey->decrypt(paramsBin);
         processor(paramsBinDecrypted, session, [session,req](const byte_vector& reqAnsBin){
-            byte_vector encryptedAns = session->sessionKey->encrypt(reqAnsBin);
+            byte_vector encryptedAns = (session->version >= 2) ?
+                    session->sessionKey->etaEncrypt(reqAnsBin) :
+                    session->sessionKey->encrypt(reqAnsBin);
             UBinder result = UBinder::of("result", UBytes(std::move(encryptedAns)));
             UBinder ans = UBinder::of("result", "ok","response", result);
             req->setAnswerBody(BossSerializer::serialize(ans).get());
