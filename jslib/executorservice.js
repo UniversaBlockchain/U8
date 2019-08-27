@@ -165,9 +165,11 @@ class ExecutorWithFixedPeriod extends Executor {
         this.cancelled = false;
 
         this.timerCallback = async () => {
-            this.timer = trs.timeout(this.period, this.timerCallback);
+            if (!this.cancelled) {
+                this.timer = trs.timeout(this.period, this.timerCallback);
 
-            await this.lambda();
+                await this.lambda();
+            }
         };
 
         if (executorService != null)
@@ -239,11 +241,13 @@ class ExecutorWithDynamicPeriod extends Executor {
         this.waitsCount = 0;
 
         this.timerCallback = async () => {
-            this.waitsCount++;
-            let period = this.periods[(this.waitsCount >= this.periods.length) ? this.periods.length - 1 : this.waitsCount];
-            this.timer = trs.timeout(period, this.timerCallback);
+            if (!this.cancelled) {
+                this.waitsCount++;
+                let period = this.periods[(this.waitsCount >= this.periods.length) ? this.periods.length - 1 : this.waitsCount];
+                this.timer = trs.timeout(period, this.timerCallback);
 
-            await this.lambda();
+                await this.lambda();
+            }
         };
 
         if (executorService != null)
