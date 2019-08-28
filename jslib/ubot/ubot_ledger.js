@@ -91,20 +91,20 @@ class UBotLedger {
         });
     }
 
-    async getSingleStorageDataByHash(hash) {
+    async getSingleStorageDataByRecordId(recordId) {
         return this.simpleQuery(
-            "SELECT storage_data FROM single_records WHERE hash = ? LIMIT 1",
+            "SELECT storage_data FROM single_records WHERE record_id = ? LIMIT 1",
             null,
             null,
-            hash.digest);
+            recordId.digest);
     }
 
-    async getMultiStorageDataByHash(hash) {
+    async getMultiStorageDataByRecordId(recordId) {
         return this.simpleQuery(
-            "SELECT storage_data FROM multi_records WHERE hash = ? LIMIT 1",
+            "SELECT storage_data FROM multi_records WHERE record_id = ? LIMIT 1",
             null,
             null,
-            hash.digest);
+            recordId.digest);
     }
 
     async findOrCreateStorage(executable_contract_id, storage_name, storage_type) {
@@ -158,6 +158,13 @@ class UBotLedger {
             hash.digest);
     }
 
+    async deleteFromSingleStorage(record_id) {
+        return this.simpleUpdate(
+            "DELETE FROM single_records WHERE record_id = ?",
+            null,
+            record_id.digest);
+    }
+
     async writeToMultiStorage(executable_contract_id, storage_name, storage_data, hash, record_id, ubot_number) {
         let id = await this.findOrCreateStorage(executable_contract_id, storage_name, UBotStorageType.MULTI);
 
@@ -176,6 +183,57 @@ class UBotLedger {
             storage_data,
             hash.digest,
             ubot_number);
+    }
+
+    async deleteFromMultiStorage(record_id) {
+        return this.simpleUpdate(
+            "DELETE FROM multi_records WHERE record_id = ?",
+            null,
+            record_id.digest);
+    }
+
+    async getRecordsFromMultiStorage(executable_contract_id, storage_name) {
+        return new Promise(async(resolve, reject) => {
+            this.dbPool_.withConnection(con => {
+                con.executeQuery(qr => {
+                        let result = [];
+                        let count = qr.getRowsCount();
+                        let x = count;
+                        while (count > 0) {
+                            let rows;
+                            if (count > 1024) {
+                                rows = qr.getRows(1024);
+                                count -= 1024;
+                            } else {
+                                rows = qr.getRows(count);
+                                count = 0;
+                            }
+
+                            for (let i = 0; i < rows.length; i++)
+                                if (rows[i] != null)
+                                    result.push({
+                                        record_id: crypto.HashId.withDigest(rows[i][0]),
+                                        storage_data: rows[i][1],
+                                        hash: crypto.HashId.withDigest(rows[i][2]),
+                                        ubot_number: Number(rows[i][3]),
+                                        storage_ubots: rows[i][4]
+                                    });
+                        }
+
+                        con.release();
+                        resolve(result);
+                    }, e => {
+                        con.release();
+                        reject(e);
+                    },
+                    "SELECT record_id, storage_data, hash, ubot_number, storage_ubots FROM multi_records JOIN storage " +
+                    "ON multi_records.storage_id = storage.id WHERE executable_contract_id = ? AND storage_name = ? AND storage_type = ?",
+                    executable_contract_id.digest,
+                    storage_name,
+                    UBotStorageType.MULTI.ordinal
+                );
+            });
+        });
     }
 }
 

@@ -110,14 +110,16 @@ class UBotCloudNotification_asmCommand extends Notification {
         MULTI_STORAGE_GET_POOL_HASHES:   {ordinal: 2}
     };
 
-    constructor(from, poolId, cmdStack, type, dataHashId, isAnswer, dataUbotInPool = -1) {
+    constructor(from, poolId, cmdStack, type, dataHashId, previousRecordId, isAnswer, isFirstRecord, dataUbotInPool = -1) {
         super(from);
         this.poolId = poolId;
         this.cmdStack = cmdStack;
         this.type = type;
         this.dataHashId = dataHashId;
         this.dataUbotInPool = dataUbotInPool;
+        this.previousRecordId = previousRecordId;
         this.isAnswer = isAnswer;
+        this.isFirstRecord = isFirstRecord;
         this.typeCode = CODE_UBOT_CLOUD_NOTIFICATION_ASM_CMD;
     }
 
@@ -125,22 +127,28 @@ class UBotCloudNotification_asmCommand extends Notification {
         bw.write(this.poolId.digest);
 
         bw.write(this.cmdStack.length);
-        for (let cmd of this.cmdStack)
-            bw.write(cmd);
+        this.cmdStack.forEach(cmd => bw.write(cmd));
 
         bw.write(this.type.ordinal);
         bw.write(this.isAnswer);
+        bw.write(this.isFirstRecord);
         switch (this.type) {
             case UBotCloudNotification_asmCommand.types.SINGLE_STORAGE_GET_DATA_HASHID:
             case UBotCloudNotification_asmCommand.types.MULTI_STORAGE_GET_DATA_HASHID:
-                if (this.isAnswer)
+                if (this.isAnswer) {
                     bw.write(this.dataHashId.digest);
+                    if (!this.isFirstRecord)
+                        bw.write(this.previousRecordId.digest);
+                }
                 break;
             case UBotCloudNotification_asmCommand.types.MULTI_STORAGE_GET_POOL_HASHES:
                 bw.write(this.dataUbotInPool);
 
-                if (this.isAnswer)
+                if (this.isAnswer) {
                     bw.write(this.dataHashId.digest);
+                    if (!this.isFirstRecord)
+                        bw.write(this.previousRecordId.digest);
+                }
         }
     }
 
@@ -154,17 +162,28 @@ class UBotCloudNotification_asmCommand extends Notification {
 
         this.type = UBotCloudNotification_asmCommand.types.byOrdinal.get(br.read());
         this.isAnswer = br.read();
+        this.isFirstRecord = br.read();
         switch (this.type) {
             case UBotCloudNotification_asmCommand.types.SINGLE_STORAGE_GET_DATA_HASHID:
             case UBotCloudNotification_asmCommand.types.MULTI_STORAGE_GET_DATA_HASHID:
-                if (this.isAnswer)
+                if (this.isAnswer) {
                     this.dataHashId = crypto.HashId.withDigest(br.read());
+                    if (!this.isFirstRecord)
+                        this.previousRecordId = crypto.HashId.withDigest(br.read());
+                    else
+                        this.previousRecordId = null;
+                }
                 break;
             case UBotCloudNotification_asmCommand.types.MULTI_STORAGE_GET_POOL_HASHES:
                 this.dataUbotInPool = br.read();
 
-                if (this.isAnswer)
+                if (this.isAnswer) {
                     this.dataHashId = crypto.HashId.withDigest(br.read());
+                    if (!this.isFirstRecord)
+                        this.previousRecordId = crypto.HashId.withDigest(br.read());
+                    else
+                        this.previousRecordId = null;
+                }
         }
     }
 
@@ -187,7 +206,13 @@ class UBotCloudNotification_asmCommand extends Notification {
         if (this.isAnswer !== o.isAnswer)
             return false;
 
+        if (this.isFirstRecord !== o.isFirstRecord)
+            return false;
+
         if (!t.valuesEqual(this.dataHashId, o.dataHashId))
+            return false;
+
+        if (!t.valuesEqual(this.previousRecordId, o.previousRecordId))
             return false;
 
         if (!t.valuesEqual(this.from, o.from))
@@ -199,7 +224,8 @@ class UBotCloudNotification_asmCommand extends Notification {
             ", poolId: " + this.poolId +
             ", cmdStack: " + JSON.stringify(this.cmdStack) +
             ", type: " + this.type.val +
-            ", isAnswer: " + this.isAnswer + "]";
+            ", isAnswer: " + this.isAnswer +
+            ", isFirstRecord: " + this.isFirstRecord + "]";
     }
 }
 t.addValAndOrdinalMaps(UBotCloudNotification_asmCommand.types);

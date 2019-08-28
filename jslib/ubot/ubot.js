@@ -67,15 +67,31 @@ class UBot {
         return null;
     }
 
-    async getStorageResult(hash, multi) {
-        let result = this.resultCache.get(hash);
+    async getStorageResult(recordId, multi) {
+        let result = this.resultCache.get(recordId);
         if (result != null)
             return result;
 
         if (multi)
-            result = await this.ledger.getMultiStorageDataByHash(hash);
+            result = await this.ledger.getMultiStorageDataByRecordId(recordId);
         else
-            result = await this.ledger.getSingleStorageDataByHash(hash);
+            result = await this.ledger.getSingleStorageDataByRecordId(recordId);
+
+        return result;
+    }
+
+    async getRecordsFromMultiStorage(executable_contract_id, storage_name) {
+        let records = await this.ledger.getRecordsFromMultiStorage(executable_contract_id, storage_name);
+
+        //sort records
+        records.sort((a, b) => a.ubot_number - b.ubot_number);
+
+        let result = new Map();
+        records.forEach(record => {
+            result.set(record.ubot_number, record.storage_data);
+
+            //TODO: get insufficient data from network and save to DB
+        });
 
         return result;
     }

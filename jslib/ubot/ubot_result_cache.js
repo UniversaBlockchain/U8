@@ -21,16 +21,16 @@ class UBotResultCache {
         this.cleanerExecutor.cancel();
     }
 
-    get(hash) {
-        let i = this.records.get(hash);
+    get(recordId) {
+        let i = this.records.get(recordId);
         if (i != null && i.result == null)
             throw new Error("cache: record with empty result");
         return i != null ? i.result : null;
     }
 
-    put(hash, result) {
+    put(recordId, result) {
         // this will plainly override current if any
-        new Record(hash, result, this);
+        new Record(recordId, result, this);
     }
 
     get size() {
@@ -39,17 +39,17 @@ class UBotResultCache {
 }
 
 class Record {
-    constructor(hash, result, resultCache) {
+    constructor(recordId, result, resultCache) {
         this.resultCache = resultCache;
-        this.hash = hash;
+        this.recordId = recordId;
         this.result = result;
         this.expiresAt = Math.floor(Date.now() / 1000) + this.resultCache.maxAge;
-        this.resultCache.records.set(hash, this);
+        this.resultCache.records.set(recordId, this);
     }
 
     checkExpiration(now) {
         if (this.expiresAt < now)
-            this.resultCache.records.delete(this.hash);
+            this.resultCache.records.delete(this.recordId);
     }
 
 }

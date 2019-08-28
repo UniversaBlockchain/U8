@@ -622,6 +622,7 @@ unit.test("ubot_main_test: call sub-method", async () => {
         },
         sub: {
             writesTo: [{storage_name: "default"}],
+            readsFrom: [{storage_name: "default"}],
             ubotAsm:
                 "moveTo var1;" +
                 "null;" +
@@ -629,6 +630,7 @@ unit.test("ubot_main_test: call sub-method", async () => {
                 "ifTrue 3;" +
                 "moveFrom var1;" +
                 "writeMultiStorage;" +
+                "getRecords;" +
                 "moveFrom var1;" +
                 "finish"
         }
@@ -803,7 +805,7 @@ unit.test("ubot_main_test: call sub-method", async () => {
     let startingContract = Contract.fromPrivateKey(userPrivKey);
     startingContract.createTransactionalSection();
     startingContract.transactional.data.executableContract = await executableContract.getPackedTransaction();
-    startingContract.state.data.methodName = "ubotAsm";
+    startingContract.state.data.methodName = "getRandom";
     startingContract.state.data.executableContractId = executableContract.id.digest;
     await startingContract.seal(true);
 
@@ -843,7 +845,8 @@ unit.test("ubot_main_test: call sub-method", async () => {
         fire(null);
     });
 
-    assert((await Boss.load(await event)).val === 4);
+    // checking length of random hash
+    assert((await event).length === 96);
 
     await shutdownUBots(ubotMains);
 });*/

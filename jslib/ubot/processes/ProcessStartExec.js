@@ -49,12 +49,10 @@ class ProcessStartExec extends ProcessBase {
 
     initStorages(methodData) {
         if (methodData.readsFrom != null && methodData.readsFrom instanceof Array)
-            for (let rf of methodData.readsFrom)
-                this.readsFrom.set(rf.storage_name, rf);
+            methodData.readsFrom.forEach(rf => this.readsFrom.set(rf.storage_name, rf));
 
         if (methodData.writesTo != null && methodData.writesTo instanceof Array)
-            for (let wt of methodData.writesTo)
-                this.writesTo.set(wt.storage_name, wt);
+            methodData.writesTo.forEach(wt => this.writesTo.set(wt.storage_name, wt));
     }
 
     static parseUbotAsmFromString(str) {
@@ -102,6 +100,8 @@ class ProcessStartExec extends ProcessBase {
                     this.cmdIndex += Number(param);
                 break;
             case "equal":
+                // console.error(JSON.stringify(this.var0));
+                // console.error(JSON.stringify(this.var1));
                 this.var0 = t.valuesEqual(this.var0, this.var1);
                 break;
             case "finish":
@@ -176,11 +176,22 @@ class ProcessStartExec extends ProcessBase {
             case "generateRandomHash":
                 this.var0 = crypto.HashId.of(t.randomBytes(64)).digest;
                 break;
+            case "getRecords":
+                storageName = (param != null) ? param : "default";
+                if (this.readsFrom.get(storageName) != null)
+                    this.var0 = await this.pr.ubot.getRecordsFromMultiStorage(this.pr.executableContract.id, storageName);
+                else {
+                    this.pr.logger.log("Can`t read from multi-storage: " + storageName);
+                    this.pr.errors.push(new ErrorRecord(Errors.FORBIDDEN, "getRecords",
+                        "Can`t read from multi-storage: " + storageName));
+                    this.pr.changeState(UBotPoolState.FAILED);
+                }
+                break;
             case "writeSingleStorage":
                 storageName = (param != null) ? param : "default";
                 storageData = this.writesTo.get(storageName);
                 if (storageData != null)
-                    await this.runUBotAsmCmd(cmdIndex, UBotAsmProcess_writeSingleStorage, await Boss.dump(this.var0), storageData);
+                    await this.runUBotAsmCmd(cmdIndex, UBotAsmProcess_writeSingleStorage, await Boss.dump(this.var0), null, storageData);
                 else {
                     this.pr.logger.log("Can`t write to single-storage: " + storageName);
                     this.pr.errors.push(new ErrorRecord(Errors.FORBIDDEN, "writeSingleStorage",
@@ -192,10 +203,36 @@ class ProcessStartExec extends ProcessBase {
                 storageName = (param != null) ? param : "default";
                 storageData = this.writesTo.get(storageName);
                 if (storageData != null)
-                    await this.runUBotAsmCmd(cmdIndex, UBotAsmProcess_writeMultiStorage, await Boss.dump(this.var0), storageData);
+                    await this.runUBotAsmCmd(cmdIndex, UBotAsmProcess_writeMultiStorage, await Boss.dump(this.var0), null, storageData);
                 else {
                     this.pr.logger.log("Can`t write to multi-storage: " + storageName);
                     this.pr.errors.push(new ErrorRecord(Errors.FORBIDDEN, "writeMultiStorage",
+                        "Can`t write to multi-storage: " + storageName));
+                    this.pr.changeState(UBotPoolState.FAILED);
+                }
+                break;
+            case "replaceSingleStorage":
+                storageName = (param != null) ? param : "default";
+                storageData = this.writesTo.get(storageName);
+                if (storageData != null)
+                    await this.runUBotAsmCmd(cmdIndex, UBotAsmProcess_writeSingleStorage, await Boss.dump(this.var1),
+                        crypto.HashId.withDigest(this.var0), storageData);
+                else {
+                    this.pr.logger.log("Can`t write to single-storage: " + storageName);
+                    this.pr.errors.push(new ErrorRecord(Errors.FORBIDDEN, "replaceSingleStorage",
+                        "Can`t write to single-storage: " + storageName));
+                    this.pr.changeState(UBotPoolState.FAILED);
+                }
+                break;
+            case "replaceMultiStorage":
+                storageName = (param != null) ? param : "default";
+                storageData = this.writesTo.get(storageName);
+                if (storageData != null)
+                    await this.runUBotAsmCmd(cmdIndex, UBotAsmProcess_writeMultiStorage, await Boss.dump(this.var1),
+                        crypto.HashId.withDigest(this.var0), storageData);
+                else {
+                    this.pr.logger.log("Can`t write to multi-storage: " + storageName);
+                    this.pr.errors.push(new ErrorRecord(Errors.FORBIDDEN, "replaceMultiStorage",
                         "Can`t write to multi-storage: " + storageName));
                     this.pr.changeState(UBotPoolState.FAILED);
                 }

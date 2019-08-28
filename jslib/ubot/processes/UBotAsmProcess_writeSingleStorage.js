@@ -5,6 +5,7 @@ const ErrorRecord = require("errors").ErrorRecord;
 const Errors = require("errors").Errors;
 const UBotPoolState = require("ubot/ubot_pool_state").UBotPoolState;
 const UBotCloudNotification_asmCommand = require("ubot/ubot_notification").UBotCloudNotification_asmCommand;
+const t = require("tools");
 
 class UBotAsmProcess_writeSingleStorage extends ProcessBase {
     constructor(processor, onReady, asmProcessor, cmdStack) {
@@ -17,14 +18,17 @@ class UBotAsmProcess_writeSingleStorage extends ProcessBase {
         this.declineCounterSet = new Set();
         this.poolSize = 0;
         this.quorumSize = 0;
+        this.recordId = null;
     }
 
-    init(binToWrite, storageData) {
+    init(binToWrite, previousRecordId, storageData) {
         this.binToWrite = binToWrite;
         this.binHashId = crypto.HashId.of(this.binToWrite);
+        this.previousRecordId = previousRecordId;
+        this.generateSelfRecordID();
 
         // put result to cache
-        this.pr.ubot.resultCache.put(this.binHashId, this.binToWrite);
+        this.pr.ubot.resultCache.put(this.recordId, this.binToWrite);
 
         this.storageName = storageData.storage_name;
         if (this.pr.executableContract.state.data.cloud_storages.hasOwnProperty(this.storageName)) {
@@ -70,25 +74,29 @@ class UBotAsmProcess_writeSingleStorage extends ProcessBase {
                         this.cmdStack,
                         UBotCloudNotification_asmCommand.types.SINGLE_STORAGE_GET_DATA_HASHID,
                         null,
-                        false
+                        null,
+                        false,
+                        true
                     )
                 );
             }
     }
 
-    generateRecordID() {
+    generateSelfRecordID() {
         let poolId = this.pr.poolId.digest;
         let binHashId = this.binHashId.digest;
-        let concat = new Uint8Array(poolId.length + binHashId.length);
+        let concat = new Uint8Array(poolId.length + binHashId.length +
+            (this.previousRecordId != null ? this.previousRecordId.digest.length : 0));
         concat.set(poolId, 0);
         concat.set(binHashId, poolId.length);
-        //TODO: add previous_record_id
+        if (this.previousRecordId != null)
+            concat.set(this.previousRecordId.digest, poolId.length + binHashId.length);
 
-        return crypto.HashId.of(concat);
+        this.recordId = crypto.HashId.of(concat);
     }
 
     async vote(notification) {
-        if (this.binHashId.equals(notification.dataHashId))
+        if (this.binHashId.equals(notification.dataHashId) && t.valuesEqual(this.previousRecordId, notification.previousRecordId))
             this.approveCounterSet.add(notification.from.number);
         else
             this.declineCounterSet.add(notification.from.number);
@@ -97,10 +105,11 @@ class UBotAsmProcess_writeSingleStorage extends ProcessBase {
             // ok
             this.currentTask.cancel();
 
-            let recordId = this.generateRecordID();
             try {
                 await this.pr.ledger.writeToSingleStorage(this.pr.executableContract.id, this.storageName,
-                    this.binToWrite, this.binHashId, recordId);
+                    this.binToWrite, this.binHashId, this.recordId);
+                if (this.previousRecordId != null)
+                    await this.pr.ledger.deleteFromSingleStorage(this.previousRecordId);
             } catch (err) {
                 this.pr.logger.log("error: UBotAsmProcess_writeSingleStorage: " + err.message);
                 this.pr.errors.push(new ErrorRecord(Errors.FAILURE, "UBotAsmProcess_writeSingleStorage",
@@ -111,7 +120,7 @@ class UBotAsmProcess_writeSingleStorage extends ProcessBase {
 
             this.pr.logger.log("UBotAsmProcess_writeSingleStorage... ready, approved");
 
-            this.pr.var0 = recordId.digest;
+            this.pr.var0 = this.recordId.digest;
             this.onReady();
             // TODO: distribution single-storage to all ubots after closing pool...
 
@@ -137,7 +146,9 @@ class UBotAsmProcess_writeSingleStorage extends ProcessBase {
                             this.cmdStack,
                             UBotCloudNotification_asmCommand.types.SINGLE_STORAGE_GET_DATA_HASHID,
                             this.binHashId,
-                            true
+                            this.previousRecordId,
+                            true,
+                            this.previousRecordId == null
                         )
                     );
                 } else if (!this.currentTask.cancelled)

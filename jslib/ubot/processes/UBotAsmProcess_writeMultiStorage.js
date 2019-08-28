@@ -7,11 +7,13 @@ const Errors = require("errors").Errors;
 const UBotPoolState = require("ubot/ubot_pool_state").UBotPoolState;
 const UBotCloudNotification_asmCommand = require("ubot/ubot_notification").UBotCloudNotification_asmCommand;
 const Boss = require('boss.js');
+const t = require("tools");
 
 class UBotAsmProcess_writeMultiStorage extends UBotAsmProcess_writeSingleStorage {
     constructor(processor, onReady, asmProcessor, cmdStack) {
         super(processor, onReady, asmProcessor, cmdStack);
         this.hashes = [];
+        this.previous = [];
         this.hashesReady = false;
         this.otherAnswers = new Set();
         this.approveCounterFromOthersSets = [];
@@ -23,8 +25,8 @@ class UBotAsmProcess_writeMultiStorage extends UBotAsmProcess_writeSingleStorage
         this.downloadAttempts = 0;
     }
 
-    init(binToWrite, storageData) {
-        super.init(binToWrite, storageData);
+    init(binToWrite, previousRecordId, storageData) {
+        super.init(binToWrite, previousRecordId, storageData);
         this.verifyMethod = storageData.multistorage_verify_method;
     }
 
@@ -32,7 +34,7 @@ class UBotAsmProcess_writeMultiStorage extends UBotAsmProcess_writeSingleStorage
         this.pr.logger.log("start UBotAsmProcess_writeMultiStorage");
 
         // check self result
-        if (!await this.verifyResult(this.binToWrite)) {
+        if (!await this.verifyResult(this.binToWrite, this.previousRecordId)) {
             this.pr.logger.log("Error UBotAsmProcess_writeMultiStorage: failed self result verification");
             this.pr.errors.push(new ErrorRecord(Errors.FAILURE, "UBotAsmProcess_writeMultiStorage",
                 "failed self result verification"));
@@ -45,8 +47,9 @@ class UBotAsmProcess_writeMultiStorage extends UBotAsmProcess_writeSingleStorage
             this.approveCounterFromOthersSets[i].add(this.pr.ubot.network.myInfo.number);
             this.approveCounterFromOthersSets[i].add(this.pr.pool[i].number);
         }
-        // add self hash
+        // add self hash and previousRecordId
         this.hashes[this.pr.poolIndexes.get(this.pr.ubot.network.myInfo.number)] = this.binHashId;
+        this.previous[this.pr.poolIndexes.get(this.pr.ubot.network.myInfo.number)] = this.previousRecordId;
 
         this.pulseGetHashes();
         this.currentTask = new ExecutorWithFixedPeriod(() => {
@@ -64,7 +67,9 @@ class UBotAsmProcess_writeMultiStorage extends UBotAsmProcess_writeSingleStorage
                         this.cmdStack,
                         UBotCloudNotification_asmCommand.types.MULTI_STORAGE_GET_DATA_HASHID,
                         null,
-                        false
+                        null,
+                        false,
+                        true
                     )
                 );
     }
@@ -80,7 +85,9 @@ class UBotAsmProcess_writeMultiStorage extends UBotAsmProcess_writeSingleStorage
                             this.cmdStack,
                             UBotCloudNotification_asmCommand.types.MULTI_STORAGE_GET_POOL_HASHES,
                             null,
-                            false
+                            null,
+                            false,
+                            true
                         )
                     );
                 else
@@ -94,7 +101,9 @@ class UBotAsmProcess_writeMultiStorage extends UBotAsmProcess_writeSingleStorage
                                     this.cmdStack,
                                     UBotCloudNotification_asmCommand.types.MULTI_STORAGE_GET_POOL_HASHES,
                                     null,
+                                    null,
                                     false,
+                                    true,
                                     j
                                 )
                             );
@@ -112,71 +121,75 @@ class UBotAsmProcess_writeMultiStorage extends UBotAsmProcess_writeSingleStorage
         }
 
         for (let i = 0; i < this.pr.pool.length; ++i)
-            if (this.approveCounterSet.has(i) && !this.otherAnswers.has(this.pr.pool[i].number))
-                this.pr.ubot.network.sendGetRequestToUbot(
-                    this.pr.pool[i],
-                    "/getMultiStorageResult/" + this.hashes[i].base64,
-                    async (respCode, body) => {
-                        if (respCode === 200) {
-                            let resultHash = crypto.HashId.of(body);
-                            let error = false;
-                            if (!resultHash.equals(this.hashes[i]))  {
-                                this.pr.logger.log("Error UBotAsmProcess_writeMultiStorage: download result checking failed");
-                                this.pr.errors.push(new ErrorRecord(Errors.FAILURE, "UBotAsmProcess_writeMultiStorage",
-                                    "download result checking failed"));
-                                error = true;
+            if (this.approveCounterSet.has(i) && !this.otherAnswers.has(this.pr.pool[i].number)) {
+                let recordId = this.generateRecordID(this.hashes[i], this.pr.pool[i].number, this.previous[i]);
 
-                            } else if (!await this.verifyResult(body)) {
-                                this.pr.logger.log("Error UBotAsmProcess_writeMultiStorage: failed result verification");
-                                this.pr.errors.push(new ErrorRecord(Errors.FAILURE, "UBotAsmProcess_writeMultiStorage",
-                                    "failed result verification"));
-                                error = true;
-                            }
+                this.pr.ubot.network.getMultiStorageResult(this.pr.pool[i], recordId,
+                    async (result) => {
+                        let resultHash = crypto.HashId.of(result);
+                        let error = false;
+                        if (!resultHash.equals(this.hashes[i]))  {
+                            this.pr.logger.log("Error UBotAsmProcess_writeMultiStorage: download result checking failed");
+                            this.pr.errors.push(new ErrorRecord(Errors.FAILURE, "UBotAsmProcess_writeMultiStorage",
+                                "download result checking failed"));
+                            error = true;
 
-                            if (error) {
-                                this.otherAnswers.add(this.pr.pool[i].number);
-                                this.approveCounterSet.delete(i);
-                                if (this.approveCounterSet.size < this.quorumSize) {
-                                    this.pr.logger.log("Error UBotAsmProcess_writeMultiStorage: consensus was broken when downloading result");
-                                    this.pr.errors.push(new ErrorRecord(Errors.FAILURE, "UBotAsmProcess_writeMultiStorage",
-                                        "consensus was broken when downloading result"));
-                                    this.pr.changeState(UBotPoolState.FAILED);
-                                }
-                            } else {
-                                let recordId = this.generateRecordID(resultHash, this.pr.pool[i].number);
-                                try {
-                                    await this.pr.ledger.writeToMultiStorage(this.pr.executableContract.id, this.storageName,
-                                        body, resultHash, recordId, this.pr.pool[i].number);
-                                } catch (err) {
-                                    this.pr.logger.log("error: UBotAsmProcess_writeMultiStorage: " + err.message);
-                                    this.pr.errors.push(new ErrorRecord(Errors.FAILURE, "UBotAsmProcess_writeMultiStorage",
-                                        "error writing to multi-storage: " + err.message));
-                                    this.pr.changeState(UBotPoolState.FAILED);
-                                    return;
-                                }
-                                this.pr.logger.log("UBotAsmProcess_writeMultiStorage... write downloaded result");
-
-                                this.otherAnswers.add(this.pr.pool[i].number);
-                                if (this.otherAnswers.size >= this.approveCounterSet.size) {
-                                    this.pr.logger.log("UBotAsmProcess_writeMultiStorage... all results wrote");
-                                    this.currentTask.cancel();
-                                    this.onReady();
-                                    // TODO: distribution multi-storage to all ubots after closing pool...
-                                }
-                            }
-
-                        } else {
-                            this.pr.logger.log("warning: pulseDownload respCode = " + respCode);
+                        } else if (!await this.verifyResult(result, this.previous[i])) {
+                            this.pr.logger.log("Error UBotAsmProcess_writeMultiStorage: failed result verification");
+                            this.pr.errors.push(new ErrorRecord(Errors.FAILURE, "UBotAsmProcess_writeMultiStorage",
+                                "failed result verification"));
+                            error = true;
                         }
-                    }
+
+                        if (error) {
+                            this.otherAnswers.add(this.pr.pool[i].number);
+                            this.approveCounterSet.delete(i);
+                            if (this.approveCounterSet.size < this.quorumSize) {
+                                this.pr.logger.log("Error UBotAsmProcess_writeMultiStorage: consensus was broken when downloading result");
+                                this.pr.errors.push(new ErrorRecord(Errors.FAILURE, "UBotAsmProcess_writeMultiStorage",
+                                    "consensus was broken when downloading result"));
+                                this.pr.changeState(UBotPoolState.FAILED);
+                            }
+                        } else {
+                            // put downloaded result to cache
+                            this.pr.ubot.resultCache.put(recordId, result);
+
+                            try {
+                                await this.pr.ledger.writeToMultiStorage(this.pr.executableContract.id, this.storageName,
+                                    result, resultHash, recordId, this.pr.pool[i].number);
+                                if (this.previous[i] != null)
+                                    await this.pr.ledger.deleteFromMultiStorage(this.previous[i]);
+                            } catch (err) {
+                                this.pr.logger.log("error: UBotAsmProcess_writeMultiStorage: " + err.message);
+                                this.pr.errors.push(new ErrorRecord(Errors.FAILURE, "UBotAsmProcess_writeMultiStorage",
+                                    "error writing to multi-storage: " + err.message));
+                                this.pr.changeState(UBotPoolState.FAILED);
+                                return;
+                            }
+                            this.pr.logger.log("UBotAsmProcess_writeMultiStorage... write downloaded result");
+
+                            this.otherAnswers.add(this.pr.pool[i].number);
+                            if (this.otherAnswers.size >= this.approveCounterSet.size) {
+                                this.pr.logger.log("UBotAsmProcess_writeMultiStorage... all results wrote");
+                                this.currentTask.cancel();
+                                this.onReady();
+                                // TODO: distribution multi-storage to all ubots after closing pool...
+                            }
+                        }
+                    },
+                    respCode => this.pr.logger.log("warning: pulseDownload respCode = " + respCode)
                 );
+            }
     }
 
-    async verifyResult(result) {
+    async verifyResult(result, previousRecordId) {
         if (this.verifyMethod == null)
             return true;
 
         let current = await Boss.load(result);
+        let previous = null;
+        if (previousRecordId != null)
+            previous = await Boss.load(await this.pr.ubot.getStorageResult(previousRecordId));
 
         return new Promise(resolve => {
             let verifyProcess = new this.pr.ProcessStartExec(this.pr, (output) => {
@@ -185,16 +198,21 @@ class UBotAsmProcess_writeMultiStorage extends UBotAsmProcess_writeSingleStorage
             });
 
             verifyProcess.var0 = current;   // current record
-            verifyProcess.var1 = null;      // previous record
+            verifyProcess.var1 = previous;  // previous record
 
             verifyProcess.start(this.verifyMethod, true);
         });
     }
 
-    generateRecordID(hash, ubotNumber) {
+    generateSelfRecordID() {
+        this.recordId = this.generateRecordID(this.binHashId, this.pr.ubot.network.myInfo.number, this.previousRecordId);
+    }
+
+    generateRecordID(hash, ubotNumber, previousRecordId) {
         let poolId = this.pr.poolId.digest;
         let binHashId = hash.digest;
-        let concat = new Uint8Array(poolId.length + binHashId.length + 4);
+        let concat = new Uint8Array(poolId.length + binHashId.length + 4 +
+            ((previousRecordId != null) ? previousRecordId.digest.length : 0));
 
         for (let i = 0 ; i < 4; i++) {
             concat[i] = ubotNumber % 256;
@@ -202,12 +220,15 @@ class UBotAsmProcess_writeMultiStorage extends UBotAsmProcess_writeSingleStorage
         }
         concat.set(poolId, 4);
         concat.set(binHashId, poolId.length + 4);
+        if (previousRecordId != null)
+            concat.set(previousRecordId.digest, poolId.length + binHashId.length + 4);
 
         return crypto.HashId.of(concat);
     }
 
     async vote(notification) {
-        if (this.hashes[notification.dataUbotInPool].equals(notification.dataHashId))
+        if (this.hashes[notification.dataUbotInPool].equals(notification.dataHashId) &&
+            t.valuesEqual(this.previous[notification.dataUbotInPool], notification.previousRecordId))
             this.approveCounterFromOthersSets[notification.dataUbotInPool].add(notification.from.number);
         else
             this.declineCounterFromOthersSets[notification.dataUbotInPool].add(notification.from.number);
@@ -225,10 +246,11 @@ class UBotAsmProcess_writeMultiStorage extends UBotAsmProcess_writeSingleStorage
             // ok
             this.currentTask.cancel();
 
-            let recordId = this.generateRecordID(this.binHashId, this.pr.ubot.network.myInfo.number);
             try {
                 await this.pr.ledger.writeToMultiStorage(this.pr.executableContract.id, this.storageName, this.binToWrite,
-                    this.binHashId, recordId, this.pr.ubot.network.myInfo.number);
+                    this.binHashId, this.recordId, this.pr.ubot.network.myInfo.number);
+                if (this.previousRecordId != null)
+                    await this.pr.ledger.deleteFromMultiStorage(this.previousRecordId);
             } catch (err) {
                 this.pr.logger.log("error: UBotAsmProcess_writeMultiStorage: " + err.message);
                 this.pr.errors.push(new ErrorRecord(Errors.FAILURE, "UBotAsmProcess_writeMultiStorage",
@@ -238,7 +260,7 @@ class UBotAsmProcess_writeMultiStorage extends UBotAsmProcess_writeSingleStorage
             }
             this.pr.logger.log("UBotAsmProcess_writeMultiStorage... hashes approved");
 
-            this.asmProcessor.var0 = recordId.digest;
+            this.asmProcessor.var0 = this.recordId.digest;
 
             // distribution multi-storage in pool
             this.otherAnswers.clear();
@@ -270,12 +292,15 @@ class UBotAsmProcess_writeMultiStorage extends UBotAsmProcess_writeSingleStorage
                             this.cmdStack,
                             UBotCloudNotification_asmCommand.types.MULTI_STORAGE_GET_DATA_HASHID,
                             this.binHashId,
-                            true
+                            this.previousRecordId,
+                            true,
+                            this.previousRecordId == null
                         )
                     );
                 } else if (!this.hashesReady) {
                     this.otherAnswers.add(notification.from.number);
                     this.hashes[this.pr.poolIndexes.get(notification.from.number)] = notification.dataHashId;
+                    this.previous[this.pr.poolIndexes.get(notification.from.number)] = notification.previousRecordId;
 
                     if (this.otherAnswers.size >= this.pr.pool.length - 1) {
                         this.hashesReady = true;
@@ -300,7 +325,9 @@ class UBotAsmProcess_writeMultiStorage extends UBotAsmProcess_writeSingleStorage
                                         this.cmdStack,
                                         UBotCloudNotification_asmCommand.types.MULTI_STORAGE_GET_POOL_HASHES,
                                         this.hashes[i],
+                                        this.previous[i],
                                         true,
+                                        this.previous[i] == null,
                                         i
                                     )
                                 );
@@ -312,7 +339,9 @@ class UBotAsmProcess_writeMultiStorage extends UBotAsmProcess_writeSingleStorage
                                 this.cmdStack,
                                 UBotCloudNotification_asmCommand.types.MULTI_STORAGE_GET_POOL_HASHES,
                                 this.hashes[notification.dataUbotInPool],
+                                this.previous[notification.dataUbotInPool],
                                 true,
+                                this.previous[notification.dataUbotInPool] == null,
                                 notification.dataUbotInPool
                             )
                         );

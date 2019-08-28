@@ -142,6 +142,26 @@ class UBotNetwork {
         });
     }
 
+    getStorageResult(ubot, recordId, pathBase, onComplete, onError) {
+        this.sendGetRequestToUbot(
+            ubot,
+            pathBase + recordId.base64,
+            async (respCode, body) => {
+                if (respCode === 200)
+                    onComplete(body);
+                else
+                    onError(respCode);
+            }
+        );
+    }
+
+    getSingleStorageResult(ubot, recordId, onComplete, onError) {
+        this.getStorageResult(ubot, recordId, "/getSingleStorageResult/", onComplete, onError);
+    }
+
+    getMultiStorageResult(ubot, recordId, onComplete, onError) {
+        this.getStorageResult(ubot, recordId, "/getMultiStorageResult/", onComplete, onError);
+    }
 }
 
 module.exports = {UBotNetwork};

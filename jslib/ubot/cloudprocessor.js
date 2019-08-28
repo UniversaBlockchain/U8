@@ -98,8 +98,31 @@ class CloudProcessor {
 
     initPoolAndQuorum() {
         this.methodName = this.startingContract.state.data.methodName;
-        this.poolSize = this.executableContract.state.data.cloud_methods[this.methodName].pool.size;
-        this.quorumSize = this.executableContract.state.data.cloud_methods[this.methodName].quorum.size;
+        if (this.executableContract.state.data.cloud_methods.hasOwnProperty(this.methodName)) {
+            if (this.executableContract.state.data.cloud_methods[this.methodName].hasOwnProperty("pool"))
+                this.poolSize = this.executableContract.state.data.cloud_methods[this.methodName].pool.size;
+            else {
+                this.logger.log("Error CloudProcessor.initPoolAndQuorum undefined pool of starting method: " + this.methodName);
+                this.errors.push(new ErrorRecord(Errors.BAD_VALUE, "CloudProcessor.initPoolAndQuorum",
+                    "undefined pool of starting method: " + this.methodName));
+                this.changeState(UBotPoolState.FAILED);
+            }
+
+            if (this.executableContract.state.data.cloud_methods[this.methodName].hasOwnProperty("quorum"))
+                this.quorumSize = this.executableContract.state.data.cloud_methods[this.methodName].quorum.size;
+            else {
+                this.logger.log("Error CloudProcessor.initPoolAndQuorum undefined quorum of starting method: " + this.methodName);
+                this.errors.push(new ErrorRecord(Errors.BAD_VALUE, "CloudProcessor.initPoolAndQuorum",
+                    "undefined quorum of starting method: " + this.methodName));
+                this.changeState(UBotPoolState.FAILED);
+            }
+
+        } else {
+            this.logger.log("Error CloudProcessor.initPoolAndQuorum undefined starting method: " + this.methodName);
+            this.errors.push(new ErrorRecord(Errors.BAD_VALUE, "CloudProcessor.initPoolAndQuorum",
+                "undefined starting method: " + this.methodName));
+            this.changeState(UBotPoolState.FAILED);
+        }
     }
 
     /*deliverToOtherUBots(notification) {
