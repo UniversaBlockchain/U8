@@ -693,7 +693,7 @@ unit.test("ubot_main_test: call sub-method", async () => {
     await shutdownUBots(ubotMains);
 });
 
-/*unit.test("ubot_main_test: secureRandom", async () => {
+unit.test("ubot_main_test: secureRandom", async () => {
     const ubotsCount = 8;
     //await dropAllTables(8);
     let ubotMains = await createUBots(ubotsCount);
@@ -751,6 +751,7 @@ unit.test("ubot_main_test: call sub-method", async () => {
                  "moveTo var3;" +
                  "insertObj hash;" +
                  "moveFrom var2;" +
+                 "moveTo var1;" +
                  "moveFrom var3;" +
                  "insertObj random;" +
                  "moveTo var1;" +
@@ -849,4 +850,4 @@ unit.test("ubot_main_test: call sub-method", async () => {
     assert((await event).length === 96);
 
     await shutdownUBots(ubotMains);
-});*/
+});

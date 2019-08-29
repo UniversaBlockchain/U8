@@ -4,6 +4,7 @@ const ExecutorService = require("executorservice").ExecutorService;
 const UBotCloudNotification = require("ubot/ubot_notification").UBotCloudNotification;
 const UBotConfig = require("ubot/ubot_config").UBotConfig;
 const UBotResultCache = require("ubot/ubot_result_cache").UBotResultCache;
+const Boss = require('boss.js');
 
 class UBot {
     constructor(logger, network, ledger) {
@@ -87,11 +88,11 @@ class UBot {
         records.sort((a, b) => a.ubot_number - b.ubot_number);
 
         let result = new Map();
-        records.forEach(record => {
-            result.set(record.ubot_number, record.storage_data);
+        for (let record of records) {
+            result.set(record.ubot_number, await Boss.load(record.storage_data));
 
             //TODO: get insufficient data from network and save to DB
-        });
+        }
 
         return result;
     }

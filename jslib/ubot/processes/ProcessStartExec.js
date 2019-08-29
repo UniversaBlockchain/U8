@@ -100,8 +100,6 @@ class ProcessStartExec extends ProcessBase {
                     this.cmdIndex += Number(param);
                 break;
             case "equal":
-                // console.error(JSON.stringify(this.var0));
-                // console.error(JSON.stringify(this.var1));
                 this.var0 = t.valuesEqual(this.var0, this.var1);
                 break;
             case "finish":
@@ -155,8 +153,8 @@ class ProcessStartExec extends ProcessBase {
                     let concat = new Uint8Array(this.var0.size * 96);
                     let offset = 0;
                     for (let value of this.var0.values()) {
-                        concat.set(value, offset);
-                        offset += value.length;
+                        concat.set(value.random, offset);
+                        offset += value.random.length;
                     }
                     this.var0 = crypto.HashId.of(concat).digest;
                 } else {
