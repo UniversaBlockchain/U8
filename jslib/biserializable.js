@@ -1,3 +1,7 @@
+/*
+ * Copyright (c) 2019 Sergey Chernov, iCodici S.n.C, All Rights Reserved.
+ */
+
 class BiSerializable {
     constructor() {
 

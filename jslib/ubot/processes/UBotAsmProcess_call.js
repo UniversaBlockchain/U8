@@ -1,3 +1,7 @@
+/*
+ * Copyright (c) 2019 Sergey Chernov, iCodici S.n.C, All Rights Reserved.
+ */
+
 const ProcessBase = require("ubot/processes/ProcessBase").ProcessBase;
 const UBotCloudNotification_asmCommand = require("ubot/ubot_notification").UBotCloudNotification_asmCommand;
 const ErrorRecord = require("errors").ErrorRecord;

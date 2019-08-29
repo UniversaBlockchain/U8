@@ -1,3 +1,7 @@
+/*
+ * Copyright (c) 2019 Sergey Chernov, iCodici S.n.C, All Rights Reserved.
+ */
+
 /**
  * Subscription to store one revision of the packed contract (transaction pack)
  * The subscribers ({@link NContract} instances) subscribe to contracts to store them for some amount of time. All

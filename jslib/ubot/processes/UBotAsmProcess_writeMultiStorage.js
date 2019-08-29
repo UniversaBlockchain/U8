@@ -1,3 +1,7 @@
+/*
+ * Copyright (c) 2019 Sergey Chernov, iCodici S.n.C, All Rights Reserved.
+ */
+
 import {ExecutorWithFixedPeriod, ExecutorWithDynamicPeriod} from "executorservice";
 
 const UBotAsmProcess_writeSingleStorage = require("ubot/processes/UBotAsmProcess_writeSingleStorage").UBotAsmProcess_writeSingleStorage;

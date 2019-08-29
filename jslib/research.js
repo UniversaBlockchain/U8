@@ -1,3 +1,7 @@
+/*
+ * Copyright (c) 2019 Sergey Chernov, iCodici S.n.C, All Rights Reserved.
+ */
+
 research.MemoryUserBase = class {
     constructor(implClass) {
         this.memoryUserImpl = new implClass();

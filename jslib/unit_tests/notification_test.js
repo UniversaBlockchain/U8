@@ -1,3 +1,7 @@
+/*
+ * Copyright (c) 2019 Sergey Chernov, iCodici S.n.C, All Rights Reserved.
+ */
+
 import {expect, unit, assert, assertSilent} from 'test'
 import {Notification, ItemNotification, ResyncNotification, ParcelNotification} from "notification";
 import {NodeInfo} from 'web'

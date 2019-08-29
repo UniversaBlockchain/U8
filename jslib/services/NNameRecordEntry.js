@@ -1,3 +1,7 @@
+/*
+ * Copyright (c) 2019 Sergey Chernov, iCodici S.n.C, All Rights Reserved.
+ */
+
 const NameRecordEntry = require("services/nameRecordEntry").NameRecordEntry;
 const t = require("tools");
 

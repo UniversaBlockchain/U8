@@ -1,3 +1,7 @@
+/*
+ * Copyright (c) 2019 Sergey Chernov, iCodici S.n.C, All Rights Reserved.
+ */
+
 const ContractSubscription = require("services/contractSubscription").ContractSubscription;
 const t = require("tools");
 

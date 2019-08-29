@@ -1,3 +1,7 @@
+/*
+ * Copyright (c) 2019 Sergey Chernov, iCodici S.n.C, All Rights Reserved.
+ */
+
 /**
  * The environment accessible to readonly {@see NContract} methods, e.g.
  * {@see NContract#onRevoked(ImmutableEnvironment)} and like.

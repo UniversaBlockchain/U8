@@ -1,3 +1,7 @@
+/*
+ * Copyright (c) 2019 Sergey Chernov, iCodici S.n.C, All Rights Reserved.
+ */
+
 const CloudProcessor = require("ubot/cloudprocessor").CloudProcessor;
 const UBotPoolState = require("ubot/ubot_pool_state").UBotPoolState;
 const ExecutorService = require("executorservice").ExecutorService;

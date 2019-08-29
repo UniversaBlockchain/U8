@@ -1,3 +1,7 @@
+/*
+ * Copyright (c) 2019 Sergey Chernov, iCodici S.n.C, All Rights Reserved.
+ */
+
 const ContractStorage = require("services/contractStorage").ContractStorage;
 const ex = require("exceptions");
 const t = require("tools");

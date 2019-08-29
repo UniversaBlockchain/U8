@@ -1,3 +1,7 @@
+/*
+ * Copyright (c) 2019 Sergey Chernov, iCodici S.n.C, All Rights Reserved.
+ */
+
 import {expect, assert, assertSilent, unit} from 'test'
 
 const DefaultBiMapper = require("defaultbimapper").DefaultBiMapper;

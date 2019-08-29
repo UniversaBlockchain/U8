@@ -1,3 +1,7 @@
+/*
+ * Copyright (c) 2019 Sergey Chernov, iCodici S.n.C, All Rights Reserved.
+ */
+
 const NameCache = require("namecache").NameCache;
 const e = require("errors");
 const ErrorRecord = e.ErrorRecord;

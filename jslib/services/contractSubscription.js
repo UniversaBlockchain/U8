@@ -1,3 +1,7 @@
+/*
+ * Copyright (c) 2019 Sergey Chernov, iCodici S.n.C, All Rights Reserved.
+ */
+
 /**
  * Subscription to events notification of the contract or contract chain.
  * The subscribers ({@link NContract} instances) subscribe to a contract or a chain of contracts to receive

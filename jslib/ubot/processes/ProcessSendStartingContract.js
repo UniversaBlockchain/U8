@@ -1,3 +1,7 @@
+/*
+ * Copyright (c) 2019 Sergey Chernov, iCodici S.n.C, All Rights Reserved.
+ */
+
 const ProcessBase = require("ubot/processes/ProcessBase").ProcessBase;
 const UBotConfig = require("ubot/ubot_config").UBotConfig;
 const ExecutorWithFixedPeriod = require("executorservice").ExecutorWithFixedPeriod;

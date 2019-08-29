@@ -1,3 +1,7 @@
+/*
+ * Copyright (c) 2019 Sergey Chernov, iCodici S.n.C, All Rights Reserved.
+ */
+
 import {HashId} from 'crypto'
 
 const ItemResult = require('itemresult').ItemResult;

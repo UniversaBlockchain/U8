@@ -1,3 +1,7 @@
+/*
+ * Copyright (c) 2019 Sergey Chernov, iCodici S.n.C, All Rights Reserved.
+ */
+
 crypto.SHA256 = 1;
 crypto.SHA512 = 2;
 crypto.SHA3_256 = 3;

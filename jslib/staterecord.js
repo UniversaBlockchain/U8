@@ -1,3 +1,7 @@
+/*
+ * Copyright (c) 2019 Sergey Chernov, iCodici S.n.C, All Rights Reserved.
+ */
+
 const Config = require("config").Config;
 const ex = require("exceptions");
 const ItemState = require("itemstate").ItemState;

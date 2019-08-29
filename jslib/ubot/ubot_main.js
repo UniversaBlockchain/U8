@@ -1,3 +1,7 @@
+/*
+ * Copyright (c) 2019 Sergey Chernov, iCodici S.n.C, All Rights Reserved.
+ */
+
 import {NetConfig, NodeInfo} from "web";
 import * as io from "io";
 import * as t from "tools";

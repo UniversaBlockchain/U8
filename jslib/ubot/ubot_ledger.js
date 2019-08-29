@@ -1,3 +1,7 @@
+/*
+ * Copyright (c) 2019 Sergey Chernov, iCodici S.n.C, All Rights Reserved.
+ */
+
 const UBotConfig = require("ubot/ubot_config").UBotConfig;
 import * as db from "pg_driver";
 

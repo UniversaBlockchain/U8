@@ -1,3 +1,7 @@
+/*
+ * Copyright (c) 2019 Sergey Chernov, iCodici S.n.C, All Rights Reserved.
+ */
+
 import {ExecutorService, ScheduleExecutor, ExecutorWithFixedPeriod, ExecutorWithDynamicPeriod} from "executorservice";
 import {Notification, ItemNotification, ResyncNotification, ParcelNotification, ParcelNotificationType, CallbackNotification} from "notification";
 import {ItemProcessor} from "itemprocessor";

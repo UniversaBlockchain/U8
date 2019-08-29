@@ -1,3 +1,7 @@
+/*
+ * Copyright (c) 2019 Sergey Chernov, iCodici S.n.C, All Rights Reserved.
+ */
+
 const bs = require("biserializable");
 const ex = require("exceptions");
 const Boss = require('boss.js');

@@ -1,3 +1,7 @@
+/*
+ * Copyright (c) 2019 Sergey Chernov, iCodici S.n.C, All Rights Reserved.
+ */
+
 const FollowerService = require("services/followerService").FollowerService;
 const ItemState = require("itemstate").ItemState;
 

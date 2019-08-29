@@ -1,3 +1,7 @@
+/*
+ * Copyright (c) 2019 Sergey Chernov, iCodici S.n.C, All Rights Reserved.
+ */
+
 /**
  * Service storage of a unique name (regulated by the UNS contract) for some amount of time.
  *

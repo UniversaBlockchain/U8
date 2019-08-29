@@ -1,3 +1,7 @@
+/*
+ * Copyright (c) 2019 Sergey Chernov, iCodici S.n.C, All Rights Reserved.
+ */
+
 const ItemState = {
     /**
      * Bad state, can't process. For example, structure that is not yet initialized. Otherwise, the contract us unknown

@@ -1,5 +1,8 @@
-import {unit, expect, assert} from 'test'
+/*
+ * Copyright (c) 2019 Sergey Chernov, iCodici S.n.C, All Rights Reserved.
+ */
 
+import {unit, expect, assert} from 'test'
 
 async function testSize(path, expectedSize) {
     let input = await io.openRead(path);

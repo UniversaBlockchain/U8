@@ -1,3 +1,7 @@
+/*
+ * Copyright (c) 2019 Sergey Chernov, iCodici S.n.C, All Rights Reserved.
+ */
+
 import * as io from 'io'
 import {PrivateKey, KeyAddress} from 'crypto'
 import {NodeInfo, NetConfig} from 'web'

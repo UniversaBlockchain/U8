@@ -1,3 +1,7 @@
+/*
+ * Copyright (c) 2019 Sergey Chernov, iCodici S.n.C, All Rights Reserved.
+ */
+
 import {VerboseLevel} from "node_consts";
 import {CallbackNotification, CallbackNotificationType} from "notification";
 import {HttpServer, HttpClient} from 'web'

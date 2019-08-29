@@ -1,3 +1,7 @@
+/*
+ * Copyright (c) 2019 Sergey Chernov, iCodici S.n.C, All Rights Reserved.
+ */
+
 const Tools = require("tools");
 const Config = require("config").Config;
 const Exception = require("exceptions").Exception;

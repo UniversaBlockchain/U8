@@ -1,3 +1,7 @@
+/*
+ * Copyright (c) 2019 Sergey Chernov, iCodici S.n.C, All Rights Reserved.
+ */
+
 import {expect, unit, assert, assertSilent} from 'test'
 import {Ledger} from 'ledger'
 import {udp} from 'network'

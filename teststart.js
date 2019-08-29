@@ -1,3 +1,7 @@
+/*
+ * Copyright (c) 2019 Sergey Chernov, iCodici S.n.C, All Rights Reserved.
+ */
+
 // async function main() {
 //     console.log("Welcome!");
 //     await sleep(500);

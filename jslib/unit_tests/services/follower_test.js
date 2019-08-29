@@ -1,3 +1,7 @@
+/*
+ * Copyright (c) 2019 Sergey Chernov, iCodici S.n.C, All Rights Reserved.
+ */
+
 import {expect, unit, assert} from 'test'
 import * as io from 'io'
 import * as tk from 'unit_tests/test_keys'

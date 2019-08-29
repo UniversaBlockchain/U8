@@ -1,3 +1,7 @@
+/*
+ * Copyright (c) 2019 Sergey Chernov, iCodici S.n.C, All Rights Reserved.
+ */
+
 import * as network from "web";
 const Contract = require("contract").Contract;
 const HashId = require("crypto").HashId;

@@ -1,3 +1,7 @@
+/*
+ * Copyright (c) 2019 Sergey Chernov, iCodici S.n.C, All Rights Reserved.
+ */
+
 import * as db from 'db_driver'
 import {MemoiseMixin} from 'tools'
 import * as io from "io";

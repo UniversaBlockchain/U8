@@ -1,3 +1,7 @@
+/*
+ * Copyright (c) 2019 Sergey Chernov, iCodici S.n.C, All Rights Reserved.
+ */
+
 const NCallbackService = require("services/callbackService").NCallbackService;
 const events = require("services/contractSubscription");
 

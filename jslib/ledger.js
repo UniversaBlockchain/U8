@@ -1,3 +1,7 @@
+/*
+ * Copyright (c) 2019 Sergey Chernov, iCodici S.n.C, All Rights Reserved.
+ */
+
 import * as db from 'pg_driver'
 import * as trs from 'timers'
 import {HashId} from 'crypto'

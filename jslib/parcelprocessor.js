@@ -1,3 +1,7 @@
+/*
+ * Copyright (c) 2019 Sergey Chernov, iCodici S.n.C, All Rights Reserved.
+ */
+
 import {ScheduleExecutor, AsyncEvent} from "executorservice";
 import {ItemProcessor, ItemProcessingState} from "itemprocessor";
 import {VerboseLevel} from "node_consts";

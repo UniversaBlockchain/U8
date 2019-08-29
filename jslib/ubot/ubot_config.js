@@ -1,3 +1,7 @@
+/*
+ * Copyright (c) 2019 Sergey Chernov, iCodici S.n.C, All Rights Reserved.
+ */
+
 class UBotConfig {
     static http_server_pool_size = 4; // 32 for production
 

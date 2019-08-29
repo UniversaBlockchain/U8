@@ -1,3 +1,7 @@
+/*
+ * Copyright (c) 2019 Sergey Chernov, iCodici S.n.C, All Rights Reserved.
+ */
+
 const ProcessBase = require("ubot/processes/ProcessBase").ProcessBase;
 const UBotCloudNotification = require("ubot/ubot_notification").UBotCloudNotification;
 const Boss = require('boss.js');

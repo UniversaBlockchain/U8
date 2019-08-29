@@ -1,3 +1,7 @@
+/*
+ * Copyright (c) 2019 Sergey Chernov, iCodici S.n.C, All Rights Reserved.
+ */
+
 let bs = require("biserializable");
 let dbm = require("defaultbimapper");
 let t = require("tools");

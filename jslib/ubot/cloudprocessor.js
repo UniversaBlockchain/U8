@@ -1,3 +1,7 @@
+/*
+ * Copyright (c) 2019 Sergey Chernov, iCodici S.n.C, All Rights Reserved.
+ */
+
 const ProcessSendStartingContract = require("ubot/processes/ProcessSendStartingContract").ProcessSendStartingContract;
 const ProcessDownloadStartingContract = require("ubot/processes/ProcessDownloadStartingContract").ProcessDownloadStartingContract;
 const ProcessStartExec = require("ubot/processes/ProcessStartExec").ProcessStartExec;

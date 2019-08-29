@@ -1,3 +1,7 @@
+/*
+ * Copyright (c) 2019 Sergey Chernov, iCodici S.n.C, All Rights Reserved.
+ */
+
 /**
  * Carries errors from I/O subsystem. When possible, provides #code property.
  */

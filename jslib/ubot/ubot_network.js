@@ -1,3 +1,7 @@
+/*
+ * Copyright (c) 2019 Sergey Chernov, iCodici S.n.C, All Rights Reserved.
+ */
+
 import {UDPAdapter, HttpClient} from "web";
 import {VerboseLevel} from "node_consts";
 import {Notification} from "notification";

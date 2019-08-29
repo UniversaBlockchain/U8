@@ -1,3 +1,7 @@
+/*
+ * Copyright (c) 2019 Sergey Chernov, iCodici S.n.C, All Rights Reserved.
+ */
+
 const bs = require("biserializable");
 const BossBiMapper = require("bossbimapper").BossBiMapper;
 const t = require("tools");

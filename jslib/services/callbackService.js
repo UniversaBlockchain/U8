@@ -1,3 +1,7 @@
+/*
+ * Copyright (c) 2019 Sergey Chernov, iCodici S.n.C, All Rights Reserved.
+ */
+
 /**
  * Universa network callback service interface. The service creates a callback processor, sends a callback to distant callback URL,
  * notifies the follower contract of a state change, notifies the other network nodes, and synchronizes the callback states.

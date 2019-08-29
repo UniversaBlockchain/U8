@@ -1,4 +1,8 @@
 /*
+ * Copyright (c) 2019 Sergey Chernov, iCodici S.n.C, All Rights Reserved.
+ */
+
+/*
  * This is a low-level interface that any database driver should implement.
  */
 

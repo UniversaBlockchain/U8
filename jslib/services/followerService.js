@@ -1,3 +1,7 @@
+/*
+ * Copyright (c) 2019 Sergey Chernov, iCodici S.n.C, All Rights Reserved.
+ */
+
 /**
  * Service for storing information about subscriptions to callbacks in the follower contract.
  * Allows you to receive and set the time to which it is possible to sending callbacks,
