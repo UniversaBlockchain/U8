@@ -16,10 +16,10 @@ class ImmutableEnvironment {
      * Read access to the instance server-size key-value store. Note that if the store is not created, it always return
      * default value, this is not an error.
      *
-     * @param {string} keyName - key name
-     * @param defaultValue - value to return if the KV store is empty
+     * @param {string} keyName - Key name.
+     * @param defaultValue - Value to return if the KV store is empty.
      *
-     * @return the stored value or the default value
+     * @return the stored value or the default value.
      */
     get(keyName, defaultValue) {
         throw new Error("not implemented");
@@ -28,7 +28,7 @@ class ImmutableEnvironment {
     /**
      * Get array of contract subscription.
      *
-     * @return {[ContractSubscription]} array of contract subscription.
+     * @return {Array<ContractSubscription>} array of contract subscription.
      */
     subscriptions() {
         throw new Error("not implemented");
@@ -37,7 +37,7 @@ class ImmutableEnvironment {
     /**
      * Get array of contract storages.
      *
-     * @return {[ContractStorage]} array of contract storages.
+     * @return {Array<ContractStorage>} array of contract storages.
      */
     storages() {
         throw new Error("not implemented");
@@ -46,7 +46,7 @@ class ImmutableEnvironment {
     /**
      * Get array of UNS mame records.
      *
-     * @return {[NameRecord]} array of UNS mame records.
+     * @return {Array<NameRecord>} array of UNS mame records.
      */
     nameRecords() {
         throw new Error("not implemented");
@@ -55,7 +55,7 @@ class ImmutableEnvironment {
     /**
      * Get follower contract service.
      *
-     * @param {boolean} init - initialize follower service if not initialized. Optional. Default - false.
+     * @param {boolean} init - Initialize follower service if not initialized. Optional. Default - false.
      * @return {FollowerService} follower contract service.
      */
     getFollowerService(init) {
@@ -65,10 +65,10 @@ class ImmutableEnvironment {
     /**
      * Availability check for reduced names, origins and addresses.
      *
-     * @param {[string]} reducedNamesToAllocate - reduced names for availability check.
-     * @param {[HashId]} originsToAllocate - origins for availability check.
-     * @param {[string]} addressesToAllocate - addresses for availability check.
-     * @return {[ErrorRecord]} array of availability errors.
+     * @param {Array<string>} reducedNamesToAllocate - Reduced names for availability check.
+     * @param {Array<HashId>} originsToAllocate - Origins for availability check.
+     * @param {Array<string>} addressesToAllocate - Addresses for availability check.
+     * @return {Array<ErrorRecord>} array of availability errors.
      */
     tryAllocate(reducedNamesToAllocate, originsToAllocate, addressesToAllocate) {
         throw new Error("not implemented");

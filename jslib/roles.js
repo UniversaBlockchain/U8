@@ -2,6 +2,10 @@
  * Copyright (c) 2019 Sergey Chernov, iCodici S.n.C, All Rights Reserved.
  */
 
+/**
+ * @module roles
+ */
+
 const bs = require("biserializable");
 const dbm = require("defaultbimapper");
 const t = require("tools");

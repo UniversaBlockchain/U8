@@ -25,6 +25,9 @@ const t = require("tools");
 
 const MAX_SANITATING_RECORDS = 64;
 
+/**
+ * @Class
+ */
 class Node {
 
     constructor(config, myInfo, ledger, network, nodeKey, logger) {

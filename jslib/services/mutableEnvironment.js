@@ -59,7 +59,7 @@ class MutableEnvironment extends ImmutableEnvironment {
      * The storage must not create copies of the same contracts or update its stored binary representations. There
      * should be always no one copy in the storage.
      *
-     * @param {[number]} packedTransaction - Packed {@see TransactionPack} with contract.
+     * @param {Array<number>} packedTransaction - Packed {@see TransactionPack} with contract.
      * @param {Date} expiresAt - Time to expiration subscription.
      *
      * @return {ContractStorage} storage subscription.

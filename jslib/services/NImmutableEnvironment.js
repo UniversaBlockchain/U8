@@ -19,9 +19,9 @@ class NImmutableEnvironment extends ImmutableEnvironment {
      * @param {NSmartContract} contract smart contract this environment belongs to
      * @param {Ledger} ledger - database ledger.
      * @param {Object} kvStorage - key-value data stored in the ledger.
-     * @param {[ContractSubscription]} subscriptions - array of contract subscription.
-     * @param {[ContractStorage]} storages - array of contract storages.
-     * @param {[NameRecord]} nameRecords - array of UNS mame records.
+     * @param {Array<ContractSubscription>} subscriptions - array of contract subscription.
+     * @param {Array<ContractStorage>} storages - array of contract storages.
+     * @param {Array<NameRecord>} nameRecords - array of UNS mame records.
      * @param {FollowerService} followerService - follower contract service.
      */
     constructor(contract, ledger, kvStorage = undefined, subscriptions = undefined, storages = undefined,
