@@ -63,9 +63,8 @@ class UBotAsmProcess_writeSingleStorage extends ProcessBase {
         this.pr.logger.log("start UBotAsmProcess_writeSingleStorage");
         this.approveCounterSet.add(this.pr.ubot.network.myInfo.number); // vote for itself
         this.pulse();
-        this.currentTask = new ExecutorWithFixedPeriod(() => {
-            this.pulse();
-        }, UBotConfig.single_storage_vote_period, this.pr.ubot.executorService).run();
+        this.getHashesTask = new ExecutorWithFixedPeriod(() => this.pulse(),
+            UBotConfig.single_storage_vote_period, this.pr.ubot.executorService).run();
     }
 
     pulse() {
@@ -107,7 +106,7 @@ class UBotAsmProcess_writeSingleStorage extends ProcessBase {
 
         if (this.approveCounterSet.size >= this.quorumSize) {
             // ok
-            this.currentTask.cancel();
+            this.getHashesTask.cancel();
 
             try {
                 await this.pr.ledger.writeToSingleStorage(this.pr.executableContract.id, this.storageName,
@@ -130,7 +129,7 @@ class UBotAsmProcess_writeSingleStorage extends ProcessBase {
 
         } else if (this.declineCounterSet.size > this.pr.pool.length - this.quorumSize) {
             // error
-            this.currentTask.cancel();
+            this.getHashesTask.cancel();
 
             this.pr.logger.log("UBotAsmProcess_writeSingleStorage... ready, declined");
             this.pr.errors.push(new ErrorRecord(Errors.FAILURE, "UBotAsmProcess_writeSingleStorage", "writing to single storage declined"));
@@ -155,7 +154,7 @@ class UBotAsmProcess_writeSingleStorage extends ProcessBase {
                             this.previousRecordId == null
                         )
                     );
-                } else if (!this.currentTask.cancelled)
+                } else if (!this.getHashesTask.cancelled)
                     await this.vote(notification);
             }
         } else {

@@ -56,12 +56,12 @@ class UBotAsmProcess_writeMultiStorage extends UBotAsmProcess_writeSingleStorage
         this.previous[this.pr.poolIndexes.get(this.pr.ubot.network.myInfo.number)] = this.previousRecordId;
 
         this.pulseGetHashes();
-        this.currentTask = new ExecutorWithFixedPeriod(() => {
-            this.pulseGetHashes();
-        }, UBotConfig.multi_storage_vote_period, this.pr.ubot.executorService).run();
+        this.getHashesTask = new ExecutorWithFixedPeriod(() => this.pulseGetHashes(),
+            UBotConfig.multi_storage_vote_period, this.pr.ubot.executorService).run();
     }
 
     pulseGetHashes() {
+        this.pr.logger.log("UBotAsmProcess_writeMultiStorage... pulseGetHashes");
         for (let i = 0; i < this.pr.pool.length; ++i)
             if (this.pr.pool[i].number !== this.pr.ubot.network.myInfo.number && !this.otherAnswers.has(this.pr.pool[i].number))
                 this.pr.ubot.network.deliver(this.pr.pool[i],
@@ -79,6 +79,7 @@ class UBotAsmProcess_writeMultiStorage extends UBotAsmProcess_writeSingleStorage
     }
 
     pulseGetPoolHashes(first = false) {
+        this.pr.logger.log("UBotAsmProcess_writeMultiStorage... pulseGetPoolHashes");
         for (let i = 0; i < this.pr.pool.length; ++i)
             if (this.pr.pool[i].number !== this.pr.ubot.network.myInfo.number) {
                 if (first)
@@ -175,7 +176,7 @@ class UBotAsmProcess_writeMultiStorage extends UBotAsmProcess_writeSingleStorage
                             this.otherAnswers.add(this.pr.pool[i].number);
                             if (this.otherAnswers.size >= this.approveCounterSet.size) {
                                 this.pr.logger.log("UBotAsmProcess_writeMultiStorage... all results wrote");
-                                this.currentTask.cancel();
+                                this.downloadTask.cancel();
                                 this.onReady();
                                 // TODO: distribution multi-storage to all ubots after closing pool...
                             }
@@ -231,11 +232,20 @@ class UBotAsmProcess_writeMultiStorage extends UBotAsmProcess_writeSingleStorage
     }
 
     async vote(notification) {
+        let message = "UBotAsmProcess_writeMultiStorage... vote {from: " + notification.from.number +
+            ", ubot: " + this.pr.pool[notification.dataUbotInPool].number + ", result: ";
+
         if (this.hashes[notification.dataUbotInPool].equals(notification.dataHashId) &&
-            t.valuesEqual(this.previous[notification.dataUbotInPool], notification.previousRecordId))
+            t.valuesEqual(this.previous[notification.dataUbotInPool], notification.previousRecordId)) {
             this.approveCounterFromOthersSets[notification.dataUbotInPool].add(notification.from.number);
-        else
+            message += "approve";
+        } else {
             this.declineCounterFromOthersSets[notification.dataUbotInPool].add(notification.from.number);
+            message += "decline";
+        }
+
+        message += "}";
+        this.pr.logger.log(message);
 
         if (this.approveCounterFromOthersSets[notification.dataUbotInPool].size >= this.quorumSize)
             this.approveCounterSet.add(notification.dataUbotInPool);
@@ -248,7 +258,7 @@ class UBotAsmProcess_writeMultiStorage extends UBotAsmProcess_writeSingleStorage
                 approveSet.size + this.declineCounterFromOthersSets[i].size === this.pr.pool.length)) {
 
             // ok
-            this.currentTask.cancel();
+            this.getPoolHashesTask.cancel();
 
             try {
                 await this.pr.ledger.writeToMultiStorage(this.pr.executableContract.id, this.storageName, this.binToWrite,
@@ -270,14 +280,14 @@ class UBotAsmProcess_writeMultiStorage extends UBotAsmProcess_writeSingleStorage
             this.otherAnswers.clear();
             this.otherAnswers.add(this.pr.ubot.network.myInfo.number);
 
-            this.currentTask = new ExecutorWithDynamicPeriod(
-                () => this.pulseDownload(), UBotConfig.multi_storage_download_periods, this.pr.ubot.executorService).run();
+            this.downloadTask = new ExecutorWithDynamicPeriod(() => this.pulseDownload(),
+                UBotConfig.multi_storage_download_periods, this.pr.ubot.executorService).run();
 
         } else if (this.declineCounterSet.size > this.pr.pool.length - this.quorumSize ||
             this.declineCounterSet.has(this.pr.poolIndexes.get(this.pr.ubot.network.myInfo.number))) {
 
             // error
-            this.currentTask.cancel();
+            this.getPoolHashesTask.cancel();
 
             this.pr.logger.log("UBotAsmProcess_writeMultiStorage... ready, declined");
             this.pr.errors.push(new ErrorRecord(Errors.FAILURE, "UBotAsmProcess_writeMultiStorage", "writing to multi-storage declined"));
@@ -308,12 +318,11 @@ class UBotAsmProcess_writeMultiStorage extends UBotAsmProcess_writeSingleStorage
 
                     if (this.otherAnswers.size >= this.pr.pool.length - 1) {
                         this.hashesReady = true;
-                        this.currentTask.cancel();
+                        this.getHashesTask.cancel();
                         this.pr.logger.log("UBotAsmProcess_writeMultiStorage: get pool hashes");
                         this.pulseGetPoolHashes(true);
-                        this.currentTask = new ExecutorWithFixedPeriod(() => {
-                            this.pulseGetPoolHashes();
-                        }, UBotConfig.multi_storage_vote_period, this.pr.ubot.executorService).run();
+                        this.getPoolHashesTask = new ExecutorWithFixedPeriod(() => this.pulseGetPoolHashes(),
+                            UBotConfig.multi_storage_vote_period, this.pr.ubot.executorService).run();
                     }
                 }
 
@@ -350,7 +359,7 @@ class UBotAsmProcess_writeMultiStorage extends UBotAsmProcess_writeSingleStorage
                             )
                         );
 
-                } else if (!this.currentTask.cancelled)
+                } else if (this.getPoolHashesTask != null && !this.getPoolHashesTask.cancelled)
                     await this.vote(notification);
             }
         } else {

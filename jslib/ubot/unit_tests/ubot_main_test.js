@@ -10,18 +10,18 @@ const io = require("io");
 const UBotMain = require("ubot/ubot_main").UBotMain;
 const UBotPoolState = require("ubot/ubot_pool_state").UBotPoolState;
 const Errors = require("errors").Errors;
-const cs = require("contractsservice");
-const BigDecimal  = require("big").Big;
 const Boss = require("boss");
 
 const CONFIG_ROOT = io.getTmpDirPath() + "/ubot_config";
+const clientKey = tk.TestKeys.getKey();
+const userPrivKey = tk.TestKeys.getKey();
 
 async function prepareConfigFiles(count) {
     await io.removeDir(CONFIG_ROOT);
     await io.createDir(CONFIG_ROOT);
     let keys = [];
     for (let i = 0; i < count; ++i)
-        keys.push(tk.TestKeys.getKey());
+        keys.push(await crypto.PrivateKey.generate(2048));
     console.log("prepareConfigFiles, configRoot: " + CONFIG_ROOT);
     let ubotNamePrefix = "ubot_";
     let configs = [];
@@ -156,8 +156,7 @@ unit.test("ubot_main_test: executeCloudMethod", async () => {
     console.log("\ntest send...");
     let url = "http://localhost:"+ubotMains[0].myInfo.clientAddress.port;
     let client = new network.HttpClient(url);
-    await client.start(tk.TestKeys.getKey(), ubotMains[0].myInfo.publicKey, null);
-    let userPrivKey = tk.TestKeys.getKey();
+    await client.start(clientKey, ubotMains[0].myInfo.publicKey, null);
 
     let executableContract = Contract.fromPrivateKey(userPrivKey);
 
@@ -240,8 +239,7 @@ unit.test("ubot_main_test: generateRandomHash", async () => {
     console.log("\ntest send...");
     let url = "http://localhost:"+ubotMains[0].myInfo.clientAddress.port;
     let client = new network.HttpClient(url);
-    await client.start(tk.TestKeys.getKey(), ubotMains[0].myInfo.publicKey, null);
-    let userPrivKey = tk.TestKeys.getKey();
+    await client.start(clientKey, ubotMains[0].myInfo.publicKey, null);
 
     let executableContract = Contract.fromPrivateKey(userPrivKey);
 
@@ -325,8 +323,7 @@ unit.test("ubot_main_test: errorOutput", async () => {
     console.log("\ntest send...");
     let url = "http://localhost:" + ubotMains[0].myInfo.clientAddress.port;
     let client = new network.HttpClient(url);
-    await client.start(tk.TestKeys.getKey(), ubotMains[0].myInfo.publicKey, null);
-    let userPrivKey = tk.TestKeys.getKey();
+    await client.start(clientKey, ubotMains[0].myInfo.publicKey, null);
 
     let executableContract = Contract.fromPrivateKey(userPrivKey);
 
@@ -413,8 +410,7 @@ unit.test("ubot_main_test: multi-verify method", async () => {
     console.log("\ntest send...");
     let url = "http://localhost:"+ubotMains[0].myInfo.clientAddress.port;
     let client = new network.HttpClient(url);
-    await client.start(tk.TestKeys.getKey(), ubotMains[0].myInfo.publicKey, null);
-    let userPrivKey = tk.TestKeys.getKey();
+    await client.start(clientKey, ubotMains[0].myInfo.publicKey, null);
 
     let executableContract = Contract.fromPrivateKey(userPrivKey);
 
@@ -508,8 +504,7 @@ unit.test("ubot_main_test: multi-verify method failed", async () => {
     console.log("\ntest send...");
     let url = "http://localhost:"+ubotMains[0].myInfo.clientAddress.port;
     let client = new network.HttpClient(url);
-    await client.start(tk.TestKeys.getKey(), ubotMains[0].myInfo.publicKey, null);
-    let userPrivKey = tk.TestKeys.getKey();
+    await client.start(clientKey, ubotMains[0].myInfo.publicKey, null);
 
     let executableContract = Contract.fromPrivateKey(userPrivKey);
 
@@ -606,8 +601,7 @@ unit.test("ubot_main_test: call sub-method", async () => {
     console.log("\ntest send...");
     let url = "http://localhost:"+ubotMains[0].myInfo.clientAddress.port;
     let client = new network.HttpClient(url);
-    await client.start(tk.TestKeys.getKey(), ubotMains[0].myInfo.publicKey, null);
-    let userPrivKey = tk.TestKeys.getKey();
+    await client.start(clientKey, ubotMains[0].myInfo.publicKey, null);
 
     let executableContract = Contract.fromPrivateKey(userPrivKey);
 
@@ -705,8 +699,7 @@ unit.test("ubot_main_test: secureRandom", async () => {
     console.log("\ntest send...");
     let url = "http://localhost:"+ubotMains[0].myInfo.clientAddress.port;
     let client = new network.HttpClient(url);
-    await client.start(tk.TestKeys.getKey(), ubotMains[0].myInfo.publicKey, null);
-    let userPrivKey = tk.TestKeys.getKey();
+    await client.start(clientKey, ubotMains[0].myInfo.publicKey, null);
 
     let executableContract = Contract.fromPrivateKey(userPrivKey);
 
