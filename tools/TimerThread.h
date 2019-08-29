@@ -1,6 +1,6 @@
-//
-// Created by Leonid Novikov on 2/7/19.
-//
+/*
+ * Copyright (c) 2019 Sergey Chernov, iCodici S.n.C, All Rights Reserved.
+ */
 
 #ifndef U8_TIMERTHREAD_H
 #define U8_TIMERTHREAD_H

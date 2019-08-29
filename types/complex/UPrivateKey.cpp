@@ -1,6 +1,6 @@
-//
-// Created by flint on 8/8/19.
-//
+/*
+ * Copyright (c) 2019 Sergey Chernov, iCodici S.n.C, All Rights Reserved.
+ */
 
 #include "UPrivateKey.h"
 #include "../UBytes.h"

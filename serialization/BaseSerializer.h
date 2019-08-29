@@ -1,6 +1,6 @@
-//
-// Created by Dmitriy Tairov on 26.12.18.
-//
+/*
+ * Copyright (c) 2018 Sergey Chernov, iCodici S.n.C, All Rights Reserved.
+ */
 
 #ifndef UNIVERSA_BASESERIALIZER_H
 #define UNIVERSA_BASESERIALIZER_H

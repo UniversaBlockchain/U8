@@ -1,6 +1,7 @@
-//
-// Created by Sergey Chernov on 2019-01-25.
-//
+/*
+ * Copyright (c) 2019 Sergey Chernov, iCodici S.n.C, All Rights Reserved.
+ */
+
 #include <thread>
 #include <atomic>
 #include <v8-version.h>

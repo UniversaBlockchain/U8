@@ -1,6 +1,6 @@
-//
-// Created by Tairov Dmitriy on 18.01.19.
-//
+/*
+ * Copyright (c) 2019 Sergey Chernov, iCodici S.n.C, All Rights Reserved.
+ */
 
 #include <thread>
 #include <cstring>

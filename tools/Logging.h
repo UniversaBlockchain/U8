@@ -1,6 +1,6 @@
-//
-// Created by Sergey Chernov on 2019-01-07.
-//
+/*
+ * Copyright (c) 2019 Sergey Chernov, iCodici S.n.C, All Rights Reserved.
+ */
 
 #ifndef U8_LOGGING_H
 #define U8_LOGGING_H

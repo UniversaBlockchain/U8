@@ -32,7 +32,7 @@ class Transactional extends bs.BiSerializable {
     /**
      * Transactional is one of contract sections. It can be changed or even skipped freely across contract revisions
      *
-     * @param contract {Contract} transactional is created for
+     * @param {Contract} contract - The contract for which section Transactional will be created.
      * @constructor
      */
     constructor(contract) {

@@ -1,6 +1,6 @@
-//
-// Created by flint on 1/23/19.
-//
+/*
+ * Copyright (c) 2019 Sergey Chernov, iCodici S.n.C, All Rights Reserved.
+ */
 
 #ifndef U8_SAFE58_H
 #define U8_SAFE58_H

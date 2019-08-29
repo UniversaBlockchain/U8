@@ -1,6 +1,6 @@
-//
-// Created by Roman Uskov on 2018-12-17.
-//
+/*
+ * Copyright (c) 2018 Sergey Chernov, iCodici S.n.C, All Rights Reserved.
+ */
 
 #include "UBinder.h"
 #include "UArray.h"

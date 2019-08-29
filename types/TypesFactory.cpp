@@ -1,6 +1,6 @@
-//
-// Created by flint on 8/7/19.
-//
+/*
+ * Copyright (c) 2019 Sergey Chernov, iCodici S.n.C, All Rights Reserved.
+ */
 
 #include "TypesFactory.h"
 #include "UArray.h"

@@ -1,6 +1,6 @@
-//
-// Created by flint on 7/29/19.
-//
+/*
+ * Copyright (c) 2019 Sergey Chernov, iCodici S.n.C, All Rights Reserved.
+ */
 
 #include "UHashId.h"
 #include "../UBytes.h"

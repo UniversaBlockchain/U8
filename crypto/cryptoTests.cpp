@@ -1,6 +1,6 @@
-//
-// Created by Leonid Novikov on 2019-01-18.
-//
+/*
+ * Copyright (c) 2019 Sergey Chernov, iCodici S.n.C, All Rights Reserved.
+ */
 
 #include "cryptoTests.h"
 #include <iostream>

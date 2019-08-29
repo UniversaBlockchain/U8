@@ -1,6 +1,6 @@
-//
-// Created by Leonid Novikov on 14.01.19.
-//
+/*
+ * Copyright (c) 2019 Sergey Chernov, iCodici S.n.C, All Rights Reserved.
+ */
 
 #ifndef U8_CRYPTO_H
 #define U8_CRYPTO_H

@@ -1,6 +1,6 @@
-//
-// Created by Dmitriy Tairov on 07.12.18.
-//
+/*
+ * Copyright (c) 2018 Sergey Chernov, iCodici S.n.C, All Rights Reserved.
+ */
 
 #ifndef UNIVERSA_BOSSSERIALIZER_H
 #define UNIVERSA_BOSSSERIALIZER_H

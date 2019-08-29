@@ -1,6 +1,6 @@
-//
-// Created by Leonid Novikov on 4/8/19.
-//
+/*
+ * Copyright (c) 2019 Sergey Chernov, iCodici S.n.C, All Rights Reserved.
+ */
 
 #include "web_bindings.h"
 #include "binding_tools.h"

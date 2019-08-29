@@ -1,6 +1,6 @@
-//
-// Created by Leonid Novikov on 2018-12-27.
-//
+/*
+ * Copyright (c) 2018 Sergey Chernov, iCodici S.n.C, All Rights Reserved.
+ */
 
 #ifndef UNITOOLS_HASHID_H
 #define UNITOOLS_HASHID_H

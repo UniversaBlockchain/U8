@@ -1,6 +1,6 @@
-//
-// Created by flint on 1/23/19.
-//
+/*
+ * Copyright (c) 2019 Sergey Chernov, iCodici S.n.C, All Rights Reserved.
+ */
 
 #include "Safe58.h"
 #include <string.h>

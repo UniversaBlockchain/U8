@@ -1,6 +1,6 @@
-//
-// Created by Dmitriy Tairov on 19.02.19.
-//
+/*
+ * Copyright (c) 2019 Sergey Chernov, iCodici S.n.C, All Rights Reserved.
+ */
 
 #include "AsyncLoop.h"
 #include "AsyncIO.h"

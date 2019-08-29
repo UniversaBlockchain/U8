@@ -1,6 +1,6 @@
-//
-// Created by Sergey Chernov on 2019-07-10.
-//
+/*
+ * Copyright (c) 2019 Sergey Chernov, iCodici S.n.C, All Rights Reserved.
+ */
 
 #include "catch2.h"
 

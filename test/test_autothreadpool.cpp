@@ -1,6 +1,6 @@
-//
-// Created by Leonid Novikov on 2/21/19.
-//
+/*
+ * Copyright (c) 2019 Sergey Chernov, iCodici S.n.C, All Rights Reserved.
+ */
 
 #include <iostream>
 #include <chrono>

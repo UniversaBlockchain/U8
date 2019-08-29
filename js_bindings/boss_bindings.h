@@ -1,6 +1,6 @@
-//
-// Created by flint on 8/5/19.
-//
+/*
+ * Copyright (c) 2019 Sergey Chernov, iCodici S.n.C, All Rights Reserved.
+ */
 
 #ifndef U8_BOSS_BINDINGS_H
 #define U8_BOSS_BINDINGS_H

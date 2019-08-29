@@ -1,6 +1,6 @@
-//
-// Created by Tairov Dmitriy on 10.02.19.
-//
+/*
+ * Copyright (c) 2019 Sergey Chernov, iCodici S.n.C, All Rights Reserved.
+ */
 
 #include "IOHandleThen.h"
 

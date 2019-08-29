@@ -1,6 +1,6 @@
-//
-// Created by Leonid Novikov on 3/4/19.
-//
+/*
+ * Copyright (c) 2019 Sergey Chernov, iCodici S.n.C, All Rights Reserved.
+ */
 
 #include <memory>
 

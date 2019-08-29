@@ -1,6 +1,6 @@
-//
-// Created by Leonid Novikov on 2018-12-11.
-//
+/*
+ * Copyright (c) 2018 Sergey Chernov, iCodici S.n.C, All Rights Reserved.
+ */
 
 #define USE_GMP 1
 #define GMP_DESC 1

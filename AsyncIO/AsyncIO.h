@@ -1,6 +1,6 @@
-//
-// Created by Dmitriy Tairov on 12.01.19.
-//
+/*
+ * Copyright (c) 2019 Sergey Chernov, iCodici S.n.C, All Rights Reserved.
+ */
 
 #ifndef U8_ASYNCIO_H
 #define U8_ASYNCIO_H

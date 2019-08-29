@@ -1,6 +1,6 @@
-//
-// Created by flint on 7/10/19.
-//
+/*
+ * Copyright (c) 2019 Sergey Chernov, iCodici S.n.C, All Rights Reserved.
+ */
 
 #include "research_bindings.h"
 #include "../tools/StressTestTools.h"

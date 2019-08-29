@@ -1,3 +1,7 @@
+/*
+ * Copyright (c) 2019 Sergey Chernov, iCodici S.n.C, All Rights Reserved.
+ */
+
 import {KeyAddress, PublicKey, HashId} from 'crypto'
 
 const bs = require("biserializable");
@@ -76,7 +80,7 @@ class Constraint extends bs.BiSerializable {
      * Constraint constructor function.
      *
      * @class
-     * @param {Contract} contract containing constraint
+     * @param {Contract} contract - Contract containing constraint.
      *
      * @classdesc Constraints allow you to refer to the internal fields of the contract, constants and fields of other
      * contracts, to establish the necessary conditions.

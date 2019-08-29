@@ -1,6 +1,6 @@
-//
-// Created by Sergey Chernov on 2019-02-01.
-//
+/*
+ * Copyright (c) 2019 Sergey Chernov, iCodici S.n.C, All Rights Reserved.
+ */
 
 
 #include "binding_tools.h"

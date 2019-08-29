@@ -1,6 +1,6 @@
-//
-// Created by flint on 8/7/19.
-//
+/*
+ * Copyright (c) 2019 Sergey Chernov, iCodici S.n.C, All Rights Reserved.
+ */
 
 #ifndef U8_TYPESFACTORY_H
 #define U8_TYPESFACTORY_H

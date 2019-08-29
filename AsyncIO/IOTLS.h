@@ -1,6 +1,6 @@
-//
-// Created by Tairov Dmitriy on 01.03.19.
-//
+/*
+ * Copyright (c) 2019 Sergey Chernov, iCodici S.n.C, All Rights Reserved.
+ */
 
 #ifndef U8_IOTLS_H
 #define U8_IOTLS_H

@@ -1,6 +1,6 @@
-//
-// Created by Dmitriy Tairov on 12.01.19.
-//
+/*
+ * Copyright (c) 2019 Sergey Chernov, iCodici S.n.C, All Rights Reserved.
+ */
 
 #include "AsyncIO.h"
 #include "TLS/uv_tls.h"

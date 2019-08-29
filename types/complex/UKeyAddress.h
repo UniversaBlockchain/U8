@@ -1,6 +1,6 @@
-//
-// Created by flint on 7/31/19.
-//
+/*
+ * Copyright (c) 2019 Sergey Chernov, iCodici S.n.C, All Rights Reserved.
+ */
 
 #ifndef U8_UKEYADDRESS_H
 #define U8_UKEYADDRESS_H
