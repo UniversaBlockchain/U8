@@ -106,7 +106,7 @@ class NNameRecord extends NameRecord {
     }
 
     toString() {
-        return crypto.HashId.of(t.randomBytes(64));
+        return crypto.HashId.of(t.randomBytes(64)).base64;
     }
 
     stringId() {

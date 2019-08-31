@@ -14,7 +14,9 @@ let timerHandler = __bios_initTimers();
 
 
 // let entries = new SortedArray([], (a, b) => b.fireAt - a.fireAt);
-let entries = new FastPriorityQueue((a, b) => a.fireAt < b.fireAt);
+let entries = new FastPriorityQueue((a, b) =>
+    a.fireAt < b.fireAt || (a.fireAt === b.fireAt && a.stringId() < b.stringId())
+);
 
 class TimeoutError extends Error {
 }
@@ -42,14 +44,30 @@ class TimeoutEntry {
     }
 
     cancel() {
-        entries.remove(this);
-        if (this == entries.peek())
+        let last = entries.peek();
+        if (entries.remove(this) && last.equals(this))
             resetCallback();
-        if (this.reject) this.reject(new TimeoutError("timeout cancelled"));
+        if (this.reject)
+            this.reject(new TimeoutError("timeout cancelled"));
     }
 
+    // toString() {
+    //     return `TimeoutEntry<${this.fireAt}:${this.repeat}:${this.callback}>`
+    // }
+
     toString() {
-        return `TimeoutEntry<${this.fireAt}:${this.repeat}:${this.callback}>`
+        return crypto.HashId.of(t.randomBytes(64)).base64;
+    }
+
+    stringId() {
+        if (this.stringId_ == null)
+            this.stringId_ = this.toString();
+
+        return this.stringId_;
+    }
+
+    equals(to) {
+        return this.stringId() === to.stringId();
     }
 }
 

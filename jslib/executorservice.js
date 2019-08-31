@@ -72,7 +72,7 @@ class Executor {
     }
 
     toString() {
-        return crypto.HashId.of(t.randomBytes(64));
+        return crypto.HashId.of(t.randomBytes(64)).base64;
     }
 
     stringId() {
@@ -169,11 +169,9 @@ class ExecutorWithFixedPeriod extends Executor {
         this.cancelled = false;
 
         this.timerCallback = async () => {
-            //console.error("CALL "  + this.period + " ID " + this.stringId());
             if (!this.cancelled) {
                 this.timer = trs.timeout(this.period, this.timerCallback);
 
-                //console.error("LAMBDA " + this.period + " ID " + this.stringId());
                 await this.lambda();
             }
         };
@@ -190,7 +188,6 @@ class ExecutorWithFixedPeriod extends Executor {
             throw new Error("Executor was cancelled");
 
         this.timer = trs.timeout(this.period, this.timerCallback);
-        //console.error("RUN " + this.period + " ID " + this.stringId());
 
         return this;
     }
@@ -199,7 +196,6 @@ class ExecutorWithFixedPeriod extends Executor {
      * Cancel executor.
      */
     cancel() {
-        //console.error("CANCEL " + this.stringId());
         if (this.cancelled)
             return;
 
