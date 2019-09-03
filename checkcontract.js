@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2019 Sergey Chernov, iCodici S.n.C, All Rights Reserved.
+ * Copyright (c) 2019-present Sergey Chernov, iCodici S.n.C, All Rights Reserved.
  */
 
 // this is just a test file tu run with u8

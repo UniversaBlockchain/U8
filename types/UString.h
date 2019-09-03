@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018 Sergey Chernov, iCodici S.n.C, All Rights Reserved.
+ * Copyright (c) 2018-present Sergey Chernov, iCodici S.n.C, All Rights Reserved.
  */
 
 #ifndef UNITOOLS_USTRING_H

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2019 Sergey Chernov, iCodici S.n.C, All Rights Reserved.
+ * Copyright (c) 2019-present Sergey Chernov, iCodici S.n.C, All Rights Reserved.
  */
 
 import {KeyAddress, PublicKey, HashId} from 'crypto'

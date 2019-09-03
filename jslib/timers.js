@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2019 Sergey Chernov, iCodici S.n.C, All Rights Reserved.
+ * Copyright (c) 2019-present Sergey Chernov, iCodici S.n.C, All Rights Reserved.
  */
 
 // This file should be used as U8 CJS module, e.g. evaluated only once then cached.
