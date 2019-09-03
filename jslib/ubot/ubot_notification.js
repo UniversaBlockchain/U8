@@ -111,7 +111,8 @@ class UBotCloudNotification_asmCommand extends Notification {
     static types = {
         SINGLE_STORAGE_GET_DATA_HASHID:   {ordinal: 0},
         MULTI_STORAGE_GET_DATA_HASHID:   {ordinal: 1},
-        MULTI_STORAGE_GET_POOL_HASHES:   {ordinal: 2}
+        MULTI_STORAGE_GET_CORTEGE_HASHID:   {ordinal: 2},
+        MULTI_STORAGE_GET_POOL_HASHES:   {ordinal: 3}
     };
 
     constructor(from, poolId, cmdStack, type, dataHashId, previousRecordId, isAnswer, isFirstRecord, dataUbotInPool = -1) {
@@ -139,6 +140,7 @@ class UBotCloudNotification_asmCommand extends Notification {
         switch (this.type) {
             case UBotCloudNotification_asmCommand.types.SINGLE_STORAGE_GET_DATA_HASHID:
             case UBotCloudNotification_asmCommand.types.MULTI_STORAGE_GET_DATA_HASHID:
+            case UBotCloudNotification_asmCommand.types.MULTI_STORAGE_GET_CORTEGE_HASHID:
                 if (this.isAnswer) {
                     bw.write(this.dataHashId.digest);
                     if (!this.isFirstRecord)
@@ -170,6 +172,7 @@ class UBotCloudNotification_asmCommand extends Notification {
         switch (this.type) {
             case UBotCloudNotification_asmCommand.types.SINGLE_STORAGE_GET_DATA_HASHID:
             case UBotCloudNotification_asmCommand.types.MULTI_STORAGE_GET_DATA_HASHID:
+            case UBotCloudNotification_asmCommand.types.MULTI_STORAGE_GET_CORTEGE_HASHID:
                 if (this.isAnswer) {
                     this.dataHashId = crypto.HashId.withDigest(br.read());
                     if (!this.isFirstRecord)

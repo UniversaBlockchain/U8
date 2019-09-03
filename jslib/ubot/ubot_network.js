@@ -146,10 +146,10 @@ class UBotNetwork {
         });
     }
 
-    getStorageResult(ubot, recordId, pathBase, onComplete, onError) {
+    getStorageResult(ubot, hash, pathBase, onComplete, onError) {
         this.sendGetRequestToUbot(
             ubot,
-            pathBase + recordId.base64,
+            pathBase + hash.base64,
             async (respCode, body) => {
                 if (respCode === 200)
                     onComplete(body);
@@ -159,12 +159,12 @@ class UBotNetwork {
         );
     }
 
-    getSingleStorageResult(ubot, recordId, onComplete, onError) {
-        this.getStorageResult(ubot, recordId, "/getSingleStorageResult/", onComplete, onError);
+    getSingleStorageResult(ubot, hash, onComplete, onError) {
+        this.getStorageResult(ubot, hash, "/getSingleStorageResult/", onComplete, onError);
     }
 
-    getMultiStorageResult(ubot, recordId, onComplete, onError) {
-        this.getStorageResult(ubot, recordId, "/getMultiStorageResult/", onComplete, onError);
+    getMultiStorageResult(ubot, hash, onComplete, onError) {
+        this.getStorageResult(ubot, hash, "/getMultiStorageResult/", onComplete, onError);
     }
 }
 

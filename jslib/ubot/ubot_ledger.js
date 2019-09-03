@@ -74,9 +74,13 @@ class UBotLedger {
                         if (row != null && row[0] != null)
                             value = row[0];
 
-                        if (processValue != null)
-                            resolve(await processValue(value));
-                        else
+                        if (processValue != null) {
+                            try {
+                                resolve(await processValue(value));
+                            } catch (err) {
+                                reject(err);
+                            }
+                        } else
                             resolve(value);
                     }, e => {
                         if (connection == null)
@@ -95,6 +99,22 @@ class UBotLedger {
         });
     }
 
+    async getSingleStorageDataByHash(hash) {
+        return this.simpleQuery(
+            "SELECT storage_data FROM single_records WHERE hash = ? LIMIT 1",
+            null,
+            null,
+            hash.digest);
+    }
+
+    async getMultiStorageDataByHash(hash) {
+        return this.simpleQuery(
+            "SELECT storage_data FROM multi_records WHERE hash = ? LIMIT 1",
+            null,
+            null,
+            hash.digest);
+    }
+
     async getSingleStorageDataByRecordId(recordId) {
         return this.simpleQuery(
             "SELECT storage_data FROM single_records WHERE record_id = ? LIMIT 1",
@@ -103,12 +123,13 @@ class UBotLedger {
             recordId.digest);
     }
 
-    async getMultiStorageDataByRecordId(recordId) {
+    async getMultiStorageDataByRecordId(recordId, ubotNumber) {
         return this.simpleQuery(
-            "SELECT storage_data FROM multi_records WHERE record_id = ? LIMIT 1",
+            "SELECT storage_data FROM multi_records WHERE record_id = ? AND ubot_number = ? LIMIT 1",
             null,
             null,
-            recordId.digest);
+            recordId.digest,
+            ubotNumber);
     }
 
     async findOrCreateStorage(executable_contract_id, storage_name, storage_type) {
@@ -174,7 +195,7 @@ class UBotLedger {
 
         return this.simpleQuery(
             "INSERT INTO multi_records (record_id, storage_id, storage_data, hash, ubot_number) VALUES (?,?,?,?,?) " +
-            "ON CONFLICT (record_id, storage_id) DO NOTHING RETURNING record_id",
+            "ON CONFLICT (record_id, ubot_number, storage_id) DO NOTHING RETURNING record_id",
             x => {
                 if (x == null)
                     throw new UBotLedgerException("writeToMultiStorage failed: returning null");

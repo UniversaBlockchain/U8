@@ -29,10 +29,9 @@ class UBotAsmProcess_writeSingleStorage extends ProcessBase {
         this.binToWrite = binToWrite;
         this.binHashId = crypto.HashId.of(this.binToWrite);
         this.previousRecordId = previousRecordId;
-        this.generateSelfRecordID();
 
         // put result to cache
-        this.pr.ubot.resultCache.put(this.recordId, this.binToWrite);
+        this.pr.ubot.resultCache.put(this.binHashId, this.binToWrite);
 
         this.storageName = storageData.storage_name;
         if (this.pr.executableContract.state.data.cloud_storages.hasOwnProperty(this.storageName)) {
@@ -107,6 +106,11 @@ class UBotAsmProcess_writeSingleStorage extends ProcessBase {
         if (this.approveCounterSet.size >= this.quorumSize) {
             // ok
             this.getHashesTask.cancel();
+
+            this.generateSelfRecordID();
+
+            // put result to cache
+            this.pr.ubot.resultCache.put(this.recordId, this.binToWrite);
 
             try {
                 await this.pr.ledger.writeToSingleStorage(this.pr.executableContract.id, this.storageName,

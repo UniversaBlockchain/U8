@@ -72,13 +72,26 @@ class UBot {
         return null;
     }
 
-    async getStorageResult(recordId, multi) {
-        let result = this.resultCache.get(recordId);
+    async getStorageResultByHash(hash, multi) {
+        let result = this.resultCache.get(hash);
         if (result != null)
             return result;
 
         if (multi)
-            result = await this.ledger.getMultiStorageDataByRecordId(recordId);
+            result = await this.ledger.getMultiStorageDataByHash(hash);
+        else
+            result = await this.ledger.getSingleStorageDataByHash(hash);
+
+        return result;
+    }
+
+    async getStorageResultByRecordId(recordId, multi, ubotNumber = undefined) {
+        let result = this.resultCache.get(recordId, ubotNumber);
+        if (result != null)
+            return result;
+
+        if (multi)
+            result = await this.ledger.getMultiStorageDataByRecordId(recordId, ubotNumber);
         else
             result = await this.ledger.getSingleStorageDataByRecordId(recordId);
 

@@ -84,9 +84,9 @@ class UBotHttpServer extends network.HttpServer {
     async onGetStorageResult(request, multi) {
         let paramIndex = request.path.indexOf("/", 1) + 1;
         let encodedString = request.path.substring(paramIndex);
-        let recordId = HashId.withBase64Digest(encodedString);
+        let hash = HashId.withBase64Digest(encodedString);
 
-        let result = await this.ubot.getStorageResult(recordId, multi);
+        let result = await this.ubot.getStorageResultByHash(hash, multi);
         if (result != null)
             request.setAnswerBody(result);
         else

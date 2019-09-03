@@ -25,16 +25,22 @@ class UBotResultCache {
         this.cleanerExecutor.cancel();
     }
 
-    get(recordId) {
-        let i = this.records.get(recordId);
+    get(hash, ubotNumber = undefined) {
+        let i = this.records.get(hash);
         if (i != null && i.result == null)
             throw new Error("cache: record with empty result");
-        return i != null ? i.result : null;
+
+        if (ubotNumber == null)
+            return i != null ? i.result : null;
+        else if (i != null && i.result != null && i.result instanceof Map)
+            return i.result.get(ubotNumber);
+        else
+            throw new Error("cache: null or not map result for cortege");
     }
 
-    put(recordId, result) {
+    put(hash, result) {
         // this will plainly override current if any
-        new Record(recordId, result, this);
+        new Record(hash, result, this);
     }
 
     get size() {
@@ -43,17 +49,17 @@ class UBotResultCache {
 }
 
 class Record {
-    constructor(recordId, result, resultCache) {
+    constructor(hash, result, resultCache) {
         this.resultCache = resultCache;
-        this.recordId = recordId;
+        this.hash = hash;
         this.result = result;
         this.expiresAt = Math.floor(Date.now() / 1000) + this.resultCache.maxAge;
-        this.resultCache.records.set(recordId, this);
+        this.resultCache.records.set(hash, this);
     }
 
     checkExpiration(now) {
         if (this.expiresAt < now)
-            this.resultCache.records.delete(this.recordId);
+            this.resultCache.records.delete(this.hash);
     }
 
 }
