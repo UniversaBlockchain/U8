@@ -89,6 +89,10 @@ public:
 
     int runAsMain(string sourceScript, const vector<string> &&args, string fileName);
 
+    void runMainLoop();
+    void startMainLoopThread();
+    void joinMainLoopThread();
+
     template<typename T>
     string getString(MaybeLocal<T> value) {
         return getString(value.ToLocalChecked());
@@ -225,6 +229,10 @@ public:
         throwError(string(text));
     }
 
+    std::shared_ptr<Persistent<FunctionTemplate>> getTemplate(const std::string& tplName);
+    void setTemplate(const std::string& tplName, std::shared_ptr<Persistent<FunctionTemplate>> tpl);
+    void resetAllHoldedTemplates();
+
 private:
 
     std::string expandPath(const std::string &path);
@@ -263,6 +271,10 @@ private:
     volatile bool isActive = true;
     int exitCode = 0;
     Queue<ContextCallback> callbacks;
+
+    std::shared_ptr<std::thread> mainLoopThread;
+
+    std::unordered_map<std::string, std::shared_ptr<Persistent<FunctionTemplate>>> templatesHolder;
 
     // do not construct it manually
     explicit Scripter();

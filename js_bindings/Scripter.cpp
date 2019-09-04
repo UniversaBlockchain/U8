@@ -15,6 +15,7 @@
 #include "web_bindings.h"
 #include "research_bindings.h"
 #include "boss_bindings.h"
+#include "worker_bindings.h"
 
 static const char *ARGV0 = nullptr;
 
@@ -179,6 +180,7 @@ void Scripter::initialize() {
     JsInitNetwork(pIsolate, global);
     JsInitResearchBindings(pIsolate, global);
     JsInitBossBindings(pIsolate, global);
+    JsInitWorkerBindings(*this, pIsolate, global);
 
     // Save context and wrap weak self:
     context.Reset(pIsolate, v8::Context::New(pIsolate, nullptr, global));
@@ -303,6 +305,22 @@ int Scripter::runAsMain(string sourceScript, const vector<string> &&args, string
         throwPendingException<ScriptError>(tryCatch, context);
     });
 
+    runMainLoop();
+
+    return exitCode;
+//
+//    if (waitExit) {
+//        pIsolate->Exit();
+//        Unlocker ul(pIsolate);
+//        waitExitPromise.get_future().get();
+//        pIsolate->Enter();
+//        return exitCode;
+//    }
+//    return code;
+
+}
+
+void Scripter::runMainLoop() {
     // main loop: we process all callbacks here in the same thread:
     {
         // optimization: the shared context scope - it could be a problem, then move it insude the loop
@@ -322,18 +340,16 @@ int Scripter::runAsMain(string sourceScript, const vector<string> &&args, string
             }
         }
     }
+}
 
-    return exitCode;
-//
-//    if (waitExit) {
-//        pIsolate->Exit();
-//        Unlocker ul(pIsolate);
-//        waitExitPromise.get_future().get();
-//        pIsolate->Enter();
-//        return exitCode;
-//    }
-//    return code;
+void Scripter::startMainLoopThread() {
+    mainLoopThread = std::make_shared<std::thread>([this](){
+        runMainLoop();
+    });
+}
 
+void Scripter::joinMainLoopThread() {
+    mainLoopThread->join();
 }
 
 std::string Scripter::expandPath(const std::string &path) {
@@ -395,3 +411,15 @@ void Scripter::unwrap(
     }
 }
 
+std::shared_ptr<Persistent<FunctionTemplate>> Scripter::getTemplate(const std::string& tplName) {
+    return templatesHolder[tplName];
+}
+
+void Scripter::setTemplate(const std::string& tplName, std::shared_ptr<Persistent<FunctionTemplate>> tpl) {
+    templatesHolder[tplName] = tpl;
+}
+
+void Scripter::resetAllHoldedTemplates() {
+    for (auto tpl : templatesHolder)
+        tpl.second->Reset();
+}
