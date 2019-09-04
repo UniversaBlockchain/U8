@@ -31,6 +31,7 @@ class ProcessDownloadStartingContract extends ProcessBase {
                     this.pr.pool = [];
                     ans.selectedPool.forEach(i => this.pr.pool.push(this.pr.ubot.network.netConfig.getInfo(i)));
                     this.pr.pool.forEach((info, i) => this.pr.poolIndexes.set(info.number, i));
+                    this.pr.selfPoolIndex = this.pr.poolIndexes.get(this.pr.ubot.network.myInfo.number);
                     this.pr.ubot.network.deliver(this.pr.respondToNotification.from,
                         new UBotCloudNotification(
                             this.pr.ubot.network.myInfo,
