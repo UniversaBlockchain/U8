@@ -27,6 +27,11 @@ To build U8, you need the following packages installed:
 ### Build procedure
 
 ~~~sh
+# Set clang as active compiler
+export CC=/usr/bin/clang-8
+export CXX=/usr/bin/clang++-8
+
+# Build
 cmake -S . -B build-release
 cmake --build build-release --target all -- -j
 ~~~
