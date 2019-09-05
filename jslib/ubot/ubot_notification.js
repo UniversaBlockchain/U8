@@ -112,7 +112,8 @@ class UBotCloudNotification_asmCommand extends Notification {
         SINGLE_STORAGE_GET_DATA_HASHID:   {ordinal: 0},
         MULTI_STORAGE_GET_DATA_HASHID:   {ordinal: 1},
         MULTI_STORAGE_GET_CORTEGE_HASHID:   {ordinal: 2},
-        MULTI_STORAGE_GET_POOL_HASHES:   {ordinal: 3}
+        MULTI_STORAGE_GET_POOL_HASHES:   {ordinal: 3},
+        MULTI_STORAGE_GET_CORTEGES:   {ordinal: 4}
     };
 
     constructor(from, poolId, cmdStack, type, dataHashId, previousRecordId, isAnswer, isFirstRecord, dataUbotInPool = -1) {
@@ -120,8 +121,9 @@ class UBotCloudNotification_asmCommand extends Notification {
         this.poolId = poolId;
         this.cmdStack = cmdStack;
         this.type = type;
-        this.dataHashId = dataHashId;
-        this.dataUbotInPool = dataUbotInPool;
+        //TODO: replace on params binder
+        this.dataHashId = dataHashId;           // cortege for MULTI_STORAGE_GET_CORTEGES
+        this.dataUbotInPool = dataUbotInPool;   // commonCortegeIteration for MULTI_STORAGE_GET_CORTEGES
         this.previousRecordId = previousRecordId;
         this.isAnswer = isAnswer;
         this.isFirstRecord = isFirstRecord;
@@ -155,6 +157,11 @@ class UBotCloudNotification_asmCommand extends Notification {
                     if (!this.isFirstRecord)
                         bw.write(this.previousRecordId.digest);
                 }
+                break;
+            case UBotCloudNotification_asmCommand.types.MULTI_STORAGE_GET_CORTEGES:
+                bw.write(this.dataUbotInPool);
+                if (this.isAnswer)
+                    bw.write(this.dataHashId);
         }
     }
 
@@ -191,6 +198,11 @@ class UBotCloudNotification_asmCommand extends Notification {
                     else
                         this.previousRecordId = null;
                 }
+                break;
+            case UBotCloudNotification_asmCommand.types.MULTI_STORAGE_GET_CORTEGES:
+                this.dataUbotInPool = br.read();
+                if (this.isAnswer)
+                    this.dataHashId = br.read();
         }
     }
 
