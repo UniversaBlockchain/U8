@@ -19,7 +19,7 @@ private:
         UDateTimeData(const TimePoint &v);
         ~UDateTimeData() override = default;
 
-        Local<Object> serializeToV8(Isolate* isolate) override {
+        Local<Object> serializeToV8(Scripter& scripter, Isolate* isolate) override {
             return Local<Object>::Cast(Date::New(isolate->GetCurrentContext(), double(value.time_since_epoch().count()*1e-6)).ToLocalChecked());
         }
 

@@ -11,6 +11,10 @@ wrk.onReceive = (obj) => {
 `;
 
 unit.test("hello worker", async () => {
+    console.log();
+    let pubKey1 = (await crypto.PrivateKey.generate(2048)).publicKey;
+    console.log("random pub key 1: " + btoa(pubKey1.fingerprints));
+
     let worker = await createWorker();
     let resolver;
     let promise = new Promise((resolve, reject) => resolver = resolve);
@@ -21,4 +25,7 @@ unit.test("hello worker", async () => {
     worker.send({a:5, b:6, c:7});
     await promise;
     await worker.close();
+
+    // let pubKey2 = (await crypto.PrivateKey.generate(2048)).publicKey;
+    // console.log("random pub key 2: " + btoa(pubKey2.fingerprints));
 });

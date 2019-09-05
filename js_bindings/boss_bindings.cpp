@@ -68,6 +68,7 @@ void JsBossAsyncLoad(const v8::FunctionCallbackInfo<v8::Value> &args) {
             if (!ac.args[1]->IsNull())
                 nestedLoadMap = v8ValueToUObject(ac.isolate, ac.args[1]);
             auto onReady = ac.asFunction(2);
+            auto se = ac.scripter;
             runAsync([=]() {
                 byte_vector bin(buffer->size());
                 memcpy(&bin[0], buffer->data(), buffer->size());
@@ -91,7 +92,7 @@ void JsBossAsyncLoad(const v8::FunctionCallbackInfo<v8::Value> &args) {
                 }
 
                 onReady->lockedContext([=](Local<Context> &cxt) {
-                    onReady->invoke(obj.serializeToV8(onReady->isolate()));
+                    onReady->invoke(obj.serializeToV8(*se, onReady->isolate()));
                 });
             });
             return;
@@ -100,41 +101,38 @@ void JsBossAsyncLoad(const v8::FunctionCallbackInfo<v8::Value> &args) {
     });
 }
 
-static shared_ptr<Persistent<Object>> hashId_prototype;
-static shared_ptr<Persistent<Object>> publicKey_prototype;
-static shared_ptr<Persistent<Object>> privateKey_prototype;
-
-shared_ptr<Persistent<Object>> getHashIdPrototype() {
-    return hashId_prototype;
+shared_ptr<Persistent<Object>> getHashIdPrototype(Scripter& scripter) {
+    return scripter.getPrototype("HashId");
 }
 
-shared_ptr<Persistent<Object>> getPublicKeyPrototype() {
-    return publicKey_prototype;
+shared_ptr<Persistent<Object>> getPublicKeyPrototype(Scripter& scripter) {
+    return scripter.getPrototype("PublicKey");
 }
 
-shared_ptr<Persistent<Object>> getPrivateKeyPrototype() {
-    return privateKey_prototype;
+shared_ptr<Persistent<Object>> getPrivateKeyPrototype(Scripter& scripter) {
+    return scripter.getPrototype("PrivateKey");
 }
 
 void JsBossAddPrototype(const v8::FunctionCallbackInfo<v8::Value> &args) {
     Scripter::unwrapArgs(args, [](ArgsContext &ac) {
         if (ac.args.Length() == 2) {
+            auto se = ac.scripter;
             string prototypeName = ac.asString(0);
             Local<Object> obj = ac.args[1]->ToObject(ac.isolate);
             auto prototype = make_shared<Persistent<Object>>(ac.isolate, obj);
             if (prototypeName == "HashId")
-                hashId_prototype = prototype;
+                se->setPrototype("HashId", prototype);
             else if (prototypeName == "PublicKey")
-                publicKey_prototype = prototype;
+                se->setPrototype("PublicKey", prototype);
             else if (prototypeName == "PrivateKey")
-                privateKey_prototype = prototype;
+                se->setPrototype("PrivateKey", prototype);
             return;
         }
         ac.throwError("invalid arguments");
     });
 }
 
-void JsInitBossBindings(Isolate *isolate, const Local<ObjectTemplate> &global) {
+void JsInitBossBindings(Scripter& scripter, Isolate *isolate, const Local<ObjectTemplate> &global) {
     global->Set(String::NewFromUtf8(isolate, "__boss_asyncDump"), FunctionTemplate::New(isolate, JsBossAsyncDump));
     global->Set(String::NewFromUtf8(isolate, "__boss_asyncLoad"), FunctionTemplate::New(isolate, JsBossAsyncLoad));
     global->Set(String::NewFromUtf8(isolate, "__boss_addPrototype"), FunctionTemplate::New(isolate, JsBossAddPrototype));

@@ -9,6 +9,12 @@ public:
     std::shared_ptr<Scripter> se;
 };
 
+static const std::string workerMain = R"End(
+function __worker_on_receive(obj) {
+    console.log("__worker_on_receive: hit!");
+}
+)End";
+
 static void JsCreateWorker(const FunctionCallbackInfo<Value> &args) {
     Scripter::unwrapArgs(args, [](ArgsContext &ac) {
         if (ac.args.Length() == 2) {
@@ -17,16 +23,20 @@ static void JsCreateWorker(const FunctionCallbackInfo<Value> &args) {
             auto onComplete = ac.asFunction(1);
             runAsync([se, onComplete]() {
                 ScripterWrap *psw = new ScripterWrap();
-                psw->se = Scripter::New();;
-                psw->se->startMainLoopThread();
-                //se->inContext([se](Local<Context> cxt) {
-                    cout << "eva1" << endl;
-                    psw->se->evaluate("console.log('print something 1');");
-                //});
+                psw->se = Scripter::New();
+                //psw->se->startMainLoopThread();
+//                v8::Isolate::Scope isolateScope(psw->se->isolate());
+//                psw->se->evaluate(workerMain);
+//                psw->se->evaluate("__worker_on_receive();");
+//                psw->se->inContext([se,psw](Local<Context> cxt) {
+//                    cout << "eva1" << endl;
+//                    psw->se->evaluate("console.log('print something 1');");
+//                });
 //                this_thread::sleep_for(3s);
 //                psw->se->evaluate("console.log('print something 0');");
 //                psw->se->exit(0);
 //                psw->se->joinMainLoopThread();
+//                this_thread::sleep_for(100ms);
                 cout << "onComplete..." << endl;
                 onComplete->lockedContext([=](Local<Context> cxt) {
                     cout << "JsCreateWorker onComplete" << endl;

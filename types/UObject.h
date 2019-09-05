@@ -7,6 +7,7 @@
 
 #include <memory>
 #include <v8.h>
+#include "../js_bindings/Scripter.h"
 
 using namespace v8;
 
@@ -37,7 +38,7 @@ public:
         this->empty = empty;
     }
 
-    virtual Local<Object> serializeToV8(Isolate* isolate) {
+    virtual Local<Object> serializeToV8(Scripter& scripter, Isolate* isolate) {
         return Local<Object>::Cast(Null(isolate));
     };
 
@@ -82,8 +83,8 @@ public:
 
     };
 
-    Local<Object> serializeToV8(Isolate* isolate) const {
-        return ptr.get()->serializeToV8(isolate);
+    Local<Object> serializeToV8(Scripter& scripter, Isolate* isolate) const {
+        return ptr.get()->serializeToV8(scripter, isolate);
     }
 
     void dbgPrint(std::string prefix = "") const {

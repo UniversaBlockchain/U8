@@ -15,7 +15,7 @@ private:
         UBoolData(bool v);
         ~UBoolData() = default;
 
-        Local<Object> serializeToV8(Isolate* isolate) override {
+        Local<Object> serializeToV8(Scripter& scripter, Isolate* isolate) override {
             return Local<Object>::Cast(Boolean::New(isolate, value));
         }
 

@@ -19,10 +19,10 @@ private:
         UHashIdData(const crypto::HashId &val);
         ~UHashIdData() override = default;
 
-        Local<Object> serializeToV8(Isolate* isolate) override {
-            auto res = wrapHashId(isolate, new crypto::HashId(*hashId.get()));
+        Local<Object> serializeToV8(Scripter& scripter, Isolate* isolate) override {
+            auto res = wrapHashId(scripter, isolate, new crypto::HashId(*hashId.get()));
             auto obj = Local<Object>::Cast(res);
-            auto unused = obj->SetPrototype(isolate->GetCurrentContext(), getHashIdPrototype()->Get(isolate));
+            auto unused = obj->SetPrototype(isolate->GetCurrentContext(), getHashIdPrototype(scripter)->Get(isolate));
             return obj;
         }
 

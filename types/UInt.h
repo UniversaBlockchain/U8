@@ -15,7 +15,7 @@ private:
         UIntData(int64_t v);
         ~UIntData() override = default;
 
-        Local<Object> serializeToV8(Isolate* isolate) override {
+        Local<Object> serializeToV8(Scripter& scripter, Isolate* isolate) override {
             return Local<Object>::Cast(Number::New(isolate, value));
         }
 

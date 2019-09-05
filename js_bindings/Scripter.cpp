@@ -173,13 +173,13 @@ void Scripter::initialize() {
     JsInitIOTCP(pIsolate, global);
     JsInitIOTLS(pIsolate, global);
     JsInitIOUDP(pIsolate, global);
-    JsInitCrypto(pIsolate, global);
+    JsInitCrypto(*this, pIsolate, global);
     JsInitQueryResult(pIsolate, global);
     JsInitBusyConnection(pIsolate, global);
     JsInitPGPool(pIsolate, global);
     JsInitNetwork(pIsolate, global);
     JsInitResearchBindings(pIsolate, global);
-    JsInitBossBindings(pIsolate, global);
+    JsInitBossBindings(*this, pIsolate, global);
     JsInitWorkerBindings(*this, pIsolate, global);
 
     // Save context and wrap weak self:
@@ -422,4 +422,12 @@ void Scripter::setTemplate(const std::string& tplName, std::shared_ptr<Persisten
 void Scripter::resetAllHoldedTemplates() {
     for (auto tpl : templatesHolder)
         tpl.second->Reset();
+}
+
+std::shared_ptr<Persistent<Object>> Scripter::getPrototype(const std::string& protoName) {
+    return prototypesHolder[protoName];
+}
+
+void Scripter::setPrototype(const std::string& protoName, std::shared_ptr<Persistent<Object>> proto) {
+    prototypesHolder[protoName] = proto;
 }

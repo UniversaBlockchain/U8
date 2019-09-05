@@ -19,10 +19,10 @@ private:
         UArrayData();
         ~UArrayData() override;
 
-        Local<Object> serializeToV8(Isolate *isolate) override {
+        Local<Object> serializeToV8(Scripter& scripter, Isolate *isolate) override {
             auto res = Array::New(isolate);
             for (auto& it: array)
-                res->Set(res->Length(), it.serializeToV8(isolate));
+                res->Set(res->Length(), it.serializeToV8(scripter, isolate));
             return res;
         };
 

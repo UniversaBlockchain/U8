@@ -19,10 +19,10 @@ private:
         UPublicKeyData(const crypto::PublicKey &val);
         ~UPublicKeyData() override = default;
 
-        Local<Object> serializeToV8(Isolate* isolate) override {
-            auto res = wrapPublicKey(isolate, new crypto::PublicKey(*publicKey.get()));
+        Local<Object> serializeToV8(Scripter& scripter, Isolate* isolate) override {
+            auto res = wrapPublicKey(scripter, isolate, new crypto::PublicKey(*publicKey.get()));
             auto obj = Local<Object>::Cast(res);
-            auto unused = obj->SetPrototype(isolate->GetCurrentContext(), getPublicKeyPrototype()->Get(isolate));
+            auto unused = obj->SetPrototype(isolate->GetCurrentContext(), getPublicKeyPrototype(scripter)->Get(isolate));
             return obj;
         }
 

@@ -232,6 +232,8 @@ public:
     std::shared_ptr<Persistent<FunctionTemplate>> getTemplate(const std::string& tplName);
     void setTemplate(const std::string& tplName, std::shared_ptr<Persistent<FunctionTemplate>> tpl);
     void resetAllHoldedTemplates();
+    std::shared_ptr<Persistent<Object>> getPrototype(const std::string& tplName);
+    void setPrototype(const std::string& protoName, std::shared_ptr<Persistent<Object>> proto);
 
 private:
 
@@ -275,6 +277,7 @@ private:
     std::shared_ptr<std::thread> mainLoopThread;
 
     std::unordered_map<std::string, std::shared_ptr<Persistent<FunctionTemplate>>> templatesHolder;
+    std::unordered_map<std::string, std::shared_ptr<Persistent<Object>>> prototypesHolder;
 
     // do not construct it manually
     explicit Scripter();

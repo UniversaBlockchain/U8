@@ -22,10 +22,10 @@ private:
         UBinderData();
         ~UBinderData() override;
 
-        Local<Object> serializeToV8(Isolate *isolate) override {
+        Local<Object> serializeToV8(Scripter& scripter, Isolate *isolate) override {
             auto res = Object::New(isolate);
             for (auto& it: binder)
-                res->Set(String::NewFromUtf8(isolate, it.first.data()), it.second.serializeToV8(isolate));
+                res->Set(String::NewFromUtf8(isolate, it.first.data()), it.second.serializeToV8(scripter, isolate));
             return res;
         };
 
