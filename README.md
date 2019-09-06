@@ -33,7 +33,7 @@ export CXX=/usr/bin/clang++-8
 
 # Build
 cmake -S . -B build-release
-cmake --build build-release --target all -- -j
+cmake --build build-release --target u8 -- -j
 ~~~
 
 After that, in the `build-release` directory you get the `u8` binary which may now execute the JavaScript scripts, like:
