@@ -281,7 +281,8 @@ Local<FunctionTemplate> initPrivateKey(Scripter& scripter, Isolate *isolate) {
     Local<FunctionTemplate> tpl = bindCppClass<PrivateKey>(
             isolate,
             "PrivateKeyImpl",
-            [=](const FunctionCallbackInfo<Value> &args) -> PrivateKey * {
+            [](const FunctionCallbackInfo<Value> &args) -> PrivateKey * {
+                Isolate *isolate = args.GetIsolate();
                 if (args.Length() == 1) {
                     if (args[0]->IsTypedArray()) {
                         // load from packed
@@ -310,15 +311,15 @@ Local<FunctionTemplate> initPublicKey(Scripter& scripter, Isolate *isolate) {
     Local<FunctionTemplate> tpl = bindCppClass<PublicKey>(
             isolate,
             "PublicKeyImpl",
-            [&scripter](const FunctionCallbackInfo<Value> &args) -> PublicKey * {
+            [](const FunctionCallbackInfo<Value> &args) -> PublicKey * {
                 Isolate *isolate = args.GetIsolate();
+                Scripter* pse = (Scripter*)isolate->GetData(0);
                 if (args.Length() == 1) {
                     if (args[0]->IsTypedArray()) {
                         auto contents = args[0].As<TypedArray>()->Buffer()->GetContents();
                         return new PublicKey(contents.Data(), contents.ByteLength());
                     } else if (args[0]->IsObject()) {
-                        cout << &scripter << endl;
-                        auto pkt = scripter.getTemplate("privateKeyTpl")->Get(isolate);
+                        auto pkt = pse->getTemplate("privateKeyTpl")->Get(isolate);
                         Local<Object> obj = args[0].As<Object>();
                         if (pkt->HasInstance(obj))
                             return new PublicKey(*unwrap<PrivateKey>(obj));
@@ -348,8 +349,9 @@ Local<FunctionTemplate> initKeyAddress(Scripter& scripter, Isolate *isolate) {
     Local<FunctionTemplate> tpl = bindCppClass<KeyAddress>(
             isolate,
             "KeyAddress",
-            [&scripter](const FunctionCallbackInfo<Value> &args) -> KeyAddress * {
+            [](const FunctionCallbackInfo<Value> &args) -> KeyAddress * {
                 auto isolate = args.GetIsolate();
+                Scripter* pse = (Scripter*)isolate->GetData(0);
                 auto a0 = args[0];
                 if (a0->IsTypedArray() && args.Length() == 1) {
                     // TODO: reuse data of the typed array
@@ -361,7 +363,7 @@ Local<FunctionTemplate> initKeyAddress(Scripter& scripter, Isolate *isolate) {
                     return new KeyAddress(*s);
                 } else if (a0->IsObject() && args.Length() == 3) {
                     Local<Object> obj = a0.As<Object>();
-                    auto tpl = *scripter.getTemplate("publicKeyTpl")->Get(isolate);
+                    auto tpl = *pse->getTemplate("publicKeyTpl")->Get(isolate);
                     if (tpl->HasInstance(obj)) {
                         auto context = args.GetIsolate()->GetCurrentContext();
                         return new KeyAddress(*unwrap<PrivateKey>(obj),
@@ -395,7 +397,8 @@ Local<FunctionTemplate> initHashId(Scripter& scripter, Isolate *isolate) {
     Local<FunctionTemplate> tpl = bindCppClass<HashId>(
             isolate,
             "HashIdImpl",
-            [=](const FunctionCallbackInfo<Value> &args) -> HashId * {
+            [](const FunctionCallbackInfo<Value> &args) -> HashId * {
+                auto isolate = args.GetIsolate();
                 if (args.Length() == 2) {
                     bool isDigest = args[0]->BooleanValue(isolate);
                     if (args[1]->IsTypedArray()) {

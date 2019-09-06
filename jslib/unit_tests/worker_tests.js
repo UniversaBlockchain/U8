@@ -26,6 +26,6 @@ unit.test("hello worker", async () => {
     await promise;
     await worker.close();
 
-    // let pubKey2 = (await crypto.PrivateKey.generate(2048)).publicKey;
-    // console.log("random pub key 2: " + btoa(pubKey2.fingerprints));
+    let pubKey2 = (await crypto.PrivateKey.generate(2048)).publicKey;
+    console.log("random pub key 2: " + btoa(pubKey2.fingerprints));
 });

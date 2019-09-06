@@ -151,6 +151,8 @@ void Scripter::initialize() {
     pIsolate = v8::Isolate::New(create_params);
     v8::Isolate::Scope isolate_scope(pIsolate);
 
+    pIsolate->SetData(0, this);
+
     // Create a stack-allocated handle scope.
     v8::HandleScope handle_scope(pIsolate);
 
