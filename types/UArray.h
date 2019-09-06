@@ -5,6 +5,7 @@
 #ifndef UNITOOLS_UARRAY_H
 #define UNITOOLS_UARRAY_H
 
+#include <string>
 #include <memory>
 #include "UObject.h"
 #include <vector>
