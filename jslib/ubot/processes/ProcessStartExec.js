@@ -104,6 +104,8 @@ class ProcessStartExec extends ProcessBase {
                     this.cmdIndex += Number(param);
                 break;
             case "equal":
+                console.log("ubot: " + this.pr.ubot.network.myInfo.number, "data = " + this.var0);
+                console.log("ubot: " + this.pr.ubot.network.myInfo.number, "data = " + this.var1);
                 this.var0 = t.valuesEqual(this.var0, this.var1);
                 break;
             case "finish":
@@ -238,6 +240,16 @@ class ProcessStartExec extends ProcessBase {
                         "Can`t write to multi-storage: " + storageName));
                     this.pr.changeState(UBotPoolState.FAILED);
                 }
+                break;
+            case "getSingleDataByRecordId":
+                this.var0 = await this.pr.ubot.getStorageResultByRecordId(this.var0, false);
+                break;
+            case "getMultiDataByRecordId":
+                console.log("ubot: " + this.pr.ubot.network.myInfo.number, "data = " + this.var0);
+                console.log("ubot: " + this.pr.ubot.network.myInfo.number, "data = " + this.var1);
+                this.var0 = await this.pr.ubot.getStorageResultByRecordId(this.var0, true, this.pr.ubot.network.myInfo.number);
+                console.log("ubot: " + this.pr.ubot.network.myInfo.number, "data = " + this.var0);
+                console.log("ubot: " + this.pr.ubot.network.myInfo.number, "data = " + this.var1);
                 break;
             default:
                 this.pr.logger.log("error: ubotAsm code '" + op + "' not found");

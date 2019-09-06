@@ -28,6 +28,7 @@ class ProcessSendStartingContract extends ProcessBase {
         this.pr.pool = t.randomChoice(list, this.pr.poolSize - 1);
         this.pr.pool.push(me);
         this.pr.pool.forEach((info, i) => this.pr.poolIndexes.set(info.number, i));
+        this.pr.selfPoolIndex = this.pr.poolIndexes.get(this.pr.ubot.network.myInfo.number);
     }
 
     async start() {

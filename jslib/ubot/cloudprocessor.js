@@ -22,6 +22,7 @@ class CloudProcessor {
         this.currentProcess = null;
         this.pool = [];
         this.poolIndexes = new Map();
+        this.selfPoolIndex = null;
         this.respondToNotification = null;
         this.output = null;
         this.errors = [];
