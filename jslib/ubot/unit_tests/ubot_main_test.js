@@ -870,8 +870,16 @@ unit.test("ubot_main_test: getDataByRecordId", async () => {
                 "generateRandomHash;" + // should approve write to multi storage, each ubot has random value
                 "moveTo var1;" +
                 "writeMultiStorage storage;" +
+                "moveTo var3;" +
                 "getMultiDataByRecordId;" +
                 "equal;" +
+               /* "ifTrue 1;" +
+                "finish;" +
+                "moveFrom var3;" +
+                "moveTo var1;" +
+                "writeSingleStorage storage;" +
+                "getSingleDataByRecordId;" +
+                "equal;" +*/
                 "finish"
         }
     };
@@ -928,10 +936,7 @@ unit.test("ubot_main_test: getDataByRecordId", async () => {
         fire(null);
     });
 
-    // checking length of random hash
-    //assert((await event).length === 96);
-
-    //assert(await Boss.load(await event));
+    assert(await event);
 
     await shutdownUBots(ubotMains);
 });

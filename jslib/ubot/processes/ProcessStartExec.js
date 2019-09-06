@@ -242,14 +242,14 @@ class ProcessStartExec extends ProcessBase {
                 }
                 break;
             case "getSingleDataByRecordId":
+                console.log("ubot: " + this.pr.ubot.network.myInfo.number, "data = " + this.var0);
+                console.log("ubot: " + this.pr.ubot.network.myInfo.number, "data = " + this.var1);
                 this.var0 = await this.pr.ubot.getStorageResultByRecordId(this.var0, false);
+                console.log("ubot: " + this.pr.ubot.network.myInfo.number, "data = " + this.var0);
+                console.log("ubot: " + this.pr.ubot.network.myInfo.number, "data = " + this.var1);
                 break;
             case "getMultiDataByRecordId":
-                console.log("ubot: " + this.pr.ubot.network.myInfo.number, "data = " + this.var0);
-                console.log("ubot: " + this.pr.ubot.network.myInfo.number, "data = " + this.var1);
                 this.var0 = await this.pr.ubot.getStorageResultByRecordId(this.var0, true, this.pr.ubot.network.myInfo.number);
-                console.log("ubot: " + this.pr.ubot.network.myInfo.number, "data = " + this.var0);
-                console.log("ubot: " + this.pr.ubot.network.myInfo.number, "data = " + this.var1);
                 break;
             default:
                 this.pr.logger.log("error: ubotAsm code '" + op + "' not found");

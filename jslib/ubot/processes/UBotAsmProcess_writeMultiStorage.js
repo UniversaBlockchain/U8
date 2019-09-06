@@ -232,7 +232,7 @@ class UBotAsmProcess_writeMultiStorage extends UBotAsmProcess_writeSingleStorage
         let current = await Boss.load(result);
         let previous = null;
         if (previousRecordId != null)
-            previous = await Boss.load(await this.pr.ubot.getStorageResultByRecordId(previousRecordId, true, ubotNumber));
+            previous = await this.pr.ubot.getStorageResultByRecordId(previousRecordId, true, ubotNumber);
 
         return new Promise(resolve => {
             let verifyProcess = new this.pr.ProcessStartExec(this.pr, (output) => {

@@ -88,12 +88,12 @@ class UBot {
     async getStorageResultByRecordId(recordId, multi, ubotNumber = undefined) {
         let result = this.resultCache.get(recordId, ubotNumber);
         if (result != null)
-            return result;
+            return await Boss.load(result);
 
         if (multi)
-            result = await this.ledger.getMultiStorageDataByRecordId(recordId, ubotNumber);
+            result = await Boss.load(await this.ledger.getMultiStorageDataByRecordId(recordId, ubotNumber));
         else
-            result = await this.ledger.getSingleStorageDataByRecordId(recordId);
+            result = await Boss.load(await this.ledger.getSingleStorageDataByRecordId(recordId));
 
         return result;
     }
