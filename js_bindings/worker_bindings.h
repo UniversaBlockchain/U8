@@ -12,5 +12,6 @@ using namespace std;
 
 void JsInitWorkerBindings(Scripter& scripter, Isolate *isolate, const Local<ObjectTemplate> &global);
 void JsInitScripterWrap(Scripter& scripter, Isolate *isolate, const Local<ObjectTemplate> &global);
+void JsInitWorkers(const v8::FunctionCallbackInfo<v8::Value> &args);
 
 #endif //U8_WORKER_BINDINGS_H

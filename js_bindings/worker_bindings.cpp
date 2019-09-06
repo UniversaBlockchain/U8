@@ -7,9 +7,14 @@
 class ScripterWrap {
 public:
     std::shared_ptr<Scripter> se;
+    std::shared_ptr<FunctionHandler> onReceive;
 };
 
 static const std::string workerMain = R"End(
+__init_workers((obj) => {
+    console.log("worker onReceive!!!!!!!!!!!!!!!!!!!!!!");
+});
+
 function __worker_on_receive(obj) {
     console.log("__worker_on_receive: hit!");
 }
@@ -24,7 +29,10 @@ static void JsCreateWorker(const FunctionCallbackInfo<Value> &args) {
             runAsync([se, onComplete]() {
                 ScripterWrap *psw = new ScripterWrap();
                 psw->se = Scripter::New();
-                //psw->se->startMainLoopThread();
+                psw->se->isolate()->SetData(1, psw);
+                psw->se->evaluate(workerMain);
+                //psw->se->evaluate("__worker_on_receive();");
+                psw->se->startMainLoopThread();
 //                v8::Isolate::Scope isolateScope(psw->se->isolate());
 //                psw->se->evaluate(workerMain);
 //                psw->se->evaluate("__worker_on_receive();");
@@ -62,14 +70,24 @@ void JsInitWorkerBindings(Scripter& scripter, Isolate *isolate, const Local<Obje
     global->Set(isolate, "wrk", wrk);
 }
 
-//void JsScripterWrap_eval(const FunctionCallbackInfo<Value> &args) {
-//    Scripter::unwrapArgs(args, [](ArgsContext &ac) {
-//        if (ac.args.Length() == 4) {
-//            return;
-//        }
-//        ac.throwError("invalid number of arguments");
-//    });
-//}
+void JsScripterWrap_send(const FunctionCallbackInfo<Value> &args) {
+    Scripter::unwrapArgs(args, [](ArgsContext &ac) {
+        if (ac.args.Length() == 0) {
+            auto psw = unwrap<ScripterWrap>(ac.args.This());
+            //runAsync([psw](){
+                //psw->onReceive->lockedContext([psw](Local<Context> &cxt){
+                    cout << "111111111111" << endl;
+                    cout << "JsScripterWrap_send se=" << psw->se.get() << ", isolate=" << psw->se->isolate() << ", psw=" << psw << endl;
+                    cout << "onReceive->scripter: " << psw->onReceive->scripter() << endl;
+                    psw->onReceive->invoke();
+                    cout << "222222222222" << endl;
+                //});
+            //});
+            return;
+        }
+        ac.throwError("invalid number of arguments");
+    });
+}
 
 void JsInitScripterWrap(Scripter& scripter, Isolate *isolate, const Local<ObjectTemplate> &global) {
     // Bind object with default constructor
@@ -78,11 +96,39 @@ void JsInitScripterWrap(Scripter& scripter, Isolate *isolate, const Local<Object
     // instance methods
     auto prototype = tpl->PrototypeTemplate();
     prototype->Set(isolate, "version", String::NewFromUtf8(isolate, "0.0.1"));
-//    prototype->Set(isolate, "_eval", FunctionTemplate::New(isolate, JsScripterWrap_eval));
+    prototype->Set(isolate, "_send", FunctionTemplate::New(isolate, JsScripterWrap_send));
 
     // register it into global namespace
     auto persistentTpl = std::make_shared<Persistent<FunctionTemplate>>();
     persistentTpl->Reset(isolate, tpl);
     scripter.setTemplate("ScripterWrapTpl", persistentTpl);
     global->Set(isolate, "ScripterWrap", tpl);
+}
+
+void JsInitWorkers(const v8::FunctionCallbackInfo<v8::Value> &args) {
+    Scripter::unwrapArgs(args, [](ArgsContext &ac) {
+        if (ac.args.Length() == 1) {
+            auto se = ac.scripter;
+            auto isolate = ac.isolate;
+            auto psw = (ScripterWrap*)isolate->GetData(1);
+            auto func = ac.asFunction(0);
+            psw->onReceive = func;
+            cout << "JsInitWorkers se=" << se.get() << ", isolate=" << isolate << ", psw=" << (ScripterWrap*)isolate->GetData(1) << endl;
+            return;
+        }
+        ac.throwError("invalid number of arguments");
+
+//        se->log("CALLED TIMERS INIT");
+//        if (se->timersReady()) {
+//            se->log_e("SR timers already initialized");
+//        } else {
+//            // timer process should be initialized and function returned
+//            auto foo = v8::Function::New(isolate->GetCurrentContext(), JsTimer);
+//            v8::Local<Function> local;
+//            if (foo.ToLocal(&local))
+//                args.GetReturnValue().Set(local);
+//            else
+//                se->log_e("ToLocal returns false");
+//        }
+    });
 }
