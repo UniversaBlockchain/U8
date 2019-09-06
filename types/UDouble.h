@@ -5,6 +5,7 @@
 #ifndef UNITOOLS_UDOUBLE_H
 #define UNITOOLS_UDOUBLE_H
 
+#include <string>
 #include <memory>
 #include "UObject.h"
 

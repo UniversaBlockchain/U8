@@ -5,6 +5,7 @@
 #ifndef UNITOOLS_UDATETIME_H
 #define UNITOOLS_UDATETIME_H
 
+#include <string>
 #include <memory>
 #include <chrono>
 

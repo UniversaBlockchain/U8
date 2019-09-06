@@ -5,6 +5,7 @@
 #ifndef UNITOOLS_UBYTES_H
 #define UNITOOLS_UBYTES_H
 
+#include <string>
 #include <memory>
 #include <vector>
 #include <cstring>

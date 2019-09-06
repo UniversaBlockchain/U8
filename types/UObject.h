@@ -5,6 +5,7 @@
 #ifndef UNITOOLS_UOBJECT_H
 #define UNITOOLS_UOBJECT_H
 
+#include <string>
 #include <memory>
 #include <v8.h>
 
