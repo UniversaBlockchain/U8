@@ -72,7 +72,7 @@ class UBot {
         return null;
     }
 
-    async getStorageResultByHash(hash, multi) {
+    async getStoragePackedResultByHash(hash, multi) {
         let result = this.resultCache.get(hash);
         if (result != null)
             return result;

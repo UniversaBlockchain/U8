@@ -116,17 +116,12 @@ class UBotCloudNotification_asmCommand extends Notification {
         MULTI_STORAGE_GET_CORTEGES:   {ordinal: 4}
     };
 
-    constructor(from, poolId, cmdStack, type, dataHashId, previousRecordId, isAnswer, isFirstRecord, dataUbotInPool = -1) {
+    constructor(from, poolId, cmdStack, type, params) {
         super(from);
         this.poolId = poolId;
         this.cmdStack = cmdStack;
         this.type = type;
-        //TODO: replace on params binder
-        this.dataHashId = dataHashId;           // cortege for MULTI_STORAGE_GET_CORTEGES
-        this.dataUbotInPool = dataUbotInPool;   // commonCortegeIteration for MULTI_STORAGE_GET_CORTEGES
-        this.previousRecordId = previousRecordId;
-        this.isAnswer = isAnswer;
-        this.isFirstRecord = isFirstRecord;
+        this.params = params;
         this.typeCode = CODE_UBOT_CLOUD_NOTIFICATION_ASM_CMD;
     }
 
@@ -136,37 +131,43 @@ class UBotCloudNotification_asmCommand extends Notification {
         bw.write(this.cmdStack.length);
         this.cmdStack.forEach(cmd => bw.write(cmd));
 
+        let isFirstRecord = this.params.previousRecordId == null;
+
         bw.write(this.type.ordinal);
-        bw.write(this.isAnswer);
-        bw.write(this.isFirstRecord);
+        bw.write(this.params.isAnswer);
+        bw.write(isFirstRecord);
         switch (this.type) {
             case UBotCloudNotification_asmCommand.types.SINGLE_STORAGE_GET_DATA_HASHID:
             case UBotCloudNotification_asmCommand.types.MULTI_STORAGE_GET_DATA_HASHID:
-            case UBotCloudNotification_asmCommand.types.MULTI_STORAGE_GET_CORTEGE_HASHID:
-                if (this.isAnswer) {
-                    bw.write(this.dataHashId.digest);
-                    if (!this.isFirstRecord)
-                        bw.write(this.previousRecordId.digest);
+                if (this.params.isAnswer) {
+                    bw.write(this.params.dataHashId.digest);
+                    if (!isFirstRecord)
+                        bw.write(this.params.previousRecordId.digest);
                 }
                 break;
+            case UBotCloudNotification_asmCommand.types.MULTI_STORAGE_GET_CORTEGE_HASHID:
+                if (this.params.isAnswer)
+                    bw.write(this.params.cortegeId.digest);
+                break;
             case UBotCloudNotification_asmCommand.types.MULTI_STORAGE_GET_POOL_HASHES:
-                bw.write(this.dataUbotInPool);
+                bw.write(this.params.dataUbotInPool);
 
-                if (this.isAnswer) {
-                    bw.write(this.dataHashId.digest);
-                    if (!this.isFirstRecord)
-                        bw.write(this.previousRecordId.digest);
+                if (this.params.isAnswer) {
+                    bw.write(this.params.dataHashId.digest);
+                    if (!isFirstRecord)
+                        bw.write(this.params.previousRecordId.digest);
                 }
                 break;
             case UBotCloudNotification_asmCommand.types.MULTI_STORAGE_GET_CORTEGES:
-                bw.write(this.dataUbotInPool);
-                if (this.isAnswer)
-                    bw.write(this.dataHashId);
+                bw.write(this.params.commonCortegeIteration);
+                if (this.params.isAnswer)
+                    bw.write(this.params.cortege);
         }
     }
 
     readFrom(br) {
         this.poolId = crypto.HashId.withDigest(br.read());
+        this.params = {};
 
         this.cmdStack = [];
         let cmdStackLen = br.read();
@@ -174,35 +175,38 @@ class UBotCloudNotification_asmCommand extends Notification {
             this.cmdStack.push(br.read());
 
         this.type = UBotCloudNotification_asmCommand.types.byOrdinal.get(br.read());
-        this.isAnswer = br.read();
-        this.isFirstRecord = br.read();
+        this.params.isAnswer = br.read();
+        let isFirstRecord = br.read();
         switch (this.type) {
             case UBotCloudNotification_asmCommand.types.SINGLE_STORAGE_GET_DATA_HASHID:
             case UBotCloudNotification_asmCommand.types.MULTI_STORAGE_GET_DATA_HASHID:
-            case UBotCloudNotification_asmCommand.types.MULTI_STORAGE_GET_CORTEGE_HASHID:
-                if (this.isAnswer) {
-                    this.dataHashId = crypto.HashId.withDigest(br.read());
-                    if (!this.isFirstRecord)
-                        this.previousRecordId = crypto.HashId.withDigest(br.read());
+                if (this.params.isAnswer) {
+                    this.params.dataHashId = crypto.HashId.withDigest(br.read());
+                    if (!isFirstRecord)
+                        this.params.previousRecordId = crypto.HashId.withDigest(br.read());
                     else
-                        this.previousRecordId = null;
+                        this.params.previousRecordId = null;
                 }
                 break;
+            case UBotCloudNotification_asmCommand.types.MULTI_STORAGE_GET_CORTEGE_HASHID:
+                if (this.params.isAnswer)
+                    this.params.cortegeId = crypto.HashId.withDigest(br.read());
+                break;
             case UBotCloudNotification_asmCommand.types.MULTI_STORAGE_GET_POOL_HASHES:
-                this.dataUbotInPool = br.read();
+                this.params.dataUbotInPool = br.read();
 
-                if (this.isAnswer) {
-                    this.dataHashId = crypto.HashId.withDigest(br.read());
-                    if (!this.isFirstRecord)
-                        this.previousRecordId = crypto.HashId.withDigest(br.read());
+                if (this.params.isAnswer) {
+                    this.params.dataHashId = crypto.HashId.withDigest(br.read());
+                    if (!isFirstRecord)
+                        this.params.previousRecordId = crypto.HashId.withDigest(br.read());
                     else
-                        this.previousRecordId = null;
+                        this.params.previousRecordId = null;
                 }
                 break;
             case UBotCloudNotification_asmCommand.types.MULTI_STORAGE_GET_CORTEGES:
-                this.dataUbotInPool = br.read();
-                if (this.isAnswer)
-                    this.dataHashId = br.read();
+                this.params.commonCortegeIteration = br.read();
+                if (this.params.isAnswer)
+                    this.params.cortege = br.read();
         }
     }
 
@@ -222,16 +226,7 @@ class UBotCloudNotification_asmCommand extends Notification {
         if (this.type.ordinal !== o.type.ordinal)
             return false;
 
-        if (this.isAnswer !== o.isAnswer)
-            return false;
-
-        if (this.isFirstRecord !== o.isFirstRecord)
-            return false;
-
-        if (!t.valuesEqual(this.dataHashId, o.dataHashId))
-            return false;
-
-        if (!t.valuesEqual(this.previousRecordId, o.previousRecordId))
+        if (!t.valuesEqual(this.params, o.params))
             return false;
 
         if (!t.valuesEqual(this.from, o.from))
@@ -243,8 +238,7 @@ class UBotCloudNotification_asmCommand extends Notification {
             ", poolId: " + this.poolId +
             ", cmdStack: " + JSON.stringify(this.cmdStack) +
             ", type: " + this.type.val +
-            ", isAnswer: " + this.isAnswer +
-            ", isFirstRecord: " + this.isFirstRecord + "]";
+            ", isAnswer: " + this.params.isAnswer + "]";
     }
 }
 t.addValAndOrdinalMaps(UBotCloudNotification_asmCommand.types);

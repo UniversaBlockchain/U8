@@ -195,7 +195,7 @@ class ProcessStartExec extends ProcessBase {
                 storageName = (param != null) ? param : "default";
                 storageData = this.writesTo.get(storageName);
                 if (storageData != null)
-                    await this.runUBotAsmCmd(cmdIndex, UBotAsmProcess_writeSingleStorage, await Boss.dump(this.var0), null, storageData);
+                    await this.runUBotAsmCmd(cmdIndex, UBotAsmProcess_writeSingleStorage, this.var0, null, storageData);
                 else {
                     this.pr.logger.log("Can`t write to single-storage: " + storageName);
                     this.pr.errors.push(new ErrorRecord(Errors.FORBIDDEN, "writeSingleStorage",
@@ -207,7 +207,7 @@ class ProcessStartExec extends ProcessBase {
                 storageName = (param != null) ? param : "default";
                 storageData = this.writesTo.get(storageName);
                 if (storageData != null)
-                    await this.runUBotAsmCmd(cmdIndex, UBotAsmProcess_writeMultiStorage, await Boss.dump(this.var0), null, storageData);
+                    await this.runUBotAsmCmd(cmdIndex, UBotAsmProcess_writeMultiStorage, this.var0, null, storageData);
                 else {
                     this.pr.logger.log("Can`t write to multi-storage: " + storageName);
                     this.pr.errors.push(new ErrorRecord(Errors.FORBIDDEN, "writeMultiStorage",
@@ -219,7 +219,7 @@ class ProcessStartExec extends ProcessBase {
                 storageName = (param != null) ? param : "default";
                 storageData = this.writesTo.get(storageName);
                 if (storageData != null)
-                    await this.runUBotAsmCmd(cmdIndex, UBotAsmProcess_writeSingleStorage, await Boss.dump(this.var1),
+                    await this.runUBotAsmCmd(cmdIndex, UBotAsmProcess_writeSingleStorage, this.var1,
                         crypto.HashId.withDigest(this.var0), storageData);
                 else {
                     this.pr.logger.log("Can`t write to single-storage: " + storageName);
@@ -232,7 +232,7 @@ class ProcessStartExec extends ProcessBase {
                 storageName = (param != null) ? param : "default";
                 storageData = this.writesTo.get(storageName);
                 if (storageData != null)
-                    await this.runUBotAsmCmd(cmdIndex, UBotAsmProcess_writeMultiStorage, await Boss.dump(this.var1),
+                    await this.runUBotAsmCmd(cmdIndex, UBotAsmProcess_writeMultiStorage, this.var1,
                         crypto.HashId.withDigest(this.var0), storageData);
                 else {
                     this.pr.logger.log("Can`t write to multi-storage: " + storageName);
@@ -242,11 +242,7 @@ class ProcessStartExec extends ProcessBase {
                 }
                 break;
             case "getSingleDataByRecordId":
-                console.log("ubot: " + this.pr.ubot.network.myInfo.number, "data = " + this.var0);
-                console.log("ubot: " + this.pr.ubot.network.myInfo.number, "data = " + this.var1);
                 this.var0 = await this.pr.ubot.getStorageResultByRecordId(this.var0, false);
-                console.log("ubot: " + this.pr.ubot.network.myInfo.number, "data = " + this.var0);
-                console.log("ubot: " + this.pr.ubot.network.myInfo.number, "data = " + this.var1);
                 break;
             case "getMultiDataByRecordId":
                 this.var0 = await this.pr.ubot.getStorageResultByRecordId(this.var0, true, this.pr.ubot.network.myInfo.number);
@@ -267,7 +263,7 @@ class ProcessStartExec extends ProcessBase {
                 resolve(result);
             }, this, newStack);
             this.commands[cmdIndex] = cmd;
-            cmd.init(...params);
+            await cmd.init(...params);
             await cmd.start();
         });
     }

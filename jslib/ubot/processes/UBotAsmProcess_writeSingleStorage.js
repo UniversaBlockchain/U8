@@ -9,6 +9,7 @@ const ErrorRecord = require("errors").ErrorRecord;
 const Errors = require("errors").Errors;
 const UBotPoolState = require("ubot/ubot_pool_state").UBotPoolState;
 const UBotCloudNotification_asmCommand = require("ubot/ubot_notification").UBotCloudNotification_asmCommand;
+const Boss = require('boss.js');
 const t = require("tools");
 
 class UBotAsmProcess_writeSingleStorage extends ProcessBase {
@@ -25,8 +26,8 @@ class UBotAsmProcess_writeSingleStorage extends ProcessBase {
         this.recordId = null;
     }
 
-    init(binToWrite, previousRecordId, storageData) {
-        this.binToWrite = binToWrite;
+    async init(binToWrite, previousRecordId, storageData) {
+        this.binToWrite = await Boss.dump(binToWrite);
         this.binHashId = crypto.HashId.of(this.binToWrite);
         this.previousRecordId = previousRecordId;
 
@@ -58,7 +59,7 @@ class UBotAsmProcess_writeSingleStorage extends ProcessBase {
         }
     }
 
-    start() {
+    async start() {
         this.pr.logger.log("start UBotAsmProcess_writeSingleStorage");
         this.approveCounterSet.add(this.pr.ubot.network.myInfo.number); // vote for itself
         this.pulse();
@@ -75,10 +76,7 @@ class UBotAsmProcess_writeSingleStorage extends ProcessBase {
                         this.pr.poolId,
                         this.cmdStack,
                         UBotCloudNotification_asmCommand.types.SINGLE_STORAGE_GET_DATA_HASHID,
-                        null,
-                        null,
-                        false,
-                        true
+                        { isAnswer: false }
                     )
                 );
             }
@@ -98,7 +96,8 @@ class UBotAsmProcess_writeSingleStorage extends ProcessBase {
     }
 
     async vote(notification) {
-        if (this.binHashId.equals(notification.dataHashId) && t.valuesEqual(this.previousRecordId, notification.previousRecordId))
+        if (this.binHashId.equals(notification.params.dataHashId) &&
+            t.valuesEqual(this.previousRecordId, notification.params.previousRecordId))
             this.approveCounterSet.add(notification.from.number);
         else
             this.declineCounterSet.add(notification.from.number);
@@ -129,7 +128,6 @@ class UBotAsmProcess_writeSingleStorage extends ProcessBase {
 
             this.pr.var0 = this.recordId.digest;
             this.onReady();
-            // TODO: distribution single-storage to all ubots after closing pool...
 
         } else if (this.declineCounterSet.size > this.pr.pool.length - this.quorumSize) {
             // error
@@ -144,7 +142,7 @@ class UBotAsmProcess_writeSingleStorage extends ProcessBase {
     async onNotify(notification) {
         if (notification instanceof UBotCloudNotification_asmCommand) {
             if (notification.type === UBotCloudNotification_asmCommand.types.SINGLE_STORAGE_GET_DATA_HASHID) {
-                if (!notification.isAnswer) {
+                if (!notification.params.isAnswer) {
                     // this.pr.logger.log("SINGLE_STORAGE_GET_DATA_HASHID req... " + notification);
                     this.pr.ubot.network.deliver(notification.from,
                         new UBotCloudNotification_asmCommand(
@@ -152,10 +150,11 @@ class UBotAsmProcess_writeSingleStorage extends ProcessBase {
                             this.pr.poolId,
                             this.cmdStack,
                             UBotCloudNotification_asmCommand.types.SINGLE_STORAGE_GET_DATA_HASHID,
-                            this.binHashId,
-                            this.previousRecordId,
-                            true,
-                            this.previousRecordId == null
+                            {
+                                dataHashId: this.binHashId,
+                                previousRecordId: this.previousRecordId,
+                                isAnswer: true
+                            }
                         )
                     );
                 } else if (!this.getHashesTask.cancelled)
