@@ -12,7 +12,7 @@ wrk.Worker = class {
     }
 
     send(obj) {
-        this.workerImpl._send();
+        this.workerImpl._send(obj);
     }
 
     async close() {

@@ -3,6 +3,8 @@
  */
 
 #include "worker_bindings.h"
+#include "../types/UObject.h"
+#include "../types/TypesFactory.h"
 
 class ScripterWrap {
 public:
@@ -12,7 +14,7 @@ public:
 
 static const std::string workerMain = R"End(
 __init_workers((obj) => {
-    console.log("worker onReceive!!!!!!!!!!!!!!!!!!!!!!");
+    console.log("worker onReceive: " + JSON.stringify(obj));
 });
 
 function __worker_on_receive(obj) {
@@ -72,17 +74,18 @@ void JsInitWorkerBindings(Scripter& scripter, Isolate *isolate, const Local<Obje
 
 void JsScripterWrap_send(const FunctionCallbackInfo<Value> &args) {
     Scripter::unwrapArgs(args, [](ArgsContext &ac) {
-        if (ac.args.Length() == 0) {
+        if (ac.args.Length() == 1) {
             auto psw = unwrap<ScripterWrap>(ac.args.This());
-            //runAsync([psw](){
+            UObject obj = v8ValueToUObject(ac.isolate, ac.args[0]);
+            auto onReceive = psw->onReceive;
+            auto se = ac.scripter;
+            runAsync([onReceive,se,obj{move(obj)}](){
                 //psw->onReceive->lockedContext([psw](Local<Context> &cxt){
-                    cout << "111111111111" << endl;
-                    cout << "JsScripterWrap_send se=" << psw->se.get() << ", isolate=" << psw->se->isolate() << ", psw=" << psw << endl;
-                    cout << "onReceive->scripter: " << psw->onReceive->scripter() << endl;
-                    psw->onReceive->invoke();
-                    cout << "222222222222" << endl;
-                //});
-            //});
+                se->lockedContext([onReceive,obj{move(obj)}](Local<Context> &cxt){
+                    auto v8obj = obj.serializeToV8(*onReceive->scripter(), onReceive->scripter()->isolate());
+                    onReceive->invoke(v8obj);
+                });
+            });
             return;
         }
         ac.throwError("invalid number of arguments");
