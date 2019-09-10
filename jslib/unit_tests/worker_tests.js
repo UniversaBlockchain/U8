@@ -23,7 +23,7 @@ unit.test("hello worker", async () => {
             console.log("worker.onReceive: " + JSON.stringify(obj));
             resolver();
         });
-        worker.send({a: i, b: 2000, c: 7});
+        worker.send({a: i, b: 20000, c: 7});
         await promise;
         await worker.close();
     }
