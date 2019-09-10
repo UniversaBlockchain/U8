@@ -2,7 +2,7 @@
  * Copyright (c) 2019 Sergey Chernov, iCodici S.n.C, All Rights Reserved.
  */
 
-wrk.Worker = class {
+wrk.WorkerHandle = class {
     constructor(workerImpl) {
         this.workerImpl = workerImpl;
     }
@@ -19,11 +19,11 @@ wrk.Worker = class {
     }
 };
 
-wrk.createWorker = function(accessLevel) {
+wrk.createWorker = function(accessLevel, workerSrc) {
     console.log("wrk.createWorker");
     return new Promise(resolve => {
-        wrk.__createWorker(accessLevel, workerImpl => {
-            resolve(new wrk.Worker(workerImpl));
+        wrk.__createWorker(accessLevel, workerSrc, workerImpl => {
+            resolve(new wrk.WorkerHandle(workerImpl));
         });
     });
 };

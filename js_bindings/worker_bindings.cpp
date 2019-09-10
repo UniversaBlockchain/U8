@@ -15,69 +15,27 @@ public:
 };
 
 static const std::string workerMain = R"End(
-function piSpigot(iThread, n) {
-    let piIter = 0;
-    let pi = new ArrayBuffer(n);
-    let boxes = Math.floor(n * 10 / 3);
-    let reminders = new ArrayBuffer(boxes);
-    for (let i = 0; i < boxes; ++i)
-        reminders[i] = 2;
-    let heldDigits = 0;
-    for (let i = 0; i < n; ++i) {
-        let carriedOver = 0;
-        let sum = 0;
-        for (let j = boxes - 1; j >= 0; --j) {
-            reminders[j] *= 10;
-            sum = reminders[j] + carriedOver;
-            let quotient = Math.floor(sum / (j*2 + 1));
-            reminders[j] = sum % (j*2 + 1);
-            carriedOver = quotient * j;
-        }
-        reminders[0] = sum % 10;
-        let q = Math.floor(sum / 10);
-        if (q == 9) {
-            ++heldDigits;
-        } else if (q == 10) {
-            q = 0;
-            for (let k = 1; k <= heldDigits; ++k) {
-                let replaced = pi[i-k];
-                if (replaced == 9)
-                    replaced = 0;
-                else
-                    ++replaced;
-                pi[i-k] = replaced;
-            }
-            heldDigits = 1;
-        } else {
-            heldDigits = 1;
-        }
-        pi[piIter++] = q;
-    }
-    let s = "";
-    for (let i = piIter - 8; i < piIter; ++i)
-        s += ""+pi[i];
-    console.log(iThread + ": " + s);
-}
-
 __init_workers((obj) => {
-    console.log("worker onReceive: " + JSON.stringify(obj));
-    piSpigot(obj.a, obj.b);
+    if (wrk.onReceive)
+        wrk.onReceive(obj);
 });
 )End";
 
 static void JsCreateWorker(const FunctionCallbackInfo<Value> &args) {
     Scripter::unwrapArgs(args, [](ArgsContext &ac) {
-        if (ac.args.Length() == 2) {
+        if (ac.args.Length() == 3) {
             auto se = ac.scripter;
             int accessLevel = ac.asInt(0);
-            auto onComplete = ac.asFunction(1);
-            runAsync([se, onComplete]() {
+            auto workerSrc = ac.asString(1);
+            auto onComplete = ac.asFunction(2);
+            runAsync([workerSrc, se, onComplete]() {
                 WorkerScripter *psw = new WorkerScripter();
                 Semaphore sem;
-                psw->loopThread = std::make_shared<std::thread>([psw,&sem]() {
+                psw->loopThread = std::make_shared<std::thread>([workerSrc,psw,&sem]() {
                     psw->se = Scripter::New();
                     psw->se->isolate()->SetData(1, psw);
                     psw->se->evaluate(workerMain);
+                    psw->se->evaluate(workerSrc);
                     sem.notify();
                     psw->se->runMainLoop();
                 });
