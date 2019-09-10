@@ -11,6 +11,7 @@ class WorkerScripter {
 public:
     std::shared_ptr<Scripter> se;
     std::shared_ptr<FunctionHandler> onReceive;
+    std::shared_ptr<FunctionHandler> onReceiveMain;
     std::shared_ptr<std::thread> loopThread;
 };
 
@@ -19,6 +20,9 @@ __init_workers((obj) => {
     if (wrk.onReceive)
         wrk.onReceive(obj);
 });
+wrk.send = (obj) => {
+    console.log("wrk.send not implemented");
+};
 )End";
 
 static void JsCreateWorker(const FunctionCallbackInfo<Value> &args) {
@@ -81,6 +85,17 @@ void JsScripterWrap_send(const FunctionCallbackInfo<Value> &args) {
     });
 }
 
+void JsScripterWrap_setOnReceive(const FunctionCallbackInfo<Value> &args) {
+    Scripter::unwrapArgs(args, [](ArgsContext &ac) {
+        if (ac.args.Length() == 1) {
+            auto psw = unwrap<WorkerScripter>(ac.args.This());
+            psw->onReceiveMain = ac.asFunction(0);
+            return;
+        }
+        ac.throwError("invalid number of arguments");
+    });
+}
+
 void JsInitScripterWrap(Scripter& scripter, Isolate *isolate, const Local<ObjectTemplate> &global) {
     // Bind object with default constructor
     Local<FunctionTemplate> tpl = bindCppClass<WorkerScripter>(isolate, "WorkerScripter");
@@ -89,6 +104,7 @@ void JsInitScripterWrap(Scripter& scripter, Isolate *isolate, const Local<Object
     auto prototype = tpl->PrototypeTemplate();
     prototype->Set(isolate, "version", String::NewFromUtf8(isolate, "0.0.1"));
     prototype->Set(isolate, "_send", FunctionTemplate::New(isolate, JsScripterWrap_send));
+    prototype->Set(isolate, "_setOnReceive", FunctionTemplate::New(isolate, JsScripterWrap_setOnReceive));
 
     // register it into global namespace
     auto persistentTpl = std::make_shared<Persistent<FunctionTemplate>>();
@@ -106,6 +122,21 @@ void JsInitWorkers(const v8::FunctionCallbackInfo<v8::Value> &args) {
             auto func = ac.asFunction(0);
             psw->onReceive = func;
             return;
+        }
+        ac.throwError("invalid number of arguments");
+    });
+}
+
+void JsSendFromWorker(const v8::FunctionCallbackInfo<v8::Value> &args) {
+    Scripter::unwrapArgs(args, [](ArgsContext &ac) {
+        if (ac.args.Length() == 1) {
+            // todo: ...
+//            auto se = ac.scripter;
+//            auto isolate = ac.isolate;
+//            auto psw = (WorkerScripter*)isolate->GetData(1);
+//            auto func = ac.asFunction(0);
+//            psw->onReceive = func;
+//            return;
         }
         ac.throwError("invalid number of arguments");
     });

@@ -171,6 +171,7 @@ void Scripter::initialize() {
     global->Set(v8String("__hardware_concurrency"), v8Int(std::thread::hardware_concurrency()));
 
     global->Set(v8String("__init_workers"), functionTemplate(JsInitWorkers));
+    global->Set(v8String("__send_from_worker"), functionTemplate(JsSendFromWorker));
 
     JsInitIOFile(pIsolate, global);
     JsInitIODir(pIsolate, global);

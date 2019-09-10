@@ -47,11 +47,13 @@ function piSpigot(iThread, n) {
     for (let i = piIter - 8; i < piIter; ++i)
         s += ""+pi[i];
     console.log(iThread + ": " + s);
+    return s;
 }
 
 wrk.onReceive = (obj) => {
     //wrk.send(obj.a + obj.b + obj.c);
-    piSpigot(obj.a, obj.b);
+    let res = piSpigot(obj.a, obj.b);
+    wrk.send(res);
 }
 `;
 
@@ -63,13 +65,13 @@ unit.test("hello worker", async () => {
     for (let i = 0; i < 10; ++i) {
         let workerHandle = await createWorker(0, workerSrc);
         let resolver;
-        let promise = new Promise((resolve, reject) => resolver = resolve);
-        workerHandle.onReceive(async obj => {
-            console.log("workerHandle.onReceive: " + JSON.stringify(obj));
-            resolver();
-        });
-        workerHandle.send({a: i, b: 20000, c: 7});
-        await promise;
+        // let promise = new Promise((resolve, reject) => resolver = resolve);
+        // workerHandle.onReceive(async obj => {
+        //     console.log("workerHandle.onReceive: " + JSON.stringify(obj));
+        //     resolver();
+        // });
+        workerHandle.send({a: i, b: 2000, c: 7});
+        // await promise;
         await workerHandle.close();
     }
     await sleep(100000);

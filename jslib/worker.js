@@ -5,10 +5,11 @@
 wrk.WorkerHandle = class {
     constructor(workerImpl) {
         this.workerImpl = workerImpl;
+        this.onReceiveCallback = obj => {}
     }
 
     onReceive(block) {
-        block({});
+        this.onReceiveCallback = block;
     }
 
     send(obj) {
@@ -23,7 +24,9 @@ wrk.createWorker = function(accessLevel, workerSrc) {
     console.log("wrk.createWorker");
     return new Promise(resolve => {
         wrk.__createWorker(accessLevel, workerSrc, workerImpl => {
-            resolve(new wrk.WorkerHandle(workerImpl));
+            let w = new wrk.WorkerHandle(workerImpl);
+            w.workerImpl._setOnReceive(obj => w.onReceiveCallback(obj));
+            resolve(w);
         });
     });
 };
