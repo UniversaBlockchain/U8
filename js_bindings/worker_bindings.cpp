@@ -5,16 +5,63 @@
 #include "worker_bindings.h"
 #include "../types/UObject.h"
 #include "../types/TypesFactory.h"
+#include "../tools/Semaphore.h"
 
 class ScripterWrap {
 public:
     std::shared_ptr<Scripter> se;
     std::shared_ptr<FunctionHandler> onReceive;
+    std::shared_ptr<std::thread> loopThread;
 };
 
 static const std::string workerMain = R"End(
+function piSpigot(iThread, n) {
+    let piIter = 0;
+    let pi = new ArrayBuffer(n);
+    let boxes = Math.floor(n * 10 / 3);
+    let reminders = new ArrayBuffer(boxes);
+    for (let i = 0; i < boxes; ++i)
+        reminders[i] = 2;
+    let heldDigits = 0;
+    for (let i = 0; i < n; ++i) {
+        let carriedOver = 0;
+        let sum = 0;
+        for (let j = boxes - 1; j >= 0; --j) {
+            reminders[j] *= 10;
+            sum = reminders[j] + carriedOver;
+            let quotient = Math.floor(sum / (j*2 + 1));
+            reminders[j] = sum % (j*2 + 1);
+            carriedOver = quotient * j;
+        }
+        reminders[0] = sum % 10;
+        let q = Math.floor(sum / 10);
+        if (q == 9) {
+            ++heldDigits;
+        } else if (q == 10) {
+            q = 0;
+            for (let k = 1; k <= heldDigits; ++k) {
+                let replaced = pi[i-k];
+                if (replaced == 9)
+                    replaced = 0;
+                else
+                    ++replaced;
+                pi[i-k] = replaced;
+            }
+            heldDigits = 1;
+        } else {
+            heldDigits = 1;
+        }
+        pi[piIter++] = q;
+    }
+    let s = "";
+    for (let i = piIter - 8; i < piIter; ++i)
+        s += ""+pi[i];
+    console.log(iThread + ": " + s);
+}
+
 __init_workers((obj) => {
     console.log("worker onReceive: " + JSON.stringify(obj));
+    piSpigot(obj.a, obj.b);
 });
 
 function __worker_on_receive(obj) {
@@ -30,11 +77,17 @@ static void JsCreateWorker(const FunctionCallbackInfo<Value> &args) {
             auto onComplete = ac.asFunction(1);
             runAsync([se, onComplete]() {
                 ScripterWrap *psw = new ScripterWrap();
-                psw->se = Scripter::New();
-                psw->se->isolate()->SetData(1, psw);
-                psw->se->evaluate(workerMain);
+                Semaphore sem;
+                psw->loopThread = std::make_shared<std::thread>([psw,&sem]() {
+                    psw->se = Scripter::New();
+                    psw->se->isolate()->SetData(1, psw);
+                    psw->se->evaluate(workerMain);
+                    sem.notify();
+                    psw->se->runMainLoop();
+                });
+                sem.wait();
                 //psw->se->evaluate("__worker_on_receive();");
-                psw->se->startMainLoopThread();
+                //psw->se->startMainLoopThread();
 //                v8::Isolate::Scope isolateScope(psw->se->isolate());
 //                psw->se->evaluate(workerMain);
 //                psw->se->evaluate("__worker_on_receive();");
@@ -80,8 +133,8 @@ void JsScripterWrap_send(const FunctionCallbackInfo<Value> &args) {
             auto onReceive = psw->onReceive;
             auto se = ac.scripter;
             runAsync([onReceive,se,obj{move(obj)}](){
-                //psw->onReceive->lockedContext([psw](Local<Context> &cxt){
-                se->lockedContext([onReceive,obj{move(obj)}](Local<Context> &cxt){
+                onReceive->lockedContext([onReceive,obj{move(obj)}](Local<Context> &cxt){
+                //se->lockedContext([onReceive,obj{move(obj)}](Local<Context> &cxt){
                     auto v8obj = obj.serializeToV8(*onReceive->scripter(), onReceive->scripter()->isolate());
                     onReceive->invoke(v8obj);
                 });

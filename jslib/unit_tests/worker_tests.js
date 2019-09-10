@@ -15,16 +15,19 @@ unit.test("hello worker", async () => {
     let pubKey1 = (await crypto.PrivateKey.generate(2048)).publicKey;
     console.log("random pub key 1: " + btoa(pubKey1.fingerprints));
 
-    let worker = await createWorker();
-    let resolver;
-    let promise = new Promise((resolve, reject) => resolver = resolve);
-    worker.onReceive(async obj => {
-        console.log("worker.onReceive: " + JSON.stringify(obj));
-        resolver();
-    });
-    worker.send({a:5, b:6, c:7});
-    await promise;
-    await worker.close();
+    for (let i = 0; i < 10; ++i) {
+        let worker = await createWorker();
+        let resolver;
+        let promise = new Promise((resolve, reject) => resolver = resolve);
+        worker.onReceive(async obj => {
+            console.log("worker.onReceive: " + JSON.stringify(obj));
+            resolver();
+        });
+        worker.send({a: i, b: 2000, c: 7});
+        await promise;
+        await worker.close();
+    }
+    await sleep(100000);
 
     let pubKey2 = (await crypto.PrivateKey.generate(2048)).publicKey;
     console.log("random pub key 2: " + btoa(pubKey2.fingerprints));
