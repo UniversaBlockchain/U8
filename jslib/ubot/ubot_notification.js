@@ -114,7 +114,9 @@ class UBotCloudNotification_asmCommand extends Notification {
         MULTI_STORAGE_GET_CORTEGE_HASHID:               {ordinal: 2},
         MULTI_STORAGE_GET_POOL_HASHES:                  {ordinal: 3},
         MULTI_STORAGE_GET_CORTEGES:                     {ordinal: 4},
-        MULTI_STORAGE_GET_SUSPICIOUS_CORTEGE_HASHID:    {ordinal: 5}
+        MULTI_STORAGE_GET_SUSPICIOUS_CORTEGE_HASHID:    {ordinal: 5},
+        MULTI_STORAGE_GET_DECISIONS:                    {ordinal: 6},
+        MULTI_STORAGE_VOTE_DECISION:                    {ordinal: 7}
     };
 
     constructor(from, poolId, cmdStack, type, params) {
@@ -169,6 +171,11 @@ class UBotCloudNotification_asmCommand extends Notification {
                 bw.write(this.params.dataUbotInPool);
                 if (this.params.isAnswer)
                     bw.write(this.params.cortegeId.digest);
+                break;
+            case UBotCloudNotification_asmCommand.types.MULTI_STORAGE_GET_DECISIONS:
+            case UBotCloudNotification_asmCommand.types.MULTI_STORAGE_VOTE_DECISION:
+                if (this.params.isAnswer)
+                    bw.write(this.params.decision);
         }
     }
 
@@ -220,6 +227,11 @@ class UBotCloudNotification_asmCommand extends Notification {
                 this.params.dataUbotInPool = br.read();
                 if (this.params.isAnswer)
                     this.params.cortegeId = crypto.HashId.withDigest(br.read());
+                break;
+            case UBotCloudNotification_asmCommand.types.MULTI_STORAGE_GET_DECISIONS:
+            case UBotCloudNotification_asmCommand.types.MULTI_STORAGE_VOTE_DECISION:
+                if (this.params.isAnswer)
+                    this.params.decision = br.read();
         }
     }
 

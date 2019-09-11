@@ -14,6 +14,15 @@ const Boss = require('boss.js');
 const t = require("tools");
 
 class UBotAsmProcess_writeMultiStorage extends UBotAsmProcess_writeSingleStorage {
+    static states = {
+        CHECKING:       {ordinal: 0},
+        SELF_APPROVED:  {ordinal: 1},
+        VOTE_APPROVED:  {ordinal: 2},
+        VOTE_DECLINED:  {ordinal: 3},
+        APPROVED:       {ordinal: 4},
+        ANALYSIS:       {ordinal: 5}
+    };
+
     constructor(processor, onReady, asmProcessor, cmdStack) {
         super(processor, onReady, asmProcessor, cmdStack);
         this.results = [];
@@ -26,10 +35,6 @@ class UBotAsmProcess_writeMultiStorage extends UBotAsmProcess_writeSingleStorage
         this.downloadAnswers = new Set();
         this.approveCounterFromOthersSets = [];
         this.declineCounterFromOthersSets = [];
-        for (let i = 0; i < this.pr.pool.length; ++i) {
-            this.approveCounterFromOthersSets.push(new Set());
-            this.declineCounterFromOthersSets.push(new Set());
-        }
         this.downloadAttempts = 0;
         this.commonCortegeIteration = 0;
         this.cortegeId = null;
@@ -40,13 +45,18 @@ class UBotAsmProcess_writeMultiStorage extends UBotAsmProcess_writeSingleStorage
         this.getCortegeIdTask = null;
         this.getCortegesTask = null;
         this.getCortegeIdsTask = null;
+        this.getDecisionsTask = null;
+        this.votingDecisionTask = null;
         this.downloadEvent = new Promise(resolve => this.downloadFire = resolve);
         this.cortegeEvent = null;
         this.cortegeFire = null;
+        this.decisionsEvent = null;
+        this.decisionsFire = null;
         this.corteges = [];
         this.iterationsCortege = [];
         this.iterationsCortegesIds = [];
         this.suspicious = new Set();
+        this.state = UBotAsmProcess_writeMultiStorage.states.CHECKING;
     }
 
     async init(binToWrite, previousRecordId, storageData) {
@@ -86,6 +96,10 @@ class UBotAsmProcess_writeMultiStorage extends UBotAsmProcess_writeSingleStorage
             this.getCortegesTask.cancel();
         if (this.getCortegeIdsTask != null)
             this.getCortegeIdsTask.cancel();
+        if (this.getDecisionsTask != null)
+            this.getDecisionsTask.cancel();
+        if (this.votingDecisionTask != null)
+            this.votingDecisionTask.cancel();
 
         this.pr.logger.log("Error UBotAsmProcess_writeMultiStorage: " + error);
         this.pr.errors.push(new ErrorRecord(Errors.FAILURE, "UBotAsmProcess_writeMultiStorage", error));
@@ -246,6 +260,38 @@ class UBotAsmProcess_writeMultiStorage extends UBotAsmProcess_writeSingleStorage
         });
     }
 
+    pulseGetDecisions() {
+        this.pr.logger.log("UBotAsmProcess_writeMultiStorage... pulseGetDecisions");
+
+        for (let i = 0; i < this.pr.pool.length; ++i)
+            if (i !== this.pr.selfPoolIndex && !this.otherAnswers.has(this.pr.pool[i].number))
+                this.pr.ubot.network.deliver(this.pr.pool[i],
+                    new UBotCloudNotification_asmCommand(
+                        this.pr.ubot.network.myInfo,
+                        this.pr.poolId,
+                        this.cmdStack,
+                        UBotCloudNotification_asmCommand.types.MULTI_STORAGE_GET_DECISIONS,
+                        { isAnswer: false }
+                    )
+                );
+    }
+
+    pulseVotingDecision() {
+        this.pr.logger.log("UBotAsmProcess_writeMultiStorage... pulseVotingDecision");
+
+        for (let i = 0; i < this.pr.pool.length; ++i)
+            if (i !== this.pr.selfPoolIndex && !this.otherAnswers.has(this.pr.pool[i].number))
+                this.pr.ubot.network.deliver(this.pr.pool[i],
+                    new UBotCloudNotification_asmCommand(
+                        this.pr.ubot.network.myInfo,
+                        this.pr.poolId,
+                        this.cmdStack,
+                        UBotCloudNotification_asmCommand.types.MULTI_STORAGE_VOTE_DECISION,
+                        { isAnswer: false }
+                    )
+                );
+    }
+
     async verifyResult(result, previousRecordId, ubotNumber) {
         if (this.verifyMethod == null)
             return true;
@@ -332,14 +378,45 @@ class UBotAsmProcess_writeMultiStorage extends UBotAsmProcess_writeSingleStorage
         await this.downloadEvent;
         this.pr.logger.log("UBotAsmProcess_writeMultiStorage... results received");
 
-        if (this.cortege.size >= this.pr.pool.length)
+        if (this.cortege.size >= this.pr.pool.length && await this.getDecision())
             await this.approveCortege(true);
         else
             new ScheduleExecutor(() => this.analyzeCortege(), 0, this.pr.ubot.executorService).run();
     }
 
+    async getDecision() {
+        this.pr.logger.log("UBotAsmProcess_writeMultiStorage... get decision");
+
+        this.state = UBotAsmProcess_writeMultiStorage.states.SELF_APPROVED;
+
+        this.decisionsEvent = new Promise(resolve => this.decisionsFire = resolve);
+
+        this.otherAnswers.clear();
+        this.pulseGetDecisions();
+        this.getDecisionsTask = new ExecutorWithFixedPeriod(() => this.pulseGetDecisions(),
+            UBotConfig.multi_storage_vote_period, this.pr.ubot.executorService).run();
+
+        // wait decision
+        await this.decisionsEvent;
+
+        this.decisionsEvent = new Promise(resolve => this.decisionsFire = resolve);
+
+        this.otherAnswers.clear();
+        this.approveCounterSet.clear();
+        this.declineCounterSet.clear();
+        this.pulseVotingDecision();
+        this.votingDecisionTask = new ExecutorWithFixedPeriod(() => this.pulseVotingDecision(),
+            UBotConfig.multi_storage_vote_period, this.pr.ubot.executorService).run();
+
+        // wait consensus decision
+        return await this.decisionsEvent;
+    }
+
     async approveCortege(fullCortege) {
         this.pr.logger.log("UBotAsmProcess_writeMultiStorage... approve cortege");
+
+        this.state = UBotAsmProcess_writeMultiStorage.states.APPROVED;
+
         this.generateSelfRecordID();
 
         let cortege = new Map();
@@ -372,10 +449,14 @@ class UBotAsmProcess_writeMultiStorage extends UBotAsmProcess_writeSingleStorage
     analyzeCortege() {
         this.pr.logger.log("UBotAsmProcess_writeMultiStorage: analyze cortege");
 
+        this.state = UBotAsmProcess_writeMultiStorage.states.ANALYSIS;
+
+        this.approveCounterSet.clear();
+        this.declineCounterSet.clear();
         for (let i = 0; i < this.pr.pool.length; ++i) {
             // votes for itself
-            this.approveCounterFromOthersSets[i].add(this.pr.ubot.network.myInfo.number);
-            this.approveCounterFromOthersSets[i].add(this.pr.pool[i].number);
+            this.approveCounterFromOthersSets.push(new Set([this.pr.ubot.network.myInfo.number, this.pr.pool[i].number]));
+            this.declineCounterFromOthersSets.push(new Set());
         }
 
         this.pulseGetPoolHashes(true);
@@ -448,6 +529,30 @@ class UBotAsmProcess_writeMultiStorage extends UBotAsmProcess_writeSingleStorage
         if (this.approveCounterSet.size + this.declineCounterSet.size >= this.suspicious.size) {
             this.getCortegeIdsTask.cancel();
             this.cortegeFire();
+        }
+    }
+
+    voteDecision(notification) {
+        let res = notification.params.decision ? "approve" : "decline";
+        this.pr.logger.log("UBotAsmProcess_writeMultiStorage... voteDecision {from: " + notification.from.number +
+            ", result: " + res + "}");
+
+        if (notification.params.decision) {
+            this.approveCounterSet.add(notification.from.number);
+
+            if (this.approveCounterSet.size >= this.quorumSize) {
+                this.votingDecisionTask.cancel();
+                this.state = UBotAsmProcess_writeMultiStorage.states.APPROVED;
+                this.decisionsFire(true);
+            }
+        } else {
+            this.declineCounterSet.add(notification.from.number);
+
+            if (this.declineCounterSet.size > this.pr.pool.length - this.quorumSize) {
+                this.votingDecisionTask.cancel();
+                this.state = UBotAsmProcess_writeMultiStorage.states.ANALYSIS;
+                this.decisionsFire(false);
+            }
         }
     }
 
@@ -714,6 +819,7 @@ class UBotAsmProcess_writeMultiStorage extends UBotAsmProcess_writeSingleStorage
 
                 } else if (this.getPoolHashesTask != null && !this.getPoolHashesTask.cancelled)
                     this.vote(notification);
+
             } else if (notification.type === UBotCloudNotification_asmCommand.types.MULTI_STORAGE_GET_CORTEGES) {
                 if (!notification.params.isAnswer) {
                     if (this.iterationsCortege[notification.params.commonCortegeIteration] != null)
@@ -750,6 +856,7 @@ class UBotAsmProcess_writeMultiStorage extends UBotAsmProcess_writeSingleStorage
                         this.cortegeFire();
                     }
                 }
+
             } else if (notification.type === UBotCloudNotification_asmCommand.types.MULTI_STORAGE_GET_SUSPICIOUS_CORTEGE_HASHID) {
                 if (!notification.params.isAnswer) {
                     if (this.iterationsCortegesIds[notification.params.commonCortegeIteration][notification.params.dataUbotInPool] != null)
@@ -770,6 +877,60 @@ class UBotAsmProcess_writeMultiStorage extends UBotAsmProcess_writeSingleStorage
                 } else if (this.getCortegeIdsTask != null && !this.getCortegeIdsTask.cancelled &&
                     notification.params.commonCortegeIteration === this.commonCortegeIteration)
                     this.voteSuspiciousCortegeId(notification);
+
+            } else if (notification.type === UBotCloudNotification_asmCommand.types.MULTI_STORAGE_GET_DECISIONS) {
+                if (!notification.params.isAnswer) {
+                    if (this.state !== UBotAsmProcess_writeMultiStorage.states.CHECKING)
+                        this.pr.ubot.network.deliver(notification.from,
+                            new UBotCloudNotification_asmCommand(
+                                this.pr.ubot.network.myInfo,
+                                this.pr.poolId,
+                                this.cmdStack,
+                                UBotCloudNotification_asmCommand.types.MULTI_STORAGE_GET_DECISIONS,
+                                {
+                                    decision: this.state !== UBotAsmProcess_writeMultiStorage.states.ANALYSIS,
+                                    isAnswer: true
+                                }
+                            )
+                        );
+                } else if (this.getDecisionsTask != null && !this.getDecisionsTask.cancelled) {
+                    if (!notification.params.decision) {
+                        this.getDecisionsTask.cancel();
+                        this.state = UBotAsmProcess_writeMultiStorage.states.VOTE_DECLINED;
+                        this.decisionsFire();
+                    } else {
+                        this.otherAnswers.add(notification.from.number);
+
+                        if (this.otherAnswers.size >= this.pr.pool.length - 1) {
+                            this.getDecisionsTask.cancel();
+                            this.state = UBotAsmProcess_writeMultiStorage.states.VOTE_APPROVED;
+                            this.decisionsFire();
+                        }
+                    }
+                }
+
+            } else if (notification.type === UBotCloudNotification_asmCommand.types.MULTI_STORAGE_VOTE_DECISION) {
+                if (!notification.params.isAnswer) {
+                    if (this.state !== UBotAsmProcess_writeMultiStorage.states.CHECKING &&
+                        this.state !== UBotAsmProcess_writeMultiStorage.states.SELF_APPROVED)
+
+                        this.pr.ubot.network.deliver(notification.from,
+                            new UBotCloudNotification_asmCommand(
+                                this.pr.ubot.network.myInfo,
+                                this.pr.poolId,
+                                this.cmdStack,
+                                UBotCloudNotification_asmCommand.types.MULTI_STORAGE_VOTE_DECISION,
+                                {
+                                    decision: this.state !== UBotAsmProcess_writeMultiStorage.states.ANALYSIS &&
+                                              this.state !== UBotAsmProcess_writeMultiStorage.states.VOTE_DECLINED,
+                                    isAnswer: true
+                                }
+                            )
+                        );
+                } else if (this.votingDecisionTask != null && !this.votingDecisionTask.cancelled) {
+                    this.otherAnswers.add(notification.from.number);
+                    this.voteDecision(notification);
+                }
             }
         } else {
             this.pr.logger.log("warning: UBotAsmProcess_writeMultiStorage - wrong notification received");
