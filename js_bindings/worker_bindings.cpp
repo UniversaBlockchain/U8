@@ -16,12 +16,12 @@ public:
 };
 
 static const std::string workerMain = R"End(
-__init_workers((obj) => {
+__init_workers(async (obj) => {
     if (wrk.onReceive)
-        wrk.onReceive(obj);
+        await wrk.onReceive(obj);
 });
 wrk.send = (obj) => {
-    console.log("wrk.send not implemented");
+    __send_from_worker(obj);
 };
 )End";
 
@@ -130,14 +130,18 @@ void JsInitWorkers(const v8::FunctionCallbackInfo<v8::Value> &args) {
 void JsSendFromWorker(const v8::FunctionCallbackInfo<v8::Value> &args) {
     Scripter::unwrapArgs(args, [](ArgsContext &ac) {
         if (ac.args.Length() == 1) {
-            // todo: ...
-//            auto se = ac.scripter;
-//            auto isolate = ac.isolate;
-//            auto psw = (WorkerScripter*)isolate->GetData(1);
-//            auto func = ac.asFunction(0);
-//            psw->onReceive = func;
-//            return;
+            UObject obj = v8ValueToUObject(ac.isolate, ac.args[0]);
+            WorkerScripter* pws = (WorkerScripter*)ac.isolate->GetData(1);
+            auto onReceiveMain = pws->onReceiveMain;
+            onReceiveMain->lockedContext([onReceiveMain,obj](auto cxt){
+                auto v8obj = obj.serializeToV8(*onReceiveMain->scripter(), onReceiveMain->scripter()->isolate());
+                onReceiveMain->invoke(v8obj);
+            });
+            return;
         }
-        ac.throwError("invalid number of arguments");
+        auto se = ac.scripter;
+        se->lockedContext([se](auto cxt){
+            se->throwException("invalid number of arguments");
+        });
     });
 }

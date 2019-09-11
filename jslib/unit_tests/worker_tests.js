@@ -46,14 +46,14 @@ function piSpigot(iThread, n) {
     let s = "";
     for (let i = piIter - 8; i < piIter; ++i)
         s += ""+pi[i];
-    console.log(iThread + ": " + s);
+    //console.log(iThread + ": " + s);
     return s;
 }
 
 wrk.onReceive = (obj) => {
     //wrk.send(obj.a + obj.b + obj.c);
     let res = piSpigot(obj.a, obj.b);
-    wrk.send(res);
+    wrk.send({piSpigotAnswer: res});
 }
 `;
 
@@ -62,19 +62,23 @@ unit.test("hello worker", async () => {
     let pubKey1 = (await crypto.PrivateKey.generate(2048)).publicKey;
     console.log("random pub key 1: " + btoa(pubKey1.fingerprints));
 
+    let t0 = new Date().getTime();
+    let promises = [];
     for (let i = 0; i < 10; ++i) {
         let workerHandle = await createWorker(0, workerSrc);
         let resolver;
-        // let promise = new Promise((resolve, reject) => resolver = resolve);
-        // workerHandle.onReceive(async obj => {
-        //     console.log("workerHandle.onReceive: " + JSON.stringify(obj));
-        //     resolver();
-        // });
-        workerHandle.send({a: i, b: 2000, c: 7});
-        // await promise;
-        await workerHandle.close();
+        let promise = new Promise((resolve, reject) => resolver = resolve);
+        workerHandle.onReceive(async obj => {
+            console.log("workerHandle.onReceive: " + JSON.stringify(obj));
+            resolver();
+        });
+        workerHandle.send({a: i, b: 20000, c: 7});
+        promises.push(promise);
+        //await workerHandle.close();
     }
-    await sleep(100000);
+    await Promise.all(promises);
+    let dt = new Date().getTime() - t0;
+    console.log("dt = " + dt + " ms");
 
     let pubKey2 = (await crypto.PrivateKey.generate(2048)).publicKey;
     console.log("random pub key 2: " + btoa(pubKey2.fingerprints));
