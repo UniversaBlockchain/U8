@@ -174,6 +174,7 @@ class UBotCloudNotification_asmCommand extends Notification {
                 break;
             case UBotCloudNotification_asmCommand.types.MULTI_STORAGE_GET_DECISIONS:
             case UBotCloudNotification_asmCommand.types.MULTI_STORAGE_VOTE_DECISION:
+                bw.write(this.params.commonCortegeIteration);
                 if (this.params.isAnswer)
                     bw.write(this.params.decision);
         }
@@ -230,6 +231,7 @@ class UBotCloudNotification_asmCommand extends Notification {
                 break;
             case UBotCloudNotification_asmCommand.types.MULTI_STORAGE_GET_DECISIONS:
             case UBotCloudNotification_asmCommand.types.MULTI_STORAGE_VOTE_DECISION:
+                this.params.commonCortegeIteration = br.read();
                 if (this.params.isAnswer)
                     this.params.decision = br.read();
         }
