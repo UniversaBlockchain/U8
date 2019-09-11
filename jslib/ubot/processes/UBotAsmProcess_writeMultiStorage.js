@@ -45,6 +45,7 @@ class UBotAsmProcess_writeMultiStorage extends UBotAsmProcess_writeSingleStorage
         this.cortegeFire = null;
         this.corteges = [];
         this.iterationsCortege = [];
+        this.iterationsCortegesIds = [];
         this.suspicious = new Set();
     }
 
@@ -224,7 +225,25 @@ class UBotAsmProcess_writeMultiStorage extends UBotAsmProcess_writeSingleStorage
     pulseGetCortegeIds() {
         this.pr.logger.log("UBotAsmProcess_writeMultiStorage... pulseGetCortegeIds");
 
+        Array.from(this.suspicious).filter(su => !this.approveCounterSet.has(su) && !this.declineCounterSet.has(su)).forEach(su => {
+            Array.from(this.cortege).filter(u => u !== this.pr.selfPoolIndex && u !== su &&
+                !this.approveCounterFromOthersSets[su].has(u) && !this.declineCounterFromOthersSets[su].has(u)).forEach(u =>
 
+                this.pr.ubot.network.deliver(this.pr.pool[u],
+                    new UBotCloudNotification_asmCommand(
+                        this.pr.ubot.network.myInfo,
+                        this.pr.poolId,
+                        this.cmdStack,
+                        UBotCloudNotification_asmCommand.types.MULTI_STORAGE_GET_SUSPICIOUS_CORTEGE_HASHID,
+                        {
+                            isAnswer: false,
+                            dataUbotInPool: su,
+                            commonCortegeIteration: this.commonCortegeIteration
+                        }
+                    )
+                )
+            );
+        });
     }
 
     async verifyResult(result, previousRecordId, ubotNumber) {
@@ -364,7 +383,7 @@ class UBotAsmProcess_writeMultiStorage extends UBotAsmProcess_writeSingleStorage
             UBotConfig.multi_storage_vote_period, this.pr.ubot.executorService).run();
     }
 
-    async vote(notification) {
+    vote(notification) {
         let message = "UBotAsmProcess_writeMultiStorage... vote {from: " + notification.from.number +
             ", ubot: " + this.pr.pool[notification.params.dataUbotInPool].number + ", result: ";
 
@@ -402,6 +421,33 @@ class UBotAsmProcess_writeMultiStorage extends UBotAsmProcess_writeSingleStorage
             this.getPoolHashesTask.cancel();
 
             this.fail("writing cortege declined");
+        }
+    }
+
+    voteSuspiciousCortegeId(notification) {
+        let message = "UBotAsmProcess_writeMultiStorage... voteSuspiciousCortegeId {from: " + notification.from.number +
+            ", ubot: " + this.pr.pool[notification.params.dataUbotInPool].number + ", result: ";
+
+        if (this.suspiciousCortegeHashes[notification.params.dataUbotInPool].equals(notification.params.cortegeId)) {
+            this.approveCounterFromOthersSets[notification.params.dataUbotInPool].add(notification.from.number);
+            message += "approve";
+        } else {
+            this.declineCounterFromOthersSets[notification.params.dataUbotInPool].add(notification.from.number);
+            message += "decline";
+        }
+
+        message += "}";
+        this.pr.logger.log(message);
+
+        if (this.approveCounterFromOthersSets[notification.params.dataUbotInPool].size >= this.quorumSize)
+            this.approveCounterSet.add(notification.params.dataUbotInPool);
+        else if (this.declineCounterFromOthersSets[notification.params.dataUbotInPool].size > this.cortege.size - this.quorumSize)
+            this.declineCounterSet.add(notification.params.dataUbotInPool);
+
+        // decision on all suspicious ubots complete
+        if (this.approveCounterSet.size + this.declineCounterSet.size >= this.suspicious.size) {
+            this.getCortegeIdsTask.cancel();
+            this.cortegeFire();
         }
     }
 
@@ -502,15 +548,27 @@ class UBotAsmProcess_writeMultiStorage extends UBotAsmProcess_writeSingleStorage
         // check suspicious corteges on other ubots
         this.suspicious.clear();
         for (let ubot of this.cortege) {
-            if ((Array.from(this.corteges[ubot]).filter(u => this.cortege.has(u)).length < this.cortege.size) ||
-                !Array.from(this.cortege).filter(u => u !== this.pr.selfPoolIndex).every(u => this.corteges[u].has(ubot)))
+            if (ubot !== this.pr.selfPoolIndex &&
+                ((Array.from(this.corteges[ubot]).filter(u => this.cortege.has(u)).length < this.cortege.size) ||
+                 !Array.from(this.cortege).filter(u => u !== this.pr.selfPoolIndex).every(u => this.corteges[u].has(ubot))))
 
                 this.suspicious.add(ubot);
         }
 
         this.cortegeEvent = new Promise(resolve => this.cortegeFire = resolve);
 
-        this.otherAnswers.clear();
+        this.suspiciousCortegeHashes = [];
+        this.approveCounterSet.clear();
+        this.declineCounterSet.clear();
+        this.approveCounterFromOthersSets = [];
+        this.declineCounterFromOthersSets = [];
+        this.suspicious.forEach(su => {
+            // calculate suspicious cortege hashes
+            this.suspiciousCortegeHashes[su] = crypto.HashId.of(JSON.stringify(Array.from(this.corteges[su]).sort((a, b) => a - b)));
+            this.approveCounterFromOthersSets[su] = new Set([this.pr.selfPoolIndex, su]);
+            this.declineCounterFromOthersSets[su] = new Set();
+        });
+
         this.pulseGetCortegeIds();
         this.getCortegeIdsTask = new ExecutorWithFixedPeriod(() => this.pulseGetCortegeIds(),
             UBotConfig.multi_storage_vote_period, this.pr.ubot.executorService).run();
@@ -518,11 +576,38 @@ class UBotAsmProcess_writeMultiStorage extends UBotAsmProcess_writeSingleStorage
         // wait results
         await this.cortegeEvent;
 
+        this.declineCounterSet.forEach(declined => {
+            this.cortege.delete(declined);
+            this.suspicious.delete(declined);
+        });
+
+        // check consensus possibility
+        if (this.cortege.size < this.quorumSize)
+            return false;
+
         // selection most suspicious ubots
+        let mostSuspicious = new Set();
+        let removalEfficiency = 0;
+        let intersection = this.calculateCortegesIntersection().size;
+        this.suspicious.forEach(su => {
+            let intersectionWithoutSu = this.calculateCortegesIntersection(su);
+
+            if (intersectionWithoutSu - intersection > removalEfficiency) {
+                removalEfficiency = intersectionWithoutSu - intersection;
+                mostSuspicious = new Set([su]);
+            } else
+                mostSuspicious.add(su);
+        });
+
+        this.suspicious = mostSuspicious;
 
         // voting for the exclusion of the most suspicious ubots
 
         return true;
+    }
+
+    calculateCortegesIntersection(without = null) {
+
     }
 
     async onNotify(notification) {
@@ -628,7 +713,7 @@ class UBotAsmProcess_writeMultiStorage extends UBotAsmProcess_writeSingleStorage
                         );
 
                 } else if (this.getPoolHashesTask != null && !this.getPoolHashesTask.cancelled)
-                    await this.vote(notification);
+                    this.vote(notification);
             } else if (notification.type === UBotCloudNotification_asmCommand.types.MULTI_STORAGE_GET_CORTEGES) {
                 if (!notification.params.isAnswer) {
                     if (this.iterationsCortege[notification.params.commonCortegeIteration] != null)
@@ -649,8 +734,14 @@ class UBotAsmProcess_writeMultiStorage extends UBotAsmProcess_writeSingleStorage
                 } else if (this.getCortegesTask != null && !this.getCortegesTask.cancelled &&
                     notification.params.commonCortegeIteration === this.commonCortegeIteration) {
 
-                    this.corteges[this.pr.poolIndexes.get(notification.from.number)] = await Boss.load(notification.params.cortege);
+                    let receivedCortege = await Boss.load(notification.params.cortege);
+                    this.corteges[this.pr.poolIndexes.get(notification.from.number)] = receivedCortege;
                     //TODO: for > 200 ubots in pool need HTTP request (check marker)
+
+                    if (this.iterationsCortegesIds[this.commonCortegeIteration] == null)
+                        this.iterationsCortegesIds[this.commonCortegeIteration] = [];
+                    this.iterationsCortegesIds[this.commonCortegeIteration][this.pr.poolIndexes.get(notification.from.number)] =
+                        crypto.HashId.of(JSON.stringify(Array.from(receivedCortege).sort((a, b) => a - b)));
 
                     this.otherAnswers.add(notification.from.number);
 
@@ -659,6 +750,26 @@ class UBotAsmProcess_writeMultiStorage extends UBotAsmProcess_writeSingleStorage
                         this.cortegeFire();
                     }
                 }
+            } else if (notification.type === UBotCloudNotification_asmCommand.types.MULTI_STORAGE_GET_SUSPICIOUS_CORTEGE_HASHID) {
+                if (!notification.params.isAnswer) {
+                    if (this.iterationsCortegesIds[notification.params.commonCortegeIteration][notification.params.dataUbotInPool] != null)
+                        this.pr.ubot.network.deliver(notification.from,
+                            new UBotCloudNotification_asmCommand(
+                                this.pr.ubot.network.myInfo,
+                                this.pr.poolId,
+                                this.cmdStack,
+                                UBotCloudNotification_asmCommand.types.MULTI_STORAGE_GET_SUSPICIOUS_CORTEGE_HASHID,
+                                {
+                                    cortegeId: this.iterationsCortegesIds[notification.params.commonCortegeIteration][notification.params.dataUbotInPool],
+                                    dataUbotInPool: notification.params.dataUbotInPool,
+                                    commonCortegeIteration: notification.params.commonCortegeIteration,
+                                    isAnswer: true
+                                }
+                            )
+                        );
+                } else if (this.getCortegeIdsTask != null && !this.getCortegeIdsTask.cancelled &&
+                    notification.params.commonCortegeIteration === this.commonCortegeIteration)
+                    this.voteSuspiciousCortegeId(notification);
             }
         } else {
             this.pr.logger.log("warning: UBotAsmProcess_writeMultiStorage - wrong notification received");

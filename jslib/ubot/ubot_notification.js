@@ -109,11 +109,12 @@ t.addValAndOrdinalMaps(UBotCloudNotification.types);
 class UBotCloudNotification_asmCommand extends Notification {
 
     static types = {
-        SINGLE_STORAGE_GET_DATA_HASHID:   {ordinal: 0},
-        MULTI_STORAGE_GET_DATA_HASHID:   {ordinal: 1},
-        MULTI_STORAGE_GET_CORTEGE_HASHID:   {ordinal: 2},
-        MULTI_STORAGE_GET_POOL_HASHES:   {ordinal: 3},
-        MULTI_STORAGE_GET_CORTEGES:   {ordinal: 4}
+        SINGLE_STORAGE_GET_DATA_HASHID:                 {ordinal: 0},
+        MULTI_STORAGE_GET_DATA_HASHID:                  {ordinal: 1},
+        MULTI_STORAGE_GET_CORTEGE_HASHID:               {ordinal: 2},
+        MULTI_STORAGE_GET_POOL_HASHES:                  {ordinal: 3},
+        MULTI_STORAGE_GET_CORTEGES:                     {ordinal: 4},
+        MULTI_STORAGE_GET_SUSPICIOUS_CORTEGE_HASHID:    {ordinal: 5}
     };
 
     constructor(from, poolId, cmdStack, type, params) {
@@ -162,6 +163,12 @@ class UBotCloudNotification_asmCommand extends Notification {
                 bw.write(this.params.commonCortegeIteration);
                 if (this.params.isAnswer)
                     bw.write(this.params.cortege);
+                break;
+            case UBotCloudNotification_asmCommand.types.MULTI_STORAGE_GET_SUSPICIOUS_CORTEGE_HASHID:
+                bw.write(this.params.commonCortegeIteration);
+                bw.write(this.params.dataUbotInPool);
+                if (this.params.isAnswer)
+                    bw.write(this.params.cortegeId.digest);
         }
     }
 
@@ -207,6 +214,12 @@ class UBotCloudNotification_asmCommand extends Notification {
                 this.params.commonCortegeIteration = br.read();
                 if (this.params.isAnswer)
                     this.params.cortege = br.read();
+                break;
+            case UBotCloudNotification_asmCommand.types.MULTI_STORAGE_GET_SUSPICIOUS_CORTEGE_HASHID:
+                this.params.commonCortegeIteration = br.read();
+                this.params.dataUbotInPool = br.read();
+                if (this.params.isAnswer)
+                    this.params.cortegeId = crypto.HashId.withDigest(br.read());
         }
     }
 
