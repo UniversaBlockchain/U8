@@ -13,6 +13,8 @@ const UBotCloudNotification_asmCommand = require("ubot/ubot_notification").UBotC
 const Boss = require('boss.js');
 const t = require("tools");
 
+const ACCURACY = 0.000001;
+
 class UBotAsmProcess_writeMultiStorage extends UBotAsmProcess_writeSingleStorage {
     static states = {
         CHECKING:       {ordinal: 0},
@@ -32,6 +34,7 @@ class UBotAsmProcess_writeMultiStorage extends UBotAsmProcess_writeSingleStorage
         this.excluded = new Set();
         this.hashesReady = false;
         this.otherAnswers = new Set();
+        this.parallelAnswers = [];
         this.downloadAnswers = new Set();
         this.approveCounterFromOthersSets = [];
         this.declineCounterFromOthersSets = [];
@@ -47,16 +50,21 @@ class UBotAsmProcess_writeMultiStorage extends UBotAsmProcess_writeSingleStorage
         this.getCortegeIdsTask = null;
         this.getDecisionsTask = null;
         this.votingDecisionTask = null;
+        this.votingExclusionSuspiciousTasks = [];
         this.downloadEvent = new Promise(resolve => this.downloadFire = resolve);
         this.cortegeEvent = null;
         this.cortegeFire = null;
         this.decisionsEvent = null;
         this.decisionsFire = null;
+        this.votingExclusionSuspiciousEvents = [];
+        this.votingExclusionSuspiciousFires = [];
         this.corteges = [];
         this.iterationsCortege = [];
         this.iterationsCortegesIds = [];
         this.iterationState = [];
         this.suspicious = new Set();
+        this.suspiciousRemovalCoefficients = [];
+        this.suspiciousReady = [];
         this.state = UBotAsmProcess_writeMultiStorage.states.CHECKING;
     }
 
@@ -101,6 +109,9 @@ class UBotAsmProcess_writeMultiStorage extends UBotAsmProcess_writeSingleStorage
             this.getDecisionsTask.cancel();
         if (this.votingDecisionTask != null)
             this.votingDecisionTask.cancel();
+        for (let i = 0; i < this.pr.pool.length; ++i)
+            if (this.votingExclusionSuspiciousTasks[i] != null)
+                this.votingExclusionSuspiciousTasks[i].cancel();
 
         this.pr.logger.log("Error UBotAsmProcess_writeMultiStorage: " + error);
         this.pr.errors.push(new ErrorRecord(Errors.FAILURE, "UBotAsmProcess_writeMultiStorage", error));
@@ -301,6 +312,13 @@ class UBotAsmProcess_writeMultiStorage extends UBotAsmProcess_writeSingleStorage
                 )
             )
         );
+    }
+
+    pulseVotingExclusionSuspicious(suspect) {
+        this.pr.logger.log("UBotAsmProcess_writeMultiStorage... pulseVotingExclusionSuspicious, iteration: " +
+            this.commonCortegeIteration + ", suspect: " + suspect);
+
+
     }
 
     async verifyResult(result, previousRecordId, ubotNumber) {
@@ -599,6 +617,9 @@ class UBotAsmProcess_writeMultiStorage extends UBotAsmProcess_writeSingleStorage
         // calculate intersection cortege members and downloaded results
         this.declineCounterSet.forEach(decline => this.cortege.delete(decline));
 
+        for (let i = 0; i < this.pr.pool.length; ++i)
+            this.suspiciousRemovalCoefficients[i] = 0;
+
         // recursive calculate common cortege
         if (await this.calculateCommonCortege())
             await this.approveCortege(false);
@@ -688,7 +709,7 @@ class UBotAsmProcess_writeMultiStorage extends UBotAsmProcess_writeSingleStorage
         this.suspicious.clear();
         for (let ubot of this.cortege) {
             if (ubot !== this.pr.selfPoolIndex &&
-                ((Array.from(this.corteges[ubot]).filter(u => this.cortege.has(u)).length < this.cortege.size) ||
+                (!Array.from(this.cortege).every(u => this.corteges[ubot].has(u)) ||
                  !Array.from(this.cortege).filter(u => u !== this.pr.selfPoolIndex).every(u => this.corteges[u].has(ubot))))
 
                 this.suspicious.add(ubot);
@@ -740,16 +761,91 @@ class UBotAsmProcess_writeMultiStorage extends UBotAsmProcess_writeSingleStorage
 
         this.suspicious = mostSuspicious;
 
-        // checking suspicious for deleting others in previous iterations
+        let removingUbots = [];     //array of removing ubots containing sets of suspicious removed by them
+        let iterationRemovalCoefficients = [];
+        for (let i = 0; i < this.pr.pool.length; ++i) {
+            iterationRemovalCoefficients[i] = 0;
+            removingUbots[i] = new Set();
+        }
 
+        // checking suspicious for deleting others in previous iterations
+        this.suspicious.forEach(su => {
+            let removing = new Set(Array.from(this.cortege).filter(u => u !== this.pr.selfPoolIndex &&
+                (!this.corteges[su].has(u)) || !this.corteges[u].has(su)));
+
+            removing.forEach(rem => {
+                iterationRemovalCoefficients[rem] += 1 / removing.size;
+                removingUbots[rem].add(su);
+                removingUbots[su].add(rem);
+            });
+        });
+
+        let candidatesLiftingSuspicion = new Set();
+        let confirmedSuspicious = new Set();
+
+        Array.from(this.cortege).filter(u => u !== this.pr.selfPoolIndex).forEach(u => {
+            let newRemovalCoefficient = this.suspiciousRemovalCoefficients[u] + iterationRemovalCoefficients[u];
+
+            if (newRemovalCoefficient >= 1 - ACCURACY) {
+                // add removing ubots to suspicious
+                this.suspicious.add(u);
+
+                if (newRemovalCoefficient > 1 + ACCURACY)
+                    // delete removal ubots from suspicious
+                    // (first placed in candidates, removed only if all removing ubots have a coefficient > 1)
+                    removingUbots[u].forEach(su => candidatesLiftingSuspicion.add(su));
+                else
+                    removingUbots[u].forEach(su => confirmedSuspicious.add(su));
+            } else
+                removingUbots[u].forEach(su => confirmedSuspicious.add(su));
+        });
+
+        // remove remaining candidates from suspicious
+        Array.from(candidatesLiftingSuspicion).filter(
+            cand => !confirmedSuspicious.has(cand)).forEach(
+                cand => this.suspicious.delete(cand));
+
+        this.suspiciousReady[this.commonCortegeIteration] = true;
 
         // voting for the exclusion of the most suspicious ubots
+        await Promise.all(Array.from(this.suspicious).map(async(su) => {
+            if (await this.voteExclusionSuspicious(su)) {
+                // increase removal coefficiens
+                removingUbots[su].forEach(rem => this.suspiciousRemovalCoefficients[rem] + 1 / removingUbots[su].size);
 
-        return true;
+                this.cortege.delete(su);
+            }
+        }));
+
+        // check consensus possibility (and return result)
+        return this.cortege.size >= this.quorumSize;
     }
 
     calculateCortegesIntersection(without = null) {
+        let baseCortege = new Set(this.cortege);
+        if (without != null)
+            baseCortege.delete(without);
 
+        return new Set(Array.from(baseCortege).filter(ubot =>
+            Array.from(baseCortege).filter(u => u !== this.pr.selfPoolIndex).every(u => this.corteges[u].has(ubot)) &&
+            (ubot === this.pr.selfPoolIndex || Array.from(baseCortege).every(u => this.corteges[ubot].has(u)))
+        ));
+    }
+
+    async voteExclusionSuspicious(suspect) {
+        this.votingExclusionSuspiciousEvents[suspect] = new Promise(resolve => this.votingExclusionSuspiciousFires[suspect] = resolve);
+
+        if (this.parallelAnswers[suspect] != null)
+            this.parallelAnswers[suspect].clear();
+        else
+            this.parallelAnswers[suspect] = new Set();
+
+        this.pulseVotingExclusionSuspicious(suspect);
+        this.votingExclusionSuspiciousTasks[suspect] = new ExecutorWithFixedPeriod(() => this.pulseVotingExclusionSuspicious(suspect),
+            UBotConfig.multi_storage_vote_period, this.pr.ubot.executorService).run();
+
+        // wait and return voting result
+        return await this.votingExclusionSuspiciousEvents[suspect];
     }
 
     async onNotify(notification) {
