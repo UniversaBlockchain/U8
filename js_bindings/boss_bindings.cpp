@@ -92,7 +92,7 @@ void JsBossAsyncLoad(const v8::FunctionCallbackInfo<v8::Value> &args) {
                 }
 
                 onReady->lockedContext([=](Local<Context> &cxt) {
-                    onReady->invoke(obj.serializeToV8(*se, onReady->isolate()));
+                    onReady->invoke(obj.serializeToV8(se));
                 });
             });
             return;
@@ -101,16 +101,16 @@ void JsBossAsyncLoad(const v8::FunctionCallbackInfo<v8::Value> &args) {
     });
 }
 
-shared_ptr<Persistent<Object>> getHashIdPrototype(Scripter& scripter) {
-    return scripter.getPrototype("HashId");
+shared_ptr<Persistent<Object>> getHashIdPrototype(shared_ptr<Scripter> scripter) {
+    return scripter->getPrototype("HashId");
 }
 
-shared_ptr<Persistent<Object>> getPublicKeyPrototype(Scripter& scripter) {
-    return scripter.getPrototype("PublicKey");
+shared_ptr<Persistent<Object>> getPublicKeyPrototype(shared_ptr<Scripter> scripter) {
+    return scripter->getPrototype("PublicKey");
 }
 
-shared_ptr<Persistent<Object>> getPrivateKeyPrototype(Scripter& scripter) {
-    return scripter.getPrototype("PrivateKey");
+shared_ptr<Persistent<Object>> getPrivateKeyPrototype(shared_ptr<Scripter> scripter) {
+    return scripter->getPrototype("PrivateKey");
 }
 
 void JsBossAddPrototype(const v8::FunctionCallbackInfo<v8::Value> &args) {

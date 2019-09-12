@@ -612,16 +612,16 @@ static void JsVerifyExtendedSignature(const FunctionCallbackInfo<Value> &args) {
                         bool isAllOk = isHashValid && isHash2Valid;
                         onComplete->lockedContext([isAllOk, es, onComplete, se](Local<Context> cxt) {
                             if (isAllOk) {
-                                onComplete->invoke(es.serializeToV8(*se, cxt->GetIsolate()));
+                                onComplete->invoke(es.serializeToV8(onComplete->scripter_sp()));
                             } else {
-                                onComplete->invoke(UObject().serializeToV8(*se, cxt->GetIsolate()));
+                                onComplete->invoke(UObject().serializeToV8(onComplete->scripter_sp()));
                             }
                         });
                     }
                 } catch (const std::exception& e) {
                     cerr << "JsVerifyExtendedSignature error: " << e.what() << endl;
                     onComplete->lockedContext([onComplete, se](Local<Context> cxt) {
-                        onComplete->invoke(UObject().serializeToV8(*se, cxt->GetIsolate()));
+                        onComplete->invoke(UObject().serializeToV8(onComplete->scripter_sp()));
                     });
                 }
             });
@@ -652,18 +652,18 @@ void JsInitCrypto(Scripter& scripter, Isolate *isolate, const Local<ObjectTempla
     global->Set(isolate, "__verify_extendedSignature", FunctionTemplate::New(isolate, JsVerifyExtendedSignature));
 }
 
-v8::Local<v8::Value> wrapHashId(Scripter& scripter, v8::Isolate* isolate, crypto::HashId* hashId) {
-    return wrap(*scripter.getTemplate("hashIdTpl"), isolate, hashId, true);
+v8::Local<v8::Value> wrapHashId(shared_ptr<Scripter> scripter, crypto::HashId* hashId) {
+    return wrap(*scripter->getTemplate("hashIdTpl"), scripter->isolate(), hashId, true);
 }
 
-v8::Local<v8::Value> wrapKeyAddress(Scripter& scripter, v8::Isolate* isolate, crypto::KeyAddress* keyAddress) {
-    return wrap(*scripter.getTemplate("keyAddressTpl"), isolate, keyAddress, true);
+v8::Local<v8::Value> wrapKeyAddress(shared_ptr<Scripter> scripter, crypto::KeyAddress* keyAddress) {
+    return wrap(*scripter->getTemplate("keyAddressTpl"), scripter->isolate(), keyAddress, true);
 }
 
-v8::Local<v8::Value> wrapPublicKey(Scripter& scripter, v8::Isolate* isolate, crypto::PublicKey* publicKey) {
-    return wrap(*scripter.getTemplate("publicKeyTpl"), isolate, publicKey, true);
+v8::Local<v8::Value> wrapPublicKey(shared_ptr<Scripter> scripter, crypto::PublicKey* publicKey) {
+    return wrap(*scripter->getTemplate("publicKeyTpl"), scripter->isolate(), publicKey, true);
 }
 
-v8::Local<v8::Value> wrapPrivateKey(Scripter& scripter, v8::Isolate* isolate, crypto::PrivateKey* privateKey) {
-    return wrap(*scripter.getTemplate("privateKeyTpl"), isolate, privateKey, true);
+v8::Local<v8::Value> wrapPrivateKey(shared_ptr<Scripter> scripter, crypto::PrivateKey* privateKey) {
+    return wrap(*scripter->getTemplate("privateKeyTpl"), scripter->isolate(), privateKey, true);
 }

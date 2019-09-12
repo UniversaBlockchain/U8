@@ -387,6 +387,7 @@ public:
     ScripterHolder(ArgsContext &ac) : _scripter(ac.scripter) {}
 
     Scripter *scripter() const { return _scripter.get(); }
+    shared_ptr<Scripter> scripter_sp() const { return _scripter; }
 
     Isolate *isolate() const { return _scripter->isolate(); }
 

@@ -18,8 +18,8 @@ private:
         UKeyAddressData(const crypto::KeyAddress &val);
         ~UKeyAddressData() = default;
 
-        Local<Object> serializeToV8(Scripter& scripter, Isolate* isolate) override {
-            auto res = wrapKeyAddress(scripter, isolate, new crypto::KeyAddress(*keyAddress.get()));
+        Local<Object> serializeToV8(shared_ptr<Scripter> scripter) override {
+            auto res = wrapKeyAddress(scripter, new crypto::KeyAddress(*keyAddress.get()));
             return Local<Object>::Cast(res);
         }
 

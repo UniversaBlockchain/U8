@@ -16,8 +16,8 @@ private:
         UStringData(const std::string &v);
         ~UStringData() override = default;
 
-        Local<Object> serializeToV8(Scripter& scripter, Isolate *isolate) override {
-            auto res = Local<Object>::Cast(String::NewFromUtf8(isolate, value.data()));
+        Local<Object> serializeToV8(shared_ptr<Scripter> scripter) override {
+            auto res = Local<Object>::Cast(String::NewFromUtf8(scripter->isolate(), value.data()));
             return res;
         };
 

@@ -75,7 +75,7 @@ void JsScripterWrap_send(const FunctionCallbackInfo<Value> &args) {
             auto se = ac.scripter;
             runAsync([onReceive,se,obj{move(obj)}](){
                 onReceive->lockedContext([onReceive,obj{move(obj)}](Local<Context> &cxt){
-                    auto v8obj = obj.serializeToV8(*onReceive->scripter(), onReceive->scripter()->isolate());
+                    auto v8obj = obj.serializeToV8(onReceive->scripter_sp());
                     onReceive->invoke(v8obj);
                 });
             });
@@ -134,7 +134,7 @@ void JsSendFromWorker(const v8::FunctionCallbackInfo<v8::Value> &args) {
             WorkerScripter* pws = (WorkerScripter*)ac.isolate->GetData(1);
             auto onReceiveMain = pws->onReceiveMain;
             onReceiveMain->lockedContext([onReceiveMain,obj](auto cxt){
-                auto v8obj = obj.serializeToV8(*onReceiveMain->scripter(), onReceiveMain->scripter()->isolate());
+                auto v8obj = obj.serializeToV8(onReceiveMain->scripter_sp());
                 onReceiveMain->invoke(v8obj);
             });
             return;
