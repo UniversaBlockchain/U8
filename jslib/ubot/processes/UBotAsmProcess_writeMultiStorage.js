@@ -32,7 +32,6 @@ class UBotAsmProcess_writeMultiStorage extends UBotAsmProcess_writeSingleStorage
         this.previous = [];
         this.cortege = new Set();
         this.excluded = new Set();
-        this.hashesReady = false;
         this.otherAnswers = new Set();
         this.parallelAnswers = [];
         this.downloadAnswers = new Set();
@@ -62,9 +61,11 @@ class UBotAsmProcess_writeMultiStorage extends UBotAsmProcess_writeSingleStorage
         this.iterationsCortege = [];
         this.iterationsCortegesIds = [];
         this.iterationState = [];
+        this.iterationsVoteLeave = [];
         this.suspicious = new Set();
         this.suspiciousRemovalCoefficients = [];
-        this.suspiciousReady = [];
+        this.leaveCounterSet = [];
+        this.removeCounterSet = [];
         this.state = UBotAsmProcess_writeMultiStorage.states.CHECKING;
     }
 
@@ -318,7 +319,23 @@ class UBotAsmProcess_writeMultiStorage extends UBotAsmProcess_writeSingleStorage
         this.pr.logger.log("UBotAsmProcess_writeMultiStorage... pulseVotingExclusionSuspicious, iteration: " +
             this.commonCortegeIteration + ", suspect: " + suspect);
 
-
+        Array.from(this.cortege).filter(
+            ubot => ubot !== this.pr.selfPoolIndex && !this.parallelAnswers[suspect].has(this.pr.pool[ubot].number)
+        ).forEach(ubot =>
+            this.pr.ubot.network.deliver(this.pr.pool[ubot],
+                new UBotCloudNotification_asmCommand(
+                    this.pr.ubot.network.myInfo,
+                    this.pr.poolId,
+                    this.cmdStack,
+                    UBotCloudNotification_asmCommand.types.MULTI_STORAGE_VOTE_EXCLUSION_SUSPICIOUS,
+                    {
+                        isAnswer: false,
+                        commonCortegeIteration: this.commonCortegeIteration,
+                        suspect: suspect
+                    }
+                )
+            )
+        );
     }
 
     async verifyResult(result, previousRecordId, ubotNumber) {
@@ -608,6 +625,29 @@ class UBotAsmProcess_writeMultiStorage extends UBotAsmProcess_writeSingleStorage
         }
     }
 
+    voteExclusionSuspect(notification) {
+        let res = notification.params.decision ? "remove" : "leave";
+
+        this.pr.logger.log("UBotAsmProcess_writeMultiStorage... voteExclusionSuspect {from: " + notification.from.number +
+            ", iteration: " + this.commonCortegeIteration + ", suspect: " + notification.params.suspect + ", result: " + res + "}");
+
+        if (notification.params.decision) {
+            this.removeCounterSet[notification.params.suspect].add(notification.from.number);
+
+            if (this.removeCounterSet[notification.params.suspect].size >= this.quorumSize) {
+                this.votingExclusionSuspiciousTasks[notification.params.suspect].cancel();
+                this.votingExclusionSuspiciousFires[notification.params.suspect](true);
+            }
+        } else {
+            this.leaveCounterSet[notification.params.suspect].add(notification.from.number);
+
+            if (this.leaveCounterSet[notification.params.suspect].size > this.pr.pool.length - this.quorumSize) {
+                this.votingExclusionSuspiciousTasks[notification.params.suspect].cancel();
+                this.votingExclusionSuspiciousFires[notification.params.suspect](false);
+            }
+        }
+    }
+
     async searchCommonCortege() {
         this.pr.logger.log("UBotAsmProcess_writeMultiStorage... searchCommonCortege wait results");
 
@@ -805,11 +845,13 @@ class UBotAsmProcess_writeMultiStorage extends UBotAsmProcess_writeSingleStorage
             cand => !confirmedSuspicious.has(cand)).forEach(
                 cand => this.suspicious.delete(cand));
 
-        this.suspiciousReady[this.commonCortegeIteration] = true;
+        let voteApprove = this.cortege;
+        this.suspicious.forEach(su => voteApprove.delete(su));
+        this.iterationsVoteLeave[this.commonCortegeIteration] = voteApprove;
 
         // voting for the exclusion of the most suspicious ubots
         await Promise.all(Array.from(this.suspicious).map(async(su) => {
-            if (await this.voteExclusionSuspicious(su)) {
+            if (await this.votingExclusionSuspicious(su)) {
                 // increase removal coefficiens
                 removingUbots[su].forEach(rem => this.suspiciousRemovalCoefficients[rem] + 1 / removingUbots[su].size);
 
@@ -832,13 +874,21 @@ class UBotAsmProcess_writeMultiStorage extends UBotAsmProcess_writeSingleStorage
         ));
     }
 
-    async voteExclusionSuspicious(suspect) {
+    async votingExclusionSuspicious(suspect) {
         this.votingExclusionSuspiciousEvents[suspect] = new Promise(resolve => this.votingExclusionSuspiciousFires[suspect] = resolve);
 
         if (this.parallelAnswers[suspect] != null)
             this.parallelAnswers[suspect].clear();
         else
             this.parallelAnswers[suspect] = new Set();
+        if (this.leaveCounterSet[suspect] != null)
+            this.leaveCounterSet[suspect].clear();
+        else
+            this.leaveCounterSet[suspect] = new Set();
+        if (this.removeCounterSet[suspect] != null)
+            this.removeCounterSet[suspect].clear();
+        else
+            this.removeCounterSet[suspect] = new Set();
 
         this.pulseVotingExclusionSuspicious(suspect);
         this.votingExclusionSuspiciousTasks[suspect] = new ExecutorWithFixedPeriod(() => this.pulseVotingExclusionSuspicious(suspect),
@@ -865,13 +915,12 @@ class UBotAsmProcess_writeMultiStorage extends UBotAsmProcess_writeSingleStorage
                             }
                         )
                     );
-                } else if (!this.hashesReady) {
+                } else if (this.getHashesTask != null && !this.getHashesTask.cancelled) {
                     this.otherAnswers.add(notification.from.number);
                     this.hashes[this.pr.poolIndexes.get(notification.from.number)] = notification.params.dataHashId;
                     this.previous[this.pr.poolIndexes.get(notification.from.number)] = notification.params.previousRecordId;
 
                     if (this.otherAnswers.size >= this.pr.pool.length - 1) {
-                        this.hashesReady = true;
                         this.getHashesTask.cancel();
 
                         this.downloadAnswers.add(this.pr.selfPoolIndex);
@@ -1088,6 +1137,31 @@ class UBotAsmProcess_writeMultiStorage extends UBotAsmProcess_writeSingleStorage
                      notification.params.commonCortegeIteration === this.commonCortegeIteration)) {
                     this.otherAnswers.add(notification.from.number);
                     this.voteDecision(notification);
+                }
+
+            } else if (notification.type === UBotCloudNotification_asmCommand.types.MULTI_STORAGE_VOTE_EXCLUSION_SUSPICIOUS) {
+                if (!notification.params.isAnswer) {
+                    if (this.iterationsVoteLeave[notification.params.commonCortegeIteration] != null)
+                        this.pr.ubot.network.deliver(notification.from,
+                            new UBotCloudNotification_asmCommand(
+                                this.pr.ubot.network.myInfo,
+                                this.pr.poolId,
+                                this.cmdStack,
+                                UBotCloudNotification_asmCommand.types.MULTI_STORAGE_VOTE_EXCLUSION_SUSPICIOUS,
+                                {
+                                    decision: !this.iterationsVoteLeave[notification.params.commonCortegeIteration].has(notification.params.suspect),
+                                    commonCortegeIteration: notification.params.commonCortegeIteration,
+                                    suspect: notification.params.suspect,
+                                    isAnswer: true
+                                }
+                            )
+                        );
+                } else if (this.votingExclusionSuspiciousTasks[notification.params.suspect] != null &&
+                    !this.votingExclusionSuspiciousTasks[notification.params.suspect].cancelled &&
+                    notification.params.commonCortegeIteration === this.commonCortegeIteration) {
+
+                    this.parallelAnswers[notification.params.suspect].add(notification.from.number);
+                    this.voteExclusionSuspect(notification);
                 }
             }
         } else {

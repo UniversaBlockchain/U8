@@ -116,7 +116,8 @@ class UBotCloudNotification_asmCommand extends Notification {
         MULTI_STORAGE_GET_CORTEGES:                     {ordinal: 4},
         MULTI_STORAGE_GET_SUSPICIOUS_CORTEGE_HASHID:    {ordinal: 5},
         MULTI_STORAGE_GET_DECISIONS:                    {ordinal: 6},
-        MULTI_STORAGE_VOTE_DECISION:                    {ordinal: 7}
+        MULTI_STORAGE_VOTE_DECISION:                    {ordinal: 7},
+        MULTI_STORAGE_VOTE_EXCLUSION_SUSPICIOUS:        {ordinal: 8}
     };
 
     constructor(from, poolId, cmdStack, type, params) {
@@ -177,6 +178,12 @@ class UBotCloudNotification_asmCommand extends Notification {
                 bw.write(this.params.commonCortegeIteration);
                 if (this.params.isAnswer)
                     bw.write(this.params.decision);
+                break;
+            case UBotCloudNotification_asmCommand.types.MULTI_STORAGE_VOTE_EXCLUSION_SUSPICIOUS:
+                bw.write(this.params.commonCortegeIteration);
+                bw.write(this.params.suspect);
+                if (this.params.isAnswer)
+                    bw.write(this.params.decision);
         }
     }
 
@@ -232,6 +239,12 @@ class UBotCloudNotification_asmCommand extends Notification {
             case UBotCloudNotification_asmCommand.types.MULTI_STORAGE_GET_DECISIONS:
             case UBotCloudNotification_asmCommand.types.MULTI_STORAGE_VOTE_DECISION:
                 this.params.commonCortegeIteration = br.read();
+                if (this.params.isAnswer)
+                    this.params.decision = br.read();
+                break;
+            case UBotCloudNotification_asmCommand.types.MULTI_STORAGE_VOTE_EXCLUSION_SUSPICIOUS:
+                this.params.commonCortegeIteration = br.read();
+                this.params.suspect = br.read();
                 if (this.params.isAnswer)
                     this.params.decision = br.read();
         }
