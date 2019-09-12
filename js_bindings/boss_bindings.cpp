@@ -132,7 +132,8 @@ void JsBossAddPrototype(const v8::FunctionCallbackInfo<v8::Value> &args) {
     });
 }
 
-void JsInitBossBindings(Scripter& scripter, Isolate *isolate, const Local<ObjectTemplate> &global) {
+void JsInitBossBindings(Scripter& scripter, const Local<ObjectTemplate> &global) {
+    Isolate *isolate = scripter.isolate();
     global->Set(String::NewFromUtf8(isolate, "__boss_asyncDump"), FunctionTemplate::New(isolate, JsBossAsyncDump));
     global->Set(String::NewFromUtf8(isolate, "__boss_asyncLoad"), FunctionTemplate::New(isolate, JsBossAsyncLoad));
     global->Set(String::NewFromUtf8(isolate, "__boss_addPrototype"), FunctionTemplate::New(isolate, JsBossAddPrototype));

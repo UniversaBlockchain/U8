@@ -21,11 +21,6 @@
 
 using namespace crypto;
 
-//static Persistent<FunctionTemplate> publicKeyTpl;
-//static Persistent<FunctionTemplate> privateKeyTpl;
-//static Persistent<FunctionTemplate> hashIdTpl;
-//static Persistent<FunctionTemplate> keyAddressTpl;
-
 static void privateKeySign(const FunctionCallbackInfo<Value> &args) {
     Scripter::unwrapArgs(args, [&](ArgsContext &ac) {
         // __sign(data, hashType, callback)
@@ -107,7 +102,7 @@ static void privateKeyGenerate(const FunctionCallbackInfo<Value> &args) {
                 runAsync([=]() {
                     auto key = new PrivateKey(strength);
                     onReady->lockedContext([=](Local<Context> &cxt) {
-                        onReady->call(cxt, wrap(*se->getTemplate("privateKeyTpl"), onReady->isolate(), key, true));
+                        onReady->call(cxt, wrap(se->privateKeyTpl, onReady->isolate(), key, true));
                     });
                 });
                 return;
@@ -222,7 +217,7 @@ static void keyAddressMatch(const FunctionCallbackInfo<Value> &args) {
         if (ac.args.Length() == 1) {
             auto keyAddress = unwrap<KeyAddress>(ac.args.This());
             auto isolate = ac.isolate;
-            auto pkt = *ac.scripter->getTemplate("publicKeyTpl")->Get(isolate);
+            auto pkt = ac.scripter->publicKeyTpl.Get(isolate);
             Local<Object> obj = ac.args[0].As<Object>();
             if (pkt->HasInstance(obj)) {
                 PublicKey *key = unwrap<PublicKey>(obj);
@@ -268,7 +263,7 @@ static void hashIdOf(const FunctionCallbackInfo<Value> &args) {
             runAsync([=]() {
                 auto h = new HashId(HashId::of(pData->data(), pData->size()));
                 onReady->lockedContext([=](Local<Context> &cxt){
-                    onReady->invoke(wrap(*se->getTemplate("hashIdTpl"), onReady->isolate(), h, true));
+                    onReady->invoke(wrap(se->hashIdTpl, onReady->isolate(), h, true));
                 });
             });
             return;
@@ -301,9 +296,7 @@ Local<FunctionTemplate> initPrivateKey(Scripter& scripter, Isolate *isolate) {
 
     tpl->Set(isolate, "__generate", FunctionTemplate::New(isolate, privateKeyGenerate));
 
-    auto persistentTpl = std::make_shared<Persistent<FunctionTemplate>>();
-    persistentTpl->Reset(isolate, tpl);
-    scripter.setTemplate("privateKeyTpl", persistentTpl);
+    scripter.privateKeyTpl.Reset(isolate, tpl);
     return tpl;
 }
 
@@ -319,7 +312,7 @@ Local<FunctionTemplate> initPublicKey(Scripter& scripter, Isolate *isolate) {
                         auto contents = args[0].As<TypedArray>()->Buffer()->GetContents();
                         return new PublicKey(contents.Data(), contents.ByteLength());
                     } else if (args[0]->IsObject()) {
-                        auto pkt = pse->getTemplate("privateKeyTpl")->Get(isolate);
+                        auto pkt = pse->privateKeyTpl.Get(isolate);
                         Local<Object> obj = args[0].As<Object>();
                         if (pkt->HasInstance(obj))
                             return new PublicKey(*unwrap<PrivateKey>(obj));
@@ -339,9 +332,7 @@ Local<FunctionTemplate> initPublicKey(Scripter& scripter, Isolate *isolate) {
     prototype->Set(isolate, "__getBitsStrength", FunctionTemplate::New(isolate, publicKeyBitsStrength));
     prototype->Set(isolate, "__encrypt", FunctionTemplate::New(isolate, publicKeyEncrypt));
 
-    auto persistentTpl = std::make_shared<Persistent<FunctionTemplate>>();
-    persistentTpl->Reset(isolate, tpl);
-    scripter.setTemplate("publicKeyTpl", persistentTpl);
+    scripter.publicKeyTpl.Reset(isolate, tpl);
     return tpl;
 }
 
@@ -363,7 +354,7 @@ Local<FunctionTemplate> initKeyAddress(Scripter& scripter, Isolate *isolate) {
                     return new KeyAddress(*s);
                 } else if (a0->IsObject() && args.Length() == 3) {
                     Local<Object> obj = a0.As<Object>();
-                    auto tpl = *pse->getTemplate("publicKeyTpl")->Get(isolate);
+                    auto tpl = pse->publicKeyTpl.Get(isolate);
                     if (tpl->HasInstance(obj)) {
                         auto context = args.GetIsolate()->GetCurrentContext();
                         return new KeyAddress(*unwrap<PrivateKey>(obj),
@@ -384,9 +375,7 @@ Local<FunctionTemplate> initKeyAddress(Scripter& scripter, Isolate *isolate) {
     prototype->Set(isolate, "getPacked", FunctionTemplate::New(isolate, keyAddressGetPacked));
     prototype->Set(isolate, "match", FunctionTemplate::New(isolate, keyAddressMatch));
 
-    auto persistentTpl = std::make_shared<Persistent<FunctionTemplate>>();
-    persistentTpl->Reset(isolate, tpl);
-    scripter.setTemplate("keyAddressTpl", persistentTpl);
+    scripter.keyAddressTpl.Reset(isolate, tpl);
     return tpl;
 }
 
@@ -423,9 +412,7 @@ Local<FunctionTemplate> initHashId(Scripter& scripter, Isolate *isolate) {
 
     tpl->Set(isolate, "__of", FunctionTemplate::New(isolate, hashIdOf));
 
-    auto persistentTpl = std::make_shared<Persistent<FunctionTemplate>>();
-    persistentTpl->Reset(isolate, tpl);
-    scripter.setTemplate("hashIdTpl", persistentTpl);
+    scripter.hashIdTpl.Reset(isolate, tpl);
     return tpl;
 }
 
@@ -631,7 +618,9 @@ static void JsVerifyExtendedSignature(const FunctionCallbackInfo<Value> &args) {
     });
 }
 
-void JsInitCrypto(Scripter& scripter, Isolate *isolate, const Local<ObjectTemplate> &global) {
+void JsInitCrypto(Scripter& scripter, const Local<ObjectTemplate> &global) {
+    Isolate *isolate = scripter.isolate();
+
     auto crypto = ObjectTemplate::New(isolate);
 
     // order is critical!
@@ -653,17 +642,17 @@ void JsInitCrypto(Scripter& scripter, Isolate *isolate, const Local<ObjectTempla
 }
 
 v8::Local<v8::Value> wrapHashId(shared_ptr<Scripter> scripter, crypto::HashId* hashId) {
-    return wrap(*scripter->getTemplate("hashIdTpl"), scripter->isolate(), hashId, true);
+    return wrap(scripter->hashIdTpl, scripter->isolate(), hashId, true);
 }
 
 v8::Local<v8::Value> wrapKeyAddress(shared_ptr<Scripter> scripter, crypto::KeyAddress* keyAddress) {
-    return wrap(*scripter->getTemplate("keyAddressTpl"), scripter->isolate(), keyAddress, true);
+    return wrap(scripter->keyAddressTpl, scripter->isolate(), keyAddress, true);
 }
 
 v8::Local<v8::Value> wrapPublicKey(shared_ptr<Scripter> scripter, crypto::PublicKey* publicKey) {
-    return wrap(*scripter->getTemplate("publicKeyTpl"), scripter->isolate(), publicKey, true);
+    return wrap(scripter->publicKeyTpl, scripter->isolate(), publicKey, true);
 }
 
 v8::Local<v8::Value> wrapPrivateKey(shared_ptr<Scripter> scripter, crypto::PrivateKey* privateKey) {
-    return wrap(*scripter->getTemplate("privateKeyTpl"), scripter->isolate(), privateKey, true);
+    return wrap(scripter->privateKeyTpl, scripter->isolate(), privateKey, true);
 }

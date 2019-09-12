@@ -10,8 +10,8 @@
 using namespace v8;
 using namespace std;
 
-void JsInitPGPool(Isolate *isolate, const Local<ObjectTemplate> &global);
-void JsInitBusyConnection(Isolate *isolate, const Local<ObjectTemplate> &global);
-void JsInitQueryResult(Isolate *isolate, const Local<ObjectTemplate> &global);
+void JsInitPGPool(Scripter& scripter, const Local<ObjectTemplate> &global);
+void JsInitBusyConnection(Scripter& scripter, const Local<ObjectTemplate> &global);
+void JsInitQueryResult(Scripter& scripter, const Local<ObjectTemplate> &global);
 
 #endif //U8_PG_BINDINGS_H

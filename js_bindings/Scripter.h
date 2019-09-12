@@ -90,8 +90,6 @@ public:
     int runAsMain(string sourceScript, const vector<string> &&args, string fileName);
 
     void runMainLoop();
-    void startMainLoopThread();
-    void joinMainLoopThread();
 
     template<typename T>
     string getString(MaybeLocal<T> value) {
@@ -229,11 +227,44 @@ public:
         throwError(string(text));
     }
 
-    std::shared_ptr<Persistent<FunctionTemplate>> getTemplate(const std::string& tplName);
-    void setTemplate(const std::string& tplName, std::shared_ptr<Persistent<FunctionTemplate>> tpl);
-    void resetAllHoldedTemplates();
     std::shared_ptr<Persistent<Object>> getPrototype(const std::string& tplName);
     void setPrototype(const std::string& protoName, std::shared_ptr<Persistent<Object>> proto);
+
+    // crypto templates
+    Persistent<FunctionTemplate> publicKeyTpl;
+    Persistent<FunctionTemplate> privateKeyTpl;
+    Persistent<FunctionTemplate> hashIdTpl;
+    Persistent<FunctionTemplate> keyAddressTpl;
+
+    // async_io templates
+    Persistent<FunctionTemplate> FileTemplate;
+    Persistent<FunctionTemplate> TCPTemplate;
+    Persistent<FunctionTemplate> TLSTemplate;
+    Persistent<FunctionTemplate> UDPTemplate;
+    Persistent<FunctionTemplate> DirTemplate;
+
+    // pgPool templates
+    Persistent<FunctionTemplate> PGPoolTemplate;
+    Persistent<FunctionTemplate> BusyConnectionTemplate;
+    Persistent<FunctionTemplate> QueryResultTemplate;
+
+    // research templates
+    Persistent<FunctionTemplate> MemoryUser1Tpl;
+    Persistent<FunctionTemplate> MemoryUser2Tpl;
+    Persistent<FunctionTemplate> MemoryUser3Tpl;
+
+    // web templates
+    Persistent<FunctionTemplate> NodeInfoTpl;
+    Persistent<FunctionTemplate> SocketAddressTpl;
+    Persistent<FunctionTemplate> NetConfigTpl;
+    Persistent<FunctionTemplate> UDPAdapterTpl;
+    Persistent<FunctionTemplate> HttpServerTpl;
+    Persistent<FunctionTemplate> HttpServerRequestBufTpl;
+    Persistent<FunctionTemplate> HttpServerRequestSecureBufTpl;
+    Persistent<FunctionTemplate> HttpClientTpl;
+
+    // worker templates
+    Persistent<FunctionTemplate> WorkerScripterTpl;
 
 private:
 
@@ -274,9 +305,6 @@ private:
     int exitCode = 0;
     Queue<ContextCallback> callbacks;
 
-    std::shared_ptr<std::thread> mainLoopThread;
-
-    std::unordered_map<std::string, std::shared_ptr<Persistent<FunctionTemplate>>> templatesHolder;
     std::unordered_map<std::string, std::shared_ptr<Persistent<Object>>> prototypesHolder;
 
     // do not construct it manually

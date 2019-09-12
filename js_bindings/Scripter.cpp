@@ -173,19 +173,19 @@ void Scripter::initialize() {
     global->Set(v8String("__init_workers"), functionTemplate(JsInitWorkers));
     global->Set(v8String("__send_from_worker"), functionTemplate(JsSendFromWorker));
 
-    JsInitIOFile(pIsolate, global);
-    JsInitIODir(pIsolate, global);
-    JsInitIOTCP(pIsolate, global);
-    JsInitIOTLS(pIsolate, global);
-    JsInitIOUDP(pIsolate, global);
-    JsInitCrypto(*this, pIsolate, global);
-    JsInitQueryResult(pIsolate, global);
-    JsInitBusyConnection(pIsolate, global);
-    JsInitPGPool(pIsolate, global);
-    JsInitNetwork(pIsolate, global);
-    JsInitResearchBindings(pIsolate, global);
-    JsInitBossBindings(*this, pIsolate, global);
-    JsInitWorkerBindings(*this, pIsolate, global);
+    JsInitIOFile(*this, global);
+    JsInitIODir(*this, global);
+    JsInitIOTCP(*this, global);
+    JsInitIOTLS(*this, global);
+    JsInitIOUDP(*this, global);
+    JsInitCrypto(*this, global);
+    JsInitQueryResult(*this, global);
+    JsInitBusyConnection(*this, global);
+    JsInitPGPool(*this, global);
+    JsInitNetwork(*this, global);
+    JsInitResearchBindings(*this, global);
+    JsInitBossBindings(*this, global);
+    JsInitWorkerBindings(*this, global);
 
     // Save context and wrap weak self:
     context.Reset(pIsolate, v8::Context::New(pIsolate, nullptr, global));
@@ -347,16 +347,6 @@ void Scripter::runMainLoop() {
     }
 }
 
-void Scripter::startMainLoopThread() {
-    mainLoopThread = std::make_shared<std::thread>([this](){
-        runMainLoop();
-    });
-}
-
-void Scripter::joinMainLoopThread() {
-    mainLoopThread->join();
-}
-
 std::string Scripter::expandPath(const std::string &path) {
     return replace_all(path, "~", home);
 }
@@ -414,19 +404,6 @@ void Scripter::unwrap(
     } else {
         cerr << "called inContext for recycled SR: ignoring" << endl;
     }
-}
-
-std::shared_ptr<Persistent<FunctionTemplate>> Scripter::getTemplate(const std::string& tplName) {
-    return templatesHolder[tplName];
-}
-
-void Scripter::setTemplate(const std::string& tplName, std::shared_ptr<Persistent<FunctionTemplate>> tpl) {
-    templatesHolder[tplName] = tpl;
-}
-
-void Scripter::resetAllHoldedTemplates() {
-    for (auto tpl : templatesHolder)
-        tpl.second->Reset();
 }
 
 std::shared_ptr<Persistent<Object>> Scripter::getPrototype(const std::string& protoName) {

@@ -10,7 +10,7 @@
 using namespace v8;
 using namespace std;
 
-void JsInitBossBindings(Scripter& scripter, Isolate *isolate, const Local<ObjectTemplate> &global);
+void JsInitBossBindings(Scripter& scripter, const Local<ObjectTemplate> &global);
 
 shared_ptr<Persistent<Object>> getHashIdPrototype(shared_ptr<Scripter> scripter);
 shared_ptr<Persistent<Object>> getPublicKeyPrototype(shared_ptr<Scripter> scripter);

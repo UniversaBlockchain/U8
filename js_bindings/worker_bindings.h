@@ -10,8 +10,9 @@
 using namespace v8;
 using namespace std;
 
-void JsInitWorkerBindings(Scripter& scripter, Isolate *isolate, const Local<ObjectTemplate> &global);
-void JsInitScripterWrap(Scripter& scripter, Isolate *isolate, const Local<ObjectTemplate> &global);
+void JsInitWorkerBindings(Scripter& scripter, const Local<ObjectTemplate> &global);
+void JsInitWorkerScripter(Scripter& scripter, const Local<ObjectTemplate> &global);
+
 void JsInitWorkers(const v8::FunctionCallbackInfo<v8::Value> &args);
 void JsSendFromWorker(const v8::FunctionCallbackInfo<v8::Value> &args);
 

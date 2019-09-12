@@ -45,7 +45,7 @@ static void JsCreateWorker(const FunctionCallbackInfo<Value> &args) {
                 });
                 sem.wait();
                 onComplete->lockedContext([=](Local<Context> cxt) {
-                    Local<Value> res = wrap(*se->getTemplate("WorkerScripterTpl"), cxt->GetIsolate(), psw);
+                    Local<Value> res = wrap(se->WorkerScripterTpl, cxt->GetIsolate(), psw);
                     onComplete->invoke(move(res));
                 });
             });
@@ -56,8 +56,10 @@ static void JsCreateWorker(const FunctionCallbackInfo<Value> &args) {
     });
 }
 
-void JsInitWorkerBindings(Scripter& scripter, Isolate *isolate, const Local<ObjectTemplate> &global) {
-    JsInitScripterWrap(scripter, isolate, global);
+void JsInitWorkerBindings(Scripter& scripter, const Local<ObjectTemplate> &global) {
+    Isolate *isolate = scripter.isolate();
+
+    JsInitWorkerScripter(scripter, global);
 
     auto wrk = ObjectTemplate::New(isolate);
 
@@ -96,7 +98,9 @@ void JsScripterWrap_setOnReceive(const FunctionCallbackInfo<Value> &args) {
     });
 }
 
-void JsInitScripterWrap(Scripter& scripter, Isolate *isolate, const Local<ObjectTemplate> &global) {
+void JsInitWorkerScripter(Scripter& scripter, const Local<ObjectTemplate> &global) {
+    Isolate *isolate = scripter.isolate();
+    
     // Bind object with default constructor
     Local<FunctionTemplate> tpl = bindCppClass<WorkerScripter>(isolate, "WorkerScripter");
 
@@ -107,9 +111,7 @@ void JsInitScripterWrap(Scripter& scripter, Isolate *isolate, const Local<Object
     prototype->Set(isolate, "_setOnReceive", FunctionTemplate::New(isolate, JsScripterWrap_setOnReceive));
 
     // register it into global namespace
-    auto persistentTpl = std::make_shared<Persistent<FunctionTemplate>>();
-    persistentTpl->Reset(isolate, tpl);
-    scripter.setTemplate("WorkerScripterTpl", persistentTpl);
+    scripter.WorkerScripterTpl.Reset(isolate, tpl);
     global->Set(isolate, "WorkerScripter", tpl);
 }
 
