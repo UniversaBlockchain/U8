@@ -6,14 +6,33 @@ wrk.WorkerHandle = class {
     constructor(workerImpl) {
         this.workerImpl = workerImpl;
         this.onReceiveCallback = obj => {}
+        this.nextJsonRpcId = 1;
+        this.callbacks = new Map();
     }
 
     onReceive(block) {
         this.onReceiveCallback = block;
     }
 
+    startJsonRpcCallbacks() {
+        this.onReceive((obj) => {
+            let id = obj.id;
+            if (this.callbacks.has(id)) {
+                this.callbacks.get(id)(obj.result);
+                this.callbacks.delete(id);
+            }
+        });
+    }
+
     send(obj) {
         this.workerImpl._send(obj);
+    }
+
+    sendJsonRpc(method, params, onComplete = null) {
+        let id = this.nextJsonRpcId;
+        if (onComplete != null)
+            this.callbacks.set(id, onComplete);
+        this.workerImpl._send({jsonrpc:"2.0", method:method, params:params, id:id});
     }
 
     release() {
@@ -21,6 +40,14 @@ wrk.WorkerHandle = class {
     }
 
     async close() {
+    }
+
+    getNextJsonRpcId() {
+        let res = this.nextJsonRpcId;
+        ++res;
+        if (res >= Number.MAX_SAFE_INTEGER)
+            res = 1;
+        return res;
     }
 };
 
@@ -44,5 +71,17 @@ wrk.getWorker = function(accessLevel, workerSrc) {
         });
     });
 };
+
+wrk.jsonRpcWrapper = `
+wrk.export = {};
+wrk.onReceive = (obj) => {
+    let method = obj.method;
+    if (wrk.export[method]) {
+        let res = wrk.export[method](obj.params);
+        if (res !== undefined)
+            wrk.send({jsonrpc:"2.0", result:res, id:obj.id});
+    }
+}
+`;
 
 module.exports = wrk;

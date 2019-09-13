@@ -2,86 +2,42 @@
  * Copyright (c) 2019 Sergey Chernov, iCodici S.n.C, All Rights Reserved.
  */
 
-import {getWorker, createWorker} from 'worker'
+import {getWorker, jsonRpcWrapper} from 'worker'
 
-let workerSrc = `
-function piSpigot(iThread, n) {
-    let piIter = 0;
-    let pi = new ArrayBuffer(n);
-    let boxes = Math.floor(n * 10 / 3);
-    let reminders = new ArrayBuffer(boxes);
-    for (let i = 0; i < boxes; ++i)
-        reminders[i] = 2;
-    let heldDigits = 0;
-    for (let i = 0; i < n; ++i) {
-        let carriedOver = 0;
-        let sum = 0;
-        for (let j = boxes - 1; j >= 0; --j) {
-            reminders[j] *= 10;
-            sum = reminders[j] + carriedOver;
-            let quotient = Math.floor(sum / (j*2 + 1));
-            reminders[j] = sum % (j*2 + 1);
-            carriedOver = quotient * j;
-        }
-        reminders[0] = sum % 10;
-        let q = Math.floor(sum / 10);
-        if (q == 9) {
-            ++heldDigits;
-        } else if (q == 10) {
-            q = 0;
-            for (let k = 1; k <= heldDigits; ++k) {
-                let replaced = pi[i-k];
-                if (replaced == 9)
-                    replaced = 0;
-                else
-                    ++replaced;
-                pi[i-k] = replaced;
-            }
-            heldDigits = 1;
-        } else {
-            heldDigits = 1;
-        }
-        pi[piIter++] = q;
+class WorkerExample {
+
+    static workerSrc = wrk.jsonRpcWrapper + `
+    wrk.export.calcAxB = (params) => {
+        return params[0] * params[1];
+    };
+    `;
+
+    constructor() {
+        this.worker = null;
     }
-    let s = "";
-    for (let i = piIter - 8; i < piIter; ++i)
-        s += ""+pi[i];
-    //console.log(iThread + ": " + s);
-    return s;
-}
 
-wrk.onReceive = (obj) => {
-    //wrk.send(obj.a + obj.b + obj.c);
-    let res = piSpigot(obj.a, obj.b);
-    wrk.send({piSpigotAnswer: res});
+    static async init() {
+        let res = new WorkerExample();
+        res.worker = await wrk.getWorker(0, WorkerExample.workerSrc);
+        res.worker.startJsonRpcCallbacks();
+        return res;
+    }
+
+    release() {
+        this.worker.release();
+    }
+
+    async calcAxB(a, b) {
+        return new Promise(resolve => this.worker.sendJsonRpc("calcAxB", [a, b], ans => {
+            resolve(ans);
+        }));
+    }
 }
-`;
 
 unit.test("hello worker", async () => {
-    console.log();
-    let pubKey1 = (await crypto.PrivateKey.generate(2048)).publicKey;
-    console.log("random pub key 1: " + btoa(pubKey1.fingerprints));
-
-    let t0 = new Date().getTime();
-    let promises = [];
-    for (let i = 0; i < 1000; ++i) {
-        //let workerHandle = await createWorker(0, workerSrc);
-        let workerHandle = await getWorker(0, workerSrc);
-        let resolver;
-        let promise = new Promise((resolve, reject) => resolver = resolve);
-        workerHandle.onReceive(async obj => {
-            console.log("workerHandle.onReceive ("+i+"): " + JSON.stringify(obj));
-            workerHandle.release();
-            resolver();
-        });
-        workerHandle.send({a: i, b: 20, c: 7});
-        promises.push(promise);
-        //await workerHandle.close();
+    for (let i = 0; i < 100; ++i) {
+        let worker = await WorkerExample.init();
+        console.log("11 * "+i+" = " + await worker.calcAxB(11, i));
+        worker.release();
     }
-    await Promise.all(promises);
-    let dt = new Date().getTime() - t0;
-    console.log("dt = " + dt + " ms");
-
-    let pubKey2 = (await crypto.PrivateKey.generate(2048)).publicKey;
-    console.log("random pub key 2: " + btoa(pubKey2.fingerprints));
 });
