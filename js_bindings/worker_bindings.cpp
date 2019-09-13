@@ -120,37 +120,6 @@ static void ReleaseWorker(WorkerScripter* pws) {
     }
 }
 
-static void JsCreateWorker(const FunctionCallbackInfo<Value> &args) {
-    Scripter::unwrapArgs(args, [](ArgsContext &ac) {
-        if (ac.args.Length() == 3) {
-            auto se = ac.scripter;
-            int accessLevel = ac.asInt(0);
-            auto workerSrc = ac.asString(1);
-            auto onComplete = ac.asFunction(2);
-            runAsync([workerSrc, se, onComplete]() {
-                WorkerScripter *psw = new WorkerScripter();
-                Semaphore sem;
-                psw->loopThread = std::make_shared<std::thread>([workerSrc,psw,&sem]() {
-                    psw->se = Scripter::New();
-                    psw->se->isolate()->SetData(1, psw);
-                    psw->se->evaluate(workerMain);
-                    psw->se->evaluate(workerSrc);
-                    sem.notify();
-                    psw->se->runMainLoop();
-                });
-                sem.wait();
-                onComplete->lockedContext([=](Local<Context> cxt) {
-                    Local<Value> res = wrap(se->WorkerScripterTpl, cxt->GetIsolate(), psw);
-                    onComplete->invoke(move(res));
-                });
-            });
-            return;
-        }
-        ac.throwError("invalid arguments");
-
-    });
-}
-
 static void JsGetWorker(const FunctionCallbackInfo<Value> &args) {
     Scripter::unwrapArgs(args, [](ArgsContext &ac) {
         if (ac.args.Length() == 3) {
@@ -186,7 +155,6 @@ void JsInitWorkerBindings(Scripter& scripter, const Local<ObjectTemplate> &globa
 
     auto wrk = ObjectTemplate::New(isolate);
 
-    wrk->Set(isolate, "__createWorker", FunctionTemplate::New(isolate, JsCreateWorker));
     wrk->Set(isolate, "__getWorker", FunctionTemplate::New(isolate, JsGetWorker));
 
     global->Set(isolate, "wrk", wrk);

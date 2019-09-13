@@ -61,17 +61,6 @@ wrk.WorkerHandle = class {
     }
 };
 
-wrk.createWorker = function(accessLevel, workerSrc) {
-    console.log("wrk.createWorker");
-    return new Promise(resolve => {
-        wrk.__createWorker(accessLevel, workerSrc, workerImpl => {
-            let w = new wrk.WorkerHandle(workerImpl);
-            w.workerImpl._setOnReceive(obj => w.onReceiveCallback(obj));
-            resolve(w);
-        });
-    });
-};
-
 wrk.getWorker = function(accessLevel, workerSrc) {
     return new Promise(resolve => {
         wrk.__getWorker(accessLevel, workerSrc, workerImpl => {
