@@ -277,6 +277,102 @@ class ProcessStartExec extends ProcessBase {
                 await this.commands[cmdIndex].onNotify(notification);
             }
     }
+
+    async writeSingleStorage(data) {
+        let storageData = {storage_name : "default"};
+        if (data != null) {
+            return new Promise(async (resolve) => {
+                let proc = new UBotAsmProcess_writeSingleStorage(this.pr, (result) => {
+                    resolve(result);
+                }, this, newStack); //TODO
+
+                await proc.init(data, null, storageData);
+                await proc.start();
+            });
+        }
+        else {
+            this.pr.logger.log("Can`t write to single-storage: default");
+            this.pr.errors.push(new ErrorRecord(Errors.FORBIDDEN, "writeSingleStorage",
+                "Can`t write to single-storage: default"));
+            this.pr.changeState(UBotPoolState.FAILED);
+        }
+    }
+
+    async writeMultiStorage(data) {
+        let storageData = {storage_name : "default"};
+        if (data != null) {
+            return new Promise(async (resolve) => {
+                let proc = new UBotAsmProcess_writeMultiStorage(this.pr, (result) => {
+                    resolve(result);
+                }, this, newStack); //TODO
+
+                await proc.init(data, null, storageData);
+                await proc.start();
+            });
+        }
+        else {
+            this.pr.logger.log("Can`t write to multi-storage: default");
+            this.pr.errors.push(new ErrorRecord(Errors.FORBIDDEN, "writeMultiStorage",
+                "Can`t write to multi-storage: default"));
+            this.pr.changeState(UBotPoolState.FAILED);
+        }
+    }
+
+    async getSingleStorage() {
+        return await this.pr.ubot.getStorageResultByRecordId(this.pr.executableContract.id, false);
+    }
+
+    async getMultiStorage() {
+        if (this.readsFrom.get("default") != null)
+            return await this.pr.ubot.getRecordsFromMultiStorage(this.pr.executableContract.id, "default");
+        else {
+            this.pr.logger.log("Can`t read from multi-storage: default");
+            this.pr.errors.push(new ErrorRecord(Errors.FORBIDDEN, "getRecords",
+                "Can`t read from multi-storage: default"));
+            this.pr.changeState(UBotPoolState.FAILED);
+        }
+    }
+
+    /*async function getRandom(maxValue) {
+        //generate random and write its hash to multi storage
+        let rnd = Math.random();
+        let hash = HashId.of(rnd);
+        let recordId = await writeMultiStorage({hash : hash});
+
+        //calculate hash of hashes and write it to single storage
+        let records = getMultiStorage();
+        let hashes = [];
+        for (let r of records) {
+            hashes.push(r.hash.toBase64String());
+        }
+
+        hashes.sort();
+        let hashesHash = HashId.of(Boss.pack(hashes));
+        await  writeSingleStorage({hashesHash : hashesHash});
+
+        //add actuall random to multi storage
+        await writeMultiStorage(recordId, {hash : hash, rnd : rnd});
+
+        //verify hashesOfHash and rnd -> hash
+        records = getMultiStorage();
+        hashes = [];
+        let result = 0;
+        for(let r of records) {
+            assertEquals(r.hash, HashId.of(r.rnd));
+            hashes.push(r.hash.toBase64String());
+            result += r.rnd;
+        }
+        hashes.sort();
+        hashesHash = HashId.of(Boss.pack(hashes));
+
+        singleStorage = getSingleStorage();
+        assertEquals(singleStorage.hashesHash, hashesHash);
+
+        result %= maxValue;
+
+        await writeSingleStorage({hashesHash:hashesHash, result: result});
+    } */
+
 }
 
 module.exports = {ProcessStartExec};
