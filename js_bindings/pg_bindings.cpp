@@ -6,10 +6,6 @@
 #include "binding_tools.h"
 #include "../db/PGPool.h"
 
-static Persistent<FunctionTemplate> PGPoolTemplate;
-static Persistent<FunctionTemplate> BusyConnectionTemplate;
-static Persistent<FunctionTemplate> QueryResultTemplate;
-
 // PGPool methods
 
 void JsPGPoolConnect(const FunctionCallbackInfo<Value> &args) {
@@ -34,7 +30,7 @@ void JsPGPoolWithConnection(const FunctionCallbackInfo<Value> &args) {
             auto onReady = ac.asFunction(0);
             pool->withConnection([=](shared_ptr<db::BusyConnection> conn) {
                 onReady->lockedContext([=](Local<Context> &cxt){
-                    onReady->invoke(wrap(BusyConnectionTemplate, onReady->isolate(), conn.get()));
+                    onReady->invoke(wrap(onReady->scripter()->BusyConnectionTemplate, onReady->isolate(), conn.get()));
                 });
             });
             return;
@@ -106,7 +102,7 @@ void JsBusyConnectionExecuteQuery(const FunctionCallbackInfo<Value> &args) {
                 db::QueryResult *pqr = new db::QueryResult();
                 pqr->moveFrom(std::move(qr));
                 onSuccess->lockedContext([=](Local<Context> &cxt) {
-                    onSuccess->invoke(wrap(QueryResultTemplate, cxt->GetIsolate(), pqr));
+                    onSuccess->invoke(wrap(onSuccess->scripter()->QueryResultTemplate, cxt->GetIsolate(), pqr));
                 });
             }, [=](const string &err) {
                 onError->lockedContext([=](Local<Context> &cxt){
@@ -205,7 +201,9 @@ void JsBusyConnectionRelease(const FunctionCallbackInfo<Value> &args) {
 
 // Classes bindings
 
-void JsInitPGPool(Isolate *isolate, const Local<ObjectTemplate> &global) {
+void JsInitPGPool(Scripter& scripter, const Local<ObjectTemplate> &global) {
+    Isolate *isolate = scripter.isolate();
+
     // Bind object with default constructor
     Local<FunctionTemplate> tpl = bindCppClass<db::PGPool>(isolate, "PGPool");
 
@@ -219,11 +217,13 @@ void JsInitPGPool(Isolate *isolate, const Local<ObjectTemplate> &global) {
     prototype->Set(isolate, "_close", FunctionTemplate::New(isolate, JsPGPoolClose));
 
     // register it into global namespace
-    PGPoolTemplate.Reset(isolate, tpl);
+    scripter.PGPoolTemplate.Reset(isolate, tpl);
     global->Set(isolate, "PGPool", tpl);
 }
 
-void JsInitBusyConnection(Isolate *isolate, const Local<ObjectTemplate> &global) {
+void JsInitBusyConnection(Scripter& scripter, const Local<ObjectTemplate> &global) {
+    Isolate *isolate = scripter.isolate();
+
     // Bind object with default constructor
     Local<FunctionTemplate> tpl = bindCppClass<db::BusyConnection>(isolate, "BusyConnection");
 
@@ -236,7 +236,7 @@ void JsInitBusyConnection(Isolate *isolate, const Local<ObjectTemplate> &global)
     prototype->Set(isolate, "_release", FunctionTemplate::New(isolate, JsBusyConnectionRelease));
 
     // register it into global namespace
-    BusyConnectionTemplate.Reset(isolate, tpl);
+    scripter.BusyConnectionTemplate.Reset(isolate, tpl);
     global->Set(isolate, "BusyConnection", tpl);
 }
 
@@ -387,7 +387,9 @@ void JsQueryResultRelease(const FunctionCallbackInfo<Value> &args) {
     });
 }
 
-void JsInitQueryResult(Isolate *isolate, const Local<ObjectTemplate> &global) {
+void JsInitQueryResult(Scripter& scripter, const Local<ObjectTemplate> &global) {
+    Isolate *isolate = scripter.isolate();
+
     // Bind object with default constructor
     Local<FunctionTemplate> tpl = bindCppClass<db::QueryResult>(isolate, "QueryResult");
 
@@ -403,6 +405,6 @@ void JsInitQueryResult(Isolate *isolate, const Local<ObjectTemplate> &global) {
     prototype->Set(isolate, "_release", FunctionTemplate::New(isolate, JsQueryResultRelease));
 
     // register it into global namespace
-    QueryResultTemplate.Reset(isolate, tpl);
+    scripter.QueryResultTemplate.Reset(isolate, tpl);
     global->Set(isolate, "QueryResult", tpl);
 }

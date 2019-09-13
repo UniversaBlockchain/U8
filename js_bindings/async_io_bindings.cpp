@@ -14,12 +14,6 @@
 #include "../AsyncIO/IOTCP.h"
 #include "../AsyncIO/IOTLS.h"
 
-static Persistent<FunctionTemplate> FileTemplate;
-static Persistent<FunctionTemplate> TCPTemplate;
-static Persistent<FunctionTemplate> TLSTemplate;
-static Persistent<FunctionTemplate> UDPTemplate;
-static Persistent<FunctionTemplate> DirTemplate;
-
 void JsAsyncGetErrorText(const FunctionCallbackInfo<Value> &args) {
     Scripter::unwrapArgs(args, [](ArgsContext &ac) {
         // args is typically big int, so we convert it through string
@@ -210,7 +204,7 @@ void JsAsyncTCPAccept(const FunctionCallbackInfo<Value> &args) {
     Scripter::unwrapArgs(args, [](ArgsContext &ac) {
         if (ac.args.Length() == 1) {
             auto obj = ac.as<Object>(0);
-            auto tpl = TCPTemplate.Get(ac.isolate);
+            auto tpl = ac.scripter->TCPTemplate.Get(ac.isolate);
             if (!obj->IsObject() || !tpl->HasInstance(obj)) {
                 ac.throwError("required IOTCP argument");
             } else {
@@ -275,7 +269,7 @@ void JsAsyncTLSAccept(const FunctionCallbackInfo<Value> &args) {
     Scripter::unwrapArgs(args, [](ArgsContext &ac) {
         if (ac.args.Length() == 3) {
             auto obj = ac.as<Object>(0);
-            auto tpl = TLSTemplate.Get(ac.isolate);
+            auto tpl = ac.scripter->TLSTemplate.Get(ac.isolate);
             if (!obj->IsObject() || !tpl->HasInstance(obj)) {
                 ac.throwError("required IOTLS argument");
                 return;
@@ -407,7 +401,9 @@ void JsAsyncUDPClose(const FunctionCallbackInfo<Value> &args) {
     });
 }
 
-void JsInitIOFile(Isolate *isolate, const Local<ObjectTemplate> &global) {
+void JsInitIOFile(Scripter& scripter, const Local<ObjectTemplate> &global) {
+    Isolate *isolate = scripter.isolate();
+
     // Bind object with default constructor
     Local<FunctionTemplate> tpl = bindCppClass<asyncio::IOFile>(isolate, "IOFile");
 
@@ -425,11 +421,13 @@ void JsInitIOFile(Isolate *isolate, const Local<ObjectTemplate> &global) {
     tpl->Set(isolate, "remove", FunctionTemplate::New(isolate, JsAsyncFileRemove));
 
     // register it into global namespace
-    FileTemplate.Reset(isolate, tpl);
+    scripter.FileTemplate.Reset(isolate, tpl);
     global->Set(isolate, "IOFile", tpl);
 }
 
-void JsInitIOTCP(Isolate *isolate, const Local<ObjectTemplate> &global) {
+void JsInitIOTCP(Scripter& scripter, const Local<ObjectTemplate> &global) {
+    Isolate *isolate = scripter.isolate();
+
     // Bind object with default constructor
     Local<FunctionTemplate> tpl = bindCppClass<asyncio::IOTCP>(isolate, "IOTCP");
 
@@ -447,11 +445,13 @@ void JsInitIOTCP(Isolate *isolate, const Local<ObjectTemplate> &global) {
     tpl->Set(isolate, "getErrorText", FunctionTemplate::New(isolate, JsAsyncGetErrorText));
 
     // register it into global namespace
-    TCPTemplate.Reset(isolate, tpl);
+    scripter.TCPTemplate.Reset(isolate, tpl);
     global->Set(isolate, "IOTCP", tpl);
 }
 
-void JsInitIOTLS(Isolate *isolate, const Local<ObjectTemplate> &global) {
+void JsInitIOTLS(Scripter& scripter, const Local<ObjectTemplate> &global) {
+    Isolate *isolate = scripter.isolate();
+
     // Bind object with default constructor
     Local<FunctionTemplate> tpl = bindCppClass<asyncio::IOTLS>(isolate, "IOTLS");
 
@@ -469,11 +469,13 @@ void JsInitIOTLS(Isolate *isolate, const Local<ObjectTemplate> &global) {
     tpl->Set(isolate, "getErrorText", FunctionTemplate::New(isolate, JsAsyncGetErrorText));
 
     // register it into global namespace
-    TLSTemplate.Reset(isolate, tpl);
+    scripter.TLSTemplate.Reset(isolate, tpl);
     global->Set(isolate, "IOTLS", tpl);
 }
 
-void JsInitIOUDP(Isolate *isolate, const Local<ObjectTemplate> &global) {
+void JsInitIOUDP(Scripter& scripter, const Local<ObjectTemplate> &global) {
+    Isolate *isolate = scripter.isolate();
+
     // Bind object with default constructor
     Local<FunctionTemplate> tpl = bindCppClass<IOUDPWrapper>(isolate, "IOUDP");
 
@@ -490,7 +492,7 @@ void JsInitIOUDP(Isolate *isolate, const Local<ObjectTemplate> &global) {
     tpl->Set(isolate, "getErrorText", FunctionTemplate::New(isolate, JsAsyncGetErrorText));
 
     // register it into global namespace
-    UDPTemplate.Reset(isolate, tpl);
+    scripter.UDPTemplate.Reset(isolate, tpl);
     global->Set(isolate, "IOUDP", tpl);
 }
 
@@ -564,7 +566,9 @@ void JsAsyncDirRemove(const FunctionCallbackInfo<Value> &args) {
     });
 }
 
-void JsInitIODir(Isolate *isolate, const Local<ObjectTemplate> &global) {
+void JsInitIODir(Scripter& scripter, const Local<ObjectTemplate> &global) {
+    Isolate *isolate = scripter.isolate();
+
     // Bind object with default constructor
     Local<FunctionTemplate> tpl = bindCppClass<asyncio::IODir>(isolate, "IODir");
 
@@ -580,6 +584,6 @@ void JsInitIODir(Isolate *isolate, const Local<ObjectTemplate> &global) {
     tpl->Set(isolate, "remove", FunctionTemplate::New(isolate, JsAsyncDirRemove));
 
     // register it into global namespace
-    DirTemplate.Reset(isolate, tpl);
+    scripter.DirTemplate.Reset(isolate, tpl);
     global->Set(isolate, "IODir", tpl);
 }

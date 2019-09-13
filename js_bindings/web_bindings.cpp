@@ -11,15 +11,6 @@
 using namespace network;
 using namespace crypto;
 
-static Persistent<FunctionTemplate> NodeInfoTpl;
-static Persistent<FunctionTemplate> SocketAddressTpl;
-static Persistent<FunctionTemplate> NetConfigTpl;
-static Persistent<FunctionTemplate> UDPAdapterTpl;
-static Persistent<FunctionTemplate> HttpServerTpl;
-static Persistent<FunctionTemplate> HttpServerRequestBufTpl;
-static Persistent<FunctionTemplate> HttpServerRequestSecureBufTpl;
-static Persistent<FunctionTemplate> HttpClientTpl;
-
 void nodeInfoGetPublicKey(const FunctionCallbackInfo<Value> &args) {
     Scripter::unwrapArgs(args, [](ArgsContext &ac) {
         if (ac.args.Length() == 0) {
@@ -36,7 +27,7 @@ void nodeInfoGetNodeAddress(const FunctionCallbackInfo<Value> &args) {
         if (ac.args.Length() == 0) {
             auto nodeInfo = unwrap<NodeInfo>(ac.args.This());
             SocketAddress* saPtr = const_cast<SocketAddress*>(&(nodeInfo->getNodeAddress()));
-            Local<Value> res[1] {wrap(SocketAddressTpl, ac.isolate, saPtr)};
+            Local<Value> res[1] {wrap(ac.scripter->SocketAddressTpl, ac.isolate, saPtr)};
             ac.setReturnValue(res[0]);
             return;
         }
@@ -49,7 +40,7 @@ void nodeInfoGetClientAddress(const FunctionCallbackInfo<Value> &args) {
         if (ac.args.Length() == 0) {
             auto nodeInfo = unwrap<NodeInfo>(ac.args.This());
             SocketAddress* saPtr = const_cast<SocketAddress*>(&(nodeInfo->getClientAddress()));
-            Local<Value> res[1] {wrap(SocketAddressTpl, ac.isolate, saPtr)};
+            Local<Value> res[1] {wrap(ac.scripter->SocketAddressTpl, ac.isolate, saPtr)};
             ac.setReturnValue(res[0]);
             return;
         }
@@ -123,7 +114,8 @@ void nodeInfoGetPublicPort(const FunctionCallbackInfo<Value> &args) {
     });
 }
 
-Local<FunctionTemplate> initNodeInfo(Isolate *isolate) {
+Local<FunctionTemplate> initNodeInfo(Scripter& scripter) {
+    Isolate *isolate = scripter.isolate();
     Local<FunctionTemplate> tpl = bindCppClass<NodeInfo>(
             isolate,
             "NodeInfoImpl",
@@ -164,7 +156,7 @@ Local<FunctionTemplate> initNodeInfo(Isolate *isolate) {
     prototype->Set(isolate, "__getHostV6", FunctionTemplate::New(isolate, nodeInfoGetHostV6));
     prototype->Set(isolate, "__getPublicPort", FunctionTemplate::New(isolate, nodeInfoGetPublicPort));
 
-    NodeInfoTpl.Reset(isolate, tpl);
+    scripter.NodeInfoTpl.Reset(isolate, tpl);
     return tpl;
 }
 
@@ -190,7 +182,8 @@ void socketAddressGetPort(const FunctionCallbackInfo<Value> &args) {
     });
 }
 
-Local<FunctionTemplate> initSocketAddress(Isolate *isolate) {
+Local<FunctionTemplate> initSocketAddress(Scripter& scripter) {
+    Isolate *isolate = scripter.isolate();
     Local<FunctionTemplate> tpl = bindCppClass<SocketAddress>(
             isolate,
             "SocketAddressImpl",
@@ -209,7 +202,7 @@ Local<FunctionTemplate> initSocketAddress(Isolate *isolate) {
     prototype->Set(isolate, "__getHost", FunctionTemplate::New(isolate, socketAddressGetHost));
     prototype->Set(isolate, "__getPort", FunctionTemplate::New(isolate, socketAddressGetPort));
 
-    SocketAddressTpl.Reset(isolate, tpl);
+    scripter.SocketAddressTpl.Reset(isolate, tpl);
     return tpl;
 }
 
@@ -236,7 +229,7 @@ void netConfig_getInfo(const FunctionCallbackInfo<Value> &args) {
             auto nodeId = ac.asInt(0);
             try {
                 const NodeInfo* pni = &netConfig->getInfo(nodeId);
-                Local<Value> res[1] {wrap(NodeInfoTpl, ac.isolate, const_cast<NodeInfo*>(pni))};
+                Local<Value> res[1] {wrap(ac.scripter->NodeInfoTpl, ac.isolate, const_cast<NodeInfo*>(pni))};
                 ac.setReturnValue(res[0]);
             } catch (const std::exception& e) {
                 ac.throwError(e.what());
@@ -270,7 +263,7 @@ void netConfig_toList(const FunctionCallbackInfo<Value> &args) {
             vector<NodeInfo*> list = netConfig->toList();
             Local<Array> arr = Array::New(ac.isolate, list.size());
             for (int i = 0; i < list.size(); ++i)
-                arr->Set(i, wrap(NodeInfoTpl, ac.isolate, list[i]));
+                arr->Set(i, wrap(ac.scripter->NodeInfoTpl, ac.isolate, list[i]));
             ac.setReturnValue(arr);
             return;
         }
@@ -290,7 +283,8 @@ void netConfig_getSize(const FunctionCallbackInfo<Value> &args) {
     });
 }
 
-Local<FunctionTemplate> initNetConfig(Isolate *isolate) {
+Local<FunctionTemplate> initNetConfig(Scripter& scripter) {
+    Isolate *isolate = scripter.isolate();
     Local<FunctionTemplate> tpl = bindCppClass<NetConfig>(isolate, "NetConfigImpl");
 
     auto prototype = tpl->PrototypeTemplate();
@@ -300,7 +294,7 @@ Local<FunctionTemplate> initNetConfig(Isolate *isolate) {
     prototype->Set(isolate, "__toList", FunctionTemplate::New(isolate, netConfig_toList));
     prototype->Set(isolate, "__getSize", FunctionTemplate::New(isolate, netConfig_getSize));
 
-    NetConfigTpl.Reset(isolate, tpl);
+    scripter.NetConfigTpl.Reset(isolate, tpl);
     return tpl;
 }
 
@@ -406,7 +400,8 @@ void udpAdapter_close(const FunctionCallbackInfo<Value> &args) {
     });
 }
 
-Local<FunctionTemplate> initUDPAdapter(Isolate *isolate) {
+Local<FunctionTemplate> initUDPAdapter(Scripter& scripter) {
+    Isolate *isolate = scripter.isolate();
     Local<FunctionTemplate> tpl = bindCppClass<UDPAdapterWrapper>(
             isolate,
             "UDPAdapterImpl",
@@ -437,7 +432,7 @@ Local<FunctionTemplate> initUDPAdapter(Isolate *isolate) {
     prototype->Set(isolate, "__setReceiveCallback", FunctionTemplate::New(isolate, udpAdapter_setReceiveCallback));
     prototype->Set(isolate, "__close", FunctionTemplate::New(isolate, udpAdapter_close));
 
-    UDPAdapterTpl.Reset(isolate, tpl);
+    scripter.UDPAdapterTpl.Reset(isolate, tpl);
     return tpl;
 }
 
@@ -623,7 +618,7 @@ private:
                 HttpServerRequestBuf* buf = new HttpServerRequestBuf();
                 for (int i = 0; i < bufCopy.size(); ++i)
                     buf->addHttpServerRequest(bufCopy[i]);
-                Local<Value> res = wrap(HttpServerRequestBufTpl, cxt->GetIsolate(), buf);
+                Local<Value> res = wrap(httpCallback_->scripter()->HttpServerRequestBufTpl, cxt->GetIsolate(), buf);
                 httpCallback_->invoke(move(res));
                 // delete buf from HttpServerRequestBuf::sendAnswer
             });
@@ -644,7 +639,7 @@ private:
                         bufCopy[i].ansCallback(buf->getAnswer(i));
                     delete buf;
                 });
-                Local<Value> res = wrap(HttpServerRequestSecureBufTpl, cxt->GetIsolate(), buf);
+                Local<Value> res = wrap(httpSecureCallback_->scripter()->HttpServerRequestSecureBufTpl, cxt->GetIsolate(), buf);
                 httpSecureCallback_->invoke(move(res));
             });
         }
@@ -733,7 +728,8 @@ void httpServer_initSecureProtocol(const FunctionCallbackInfo<Value> &args) {
     });
 }
 
-Local<FunctionTemplate> initHttpServer(Isolate *isolate) {
+Local<FunctionTemplate> initHttpServer(Scripter& scripter) {
+    Isolate *isolate = scripter.isolate();
     Local<FunctionTemplate> tpl = bindCppClass<HttpServerBuffered>(
             isolate,
             "HttpServerTpl",
@@ -765,7 +761,7 @@ Local<FunctionTemplate> initHttpServer(Isolate *isolate) {
     prototype->Set(isolate, "__addEndpoint", FunctionTemplate::New(isolate, httpServer_addEndpoint));
     prototype->Set(isolate, "__initSecureProtocol", FunctionTemplate::New(isolate, httpServer_initSecureProtocol));
 
-    HttpServerTpl.Reset(isolate, tpl);
+    scripter.HttpServerTpl.Reset(isolate, tpl);
     return tpl;
 }
 
@@ -1060,7 +1056,8 @@ void httpClient_stop(const FunctionCallbackInfo<Value> &args) {
     });
 }
 
-Local<FunctionTemplate> initHttpClient(Isolate *isolate) {
+Local<FunctionTemplate> initHttpClient(Scripter& scripter) {
+    Isolate *isolate = scripter.isolate();
     Local<FunctionTemplate> tpl = bindCppClass<HttpClientBuffered>(
             isolate,
             "HttpClientTpl",
@@ -1091,23 +1088,24 @@ Local<FunctionTemplate> initHttpClient(Isolate *isolate) {
     prototype->Set(isolate, "__start", FunctionTemplate::New(isolate, httpClient_start));
     prototype->Set(isolate, "__stop", FunctionTemplate::New(isolate, httpClient_stop));
 
-    HttpClientTpl.Reset(isolate, tpl);
+    scripter.HttpClientTpl.Reset(isolate, tpl);
     return tpl;
 }
 
-void JsInitNetwork(Isolate *isolate, const Local<ObjectTemplate> &global) {
+void JsInitNetwork(Scripter& scripter, const Local<ObjectTemplate> &global) {
+    Isolate *isolate = scripter.isolate();
 
-    JsInitHttpServerRequest(isolate, global);
-    JsInitHttpServerSecureRequest(isolate, global);
+    JsInitHttpServerRequest(scripter, global);
+    JsInitHttpServerSecureRequest(scripter, global);
 
     auto network = ObjectTemplate::New(isolate);
 
-    network->Set(isolate, "NodeInfoImpl", initNodeInfo(isolate));
-    network->Set(isolate, "SocketAddressImpl", initSocketAddress(isolate));
-    network->Set(isolate, "NetConfigImpl", initNetConfig(isolate));
-    network->Set(isolate, "UDPAdapterImpl", initUDPAdapter(isolate));
-    network->Set(isolate, "HttpServerImpl", initHttpServer(isolate));
-    network->Set(isolate, "HttpClientImpl", initHttpClient(isolate));
+    network->Set(isolate, "NodeInfoImpl", initNodeInfo(scripter));
+    network->Set(isolate, "SocketAddressImpl", initSocketAddress(scripter));
+    network->Set(isolate, "NetConfigImpl", initNetConfig(scripter));
+    network->Set(isolate, "UDPAdapterImpl", initUDPAdapter(scripter));
+    network->Set(isolate, "HttpServerImpl", initHttpServer(scripter));
+    network->Set(isolate, "HttpClientImpl", initHttpClient(scripter));
 
     global->Set(isolate, "network", network);
 }
@@ -1247,7 +1245,9 @@ void HttpServerRequestBuf_getRequestBody(const FunctionCallbackInfo<Value> &args
     });
 }
 
-void JsInitHttpServerRequest(Isolate *isolate, const Local<ObjectTemplate> &global) {
+void JsInitHttpServerRequest(Scripter& scripter, const Local<ObjectTemplate> &global) {
+    Isolate *isolate = scripter.isolate();
+
     // Bind object with default constructor
     Local<FunctionTemplate> tpl = bindCppClass<HttpServerRequestBuf>(isolate, "HttpServerRequestBuf");
 
@@ -1267,7 +1267,7 @@ void JsInitHttpServerRequest(Isolate *isolate, const Local<ObjectTemplate> &glob
     prototype->Set(isolate, "getRequestBody", FunctionTemplate::New(isolate, HttpServerRequestBuf_getRequestBody));
 
     // register it into global namespace
-    HttpServerRequestBufTpl.Reset(isolate, tpl);
+    scripter.HttpServerRequestBufTpl.Reset(isolate, tpl);
     global->Set(isolate, "HttpServerRequestBuf", tpl);
 }
 
@@ -1318,7 +1318,9 @@ void HttpServerSecureRequestBuf_setAnswer(const FunctionCallbackInfo<Value> &arg
     });
 }
 
-void JsInitHttpServerSecureRequest(Isolate *isolate, const Local<ObjectTemplate> &global) {
+void JsInitHttpServerSecureRequest(Scripter& scripter, const Local<ObjectTemplate> &global) {
+    Isolate *isolate = scripter.isolate();
+
     // Bind object with default constructor
     Local<FunctionTemplate> tpl = bindCppClass<HttpServerSecureRequestBuf>(isolate, "HttpServerSecureRequestBuf");
 
@@ -1331,6 +1333,6 @@ void JsInitHttpServerSecureRequest(Isolate *isolate, const Local<ObjectTemplate>
     prototype->Set(isolate, "setAnswer", FunctionTemplate::New(isolate, HttpServerSecureRequestBuf_setAnswer));
 
     // register it into global namespace
-    HttpServerRequestSecureBufTpl.Reset(isolate, tpl);
+    scripter.HttpServerRequestSecureBufTpl.Reset(isolate, tpl);
     global->Set(isolate, "HttpServerSecureRequestBuf", tpl);
 }

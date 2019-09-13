@@ -11,9 +11,9 @@
 #include "../crypto/PrivateKey.h"
 #include "../crypto/PublicKey.h"
 
-v8::Local<v8::Value> wrapHashId(v8::Isolate* isolate, crypto::HashId* hashId);
-v8::Local<v8::Value> wrapKeyAddress(v8::Isolate* isolate, crypto::KeyAddress* keyAddress);
-v8::Local<v8::Value> wrapPublicKey(v8::Isolate* isolate, crypto::PublicKey* publicKey);
-v8::Local<v8::Value> wrapPrivateKey(v8::Isolate* isolate, crypto::PrivateKey* privateKey);
+v8::Local<v8::Value> wrapHashId(shared_ptr<Scripter> scripter, crypto::HashId* hashId);
+v8::Local<v8::Value> wrapKeyAddress(shared_ptr<Scripter> scripter, crypto::KeyAddress* keyAddress);
+v8::Local<v8::Value> wrapPublicKey(shared_ptr<Scripter> scripter, crypto::PublicKey* publicKey);
+v8::Local<v8::Value> wrapPrivateKey(shared_ptr<Scripter> scripter, crypto::PrivateKey* privateKey);
 
 #endif //U8_CRYPTO_BINDINGS_H

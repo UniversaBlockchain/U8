@@ -20,8 +20,8 @@ private:
         UDateTimeData(const TimePoint &v);
         ~UDateTimeData() override = default;
 
-        Local<Object> serializeToV8(Isolate* isolate) override {
-            return Local<Object>::Cast(Date::New(isolate->GetCurrentContext(), double(value.time_since_epoch().count()*1e-6)).ToLocalChecked());
+        Local<Object> serializeToV8(shared_ptr<Scripter> scripter) override {
+            return Local<Object>::Cast(Date::New(scripter->isolate()->GetCurrentContext(), double(value.time_since_epoch().count()*1e-6)).ToLocalChecked());
         }
 
         void dbgPrint(std::string prefix) override {

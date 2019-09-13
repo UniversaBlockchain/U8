@@ -20,10 +20,10 @@ private:
         UArrayData();
         ~UArrayData() override;
 
-        Local<Object> serializeToV8(Isolate *isolate) override {
-            auto res = Array::New(isolate);
+        Local<Object> serializeToV8(shared_ptr<Scripter> scripter) override {
+            auto res = Array::New(scripter->isolate());
             for (auto& it: array)
-                res->Set(res->Length(), it.serializeToV8(isolate));
+                res->Set(res->Length(), it.serializeToV8(scripter));
             return res;
         };
 

@@ -89,6 +89,8 @@ public:
 
     int runAsMain(string sourceScript, const vector<string> &&args, string fileName);
 
+    void runMainLoop();
+
     template<typename T>
     string getString(MaybeLocal<T> value) {
         return getString(value.ToLocalChecked());
@@ -225,6 +227,45 @@ public:
         throwError(string(text));
     }
 
+    std::shared_ptr<Persistent<Object>> getPrototype(const std::string& tplName);
+    void setPrototype(const std::string& protoName, std::shared_ptr<Persistent<Object>> proto);
+
+    // crypto templates
+    Persistent<FunctionTemplate> publicKeyTpl;
+    Persistent<FunctionTemplate> privateKeyTpl;
+    Persistent<FunctionTemplate> hashIdTpl;
+    Persistent<FunctionTemplate> keyAddressTpl;
+
+    // async_io templates
+    Persistent<FunctionTemplate> FileTemplate;
+    Persistent<FunctionTemplate> TCPTemplate;
+    Persistent<FunctionTemplate> TLSTemplate;
+    Persistent<FunctionTemplate> UDPTemplate;
+    Persistent<FunctionTemplate> DirTemplate;
+
+    // pgPool templates
+    Persistent<FunctionTemplate> PGPoolTemplate;
+    Persistent<FunctionTemplate> BusyConnectionTemplate;
+    Persistent<FunctionTemplate> QueryResultTemplate;
+
+    // research templates
+    Persistent<FunctionTemplate> MemoryUser1Tpl;
+    Persistent<FunctionTemplate> MemoryUser2Tpl;
+    Persistent<FunctionTemplate> MemoryUser3Tpl;
+
+    // web templates
+    Persistent<FunctionTemplate> NodeInfoTpl;
+    Persistent<FunctionTemplate> SocketAddressTpl;
+    Persistent<FunctionTemplate> NetConfigTpl;
+    Persistent<FunctionTemplate> UDPAdapterTpl;
+    Persistent<FunctionTemplate> HttpServerTpl;
+    Persistent<FunctionTemplate> HttpServerRequestBufTpl;
+    Persistent<FunctionTemplate> HttpServerRequestSecureBufTpl;
+    Persistent<FunctionTemplate> HttpClientTpl;
+
+    // worker templates
+    Persistent<FunctionTemplate> WorkerScripterTpl;
+
 private:
 
     std::string expandPath(const std::string &path);
@@ -263,6 +304,8 @@ private:
     volatile bool isActive = true;
     int exitCode = 0;
     Queue<ContextCallback> callbacks;
+
+    std::unordered_map<std::string, std::shared_ptr<Persistent<Object>>> prototypesHolder;
 
     // do not construct it manually
     explicit Scripter();
@@ -372,6 +415,7 @@ public:
     ScripterHolder(ArgsContext &ac) : _scripter(ac.scripter) {}
 
     Scripter *scripter() const { return _scripter.get(); }
+    shared_ptr<Scripter> scripter_sp() const { return _scripter; }
 
     Isolate *isolate() const { return _scripter->isolate(); }
 

@@ -9,10 +9,6 @@
 #include <deque>
 #include <forward_list>
 
-static Persistent<FunctionTemplate> MemoryUser1Tpl;
-static Persistent<FunctionTemplate> MemoryUser2Tpl;
-static Persistent<FunctionTemplate> MemoryUser3Tpl;
-
 template <class T, int minSize, int maxSize>
 class MemoryUser {
 public:
@@ -136,7 +132,8 @@ static void memoryUser_checkAsync(const FunctionCallbackInfo<Value> &args) {
     });
 }
 
-Local<FunctionTemplate> initMemoryUser1(Isolate *isolate) {
+Local<FunctionTemplate> initMemoryUser1(Scripter& scripter) {
+    Isolate *isolate = scripter.isolate();
     Local<FunctionTemplate> tpl = bindCppClass<MemoryUser1>(
             isolate,
             "MemoryUser1Tpl",
@@ -162,11 +159,12 @@ Local<FunctionTemplate> initMemoryUser1(Isolate *isolate) {
     prototype->Set(isolate, "__check", FunctionTemplate::New(isolate, memoryUser_check<MemoryUser1>));
     prototype->Set(isolate, "__checkAsync", FunctionTemplate::New(isolate, memoryUser_checkAsync<MemoryUser1>));
 
-    MemoryUser1Tpl.Reset(isolate, tpl);
+    scripter.MemoryUser1Tpl.Reset(isolate, tpl);
     return tpl;
 }
 
-Local<FunctionTemplate> initMemoryUser2(Isolate *isolate) {
+Local<FunctionTemplate> initMemoryUser2(Scripter& scripter) {
+    Isolate *isolate = scripter.isolate();
     Local<FunctionTemplate> tpl = bindCppClass<MemoryUser2>(
             isolate,
             "MemoryUser2Tpl",
@@ -192,11 +190,12 @@ Local<FunctionTemplate> initMemoryUser2(Isolate *isolate) {
     prototype->Set(isolate, "__check", FunctionTemplate::New(isolate, memoryUser_check<MemoryUser2>));
     prototype->Set(isolate, "__checkAsync", FunctionTemplate::New(isolate, memoryUser_checkAsync<MemoryUser2>));
 
-    MemoryUser2Tpl.Reset(isolate, tpl);
+    scripter.MemoryUser2Tpl.Reset(isolate, tpl);
     return tpl;
 }
 
-Local<FunctionTemplate> initMemoryUser3(Isolate *isolate) {
+Local<FunctionTemplate> initMemoryUser3(Scripter& scripter) {
+    Isolate *isolate = scripter.isolate();
     Local<FunctionTemplate> tpl = bindCppClass<MemoryUser3>(
             isolate,
             "MemoryUser3Tpl",
@@ -222,17 +221,18 @@ Local<FunctionTemplate> initMemoryUser3(Isolate *isolate) {
     prototype->Set(isolate, "__check", FunctionTemplate::New(isolate, memoryUser_check<MemoryUser3>));
     prototype->Set(isolate, "__checkAsync", FunctionTemplate::New(isolate, memoryUser_checkAsync<MemoryUser3>));
 
-    MemoryUser3Tpl.Reset(isolate, tpl);
+    scripter.MemoryUser3Tpl.Reset(isolate, tpl);
     return tpl;
 }
 
-void JsInitResearchBindings(Isolate *isolate, const Local<ObjectTemplate> &global) {
+void JsInitResearchBindings(Scripter& scripter, const Local<ObjectTemplate> &global) {
+    Isolate *isolate = scripter.isolate();
 
     auto research = ObjectTemplate::New(isolate);
 
-    research->Set(isolate, "MemoryUser1Impl", initMemoryUser1(isolate));
-    research->Set(isolate, "MemoryUser2Impl", initMemoryUser2(isolate));
-    research->Set(isolate, "MemoryUser3Impl", initMemoryUser3(isolate));
+    research->Set(isolate, "MemoryUser1Impl", initMemoryUser1(scripter));
+    research->Set(isolate, "MemoryUser2Impl", initMemoryUser2(scripter));
+    research->Set(isolate, "MemoryUser3Impl", initMemoryUser3(scripter));
 
     global->Set(isolate, "research", research);
 }

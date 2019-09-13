@@ -8,6 +8,7 @@
 #include <string>
 #include <memory>
 #include <v8.h>
+#include "../js_bindings/Scripter.h"
 
 using namespace v8;
 
@@ -38,8 +39,8 @@ public:
         this->empty = empty;
     }
 
-    virtual Local<Object> serializeToV8(Isolate* isolate) {
-        return Local<Object>::Cast(Null(isolate));
+    virtual Local<Object> serializeToV8(shared_ptr<Scripter> scripter) {
+        return Local<Object>::Cast(Null(scripter->isolate()));
     };
 
     virtual void dbgPrint(std::string prefix) {
@@ -83,8 +84,8 @@ public:
 
     };
 
-    Local<Object> serializeToV8(Isolate* isolate) const {
-        return ptr.get()->serializeToV8(isolate);
+    Local<Object> serializeToV8(shared_ptr<Scripter> scripter) const {
+        return ptr.get()->serializeToV8(scripter);
     }
 
     void dbgPrint(std::string prefix = "") const {

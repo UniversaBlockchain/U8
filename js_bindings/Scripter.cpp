@@ -15,6 +15,7 @@
 #include "web_bindings.h"
 #include "research_bindings.h"
 #include "boss_bindings.h"
+#include "worker_bindings.h"
 
 static const char *ARGV0 = nullptr;
 
@@ -150,6 +151,8 @@ void Scripter::initialize() {
     pIsolate = v8::Isolate::New(create_params);
     v8::Isolate::Scope isolate_scope(pIsolate);
 
+    pIsolate->SetData(0, this);
+
     // Create a stack-allocated handle scope.
     v8::HandleScope handle_scope(pIsolate);
 
@@ -167,18 +170,22 @@ void Scripter::initialize() {
 
     global->Set(v8String("__hardware_concurrency"), v8Int(std::thread::hardware_concurrency()));
 
-    JsInitIOFile(pIsolate, global);
-    JsInitIODir(pIsolate, global);
-    JsInitIOTCP(pIsolate, global);
-    JsInitIOTLS(pIsolate, global);
-    JsInitIOUDP(pIsolate, global);
-    JsInitCrypto(pIsolate, global);
-    JsInitQueryResult(pIsolate, global);
-    JsInitBusyConnection(pIsolate, global);
-    JsInitPGPool(pIsolate, global);
-    JsInitNetwork(pIsolate, global);
-    JsInitResearchBindings(pIsolate, global);
-    JsInitBossBindings(pIsolate, global);
+    global->Set(v8String("__init_workers"), functionTemplate(JsInitWorkers));
+    global->Set(v8String("__send_from_worker"), functionTemplate(JsSendFromWorker));
+
+    JsInitIOFile(*this, global);
+    JsInitIODir(*this, global);
+    JsInitIOTCP(*this, global);
+    JsInitIOTLS(*this, global);
+    JsInitIOUDP(*this, global);
+    JsInitCrypto(*this, global);
+    JsInitQueryResult(*this, global);
+    JsInitBusyConnection(*this, global);
+    JsInitPGPool(*this, global);
+    JsInitNetwork(*this, global);
+    JsInitResearchBindings(*this, global);
+    JsInitBossBindings(*this, global);
+    JsInitWorkerBindings(*this, global);
 
     // Save context and wrap weak self:
     context.Reset(pIsolate, v8::Context::New(pIsolate, nullptr, global));
@@ -303,6 +310,22 @@ int Scripter::runAsMain(string sourceScript, const vector<string> &&args, string
         throwPendingException<ScriptError>(tryCatch, context);
     });
 
+    runMainLoop();
+
+    return exitCode;
+//
+//    if (waitExit) {
+//        pIsolate->Exit();
+//        Unlocker ul(pIsolate);
+//        waitExitPromise.get_future().get();
+//        pIsolate->Enter();
+//        return exitCode;
+//    }
+//    return code;
+
+}
+
+void Scripter::runMainLoop() {
     // main loop: we process all callbacks here in the same thread:
     {
         // optimization: the shared context scope - it could be a problem, then move it insude the loop
@@ -322,18 +345,6 @@ int Scripter::runAsMain(string sourceScript, const vector<string> &&args, string
             }
         }
     }
-
-    return exitCode;
-//
-//    if (waitExit) {
-//        pIsolate->Exit();
-//        Unlocker ul(pIsolate);
-//        waitExitPromise.get_future().get();
-//        pIsolate->Enter();
-//        return exitCode;
-//    }
-//    return code;
-
 }
 
 std::string Scripter::expandPath(const std::string &path) {
@@ -395,3 +406,10 @@ void Scripter::unwrap(
     }
 }
 
+std::shared_ptr<Persistent<Object>> Scripter::getPrototype(const std::string& protoName) {
+    return prototypesHolder[protoName];
+}
+
+void Scripter::setPrototype(const std::string& protoName, std::shared_ptr<Persistent<Object>> proto) {
+    prototypesHolder[protoName] = proto;
+}

@@ -21,11 +21,6 @@
 
 using namespace crypto;
 
-static Persistent<FunctionTemplate> publicKeyTpl;
-static Persistent<FunctionTemplate> privateKeyTpl;
-static Persistent<FunctionTemplate> hashIdTpl;
-static Persistent<FunctionTemplate> keyAddressTpl;
-
 static void privateKeySign(const FunctionCallbackInfo<Value> &args) {
     Scripter::unwrapArgs(args, [&](ArgsContext &ac) {
         // __sign(data, hashType, callback)
@@ -103,10 +98,11 @@ static void privateKeyGenerate(const FunctionCallbackInfo<Value> &args) {
                 ac.throwError("strength must be at least 2048");
             else {
                 auto onReady = ac.asFunction(1);
+                auto se = ac.scripter;
                 runAsync([=]() {
                     auto key = new PrivateKey(strength);
                     onReady->lockedContext([=](Local<Context> &cxt) {
-                        onReady->call(cxt, wrap(privateKeyTpl, onReady->isolate(), key, true));
+                        onReady->call(cxt, wrap(se->privateKeyTpl, onReady->isolate(), key, true));
                     });
                 });
                 return;
@@ -221,7 +217,7 @@ static void keyAddressMatch(const FunctionCallbackInfo<Value> &args) {
         if (ac.args.Length() == 1) {
             auto keyAddress = unwrap<KeyAddress>(ac.args.This());
             auto isolate = ac.isolate;
-            auto pkt = publicKeyTpl.Get(isolate);
+            auto pkt = ac.scripter->publicKeyTpl.Get(isolate);
             Local<Object> obj = ac.args[0].As<Object>();
             if (pkt->HasInstance(obj)) {
                 PublicKey *key = unwrap<PublicKey>(obj);
@@ -263,10 +259,11 @@ static void hashIdOf(const FunctionCallbackInfo<Value> &args) {
         if (ac.args.Length() == 2) {
             auto pData = ac.asBuffer(0);
             auto onReady = ac.asFunction(1);
+            auto se = ac.scripter;
             runAsync([=]() {
                 auto h = new HashId(HashId::of(pData->data(), pData->size()));
                 onReady->lockedContext([=](Local<Context> &cxt){
-                    onReady->invoke(wrap(hashIdTpl, onReady->isolate(), h, true));
+                    onReady->invoke(wrap(se->hashIdTpl, onReady->isolate(), h, true));
                 });
             });
             return;
@@ -275,11 +272,12 @@ static void hashIdOf(const FunctionCallbackInfo<Value> &args) {
     });
 }
 
-Local<FunctionTemplate> initPrivateKey(Isolate *isolate) {
+Local<FunctionTemplate> initPrivateKey(Scripter& scripter, Isolate *isolate) {
     Local<FunctionTemplate> tpl = bindCppClass<PrivateKey>(
             isolate,
             "PrivateKeyImpl",
-            [=](const FunctionCallbackInfo<Value> &args) -> PrivateKey * {
+            [](const FunctionCallbackInfo<Value> &args) -> PrivateKey * {
+                Isolate *isolate = args.GetIsolate();
                 if (args.Length() == 1) {
                     if (args[0]->IsTypedArray()) {
                         // load from packed
@@ -298,22 +296,23 @@ Local<FunctionTemplate> initPrivateKey(Isolate *isolate) {
 
     tpl->Set(isolate, "__generate", FunctionTemplate::New(isolate, privateKeyGenerate));
 
-    privateKeyTpl.Reset(isolate, tpl);
+    scripter.privateKeyTpl.Reset(isolate, tpl);
     return tpl;
 }
 
-Local<FunctionTemplate> initPublicKey(Isolate *isolate) {
+Local<FunctionTemplate> initPublicKey(Scripter& scripter, Isolate *isolate) {
     Local<FunctionTemplate> tpl = bindCppClass<PublicKey>(
             isolate,
             "PublicKeyImpl",
             [](const FunctionCallbackInfo<Value> &args) -> PublicKey * {
                 Isolate *isolate = args.GetIsolate();
+                Scripter* pse = (Scripter*)isolate->GetData(0);
                 if (args.Length() == 1) {
                     if (args[0]->IsTypedArray()) {
                         auto contents = args[0].As<TypedArray>()->Buffer()->GetContents();
                         return new PublicKey(contents.Data(), contents.ByteLength());
                     } else if (args[0]->IsObject()) {
-                        auto pkt = privateKeyTpl.Get(isolate);
+                        auto pkt = pse->privateKeyTpl.Get(isolate);
                         Local<Object> obj = args[0].As<Object>();
                         if (pkt->HasInstance(obj))
                             return new PublicKey(*unwrap<PrivateKey>(obj));
@@ -333,16 +332,17 @@ Local<FunctionTemplate> initPublicKey(Isolate *isolate) {
     prototype->Set(isolate, "__getBitsStrength", FunctionTemplate::New(isolate, publicKeyBitsStrength));
     prototype->Set(isolate, "__encrypt", FunctionTemplate::New(isolate, publicKeyEncrypt));
 
-    publicKeyTpl.Reset(isolate, tpl);
+    scripter.publicKeyTpl.Reset(isolate, tpl);
     return tpl;
 }
 
-Local<FunctionTemplate> initKeyAddress(Isolate *isolate) {
+Local<FunctionTemplate> initKeyAddress(Scripter& scripter, Isolate *isolate) {
     Local<FunctionTemplate> tpl = bindCppClass<KeyAddress>(
             isolate,
             "KeyAddress",
             [](const FunctionCallbackInfo<Value> &args) -> KeyAddress * {
                 auto isolate = args.GetIsolate();
+                Scripter* pse = (Scripter*)isolate->GetData(0);
                 auto a0 = args[0];
                 if (a0->IsTypedArray() && args.Length() == 1) {
                     // TODO: reuse data of the typed array
@@ -354,7 +354,7 @@ Local<FunctionTemplate> initKeyAddress(Isolate *isolate) {
                     return new KeyAddress(*s);
                 } else if (a0->IsObject() && args.Length() == 3) {
                     Local<Object> obj = a0.As<Object>();
-                    auto tpl = publicKeyTpl.Get(isolate);
+                    auto tpl = pse->publicKeyTpl.Get(isolate);
                     if (tpl->HasInstance(obj)) {
                         auto context = args.GetIsolate()->GetCurrentContext();
                         return new KeyAddress(*unwrap<PrivateKey>(obj),
@@ -375,18 +375,19 @@ Local<FunctionTemplate> initKeyAddress(Isolate *isolate) {
     prototype->Set(isolate, "getPacked", FunctionTemplate::New(isolate, keyAddressGetPacked));
     prototype->Set(isolate, "match", FunctionTemplate::New(isolate, keyAddressMatch));
 
-    keyAddressTpl.Reset(isolate, tpl);
+    scripter.keyAddressTpl.Reset(isolate, tpl);
     return tpl;
 }
 
 /*
  * constructor: new HashId(data, isDigest)
  */
-Local<FunctionTemplate> initHashId(Isolate *isolate) {
+Local<FunctionTemplate> initHashId(Scripter& scripter, Isolate *isolate) {
     Local<FunctionTemplate> tpl = bindCppClass<HashId>(
             isolate,
             "HashIdImpl",
-            [=](const FunctionCallbackInfo<Value> &args) -> HashId * {
+            [](const FunctionCallbackInfo<Value> &args) -> HashId * {
+                auto isolate = args.GetIsolate();
                 if (args.Length() == 2) {
                     bool isDigest = args[0]->BooleanValue(isolate);
                     if (args[1]->IsTypedArray()) {
@@ -411,7 +412,7 @@ Local<FunctionTemplate> initHashId(Isolate *isolate) {
 
     tpl->Set(isolate, "__of", FunctionTemplate::New(isolate, hashIdOf));
 
-    hashIdTpl.Reset(isolate, tpl);
+    scripter.hashIdTpl.Reset(isolate, tpl);
     return tpl;
 }
 
@@ -550,7 +551,8 @@ static void JsVerifyExtendedSignature(const FunctionCallbackInfo<Value> &args) {
             auto sig = ac.asBuffer(1);
             auto data = ac.asBuffer(2);
             auto onComplete = ac.asFunction(3);
-            runAsync([pubKey,sig,data,onComplete](){
+            auto se = ac.scripter;
+            runAsync([pubKey,sig,data,onComplete,se](){
                 try {
                     byte_vector bvSig(sig->size());
                     memcpy(&bvSig[0], sig->data(), sig->size());
@@ -595,18 +597,18 @@ static void JsVerifyExtendedSignature(const FunctionCallbackInfo<Value> &args) {
                             isHash2Valid = (hash1 == dataHash1);
                         }
                         bool isAllOk = isHashValid && isHash2Valid;
-                        onComplete->lockedContext([isAllOk, es, onComplete](Local<Context> cxt) {
+                        onComplete->lockedContext([isAllOk, es, onComplete, se](Local<Context> cxt) {
                             if (isAllOk) {
-                                onComplete->invoke(es.serializeToV8(cxt->GetIsolate()));
+                                onComplete->invoke(es.serializeToV8(onComplete->scripter_sp()));
                             } else {
-                                onComplete->invoke(UObject().serializeToV8(cxt->GetIsolate()));
+                                onComplete->invoke(UObject().serializeToV8(onComplete->scripter_sp()));
                             }
                         });
                     }
                 } catch (const std::exception& e) {
                     cerr << "JsVerifyExtendedSignature error: " << e.what() << endl;
-                    onComplete->lockedContext([onComplete](Local<Context> cxt) {
-                        onComplete->invoke(UObject().serializeToV8(cxt->GetIsolate()));
+                    onComplete->lockedContext([onComplete, se](Local<Context> cxt) {
+                        onComplete->invoke(UObject().serializeToV8(onComplete->scripter_sp()));
                     });
                 }
             });
@@ -616,17 +618,19 @@ static void JsVerifyExtendedSignature(const FunctionCallbackInfo<Value> &args) {
     });
 }
 
-void JsInitCrypto(Isolate *isolate, const Local<ObjectTemplate> &global) {
+void JsInitCrypto(Scripter& scripter, const Local<ObjectTemplate> &global) {
+    Isolate *isolate = scripter.isolate();
+
     auto crypto = ObjectTemplate::New(isolate);
 
     // order is critical!
-    crypto->Set(isolate, "PrivateKeyImpl", initPrivateKey(isolate));
-    crypto->Set(isolate, "PublicKeyImpl", initPublicKey(isolate));
-    crypto->Set(isolate, "KeyAddress", initKeyAddress(isolate));
+    crypto->Set(isolate, "PrivateKeyImpl", initPrivateKey(scripter, isolate));
+    crypto->Set(isolate, "PublicKeyImpl", initPublicKey(scripter, isolate));
+    crypto->Set(isolate, "KeyAddress", initKeyAddress(scripter, isolate));
     crypto->Set(isolate, "SymmetricKeyImpl", initSymmetricKey(isolate));
     // endo of critical order
     crypto->Set(isolate, "version", String::NewFromUtf8(isolate, "0.0.1"));
-    crypto->Set(isolate, "HashIdImpl", initHashId(isolate));
+    crypto->Set(isolate, "HashIdImpl", initHashId(scripter, isolate));
     crypto->Set(isolate, "__digest", FunctionTemplate::New(isolate, digest));
 
     global->Set(isolate, "crypto", crypto);
@@ -637,18 +641,18 @@ void JsInitCrypto(Isolate *isolate, const Local<ObjectTemplate> &global) {
     global->Set(isolate, "__verify_extendedSignature", FunctionTemplate::New(isolate, JsVerifyExtendedSignature));
 }
 
-v8::Local<v8::Value> wrapHashId(v8::Isolate* isolate, crypto::HashId* hashId) {
-    return wrap(hashIdTpl, isolate, hashId, true);
+v8::Local<v8::Value> wrapHashId(shared_ptr<Scripter> scripter, crypto::HashId* hashId) {
+    return wrap(scripter->hashIdTpl, scripter->isolate(), hashId, true);
 }
 
-v8::Local<v8::Value> wrapKeyAddress(v8::Isolate* isolate, crypto::KeyAddress* keyAddress) {
-    return wrap(keyAddressTpl, isolate, keyAddress, true);
+v8::Local<v8::Value> wrapKeyAddress(shared_ptr<Scripter> scripter, crypto::KeyAddress* keyAddress) {
+    return wrap(scripter->keyAddressTpl, scripter->isolate(), keyAddress, true);
 }
 
-v8::Local<v8::Value> wrapPublicKey(v8::Isolate* isolate, crypto::PublicKey* publicKey) {
-    return wrap(publicKeyTpl, isolate, publicKey, true);
+v8::Local<v8::Value> wrapPublicKey(shared_ptr<Scripter> scripter, crypto::PublicKey* publicKey) {
+    return wrap(scripter->publicKeyTpl, scripter->isolate(), publicKey, true);
 }
 
-v8::Local<v8::Value> wrapPrivateKey(v8::Isolate* isolate, crypto::PrivateKey* privateKey) {
-    return wrap(privateKeyTpl, isolate, privateKey, true);
+v8::Local<v8::Value> wrapPrivateKey(shared_ptr<Scripter> scripter, crypto::PrivateKey* privateKey) {
+    return wrap(scripter->privateKeyTpl, scripter->isolate(), privateKey, true);
 }

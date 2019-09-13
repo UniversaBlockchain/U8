@@ -19,6 +19,6 @@ void JsTypedArrayToString(const FunctionCallbackInfo<v8::Value> &args);
 
 void JsStringToTypedArray(const FunctionCallbackInfo<v8::Value> &args);
 
-void JsInitCrypto(Isolate *isolate, const Local<ObjectTemplate> &global);
+void JsInitCrypto(Scripter& scripter, const Local<ObjectTemplate> &global);
 
 #endif //U8_BASIC_BUILTINS_H
