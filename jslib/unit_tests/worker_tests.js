@@ -7,7 +7,19 @@ import {getWorker, jsonRpcWrapper} from 'worker'
 class WorkerExample {
 
     static workerSrc = wrk.jsonRpcWrapper + `
-    wrk.export.calcAxB = (params) => {
+    function print(text) {
+        wrk.sendJsonRpc("print", [text]);
+    }
+    
+    function callSomethingFromMainScripter(val) {
+        return new Promise(resolve => wrk.sendJsonRpc("callSomethingFromMainScripter", [val], ans => {
+            resolve(ans);
+        }));
+    }
+    
+    wrk.export.calcAxB = async (params) => {
+        let textLen = await callSomethingFromMainScripter("some_parameter");
+        print(textLen);
         return params[0] * params[1];
     };
     `;
@@ -16,10 +28,21 @@ class WorkerExample {
         this.worker = null;
     }
 
-    static async init() {
+    static async start() {
         let res = new WorkerExample();
         res.worker = await wrk.getWorker(0, WorkerExample.workerSrc);
         res.worker.startJsonRpcCallbacks();
+
+        res.worker.export["callSomethingFromMainScripter"] = (params) => {
+            // return val.length to worker
+            let valLength = params[0].length;
+            return valLength;
+        };
+
+        res.worker.export["print"] = (params) => {
+            console.log("worker prints: " + params[0]);
+        };
+
         return res;
     }
 
@@ -27,7 +50,7 @@ class WorkerExample {
         this.worker.release();
     }
 
-    async calcAxB(a, b) {
+    calcAxB(a, b) {
         return new Promise(resolve => this.worker.sendJsonRpc("calcAxB", [a, b], ans => {
             resolve(ans);
         }));
@@ -35,9 +58,8 @@ class WorkerExample {
 }
 
 unit.test("hello worker", async () => {
-    for (let i = 0; i < 100; ++i) {
-        let worker = await WorkerExample.init();
+    let worker = await WorkerExample.start();
+    for (let i = 0; i < 100; ++i)
         console.log("11 * "+i+" = " + await worker.calcAxB(11, i));
-        worker.release();
-    }
+    worker.release();
 });
