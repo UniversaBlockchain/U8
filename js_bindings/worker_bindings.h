@@ -10,6 +10,8 @@
 using namespace v8;
 using namespace std;
 
+void InitWorkerPools(int accessLevel0_poolSize);
+
 void JsInitWorkerBindings(Scripter& scripter, const Local<ObjectTemplate> &global);
 void JsInitWorkerScripter(Scripter& scripter, const Local<ObjectTemplate> &global);
 

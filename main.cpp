@@ -9,6 +9,7 @@
 #include "crypto/base64.h"
 #include "js_bindings/Scripter.h"
 #include "tools/tools.h"
+#include "js_bindings/worker_bindings.h"
 
 #include "AsyncIO/AsyncIO.h"
 #include "AsyncIO/AsyncIOTests.h"
@@ -52,6 +53,7 @@ int main(int argc, const char **argv) {
     } else {
         return Scripter::Application(argv[0], [=](shared_ptr<Scripter> se) {
             vector<string> args(argv + 1, argv + argc);
+            InitWorkerPools(4);
             // important note. At this point secipter instance is initialized but not locked (owning)
             // the current thread, so can be used in any thread, but only with lockging the context:
             // so we lock the context to execute evaluate:

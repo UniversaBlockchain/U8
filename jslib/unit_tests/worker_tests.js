@@ -2,7 +2,7 @@
  * Copyright (c) 2019 Sergey Chernov, iCodici S.n.C, All Rights Reserved.
  */
 
-import {createWorker} from 'worker'
+import {getWorker, createWorker} from 'worker'
 
 let workerSrc = `
 function piSpigot(iThread, n) {
@@ -64,15 +64,17 @@ unit.test("hello worker", async () => {
 
     let t0 = new Date().getTime();
     let promises = [];
-    for (let i = 0; i < 10; ++i) {
-        let workerHandle = await createWorker(0, workerSrc);
+    for (let i = 0; i < 1000; ++i) {
+        //let workerHandle = await createWorker(0, workerSrc);
+        let workerHandle = await getWorker(0, workerSrc);
         let resolver;
         let promise = new Promise((resolve, reject) => resolver = resolve);
         workerHandle.onReceive(async obj => {
-            console.log("workerHandle.onReceive: " + JSON.stringify(obj));
+            console.log("workerHandle.onReceive ("+i+"): " + JSON.stringify(obj));
+            workerHandle.release();
             resolver();
         });
-        workerHandle.send({a: i, b: 2000, c: 7});
+        workerHandle.send({a: i, b: 20, c: 7});
         promises.push(promise);
         //await workerHandle.close();
     }
