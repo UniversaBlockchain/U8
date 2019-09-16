@@ -31,6 +31,7 @@ class CloudProcessor {
         this.quorumSize = 0;
         this.localStorage = new Map();
         this.ProcessStartExec = ProcessStartExec;
+        this.worker = null;
     }
 
     startProcessingCurrentState() {

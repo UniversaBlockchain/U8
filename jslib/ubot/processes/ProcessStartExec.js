@@ -2,6 +2,8 @@
  * Copyright (c) 2019-present Sergey Chernov, iCodici S.n.C, All Rights Reserved.
  */
 
+import {getWorker, jsonRpcWrapper} from 'worker'
+
 const ProcessBase = require("ubot/processes/ProcessBase").ProcessBase;
 const UBotAsmProcess_writeSingleStorage = require("ubot/processes/UBotAsmProcess_writeSingleStorage").UBotAsmProcess_writeSingleStorage;
 const UBotAsmProcess_writeMultiStorage = require("ubot/processes/UBotAsmProcess_writeMultiStorage").UBotAsmProcess_writeMultiStorage;
@@ -17,6 +19,33 @@ const Boss = require('boss.js');
 const notSupportedCommandsInMultiVerify = ["call", "writeSingleStorage", "writeMultiStorage", "replaceSingleStorage", "replaceMultiStorage"];
 
 class ProcessStartExec extends ProcessBase {
+
+    static workerSrc = wrk.farcallWrapper + `
+    function writeSingleStorage(data) {
+        return new Promise(resolve => wrk.farcall("writeSingleStorage", [data], {}, ans => {
+            resolve(ans);
+        }));
+    }
+    
+    function writeMultiStorage(data) {
+        return new Promise(resolve => wrk.farcall("writeSingleStorage", [data], {}, ans => {
+            resolve(ans);
+        }));
+    }
+    
+    function getSingleStorage() {
+        return new Promise(resolve => wrk.farcall("writeSingleStorage", [], {}, ans => {
+            resolve(ans);
+        }));
+    }
+    
+    function getMultiStorage() {
+        return new Promise(resolve => wrk.farcall("writeSingleStorage", [], {}, ans => {
+            resolve(ans);
+        }));
+    }
+    `;
+
     constructor(processor, onReady, cmdStack = []) {
         super(processor, onReady);
         this.ubotAsm = [];
@@ -24,7 +53,9 @@ class ProcessStartExec extends ProcessBase {
         this.var1 = null;
         this.output = null;
         this.commands = [];
+        this.processes = [];
         this.cmdIndex = 0;
+        this.procIndex = 0;
         this.readsFrom = new Map();
         this.writesTo = new Map();
         this.cmdStack = cmdStack;
@@ -42,13 +73,52 @@ class ProcessStartExec extends ProcessBase {
 
         this.initStorages(this.pr.executableContract.state.data.cloud_methods[methodName]);
 
-        this.ubotAsm = ProcessStartExec.parseUbotAsmFromString(this.pr.executableContract.state.data.cloud_methods[methodName].ubotAsm);
+        if (this.pr.executableContract.state.data.hasOwnProperty("js")) {
+            if (this.pr.worker != null) {
+                this.pr.logger.log("Error: worker is already running");
+                return;
+            }
 
-        new ScheduleExecutor(async () => {
-            await this.evalUbotAsm();
-            this.pr.logger.log("  method result: " + this.output);
-            this.onReady(this.output);
-        }, 0, this.pr.ubot.executorService).run();
+            new ScheduleExecutor(async () => {
+                let methodExport = "wrk.export." + methodName + " = " + methodName + ";";
+                this.pr.worker = await wrk.getWorker(0,
+                    ProcessStartExec.workerSrc + this.pr.executableContract.state.data.js + methodExport);
+                this.pr.worker.startFarcallCallbacks();
+
+                this.pr.worker.export["writeSingleStorage"] = async (args, kwargs) => {
+                    return await this.writeSingleStorage(args[0]);
+                };
+
+                this.pr.worker.export["writeMultiStorage"] = async (args, kwargs) => {
+                    return await this.writeMultiStorage(args[0]);
+                };
+
+                this.pr.worker.export["getSingleStorage"] = async (args, kwargs) => {
+                    return await this.getSingleStorage();
+                };
+
+                this.pr.worker.export["getSMultiStorage"] = async (args, kwargs) => {
+                    return await this.getMultiStorage();
+                };
+
+                let result = await new Promise(resolve => this.pr.worker.farcall(methodName, [], {}, ans => resolve(ans)));
+
+                this.pr.worker.release();
+                this.pr.worker = null;
+
+                this.pr.logger.log("  method result: " + result);
+                this.onReady(result);
+            }, 0, this.pr.ubot.executorService).run();
+
+        } else if (this.pr.executableContract.state.data.cloud_methods[methodName].hasOwnProperty("ubotAsm")) {
+            this.ubotAsm = ProcessStartExec.parseUbotAsmFromString(this.pr.executableContract.state.data.cloud_methods[methodName].ubotAsm);
+
+            new ScheduleExecutor(async () => {
+                await this.evalUbotAsm();
+                this.pr.logger.log("  method result: " + this.output);
+                this.onReady(this.output);
+            }, 0, this.pr.ubot.executorService).run();
+        }
     }
 
     initStorages(methodData) {
@@ -269,51 +339,55 @@ class ProcessStartExec extends ProcessBase {
     }
 
     async onNotify(notification) {
-        if (notification instanceof UBotCloudNotification_asmCommand)
-            if (notification.cmdStack.length > 0 && this.commands[notification.cmdStack[0]] != null) {
-                // shift command index from stack
-                let cmdIndex = notification.cmdStack.shift();
+        if (notification instanceof UBotCloudNotification_asmCommand) {
+            if (notification.procIndex instanceof Array) {
+                if (notification.procIndex.length > 0 && this.commands[notification.procIndex[0]] != null) {
+                    // shift command index from stack
+                    let cmdIndex = notification.procIndex.shift();
 
-                await this.commands[cmdIndex].onNotify(notification);
-            }
+                    await this.commands[cmdIndex].onNotify(notification);
+                }
+            } else
+                await this.processes[notification.procIndex].onNotify(notification);
+        }
     }
 
     async writeSingleStorage(data) {
-        let storageData = {storage_name : "default"};
         if (data != null) {
             return new Promise(async (resolve) => {
                 let proc = new UBotAsmProcess_writeSingleStorage(this.pr, (result) => {
                     resolve(result);
-                }, this, newStack); //TODO
+                }, this, this.procIndex);
+                this.processes[this.procIndex] = proc;
+                this.procIndex++;
 
-                await proc.init(data, null, storageData);
+                await proc.init(data, null, {storage_name : "default"});
                 await proc.start();
             });
-        }
-        else {
-            this.pr.logger.log("Can`t write to single-storage: default");
+        } else {
+            this.pr.logger.log("Can`t write empty data to single-storage");
             this.pr.errors.push(new ErrorRecord(Errors.FORBIDDEN, "writeSingleStorage",
-                "Can`t write to single-storage: default"));
+                "Can`t write empty data to single-storage"));
             this.pr.changeState(UBotPoolState.FAILED);
         }
     }
 
     async writeMultiStorage(data) {
-        let storageData = {storage_name : "default"};
         if (data != null) {
             return new Promise(async (resolve) => {
                 let proc = new UBotAsmProcess_writeMultiStorage(this.pr, (result) => {
                     resolve(result);
-                }, this, newStack); //TODO
+                }, this, this.procIndex);
+                this.processes[this.procIndex] = proc;
+                this.procIndex++;
 
-                await proc.init(data, null, storageData);
+                await proc.init(data, null, {storage_name : "default"});
                 await proc.start();
             });
-        }
-        else {
-            this.pr.logger.log("Can`t write to multi-storage: default");
+        } else {
+            this.pr.logger.log("Can`t write empty data to multi-storage");
             this.pr.errors.push(new ErrorRecord(Errors.FORBIDDEN, "writeMultiStorage",
-                "Can`t write to multi-storage: default"));
+                "Can`t write empty data to multi-storage"));
             this.pr.changeState(UBotPoolState.FAILED);
         }
     }
@@ -323,56 +397,8 @@ class ProcessStartExec extends ProcessBase {
     }
 
     async getMultiStorage() {
-        if (this.readsFrom.get("default") != null)
-            return await this.pr.ubot.getRecordsFromMultiStorage(this.pr.executableContract.id, "default");
-        else {
-            this.pr.logger.log("Can`t read from multi-storage: default");
-            this.pr.errors.push(new ErrorRecord(Errors.FORBIDDEN, "getRecords",
-                "Can`t read from multi-storage: default"));
-            this.pr.changeState(UBotPoolState.FAILED);
-        }
+        return await this.pr.ubot.getRecordsFromMultiStorage(this.pr.executableContract.id, "default");
     }
-
-    /*async function getRandom(maxValue) {
-        //generate random and write its hash to multi storage
-        let rnd = Math.random();
-        let hash = HashId.of(rnd);
-        let recordId = await writeMultiStorage({hash : hash});
-
-        //calculate hash of hashes and write it to single storage
-        let records = getMultiStorage();
-        let hashes = [];
-        for (let r of records) {
-            hashes.push(r.hash.toBase64String());
-        }
-
-        hashes.sort();
-        let hashesHash = HashId.of(Boss.pack(hashes));
-        await  writeSingleStorage({hashesHash : hashesHash});
-
-        //add actuall random to multi storage
-        await writeMultiStorage(recordId, {hash : hash, rnd : rnd});
-
-        //verify hashesOfHash and rnd -> hash
-        records = getMultiStorage();
-        hashes = [];
-        let result = 0;
-        for(let r of records) {
-            assertEquals(r.hash, HashId.of(r.rnd));
-            hashes.push(r.hash.toBase64String());
-            result += r.rnd;
-        }
-        hashes.sort();
-        hashesHash = HashId.of(Boss.pack(hashes));
-
-        singleStorage = getSingleStorage();
-        assertEquals(singleStorage.hashesHash, hashesHash);
-
-        result %= maxValue;
-
-        await writeSingleStorage({hashesHash:hashesHash, result: result});
-    } */
-
 }
 
 module.exports = {ProcessStartExec};

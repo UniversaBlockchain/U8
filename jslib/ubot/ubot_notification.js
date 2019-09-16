@@ -120,10 +120,10 @@ class UBotCloudNotification_asmCommand extends Notification {
         MULTI_STORAGE_VOTE_EXCLUSION_SUSPICIOUS:        {ordinal: 8}
     };
 
-    constructor(from, poolId, cmdStack, type, params) {
+    constructor(from, poolId, procIndex, type, params) {
         super(from);
         this.poolId = poolId;
-        this.cmdStack = cmdStack;
+        this.procIndex = procIndex;
         this.type = type;
         this.params = params;
         this.typeCode = CODE_UBOT_CLOUD_NOTIFICATION_ASM_CMD;
@@ -132,8 +132,13 @@ class UBotCloudNotification_asmCommand extends Notification {
     writeTo(bw) {
         bw.write(this.poolId.digest);
 
-        bw.write(this.cmdStack.length);
-        this.cmdStack.forEach(cmd => bw.write(cmd));
+        if (this.procIndex instanceof Array) {
+            bw.write(this.procIndex.length);
+            this.procIndex.forEach(cmd => bw.write(cmd));
+        } else {
+            bw.write(0);
+            bw.write(this.procIndex);
+        }
 
         let isFirstRecord = this.params.previousRecordId == null;
 
@@ -191,10 +196,13 @@ class UBotCloudNotification_asmCommand extends Notification {
         this.poolId = crypto.HashId.withDigest(br.read());
         this.params = {};
 
-        this.cmdStack = [];
-        let cmdStackLen = br.read();
-        for (let i = 0; i < cmdStackLen; i++)
-            this.cmdStack.push(br.read());
+        let procIndexLen = br.read();
+        if (procIndexLen !== 0) {
+            this.procIndex = [];
+            for (let i = 0; i < procIndexLen; i++)
+                this.procIndex.push(br.read());
+        } else
+            this.procIndex = br.read();
 
         this.type = UBotCloudNotification_asmCommand.types.byOrdinal.get(br.read());
         this.params.isAnswer = br.read();
@@ -260,7 +268,7 @@ class UBotCloudNotification_asmCommand extends Notification {
         if (this.type.poolId !== o.type.poolId)
             return false;
 
-        if (!t.valuesEqual(this.cmdStack, o.cmdStack))
+        if (!t.valuesEqual(this.procIndex, o.procIndex))
             return false;
 
         if (this.type.ordinal !== o.type.ordinal)
@@ -276,7 +284,7 @@ class UBotCloudNotification_asmCommand extends Notification {
     toString() {
         return "[UBotCloudNotification_asmCommand from node: " + this.from.number +
             ", poolId: " + this.poolId +
-            ", cmdStack: " + JSON.stringify(this.cmdStack) +
+            ", procIndex: " + JSON.stringify(this.procIndex) +
             ", type: " + this.type.val +
             ", isAnswer: " + this.params.isAnswer + "]";
     }

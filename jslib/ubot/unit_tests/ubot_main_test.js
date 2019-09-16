@@ -3,7 +3,6 @@
  */
 
 import * as tk from "unit_tests/test_keys";
-import * as db from "pg_driver";
 import {expect, assert, unit} from 'test'
 
 const io = require("io");
@@ -65,49 +64,6 @@ async function prepareConfigFiles(count) {
     }
 }
 
-async function dropAllTables(count) {
-    console.log("======================== dropAllTables ========================");
-    let unlockFile = io.getTmpDirPath() + "/unlock_dropAllTables_45b72e15c8b5";
-    let enabled = await io.isAccessible(unlockFile);
-    if (!enabled) {
-        console.error("  Operation not permitted. To unlock it, please touch " + unlockFile);
-        await sleep(9000);
-    } else {
-        let promises = [];
-        for (let i = 0; i < count; ++i) {
-            promises.push(new Promise(resolve => {
-                let pool = null;
-                db.connect("host=localhost port=5432 dbname=ubot_t" + i, (p) => {
-                    pool = p;
-                }, (e) => {
-                    throw new Error("error: dropAllTables.connect.onError: " + e);
-                }, 1);
-                pool.withConnection(con => {
-                    con.executeQuery(async qr => {
-                        let rows = qr.getRows(0);
-                        for (let i = 0; i < rows.length; ++i) {
-                            let resolver;
-                            let promise = new Promise(resolve => resolver = resolve);
-                            con.executeUpdate(affectedRows => {
-                                resolver();
-                            }, err => {
-                                throw new Error("error: dropAllTables.executeUpdate.onError: " + err);
-                            }, "DROP TABLE " + rows[i][0] + " CASCADE");
-                            await promise;
-                        }
-                        con.release();
-                        resolve();
-                    }, err => {
-                        con.release();
-                        throw new Error("error: dropAllTables.executeQuery.onError: " + err);
-                    }, "SELECT tablename FROM pg_tables where schemaname = 'public'");
-                });
-            }));
-        }
-        await Promise.all(promises);
-    }
-}
-
 async function createUbotMain(name, nolog) {
     let args = ["--config", CONFIG_ROOT+"/"+name];
     if (nolog)
@@ -148,9 +104,8 @@ unit.test("ubot_main_test: hello ubot", async () => {
     await shutdownUBots(ubotMains);
 });
 
-unit.test("ubot_main_test: executeCloudMethod", async () => {
+/*unit.test("ubot_main_test: JS secureRandom", async () => {
     const ubotsCount = 8;
-    //await dropAllTables(8);
     let ubotMains = await createUBots(ubotsCount);
 
     console.log("\ntest send...");
@@ -161,642 +116,60 @@ unit.test("ubot_main_test: executeCloudMethod", async () => {
     let executableContract = Contract.fromPrivateKey(userPrivKey);
 
     executableContract.state.data.cloud_methods = {
-        ubotAsm: {
-            pool: {size: 5},
-            quorum: {size: 4},
-            writesTo: [{storage_name: "default"}],
-            ubotAsm:
-                "calc2x2;" + // should approve write to single storage, each ubot has same value
-                "moveTo var1;" +
-                "writeSingleStorage;" +
-                "moveFrom var1;" +
-                "finish"
-        }
-    };
-
-    executableContract.state.data.cloud_storages = {
-        default: {
+        getRandom: {
             pool: {size: 5},
             quorum: {size: 4}
         }
     };
 
-    await executableContract.seal();
+    executableContract.state.data.js = `
+    async function getRandom() {
+        //generate random and write its hash to multi storage
+        let rnd = Math.random();
+        
+        //console.error(rnd);
+        return rnd;
+        
+        let hash = crypto.HashId.of(rnd);        
+        await writeMultiStorage({hash : hash});
 
-    let startingContract = Contract.fromPrivateKey(userPrivKey);
-    startingContract.createTransactionalSection();
-    startingContract.transactional.data.executableContract = await executableContract.getPackedTransaction();
-    startingContract.state.data.methodName = "ubotAsm";
-    startingContract.state.data.executableContractId = executableContract.id.digest;
-    await startingContract.seal(true);
+        //calculate hash of hashes and write it to single storage
+        let records = getMultiStorage();
+        let hashes = [];
+        for (let r of records.values())
+            hashes.push(r.hash.base64);
 
-    console.log("executableContract.id: " + executableContract.id);
-    console.log("startingContract.id: " + startingContract.id);
+        hashes.sort();
+        let hashesHash = HashId.of(hashes.join());
+        await writeSingleStorage({hashesHash : hashesHash});
 
-    let startingContractBin = await startingContract.getPackedTransaction();
-    await client.command("executeCloudMethod", {contract: startingContractBin}, resp=>{
-        console.log("resp: " + JSON.stringify(resp));
-    }, err=>{
-        console.log("err: " + err);
-    });
+        //add actual random to multi storage
+        await writeMultiStorage({hash : hash, rnd : rnd});
 
-    //waiting pool started...
-    await sleep(1000);
-
-    let pool = [];
-    let proc = ubotMains[0].ubot.processors.get(startingContract.id.base64);
-
-    for (let i = 0; i < proc.pool.length; i++)
-        pool.push(proc.pool[i].number);
-
-    //waiting pool finished...
-    while (!pool.every(ubot => !ubotMains[ubot].ubot.processors.get(startingContract.id.base64).state.canContinue))
-        await sleep(100);
-
-    assert(pool.every(ubot => ubotMains[ubot].ubot.processors.get(startingContract.id.base64).state === UBotPoolState.FINISHED));
-
-    let fire = null;
-    let event = new Promise(resolve => fire = resolve);
-
-    await client.command("getState", {startingContractId: startingContract.id}, resp=>{
-        console.log("resp: " + JSON.stringify(resp));
-        fire(resp.result);
-    }, err=>{
-        console.log("err: " + err);
-        fire(null);
-    });
-
-    assert((await Boss.load(await event)).val === 4);
-
-    await shutdownUBots(ubotMains);
-});
-
-unit.test("ubot_main_test: generateRandomHash", async () => {
-    const ubotsCount = 8;
-    //await dropAllTables(8);
-    let ubotMains = await createUBots(ubotsCount);
-
-    console.log("\ntest send...");
-    let url = "http://localhost:"+ubotMains[0].myInfo.clientAddress.port;
-    let client = new network.HttpClient(url);
-    await client.start(clientKey, ubotMains[0].myInfo.publicKey, null);
-
-    let executableContract = Contract.fromPrivateKey(userPrivKey);
-
-    executableContract.state.data.cloud_methods = {
-        ubotAsm: {
-            pool: {size: 5},
-            quorum: {size: 4},
-            writesTo: [{storage_name: "default"}],
-            ubotAsm:
-                "generateRandomHash;" + // should approve write to multi storage, each ubot has random value
-                "moveTo var1;" +
-                "writeMultiStorage;" +
-                "moveFrom var1;" +
-                "finish"
+        //verify hashesOfHash and rnd -> hash
+        records = getMultiStorage();
+        hashes = [];
+        let result = 0;
+        for (let r of records.values()) {
+            if (!r.hash.equals(HashId.of(r.rnd)))
+                throw new Error("Hash does not match the random value");
+        
+            assertEquals(r.hash, );
+            hashes.push(r.hash.base64);
+            result += r.rnd;
         }
-    };
+        hashes.sort();
+        hashesHash = HashId.of(hashes.join());
 
-    executableContract.state.data.cloud_storages = {
-        default: {
-            pool: {size: 5},
-            quorum: {size: 4}
-        }
-    };
+        let singleStorage = getSingleStorage();
+        if (!hashesHash.equals(singleStorage.hashesHash))
+            throw new Error("Hash of hashes does not match the previously saved");
 
-    await executableContract.seal();
+        result %= 100;
 
-    let startingContract = Contract.fromPrivateKey(userPrivKey);
-    startingContract.createTransactionalSection();
-    startingContract.transactional.data.executableContract = await executableContract.getPackedTransaction();
-    startingContract.state.data.methodName = "ubotAsm";
-    startingContract.state.data.executableContractId = executableContract.id.digest;
-    await startingContract.seal(true);
-
-    console.log("executableContract.id: " + executableContract.id);
-    console.log("startingContract.id: " + startingContract.id);
-
-    let startingContractBin = await startingContract.getPackedTransaction();
-    await client.command("executeCloudMethod", {contract: startingContractBin}, resp=>{
-        console.log("resp: " + JSON.stringify(resp));
-    }, err=>{
-        console.log("err: " + err);
-    });
-
-    //waiting pool started...
-    await sleep(1000);
-
-    let pool = [];
-    let proc = ubotMains[0].ubot.processors.get(startingContract.id.base64);
-
-    for (let i = 0; i < proc.pool.length; i++)
-        pool.push(proc.pool[i].number);
-
-    //waiting pool finished...
-    while (!pool.every(ubot => !ubotMains[ubot].ubot.processors.get(startingContract.id.base64).state.canContinue))
-        await sleep(100);
-
-    assert(pool.every(ubot => ubotMains[ubot].ubot.processors.get(startingContract.id.base64).state === UBotPoolState.FINISHED));
-
-    let fire = null;
-    let event = new Promise(resolve => fire = resolve);
-
-    await client.command("getState", {startingContractId: startingContract.id}, resp=>{
-        console.log("resp: " + JSON.stringify(resp));
-        fire(resp.result);
-    }, err=>{
-        console.log("err: " + err);
-        fire(null);
-    });
-
-    // checking length of random hash
-    assert((await event).length === 96);
-
-    await shutdownUBots(ubotMains);
-});
-
-unit.test("ubot_main_test: errorOutput", async () => {
-    const ubotsCount = 8;
-    //await dropAllTables(8);
-    let ubotMains = await createUBots(ubotsCount);
-
-    console.log("\ntest send...");
-    let url = "http://localhost:" + ubotMains[0].myInfo.clientAddress.port;
-    let client = new network.HttpClient(url);
-    await client.start(clientKey, ubotMains[0].myInfo.publicKey, null);
-
-    let executableContract = Contract.fromPrivateKey(userPrivKey);
-
-    executableContract.state.data.cloud_methods = {
-        ubotAsm: {
-            pool: {size: 5},
-            quorum: {size: 6},
-            writesTo: [{storage_name: "default"}],
-            ubotAsm:
-                "calc2x2;" + // should approve write to single storage, each ubot has same value
-                "moveTo var1;" +
-                "writeSingleStorage;" +
-                "moveFrom var1;" +
-                "finish"
-        }
-    };
-
-    executableContract.state.data.cloud_storages = {
-        default: {
-            pool: {size: 5},
-            quorum: {size: 6}
-        }
-    };
-
-    await executableContract.seal();
-
-    let startingContract = Contract.fromPrivateKey(userPrivKey);
-    startingContract.createTransactionalSection();
-    startingContract.transactional.data.executableContract = await executableContract.getPackedTransaction();
-    startingContract.state.data.methodName = "ubotAsm";
-    startingContract.state.data.executableContractId = executableContract.id.digest;
-    await startingContract.seal(true);
-
-    console.log("executableContract.id: " + executableContract.id);
-    console.log("startingContract.id: " + startingContract.id);
-
-    let startingContractBin = await startingContract.getPackedTransaction();
-    await client.command("executeCloudMethod", {contract: startingContractBin}, resp=>{
-        console.log("resp: " + JSON.stringify(resp));
-    }, err=>{
-        console.log("err: " + err);
-    });
-
-    //waiting pool started...
-    await sleep(1000);
-
-    let pool = [];
-    let proc = ubotMains[0].ubot.processors.get(startingContract.id.base64);
-
-    for (let i = 0; i < proc.pool.length; i++)
-        pool.push(proc.pool[i].number);
-
-    //waiting pool finished...
-    while (!pool.every(ubot => !ubotMains[ubot].ubot.processors.get(startingContract.id.base64).state.canContinue))
-        await sleep(100);
-
-    assert(pool.every(ubot => ubotMains[ubot].ubot.processors.get(startingContract.id.base64).state === UBotPoolState.FAILED));
-
-    let fire = null;
-    let event = new Promise(resolve => fire = resolve);
-
-    await client.command("getState", {startingContractId: startingContract.id}, resp=>{
-        console.log("resp: " + JSON.stringify(resp));
-        fire(resp);
-    }, err=>{
-        console.log("err: " + err);
-        fire(null);
-    });
-
-    let errors = (await event).errors;
-    assert(errors.length === 1);
-    assert(errors[0].error === Errors.FAILURE);
-    assert(errors[0].objectName === "UBotAsmProcess_writeSingleStorage");
-    assert(errors[0].message === "writing to single storage declined");
-
-    await shutdownUBots(ubotMains);
-});
-
-unit.test("ubot_main_test: multi-verify method", async () => {
-    const ubotsCount = 8;
-    //await dropAllTables(8);
-    let ubotMains = await createUBots(ubotsCount);
-
-    console.log("\ntest send...");
-    let url = "http://localhost:"+ubotMains[0].myInfo.clientAddress.port;
-    let client = new network.HttpClient(url);
-    await client.start(clientKey, ubotMains[0].myInfo.publicKey, null);
-
-    let executableContract = Contract.fromPrivateKey(userPrivKey);
-
-    executableContract.state.data.cloud_methods = {
-        main: {
-            pool: {size: 5},
-            quorum: {size: 4},
-            writesTo: [{storage_name: "special", multistorage_verify_method: "special_verify"}],
-            ubotAsm:
-                "generateRandomHash;" +
-                "moveTo var1;" +
-                "newObj;" +
-                "insertObj hash;" +
-                "writeMultiStorage special;" +
-                "finish"
-        },
-        special_verify: {
-            ubotAsm:
-                "hasOwnProperty hash;" +
-                "ifTrue 1;" +
-                "finish;" +
-                "null;" +
-                "equal;" +
-                "finish"
-        }
-    };
-
-    executableContract.state.data.cloud_storages = {
-        special: {
-            pool: {size: 5},
-            quorum: {size: 4}
-        }
-    };
-
-    await executableContract.seal();
-
-    let startingContract = Contract.fromPrivateKey(userPrivKey);
-    startingContract.createTransactionalSection();
-    startingContract.transactional.data.executableContract = await executableContract.getPackedTransaction();
-    startingContract.state.data.methodName = "main";
-    startingContract.state.data.executableContractId = executableContract.id.digest;
-    await startingContract.seal(true);
-
-    console.log("executableContract.id: " + executableContract.id);
-    console.log("startingContract.id: " + startingContract.id);
-
-    let startingContractBin = await startingContract.getPackedTransaction();
-    await client.command("executeCloudMethod", {contract: startingContractBin}, resp=>{
-        console.log("resp: " + JSON.stringify(resp));
-    }, err=>{
-        console.log("err: " + err);
-    });
-
-    //waiting pool started...
-    await sleep(1000);
-
-    let pool = [];
-    let proc = ubotMains[0].ubot.processors.get(startingContract.id.base64);
-
-    for (let i = 0; i < proc.pool.length; i++)
-        pool.push(proc.pool[i].number);
-
-    //waiting pool finished...
-    while (!pool.every(ubot => !ubotMains[ubot].ubot.processors.get(startingContract.id.base64).state.canContinue))
-        await sleep(100);
-
-    assert(pool.every(ubot => ubotMains[ubot].ubot.processors.get(startingContract.id.base64).state === UBotPoolState.FINISHED));
-
-    let fire = null;
-    let event = new Promise(resolve => fire = resolve);
-
-    await client.command("getState", {startingContractId: startingContract.id}, resp=>{
-        console.log("resp: " + JSON.stringify(resp));
-        fire(resp.result);
-    }, err=>{
-        console.log("err: " + err);
-        fire(null);
-    });
-
-    // checking length of random hash
-    assert((await event).length === 96);
-
-    await shutdownUBots(ubotMains);
-});
-
-unit.test("ubot_main_test: multi-verify method failed", async () => {
-    const ubotsCount = 8;
-    //await dropAllTables(8);
-    let ubotMains = await createUBots(ubotsCount);
-
-    console.log("\ntest send...");
-    let url = "http://localhost:"+ubotMains[0].myInfo.clientAddress.port;
-    let client = new network.HttpClient(url);
-    await client.start(clientKey, ubotMains[0].myInfo.publicKey, null);
-
-    let executableContract = Contract.fromPrivateKey(userPrivKey);
-
-    executableContract.state.data.cloud_methods = {
-        main: {
-            pool: {size: 5},
-            quorum: {size: 4},
-            writesTo: [{storage_name: "special", multistorage_verify_method: "special_verify"}],
-            ubotAsm:
-                "generateRandomHash;" +
-                "moveTo var1;" +
-                "newObj;" +
-                "insertObj hash;" +
-                "writeMultiStorage special;" +
-                "finish"
-        },
-        special_verify: {
-            ubotAsm:
-                "hasOwnProperty hashhh;" +
-                "ifTrue 1;" +
-                "finish;" +
-                "null;" +
-                "equal;" +
-                "finish"
-        }
-    };
-
-    executableContract.state.data.cloud_storages = {
-        special: {
-            pool: {size: 5},
-            quorum: {size: 4}
-        }
-    };
-
-    await executableContract.seal();
-
-    let startingContract = Contract.fromPrivateKey(userPrivKey);
-    startingContract.createTransactionalSection();
-    startingContract.transactional.data.executableContract = await executableContract.getPackedTransaction();
-    startingContract.state.data.methodName = "main";
-    startingContract.state.data.executableContractId = executableContract.id.digest;
-    await startingContract.seal(true);
-
-    console.log("executableContract.id: " + executableContract.id);
-    console.log("startingContract.id: " + startingContract.id);
-
-    let startingContractBin = await startingContract.getPackedTransaction();
-    await client.command("executeCloudMethod", {contract: startingContractBin}, resp=>{
-        console.log("resp: " + JSON.stringify(resp));
-    }, err=>{
-        console.log("err: " + err);
-    });
-
-    //waiting pool started...
-    await sleep(1000);
-
-    let pool = [];
-    let proc = ubotMains[0].ubot.processors.get(startingContract.id.base64);
-
-    for (let i = 0; i < proc.pool.length; i++)
-        pool.push(proc.pool[i].number);
-
-    //waiting pool finished...
-    while (!pool.every(ubot => !ubotMains[ubot].ubot.processors.get(startingContract.id.base64).state.canContinue))
-        await sleep(100);
-
-    assert(pool.every(ubot => ubotMains[ubot].ubot.processors.get(startingContract.id.base64).state === UBotPoolState.FAILED));
-
-    let fire = null;
-    let event = new Promise(resolve => fire = resolve);
-
-    await client.command("getState", {startingContractId: startingContract.id}, resp=>{
-        console.log("resp: " + JSON.stringify(resp));
-        fire(resp);
-    }, err=>{
-        console.log("err: " + err);
-        fire(null);
-    });
-
-    let errors = (await event).errors;
-    assert(errors.length === 1);
-    assert(errors[0].error === Errors.FAILURE);
-    assert(errors[0].objectName === "UBotAsmProcess_writeMultiStorage");
-    assert(errors[0].message === "failed self result verification");
-
-    await shutdownUBots(ubotMains);
-});
-
-unit.test("ubot_main_test: call sub-method", async () => {
-    const ubotsCount = 8;
-    //await dropAllTables(8);
-    let ubotMains = await createUBots(ubotsCount);
-
-    console.log("\ntest send...");
-    let url = "http://localhost:"+ubotMains[0].myInfo.clientAddress.port;
-    let client = new network.HttpClient(url);
-    await client.start(clientKey, ubotMains[0].myInfo.publicKey, null);
-
-    let executableContract = Contract.fromPrivateKey(userPrivKey);
-
-    executableContract.state.data.cloud_methods = {
-        main: {
-            pool: {size: 5},
-            quorum: {size: 4},
-            ubotAsm:
-                "generateRandomHash;" +
-                "moveTo var1;" +
-                "call sub;" +
-                "equal;" +
-                "ifFalse 1;" +
-                "calc2x2;" +
-                "finish"
-        },
-        sub: {
-            writesTo: [{storage_name: "default"}],
-            readsFrom: [{storage_name: "default"}],
-            ubotAsm:
-                "moveTo var1;" +
-                "null;" +
-                "equal;" +
-                "ifTrue 3;" +
-                "moveFrom var1;" +
-                "writeMultiStorage;" +
-                "getRecords;" +
-                "moveFrom var1;" +
-                "finish"
-        }
-    };
-
-    executableContract.state.data.cloud_storages = {
-        default: {
-            pool: {size: 5},
-            quorum: {size: 4}
-        }
-    };
-
-    await executableContract.seal();
-
-    let startingContract = Contract.fromPrivateKey(userPrivKey);
-    startingContract.createTransactionalSection();
-    startingContract.transactional.data.executableContract = await executableContract.getPackedTransaction();
-    startingContract.state.data.methodName = "main";
-    startingContract.state.data.executableContractId = executableContract.id.digest;
-    await startingContract.seal(true);
-
-    console.log("executableContract.id: " + executableContract.id);
-    console.log("startingContract.id: " + startingContract.id);
-
-    let startingContractBin = await startingContract.getPackedTransaction();
-    await client.command("executeCloudMethod", {contract: startingContractBin}, resp=>{
-        console.log("resp: " + JSON.stringify(resp));
-    }, err=>{
-        console.log("err: " + err);
-    });
-
-    //waiting pool started...
-    await sleep(1000);
-
-    let pool = [];
-    let proc = ubotMains[0].ubot.processors.get(startingContract.id.base64);
-
-    for (let i = 0; i < proc.pool.length; i++)
-        pool.push(proc.pool[i].number);
-
-    //waiting pool finished...
-    while (!pool.every(ubot => !ubotMains[ubot].ubot.processors.get(startingContract.id.base64).state.canContinue))
-        await sleep(100);
-
-    assert(pool.every(ubot => ubotMains[ubot].ubot.processors.get(startingContract.id.base64).state === UBotPoolState.FINISHED));
-
-    let fire = null;
-    let event = new Promise(resolve => fire = resolve);
-
-    await client.command("getState", {startingContractId: startingContract.id}, resp=>{
-        console.log("resp: " + JSON.stringify(resp));
-        fire(resp.result);
-    }, err=>{
-        console.log("err: " + err);
-        fire(null);
-    });
-
-    assert((await Boss.load(await event)).val === 4);
-
-    await shutdownUBots(ubotMains);
-});
-
-unit.test("ubot_main_test: secureRandom", async () => {
-    const ubotsCount = 8;
-    //await dropAllTables(8);
-    let ubotMains = await createUBots(ubotsCount);
-
-    console.log("\ntest send...");
-    let url = "http://localhost:"+ubotMains[0].myInfo.clientAddress.port;
-    let client = new network.HttpClient(url);
-    await client.start(clientKey, ubotMains[0].myInfo.publicKey, null);
-
-    let executableContract = Contract.fromPrivateKey(userPrivKey);
-
-    executableContract.state.data.cloud_methods = {
-         getRandom: {
-             pool: {size: 5},
-             quorum: {size: 4},
-             readsFrom: [{storage_name: "internal"}],
-             writesTo: [{storage_name: "result"}],
-             ubotAsm:
-                 "call step1;" +
-                 "call step2;" +
-                 "getRecords internal;" +
-                 "aggregateRandom;" +
-                 "moveTo var1;" +
-                 "newObj;" +
-                 "insertObj random;" +
-                 "writeSingleStorage result;" +
-                 "moveFrom var1;" +
-                 "finish"
-         },
-         step1: {
-             writesTo: [{storage_name: "internal", multistorage_verify_method: "step1_verify"}],
-             ubotAsm:
-                 "generateRandomHash;" +
-                 "moveTo var2;" +
-                 "getHash;" +
-                 "moveTo var1;" +
-                 "newObj;" +
-                 "insertObj hash;" +
-                 "writeMultiStorage internal;" +
-                 "putLocalStorage recordId;" +
-                 "moveFrom var2;" +
-                 "putLocalStorage random;" +
-                 "finish"
-         },
-         step2: {
-             readsFrom: [{storage_name: "internal"}],
-             writesTo: [{storage_name: "internal", multistorage_verify_method: "step2_verify"}],
-             ubotAsm:
-                 "getLocalStorage random;" +
-                 "moveTo var2;" +
-                 "getHash;" +
-                 "moveTo var1;" +
-                 "newObj;" +
-                 "moveTo var3;" +
-                 "insertObj hash;" +
-                 "moveFrom var2;" +
-                 "moveTo var1;" +
-                 "moveFrom var3;" +
-                 "insertObj random;" +
-                 "moveTo var1;" +
-                 "getLocalStorage recordId;" +
-                 "replaceMultiStorage internal;" +
-                 "finish"
-         },
-         step1_verify: {
-             ubotAsm:
-                 "hasOwnProperty hash;" +
-                 "ifTrue 1;" +
-                 "finish;" +
-                 "null;" +
-                 "equal;" +
-                 "finish"
-         },
-         step2_verify: {
-             ubotAsm:
-                 "moveTo var3;" +
-                 "getObj hash;" +
-                 "moveTo var2;" +
-                 "moveFrom var1;" +
-                 "getObj hash;" +
-                 "moveTo var1;" +
-                 "moveFrom var2;" +
-                 "equal;" +
-                 "ifTrue 1;" +
-                 "finish;" +
-                 "moveFrom var3;" +
-                 "getObj random;" +
-                 "getHash;" +
-                 "moveTo var1;" +
-                 "moveFrom var2;" +
-                 "equal;" +
-                 "finish"
-         }
-    };
-
-    executableContract.state.data.cloud_storages = {
-         internal: {
-             pool: {size: 5},
-             quorum: {size: 4}
-         },
-         result: {
-             pool: {size: 5},
-             quorum: {size: 4}
-         }
-    };
+        await writeSingleStorage({hashesHash: hashesHash, result: result});
+    }
+    `;
 
     await executableContract.seal();
 
@@ -844,100 +217,7 @@ unit.test("ubot_main_test: secureRandom", async () => {
     });
 
     // checking length of random hash
-    assert((await event).length === 96);
+    //assert((await event).length === 96);
 
     await shutdownUBots(ubotMains);
-});
-
-unit.test("ubot_main_test: getDataByRecordId", async () => {
-    const ubotsCount = 8;
-    //await dropAllTables(8);
-    let ubotMains = await createUBots(ubotsCount);
-
-    console.log("\ntest send...");
-    let url = "http://localhost:"+ubotMains[0].myInfo.clientAddress.port;
-    let client = new network.HttpClient(url);
-    await client.start(clientKey, ubotMains[0].myInfo.publicKey, null);
-
-    let executableContract = Contract.fromPrivateKey(userPrivKey);
-
-    executableContract.state.data.cloud_methods = {
-        ubotAsm: {
-            pool: {size: 5},
-            quorum: {size: 4},
-            writesTo: [{storage_name: "storage"}],
-            ubotAsm:
-                "generateRandomHash;" + // should approve write to multi storage, each ubot has random value
-                "moveTo var1;" +
-                "writeMultiStorage storage;" +
-                "moveTo var3;" +
-                "getMultiDataByRecordId;" +
-                "equal;" +
-               /* "ifTrue 1;" +
-                "finish;" +
-                "moveFrom var3;" +
-                "moveTo var1;" +
-                "writeSingleStorage storage;" +
-                "getSingleDataByRecordId;" +
-                "equal;" +*/
-                "finish"
-        }
-    };
-
-    executableContract.state.data.cloud_storages = {
-        storage: {
-            pool: {size: 5},
-            quorum: {size: 4}
-        }
-    };
-
-    await executableContract.seal();
-
-    let startingContract = Contract.fromPrivateKey(userPrivKey);
-    startingContract.createTransactionalSection();
-    startingContract.transactional.data.executableContract = await executableContract.getPackedTransaction();
-    startingContract.state.data.methodName = "ubotAsm";
-    startingContract.state.data.executableContractId = executableContract.id.digest;
-    await startingContract.seal(true);
-
-    console.log("executableContract.id: " + executableContract.id);
-    console.log("startingContract.id: " + startingContract.id);
-
-    let startingContractBin = await startingContract.getPackedTransaction();
-    await client.command("executeCloudMethod", {contract: startingContractBin}, resp=>{
-        console.log("resp: " + JSON.stringify(resp));
-    }, err=>{
-        console.log("err: " + err);
-    });
-
-    //waiting pool started...
-    await sleep(1000);
-
-    let pool = [];
-    let proc = ubotMains[0].ubot.processors.get(startingContract.id.base64);
-
-    for (let i = 0; i < proc.pool.length; i++)
-        pool.push(proc.pool[i].number);
-
-    //waiting pool finished...
-    while (!pool.every(ubot => !ubotMains[ubot].ubot.processors.get(startingContract.id.base64).state.canContinue))
-        await sleep(100);
-
-    assert(pool.every(ubot => ubotMains[ubot].ubot.processors.get(startingContract.id.base64).state === UBotPoolState.FINISHED));
-
-    let fire = null;
-    let event = new Promise(resolve => fire = resolve);
-
-    await client.command("getState", {startingContractId: startingContract.id}, resp=>{
-        console.log("resp: " + JSON.stringify(resp));
-        fire(resp.result);
-    }, err=>{
-        console.log("err: " + err);
-        fire(null);
-    });
-
-    assert(await event);
-
-    await shutdownUBots(ubotMains);
-});
-
+});*/
