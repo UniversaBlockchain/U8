@@ -6,34 +6,13 @@ wrk.WorkerHandle = class {
     constructor(workerImpl) {
         this.workerImpl = workerImpl;
         this.onReceiveCallback = obj => {};
-        this.nextJsonRpcId = 1;
         this.nextFarcallSN = 0;
-        this.callbacks = new Map();
         this.callbacksFarcall = new Map();
         this.export = {};
     }
 
     onReceive(block) {
         this.onReceiveCallback = block;
-    }
-
-    startJsonRpcCallbacks() {
-        this.onReceive(async (obj) => {
-            let id = obj.id;
-            if (obj.result !== undefined) {
-                if (this.callbacks.has(id)) {
-                    this.callbacks.get(id)(obj.result);
-                    this.callbacks.delete(id);
-                }
-            } else {
-                let method = obj.method;
-                if (method && this.export[method]) {
-                    let res = await this.export[method](obj.params);
-                    if (res !== undefined)
-                        this.send({jsonrpc:"2.0", result:res, id:obj.id});
-                }
-            }
-        });
     }
 
     startFarcallCallbacks() {
@@ -58,13 +37,6 @@ wrk.WorkerHandle = class {
         this.workerImpl._send(obj);
     }
 
-    sendJsonRpc(method, params, onComplete = null) {
-        let id = this.getNextJsonRpcId();
-        if (onComplete != null)
-            this.callbacks.set(id, onComplete);
-        this.workerImpl._send({jsonrpc:"2.0", method:method, params:params, id:id});
-    }
-
     farcall(cmd, args, kwargs, onComplete = null) {
         let id = this.getNextFarcallSN();
         if (onComplete != null)
@@ -77,14 +49,6 @@ wrk.WorkerHandle = class {
     }
 
     async close() {
-    }
-
-    getNextJsonRpcId() {
-        let res = this.nextJsonRpcId;
-        ++this.nextJsonRpcId;
-        if (this.nextJsonRpcId >= Number.MAX_SAFE_INTEGER)
-            this.nextJsonRpcId = 1;
-        return res;
     }
 
     getNextFarcallSN() {
@@ -105,39 +69,6 @@ wrk.getWorker = function(accessLevel, workerSrc) {
         });
     });
 };
-
-wrk.jsonRpcWrapper = `
-wrk.export = {};
-wrk.nextJsonRpcId = 1;
-wrk.callbacks = new Map();
-wrk.getNextJsonRpcId = () => {
-    let res = wrk.nextJsonRpcId;
-    ++wrk.nextJsonRpcId;
-    if (wrk.nextJsonRpcId >= Number.MAX_SAFE_INTEGER)
-        wrk.nextJsonRpcId = 1;
-    return res;
-};
-wrk.onReceive = async (obj) => {
-    let method = obj.method;
-    if (method && wrk.export[method]) {
-        let res = await wrk.export[method](obj.params);
-        if (res !== undefined)
-            wrk.send({jsonrpc:"2.0", result:res, id:obj.id});
-    } else if (obj.result !== undefined) {
-        let id = obj.id;
-        if (wrk.callbacks.has(id)) {
-            wrk.callbacks.get(id)(obj.result);
-            wrk.callbacks.delete(id);
-        }
-    }
-}
-wrk.sendJsonRpc = (method, params, onComplete = null) => {
-    let id = wrk.getNextJsonRpcId();
-    if (onComplete != null)
-        wrk.callbacks.set(id, onComplete);
-    wrk.send({jsonrpc:"2.0", method:method, params:params, id:id});
-}
-`;
 
 wrk.farcallWrapper = `
 wrk.export = {};
