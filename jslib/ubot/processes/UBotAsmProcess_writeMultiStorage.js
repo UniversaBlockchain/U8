@@ -361,16 +361,20 @@ class UBotAsmProcess_writeMultiStorage extends UBotAsmProcess_writeSingleStorage
     }
 
     generateSelfRecordID() {
-        let poolId = this.pr.poolId.digest;
-        let cortegeId = this.cortegeId.digest;
-        let concat = new Uint8Array(poolId.length + cortegeId.length +
-            (this.previousRecordId != null ? this.previousRecordId.digest.length : 0));
-        concat.set(poolId, 0);
-        concat.set(cortegeId, poolId.length);
-        if (this.previousRecordId != null)
-            concat.set(this.previousRecordId.digest, poolId.length + cortegeId.length);
+        if (this.previousRecordId != null && this.previousRecordId.equals(this.pr.executableContract.id))
+            this.recordId = this.previousRecordId;   //executable contract id - default record id
+        else {
+            let poolId = this.pr.poolId.digest;
+            let cortegeId = this.cortegeId.digest;
+            let concat = new Uint8Array(poolId.length + cortegeId.length +
+                (this.previousRecordId != null ? this.previousRecordId.digest.length : 0));
+            concat.set(poolId, 0);
+            concat.set(cortegeId, poolId.length);
+            if (this.previousRecordId != null)
+                concat.set(this.previousRecordId.digest, poolId.length + cortegeId.length);
 
-        this.recordId = crypto.HashId.of(concat);
+            this.recordId = crypto.HashId.of(concat);
+        }
     }
 
     generateCortegeId() {
@@ -483,13 +487,13 @@ class UBotAsmProcess_writeMultiStorage extends UBotAsmProcess_writeSingleStorage
         this.pr.ubot.resultCache.put(this.recordId, cortege);
 
         try {
+            if (this.previousRecordId != null)
+                await this.pr.ledger.deleteFromMultiStorage(this.previousRecordId);
             //TODO: replace on multi-insert
             for (let i = 0; i < this.pr.pool.length; i++)
                 if (fullCortege || this.cortege.has(i))
                     await this.pr.ledger.writeToMultiStorage(this.pr.executableContract.id, this.storageName, this.results[i],
                         this.hashes[i], this.recordId, this.pr.pool[i].number);
-            if (this.previousRecordId != null)
-                await this.pr.ledger.deleteFromMultiStorage(this.previousRecordId);
         } catch (err) {
             this.fail("error writing to multi-storage: " + err.message);
             return;

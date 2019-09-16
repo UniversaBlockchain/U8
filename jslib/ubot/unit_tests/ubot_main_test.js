@@ -104,7 +104,7 @@ unit.test("ubot_main_test: hello ubot", async () => {
     await shutdownUBots(ubotMains);
 });
 
-/*unit.test("ubot_main_test: JS secureRandom", async () => {
+unit.test("ubot_main_test: JS secureRandom", async () => {
     const ubotsCount = 8;
     let ubotMains = await createUBots(ubotsCount);
 
@@ -126,43 +126,42 @@ unit.test("ubot_main_test: hello ubot", async () => {
     async function getRandom() {
         //generate random and write its hash to multi storage
         let rnd = Math.random();
+        let hash = crypto.HashId.of(rnd.toString()).base64;
         
-        //console.error(rnd);
-        return rnd;
-        
-        let hash = crypto.HashId.of(rnd);        
         await writeMultiStorage({hash : hash});
-
+        
         //calculate hash of hashes and write it to single storage
-        let records = getMultiStorage();
+        let records = await getMultiStorage();
         let hashes = [];
-        for (let r of records.values())
-            hashes.push(r.hash.base64);
+        for (let r of records)
+            hashes.push(r.hash);
 
         hashes.sort();
-        let hashesHash = HashId.of(hashes.join());
+        let hashesHash = crypto.HashId.of(hashes.join()).base64;
         await writeSingleStorage({hashesHash : hashesHash});
+        
+        //console.error(JSON.stringify(hashesHash));
+        return rnd;
 
         //add actual random to multi storage
         await writeMultiStorage({hash : hash, rnd : rnd});
 
         //verify hashesOfHash and rnd -> hash
-        records = getMultiStorage();
+        records = await getMultiStorage();
         hashes = [];
         let result = 0;
-        for (let r of records.values()) {
-            if (!r.hash.equals(HashId.of(r.rnd)))
+        for (let r of records) {
+            if (r.hash !== crypto.HashId.of(r.rnd).base64)
                 throw new Error("Hash does not match the random value");
         
-            assertEquals(r.hash, );
-            hashes.push(r.hash.base64);
+            hashes.push(r.hash);
             result += r.rnd;
         }
         hashes.sort();
-        hashesHash = HashId.of(hashes.join());
+        hashesHash = crypto.HashId.of(hashes.join()).base64;
 
-        let singleStorage = getSingleStorage();
-        if (!hashesHash.equals(singleStorage.hashesHash))
+        let singleStorage = await getSingleStorage();
+        if (hashesHash !== singleStorage.hashesHash)
             throw new Error("Hash of hashes does not match the previously saved");
 
         result %= 100;
@@ -219,5 +218,6 @@ unit.test("ubot_main_test: hello ubot", async () => {
     // checking length of random hash
     //assert((await event).length === 96);
 
+    await client.stop();
     await shutdownUBots(ubotMains);
-});*/
+});

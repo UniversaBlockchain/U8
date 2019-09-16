@@ -104,9 +104,9 @@ class UBot {
         //sort records
         records.sort((a, b) => a.ubot_number - b.ubot_number);
 
-        let result = new Map();
+        let result = [];
         for (let record of records) {
-            result.set(record.ubot_number, await Boss.load(record.storage_data));
+            result.push(await Boss.load(record.storage_data));
 
             //TODO: get insufficient data from network and save to DB
         }

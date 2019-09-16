@@ -35,7 +35,8 @@ class UBotAsmProcess_writeSingleStorage extends ProcessBase {
         this.pr.ubot.resultCache.put(this.binHashId, this.binToWrite);
 
         this.storageName = storageData.storage_name;
-        if (this.pr.executableContract.state.data.cloud_storages.hasOwnProperty(this.storageName)) {
+        if (this.pr.executableContract.state.data.hasOwnProperty("cloud_storages") &&
+            this.pr.executableContract.state.data.cloud_storages.hasOwnProperty(this.storageName)) {
             if (this.pr.executableContract.state.data.cloud_storages[this.storageName].hasOwnProperty("pool"))
                 this.poolSize = this.pr.executableContract.state.data.cloud_storages[this.storageName].pool.size;
             else
@@ -83,16 +84,20 @@ class UBotAsmProcess_writeSingleStorage extends ProcessBase {
     }
 
     generateSelfRecordID() {
-        let poolId = this.pr.poolId.digest;
-        let binHashId = this.binHashId.digest;
-        let concat = new Uint8Array(poolId.length + binHashId.length +
-            (this.previousRecordId != null ? this.previousRecordId.digest.length : 0));
-        concat.set(poolId, 0);
-        concat.set(binHashId, poolId.length);
-        if (this.previousRecordId != null)
-            concat.set(this.previousRecordId.digest, poolId.length + binHashId.length);
+        if (this.previousRecordId != null && this.previousRecordId.equals(this.pr.executableContract.id))
+            this.recordId = this.previousRecordId;   //executable contract id - default record id
+        else {
+            let poolId = this.pr.poolId.digest;
+            let binHashId = this.binHashId.digest;
+            let concat = new Uint8Array(poolId.length + binHashId.length +
+                (this.previousRecordId != null ? this.previousRecordId.digest.length : 0));
+            concat.set(poolId, 0);
+            concat.set(binHashId, poolId.length);
+            if (this.previousRecordId != null)
+                concat.set(this.previousRecordId.digest, poolId.length + binHashId.length);
 
-        this.recordId = crypto.HashId.of(concat);
+            this.recordId = crypto.HashId.of(concat);
+        }
     }
 
     async vote(notification) {
@@ -112,10 +117,10 @@ class UBotAsmProcess_writeSingleStorage extends ProcessBase {
             this.pr.ubot.resultCache.put(this.recordId, this.binToWrite);
 
             try {
-                await this.pr.ledger.writeToSingleStorage(this.pr.executableContract.id, this.storageName,
-                    this.binToWrite, this.binHashId, this.recordId);
                 if (this.previousRecordId != null)
                     await this.pr.ledger.deleteFromSingleStorage(this.previousRecordId);
+                await this.pr.ledger.writeToSingleStorage(this.pr.executableContract.id, this.storageName,
+                    this.binToWrite, this.binHashId, this.recordId);
             } catch (err) {
                 this.pr.logger.log("error: UBotAsmProcess_writeSingleStorage: " + err.message);
                 this.pr.errors.push(new ErrorRecord(Errors.FAILURE, "UBotAsmProcess_writeSingleStorage",

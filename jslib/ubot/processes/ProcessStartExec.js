@@ -28,19 +28,19 @@ class ProcessStartExec extends ProcessBase {
     }
     
     function writeMultiStorage(data) {
-        return new Promise(resolve => wrk.farcall("writeSingleStorage", [data], {}, ans => {
+        return new Promise(resolve => wrk.farcall("writeMultiStorage", [data], {}, ans => {
             resolve(ans);
         }));
     }
     
     function getSingleStorage() {
-        return new Promise(resolve => wrk.farcall("writeSingleStorage", [], {}, ans => {
+        return new Promise(resolve => wrk.farcall("getSingleStorage", [], {}, ans => {
             resolve(ans);
         }));
     }
     
     function getMultiStorage() {
-        return new Promise(resolve => wrk.farcall("writeSingleStorage", [], {}, ans => {
+        return new Promise(resolve => wrk.farcall("getMultiStorage", [], {}, ans => {
             resolve(ans);
         }));
     }
@@ -81,6 +81,13 @@ class ProcessStartExec extends ProcessBase {
 
             new ScheduleExecutor(async () => {
                 let methodExport = "wrk.export." + methodName + " = " + methodName + ";";
+                /*let methodExport = "wrk.export." + methodName + " = async(...params) => {" +
+                    "try {" +
+                    "   await " + methodName + "(...params);" +
+                    "} catch (err) {" +
+                    "   console.error(err.message);" +
+                    "}};";*/
+
                 this.pr.worker = await wrk.getWorker(0,
                     ProcessStartExec.workerSrc + this.pr.executableContract.state.data.js + methodExport);
                 this.pr.worker.startFarcallCallbacks();
@@ -97,7 +104,7 @@ class ProcessStartExec extends ProcessBase {
                     return await this.getSingleStorage();
                 };
 
-                this.pr.worker.export["getSMultiStorage"] = async (args, kwargs) => {
+                this.pr.worker.export["getMultiStorage"] = async (args, kwargs) => {
                     return await this.getMultiStorage();
                 };
 
@@ -225,17 +232,17 @@ class ProcessStartExec extends ProcessBase {
                 this.var0 = await this.runUBotAsmCmd(cmdIndex, UBotAsmProcess_call, param);
                 break;
             case "aggregateRandom":
-                if (this.var0 instanceof Map) {
-                    let concat = new Uint8Array(this.var0.size * 96);
+                if (this.var0 instanceof Array) {
+                    let concat = new Uint8Array(this.var0.length * 96);
                     let offset = 0;
-                    for (let value of this.var0.values()) {
+                    for (let value of this.var0) {
                         concat.set(value.random, offset);
                         offset += value.random.length;
                     }
                     this.var0 = crypto.HashId.of(concat).digest;
                 } else {
-                    this.pr.logger.log("Error: this.var0 is not an Map class");
-                    this.pr.errors.push(new ErrorRecord(Errors.BAD_VALUE, "aggregateRandom", "Error: this.var0 is not an Map class"));
+                    this.pr.logger.log("Error: this.var0 is not array");
+                    this.pr.errors.push(new ErrorRecord(Errors.BAD_VALUE, "aggregateRandom", "Error: this.var0 is not array"));
                     this.pr.changeState(UBotPoolState.FAILED);
                 }
                 break;
@@ -347,7 +354,7 @@ class ProcessStartExec extends ProcessBase {
 
                     await this.commands[cmdIndex].onNotify(notification);
                 }
-            } else
+            } else if (typeof notification.procIndex === "number" && this.processes[notification.procIndex] != null)
                 await this.processes[notification.procIndex].onNotify(notification);
         }
     }
@@ -361,7 +368,7 @@ class ProcessStartExec extends ProcessBase {
                 this.processes[this.procIndex] = proc;
                 this.procIndex++;
 
-                await proc.init(data, null, {storage_name : "default"});
+                await proc.init(data, this.pr.executableContract.id, {storage_name : "default"});
                 await proc.start();
             });
         } else {
@@ -381,7 +388,7 @@ class ProcessStartExec extends ProcessBase {
                 this.processes[this.procIndex] = proc;
                 this.procIndex++;
 
-                await proc.init(data, null, {storage_name : "default"});
+                await proc.init(data, this.pr.executableContract.id, {storage_name : "default"});
                 await proc.start();
             });
         } else {

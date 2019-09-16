@@ -216,6 +216,7 @@ unit.test("ubot_commands_test: executeCloudMethod", async () => {
 
     assert((await Boss.load(await event)).val === 4);
 
+    await client.stop();
     await shutdownUBots(ubotMains);
 });
 
@@ -300,6 +301,7 @@ unit.test("ubot_commands_test: generateRandomHash", async () => {
     // checking length of random hash
     assert((await event).length === 96);
 
+    await client.stop();
     await shutdownUBots(ubotMains);
 });
 
@@ -387,6 +389,7 @@ unit.test("ubot_commands_test: errorOutput", async () => {
     assert(errors[0].objectName === "UBotAsmProcess_writeSingleStorage");
     assert(errors[0].message === "writing to single storage declined");
 
+    await client.stop();
     await shutdownUBots(ubotMains);
 });
 
@@ -481,6 +484,7 @@ unit.test("ubot_commands_test: multi-verify method", async () => {
     // checking length of random hash
     assert((await event).length === 96);
 
+    await client.stop();
     await shutdownUBots(ubotMains);
 });
 
@@ -578,6 +582,7 @@ unit.test("ubot_commands_test: multi-verify method failed", async () => {
     assert(errors[0].objectName === "UBotAsmProcess_writeMultiStorage");
     assert(errors[0].message === "failed self result verification");
 
+    await client.stop();
     await shutdownUBots(ubotMains);
 });
 
@@ -676,6 +681,7 @@ unit.test("ubot_commands_test: call sub-method", async () => {
 
     assert((await Boss.load(await event)).val === 4);
 
+    await client.stop();
     await shutdownUBots(ubotMains);
 });
 
@@ -834,6 +840,7 @@ unit.test("ubot_commands_test: secureRandom", async () => {
     // checking length of random hash
     assert((await event).length === 96);
 
+    await client.stop();
     await shutdownUBots(ubotMains);
 });
 
@@ -926,5 +933,6 @@ unit.test("ubot_commands_test: getDataByRecordId", async () => {
 
     assert(await event);
 
+    await client.stop();
     await shutdownUBots(ubotMains);
 });
