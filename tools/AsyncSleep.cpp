@@ -6,7 +6,7 @@
 
 #include <thread>
 
-static const long TOO_LONG = 0x7FFFffffFFFF;
+static const long TOO_LONG = 3153600000000l;//0x7FFFffffFFFF;
 
 static function<void()> empty_block = []() {};
 
