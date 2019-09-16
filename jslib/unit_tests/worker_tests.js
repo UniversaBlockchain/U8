@@ -24,14 +24,37 @@ class WorkerExample {
     };
     `;
 
+    static workerSrcFarcall = wrk.farcallWrapper + `
+    function print(text) {
+        wrk.farcall("farcallPrint", [], {text:text});
+    }
+    
+    function farcallSomethingFromMainScripter(val) {
+        return new Promise(resolve => wrk.farcall("farcallSomethingFromMainScripter", [], {text:val}, ans => {
+            resolve(ans);
+        }));
+    }
+    
+    wrk.export.calcAxBxC = async (args, kwargs) => {
+        let textLen = await farcallSomethingFromMainScripter("some_parameter");
+        print(textLen);
+        return args[0] * args[1] * args[2];
+    };
+    `;
+
     constructor() {
         this.worker = null;
     }
 
-    static async start() {
+    static async start(useFarcall) {
         let res = new WorkerExample();
-        res.worker = await wrk.getWorker(0, WorkerExample.workerSrc);
-        res.worker.startJsonRpcCallbacks();
+        if (useFarcall) {
+            res.worker = await wrk.getWorker(0, WorkerExample.workerSrcFarcall);
+            res.worker.startFarcallCallbacks();
+        } else {
+            res.worker = await wrk.getWorker(0, WorkerExample.workerSrc);
+            res.worker.startJsonRpcCallbacks();
+        }
 
         res.worker.export["callSomethingFromMainScripter"] = (params) => {
             // return val.length to worker
@@ -39,8 +62,18 @@ class WorkerExample {
             return valLength;
         };
 
+        res.worker.export["farcallSomethingFromMainScripter"] = (args, kwargs) => {
+            // return val.length to worker
+            let valLength = kwargs.text.length;
+            return valLength;
+        };
+
         res.worker.export["print"] = (params) => {
             console.log("worker prints: " + params[0]);
+        };
+
+        res.worker.export["farcallPrint"] = (args, kwargs) => {
+            console.log("worker farcall prints: " + kwargs.text);
         };
 
         return res;
@@ -55,11 +88,21 @@ class WorkerExample {
             resolve(ans);
         }));
     }
+
+    calcAxBxC(a, b, c) {
+        return new Promise(resolve => this.worker.farcall("calcAxBxC", [a, b, c], {}, ans => {
+            resolve(ans);
+        }));
+    }
 }
 
 unit.test("hello worker", async () => {
-    let worker = await WorkerExample.start();
-    for (let i = 0; i < 100; ++i)
-        console.log("11 * "+i+" = " + await worker.calcAxB(11, i));
+    let worker = await WorkerExample.start(false);
+    let workerFarcall = await WorkerExample.start(true);
+    for (let i = 0; i < 100; ++i) {
+        console.log("11 * " + i + " = " + await worker.calcAxB(11, i));
+        console.log("3 * 4 * " + i + " = " + await workerFarcall.calcAxBxC(3, 4, i));
+    }
     worker.release();
+    workerFarcall.release();
 });
