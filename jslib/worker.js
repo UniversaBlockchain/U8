@@ -85,8 +85,7 @@ wrk.onReceive = async (obj) => {
     let cmd = obj.cmd;
     if (cmd && wrk.export[cmd]) {
         let res = await wrk.export[cmd](obj.args, obj.kwargs);
-        if (res !== undefined)
-            wrk.send({serial:wrk.getNextFarcallSN(), ref:obj.serial, result:res});
+        wrk.send({serial:wrk.getNextFarcallSN(), ref:obj.serial, result:res});
     } else if (obj.result !== undefined) {
         let ref = obj.ref;
         if (wrk.callbacksFarcall.has(ref)) {
