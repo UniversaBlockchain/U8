@@ -64,6 +64,40 @@ unit.test("worker_tests: hello worker", async () => {
     worker.release();
 });
 
+/*unit.test("worker_tests: check that all global objects are frozen", async () => {
+    let global = Function('return this')();
+    let globalItems = new Set();
+    for (let k in global) {
+        globalItems.add(k);
+    }
+    let checkFunction = (global, functionName) => {
+        try {
+            global[functionName] = null;
+            assert(false);
+        } catch (e) {
+            if (!(e instanceof TypeError))
+                throw e;
+        } finally {
+            globalItems.delete(functionName);
+        }
+    };
+    checkFunction(global, "__bios_print");
+    checkFunction(global, "__debug_throw");
+    checkFunction(global, "__bios_loadRequired");
+    checkFunction(global, "__bios_initTimers");
+    checkFunction(global, "exit");
+    checkFunction(global, "utf8Decode");
+    checkFunction(global, "utf8Encode");
+    checkFunction(global, "$0");
+
+    checkFunction(global, "btoa");
+    if (globalItems.size > 0) {
+        for (let k of globalItems)
+            console.error("unckecked global item: " + k);
+        assert(false);
+    }
+});*/
+
 /*unit.test("worker_tests: isolate js context", async () => {
     class Worker {
         constructor() {this.worker = null;}

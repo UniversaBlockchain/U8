@@ -121,6 +121,7 @@ Object.freeze(platform);
 require('crypto');
 
 function __call_main(args) {
+    //Object.freeze(Function('return this')());
     let result = main(args);
     if (result instanceof Promise) {
         // the promise that resolves exit code:
