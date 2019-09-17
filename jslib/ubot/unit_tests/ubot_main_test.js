@@ -222,9 +222,9 @@ unit.test("ubot_main_test: JS secureRandom", async () => {
         fire(null);
     });
 
-    await event;
-    // checking length of random hash
-    //assert((await event).length === 96);
+    let random = await event;
+    // checking secure random value
+    assert(typeof random === "number" && random >= 0 && random < 1000);
 
     await client.stop();
     await shutdownUBots(ubotMains);
