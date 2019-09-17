@@ -61,9 +61,11 @@ class ProcessStartExec extends ProcessBase {
         this.cmdStack = cmdStack;
     }
 
-    start(methodName = null, multiVerifyMethod = false) {
+    start(methodName = null, methodArgs = null, multiVerifyMethod = false) {
         if (methodName == null)
             methodName = this.pr.methodName;
+        if (methodArgs == null)
+            methodArgs = this.pr.methodArgs;
         this.multiVerifyMethod = multiVerifyMethod;
 
         this.pr.logger.log("start ProcessStartExec");
@@ -80,13 +82,14 @@ class ProcessStartExec extends ProcessBase {
             }
 
             new ScheduleExecutor(async () => {
-                let methodExport = "wrk.export." + methodName + " = " + methodName + ";";
-                /*let methodExport = "wrk.export." + methodName + " = async(...params) => {" +
-                    "try {" +
-                    "   await " + methodName + "(...params);" +
-                    "} catch (err) {" +
-                    "   console.error(err.message);" +
-                    "}};";*/
+                //let methodExport = "wrk.export." + methodName + " = " + methodName + ";";
+                let methodExport = "wrk.export." + methodName + " = async(params) => {" +
+                    "   try {" +
+                    "      return await " + methodName + "(...params);" +
+                    "   } catch (err) {" +
+                    "       console.error(err.message);" +
+                    "   }" +
+                    "};";
 
                 this.pr.worker = await wrk.getWorker(0,
                     ProcessStartExec.workerSrc + this.pr.executableContract.state.data.js + methodExport);
@@ -108,7 +111,7 @@ class ProcessStartExec extends ProcessBase {
                     return await this.getMultiStorage();
                 };
 
-                let result = await new Promise(resolve => this.pr.worker.farcall(methodName, [], {}, ans => resolve(ans)));
+                let result = await new Promise(resolve => this.pr.worker.farcall(methodName, methodArgs, {}, ans => resolve(ans)));
 
                 this.pr.worker.release();
                 this.pr.worker = null;
@@ -181,8 +184,6 @@ class ProcessStartExec extends ProcessBase {
                     this.cmdIndex += Number(param);
                 break;
             case "equal":
-                console.log("ubot: " + this.pr.ubot.network.myInfo.number, "data = " + this.var0);
-                console.log("ubot: " + this.pr.ubot.network.myInfo.number, "data = " + this.var1);
                 this.var0 = t.valuesEqual(this.var0, this.var1);
                 break;
             case "finish":
@@ -260,7 +261,7 @@ class ProcessStartExec extends ProcessBase {
             case "getRecords":
                 storageName = (param != null) ? param : "default";
                 if (this.readsFrom.get(storageName) != null)
-                    this.var0 = await this.pr.ubot.getRecordsFromMultiStorage(this.pr.executableContract.id, storageName);
+                    this.var0 = await this.pr.ubot.getAllRecordsFromMultiStorage(this.pr.executableContract.id, storageName);
                 else {
                     this.pr.logger.log("Can`t read from multi-storage: " + storageName);
                     this.pr.errors.push(new ErrorRecord(Errors.FORBIDDEN, "getRecords",
@@ -319,10 +320,25 @@ class ProcessStartExec extends ProcessBase {
                 }
                 break;
             case "getSingleDataByRecordId":
-                this.var0 = await this.pr.ubot.getStorageResultByRecordId(this.var0, false);
+                if (this.var0 instanceof Uint8Array)
+                    this.var0 = await this.pr.ubot.getStorageResultByRecordId(crypto.HashId.withDigest(this.var0), false);
+                else {
+                    this.pr.logger.log("Error: this.var0 is not hash digest");
+                    this.pr.errors.push(new ErrorRecord(Errors.BAD_VALUE, "getSingleDataByRecordId",
+                        "Error: this.var0 is not hash digest"));
+                    this.pr.changeState(UBotPoolState.FAILED);
+                }
                 break;
             case "getMultiDataByRecordId":
-                this.var0 = await this.pr.ubot.getStorageResultByRecordId(this.var0, true, this.pr.ubot.network.myInfo.number);
+                if (this.var0 instanceof Uint8Array)
+                    this.var0 = await this.pr.ubot.getStorageResultByRecordId(crypto.HashId.withDigest(this.var0), true,
+                        this.pr.ubot.network.myInfo.number);
+                else {
+                    this.pr.logger.log("Error: this.var0 is not hash digest");
+                    this.pr.errors.push(new ErrorRecord(Errors.BAD_VALUE, "getMultiDataByRecordId",
+                        "Error: this.var0 is not hash digest"));
+                    this.pr.changeState(UBotPoolState.FAILED);
+                }
                 break;
             default:
                 this.pr.logger.log("error: ubotAsm code '" + op + "' not found");
@@ -368,7 +384,7 @@ class ProcessStartExec extends ProcessBase {
                 this.processes[this.procIndex] = proc;
                 this.procIndex++;
 
-                await proc.init(data, this.pr.executableContract.id, {storage_name : "default"});
+                await proc.init(data, this.pr.getDefaultRecordId(false), {storage_name : "default"});
                 await proc.start();
             });
         } else {
@@ -388,7 +404,7 @@ class ProcessStartExec extends ProcessBase {
                 this.processes[this.procIndex] = proc;
                 this.procIndex++;
 
-                await proc.init(data, this.pr.executableContract.id, {storage_name : "default"});
+                await proc.init(data, this.pr.getDefaultRecordId(true), {storage_name : "default"});
                 await proc.start();
             });
         } else {
@@ -400,11 +416,11 @@ class ProcessStartExec extends ProcessBase {
     }
 
     async getSingleStorage() {
-        return await this.pr.ubot.getStorageResultByRecordId(this.pr.executableContract.id, false);
+        return await this.pr.ubot.getStorageResultByRecordId(this.pr.getDefaultRecordId(false), false);
     }
 
     async getMultiStorage() {
-        return await this.pr.ubot.getRecordsFromMultiStorage(this.pr.executableContract.id, "default");
+        return await this.pr.ubot.getRecordsFromMultiStorageByRecordId(this.pr.getDefaultRecordId(true));
     }
 }
 

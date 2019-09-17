@@ -217,13 +217,12 @@ class UBotLedger {
             record_id.digest);
     }
 
-    async getRecordsFromMultiStorage(executable_contract_id, storage_name) {
+    async getAllRecordsFromMultiStorage(executable_contract_id, storage_name) {
         return new Promise(async(resolve, reject) => {
             this.dbPool_.withConnection(con => {
                 con.executeQuery(qr => {
                         let result = [];
                         let count = qr.getRowsCount();
-                        let x = count;
                         while (count > 0) {
                             let rows;
                             if (count > 1024) {
@@ -256,6 +255,45 @@ class UBotLedger {
                     executable_contract_id.digest,
                     storage_name,
                     UBotStorageType.MULTI.ordinal
+                );
+            });
+        });
+    }
+
+    async getRecordsFromMultiStorageByRecordId(recordId) {
+        return new Promise(async(resolve, reject) => {
+            this.dbPool_.withConnection(con => {
+                con.executeQuery(qr => {
+                        let result = [];
+                        let count = qr.getRowsCount();
+                        while (count > 0) {
+                            let rows;
+                            if (count > 1024) {
+                                rows = qr.getRows(1024);
+                                count -= 1024;
+                            } else {
+                                rows = qr.getRows(count);
+                                count = 0;
+                            }
+
+                            for (let i = 0; i < rows.length; i++)
+                                if (rows[i] != null)
+                                    result.push({
+                                        storage_data: rows[i][0],
+                                        hash: crypto.HashId.withDigest(rows[i][1]),
+                                        ubot_number: Number(rows[i][2]),
+                                        storage_ubots: rows[i][3]
+                                    });
+                        }
+
+                        con.release();
+                        resolve(result);
+                    }, e => {
+                        con.release();
+                        reject(e);
+                    },
+                    "SELECT storage_data, hash, ubot_number, storage_ubots FROM multi_records WHERE record_id = ?",
+                    recordId.digest
                 );
             });
         });

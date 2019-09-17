@@ -868,13 +868,13 @@ unit.test("ubot_commands_test: getDataByRecordId", async () => {
                 "moveTo var3;" +
                 "getMultiDataByRecordId;" +
                 "equal;" +
-                /* "ifTrue 1;" +
-                 "finish;" +
-                 "moveFrom var3;" +
-                 "moveTo var1;" +
-                 "writeSingleStorage storage;" +
-                 "getSingleDataByRecordId;" +
-                 "equal;" +*/
+                "ifTrue 1;" +
+                "finish;" +
+                "moveFrom var3;" +
+                "moveTo var1;" +
+                "writeSingleStorage storage;" +
+                "getSingleDataByRecordId;" +
+                "equal;" +
                 "finish"
         }
     };

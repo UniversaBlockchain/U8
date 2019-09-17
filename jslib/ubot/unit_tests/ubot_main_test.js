@@ -123,7 +123,9 @@ unit.test("ubot_main_test: JS secureRandom", async () => {
     };
 
     executableContract.state.data.js = `
-    async function getRandom() {
+    const BigDecimal  = require("big").Big;
+    
+    async function getRandom(max) {
         //generate random and write its hash to multi storage
         let rnd = Math.random();
         let hash = crypto.HashId.of(rnd.toString()).base64;
@@ -140,33 +142,37 @@ unit.test("ubot_main_test: JS secureRandom", async () => {
         let hashesHash = crypto.HashId.of(hashes.join()).base64;
         await writeSingleStorage({hashesHash : hashesHash});
         
-        //console.error(JSON.stringify(hashesHash));
-        return rnd;
-
         //add actual random to multi storage
         await writeMultiStorage({hash : hash, rnd : rnd});
 
         //verify hashesOfHash and rnd -> hash
         records = await getMultiStorage();
         hashes = [];
-        let result = 0;
+        rands = [];
         for (let r of records) {
-            if (r.hash !== crypto.HashId.of(r.rnd).base64)
+            if (r.hash !== crypto.HashId.of(r.rnd.toString()).base64)
                 throw new Error("Hash does not match the random value");
         
             hashes.push(r.hash);
-            result += r.rnd;
+            rands.push(r.rnd.toString());
         }
         hashes.sort();
+        rands.sort();
         hashesHash = crypto.HashId.of(hashes.join()).base64;
 
         let singleStorage = await getSingleStorage();
         if (hashesHash !== singleStorage.hashesHash)
             throw new Error("Hash of hashes does not match the previously saved");
 
-        result %= 100;
+        let randomHash = crypto.HashId.of(rands.join());
+        let bigRandom = new BigDecimal(0);
+        randomHash.digest.forEach(byte => bigRandom = bigRandom.mul(256).add(byte));
+        
+        let result = Number.parseInt(bigRandom.mod(max).toFixed());
 
         await writeSingleStorage({hashesHash: hashesHash, result: result});
+
+        return result;
     }
     `;
 
@@ -176,6 +182,7 @@ unit.test("ubot_main_test: JS secureRandom", async () => {
     startingContract.createTransactionalSection();
     startingContract.transactional.data.executableContract = await executableContract.getPackedTransaction();
     startingContract.state.data.methodName = "getRandom";
+    startingContract.state.data.methodArgs = [1000];
     startingContract.state.data.executableContractId = executableContract.id.digest;
     await startingContract.seal(true);
 
@@ -215,6 +222,7 @@ unit.test("ubot_main_test: JS secureRandom", async () => {
         fire(null);
     });
 
+    await event;
     // checking length of random hash
     //assert((await event).length === 96);
 

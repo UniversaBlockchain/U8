@@ -84,7 +84,7 @@ class UBotAsmProcess_writeSingleStorage extends ProcessBase {
     }
 
     generateSelfRecordID() {
-        if (this.previousRecordId != null && this.previousRecordId.equals(this.pr.executableContract.id))
+        if (this.previousRecordId != null && this.previousRecordId.equals(this.pr.getDefaultRecordId(false)))
             this.recordId = this.previousRecordId;   //executable contract id - default record id
         else {
             let poolId = this.pr.poolId.digest;
@@ -131,7 +131,7 @@ class UBotAsmProcess_writeSingleStorage extends ProcessBase {
 
             this.pr.logger.log("UBotAsmProcess_writeSingleStorage... ready, approved");
 
-            this.pr.var0 = this.recordId.digest;
+            this.asmProcessor.var0 = this.recordId.digest;
             this.onReady();
 
         } else if (this.declineCounterSet.size > this.pr.pool.length - this.quorumSize) {

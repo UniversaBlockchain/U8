@@ -27,6 +27,7 @@ class CloudProcessor {
         this.output = null;
         this.errors = [];
         this.methodName = null;
+        this.methodArgs = [];
         this.poolSize = 0;
         this.quorumSize = 0;
         this.localStorage = new Map();
@@ -104,6 +105,10 @@ class CloudProcessor {
 
     initPoolAndQuorum() {
         this.methodName = this.startingContract.state.data.methodName;
+
+        if (this.startingContract.state.data.hasOwnProperty("methodArgs"))
+            this.methodArgs = this.startingContract.state.data.methodArgs;
+
         if (this.executableContract.state.data.cloud_methods.hasOwnProperty(this.methodName)) {
             if (this.executableContract.state.data.cloud_methods[this.methodName].hasOwnProperty("pool"))
                 this.poolSize = this.executableContract.state.data.cloud_methods[this.methodName].pool.size;
@@ -129,6 +134,14 @@ class CloudProcessor {
                 "undefined starting method: " + this.methodName));
             this.changeState(UBotPoolState.FAILED);
         }
+    }
+
+    getDefaultRecordId(multi) {
+        let concat = new Uint8Array(this.executableContract.id.digest.length + 1);
+        concat[0] = multi ? 1 : 0;
+        concat.set(this.executableContract.id.digest, 1);
+
+        return crypto.HashId.of(concat);
     }
 
     /*deliverToOtherUBots(notification) {

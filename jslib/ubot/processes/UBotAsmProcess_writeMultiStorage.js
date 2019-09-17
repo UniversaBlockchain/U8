@@ -361,7 +361,7 @@ class UBotAsmProcess_writeMultiStorage extends UBotAsmProcess_writeSingleStorage
     }
 
     generateSelfRecordID() {
-        if (this.previousRecordId != null && this.previousRecordId.equals(this.pr.executableContract.id))
+        if (this.previousRecordId != null && this.previousRecordId.equals(this.pr.getDefaultRecordId(true)))
             this.recordId = this.previousRecordId;   //executable contract id - default record id
         else {
             let poolId = this.pr.poolId.digest;

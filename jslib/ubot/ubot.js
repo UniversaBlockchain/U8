@@ -98,8 +98,24 @@ class UBot {
         return result;
     }
 
-    async getRecordsFromMultiStorage(executable_contract_id, storage_name) {
-        let records = await this.ledger.getRecordsFromMultiStorage(executable_contract_id, storage_name);
+    async getAllRecordsFromMultiStorage(executable_contract_id, storage_name) {
+        let records = await this.ledger.getAllRecordsFromMultiStorage(executable_contract_id, storage_name);
+
+        //sort records
+        records.sort((a, b) => a.ubot_number - b.ubot_number);
+
+        let result = [];
+        for (let record of records) {
+            result.push(await Boss.load(record.storage_data));
+
+            //TODO: get insufficient data from network and save to DB
+        }
+
+        return result;
+    }
+
+    async getRecordsFromMultiStorageByRecordId(recordId) {
+        let records = await this.ledger.getRecordsFromMultiStorageByRecordId(recordId);
 
         //sort records
         records.sort((a, b) => a.ubot_number - b.ubot_number);
