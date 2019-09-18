@@ -65,6 +65,7 @@ unit.test("worker_tests: hello worker", async () => {
 });
 
 unit.test("worker_tests: check that all global objects are frozen", async () => {
+    let testSrc = `
     let checkFunction = (o, functionName) => {
         try {
             o[functionName]._wefhowegfh_add_some_field_ = true;
@@ -98,7 +99,34 @@ unit.test("worker_tests: check that all global objects are frozen", async () => 
                 checkFunction(o, k);
         }
     };
-    checkObject("", Function('return this')());
+    `;
+    console.log("main scripter:");
+    eval(testSrc + `checkObject("", Function('return this')());`);
+
+    console.log("worker scripter:");
+    class Worker {
+        constructor() {this.worker = null;}
+        release() {this.worker.release();}
+        static async start() {
+            let res = new Worker();
+            res.worker = await wrk.getWorker(0, wrk.farcallWrapper+testSrc+`
+            wrk.export.checkObject = async (args, kwargs) => {
+                checkObject("", Function('return this')());
+            }
+            `);
+            res.worker.startFarcallCallbacks();
+            return res;
+        }
+        checkObject() {
+            return new Promise(resolve => this.worker.farcall("checkObject", [], {}, ans => {
+                resolve(ans);
+            }));
+        }
+    }
+    let worker = await Worker.start();
+    //TODO: check it with worker too
+    //await worker.checkObject();
+    worker.release();
 });
 
 unit.test("worker_tests: isolate js context", async () => {

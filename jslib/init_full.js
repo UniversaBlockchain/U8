@@ -120,7 +120,7 @@ Object.freeze(platform);
 // crypto is a global module and needs global initialization:
 require('crypto');
 
-function __call_main(args) {
+function freezeGlobals() {
     let global = Function('return this')();
     Object.freeze(global.__bios_print);
     Object.freeze(global.__debug_throw);
@@ -182,7 +182,12 @@ function __call_main(args) {
     Object.freeze(global.main);
     Object.freeze(global._);
     Object.freeze(global.__args);
+    Object.freeze(global.freezeGlobals);
     Object.freeze(global);
+}
+
+function __call_main(args) {
+    freezeGlobals();
     let result = main(args);
     if (result instanceof Promise) {
         // the promise that resolves exit code:

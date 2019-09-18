@@ -57,6 +57,8 @@ __init_workers(async (src, obj) => {
 wrk.send = (obj) => {
     __send_from_worker(obj);
 };
+
+freezeGlobals();
 )End";
 
 void InitWorkerPools(int accessLevel0_poolSize) {
