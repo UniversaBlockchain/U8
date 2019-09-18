@@ -348,5 +348,6 @@ const HashId = crypto.HashId = class extends crypto.HashIdImpl {
 
 Object.assign(crypto.HashId.prototype, MemoiseMixin);
 Object.assign(crypto.HashId.prototype, DigestEqMixin);
+// Object.freeze(crypto);
 
 module.exports = {KeyAddress, HashId, PublicKey, PrivateKey, SymmetricKey};

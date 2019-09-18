@@ -121,7 +121,17 @@ Object.freeze(platform);
 require('crypto');
 
 function __call_main(args) {
-    //Object.freeze(Function('return this')());
+    // let global = Function('return this')();
+    // Object.freeze(global.__bios_print);
+    // Object.freeze(global.__debug_throw);
+    // Object.freeze(global.__bios_loadRequired);
+    // Object.freeze(global.__bios_initTimers);
+    // Object.freeze(global.exit);
+    // Object.freeze(global.utf8Decode);
+    // Object.freeze(global.utf8Encode);
+    // Object.freeze(global.__init_workers);
+    // Object.freeze(global.__send_from_worker);
+    // Object.freeze(global);
     let result = main(args);
     if (result instanceof Promise) {
         // the promise that resolves exit code:

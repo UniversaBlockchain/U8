@@ -64,39 +64,101 @@ unit.test("worker_tests: hello worker", async () => {
     worker.release();
 });
 
-/*unit.test("worker_tests: check that all global objects are frozen", async () => {
-    let global = Function('return this')();
-    let globalItems = new Set();
-    for (let k in global) {
-        globalItems.add(k);
-    }
-    let checkFunction = (global, functionName) => {
-        try {
-            global[functionName] = null;
-            assert(false);
-        } catch (e) {
-            if (!(e instanceof TypeError))
-                throw e;
-        } finally {
-            globalItems.delete(functionName);
-        }
-    };
-    checkFunction(global, "__bios_print");
-    checkFunction(global, "__debug_throw");
-    checkFunction(global, "__bios_loadRequired");
-    checkFunction(global, "__bios_initTimers");
-    checkFunction(global, "exit");
-    checkFunction(global, "utf8Decode");
-    checkFunction(global, "utf8Encode");
-    checkFunction(global, "$0");
+// unit.test("worker_tests: check that all global objects are frozen bak", async () => {
+//     //let global = Function('return this')();
+//     let global = Function('return crypto')();
+//     let globalItems = new Set();
+//     for (let k in global) {
+//         globalItems.add(k);
+//     }
+//     let checkFunction = (global, functionName) => {
+//         try {
+//             global[functionName] = null;
+//             assert(false);
+//         } catch (e) {
+//             if (!(e instanceof TypeError))
+//                 throw e;
+//         } finally {
+//             globalItems.delete(functionName);
+//         }
+//     };
+//     let checkItem = (item, functionName) => {
+//         try {
+//             item[functionName] = null;
+//             assert(false);
+//         } catch (e) {
+//             if (!(e instanceof TypeError))
+//                 throw e;
+//         } finally {
+//             globalItems.delete(functionName);
+//         }
+//     };
+//     // checkFunction(global, "__bios_print");
+//     // checkFunction(global, "__debug_throw");
+//     // checkFunction(global, "__bios_loadRequired");
+//     // checkFunction(global, "__bios_initTimers");
+//     // checkFunction(global, "exit");
+//     // checkFunction(global, "utf8Decode");
+//     // checkFunction(global, "utf8Encode");
+//     // checkFunction(global, "$0");
+//     // checkFunction(global, "__hardware_concurrency");
+//     // checkFunction(global, "__init_workers");
+//     // checkFunction(global, "__send_from_worker");
+//     // checkFunction(global, "IOFile");
+//     // checkFunction(global, "IODir");
+//     // checkFunction(global, "IOTCP");
+//     // checkFunction(global, "IOTLS");
+//     // checkFunction(global, "IOUDP");
+//     // checkItem(crypto.HashId, "of");
+//     // checkFunction(global, "atob");
+//     // checkFunction(global, "btoa");
+//     // checkFunction(global, "__verify_extendedSignature");
+//     crypto.HashId._lkwefjoweijf_ = true;
+//     console.log("crypto.HashId.of: " + crypto.HashId.of);
+//
+//     if (globalItems.size > 0) {
+//         for (let k of globalItems)
+//             console.error("unckecked global item: " + k);
+//         assert(false);
+//     }
+// });
 
-    checkFunction(global, "btoa");
-    if (globalItems.size > 0) {
-        for (let k of globalItems)
-            console.error("unckecked global item: " + k);
-        assert(false);
-    }
-});*/
+// unit.test("worker_tests: check that all global objects are frozen", async () => {
+//     let checkFunction = (o, functionName) => {
+//         try {
+//             o[functionName]._wefhowegfh_add_some_field_ = true;
+//             console.error(functionName + ": " + o[functionName]._wefhowegfh_add_some_field_);
+//             assert(false);
+//         } catch (e) {
+//             if (!(e instanceof TypeError))
+//                 throw e;
+//         }
+//         try {
+//             o[functionName] = null;
+//             console.error(functionName + ": " + o[functionName]);
+//             assert(false);
+//         } catch (e) {
+//             if (!(e instanceof TypeError))
+//                 throw e;
+//         }
+//     };
+//     let checkObject = (o) => {
+//         for (let k in o) {
+//             let val = o[k];
+//             let descr = "undefined";
+//             if (val)
+//                 descr = val.constructor.name;
+//             console.log("k: " + k + " - " + descr);
+//             if (descr === "Function")
+//                 checkFunction(o, k);
+//             else if (descr === "Object")
+//                 checkObject(val);
+//             else
+//                 checkFunction(o, k);
+//         }
+//     };
+//     checkObject(Function('return this')());
+// });
 
 /*unit.test("worker_tests: isolate js context", async () => {
     class Worker {
