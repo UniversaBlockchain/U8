@@ -101,7 +101,7 @@ unit.test("worker_tests: check that all global objects are frozen", async () => 
     checkObject("", Function('return this')());
 });
 
-/*unit.test("worker_tests: isolate js context", async () => {
+unit.test("worker_tests: isolate js context", async () => {
     class Worker {
         constructor() {this.worker = null;}
         release() {this.worker.release();}
@@ -148,14 +148,13 @@ unit.test("worker_tests: check that all global objects are frozen", async () => 
     for (let i = 0; i < 10; ++i) {
         let val = "hello"+i;
         let res = crypto.HashId.withDigest(await worker.doSomething(val));
-        console.log("i=" + i + ", " + res.base64);
+        //console.log("i=" + i + ", " + res.base64);
         assert(res.equals(crypto.HashId.of(val)));
     }
     worker.release();
 
     // iterate all workers in pool, call changeCrypto() for each of them
     for (let i = 0; i < 200; ++i) {
-        console.log("i = " + i);
         let worker2 = await Worker2.start();
         await worker2.changeCrypto();
         worker2.release();
@@ -165,8 +164,8 @@ unit.test("worker_tests: check that all global objects are frozen", async () => 
     for (let i = 0; i < 10; ++i) {
         let val = "hello"+i;
         let res = crypto.HashId.withDigest(await worker.doSomething(val));
-        console.log("i=" + i + ", " + res.base64);
-        //assert(res.equals(crypto.HashId.of(val)));
+        //console.log("i=" + i + ", " + res.base64);
+        assert(res.equals(crypto.HashId.of(val)));
     }
     worker.release();
-});*/
+});
