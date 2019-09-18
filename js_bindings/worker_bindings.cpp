@@ -12,6 +12,7 @@ class WorkerScripter {
 public:
     int id;
     int accessLevel;
+    std::string jsWorkerSrc;
     std::shared_ptr<Scripter> se;
     std::shared_ptr<FunctionHandler> onReceive;
     std::shared_ptr<FunctionHandler> onReceiveMain;
@@ -25,10 +26,34 @@ static std::list<shared_ptr<WorkerScripter>> workersPool_accessLevel0;
 static std::unordered_map<int, shared_ptr<WorkerScripter>> workersPool_accessLevel0_used;
 
 static const std::string workerMain = R"End(
-__init_workers(async (obj) => {
-    if (wrk.onReceive)
-        await wrk.onReceive(obj);
+wrk.export = {};
+wrk.nextFarcallSN = 0;
+wrk.callbacksFarcall = new Map();
+wrk.getNextFarcallSN = () => {
+    let res = wrk.nextFarcallSN;
+    ++wrk.nextFarcallSN;
+    if (wrk.nextFarcallSN >= Number.MAX_SAFE_INTEGER)
+        wrk.nextFarcallSN = 0;
+    return res;
+};
+
+__init_workers(async (src, obj) => {
+    // this context can be used for something critical to the execution of source.methodName
+    // so we isolate it:
+    return (function() {
+        // This is a non-safe calling function context, but it is local
+        // and will be garbaged on exit
+
+        // interpret source
+        eval(src);
+        // create caller for the methodName
+        let wrap = eval(`(obj) => { return ${"wrk.onReceive"}(obj); }`);
+        // call it safely
+        return wrap(obj)
+    })();
+
 });
+
 wrk.send = (obj) => {
     __send_from_worker(obj);
 };
@@ -130,12 +155,7 @@ static void JsGetWorker(const FunctionCallbackInfo<Value> &args) {
             runAsync([accessLevel, workerSrc, onComplete]() {
                 Blocking;
                 auto w = GetWorker(accessLevel);
-                Semaphore sem;
-                w->se->lockedContext([w,workerSrc,&sem](auto cxt){
-                    w->se->evaluate(workerSrc);
-                    sem.notify();
-                });
-                sem.wait();
+                w->jsWorkerSrc = workerSrc;
                 onComplete->lockedContext([=](Local<Context> cxt) {
                     Local<Value> res = wrap(onComplete->scripter()->WorkerScripterTpl, cxt->GetIsolate(), w.get());
                     onComplete->invoke(move(res));
@@ -167,10 +187,12 @@ void JsScripterWrap_send(const FunctionCallbackInfo<Value> &args) {
             UObject obj = v8ValueToUObject(ac.isolate, ac.args[0]);
             auto onReceive = psw->onReceive;
             auto se = ac.scripter;
-            runAsync([onReceive,se,obj{move(obj)}](){
-                onReceive->lockedContext([onReceive,obj{move(obj)}](Local<Context> &cxt){
+            runAsync([psw,onReceive,se,obj{move(obj)}](){
+                onReceive->lockedContext([psw,onReceive,obj{move(obj)}](Local<Context> &cxt){
+                    auto src = Local<Object>::Cast(String::NewFromUtf8(onReceive->scripter()->isolate(), psw->jsWorkerSrc.data()));
                     auto v8obj = obj.serializeToV8(onReceive->scripter_sp());
-                    onReceive->invoke(v8obj);
+                    Local<Value> args[2] {src, v8obj};
+                    onReceive->invoke(2, args);
                 });
             });
             return;

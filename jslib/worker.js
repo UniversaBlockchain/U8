@@ -71,16 +71,6 @@ wrk.getWorker = function(accessLevel, workerSrc) {
 };
 
 wrk.farcallWrapper = `
-wrk.export = {};
-wrk.nextFarcallSN = 0;
-wrk.callbacksFarcall = new Map();
-wrk.getNextFarcallSN = () => {
-    let res = wrk.nextFarcallSN;
-    ++wrk.nextFarcallSN;
-    if (wrk.nextFarcallSN >= Number.MAX_SAFE_INTEGER)
-        wrk.nextFarcallSN = 0;
-    return res;
-};
 wrk.onReceive = async (obj) => {
     let cmd = obj.cmd;
     if (cmd && wrk.export[cmd]) {
