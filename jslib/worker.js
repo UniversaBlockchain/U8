@@ -92,4 +92,9 @@ wrk.farcall = (cmd, args, kwargs, onComplete = null) => {
 }
 `;
 
+Object.freeze(wrk.__getWorker);
+Object.freeze(wrk.WorkerHandle);
+Object.freeze(wrk.getWorker);
+Object.freeze(wrk);
+
 module.exports = wrk;
