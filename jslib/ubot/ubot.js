@@ -98,6 +98,19 @@ class UBot {
         return result;
     }
 
+    async getStoragePackedResultByRecordId(recordId, multi, ubotNumber = undefined) {
+        let result = this.resultCache.get(recordId, ubotNumber);
+        if (result != null)
+            return result;
+
+        if (multi)
+            result = await this.ledger.getMultiStorageDataByRecordId(recordId, ubotNumber);
+        else
+            result = await this.ledger.getSingleStorageDataByRecordId(recordId);
+
+        return result;
+    }
+
     async getAllRecordsFromMultiStorage(executable_contract_id, storage_name) {
         let records = await this.ledger.getAllRecordsFromMultiStorage(executable_contract_id, storage_name);
 
@@ -105,27 +118,24 @@ class UBot {
         records.sort((a, b) => a.ubot_number - b.ubot_number);
 
         let result = [];
-        for (let record of records) {
+        for (let record of records)
             result.push(await Boss.load(record.storage_data));
-
-            //TODO: get insufficient data from network and save to DB
-        }
 
         return result;
     }
 
-    async getRecordsFromMultiStorageByRecordId(recordId) {
+    async getRecordsFromMultiStorageByRecordId(recordId, packed = false) {
         let records = await this.ledger.getRecordsFromMultiStorageByRecordId(recordId);
 
         //sort records
         records.sort((a, b) => a.ubot_number - b.ubot_number);
 
         let result = [];
-        for (let record of records) {
-            result.push(await Boss.load(record.storage_data));
-
-            //TODO: get insufficient data from network and save to DB
-        }
+        for (let record of records)
+            if (packed)
+                result.push(record.storage_data);
+            else
+                result.push(await Boss.load(record.storage_data));
 
         return result;
     }

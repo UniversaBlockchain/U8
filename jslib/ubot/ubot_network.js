@@ -5,8 +5,10 @@
 import {UDPAdapter, HttpClient} from "web";
 import {VerboseLevel} from "node_consts";
 import {Notification} from "notification";
+import {AsyncEvent} from "executorservice";
 
 const Boss = require("boss.js");
+const UBotConfig = require("ubot/ubot_config").UBotConfig;
 
 class UBotNetwork {
 
@@ -165,6 +167,48 @@ class UBotNetwork {
 
     getMultiStorageResult(ubot, hash, onComplete, onError) {
         this.getStorageResult(ubot, hash, "/getMultiStorageResult/", onComplete, onError);
+    }
+
+    async downloadActualStorageResult(ubot, recordId, actualHash, multi) {
+        let downloadEvent = new AsyncEvent();
+        let basePath = multi ? "/downloadActualMultiStorageResult/" : "/downloadActualSingleStorageResult/";
+
+        this.sendGetRequestToUbot(
+            ubot,
+            basePath + recordId.base64 + "_" + actualHash.base64,
+            async (respCode, body) => {
+                if (respCode === 200)
+                    downloadEvent.fire(body);
+                else
+                    downloadEvent.fire(null);
+            }
+        );
+
+        return await downloadEvent.await(UBotConfig.maxDownloadActualStorageResultTime);
+    }
+
+    async searchActualStorageResult(recordId, actualHash, multi) {
+        let list = this.netConfig.toList();
+
+        while (list.length > 0) {
+            let checkIndex = Math.floor(Math.random() * list.length);
+            let checkUbot = list[checkIndex];
+            list.splice(checkIndex, 1);
+
+            if (checkUbot.number === this.myInfo.number)
+                continue;
+
+            let result = await this.downloadActualStorageResult(checkUbot, recordId, actualHash, multi);
+            if (result != null) {
+                // check result hash
+                if (multi) {
+                    // TODO:...
+                } else if (actualHash.equals(HashId.of(result)))
+                    return result;
+            }
+        }
+
+        return null;
     }
 }
 

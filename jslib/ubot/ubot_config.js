@@ -14,6 +14,8 @@ class UBotConfig {
 
     static maxResultCacheAge = 20*60; //20 minutes
     static maxResultDownloadAttempts = 5;
+
+    static maxDownloadActualStorageResultTime = 10000; // ms
 }
 
 module.exports = {UBotConfig};

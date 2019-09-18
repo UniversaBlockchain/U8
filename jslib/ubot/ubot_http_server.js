@@ -26,6 +26,8 @@ class UBotHttpServer extends network.HttpServer {
         this.addRawEndpoint("/getStartingContract", request => this.onGetStartingContract(request));
         this.addRawEndpoint("/getSingleStorageResult", request => this.onGetStorageResult(request, false));
         this.addRawEndpoint("/getMultiStorageResult", request => this.onGetStorageResult(request, true));
+        this.addRawEndpoint("/downloadActualSingleStorageResult", request => this.onDownloadActualStorageResult(request, false));
+        this.addRawEndpoint("/downloadActualMultiStorageResult", request => this.onDownloadActualStorageResult(request, true));
 
         super.startServer();
     }
@@ -88,6 +90,32 @@ class UBotHttpServer extends network.HttpServer {
 
         let result = await this.ubot.getStoragePackedResultByHash(hash, multi);
         if (result != null)
+            request.setAnswerBody(result);
+        else
+            request.setStatusCode(204);
+
+        request.sendAnswer();
+    }
+
+    async onDownloadActualStorageResult(request, multi) {
+        let paramIndex = request.path.indexOf("/", 1) + 1;
+        let paramsString = request.path.substring(paramIndex);
+        let params = paramsString.split("_");
+        let recordId = HashId.withBase64Digest(params[0]);
+        let actualHash = HashId.withBase64Digest(params[1]);
+
+        let result = null;
+        let resultHash = null;
+        if (multi) {
+            let records = await this.ubot.getRecordsFromMultiStorageByRecordId(recordId, true);
+            // assume result (cortege) and calculate hash
+            // TODO:... (use records.hashes)
+        } else {
+            result = await this.ubot.getStoragePackedResultByRecordId(recordId, false);
+            resultHash = HashId.of(result);
+        }
+
+        if (result != null && resultHash != null && resultHash.equals(actualHash))
             request.setAnswerBody(result);
         else
             request.setStatusCode(204);

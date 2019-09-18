@@ -380,9 +380,15 @@ class UBotProcess_writeMultiStorage extends UBotProcess_writeSingleStorage {
     generateCortegeId() {
         let concat = new Uint8Array(this.cortege.size * this.binHashId.digest.length);
 
-        for (let i = 0; i < this.pr.pool.length; i++)
-            if (this.cortege.has(i))
-                concat.set(this.hashes[i], i * this.binHashId.digest.length);
+        let sorted = [];
+        this.cortege.forEach(ubot => sorted.push({
+            ubot_number: this.pr.pool[ubot].number,
+            hash: this.hashes[ubot]
+        }));
+
+        sorted.sort((a, b) => a.ubot_number - b.ubot_number);
+
+        sorted.forEach((ubot, i) => concat.set(ubot.hash, i * this.binHashId.digest.length));
 
         this.cortegeId = crypto.HashId.of(concat);
     }
