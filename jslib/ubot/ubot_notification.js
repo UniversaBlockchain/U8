@@ -7,7 +7,7 @@ const t = require("tools");
 
 const CODE_UBOT_TEST_NOTIFICATION                   = 10;
 const CODE_UBOT_CLOUD_NOTIFICATION                  = 11;
-const CODE_UBOT_CLOUD_NOTIFICATION_ASM_CMD          = 12;
+const CODE_UBOT_CLOUD_NOTIFICATION_PROCESS          = 12;
 
 class UBotTestNotification extends Notification {
     constructor(from, textValue, requestResult) {
@@ -106,7 +106,7 @@ class UBotCloudNotification extends Notification {
 }
 t.addValAndOrdinalMaps(UBotCloudNotification.types);
 
-class UBotCloudNotification_asmCommand extends Notification {
+class UBotCloudNotification_process extends Notification {
 
     static types = {
         SINGLE_STORAGE_GET_DATA_HASHID:                 {ordinal: 0},
@@ -126,7 +126,7 @@ class UBotCloudNotification_asmCommand extends Notification {
         this.procIndex = procIndex;
         this.type = type;
         this.params = params;
-        this.typeCode = CODE_UBOT_CLOUD_NOTIFICATION_ASM_CMD;
+        this.typeCode = CODE_UBOT_CLOUD_NOTIFICATION_PROCESS;
     }
 
     writeTo(bw) {
@@ -146,19 +146,19 @@ class UBotCloudNotification_asmCommand extends Notification {
         bw.write(this.params.isAnswer);
         bw.write(isFirstRecord);
         switch (this.type) {
-            case UBotCloudNotification_asmCommand.types.SINGLE_STORAGE_GET_DATA_HASHID:
-            case UBotCloudNotification_asmCommand.types.MULTI_STORAGE_GET_DATA_HASHID:
+            case UBotCloudNotification_process.types.SINGLE_STORAGE_GET_DATA_HASHID:
+            case UBotCloudNotification_process.types.MULTI_STORAGE_GET_DATA_HASHID:
                 if (this.params.isAnswer) {
                     bw.write(this.params.dataHashId.digest);
                     if (!isFirstRecord)
                         bw.write(this.params.previousRecordId.digest);
                 }
                 break;
-            case UBotCloudNotification_asmCommand.types.MULTI_STORAGE_GET_CORTEGE_HASHID:
+            case UBotCloudNotification_process.types.MULTI_STORAGE_GET_CORTEGE_HASHID:
                 if (this.params.isAnswer)
                     bw.write(this.params.cortegeId.digest);
                 break;
-            case UBotCloudNotification_asmCommand.types.MULTI_STORAGE_GET_POOL_HASHES:
+            case UBotCloudNotification_process.types.MULTI_STORAGE_GET_POOL_HASHES:
                 bw.write(this.params.dataUbotInPool);
 
                 if (this.params.isAnswer) {
@@ -167,24 +167,24 @@ class UBotCloudNotification_asmCommand extends Notification {
                         bw.write(this.params.previousRecordId.digest);
                 }
                 break;
-            case UBotCloudNotification_asmCommand.types.MULTI_STORAGE_GET_CORTEGES:
+            case UBotCloudNotification_process.types.MULTI_STORAGE_GET_CORTEGES:
                 bw.write(this.params.commonCortegeIteration);
                 if (this.params.isAnswer)
                     bw.write(this.params.cortege);
                 break;
-            case UBotCloudNotification_asmCommand.types.MULTI_STORAGE_GET_SUSPICIOUS_CORTEGE_HASHID:
+            case UBotCloudNotification_process.types.MULTI_STORAGE_GET_SUSPICIOUS_CORTEGE_HASHID:
                 bw.write(this.params.commonCortegeIteration);
                 bw.write(this.params.dataUbotInPool);
                 if (this.params.isAnswer)
                     bw.write(this.params.cortegeId.digest);
                 break;
-            case UBotCloudNotification_asmCommand.types.MULTI_STORAGE_GET_DECISIONS:
-            case UBotCloudNotification_asmCommand.types.MULTI_STORAGE_VOTE_DECISION:
+            case UBotCloudNotification_process.types.MULTI_STORAGE_GET_DECISIONS:
+            case UBotCloudNotification_process.types.MULTI_STORAGE_VOTE_DECISION:
                 bw.write(this.params.commonCortegeIteration);
                 if (this.params.isAnswer)
                     bw.write(this.params.decision);
                 break;
-            case UBotCloudNotification_asmCommand.types.MULTI_STORAGE_VOTE_EXCLUSION_SUSPICIOUS:
+            case UBotCloudNotification_process.types.MULTI_STORAGE_VOTE_EXCLUSION_SUSPICIOUS:
                 bw.write(this.params.commonCortegeIteration);
                 bw.write(this.params.suspect);
                 if (this.params.isAnswer)
@@ -204,12 +204,12 @@ class UBotCloudNotification_asmCommand extends Notification {
         } else
             this.procIndex = br.read();
 
-        this.type = UBotCloudNotification_asmCommand.types.byOrdinal.get(br.read());
+        this.type = UBotCloudNotification_process.types.byOrdinal.get(br.read());
         this.params.isAnswer = br.read();
         let isFirstRecord = br.read();
         switch (this.type) {
-            case UBotCloudNotification_asmCommand.types.SINGLE_STORAGE_GET_DATA_HASHID:
-            case UBotCloudNotification_asmCommand.types.MULTI_STORAGE_GET_DATA_HASHID:
+            case UBotCloudNotification_process.types.SINGLE_STORAGE_GET_DATA_HASHID:
+            case UBotCloudNotification_process.types.MULTI_STORAGE_GET_DATA_HASHID:
                 if (this.params.isAnswer) {
                     this.params.dataHashId = crypto.HashId.withDigest(br.read());
                     if (!isFirstRecord)
@@ -218,11 +218,11 @@ class UBotCloudNotification_asmCommand extends Notification {
                         this.params.previousRecordId = null;
                 }
                 break;
-            case UBotCloudNotification_asmCommand.types.MULTI_STORAGE_GET_CORTEGE_HASHID:
+            case UBotCloudNotification_process.types.MULTI_STORAGE_GET_CORTEGE_HASHID:
                 if (this.params.isAnswer)
                     this.params.cortegeId = crypto.HashId.withDigest(br.read());
                 break;
-            case UBotCloudNotification_asmCommand.types.MULTI_STORAGE_GET_POOL_HASHES:
+            case UBotCloudNotification_process.types.MULTI_STORAGE_GET_POOL_HASHES:
                 this.params.dataUbotInPool = br.read();
 
                 if (this.params.isAnswer) {
@@ -233,24 +233,24 @@ class UBotCloudNotification_asmCommand extends Notification {
                         this.params.previousRecordId = null;
                 }
                 break;
-            case UBotCloudNotification_asmCommand.types.MULTI_STORAGE_GET_CORTEGES:
+            case UBotCloudNotification_process.types.MULTI_STORAGE_GET_CORTEGES:
                 this.params.commonCortegeIteration = br.read();
                 if (this.params.isAnswer)
                     this.params.cortege = br.read();
                 break;
-            case UBotCloudNotification_asmCommand.types.MULTI_STORAGE_GET_SUSPICIOUS_CORTEGE_HASHID:
+            case UBotCloudNotification_process.types.MULTI_STORAGE_GET_SUSPICIOUS_CORTEGE_HASHID:
                 this.params.commonCortegeIteration = br.read();
                 this.params.dataUbotInPool = br.read();
                 if (this.params.isAnswer)
                     this.params.cortegeId = crypto.HashId.withDigest(br.read());
                 break;
-            case UBotCloudNotification_asmCommand.types.MULTI_STORAGE_GET_DECISIONS:
-            case UBotCloudNotification_asmCommand.types.MULTI_STORAGE_VOTE_DECISION:
+            case UBotCloudNotification_process.types.MULTI_STORAGE_GET_DECISIONS:
+            case UBotCloudNotification_process.types.MULTI_STORAGE_VOTE_DECISION:
                 this.params.commonCortegeIteration = br.read();
                 if (this.params.isAnswer)
                     this.params.decision = br.read();
                 break;
-            case UBotCloudNotification_asmCommand.types.MULTI_STORAGE_VOTE_EXCLUSION_SUSPICIOUS:
+            case UBotCloudNotification_process.types.MULTI_STORAGE_VOTE_EXCLUSION_SUSPICIOUS:
                 this.params.commonCortegeIteration = br.read();
                 this.params.suspect = br.read();
                 if (this.params.isAnswer)
@@ -282,17 +282,17 @@ class UBotCloudNotification_asmCommand extends Notification {
     }
 
     toString() {
-        return "[UBotCloudNotification_asmCommand from node: " + this.from.number +
+        return "[UBotCloudNotification_process from node: " + this.from.number +
             ", poolId: " + this.poolId +
             ", procIndex: " + JSON.stringify(this.procIndex) +
             ", type: " + this.type.val +
             ", isAnswer: " + this.params.isAnswer + "]";
     }
 }
-t.addValAndOrdinalMaps(UBotCloudNotification_asmCommand.types);
+t.addValAndOrdinalMaps(UBotCloudNotification_process.types);
 
 Notification.registerClass(CODE_UBOT_TEST_NOTIFICATION, UBotTestNotification);
 Notification.registerClass(CODE_UBOT_CLOUD_NOTIFICATION, UBotCloudNotification);
-Notification.registerClass(CODE_UBOT_CLOUD_NOTIFICATION_ASM_CMD, UBotCloudNotification_asmCommand);
+Notification.registerClass(CODE_UBOT_CLOUD_NOTIFICATION_PROCESS, UBotCloudNotification_process);
 
-module.exports = {UBotTestNotification, UBotCloudNotification, UBotCloudNotification_asmCommand};
+module.exports = {UBotTestNotification, UBotCloudNotification, UBotCloudNotification_process};

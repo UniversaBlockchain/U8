@@ -386,7 +386,7 @@ unit.test("ubot_commands_test: errorOutput", async () => {
     let errors = (await event).errors;
     assert(errors.length === 1);
     assert(errors[0].error === Errors.FAILURE);
-    assert(errors[0].objectName === "UBotAsmProcess_writeSingleStorage");
+    assert(errors[0].objectName === "UBotProcess_writeSingleStorage");
     assert(errors[0].message === "writing to single storage declined");
 
     await client.stop();
@@ -579,7 +579,7 @@ unit.test("ubot_commands_test: multi-verify method failed", async () => {
     let errors = (await event).errors;
     assert(errors.length === 1);
     assert(errors[0].error === Errors.FAILURE);
-    assert(errors[0].objectName === "UBotAsmProcess_writeMultiStorage");
+    assert(errors[0].objectName === "UBotProcess_writeMultiStorage");
     assert(errors[0].message === "failed self result verification");
 
     await client.stop();

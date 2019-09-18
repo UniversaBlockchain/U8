@@ -4,18 +4,18 @@
 
 import {ScheduleExecutor, ExecutorWithFixedPeriod, ExecutorWithDynamicPeriod} from "executorservice";
 
-const UBotAsmProcess_writeSingleStorage = require("ubot/processes/UBotAsmProcess_writeSingleStorage").UBotAsmProcess_writeSingleStorage;
+const UBotProcess_writeSingleStorage = require("ubot/processes/UBotProcess_writeSingleStorage").UBotProcess_writeSingleStorage;
 const UBotConfig = require("ubot/ubot_config").UBotConfig;
 const ErrorRecord = require("errors").ErrorRecord;
 const Errors = require("errors").Errors;
 const UBotPoolState = require("ubot/ubot_pool_state").UBotPoolState;
-const UBotCloudNotification_asmCommand = require("ubot/ubot_notification").UBotCloudNotification_asmCommand;
+const UBotCloudNotification_process = require("ubot/ubot_notification").UBotCloudNotification_process;
 const Boss = require('boss.js');
 const t = require("tools");
 
 const ACCURACY = 0.000001;
 
-class UBotAsmProcess_writeMultiStorage extends UBotAsmProcess_writeSingleStorage {
+class UBotProcess_writeMultiStorage extends UBotProcess_writeSingleStorage {
     static states = {
         CHECKING:       {ordinal: 0},
         SELF_APPROVED:  {ordinal: 1},
@@ -25,8 +25,8 @@ class UBotAsmProcess_writeMultiStorage extends UBotAsmProcess_writeSingleStorage
         ANALYSIS:       {ordinal: 5}
     };
 
-    constructor(processor, onReady, asmProcessor, cmdStack) {
-        super(processor, onReady, asmProcessor, cmdStack);
+    constructor(processor, onReady, mainProcess, procIndex) {
+        super(processor, onReady, mainProcess, procIndex);
         this.results = [];
         this.hashes = [];
         this.previous = [];
@@ -66,7 +66,7 @@ class UBotAsmProcess_writeMultiStorage extends UBotAsmProcess_writeSingleStorage
         this.suspiciousRemovalCoefficients = [];
         this.leaveCounterSet = [];
         this.removeCounterSet = [];
-        this.state = UBotAsmProcess_writeMultiStorage.states.CHECKING;
+        this.state = UBotProcess_writeMultiStorage.states.CHECKING;
     }
 
     async init(binToWrite, previousRecordId, storageData) {
@@ -75,7 +75,7 @@ class UBotAsmProcess_writeMultiStorage extends UBotAsmProcess_writeSingleStorage
     }
 
     async start() {
-        this.pr.logger.log("start UBotAsmProcess_writeMultiStorage");
+        this.pr.logger.log("start UBotProcess_writeMultiStorage");
 
         // check self result
         if (!await this.verifyResult(this.binToWrite, this.previousRecordId, this.pr.ubot.network.myInfo.number)) {
@@ -114,52 +114,52 @@ class UBotAsmProcess_writeMultiStorage extends UBotAsmProcess_writeSingleStorage
             if (this.votingExclusionSuspiciousTasks[i] != null)
                 this.votingExclusionSuspiciousTasks[i].cancel();
 
-        this.pr.logger.log("Error UBotAsmProcess_writeMultiStorage: " + error);
-        this.pr.errors.push(new ErrorRecord(Errors.FAILURE, "UBotAsmProcess_writeMultiStorage", error));
+        this.pr.logger.log("Error UBotProcess_writeMultiStorage: " + error);
+        this.pr.errors.push(new ErrorRecord(Errors.FAILURE, "UBotProcess_writeMultiStorage", error));
         this.pr.changeState(UBotPoolState.FAILED);
     }
 
     pulseGetHashes() {
-        this.pr.logger.log("UBotAsmProcess_writeMultiStorage... pulseGetHashes");
+        this.pr.logger.log("UBotProcess_writeMultiStorage... pulseGetHashes");
         for (let i = 0; i < this.pr.pool.length; ++i)
             if (this.pr.pool[i].number !== this.pr.ubot.network.myInfo.number && !this.otherAnswers.has(this.pr.pool[i].number))
                 this.pr.ubot.network.deliver(this.pr.pool[i],
-                    new UBotCloudNotification_asmCommand(
+                    new UBotCloudNotification_process(
                         this.pr.ubot.network.myInfo,
                         this.pr.poolId,
-                        this.cmdStack,
-                        UBotCloudNotification_asmCommand.types.MULTI_STORAGE_GET_DATA_HASHID,
+                        this.procIndex,
+                        UBotCloudNotification_process.types.MULTI_STORAGE_GET_DATA_HASHID,
                         { isAnswer: false }
                     )
                 );
     }
 
     pulseGetCortegeId() {
-        this.pr.logger.log("UBotAsmProcess_writeMultiStorage... pulseGetCortegeId");
+        this.pr.logger.log("UBotProcess_writeMultiStorage... pulseGetCortegeId");
         for (let i = 0; i < this.pr.pool.length; ++i)
             if (this.pr.pool[i].number !== this.pr.ubot.network.myInfo.number && !this.otherAnswers.has(this.pr.pool[i].number))
                 this.pr.ubot.network.deliver(this.pr.pool[i],
-                    new UBotCloudNotification_asmCommand(
+                    new UBotCloudNotification_process(
                         this.pr.ubot.network.myInfo,
                         this.pr.poolId,
-                        this.cmdStack,
-                        UBotCloudNotification_asmCommand.types.MULTI_STORAGE_GET_CORTEGE_HASHID,
+                        this.procIndex,
+                        UBotCloudNotification_process.types.MULTI_STORAGE_GET_CORTEGE_HASHID,
                         { isAnswer: false }
                     )
                 );
     }
 
     pulseGetPoolHashes(first = false) {
-        this.pr.logger.log("UBotAsmProcess_writeMultiStorage... pulseGetPoolHashes");
+        this.pr.logger.log("UBotProcess_writeMultiStorage... pulseGetPoolHashes");
         for (let i = 0; i < this.pr.pool.length; ++i)
             if (this.pr.pool[i].number !== this.pr.ubot.network.myInfo.number) {
                 if (first)
                     this.pr.ubot.network.deliver(this.pr.pool[i],
-                        new UBotCloudNotification_asmCommand(
+                        new UBotCloudNotification_process(
                             this.pr.ubot.network.myInfo,
                             this.pr.poolId,
-                            this.cmdStack,
-                            UBotCloudNotification_asmCommand.types.MULTI_STORAGE_GET_POOL_HASHES,
+                            this.procIndex,
+                            UBotCloudNotification_process.types.MULTI_STORAGE_GET_POOL_HASHES,
                             {
                                 dataUbotInPool: -1,
                                 isAnswer: false
@@ -171,11 +171,11 @@ class UBotAsmProcess_writeMultiStorage extends UBotAsmProcess_writeSingleStorage
                         if (!this.approveCounterFromOthersSets[j].has(this.pr.pool[i].number) &&
                             !this.declineCounterFromOthersSets[j].has(this.pr.pool[i].number))
                             this.pr.ubot.network.deliver(this.pr.pool[i],
-                                new UBotCloudNotification_asmCommand(
+                                new UBotCloudNotification_process(
                                     this.pr.ubot.network.myInfo,
                                     this.pr.poolId,
-                                    this.cmdStack,
-                                    UBotCloudNotification_asmCommand.types.MULTI_STORAGE_GET_POOL_HASHES,
+                                    this.procIndex,
+                                    UBotCloudNotification_process.types.MULTI_STORAGE_GET_POOL_HASHES,
                                     {
                                         dataUbotInPool: j,
                                         isAnswer: false
@@ -188,7 +188,7 @@ class UBotAsmProcess_writeMultiStorage extends UBotAsmProcess_writeSingleStorage
     pulseDownload() {
         this.downloadAttempts++;
         if (this.downloadAttempts > UBotConfig.maxResultDownloadAttempts) {
-            this.pr.logger.log("UBotAsmProcess_writeMultiStorage... limit of attempts to download result reached");
+            this.pr.logger.log("UBotProcess_writeMultiStorage... limit of attempts to download result reached");
             this.downloadTask.cancel();
 
             if (this.cortege.size >= this.quorumSize)
@@ -218,7 +218,7 @@ class UBotAsmProcess_writeMultiStorage extends UBotAsmProcess_writeSingleStorage
 
                         this.downloadAnswers.add(i);
                         if (this.downloadAnswers.size >= this.pr.pool.length) {
-                            this.pr.logger.log("UBotAsmProcess_writeMultiStorage... results downloaded");
+                            this.pr.logger.log("UBotProcess_writeMultiStorage... results downloaded");
                             this.downloadTask.cancel();
                             this.downloadFire();
                         }
@@ -229,17 +229,17 @@ class UBotAsmProcess_writeMultiStorage extends UBotAsmProcess_writeSingleStorage
     }
 
     pulseGetCorteges() {
-        this.pr.logger.log("UBotAsmProcess_writeMultiStorage... pulseGetCorteges");
+        this.pr.logger.log("UBotProcess_writeMultiStorage... pulseGetCorteges");
 
         Array.from(this.cortege).filter(
             ubot => ubot !== this.pr.selfPoolIndex && !this.otherAnswers.has(this.pr.pool[ubot].number)
         ).forEach(ubot =>
             this.pr.ubot.network.deliver(this.pr.pool[ubot],
-                new UBotCloudNotification_asmCommand(
+                new UBotCloudNotification_process(
                     this.pr.ubot.network.myInfo,
                     this.pr.poolId,
-                    this.cmdStack,
-                    UBotCloudNotification_asmCommand.types.MULTI_STORAGE_GET_CORTEGES,
+                    this.procIndex,
+                    UBotCloudNotification_process.types.MULTI_STORAGE_GET_CORTEGES,
                     {
                         isAnswer: false,
                         commonCortegeIteration: this.commonCortegeIteration
@@ -250,18 +250,18 @@ class UBotAsmProcess_writeMultiStorage extends UBotAsmProcess_writeSingleStorage
     }
 
     pulseGetCortegeIds() {
-        this.pr.logger.log("UBotAsmProcess_writeMultiStorage... pulseGetCortegeIds");
+        this.pr.logger.log("UBotProcess_writeMultiStorage... pulseGetCortegeIds");
 
         Array.from(this.suspicious).filter(su => !this.approveCounterSet.has(su) && !this.declineCounterSet.has(su)).forEach(su => {
             Array.from(this.cortege).filter(u => u !== this.pr.selfPoolIndex && u !== su &&
                 !this.approveCounterFromOthersSets[su].has(u) && !this.declineCounterFromOthersSets[su].has(u)).forEach(u =>
 
                 this.pr.ubot.network.deliver(this.pr.pool[u],
-                    new UBotCloudNotification_asmCommand(
+                    new UBotCloudNotification_process(
                         this.pr.ubot.network.myInfo,
                         this.pr.poolId,
-                        this.cmdStack,
-                        UBotCloudNotification_asmCommand.types.MULTI_STORAGE_GET_SUSPICIOUS_CORTEGE_HASHID,
+                        this.procIndex,
+                        UBotCloudNotification_process.types.MULTI_STORAGE_GET_SUSPICIOUS_CORTEGE_HASHID,
                         {
                             isAnswer: false,
                             dataUbotInPool: su,
@@ -274,17 +274,17 @@ class UBotAsmProcess_writeMultiStorage extends UBotAsmProcess_writeSingleStorage
     }
 
     pulseGetDecisions(iteration = -1) {
-        this.pr.logger.log("UBotAsmProcess_writeMultiStorage... pulseGetDecisions" + (iteration !== -1 ? ", iteration: " + iteration : ""));
+        this.pr.logger.log("UBotProcess_writeMultiStorage... pulseGetDecisions" + (iteration !== -1 ? ", iteration: " + iteration : ""));
 
         Array.from(this.cortege).filter(
             ubot => ubot !== this.pr.selfPoolIndex && !this.otherAnswers.has(this.pr.pool[ubot].number)
         ).forEach(ubot =>
             this.pr.ubot.network.deliver(this.pr.pool[ubot],
-                new UBotCloudNotification_asmCommand(
+                new UBotCloudNotification_process(
                     this.pr.ubot.network.myInfo,
                     this.pr.poolId,
-                    this.cmdStack,
-                    UBotCloudNotification_asmCommand.types.MULTI_STORAGE_GET_DECISIONS,
+                    this.procIndex,
+                    UBotCloudNotification_process.types.MULTI_STORAGE_GET_DECISIONS,
                     {
                         isAnswer: false,
                         commonCortegeIteration: iteration
@@ -295,17 +295,17 @@ class UBotAsmProcess_writeMultiStorage extends UBotAsmProcess_writeSingleStorage
     }
 
     pulseVotingDecision(iteration = -1) {
-        this.pr.logger.log("UBotAsmProcess_writeMultiStorage... pulseVotingDecision" + (iteration !== -1 ? ", iteration: " + iteration : ""));
+        this.pr.logger.log("UBotProcess_writeMultiStorage... pulseVotingDecision" + (iteration !== -1 ? ", iteration: " + iteration : ""));
 
         Array.from(this.cortege).filter(
             ubot => ubot !== this.pr.selfPoolIndex && !this.otherAnswers.has(this.pr.pool[ubot].number)
         ).forEach(ubot =>
             this.pr.ubot.network.deliver(this.pr.pool[ubot],
-                new UBotCloudNotification_asmCommand(
+                new UBotCloudNotification_process(
                     this.pr.ubot.network.myInfo,
                     this.pr.poolId,
-                    this.cmdStack,
-                    UBotCloudNotification_asmCommand.types.MULTI_STORAGE_VOTE_DECISION,
+                    this.procIndex,
+                    UBotCloudNotification_process.types.MULTI_STORAGE_VOTE_DECISION,
                     {
                         isAnswer: false,
                         commonCortegeIteration: iteration
@@ -316,18 +316,18 @@ class UBotAsmProcess_writeMultiStorage extends UBotAsmProcess_writeSingleStorage
     }
 
     pulseVotingExclusionSuspicious(suspect) {
-        this.pr.logger.log("UBotAsmProcess_writeMultiStorage... pulseVotingExclusionSuspicious, iteration: " +
+        this.pr.logger.log("UBotProcess_writeMultiStorage... pulseVotingExclusionSuspicious, iteration: " +
             this.commonCortegeIteration + ", suspect: " + suspect);
 
         Array.from(this.cortege).filter(
             ubot => ubot !== this.pr.selfPoolIndex && !this.parallelAnswers[suspect].has(this.pr.pool[ubot].number)
         ).forEach(ubot =>
             this.pr.ubot.network.deliver(this.pr.pool[ubot],
-                new UBotCloudNotification_asmCommand(
+                new UBotCloudNotification_process(
                     this.pr.ubot.network.myInfo,
                     this.pr.poolId,
-                    this.cmdStack,
-                    UBotCloudNotification_asmCommand.types.MULTI_STORAGE_VOTE_EXCLUSION_SUSPICIOUS,
+                    this.procIndex,
+                    UBotCloudNotification_process.types.MULTI_STORAGE_VOTE_EXCLUSION_SUSPICIOUS,
                     {
                         isAnswer: false,
                         commonCortegeIteration: this.commonCortegeIteration,
@@ -399,7 +399,7 @@ class UBotAsmProcess_writeMultiStorage extends UBotAsmProcess_writeSingleStorage
     }
 
     checkCortege() {
-        this.pr.logger.log("UBotAsmProcess_writeMultiStorage: check cortege");
+        this.pr.logger.log("UBotProcess_writeMultiStorage: check cortege");
 
         // generate common hash
         let concat = new Uint8Array(this.pr.pool.length * this.binHashId.digest.length);
@@ -423,10 +423,10 @@ class UBotAsmProcess_writeMultiStorage extends UBotAsmProcess_writeSingleStorage
     }
 
     async checkResults() {
-        this.pr.logger.log("UBotAsmProcess_writeMultiStorage... wait results");
+        this.pr.logger.log("UBotProcess_writeMultiStorage... wait results");
 
         await this.downloadEvent;
-        this.pr.logger.log("UBotAsmProcess_writeMultiStorage... results received");
+        this.pr.logger.log("UBotProcess_writeMultiStorage... results received");
 
         if (this.cortege.size >= this.pr.pool.length && await this.getDecision())
             await this.approveCortege(true);
@@ -435,17 +435,17 @@ class UBotAsmProcess_writeMultiStorage extends UBotAsmProcess_writeSingleStorage
     }
 
     async getDecision() {
-        if (this.state === UBotAsmProcess_writeMultiStorage.states.ANALYSIS)
-            this.pr.logger.log("UBotAsmProcess_writeMultiStorage... get decision after analysis, iteration: " + this.commonCortegeIteration);
+        if (this.state === UBotProcess_writeMultiStorage.states.ANALYSIS)
+            this.pr.logger.log("UBotProcess_writeMultiStorage... get decision after analysis, iteration: " + this.commonCortegeIteration);
         else
-            this.pr.logger.log("UBotAsmProcess_writeMultiStorage... get decision");
+            this.pr.logger.log("UBotProcess_writeMultiStorage... get decision");
 
         let iteration = -1;
-        if (this.state === UBotAsmProcess_writeMultiStorage.states.ANALYSIS) {
-            this.iterationState[this.commonCortegeIteration] = UBotAsmProcess_writeMultiStorage.states.SELF_APPROVED;
+        if (this.state === UBotProcess_writeMultiStorage.states.ANALYSIS) {
+            this.iterationState[this.commonCortegeIteration] = UBotProcess_writeMultiStorage.states.SELF_APPROVED;
             iteration = this.commonCortegeIteration;
         } else
-            this.state = UBotAsmProcess_writeMultiStorage.states.SELF_APPROVED;
+            this.state = UBotProcess_writeMultiStorage.states.SELF_APPROVED;
 
         this.decisionsEvent = new Promise(resolve => this.decisionsFire = resolve);
 
@@ -471,9 +471,9 @@ class UBotAsmProcess_writeMultiStorage extends UBotAsmProcess_writeSingleStorage
     }
 
     async approveCortege(fullCortege) {
-        this.pr.logger.log("UBotAsmProcess_writeMultiStorage... approve cortege");
+        this.pr.logger.log("UBotProcess_writeMultiStorage... approve cortege");
 
-        this.state = UBotAsmProcess_writeMultiStorage.states.APPROVED;
+        this.state = UBotProcess_writeMultiStorage.states.APPROVED;
 
         this.generateSelfRecordID();
 
@@ -498,16 +498,16 @@ class UBotAsmProcess_writeMultiStorage extends UBotAsmProcess_writeSingleStorage
             this.fail("error writing to multi-storage: " + err.message);
             return;
         }
-        this.pr.logger.log("UBotAsmProcess_writeMultiStorage... cortege approved");
+        this.pr.logger.log("UBotProcess_writeMultiStorage... cortege approved");
 
-        this.asmProcessor.var0 = this.recordId.digest;
+        this.mainProcess.var0 = this.recordId.digest;
         this.onReady();
     }
 
     analyzeCortege() {
-        this.pr.logger.log("UBotAsmProcess_writeMultiStorage: analyze cortege");
+        this.pr.logger.log("UBotProcess_writeMultiStorage: analyze cortege");
 
-        this.state = UBotAsmProcess_writeMultiStorage.states.ANALYSIS;
+        this.state = UBotProcess_writeMultiStorage.states.ANALYSIS;
 
         this.approveCounterSet.clear();
         this.declineCounterSet.clear();
@@ -523,7 +523,7 @@ class UBotAsmProcess_writeMultiStorage extends UBotAsmProcess_writeSingleStorage
     }
 
     vote(notification) {
-        let message = "UBotAsmProcess_writeMultiStorage... vote {from: " + notification.from.number +
+        let message = "UBotProcess_writeMultiStorage... vote {from: " + notification.from.number +
             ", ubot: " + this.pr.pool[notification.params.dataUbotInPool].number + ", result: ";
 
         if (this.hashes[notification.params.dataUbotInPool].equals(notification.params.dataHashId) &&
@@ -564,7 +564,7 @@ class UBotAsmProcess_writeMultiStorage extends UBotAsmProcess_writeSingleStorage
     }
 
     voteSuspiciousCortegeId(notification) {
-        let message = "UBotAsmProcess_writeMultiStorage... voteSuspiciousCortegeId {from: " + notification.from.number +
+        let message = "UBotProcess_writeMultiStorage... voteSuspiciousCortegeId {from: " + notification.from.number +
             ", ubot: " + this.pr.pool[notification.params.dataUbotInPool].number + ", result: ";
 
         if (this.suspiciousCortegeHashes[notification.params.dataUbotInPool].equals(notification.params.cortegeId)) {
@@ -594,10 +594,10 @@ class UBotAsmProcess_writeMultiStorage extends UBotAsmProcess_writeSingleStorage
         let res = notification.params.decision ? "approve" : "decline";
 
         if (notification.params.commonCortegeIteration === -1)
-            this.pr.logger.log("UBotAsmProcess_writeMultiStorage... voteDecision {from: " + notification.from.number +
+            this.pr.logger.log("UBotProcess_writeMultiStorage... voteDecision {from: " + notification.from.number +
                 ", result: " + res + "}");
         else
-            this.pr.logger.log("UBotAsmProcess_writeMultiStorage... voteDecision {from: " + notification.from.number +
+            this.pr.logger.log("UBotProcess_writeMultiStorage... voteDecision {from: " + notification.from.number +
                 ", iteration: " + this.commonCortegeIteration + ", result: " + res + "}");
 
         if (notification.params.decision) {
@@ -607,9 +607,9 @@ class UBotAsmProcess_writeMultiStorage extends UBotAsmProcess_writeSingleStorage
                 this.votingDecisionTask.cancel();
 
                 if (notification.params.commonCortegeIteration === -1)
-                    this.state = UBotAsmProcess_writeMultiStorage.states.APPROVED;
+                    this.state = UBotProcess_writeMultiStorage.states.APPROVED;
                 else
-                    this.iterationState[this.commonCortegeIteration] = UBotAsmProcess_writeMultiStorage.states.APPROVED;
+                    this.iterationState[this.commonCortegeIteration] = UBotProcess_writeMultiStorage.states.APPROVED;
 
                 this.decisionsFire(true);
             }
@@ -620,9 +620,9 @@ class UBotAsmProcess_writeMultiStorage extends UBotAsmProcess_writeSingleStorage
                 this.votingDecisionTask.cancel();
 
                 if (notification.params.commonCortegeIteration === -1)
-                    this.state = UBotAsmProcess_writeMultiStorage.states.ANALYSIS;
+                    this.state = UBotProcess_writeMultiStorage.states.ANALYSIS;
                 else
-                    this.iterationState[this.commonCortegeIteration] = UBotAsmProcess_writeMultiStorage.states.ANALYSIS;
+                    this.iterationState[this.commonCortegeIteration] = UBotProcess_writeMultiStorage.states.ANALYSIS;
 
                 this.decisionsFire(false);
             }
@@ -632,7 +632,7 @@ class UBotAsmProcess_writeMultiStorage extends UBotAsmProcess_writeSingleStorage
     voteExclusionSuspect(notification) {
         let res = notification.params.decision ? "remove" : "leave";
 
-        this.pr.logger.log("UBotAsmProcess_writeMultiStorage... voteExclusionSuspect {from: " + notification.from.number +
+        this.pr.logger.log("UBotProcess_writeMultiStorage... voteExclusionSuspect {from: " + notification.from.number +
             ", iteration: " + this.commonCortegeIteration + ", suspect: " + notification.params.suspect + ", result: " + res + "}");
 
         if (notification.params.decision) {
@@ -653,10 +653,10 @@ class UBotAsmProcess_writeMultiStorage extends UBotAsmProcess_writeSingleStorage
     }
 
     async searchCommonCortege() {
-        this.pr.logger.log("UBotAsmProcess_writeMultiStorage... searchCommonCortege wait results");
+        this.pr.logger.log("UBotProcess_writeMultiStorage... searchCommonCortege wait results");
 
         await this.downloadEvent;
-        this.pr.logger.log("UBotAsmProcess_writeMultiStorage... searchCommonCortege results received");
+        this.pr.logger.log("UBotProcess_writeMultiStorage... searchCommonCortege results received");
 
         // calculate intersection cortege members and downloaded results
         this.declineCounterSet.forEach(decline => this.cortege.delete(decline));
@@ -672,8 +672,8 @@ class UBotAsmProcess_writeMultiStorage extends UBotAsmProcess_writeSingleStorage
     }
 
     async calculateCommonCortege() {
-        this.pr.logger.log("UBotAsmProcess_writeMultiStorage... calculateCommonCortege iteration: " + this.commonCortegeIteration);
-        this.pr.logger.log("UBotAsmProcess_writeMultiStorage... self cortege = " + JSON.stringify(Array.from(this.cortege)));
+        this.pr.logger.log("UBotProcess_writeMultiStorage... calculateCommonCortege iteration: " + this.commonCortegeIteration);
+        this.pr.logger.log("UBotProcess_writeMultiStorage... self cortege = " + JSON.stringify(Array.from(this.cortege)));
 
         this.iterationsCortege[this.commonCortegeIteration] = new Set(this.cortege);
 
@@ -698,8 +698,8 @@ class UBotAsmProcess_writeMultiStorage extends UBotAsmProcess_writeSingleStorage
         let cortegesHash = this.getCortegesHash();
         if (this.lastCortegesHash != null) {
             if (this.lastCortegesHash.equals(cortegesHash)) {
-                this.pr.logger.log("Error UBotAsmProcess_writeMultiStorage: cortege has not changed during the iteration, consensus not found");
-                this.pr.errors.push(new ErrorRecord(Errors.FAILURE, "UBotAsmProcess_writeMultiStorage",
+                this.pr.logger.log("Error UBotProcess_writeMultiStorage: cortege has not changed during the iteration, consensus not found");
+                this.pr.errors.push(new ErrorRecord(Errors.FAILURE, "UBotProcess_writeMultiStorage",
                     "cortege has not changed during the iteration, consensus not found"));
                 return false;
             }
@@ -708,8 +708,8 @@ class UBotAsmProcess_writeMultiStorage extends UBotAsmProcess_writeSingleStorage
 
         // analyze corteges
         if (!await this.crossAnalyzeCorteges()) {
-            this.pr.logger.log("Error UBotAsmProcess_writeMultiStorage: consensus not found");
-            this.pr.errors.push(new ErrorRecord(Errors.FAILURE, "UBotAsmProcess_writeMultiStorage", "consensus not found"));
+            this.pr.logger.log("Error UBotProcess_writeMultiStorage: consensus not found");
+            this.pr.errors.push(new ErrorRecord(Errors.FAILURE, "UBotProcess_writeMultiStorage", "consensus not found"));
             return false;
         }
 
@@ -903,15 +903,15 @@ class UBotAsmProcess_writeMultiStorage extends UBotAsmProcess_writeSingleStorage
     }
 
     async onNotify(notification) {
-        if (notification instanceof UBotCloudNotification_asmCommand) {
-            if (notification.type === UBotCloudNotification_asmCommand.types.MULTI_STORAGE_GET_DATA_HASHID) {
+        if (notification instanceof UBotCloudNotification_process) {
+            if (notification.type === UBotCloudNotification_process.types.MULTI_STORAGE_GET_DATA_HASHID) {
                 if (!notification.params.isAnswer) {
                     this.pr.ubot.network.deliver(notification.from,
-                        new UBotCloudNotification_asmCommand(
+                        new UBotCloudNotification_process(
                             this.pr.ubot.network.myInfo,
                             this.pr.poolId,
-                            this.cmdStack,
-                            UBotCloudNotification_asmCommand.types.MULTI_STORAGE_GET_DATA_HASHID,
+                            this.procIndex,
+                            UBotCloudNotification_process.types.MULTI_STORAGE_GET_DATA_HASHID,
                             {
                                 dataHashId: this.binHashId,
                                 previousRecordId: this.previousRecordId,
@@ -938,15 +938,15 @@ class UBotAsmProcess_writeMultiStorage extends UBotAsmProcess_writeSingleStorage
                     }
                 }
 
-            } else if (notification.type === UBotCloudNotification_asmCommand.types.MULTI_STORAGE_GET_CORTEGE_HASHID) {
+            } else if (notification.type === UBotCloudNotification_process.types.MULTI_STORAGE_GET_CORTEGE_HASHID) {
                 if (!notification.params.isAnswer) {
                     if (this.cortegeId != null)
                         this.pr.ubot.network.deliver(notification.from,
-                            new UBotCloudNotification_asmCommand(
+                            new UBotCloudNotification_process(
                                 this.pr.ubot.network.myInfo,
                                 this.pr.poolId,
-                                this.cmdStack,
-                                UBotCloudNotification_asmCommand.types.MULTI_STORAGE_GET_CORTEGE_HASHID,
+                                this.procIndex,
+                                UBotCloudNotification_process.types.MULTI_STORAGE_GET_CORTEGE_HASHID,
                                 {
                                     cortegeId: this.cortegeId,
                                     isAnswer: true
@@ -968,17 +968,17 @@ class UBotAsmProcess_writeMultiStorage extends UBotAsmProcess_writeSingleStorage
                     }
                 }
 
-            } else if (notification.type === UBotCloudNotification_asmCommand.types.MULTI_STORAGE_GET_POOL_HASHES) {
+            } else if (notification.type === UBotCloudNotification_process.types.MULTI_STORAGE_GET_POOL_HASHES) {
                 if (!notification.params.isAnswer) {
                     if (notification.params.dataUbotInPool === -1) {
                         for (let i = 0; i < this.pr.pool.length; i++)
                             if (this.pr.selfPoolIndex !== i && this.hashes[i] != null)
                                 this.pr.ubot.network.deliver(notification.from,
-                                    new UBotCloudNotification_asmCommand(
+                                    new UBotCloudNotification_process(
                                         this.pr.ubot.network.myInfo,
                                         this.pr.poolId,
-                                        this.cmdStack,
-                                        UBotCloudNotification_asmCommand.types.MULTI_STORAGE_GET_POOL_HASHES,
+                                        this.procIndex,
+                                        UBotCloudNotification_process.types.MULTI_STORAGE_GET_POOL_HASHES,
                                         {
                                             dataHashId: this.hashes[i],
                                             dataUbotInPool: i,
@@ -989,11 +989,11 @@ class UBotAsmProcess_writeMultiStorage extends UBotAsmProcess_writeSingleStorage
                                 );
                     } else if (this.hashes[notification.params.dataUbotInPool] != null)
                         this.pr.ubot.network.deliver(notification.from,
-                            new UBotCloudNotification_asmCommand(
+                            new UBotCloudNotification_process(
                                 this.pr.ubot.network.myInfo,
                                 this.pr.poolId,
-                                this.cmdStack,
-                                UBotCloudNotification_asmCommand.types.MULTI_STORAGE_GET_POOL_HASHES,
+                                this.procIndex,
+                                UBotCloudNotification_process.types.MULTI_STORAGE_GET_POOL_HASHES,
                                 {
                                     dataHashId: this.hashes[notification.params.dataUbotInPool],
                                     dataUbotInPool: notification.params.dataUbotInPool,
@@ -1006,15 +1006,15 @@ class UBotAsmProcess_writeMultiStorage extends UBotAsmProcess_writeSingleStorage
                 } else if (this.getPoolHashesTask != null && !this.getPoolHashesTask.cancelled)
                     this.vote(notification);
 
-            } else if (notification.type === UBotCloudNotification_asmCommand.types.MULTI_STORAGE_GET_CORTEGES) {
+            } else if (notification.type === UBotCloudNotification_process.types.MULTI_STORAGE_GET_CORTEGES) {
                 if (!notification.params.isAnswer) {
                     if (this.iterationsCortege[notification.params.commonCortegeIteration] != null)
                         this.pr.ubot.network.deliver(notification.from,
-                            new UBotCloudNotification_asmCommand(
+                            new UBotCloudNotification_process(
                                 this.pr.ubot.network.myInfo,
                                 this.pr.poolId,
-                                this.cmdStack,
-                                UBotCloudNotification_asmCommand.types.MULTI_STORAGE_GET_CORTEGES,
+                                this.procIndex,
+                                UBotCloudNotification_process.types.MULTI_STORAGE_GET_CORTEGES,
                                 {
                                     //TODO: for > 200 ubots in pool need HTTP request
                                     cortege: await Boss.dump(this.iterationsCortege[notification.params.commonCortegeIteration]),
@@ -1043,15 +1043,15 @@ class UBotAsmProcess_writeMultiStorage extends UBotAsmProcess_writeSingleStorage
                     }
                 }
 
-            } else if (notification.type === UBotCloudNotification_asmCommand.types.MULTI_STORAGE_GET_SUSPICIOUS_CORTEGE_HASHID) {
+            } else if (notification.type === UBotCloudNotification_process.types.MULTI_STORAGE_GET_SUSPICIOUS_CORTEGE_HASHID) {
                 if (!notification.params.isAnswer) {
                     if (this.iterationsCortegesIds[notification.params.commonCortegeIteration][notification.params.dataUbotInPool] != null)
                         this.pr.ubot.network.deliver(notification.from,
-                            new UBotCloudNotification_asmCommand(
+                            new UBotCloudNotification_process(
                                 this.pr.ubot.network.myInfo,
                                 this.pr.poolId,
-                                this.cmdStack,
-                                UBotCloudNotification_asmCommand.types.MULTI_STORAGE_GET_SUSPICIOUS_CORTEGE_HASHID,
+                                this.procIndex,
+                                UBotCloudNotification_process.types.MULTI_STORAGE_GET_SUSPICIOUS_CORTEGE_HASHID,
                                 {
                                     cortegeId: this.iterationsCortegesIds[notification.params.commonCortegeIteration][notification.params.dataUbotInPool],
                                     dataUbotInPool: notification.params.dataUbotInPool,
@@ -1064,21 +1064,21 @@ class UBotAsmProcess_writeMultiStorage extends UBotAsmProcess_writeSingleStorage
                     notification.params.commonCortegeIteration === this.commonCortegeIteration)
                     this.voteSuspiciousCortegeId(notification);
 
-            } else if (notification.type === UBotCloudNotification_asmCommand.types.MULTI_STORAGE_GET_DECISIONS) {
+            } else if (notification.type === UBotCloudNotification_process.types.MULTI_STORAGE_GET_DECISIONS) {
                 if (!notification.params.isAnswer) {
                     let state = this.state;
                     if (notification.params.commonCortegeIteration !== -1)
                         state = this.iterationState[notification.params.commonCortegeIteration];
 
-                    if (state != null && state !== UBotAsmProcess_writeMultiStorage.states.CHECKING)
+                    if (state != null && state !== UBotProcess_writeMultiStorage.states.CHECKING)
                         this.pr.ubot.network.deliver(notification.from,
-                            new UBotCloudNotification_asmCommand(
+                            new UBotCloudNotification_process(
                                 this.pr.ubot.network.myInfo,
                                 this.pr.poolId,
-                                this.cmdStack,
-                                UBotCloudNotification_asmCommand.types.MULTI_STORAGE_GET_DECISIONS,
+                                this.procIndex,
+                                UBotCloudNotification_process.types.MULTI_STORAGE_GET_DECISIONS,
                                 {
-                                    decision: state !== UBotAsmProcess_writeMultiStorage.states.ANALYSIS,
+                                    decision: state !== UBotProcess_writeMultiStorage.states.ANALYSIS,
                                     commonCortegeIteration: notification.params.commonCortegeIteration,
                                     isAnswer: true
                                 }
@@ -1095,9 +1095,9 @@ class UBotAsmProcess_writeMultiStorage extends UBotAsmProcess_writeSingleStorage
                             this.getDecisionsTask.cancel();
 
                             if (notification.params.commonCortegeIteration === -1)
-                                this.state = UBotAsmProcess_writeMultiStorage.states.VOTE_APPROVED;
+                                this.state = UBotProcess_writeMultiStorage.states.VOTE_APPROVED;
                             else
-                                this.iterationState[this.commonCortegeIteration] = UBotAsmProcess_writeMultiStorage.states.VOTE_APPROVED;
+                                this.iterationState[this.commonCortegeIteration] = UBotProcess_writeMultiStorage.states.VOTE_APPROVED;
 
                             this.decisionsFire();
                         }
@@ -1105,32 +1105,32 @@ class UBotAsmProcess_writeMultiStorage extends UBotAsmProcess_writeSingleStorage
                         this.getDecisionsTask.cancel();
 
                         if (notification.params.commonCortegeIteration === -1)
-                            this.state = UBotAsmProcess_writeMultiStorage.states.VOTE_DECLINED;
+                            this.state = UBotProcess_writeMultiStorage.states.VOTE_DECLINED;
                         else
-                            this.iterationState[this.commonCortegeIteration] = UBotAsmProcess_writeMultiStorage.states.VOTE_DECLINED;
+                            this.iterationState[this.commonCortegeIteration] = UBotProcess_writeMultiStorage.states.VOTE_DECLINED;
 
                         this.decisionsFire();
                     }
                 }
 
-            } else if (notification.type === UBotCloudNotification_asmCommand.types.MULTI_STORAGE_VOTE_DECISION) {
+            } else if (notification.type === UBotCloudNotification_process.types.MULTI_STORAGE_VOTE_DECISION) {
                 if (!notification.params.isAnswer) {
                     let state = this.state;
                     if (notification.params.commonCortegeIteration !== -1)
                         state = this.iterationState[notification.params.commonCortegeIteration];
 
-                    if (state != null && state !== UBotAsmProcess_writeMultiStorage.states.CHECKING &&
-                        state !== UBotAsmProcess_writeMultiStorage.states.SELF_APPROVED)
+                    if (state != null && state !== UBotProcess_writeMultiStorage.states.CHECKING &&
+                        state !== UBotProcess_writeMultiStorage.states.SELF_APPROVED)
 
                         this.pr.ubot.network.deliver(notification.from,
-                            new UBotCloudNotification_asmCommand(
+                            new UBotCloudNotification_process(
                                 this.pr.ubot.network.myInfo,
                                 this.pr.poolId,
-                                this.cmdStack,
-                                UBotCloudNotification_asmCommand.types.MULTI_STORAGE_VOTE_DECISION,
+                                this.procIndex,
+                                UBotCloudNotification_process.types.MULTI_STORAGE_VOTE_DECISION,
                                 {
-                                    decision: state !== UBotAsmProcess_writeMultiStorage.states.ANALYSIS &&
-                                              state !== UBotAsmProcess_writeMultiStorage.states.VOTE_DECLINED,
+                                    decision: state !== UBotProcess_writeMultiStorage.states.ANALYSIS &&
+                                              state !== UBotProcess_writeMultiStorage.states.VOTE_DECLINED,
                                     commonCortegeIteration: notification.params.commonCortegeIteration,
                                     isAnswer: true
                                 }
@@ -1143,15 +1143,15 @@ class UBotAsmProcess_writeMultiStorage extends UBotAsmProcess_writeSingleStorage
                     this.voteDecision(notification);
                 }
 
-            } else if (notification.type === UBotCloudNotification_asmCommand.types.MULTI_STORAGE_VOTE_EXCLUSION_SUSPICIOUS) {
+            } else if (notification.type === UBotCloudNotification_process.types.MULTI_STORAGE_VOTE_EXCLUSION_SUSPICIOUS) {
                 if (!notification.params.isAnswer) {
                     if (this.iterationsVoteLeave[notification.params.commonCortegeIteration] != null)
                         this.pr.ubot.network.deliver(notification.from,
-                            new UBotCloudNotification_asmCommand(
+                            new UBotCloudNotification_process(
                                 this.pr.ubot.network.myInfo,
                                 this.pr.poolId,
-                                this.cmdStack,
-                                UBotCloudNotification_asmCommand.types.MULTI_STORAGE_VOTE_EXCLUSION_SUSPICIOUS,
+                                this.procIndex,
+                                UBotCloudNotification_process.types.MULTI_STORAGE_VOTE_EXCLUSION_SUSPICIOUS,
                                 {
                                     decision: !this.iterationsVoteLeave[notification.params.commonCortegeIteration].has(notification.params.suspect),
                                     commonCortegeIteration: notification.params.commonCortegeIteration,
@@ -1169,9 +1169,9 @@ class UBotAsmProcess_writeMultiStorage extends UBotAsmProcess_writeSingleStorage
                 }
             }
         } else {
-            this.pr.logger.log("warning: UBotAsmProcess_writeMultiStorage - wrong notification received");
+            this.pr.logger.log("warning: UBotProcess_writeMultiStorage - wrong notification received");
         }
     }
 }
 
-module.exports = {UBotAsmProcess_writeMultiStorage};
+module.exports = {UBotProcess_writeMultiStorage};

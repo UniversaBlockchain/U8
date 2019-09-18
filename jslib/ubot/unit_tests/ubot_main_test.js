@@ -105,6 +105,8 @@ unit.test("ubot_main_test: hello ubot", async () => {
 });
 
 unit.test("ubot_main_test: JS secureRandom", async () => {
+    //for (let i = 0; i < 50; i++) {
+    //console.log("\nIteration test № ", i);
     const ubotsCount = 8;
     let ubotMains = await createUBots(ubotsCount);
 
@@ -227,5 +229,5 @@ unit.test("ubot_main_test: JS secureRandom", async () => {
     assert(typeof random === "number" && random >= 0 && random < 1000);
 
     await client.stop();
-    await shutdownUBots(ubotMains);
+    await shutdownUBots(ubotMains);//}
 });
