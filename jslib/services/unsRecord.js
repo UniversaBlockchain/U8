@@ -175,6 +175,22 @@ class UnsRecord extends bs.BiSerializable {
         if (data.hasOwnProperty("origin"))
             this.unsOrigin = await deserializer.deserialize(data.origin);
     }
+
+    equals(to) {
+        if(this === to)
+            return true;
+
+        if(Object.getPrototypeOf(this) !== Object.getPrototypeOf(to))
+            return false;
+
+        if(!t.valuesEqual(this.unsAddresses, to.unsAddresses))
+            return false;
+
+        if(!t.valuesEqual(this.unsOrigin, to.unsOrigin))
+            return false;
+
+        return true;
+    }
 }
 
 DefaultBiMapper.registerAdapter(new bs.BiAdapter("UnsRecord", UnsRecord));

@@ -159,6 +159,31 @@ class UnsName extends bs.BiSerializable {
         this.unsURL = data[UnsName.URL_FIELD_NAME];
         this.unsRecords = await deserializer.deserialize(data[UnsName.ENTRIES_FIELD_NAME]);
     }
+
+    equals(to) {
+        if(this === to)
+            return true;
+
+        if(Object.getPrototypeOf(this) !== Object.getPrototypeOf(to))
+            return false;
+
+        if(!t.valuesEqual(this.unsReducedName, to.unsReducedName))
+            return false;
+
+        if(!t.valuesEqual(this.unsName, to.unsName))
+            return false;
+
+        if(!t.valuesEqual(this.unsDescription, to.unsDescription))
+            return false;
+
+        if(!t.valuesEqual(this.unsURL, to.unsURL))
+            return false;
+
+        if(!t.valuesEqual(this.unsRecords, to.unsRecords))
+            return false;
+
+        return true;
+    }
 }
 
 DefaultBiMapper.registerAdapter(new bs.BiAdapter("UnsName", UnsName));

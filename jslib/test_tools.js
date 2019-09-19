@@ -118,9 +118,7 @@ async function assertSameContracts(c1, c2) {
     assertSilent(c1.state.branchId === c2.state.branchId);
     assertSilent(c1.state.getBranchRevision() === c2.state.getBranchRevision());
 
-    assertSilent(c1.state.data.equals(c2.state.data) ||
-        (await BossBiMapper.getInstance().serialize(c1.state.data)).equals(await BossBiMapper.getInstance().serialize(c2.state.data)) ||
-        (await DefaultBiMapper.getInstance().serialize(c1.state.data)).equals(await DefaultBiMapper.getInstance().serialize(c2.state.data)));
+    assertSilent(c1.state.data.equals(c2.state.data));
 
     // check constraints
     assertSilent(Array.from(c1.constraints.values()).every(c => c.equals(c2.findConstraintByName(c.name))));

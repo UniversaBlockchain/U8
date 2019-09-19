@@ -34,7 +34,8 @@ class ProcessSendStartingContract extends ProcessBase {
     async start() {
         this.pr.logger.log("start ProcessSendStartingContract");
 
-        this.pr.executableContract = await Contract.fromPackedTransaction(this.pr.startingContract.transactional.data.executableContract);
+        this.pr.executableContract = this.pr.startingContract.transactionPack.referencedItems.get(
+            this.pr.startingContract.state.data.executableContractId);
 
         this.pr.initPoolAndQuorum();
         this.selectPool();

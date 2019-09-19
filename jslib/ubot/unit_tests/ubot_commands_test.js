@@ -175,7 +175,7 @@ unit.test("ubot_commands_test: executeCloudMethod", async () => {
     startingContract.createTransactionalSection();
     startingContract.transactional.data.executableContract = await executableContract.getPackedTransaction();
     startingContract.state.data.methodName = "ubotAsm";
-    startingContract.state.data.executableContractId = executableContract.id.digest;
+    startingContract.state.data.executableContractId = executableContract.id;
     await startingContract.seal(true);
 
     console.log("executableContract.id: " + executableContract.id);
@@ -259,7 +259,7 @@ unit.test("ubot_commands_test: generateRandomHash", async () => {
     startingContract.createTransactionalSection();
     startingContract.transactional.data.executableContract = await executableContract.getPackedTransaction();
     startingContract.state.data.methodName = "ubotAsm";
-    startingContract.state.data.executableContractId = executableContract.id.digest;
+    startingContract.state.data.executableContractId = executableContract.id;
     await startingContract.seal(true);
 
     console.log("executableContract.id: " + executableContract.id);
@@ -344,7 +344,7 @@ unit.test("ubot_commands_test: errorOutput", async () => {
     startingContract.createTransactionalSection();
     startingContract.transactional.data.executableContract = await executableContract.getPackedTransaction();
     startingContract.state.data.methodName = "ubotAsm";
-    startingContract.state.data.executableContractId = executableContract.id.digest;
+    startingContract.state.data.executableContractId = executableContract.id;
     await startingContract.seal(true);
 
     console.log("executableContract.id: " + executableContract.id);
@@ -442,7 +442,7 @@ unit.test("ubot_commands_test: multi-verify method", async () => {
     startingContract.createTransactionalSection();
     startingContract.transactional.data.executableContract = await executableContract.getPackedTransaction();
     startingContract.state.data.methodName = "main";
-    startingContract.state.data.executableContractId = executableContract.id.digest;
+    startingContract.state.data.executableContractId = executableContract.id;
     await startingContract.seal(true);
 
     console.log("executableContract.id: " + executableContract.id);
@@ -537,7 +537,7 @@ unit.test("ubot_commands_test: multi-verify method failed", async () => {
     startingContract.createTransactionalSection();
     startingContract.transactional.data.executableContract = await executableContract.getPackedTransaction();
     startingContract.state.data.methodName = "main";
-    startingContract.state.data.executableContractId = executableContract.id.digest;
+    startingContract.state.data.executableContractId = executableContract.id;
     await startingContract.seal(true);
 
     console.log("executableContract.id: " + executableContract.id);
@@ -640,7 +640,7 @@ unit.test("ubot_commands_test: call sub-method", async () => {
     startingContract.createTransactionalSection();
     startingContract.transactional.data.executableContract = await executableContract.getPackedTransaction();
     startingContract.state.data.methodName = "main";
-    startingContract.state.data.executableContractId = executableContract.id.digest;
+    startingContract.state.data.executableContractId = executableContract.id;
     await startingContract.seal(true);
 
     console.log("executableContract.id: " + executableContract.id);
@@ -798,7 +798,7 @@ unit.test("ubot_commands_test: secureRandom", async () => {
     startingContract.createTransactionalSection();
     startingContract.transactional.data.executableContract = await executableContract.getPackedTransaction();
     startingContract.state.data.methodName = "getRandom";
-    startingContract.state.data.executableContractId = executableContract.id.digest;
+    startingContract.state.data.executableContractId = executableContract.id;
     await startingContract.seal(true);
 
     console.log("executableContract.id: " + executableContract.id);
@@ -892,7 +892,7 @@ unit.test("ubot_commands_test: getDataByRecordId", async () => {
     startingContract.createTransactionalSection();
     startingContract.transactional.data.executableContract = await executableContract.getPackedTransaction();
     startingContract.state.data.methodName = "ubotAsm";
-    startingContract.state.data.executableContractId = executableContract.id.digest;
+    startingContract.state.data.executableContractId = executableContract.id;
     await startingContract.seal(true);
 
     console.log("executableContract.id: " + executableContract.id);

@@ -555,7 +555,7 @@ async function createNotaryContract(issuerKeys, ownerKeys, filePaths = null, fil
             let fileData = {
                 file_name: fileName,
                 __type: "file",
-                hash_id: await BossBiMapper.getInstance().serialize(HashId.of(buffer))
+                hash_id: HashId.of(buffer)
             };
 
             if (fileDescriptions != null && fileDescriptions[i] != null && typeof fileDescriptions[i] === "string")

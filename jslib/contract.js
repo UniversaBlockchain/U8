@@ -76,7 +76,10 @@ class Transactional extends bs.BiSerializable {
             if (data.hasOwnProperty("valid_until"))
                 this.validUntil = data.valid_until;
 
-            this.data = data.data;
+            if(data.hasOwnProperty("data"))
+                this.data = await deserializer.deserialize(data.data);
+            else
+                this.data = {};
         }
     }
 }
@@ -199,7 +202,7 @@ class State extends bs.BiSerializable {
             throw new ex.IllegalArgumentError("bad creator role name");
 
         if(data.hasOwnProperty("data"))
-            this.data = data.data;
+            this.data = await deserializer.deserialize(data.data);
         else
             this.data = {};
 
@@ -371,7 +374,7 @@ class Definition extends bs.BiSerializable {
         }
 
         if(data.hasOwnProperty("data")) {
-            this.data = data.data;
+            this.data = await deserializer.deserialize(data.data);
         } else {
             this.data = {};
         }

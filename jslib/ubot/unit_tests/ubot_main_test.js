@@ -10,6 +10,8 @@ const UBotMain = require("ubot/ubot_main").UBotMain;
 const UBotPoolState = require("ubot/ubot_pool_state").UBotPoolState;
 const Errors = require("errors").Errors;
 const Boss = require("boss");
+const cs = require("contractsservice");
+const Constraint = require('constraint').Constraint;
 
 const CONFIG_ROOT = io.getTmpDirPath() + "/ubot_config";
 const clientKey = tk.TestKeys.getKey();
@@ -150,7 +152,7 @@ unit.test("ubot_main_test: JS secureRandom", async () => {
         //verify hashesOfHash and rnd -> hash
         records = await getMultiStorage();
         hashes = [];
-        rands = [];
+        let rands = [];
         for (let r of records) {
             if (r.hash !== crypto.HashId.of(r.rnd.toString()).base64)
                 throw new Error("Hash does not match the random value");
@@ -181,12 +183,12 @@ unit.test("ubot_main_test: JS secureRandom", async () => {
     await executableContract.seal();
 
     let startingContract = Contract.fromPrivateKey(userPrivKey);
-    startingContract.createTransactionalSection();
-    startingContract.transactional.data.executableContract = await executableContract.getPackedTransaction();
     startingContract.state.data.methodName = "getRandom";
     startingContract.state.data.methodArgs = [1000];
-    startingContract.state.data.executableContractId = executableContract.id.digest;
-    await startingContract.seal(true);
+    startingContract.state.data.executableContractId = executableContract.id;
+
+    await cs.addConstraintToContract(startingContract, executableContract, "executableContractConstraint",
+        Constraint.TYPE_EXISTING_STATE, ["this.state.data.executableContractId == ref.id"], true);
 
     console.log("executableContract.id: " + executableContract.id);
     console.log("startingContract.id: " + startingContract.id);

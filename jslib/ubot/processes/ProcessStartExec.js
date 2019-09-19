@@ -71,7 +71,7 @@ class ProcessStartExec extends ProcessBase {
         this.pr.logger.log("start ProcessStartExec");
 
         this.pr.logger.log("  methodName: " + methodName);
-        this.pr.logger.log("  executableContractId: " + crypto.HashId.withDigest(this.pr.startingContract.state.data.executableContractId));
+        this.pr.logger.log("  executableContractId: " + this.pr.startingContract.state.data.executableContractId);
 
         this.initStorages(this.pr.executableContract.state.data.cloud_methods[methodName]);
 
