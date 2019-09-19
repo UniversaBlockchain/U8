@@ -69,16 +69,20 @@ unit.test("worker_tests: check that all global objects are frozen", async () => 
     let checkFunction = (o, functionName) => {
         try {
             o[functionName]._wefhowegfh_add_some_field_ = true;
-            console.error(functionName + "._wefhowegfh_add_some_field_: should be frozen");
-            assert(false);
+            if (o[functionName]._wefhowegfh_add_some_field_ === true) {
+                console.error(functionName + "._wefhowegfh_add_some_field_: should be frozen");
+                assert(false);
+            }
         } catch (e) {
             if (!(e instanceof TypeError))
                 throw e;
         }
         try {
             o[functionName] = null;
-            console.error(functionName + ": " + o[functionName] + " - should be frozen");
-            assert(false);
+            if (o[functionName] === null) {
+                console.error(functionName + ": " + o[functionName] + " - should be frozen");
+                assert(false);
+            }
         } catch (e) {
             if (!(e instanceof TypeError))
                 throw e;
