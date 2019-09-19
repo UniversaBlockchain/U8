@@ -11,6 +11,8 @@ const UBotMain = require("ubot/ubot_main").UBotMain;
 const UBotPoolState = require("ubot/ubot_pool_state").UBotPoolState;
 const Errors = require("errors").Errors;
 const Boss = require("boss");
+const cs = require("contractsservice");
+const Constraint = require('constraint').Constraint;
 
 const CONFIG_ROOT = io.getTmpDirPath() + "/ubot_config";
 const clientKey = tk.TestKeys.getKey();
@@ -172,11 +174,12 @@ unit.test("ubot_commands_test: executeCloudMethod", async () => {
     await executableContract.seal();
 
     let startingContract = Contract.fromPrivateKey(userPrivKey);
-    startingContract.createTransactionalSection();
-    startingContract.transactional.data.executableContract = await executableContract.getPackedTransaction();
+
     startingContract.state.data.methodName = "ubotAsm";
     startingContract.state.data.executableContractId = executableContract.id;
-    await startingContract.seal(true);
+
+    await cs.addConstraintToContract(startingContract, executableContract, "executableContractConstraint",
+        Constraint.TYPE_EXISTING_STATE, ["this.state.data.executableContractId == ref.id"], true);
 
     console.log("executableContract.id: " + executableContract.id);
     console.log("startingContract.id: " + startingContract.id);
@@ -256,11 +259,12 @@ unit.test("ubot_commands_test: generateRandomHash", async () => {
     await executableContract.seal();
 
     let startingContract = Contract.fromPrivateKey(userPrivKey);
-    startingContract.createTransactionalSection();
-    startingContract.transactional.data.executableContract = await executableContract.getPackedTransaction();
+
     startingContract.state.data.methodName = "ubotAsm";
     startingContract.state.data.executableContractId = executableContract.id;
-    await startingContract.seal(true);
+
+    await cs.addConstraintToContract(startingContract, executableContract, "executableContractConstraint",
+        Constraint.TYPE_EXISTING_STATE, ["this.state.data.executableContractId == ref.id"], true);
 
     console.log("executableContract.id: " + executableContract.id);
     console.log("startingContract.id: " + startingContract.id);
@@ -341,11 +345,12 @@ unit.test("ubot_commands_test: errorOutput", async () => {
     await executableContract.seal();
 
     let startingContract = Contract.fromPrivateKey(userPrivKey);
-    startingContract.createTransactionalSection();
-    startingContract.transactional.data.executableContract = await executableContract.getPackedTransaction();
+
     startingContract.state.data.methodName = "ubotAsm";
     startingContract.state.data.executableContractId = executableContract.id;
-    await startingContract.seal(true);
+
+    await cs.addConstraintToContract(startingContract, executableContract, "executableContractConstraint",
+        Constraint.TYPE_EXISTING_STATE, ["this.state.data.executableContractId == ref.id"], true);
 
     console.log("executableContract.id: " + executableContract.id);
     console.log("startingContract.id: " + startingContract.id);
@@ -439,11 +444,12 @@ unit.test("ubot_commands_test: multi-verify method", async () => {
     await executableContract.seal();
 
     let startingContract = Contract.fromPrivateKey(userPrivKey);
-    startingContract.createTransactionalSection();
-    startingContract.transactional.data.executableContract = await executableContract.getPackedTransaction();
+
     startingContract.state.data.methodName = "main";
     startingContract.state.data.executableContractId = executableContract.id;
-    await startingContract.seal(true);
+
+    await cs.addConstraintToContract(startingContract, executableContract, "executableContractConstraint",
+        Constraint.TYPE_EXISTING_STATE, ["this.state.data.executableContractId == ref.id"], true);
 
     console.log("executableContract.id: " + executableContract.id);
     console.log("startingContract.id: " + startingContract.id);
@@ -534,11 +540,12 @@ unit.test("ubot_commands_test: multi-verify method failed", async () => {
     await executableContract.seal();
 
     let startingContract = Contract.fromPrivateKey(userPrivKey);
-    startingContract.createTransactionalSection();
-    startingContract.transactional.data.executableContract = await executableContract.getPackedTransaction();
+
     startingContract.state.data.methodName = "main";
     startingContract.state.data.executableContractId = executableContract.id;
-    await startingContract.seal(true);
+
+    await cs.addConstraintToContract(startingContract, executableContract, "executableContractConstraint",
+        Constraint.TYPE_EXISTING_STATE, ["this.state.data.executableContractId == ref.id"], true);
 
     console.log("executableContract.id: " + executableContract.id);
     console.log("startingContract.id: " + startingContract.id);
@@ -637,11 +644,12 @@ unit.test("ubot_commands_test: call sub-method", async () => {
     await executableContract.seal();
 
     let startingContract = Contract.fromPrivateKey(userPrivKey);
-    startingContract.createTransactionalSection();
-    startingContract.transactional.data.executableContract = await executableContract.getPackedTransaction();
+
     startingContract.state.data.methodName = "main";
     startingContract.state.data.executableContractId = executableContract.id;
-    await startingContract.seal(true);
+
+    await cs.addConstraintToContract(startingContract, executableContract, "executableContractConstraint",
+        Constraint.TYPE_EXISTING_STATE, ["this.state.data.executableContractId == ref.id"], true);
 
     console.log("executableContract.id: " + executableContract.id);
     console.log("startingContract.id: " + startingContract.id);
@@ -795,11 +803,12 @@ unit.test("ubot_commands_test: secureRandom", async () => {
     await executableContract.seal();
 
     let startingContract = Contract.fromPrivateKey(userPrivKey);
-    startingContract.createTransactionalSection();
-    startingContract.transactional.data.executableContract = await executableContract.getPackedTransaction();
+
     startingContract.state.data.methodName = "getRandom";
     startingContract.state.data.executableContractId = executableContract.id;
-    await startingContract.seal(true);
+
+    await cs.addConstraintToContract(startingContract, executableContract, "executableContractConstraint",
+        Constraint.TYPE_EXISTING_STATE, ["this.state.data.executableContractId == ref.id"], true);
 
     console.log("executableContract.id: " + executableContract.id);
     console.log("startingContract.id: " + startingContract.id);
@@ -889,11 +898,12 @@ unit.test("ubot_commands_test: getDataByRecordId", async () => {
     await executableContract.seal();
 
     let startingContract = Contract.fromPrivateKey(userPrivKey);
-    startingContract.createTransactionalSection();
-    startingContract.transactional.data.executableContract = await executableContract.getPackedTransaction();
+
     startingContract.state.data.methodName = "ubotAsm";
     startingContract.state.data.executableContractId = executableContract.id;
-    await startingContract.seal(true);
+
+    await cs.addConstraintToContract(startingContract, executableContract, "executableContractConstraint",
+        Constraint.TYPE_EXISTING_STATE, ["this.state.data.executableContractId == ref.id"], true);
 
     console.log("executableContract.id: " + executableContract.id);
     console.log("startingContract.id: " + startingContract.id);
