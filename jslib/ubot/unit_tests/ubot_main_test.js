@@ -183,12 +183,12 @@ unit.test("ubot_main_test: JS secureRandom", async () => {
     await executableContract.seal();
 
     let startingContract = Contract.fromPrivateKey(userPrivKey);
-    startingContract.state.data.methodName = "getRandom";
-    startingContract.state.data.methodArgs = [1000];
-    startingContract.state.data.executableContractId = executableContract.id;
+    startingContract.state.data.method_name = "getRandom";
+    startingContract.state.data.method_args = [1000];
+    startingContract.state.data.executable_contract_id = executableContract.id;
 
     await cs.addConstraintToContract(startingContract, executableContract, "executableContractConstraint",
-        Constraint.TYPE_EXISTING_STATE, ["this.state.data.executableContractId == ref.id"], true);
+        Constraint.TYPE_EXISTING_STATE, ["this.state.data.executable_contract_id == ref.id"], true);
 
     console.log("executableContract.id: " + executableContract.id);
     console.log("startingContract.id: " + startingContract.id);

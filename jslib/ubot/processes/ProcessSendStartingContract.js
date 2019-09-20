@@ -35,7 +35,7 @@ class ProcessSendStartingContract extends ProcessBase {
         this.pr.logger.log("start ProcessSendStartingContract");
 
         this.pr.executableContract = this.pr.startingContract.transactionPack.referencedItems.get(
-            this.pr.startingContract.state.data.executableContractId);
+            this.pr.startingContract.state.data.executable_contract_id);
 
         this.pr.initPoolAndQuorum();
         this.selectPool();

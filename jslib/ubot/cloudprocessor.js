@@ -104,10 +104,10 @@ class CloudProcessor {
     }
 
     initPoolAndQuorum() {
-        this.methodName = this.startingContract.state.data.methodName;
+        this.methodName = this.startingContract.state.data.method_name;
 
-        if (this.startingContract.state.data.hasOwnProperty("methodArgs"))
-            this.methodArgs = this.startingContract.state.data.methodArgs;
+        if (this.startingContract.state.data.hasOwnProperty("method_args"))
+            this.methodArgs = this.startingContract.state.data.method_args;
 
         if (this.executableContract.state.data.cloud_methods.hasOwnProperty(this.methodName)) {
             if (this.executableContract.state.data.cloud_methods[this.methodName].hasOwnProperty("pool"))
