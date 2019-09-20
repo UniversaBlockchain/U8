@@ -13,9 +13,11 @@ const Boss = require("boss");
 const cs = require("contractsservice");
 const Constraint = require('constraint').Constraint;
 
-const CONFIG_ROOT = io.getTmpDirPath() + "/ubot_config";
+const CONFIG_ROOT = "../test/config/ubot_config"; //io.getTmpDirPath() + "/ubot_config";
 const clientKey = tk.TestKeys.getKey();
 const userPrivKey = tk.TestKeys.getKey();
+
+const ubotsCount = 30;
 
 async function prepareConfigFiles(count) {
     await io.removeDir(CONFIG_ROOT);
@@ -79,7 +81,7 @@ async function createUbotMain(name, nolog) {
 }
 
 async function createUBots(count) {
-    await prepareConfigFiles(count);
+    //await prepareConfigFiles(count);
     let ubotMains = [];
     for (let i = 0; i < count; ++i)
         ubotMains.push(createUbotMain("ubot"+i, false));
@@ -95,7 +97,6 @@ async function shutdownUBots(ubots) {
 }
 
 unit.test("ubot_main_test: hello ubot", async () => {
-    const ubotsCount = 6;
     let ubotMains = await createUBots(ubotsCount);
 
     console.log("\ntest send...");
@@ -109,7 +110,6 @@ unit.test("ubot_main_test: hello ubot", async () => {
 unit.test("ubot_main_test: JS secureRandom", async () => {
     //for (let i = 0; i < 50; i++) {
     //console.log("\nIteration test № ", i);
-    const ubotsCount = 8;
     let ubotMains = await createUBots(ubotsCount);
 
     console.log("\ntest send...");

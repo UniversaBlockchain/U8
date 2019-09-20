@@ -14,9 +14,11 @@ const Boss = require("boss");
 const cs = require("contractsservice");
 const Constraint = require('constraint').Constraint;
 
-const CONFIG_ROOT = io.getTmpDirPath() + "/ubot_config";
+const CONFIG_ROOT = "../test/config/ubot_config"; //io.getTmpDirPath() + "/ubot_config";
 const clientKey = tk.TestKeys.getKey();
 const userPrivKey = tk.TestKeys.getKey();
+
+const ubotsCount = 30;
 
 async function prepareConfigFiles(count) {
     await io.removeDir(CONFIG_ROOT);
@@ -123,7 +125,7 @@ async function createUbotMain(name, nolog) {
 }
 
 async function createUBots(count) {
-    await prepareConfigFiles(count);
+    //await prepareConfigFiles(count);
     let ubotMains = [];
     for (let i = 0; i < count; ++i)
         ubotMains.push(createUbotMain("ubot"+i, false));
@@ -139,8 +141,6 @@ async function shutdownUBots(ubots) {
 }
 
 unit.test("ubot_commands_test: executeCloudMethod", async () => {
-    const ubotsCount = 8;
-    //await dropAllTables(8);
     let ubotMains = await createUBots(ubotsCount);
 
     console.log("\ntest send...");
@@ -224,8 +224,6 @@ unit.test("ubot_commands_test: executeCloudMethod", async () => {
 });
 
 unit.test("ubot_commands_test: generateRandomHash", async () => {
-    const ubotsCount = 8;
-    //await dropAllTables(8);
     let ubotMains = await createUBots(ubotsCount);
 
     console.log("\ntest send...");
@@ -310,8 +308,6 @@ unit.test("ubot_commands_test: generateRandomHash", async () => {
 });
 
 unit.test("ubot_commands_test: errorOutput", async () => {
-    const ubotsCount = 8;
-    //await dropAllTables(8);
     let ubotMains = await createUBots(ubotsCount);
 
     console.log("\ntest send...");
@@ -399,8 +395,6 @@ unit.test("ubot_commands_test: errorOutput", async () => {
 });
 
 unit.test("ubot_commands_test: multi-verify method", async () => {
-    const ubotsCount = 8;
-    //await dropAllTables(8);
     let ubotMains = await createUBots(ubotsCount);
 
     console.log("\ntest send...");
@@ -495,8 +489,6 @@ unit.test("ubot_commands_test: multi-verify method", async () => {
 });
 
 unit.test("ubot_commands_test: multi-verify method failed", async () => {
-    const ubotsCount = 8;
-    //await dropAllTables(8);
     let ubotMains = await createUBots(ubotsCount);
 
     console.log("\ntest send...");
@@ -594,8 +586,6 @@ unit.test("ubot_commands_test: multi-verify method failed", async () => {
 });
 
 unit.test("ubot_commands_test: call sub-method", async () => {
-    const ubotsCount = 8;
-    //await dropAllTables(8);
     let ubotMains = await createUBots(ubotsCount);
 
     console.log("\ntest send...");
@@ -694,8 +684,6 @@ unit.test("ubot_commands_test: call sub-method", async () => {
 });
 
 unit.test("ubot_commands_test: secureRandom", async () => {
-    const ubotsCount = 8;
-    //await dropAllTables(8);
     let ubotMains = await createUBots(ubotsCount);
 
     console.log("\ntest send...");
@@ -854,8 +842,6 @@ unit.test("ubot_commands_test: secureRandom", async () => {
 });
 
 unit.test("ubot_commands_test: getDataByRecordId", async () => {
-    const ubotsCount = 8;
-    //await dropAllTables(8);
     let ubotMains = await createUBots(ubotsCount);
 
     console.log("\ntest send...");
