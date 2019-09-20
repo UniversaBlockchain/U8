@@ -202,7 +202,26 @@ class UBotNetwork {
             if (result != null) {
                 // check result hash
                 if (multi) {
-                    // TODO:...
+                    result = await Boss.load(result);
+
+                    let results = [];
+                    let ubots = [];
+                    let concat = new Uint8Array(Object.keys(result).length * 96);
+
+                    Object.keys(result).forEach((ubot, i) => {
+                        results.push(result[ubot]);
+                        ubots.push(Number(ubot));
+                        concat.set(crypto.HashId.of(result[ubot]).digest, i * 96);
+                    });
+
+                    let resultHash = crypto.HashId.of(concat);
+
+                    if (actualHash.equals(resultHash))
+                        return {
+                            records: results,
+                            ubots: ubots
+                        };
+
                 } else if (actualHash.equals(HashId.of(result)))
                     return result;
             }

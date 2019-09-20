@@ -416,11 +416,29 @@ class ProcessStartExec extends ProcessBase {
     }
 
     async getSingleStorage() {
-        return await this.pr.ubot.getStorageResultByRecordId(this.pr.getDefaultRecordId(false), false);
+        let recordId = this.pr.getDefaultRecordId(false);
+
+        // TODO: get actual hash from MainNet by recordId
+
+        return await this.pr.ubot.getStorageResultByRecordId(recordId, false);
     }
 
     async getMultiStorage() {
-        return await this.pr.ubot.getRecordsFromMultiStorageByRecordId(this.pr.getDefaultRecordId(true));
+        let recordId = this.pr.getDefaultRecordId(true);
+
+        // TODO: get actual hash from MainNet
+
+        let result = await this.pr.ubot.getRecordsFromMultiStorageByRecordId(recordId);
+
+        // if (result != null && result.cortegeId.equals(actualHash))
+        //     return result.records;
+        //
+        // result = await this.pr.ubot.network.searchActualStorageResult(recordId, actualHash, true);
+
+        if (result != null)
+            return result.records;
+        else
+            return [];
     }
 }
 

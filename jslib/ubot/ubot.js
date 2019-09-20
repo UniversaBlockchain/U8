@@ -127,17 +127,33 @@ class UBot {
     async getRecordsFromMultiStorageByRecordId(recordId, packed = false) {
         let records = await this.ledger.getRecordsFromMultiStorageByRecordId(recordId);
 
+        if (records.length === 0)
+            return null;
+
         //sort records
         records.sort((a, b) => a.ubot_number - b.ubot_number);
 
-        let result = [];
-        for (let record of records)
-            if (packed)
-                result.push(record.storage_data);
-            else
-                result.push(await Boss.load(record.storage_data));
+        let results = [];
+        let ubots = [];
+        let i = 0;
+        let concat = new Uint8Array(records.length * records[0].hash.digest.length);
 
-        return result;
+        for (let record of records) {
+            if (packed)
+                results.push(record.storage_data);
+            else
+                results.push(await Boss.load(record.storage_data));
+
+            ubots.push(record.ubot_number);
+            concat.set(record.hash.digest, i * record.hash.digest);
+            i++;
+        }
+
+        return {
+            records: results,
+            cortegeId: crypto.HashId.of(concat),
+            ubots: ubots
+        };
     }
 }
 

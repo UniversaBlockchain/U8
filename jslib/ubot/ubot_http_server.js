@@ -107,9 +107,13 @@ class UBotHttpServer extends network.HttpServer {
         let result = null;
         let resultHash = null;
         if (multi) {
-            let records = await this.ubot.getRecordsFromMultiStorageByRecordId(recordId, true);
-            // assume result (cortege) and calculate hash
-            // TODO:... (use records.hashes)
+            let storageResults = await this.ubot.getRecordsFromMultiStorageByRecordId(recordId, true);
+            resultHash = storageResults.cortegeId;
+
+            // assume result (cortege)
+            result = {};
+            storageResults.records.forEach((record, i) => result[storageResults.ubots[i]] = record);
+            result = await Boss.dump(result);
         } else {
             result = await this.ubot.getStoragePackedResultByRecordId(recordId, false);
             resultHash = HashId.of(result);
