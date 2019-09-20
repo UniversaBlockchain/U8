@@ -70,8 +70,8 @@ class ProcessStartExec extends ProcessBase {
 
         this.pr.logger.log("start ProcessStartExec");
 
-        this.pr.logger.log("  methodName: " + methodName);
-        this.pr.logger.log("  executable_contract_id: " + this.pr.startingContract.state.data.executable_contract_id);
+        this.pr.logger.log("  method name: " + methodName);
+        this.pr.logger.log("  executable contract: " + this.pr.startingContract.state.data.executable_contract_id);
 
         this.initStorages(this.pr.executableContract.state.data.cloud_methods[methodName]);
 
@@ -418,15 +418,22 @@ class ProcessStartExec extends ProcessBase {
     async getSingleStorage() {
         let recordId = this.pr.getDefaultRecordId(false);
 
-        // TODO: get actual hash from MainNet by recordId
+        // TODO: get actual hash from MainNet by this.executableContract.id (further recordId)
 
-        return await this.pr.ubot.getStorageResultByRecordId(recordId, false);
+        let result = await this.pr.ubot.getStorageResultByRecordId(recordId, false);
+
+        return result;
+
+        // if (result != null && actualHash.equals(crypto.HashId.of(result)))
+        //     return result;
+        //
+        // return await this.pr.ubot.network.searchActualStorageResult(recordId, actualHash, false);
     }
 
     async getMultiStorage() {
         let recordId = this.pr.getDefaultRecordId(true);
 
-        // TODO: get actual hash from MainNet
+        // TODO: get actual hash from MainNet by this.executableContract.id (further recordId)
 
         let result = await this.pr.ubot.getRecordsFromMultiStorageByRecordId(recordId);
 
