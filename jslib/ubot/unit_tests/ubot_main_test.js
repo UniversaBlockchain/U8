@@ -8,8 +8,6 @@ import {expect, assert, unit} from 'test'
 const io = require("io");
 const UBotMain = require("ubot/ubot_main").UBotMain;
 const UBotPoolState = require("ubot/ubot_pool_state").UBotPoolState;
-const Errors = require("errors").Errors;
-const Boss = require("boss");
 const cs = require("contractsservice");
 const Constraint = require('constraint').Constraint;
 
