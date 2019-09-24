@@ -111,6 +111,8 @@ public:
     /** for js bindings */
     void command(const byte_vector& callBin, const std::function<void(byte_vector&&)>& onComplete);
 
+    void changeStartTimeoutMillis(int newValue) {startTimeoutMillis_ = newValue;}
+
 private:
     void execCommand(const byte_vector& callBin, std::function<void(byte_vector&&)>&& onComplete);
     void execCommand(const std::string& name, const UBinder& params, std::function<void(UBinder&&)>&& onComplete);
@@ -120,6 +122,7 @@ private:
     HttpClientWorkerAsync worker_;
     std::shared_ptr<HttpClientSession> session_;
     std::string rootUrl_;
+    int startTimeoutMillis_ = 10000;
 
 public:
     static const int CLIENT_VERSION;

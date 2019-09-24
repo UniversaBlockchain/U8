@@ -453,6 +453,8 @@ network.HttpClient = class {
         return new Promise((resolve, reject) => {
             this.httpClient_.__start(clientPrivateKey.packed, nodePublickey.packed, ()=>{
                 resolve();
+            }, (errText)=>{
+                reject(errText);
             });
         });
     }

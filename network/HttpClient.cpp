@@ -250,7 +250,8 @@ void HttpClient::start(const crypto::PrivateKey& clientKey, const crypto::Public
             session_->version = std::min(int(server_version), HttpClient::CLIENT_VERSION);
             sem.notify();
         });
-        sem.wait();
+        if (!sem.wait(std::chrono::milliseconds(startTimeoutMillis_)))
+            throw std::runtime_error("HttpClient timeout while starting secure connection");
         byte_vector client_nonce(47);
         sprng_read(&client_nonce[0], client_nonce.size(), NULL);
         byte_vector client_nonce_copy = client_nonce;

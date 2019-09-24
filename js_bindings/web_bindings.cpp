@@ -873,10 +873,16 @@ public:
         bufferedCommandCallback_ = bufferedCommandCallback;
     }
 
-    void start(const byte_vector& clientPrivateKeyPacked, const byte_vector& nodePublicKeyPacked, const std::function<void()>& onComplete) {
-        runAsync([this,clientPrivateKeyPacked,nodePublicKeyPacked,onComplete](){
-            httpClient_->start(crypto::PrivateKey(clientPrivateKeyPacked), crypto::PublicKey(nodePublicKeyPacked));
-            onComplete();
+    void start(const byte_vector& clientPrivateKeyPacked, const byte_vector& nodePublicKeyPacked,
+            const std::function<void()>& onComplete, const std::function<void(const std::string&)>& onError) {
+        runAsync([this,clientPrivateKeyPacked,nodePublicKeyPacked,onComplete,onError](){
+            Blocking;
+            try {
+                httpClient_->start(crypto::PrivateKey(clientPrivateKeyPacked), crypto::PublicKey(nodePublicKeyPacked));
+                onComplete();
+            } catch (const std::exception& e) {
+                onError(e.what());
+            }
         });
     }
 
@@ -887,6 +893,10 @@ public:
         }
         delete httpClient_;
         httpClient_ = nullptr;
+    }
+
+    void changeStartTimeoutMillis(int newValue) {
+        httpClient_->changeStartTimeoutMillis(newValue);
     }
 
 private:
@@ -1020,7 +1030,7 @@ void httpClient_setBufferedCommandCallback(const FunctionCallbackInfo<Value> &ar
 
 void httpClient_start(const FunctionCallbackInfo<Value> &args) {
     Scripter::unwrapArgs(args, [](ArgsContext &ac) {
-        if (ac.args.Length() == 3) {
+        if (ac.args.Length() == 4) {
             auto httpClient = unwrap<HttpClientBuffered>(ac.args.This());
 
             auto contents0 = ac.args[0].As<TypedArray>()->Buffer()->GetContents();
@@ -1032,10 +1042,15 @@ void httpClient_start(const FunctionCallbackInfo<Value> &args) {
             memcpy(&bv1[0], contents1.Data(), contents1.ByteLength());
 
             auto onReady = ac.asFunction(2);
+            auto onError = ac.asFunction(3);
 
             httpClient->start(bv0, bv1, [=](){
                 onReady->lockedContext([=](Local<Context> &cxt){
                     onReady->invoke();
+                });
+            }, [=](const std::string& errText){
+                onError->lockedContext([=](Local<Context> &cxt){
+                    onError->invoke(onError->scripter()->v8String(errText));
                 });
             });
 
@@ -1053,6 +1068,18 @@ void httpClient_stop(const FunctionCallbackInfo<Value> &args) {
             return;
         }
         se->throwError("invalid arguments");
+    });
+}
+
+void httpClient_changeStartTimeoutMillis(const FunctionCallbackInfo<Value> &args) {
+    Scripter::unwrapArgs(args, [](ArgsContext &ac) {
+        if (ac.args.Length() == 1) {
+            auto httpClient = unwrap<HttpClientBuffered>(ac.args.This());
+            int newValue = ac.asInt(0);
+            httpClient->changeStartTimeoutMillis(newValue);
+            return;
+        }
+        ac.throwError("invalid arguments");
     });
 }
 
@@ -1087,6 +1114,7 @@ Local<FunctionTemplate> initHttpClient(Scripter& scripter) {
     prototype->Set(isolate, "__setBufferedCommandCallback", FunctionTemplate::New(isolate, httpClient_setBufferedCommandCallback));
     prototype->Set(isolate, "__start", FunctionTemplate::New(isolate, httpClient_start));
     prototype->Set(isolate, "__stop", FunctionTemplate::New(isolate, httpClient_stop));
+    prototype->Set(isolate, "__changeStartTimeoutMillis", FunctionTemplate::New(isolate, httpClient_changeStartTimeoutMillis));
 
     scripter.HttpClientTpl.Reset(isolate, tpl);
     return tpl;
