@@ -76,7 +76,7 @@ public:
      *
      * @return shared pointer to scripter environment.
      */
-    static shared_ptr<Scripter> New();
+    static shared_ptr<Scripter> New(int accessLevel);
 
 
     /**
@@ -281,7 +281,7 @@ private:
 
 
     // we should not put this code in the constructor as it uses shared_from_this()
-    void initialize();
+    void initialize(int accessLevel);
 
     // Sleep timer is in exclusive use of this function:
     friend void JsTimer(const v8::FunctionCallbackInfo<v8::Value> &args);

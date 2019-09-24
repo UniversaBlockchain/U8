@@ -19,11 +19,15 @@ public:
     std::shared_ptr<std::thread> loopThread;
 };
 
+static bool workersPool_isInit = false;
 static std::mutex workersPool_accessLevel0_mutex;
 std::condition_variable workersPool_accessLevel0_cv;
-static bool workersPool_isInit = false;
 static std::list<shared_ptr<WorkerScripter>> workersPool_accessLevel0;
 static std::unordered_map<int, shared_ptr<WorkerScripter>> workersPool_accessLevel0_used;
+static std::mutex workersPool_accessLevel1_mutex;
+std::condition_variable workersPool_accessLevel1_cv;
+static std::list<shared_ptr<WorkerScripter>> workersPool_accessLevel1;
+static std::unordered_map<int, shared_ptr<WorkerScripter>> workersPool_accessLevel1_used;
 
 static const std::string workerMain = R"End(
 let wrk = {};
@@ -62,9 +66,10 @@ wrk.send = (obj) => {
 freezeGlobals();
 )End";
 
-void InitWorkerPools(int accessLevel0_poolSize) {
+void InitWorkerPools(int accessLevel0_poolSize, int accessLevel1_poolSize) {
     {
-        std::lock_guard lock(workersPool_accessLevel0_mutex);
+        std::lock_guard lock0(workersPool_accessLevel0_mutex);
+        std::lock_guard lock1(workersPool_accessLevel1_mutex);
         if (!workersPool_isInit) {
             workersPool_isInit = true;
             for (int i = 0; i < accessLevel0_poolSize; ++i) {
@@ -73,7 +78,7 @@ void InitWorkerPools(int accessLevel0_poolSize) {
                 pws->accessLevel = 0;
                 Semaphore sem;
                 pws->loopThread = std::make_shared<std::thread>([pws, &sem]() {
-                    pws->se = Scripter::New();
+                    pws->se = Scripter::New(0);
                     pws->se->isolate()->SetData(1, pws.get());
                     pws->se->evaluate(workerMain);
                     sem.notify();
@@ -82,10 +87,22 @@ void InitWorkerPools(int accessLevel0_poolSize) {
                 sem.wait();
                 workersPool_accessLevel0.push_back(pws);
             }
+            for (int i = 0; i < accessLevel1_poolSize; ++i) {
+                auto pws = std::make_shared<WorkerScripter>();
+                pws->id = i;
+                pws->accessLevel = 1;
+                Semaphore sem;
+                pws->loopThread = std::make_shared<std::thread>([pws, &sem]() {
+                    pws->se = Scripter::New(1);
+                    pws->se->isolate()->SetData(1, pws.get());
+                    pws->se->evaluate(workerMain);
+                    sem.notify();
+                    pws->se->runMainLoop();
+                });
+                sem.wait();
+                workersPool_accessLevel1.push_back(pws);
+            }
         }
-    }
-    {
-        // todo: init ubot's worker pool here
     }
 }
 
@@ -100,11 +117,10 @@ static shared_ptr<WorkerScripter> GetWorker(int accessLevel) {
         pool = &workersPool_accessLevel0;
         poolUsed = &workersPool_accessLevel0_used;
     } else if (accessLevel == 1) {
-        // todo: route to ubot's worker pool here
-        mtx = &workersPool_accessLevel0_mutex;
-        cv = &workersPool_accessLevel0_cv;
-        pool = &workersPool_accessLevel0;
-        poolUsed = &workersPool_accessLevel0_used;
+        mtx = &workersPool_accessLevel1_mutex;
+        cv = &workersPool_accessLevel1_cv;
+        pool = &workersPool_accessLevel1;
+        poolUsed = &workersPool_accessLevel1_used;
     }
     if (mtx == nullptr)
         return nullptr;
@@ -130,11 +146,10 @@ static void ReleaseWorker(WorkerScripter* pws) {
         pool = &workersPool_accessLevel0;
         poolUsed = &workersPool_accessLevel0_used;
     } else if (accessLevel == 1) {
-        // todo: route to ubot's worker pool here
-        mtx = &workersPool_accessLevel0_mutex;
-        cv = &workersPool_accessLevel0_cv;
-        pool = &workersPool_accessLevel0;
-        poolUsed = &workersPool_accessLevel0_used;
+        mtx = &workersPool_accessLevel1_mutex;
+        cv = &workersPool_accessLevel1_cv;
+        pool = &workersPool_accessLevel1;
+        poolUsed = &workersPool_accessLevel1_used;
     }
     if (mtx == nullptr)
         return;

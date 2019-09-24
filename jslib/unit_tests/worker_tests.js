@@ -65,12 +65,19 @@ unit.test("worker_tests: hello worker", async () => {
 });
 
 unit.test("worker_tests: check that all global objects are frozen", async () => {
+    let fails = "";
+    let delayedAssert = (condition, text) => {
+        if (!condition)
+            fails += text + "\n";
+    };
+
     let testSrc = `
     let checkFunction = (o, functionName) => {
         try {
             o[functionName]._wefhowegfh_add_some_field_ = true;
             if (o[functionName]._wefhowegfh_add_some_field_ === true) {
-                console.error(functionName + "._wefhowegfh_add_some_field_: should be frozen");
+                //console.error(functionName + "._wefhowegfh_add_some_field_: should be frozen");
+                wrk.farcall("print_error", [], {text:functionName + "._wefhowegfh_add_some_field_: should be frozen"});
                 assert(false);
             }
         } catch (e) {
@@ -80,7 +87,8 @@ unit.test("worker_tests: check that all global objects are frozen", async () => 
         try {
             o[functionName] = null;
             if (o[functionName] === null) {
-                console.error(functionName + ": " + o[functionName] + " - should be frozen");
+                //console.error(functionName + ": " + o[functionName] + " - should be frozen");
+                wrk.farcall("print_error", [], {text:functionName + ": " + o[functionName] + " - should be frozen"});
                 assert(false);
             }
         } catch (e) {
@@ -88,36 +96,57 @@ unit.test("worker_tests: check that all global objects are frozen", async () => 
                 throw e;
         }
     };
-    let checkObject = (prefix, o) => {
+    let checkObject = (prefix, o, useConsole) => {
         for (let k in o) {
             let val = o[k];
             let descr = "undefined";
             if (val)
                 descr = val.constructor.name;
-            console.log("k: " + prefix + k + " - " + descr);
+            if (useConsole === true)
+                console.log("k: " + prefix + k + " - " + descr);
+            else
+                wrk.farcall("print_log", [], {text:"k: " + prefix + k + " - " + descr});
             if (descr === "Function")
                 checkFunction(o, k);
             else if (descr === "Object")
-                checkObject(prefix+k+".", val);
+                checkObject(prefix+k+".", val, useConsole);
             else
                 checkFunction(o, k);
         }
     };
     `;
     console.log("main scripter:");
-    eval(testSrc + `checkObject("", Function('return this')());`);
+    eval(testSrc + `checkObject("", Function('return this')(), true);`);
 
-    console.log("worker scripter:");
     class Worker {
         constructor() {this.worker = null;}
         release() {this.worker.release();}
-        static async start() {
+        static async start(accessLevel) {
             let res = new Worker();
-            res.worker = await getWorker(0, farcallWrapper+testSrc+`
+            res.worker = await getWorker(accessLevel, farcallWrapper+testSrc+`
             wrk.export.checkObject = async (args, kwargs) => {
-                checkObject("", Function('return this')());
+                wrk.farcall("say_platform", [], {platform:platform});
+                checkObject("", Function('return this')(), false);
             }
             `);
+            res.worker.export["print_log"] = (args, kwargs) => {
+                console.log("worker prints: " + kwargs.text);
+            };
+            res.worker.export["print_error"] = (args, kwargs) => {
+                console.error("worker prints: " + kwargs.text);
+            };
+            res.worker.export["say_platform"] = (args, kwargs) => {
+                console.log("worker say_platform: " + JSON.stringify(kwargs.platform));
+                if (accessLevel === 0) {
+                    delayedAssert(kwargs.platform.accessLevel === 0, "kwargs.platform.accessLevel");
+                    delayedAssert(kwargs.platform.accessLevelName === 'full', "kwargs.platform.accessLevelName");
+                    delayedAssert(kwargs.platform.hardwareConcurrency === platform.hardwareConcurrency, "kwargs.platform.hardwareConcurrency");
+                } else {
+                    delayedAssert(kwargs.platform.accessLevel === 1, "kwargs.platform.accessLevel");
+                    delayedAssert(kwargs.platform.accessLevelName === 'restricted', "kwargs.platform.accessLevelName");
+                    delayedAssert(kwargs.platform.hardwareConcurrency === 1, "kwargs.platform.hardwareConcurrency");
+                }
+            };
             res.worker.startFarcallCallbacks();
             return res;
         }
@@ -127,9 +156,21 @@ unit.test("worker_tests: check that all global objects are frozen", async () => 
             }));
         }
     }
-    let worker = await Worker.start();
-    await worker.checkObject();
-    worker.release();
+
+    console.log("worker scripter accessLevel0:");
+    let worker0 = await Worker.start(0);
+    await worker0.checkObject();
+    worker0.release();
+
+    console.log("worker scripter accessLevel1:");
+    let worker1 = await Worker.start(1);
+    await worker1.checkObject();
+    worker1.release();
+
+    if (fails !== "") {
+        console.error(fails);
+        assert(false);
+    }
 });
 
 unit.test("worker_tests: isolate js context", async () => {

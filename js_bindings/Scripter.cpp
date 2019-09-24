@@ -49,7 +49,7 @@ void Scripter::closeV8(std::unique_ptr<v8::Platform> &platform) {
 int Scripter::Application(const char *argv0, function<int(shared_ptr<Scripter>)> &&block) {
     try {
         auto platform = initV8(argv0);
-        auto se = New();
+        auto se = New(0);
         return block(se);
     }
     catch (const ScriptError &e) {
@@ -67,12 +67,12 @@ int Scripter::Application(const char *argv0, function<int(shared_ptr<Scripter>)>
 
 }
 
-shared_ptr<Scripter> Scripter::New() {
+shared_ptr<Scripter> Scripter::New(int accessLevel) {
     if (!ARGV0)
         throw runtime_error("Platform in not initialized");
     // we can not use make_shared as our constructor is intentionally private:
     shared_ptr<Scripter> scripter(new Scripter);
-    scripter->initialize();
+    scripter->initialize(accessLevel);
     return scripter;
 }
 
@@ -141,7 +141,7 @@ static void JsThrowScripterException(const FunctionCallbackInfo<Value> &args) {
     });
 }
 
-void Scripter::initialize() {
+void Scripter::initialize(int accessLevel) {
     if (initialized)
         throw runtime_error("SR is already initialized");
     initialized = true;
@@ -158,34 +158,45 @@ void Scripter::initialize() {
 
     // Global object for U8
     v8::Local<v8::ObjectTemplate> global = v8::ObjectTemplate::New(pIsolate);
-    // Bind the global 'print' function to the C++ Print callback.
-    global->Set(v8String("__bios_print"), functionTemplate(JsPrint));
-    global->Set(v8String("__debug_throw"), functionTemplate(JsThrowScripterException));
-    global->Set(v8String("__bios_loadRequired"), functionTemplate(JsLoadRequired));
-    global->Set(v8String("__bios_initTimers"), functionTemplate(JsInitTimers));
-    global->Set(v8String("exit"), functionTemplate(JsExit));
-    global->Set(v8String("utf8Decode"), functionTemplate(JsTypedArrayToString));
-    global->Set(v8String("utf8Encode"), functionTemplate(JsStringToTypedArray));
-    global->Set(v8String("$0"), v8String(ARGV0));
 
-    global->Set(v8String("__hardware_concurrency"), v8Int(std::thread::hardware_concurrency()));
+    if (accessLevel == 0) {
+        // Bind the global 'print' function to the C++ Print callback.
+        global->Set(v8String("__bios_print"), functionTemplate(JsPrint));
+        global->Set(v8String("__debug_throw"), functionTemplate(JsThrowScripterException));
+        global->Set(v8String("__bios_loadRequired"), functionTemplate(JsLoadRequired));
+        global->Set(v8String("__bios_initTimers"), functionTemplate(JsInitTimers));
+        global->Set(v8String("exit"), functionTemplate(JsExit));
+        global->Set(v8String("utf8Decode"), functionTemplate(JsTypedArrayToString));
+        global->Set(v8String("utf8Encode"), functionTemplate(JsStringToTypedArray));
+        global->Set(v8String("$0"), v8String(ARGV0));
 
-    global->Set(v8String("__init_workers"), functionTemplate(JsInitWorkers));
-    global->Set(v8String("__send_from_worker"), functionTemplate(JsSendFromWorker));
+        global->Set(v8String("__hardware_concurrency"), v8Int(std::thread::hardware_concurrency()));
 
-    JsInitIOFile(*this, global);
-    JsInitIODir(*this, global);
-    JsInitIOTCP(*this, global);
-    JsInitIOTLS(*this, global);
-    JsInitIOUDP(*this, global);
-    JsInitCrypto(*this, global);
-    JsInitQueryResult(*this, global);
-    JsInitBusyConnection(*this, global);
-    JsInitPGPool(*this, global);
-    JsInitNetwork(*this, global);
-    JsInitResearchBindings(*this, global);
-    JsInitBossBindings(*this, global);
-    JsInitWorkerBindings(*this, global);
+        global->Set(v8String("__init_workers"), functionTemplate(JsInitWorkers));
+        global->Set(v8String("__send_from_worker"), functionTemplate(JsSendFromWorker));
+
+        JsInitIOFile(*this, global);
+        JsInitIODir(*this, global);
+        JsInitIOTCP(*this, global);
+        JsInitIOTLS(*this, global);
+        JsInitIOUDP(*this, global);
+        JsInitCrypto(*this, global);
+        JsInitQueryResult(*this, global);
+        JsInitBusyConnection(*this, global);
+        JsInitPGPool(*this, global);
+        JsInitNetwork(*this, global);
+        JsInitResearchBindings(*this, global);
+        JsInitBossBindings(*this, global);
+        JsInitWorkerBindings(*this, global);
+    } else if (accessLevel == 1) {
+        global->Set(v8String("__bios_loadRequired"), functionTemplate(JsLoadRequired));
+        global->Set(v8String("__bios_initTimers"), functionTemplate(JsInitTimers));
+        global->Set(v8String("__init_workers"), functionTemplate(JsInitWorkers));
+        global->Set(v8String("__send_from_worker"), functionTemplate(JsSendFromWorker));
+        JsInitCrypto(*this, global);
+    } else {
+        throw runtime_error("scripter's access level is unknown: " + std::to_string(accessLevel));
+    }
 
     // Save context and wrap weak self:
     context.Reset(pIsolate, v8::Context::New(pIsolate, nullptr, global));
@@ -196,10 +207,11 @@ void Scripter::initialize() {
 
     // now run initialization library script
     inContext([&](auto context) {
-        auto src = loadFileAsString("init_full.js");
+        std::string initScriptFileName = accessLevel==0 ? "init_full.js" : "init_restricted.js";
+        auto src = loadFileAsString(initScriptFileName);
         if (src.empty())
             throw runtime_error("failed to find U8 jslib");
-        src = src + "\n//# sourceURL=" + "jslib/init_full.js\n";
+        src = src + "\n//# sourceURL=" + "jslib/"+initScriptFileName+"\n";
 
         // Compile the source code.
         TryCatch trycatch(pIsolate);
