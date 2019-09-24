@@ -10,6 +10,7 @@ let _boss = require("boss.min");
 __boss_addPrototype("HashId", crypto.HashId.prototype);
 __boss_addPrototype("PublicKey", crypto.PublicKey.prototype);
 __boss_addPrototype("PrivateKey", crypto.PrivateKey.prototype);
+eval("__boss_addPrototype = undefined;");
 
 const mainNestedLoadMap = {
     TransactionPack: {
