@@ -199,7 +199,7 @@ unit.test("ubot_main_test: JS secureRandom", async () => {
     });
 
     //waiting pool started...
-    await sleep(1000);
+    await sleep(5000);
 
     let pool = [];
     let proc = ubotMains[0].ubot.processors.get(startingContract.id.base64);

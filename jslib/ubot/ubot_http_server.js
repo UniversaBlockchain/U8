@@ -39,7 +39,7 @@ class UBotHttpServer extends network.HttpServer {
     async onExecuteCloudMethod(params, clientKey) {
         try {
             let contract = await Contract.fromPackedTransaction(params.contract);
-            this.ubot.executeCloudMethod(contract);
+            await this.ubot.executeCloudMethod(contract);
         } catch (err) {
             this.logger.log(err.stack);
             this.logger.log("executeCloudMethod ERROR: " + err.message);
@@ -74,8 +74,8 @@ class UBotHttpServer extends network.HttpServer {
         let contract = this.ubot.getStartingContract(hashId);
         if (contract != null) {
             let contractBin = await contract.getPackedTransaction();
-            let selectedPool = this.ubot.getSelectedPoolNumbers(hashId);
-            let answerBin = await Boss.dump({contractBin: contractBin, selectedPool: selectedPool});
+            //let selectedPool = this.ubot.getSelectedPoolNumbers(hashId);
+            let answerBin = await Boss.dump({contractBin: contractBin});
             request.setAnswerBody(answerBin);
         } else {
             request.setStatusCode(204);

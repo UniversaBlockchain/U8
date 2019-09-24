@@ -1,5 +1,5 @@
 ---
-http_client_port: 18029
+http_client_port: 17029
 http_public_port: 17029
 udp_server_port: 16029
 database: host=localhost port=5432 dbname=ubot_t29

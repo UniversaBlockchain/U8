@@ -15,21 +15,21 @@ class ProcessSendStartingContract extends ProcessBase {
         this.otherAnswers = new Set();
     }
 
-    selectPool() {
-        let list = this.pr.ubot.network.netConfig.toList();
-        let myIndex = 0;
-        for (let i = 1; i < list.length; ++i)
-            if (list[i].number === this.pr.ubot.network.myInfo.number) {
-                myIndex = i;
-                break;
-            }
-        let me = list[myIndex];
-        list.splice(myIndex, 1);
-        this.pr.pool = t.randomChoice(list, this.pr.poolSize - 1);
-        this.pr.pool.push(me);
-        this.pr.pool.forEach((info, i) => this.pr.poolIndexes.set(info.number, i));
-        this.pr.selfPoolIndex = this.pr.poolIndexes.get(this.pr.ubot.network.myInfo.number);
-    }
+    // selectPool() {
+    //     let list = this.pr.ubot.network.netConfig.toList();
+    //     let myIndex = 0;
+    //     for (let i = 1; i < list.length; ++i)
+    //         if (list[i].number === this.pr.ubot.network.myInfo.number) {
+    //             myIndex = i;
+    //             break;
+    //         }
+    //     let me = list[myIndex];
+    //     list.splice(myIndex, 1);
+    //     this.pr.pool = t.randomChoice(list, this.pr.poolSize - 1);
+    //     this.pr.pool.push(me);
+    //     this.pr.pool.forEach((info, i) => this.pr.poolIndexes.set(info.number, i));
+    //     this.pr.selfPoolIndex = this.pr.poolIndexes.get(this.pr.ubot.network.myInfo.number);
+    // }
 
     async start() {
         this.pr.logger.log("start ProcessSendStartingContract");
@@ -38,7 +38,6 @@ class ProcessSendStartingContract extends ProcessBase {
             this.pr.startingContract.state.data.executable_contract_id);
 
         this.pr.initPoolAndQuorum();
-        this.selectPool();
 
         // periodically send notifications
         this.pulse();
@@ -54,6 +53,7 @@ class ProcessSendStartingContract extends ProcessBase {
                     new UBotCloudNotification(
                         this.pr.ubot.network.myInfo,
                         this.pr.poolId,
+                        this.pr.executableContract.id,
                         UBotCloudNotification.types.DOWNLOAD_STARTING_CONTRACT,
                         false
                     )

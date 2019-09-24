@@ -50,7 +50,7 @@ class UBotMain {
         this.ledger = new UBotLedger(this.logger, t.getOrThrow(this.settings, "database"));
         await this.ledger.init();
 
-        this.ubot = new UBot(this.logger, this.network, this.ledger);
+        this.ubot = new UBot(this.logger, this.network, this.ledger, this.nodeKey);
 
         this.httpServer = new UBotHttpServer(this.nodeKey, "127.0.0.1", this.myInfo.clientAddress.port, this.logger, this.ubot);
 

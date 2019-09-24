@@ -5,23 +5,56 @@
 import {expect, assert, unit} from 'test'
 import * as tk from "unit_tests/test_keys";
 
+const UBotMain = require("ubot/ubot_main").UBotMain;
+const UBotPoolState = require("ubot/ubot_pool_state").UBotPoolState;
 const UbotClient = require('ubot/ubot_client').UbotClient;
 const cs = require("contractsservice");
 const Constraint = require('constraint').Constraint;
 
-const TEST_TOPOLOGY_ROOT = "../test/topology/";
+const TOPOLOGY_ROOT = "../jslib/ubot/topology/";
+const CONFIG_ROOT = "../test/config/ubot_config";
+const ubotsCount = 30;
+
+const clientKey = tk.TestKeys.getKey();
+const userPrivKey = tk.TestKeys.getKey();
+
+async function createUbotMain(name, nolog) {
+    let args = ["--config", CONFIG_ROOT+"/"+name];
+    if (nolog)
+        args.push("--nolog");
+
+    return new Promise(async resolve => {
+        let ubotMain = new UBotMain(...args);
+        await ubotMain.start();
+        resolve(ubotMain);
+    });
+}
+
+async function createUBots(count) {
+    //await prepareConfigFiles(count);
+    let ubotMains = [];
+    for (let i = 0; i < count; ++i)
+        ubotMains.push(createUbotMain("ubot"+i, false));
+    ubotMains = await Promise.all(ubotMains);
+    return ubotMains;
+}
+
+async function shutdownUBots(ubots) {
+    let promises = [];
+    for (let i = 0; i < ubots.length; ++i)
+        promises.push(ubots[i].shutdown());
+    return Promise.all(promises);
+}
 
 unit.test("ubot_pro_test: start client", async () => {
-    const clientKey = tk.TestKeys.getKey();
-    let ubotClient = await new UbotClient(clientKey, TEST_TOPOLOGY_ROOT + "universa.pro.json").start();
+    let ubotClient = await new UbotClient(clientKey, TOPOLOGY_ROOT + "universa.pro.json").start();
 
     await ubotClient.shutdown();
 });
 
 unit.test("ubot_pro_test: start cloud method", async () => {
-    const clientKey = tk.TestKeys.getKey();
-    const userPrivKey = tk.TestKeys.getKey();
-    let ubotClient = await new UbotClient(clientKey, TEST_TOPOLOGY_ROOT + "universa.pro.json").start();
+    let ubotMains = await createUBots(ubotsCount);
+    let ubotClient = await new UbotClient(clientKey, TOPOLOGY_ROOT + "universa.pro.json").start();
 
     let executableContract = Contract.fromPrivateKey(userPrivKey);
 
@@ -98,5 +131,27 @@ unit.test("ubot_pro_test: start cloud method", async () => {
 
     await ubotClient.startCloudMethod(requestContract);
 
+    console.log("Session: " + JSON.stringify(ubotClient.session));
+    let pool = ubotClient.session.sessionPool;
+
+    let state = await ubotClient.getStateCloudMethod(requestContract.id);
+    console.log("State: " + JSON.stringify(state));
+
+    if (state.state !== UBotPoolState.FINISHED.val)
+        state = await ubotClient.waitCloudMethod(requestContract.id);
+
+    console.log("Final state: " + JSON.stringify(state));
+    assert(state.state === UBotPoolState.FINISHED.val);
+
+    // checking secure random value
+    assert(typeof state.result === "number" && state.result >= 0 && state.result < 1000);
+
+    // waiting pool finished...
+    while (!pool.every(ubot => !ubotMains[ubot].ubot.processors.get(requestContract.id.base64).state.canContinue))
+        await sleep(100);
+
+    assert(pool.every(ubot => ubotMains[ubot].ubot.processors.get(requestContract.id.base64).state === UBotPoolState.FINISHED));
+
     await ubotClient.shutdown();
+    await shutdownUBots(ubotMains);
 });

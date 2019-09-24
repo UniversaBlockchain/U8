@@ -1,5 +1,5 @@
 ---
-http_client_port: 18016
+http_client_port: 17016
 http_public_port: 17016
 udp_server_port: 16016
 database: host=localhost port=5432 dbname=ubot_t16

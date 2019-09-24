@@ -29,14 +29,15 @@ class ProcessDownloadStartingContract extends ProcessBase {
                     this.pr.executableContract = this.pr.startingContract.transactionPack.referencedItems.get(
                         this.pr.startingContract.state.data.executable_contract_id);
                     this.pr.initPoolAndQuorum();
-                    this.pr.pool = [];
-                    ans.selectedPool.forEach(i => this.pr.pool.push(this.pr.ubot.network.netConfig.getInfo(i)));
-                    this.pr.pool.forEach((info, i) => this.pr.poolIndexes.set(info.number, i));
-                    this.pr.selfPoolIndex = this.pr.poolIndexes.get(this.pr.ubot.network.myInfo.number);
+                    // this.pr.pool = [];
+                    // ans.selectedPool.forEach(i => this.pr.pool.push(this.pr.ubot.network.netConfig.getInfo(i)));
+                    // this.pr.pool.forEach((info, i) => this.pr.poolIndexes.set(info.number, i));
+                    // this.pr.selfPoolIndex = this.pr.poolIndexes.get(this.pr.ubot.network.myInfo.number);
                     this.pr.ubot.network.deliver(this.pr.respondToNotification.from,
                         new UBotCloudNotification(
                             this.pr.ubot.network.myInfo,
                             this.pr.poolId,
+                            this.pr.executableContract.id,
                             UBotCloudNotification.types.DOWNLOAD_STARTING_CONTRACT,
                             true
                         )

@@ -8,10 +8,13 @@ const ExecutorService = require("executorservice").ExecutorService;
 const UBotCloudNotification = require("ubot/ubot_notification").UBotCloudNotification;
 const UBotConfig = require("ubot/ubot_config").UBotConfig;
 const UBotResultCache = require("ubot/ubot_result_cache").UBotResultCache;
+const UbotClient = require('ubot/ubot_client').UbotClient;
 const Boss = require('boss.js');
 
+const TOPOLOGY_ROOT = "../jslib/ubot/topology/";
+
 class UBot {
-    constructor(logger, network, ledger) {
+    constructor(logger, network, ledger, nodeKey) {
         //this.logger = logger;
         this.logger = {log: text => logger.log("UBot"+network.myInfo.number+": " + text)};
         this.ledger = ledger;
@@ -19,17 +22,28 @@ class UBot {
         this.processors = new Map();
         this.resultCache = new UBotResultCache(UBotConfig.maxResultCacheAge);
         this.executorService = new ExecutorService();
+        this.nodeKey = nodeKey;
+        this.client = null;
     }
 
     async shutdown() {
         //this.logger.log("UBot.shutdown()...");
         this.resultCache.shutdown();
         this.executorService.shutdown();
+        if (this.client != null)
+            await this.client.shutdown();
     }
 
-    executeCloudMethod(contract) {
+    async executeCloudMethod(contract) {
         this.logger.log("executeCloudMethod: startingContract.id = " + contract.id);
         this.logger.log("  contract.state.data: " + JSON.stringify(contract.state.data));
+
+        if (this.client == null)
+            this.client = await new UbotClient(this.nodeKey, TOPOLOGY_ROOT + "universa.pro.json").start();
+
+        await this.client.checkSession(contract.state.data.executable_contract_id, contract.id, this.network.myInfo.number);
+        this.logger.log("executeCloudMethod: session pool = " + JSON.stringify(this.client.session.sessionPool));
+
         let processor = new CloudProcessor(UBotPoolState.SEND_STARTING_CONTRACT, contract.id, this);
         processor.startingContract = contract;
         processor.startProcessingCurrentState();
@@ -44,13 +58,28 @@ class UBot {
         if (this.processors.has(notification.poolId.base64)) {
             await this.processors.get(notification.poolId.base64).onNotify(notification);
 
-        } else if (notification.type === UBotCloudNotification.types.DOWNLOAD_STARTING_CONTRACT && !notification.isAnswer) {
+        } else if (notification instanceof UBotCloudNotification &&
+            notification.type === UBotCloudNotification.types.DOWNLOAD_STARTING_CONTRACT && !notification.isAnswer) {
+
+            if (this.client == null)
+                this.client = await new UbotClient(this.nodeKey, TOPOLOGY_ROOT + "universa.pro.json").start();
+
+            try {
+                await this.client.checkSession(notification.executableContractId, notification.poolId, this.network.myInfo.number);
+            } catch (err) {
+                this.logger.log("Error: check session failed, ubot is not started by notification: " + notification.poolId.base64 +
+                    ", message: " + err.message);
+                return;
+            }
+
+            this.logger.log("onCloudNotify session checked, session pool = " + JSON.stringify(this.client.session.sessionPool));
+
             let processor = new CloudProcessor(UBotPoolState.INIT, notification.poolId, this);
             processor.onNotifyInit(notification);
             this.processors.set(notification.poolId.base64, processor);
 
         } else
-            this.logger.log("Warning: unknown notification. Type = " + notification.type.ordinal + " isAnswer = " + notification.isAnswer);
+            this.logger.log("Warning: unknown notification. Type = " + notification.type.ordinal + ", Type code = " + notification.typeCode);
     }
 
     getStartingContract(hashId) {

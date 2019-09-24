@@ -33,6 +33,18 @@ class CloudProcessor {
         this.localStorage = new Map();
         this.ProcessStartExec = ProcessStartExec;
         this.worker = null;
+        this.selectPool();
+    }
+
+    selectPool() {
+        let pool = this.ubot.client.session.sessionPool;
+        this.ubot.network.netConfig.toList().forEach(ubot => {
+            if (~pool.indexOf(ubot.number))
+                this.pool.push(ubot);
+        });
+
+        this.pool.forEach((info, i) => this.poolIndexes.set(info.number, i));
+        this.selfPoolIndex = this.poolIndexes.get(this.ubot.network.myInfo.number);
     }
 
     startProcessingCurrentState() {

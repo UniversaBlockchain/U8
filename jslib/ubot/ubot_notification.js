@@ -54,12 +54,13 @@ class UBotTestNotification extends Notification {
 class UBotCloudNotification extends Notification {
 
     static types = {
-        DOWNLOAD_STARTING_CONTRACT:   {ordinal: 0},
+        DOWNLOAD_STARTING_CONTRACT:   {ordinal: 0}
     };
 
-    constructor(from, poolId, type, isAnswer) {
+    constructor(from, poolId, executableContractId, type, isAnswer) {
         super(from);
         this.poolId = poolId;
+        this.executableContractId = executableContractId;
         this.type = type;
         this.isAnswer = isAnswer;
         this.typeCode = CODE_UBOT_CLOUD_NOTIFICATION;
@@ -67,12 +68,14 @@ class UBotCloudNotification extends Notification {
 
     writeTo(bw) {
         bw.write(this.poolId.digest);
+        bw.write(this.executableContractId.digest);
         bw.write(this.type.ordinal);
         bw.write(this.isAnswer);
     }
 
     readFrom(br) {
         this.poolId = crypto.HashId.withDigest(br.read());
+        this.executableContractId = crypto.HashId.withDigest(br.read());
         this.type = UBotCloudNotification.types.byOrdinal.get(br.read());
         this.isAnswer = br.read();
     }
@@ -85,6 +88,9 @@ class UBotCloudNotification extends Notification {
             return false;
 
         if (this.type.poolId !== o.type.poolId)
+            return false;
+
+        if (this.type.executableContractId !== o.type.executableContractId)
             return false;
 
         if (this.type.ordinal !== o.type.ordinal)
@@ -100,6 +106,7 @@ class UBotCloudNotification extends Notification {
     toString() {
         return "[UBotCloudNotification from node: " + this.from.number +
             ", poolId: " + this.poolId +
+            ", executableContractId: " + this.executableContractId +
             ", type: " + this.type.val +
             ", isAnswer: " + this.isAnswer + "]";
     }
