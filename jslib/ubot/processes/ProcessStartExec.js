@@ -2,7 +2,7 @@
  * Copyright (c) 2019-present Sergey Chernov, iCodici S.n.C, All Rights Reserved.
  */
 
-import {getWorker, jsonRpcWrapper} from 'worker'
+import {getWorker, farcallWrapper} from 'worker'
 
 const ProcessBase = require("ubot/processes/ProcessBase").ProcessBase;
 const UBotProcess_writeSingleStorage = require("ubot/processes/UBotProcess_writeSingleStorage").UBotProcess_writeSingleStorage;
@@ -20,7 +20,7 @@ const notSupportedCommandsInMultiVerify = ["call", "writeSingleStorage", "writeM
 
 class ProcessStartExec extends ProcessBase {
 
-    static workerSrc = wrk.farcallWrapper + `
+    static workerSrc = farcallWrapper + `
     function writeSingleStorage(data) {
         return new Promise(resolve => wrk.farcall("writeSingleStorage", [data], {}, ans => {
             resolve(ans);
@@ -91,7 +91,7 @@ class ProcessStartExec extends ProcessBase {
                     "   }" +
                     "};";
 
-                this.pr.worker = await wrk.getWorker(0,
+                this.pr.worker = await getWorker(0,
                     ProcessStartExec.workerSrc + this.pr.executableContract.state.data.js + methodExport);
                 this.pr.worker.startFarcallCallbacks();
 

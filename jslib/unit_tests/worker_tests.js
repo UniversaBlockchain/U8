@@ -2,11 +2,11 @@
  * Copyright (c) 2019-present Sergey Chernov, iCodici S.n.C, All Rights Reserved.
  */
 
-import {getWorker, jsonRpcWrapper} from 'worker'
+import {getWorker, farcallWrapper} from 'worker'
 
 class WorkerExample {
 
-    static workerSrc = wrk.farcallWrapper + `
+    static workerSrc = farcallWrapper + `
     function print(text) {
         wrk.farcall("print", [], {text:text});
     }
@@ -30,7 +30,7 @@ class WorkerExample {
 
     static async start() {
         let res = new WorkerExample();
-        res.worker = await wrk.getWorker(0, WorkerExample.workerSrc);
+        res.worker = await getWorker(0, WorkerExample.workerSrc);
         res.worker.startFarcallCallbacks();
 
         res.worker.export["callSomethingFromMainScripter"] = (args, kwargs) => {
@@ -113,7 +113,7 @@ unit.test("worker_tests: check that all global objects are frozen", async () => 
         release() {this.worker.release();}
         static async start() {
             let res = new Worker();
-            res.worker = await wrk.getWorker(0, wrk.farcallWrapper+testSrc+`
+            res.worker = await getWorker(0, farcallWrapper+testSrc+`
             wrk.export.checkObject = async (args, kwargs) => {
                 checkObject("", Function('return this')());
             }
@@ -128,8 +128,7 @@ unit.test("worker_tests: check that all global objects are frozen", async () => 
         }
     }
     let worker = await Worker.start();
-    //TODO: check it with worker too
-    //await worker.checkObject();
+    await worker.checkObject();
     worker.release();
 });
 
@@ -139,7 +138,7 @@ unit.test("worker_tests: isolate js context", async () => {
         release() {this.worker.release();}
         static async start() {
             let res = new Worker();
-            res.worker = await wrk.getWorker(0, wrk.farcallWrapper+`
+            res.worker = await getWorker(0, farcallWrapper+`
             wrk.export.doSomething = async (args, kwargs) => {
                 return crypto.HashId.of(args[0]).digest;
             }
@@ -159,7 +158,7 @@ unit.test("worker_tests: isolate js context", async () => {
         release() {this.worker.release();}
         static async start() {
             let res = new Worker2();
-            res.worker = await wrk.getWorker(0, wrk.farcallWrapper+`
+            res.worker = await getWorker(0, farcallWrapper+`
             wrk.export.changeCrypto = async (args, kwargs) => {
                 crypto.HashId.of = (val) => {
                     return crypto.HashId.of_sync("111");

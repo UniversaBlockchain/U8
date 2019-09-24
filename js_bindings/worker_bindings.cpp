@@ -26,6 +26,7 @@ static std::list<shared_ptr<WorkerScripter>> workersPool_accessLevel0;
 static std::unordered_map<int, shared_ptr<WorkerScripter>> workersPool_accessLevel0_used;
 
 static const std::string workerMain = R"End(
+let wrk = {};
 wrk.export = {};
 wrk.nextFarcallSN = 0;
 wrk.callbacksFarcall = new Map();
@@ -179,7 +180,7 @@ void JsInitWorkerBindings(Scripter& scripter, const Local<ObjectTemplate> &globa
 
     wrk->Set(isolate, "__getWorker", FunctionTemplate::New(isolate, JsGetWorker));
 
-    global->Set(isolate, "wrk", wrk);
+    global->Set(isolate, "wrkImpl", wrk);
 }
 
 void JsScripterWrap_send(const FunctionCallbackInfo<Value> &args) {

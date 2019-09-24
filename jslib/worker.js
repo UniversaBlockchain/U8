@@ -2,6 +2,8 @@
  * Copyright (c) 2019-present Sergey Chernov, iCodici S.n.C, All Rights Reserved.
  */
 
+let wrk = {};
+
 wrk.WorkerHandle = class {
     constructor(workerImpl) {
         this.workerImpl = workerImpl;
@@ -62,7 +64,7 @@ wrk.WorkerHandle = class {
 
 wrk.getWorker = function(accessLevel, workerSrc) {
     return new Promise(resolve => {
-        wrk.__getWorker(accessLevel, workerSrc, workerImpl => {
+        wrkImpl.__getWorker(accessLevel, workerSrc, workerImpl => {
             let w = new wrk.WorkerHandle(workerImpl);
             w.workerImpl._setOnReceive(obj => w.onReceiveCallback(obj));
             resolve(w);
