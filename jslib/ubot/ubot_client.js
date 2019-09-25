@@ -4,20 +4,12 @@
 
 import {PublicKey} from 'crypto'
 import {HttpClient} from 'web'
+import {UBotSession, UBotSessionState} from 'ubot/ubot_session'
 
 const TopologyBuilder = require("topology_builder").TopologyBuilder;
 const UBotPoolState = require("ubot/ubot_pool_state").UBotPoolState;
-const Boss = require("boss");
 
-const UBotSessionState = {
-    VOTING_REQUEST_ID       : {val: "VOTING_REQUEST_ID", ordinal: 0},
-    COLLECTING_RANDOMS      : {val: "COLLECTING_RANDOMS", ordinal: 1},
-    VOTING_SESSION_ID       : {val: "VOTING_SESSION_ID", ordinal: 2},
-    OPERATIONAL             : {val: "OPERATIONAL", ordinal: 3},
-    ABORTED                 : {val: "ABORTED", ordinal: 4}
-};
-
-class UbotClientException extends Error {
+class UBotClientException extends Error {
     constructor(message = undefined) {
         super();
         this.message = message;
@@ -31,12 +23,12 @@ class NodeRecord {
         else if (data.hasOwnProperty("url") && typeof data.url === "string")
             this.url = data.url;
         else
-            throw new UbotClientException("Not found URL in topology item data");
+            throw new UBotClientException("Not found URL in topology item data");
 
         try {
             this.key = new PublicKey(data.key);
         } catch (err) {
-            throw new UbotClientException("Failed to construct node public key: " + err.message);
+            throw new UBotClientException("Failed to construct node public key: " + err.message);
         }
     }
 
@@ -45,7 +37,7 @@ class NodeRecord {
     }
 }
 
-class UbotClient {
+class UBotClient {
     constructor(clientPrivateKey, topologyInput, topologyCacheDir) {
         this.clientPrivateKey = clientPrivateKey;
         this.topologyInput = topologyInput;
@@ -55,7 +47,6 @@ class UbotClient {
         this.topologyUBotNet = null;
         this.httpUbotClient = null;
         this.ubotPublicKey = null;
-        this.session = null;
     }
 
     async start() {
@@ -83,11 +74,13 @@ class UbotClient {
 
     async shutdown() {
         await this.httpNodeClient.stop();
+        if (this.httpUbotClient != null)
+            await this.httpUbotClient.stop();
     }
 
     async connectUbot(pool) {
         if (this.topologyUBotNet == null)
-            throw new UbotClientException("UBotNet topology not initialized");
+            throw new UBotClientException("UBotNet topology not initialized");
 
         this.topologyUBotNet.forEach(topologyItem => {
             let keyString = topologyItem.key;
@@ -124,48 +117,50 @@ class UbotClient {
         );
 
         if (sessionData == null || !sessionData.hasOwnProperty("session"))
-            throw new UbotClientException("Wrong session data");
+            throw new UBotClientException("Wrong session data");
 
-        console.log("UbotClient.getSession: " + JSON.stringify(sessionData.session));
+        console.log("UBotClient.getSession: " + JSON.stringify(sessionData.session));
         return sessionData.session;
     }
 
     async createSession(requestContract) {
-        this.session = await this.getSession("ubotCreateSession",
+        let session = await this.getSession("ubotCreateSession",
             {packedRequest: await requestContract.getPackedTransaction()});
 
         // wait session requestId
-        while (this.session.state === UBotSessionState.VOTING_REQUEST_ID.val) {
+        while (session.state === UBotSessionState.VOTING_REQUEST_ID.val) {
             await sleep(100);
-            this.session = await this.getSession("ubotGetSession",
+            session = await this.getSession("ubotGetSession",
                 {executableContractId: requestContract.state.data.executable_contract_id});
         }
 
-        if (this.session == null)
-            throw new UbotClientException("Session is null");
+        if (session == null)
+            throw new UBotClientException("Session is null");
 
-        if (this.session.state === UBotSessionState.ABORTED.val)
-            throw new UbotClientException("Session has been aborted");
+        if (session.state === UBotSessionState.ABORTED.val)
+            throw new UBotClientException("Session has been aborted");
 
-        if (this.session.requestId == null || !this.session.requestId.equals(requestContract.id))
-            throw new UbotClientException("Unable to create session by request contract");
+        if (session.requestId == null || !session.requestId.equals(requestContract.id))
+            throw new UBotClientException("Unable to create session by request contract");
 
         // wait session id and pool
-        while (this.session.state !== UBotSessionState.OPERATIONAL.val && this.session.state !== UBotSessionState.ABORTED.val) {
+        while (session.state !== UBotSessionState.OPERATIONAL.val && session.state !== UBotSessionState.ABORTED.val) {
             await sleep(100);
-            this.session = await this.getSession("ubotGetSession",
+            session = await this.getSession("ubotGetSession",
                 {executableContractId: requestContract.state.data.executable_contract_id});
         }
 
-        if (this.session.state === UBotSessionState.ABORTED.val)
-            throw new UbotClientException("Session has been aborted");
+        if (session.state === UBotSessionState.ABORTED.val)
+            throw new UBotClientException("Session has been aborted");
 
-        if (this.session.sessionPool == null)
-            throw new UbotClientException("Unable to get session pool");
+        if (session.sessionPool == null)
+            throw new UBotClientException("Unable to get session pool");
+
+        return new UBotSession(session, this);
     }
 
     async startCloudMethod(requestContract) {
-        await this.createSession(requestContract);
+        let session = await this.createSession(requestContract);
 
         // get ubot registry
         let serviceContracts = await new Promise(async (resolve, reject) =>
@@ -177,13 +172,13 @@ class UbotClient {
 
         if (serviceContracts == null || serviceContracts.contracts == null ||
             serviceContracts.contracts.ubot_registry_contract == null)
-            throw new UbotClientException("Unable to get ubot registry contract");
+            throw new UBotClientException("Unable to get ubot registry contract");
 
         let ubotRegistry = await Contract.fromSealedBinary(serviceContracts.contracts.ubot_registry_contract);
         //console.log(JSON.stringify(ubotRegistry.state.data.topology, null, 2));
 
         this.topologyUBotNet = ubotRegistry.state.data.topology;
-        await this.connectUbot(this.session.sessionPool);
+        await this.connectUbot(session.pool);
 
         // execute cloud method
         let resp = await new Promise(async (resolve, reject) =>
@@ -194,44 +189,47 @@ class UbotClient {
         );
 
         if (resp == null || resp.status !== "ok")
-            throw new UbotClientException("Error execute cloud method, response: " + JSON.stringify(resp));
+            throw new UBotClientException("Error execute cloud method, response: " + JSON.stringify(resp));
+
+        return session;
     }
 
     async checkSession(executableContractId, requestContractId, ubotNumber) {
-        this.session = await this.getSession("ubotGetSession",
+        let session = await this.getSession("ubotGetSession",
             {executableContractId: executableContractId});
 
-        if (this.session == null)
-            throw new UbotClientException("Session is null");
+        if (session == null)
+            throw new UBotClientException("Session is null");
 
-        if (this.session.state !== UBotSessionState.OPERATIONAL.val) {
-            if (this.session.state !== UBotSessionState.VOTING_SESSION_ID.val)
-                throw new UbotClientException("Session is not in operational mode");
+        if (session.state !== UBotSessionState.OPERATIONAL.val) {
+            if (session.state !== UBotSessionState.VOTING_SESSION_ID.val)
+                throw new UBotClientException("Session is not in operational mode");
 
             // wait session id and pool
-            while (this.session.state !== UBotSessionState.OPERATIONAL.val && this.session.state !== UBotSessionState.ABORTED.val) {
+            while (session.state !== UBotSessionState.OPERATIONAL.val && session.state !== UBotSessionState.ABORTED.val) {
                 await sleep(100);
-                this.session = await this.getSession("ubotGetSession",
-                    {executableContractId: executableContractId});
+                session = await this.getSession("ubotGetSession", {executableContractId: executableContractId});
             }
 
-            if (this.session.state === UBotSessionState.ABORTED.val)
-                throw new UbotClientException("Session has been aborted");
+            if (session.state === UBotSessionState.ABORTED.val)
+                throw new UBotClientException("Session has been aborted");
         }
 
-        if (this.session.requestId == null || !this.session.requestId.equals(requestContractId))
-            throw new UbotClientException("Session does not match the request contract");
+        if (session.requestId == null || !session.requestId.equals(requestContractId))
+            throw new UBotClientException("Session does not match the request contract");
 
-        if (this.session.sessionPool == null)
-            throw new UbotClientException("Unable to get session pool");
+        if (session.sessionPool == null)
+            throw new UBotClientException("Unable to get session pool");
 
-        if (!~this.session.sessionPool.indexOf(ubotNumber))
-            throw new UbotClientException("Ubot is not in the pool of session");
+        if (!~session.sessionPool.indexOf(ubotNumber))
+            throw new UBotClientException("Ubot is not in the pool of session");
+
+        return new UBotSession(session, this);
     }
 
     async getStateCloudMethod(requestContractId) {
         if (this.httpUbotClient == null)
-            throw new UbotClientException("Ubot HTTP client is not initialized");
+            throw new UBotClientException("Ubot HTTP client is not initialized");
 
         return new Promise(async (resolve, reject) =>
             await this.httpUbotClient.command("getState", {startingContractId: requestContractId},
@@ -254,4 +252,4 @@ class UbotClient {
     }
 }
 
-module.exports = {UbotClient};
+module.exports = {UBotClient};

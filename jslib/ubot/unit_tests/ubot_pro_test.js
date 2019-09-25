@@ -7,7 +7,7 @@ import * as tk from "unit_tests/test_keys";
 
 const UBotMain = require("ubot/ubot_main").UBotMain;
 const UBotPoolState = require("ubot/ubot_pool_state").UBotPoolState;
-const UbotClient = require('ubot/ubot_client').UbotClient;
+const UBotClient = require('ubot/ubot_client').UBotClient;
 const cs = require("contractsservice");
 const Constraint = require('constraint').Constraint;
 
@@ -47,14 +47,14 @@ async function shutdownUBots(ubots) {
 }
 
 unit.test("ubot_pro_test: start client", async () => {
-    let ubotClient = await new UbotClient(clientKey, TOPOLOGY_ROOT + "universa.pro.json").start();
+    let ubotClient = await new UBotClient(clientKey, TOPOLOGY_ROOT + "universa.pro.json").start();
 
     await ubotClient.shutdown();
 });
 
 unit.test("ubot_pro_test: start cloud method", async () => {
     let ubotMains = await createUBots(ubotsCount);
-    let ubotClient = await new UbotClient(clientKey, TOPOLOGY_ROOT + "universa.pro.json").start();
+    let ubotClient = await new UBotClient(clientKey, TOPOLOGY_ROOT + "universa.pro.json").start();
 
     let executableContract = Contract.fromPrivateKey(userPrivKey);
 
@@ -129,10 +129,9 @@ unit.test("ubot_pro_test: start cloud method", async () => {
     await cs.addConstraintToContract(requestContract, executableContract, "executableContractConstraint",
         Constraint.TYPE_EXISTING_STATE, ["this.state.data.executable_contract_id == ref.id"], true);
 
-    await ubotClient.startCloudMethod(requestContract);
+    let session = await ubotClient.startCloudMethod(requestContract);
 
-    console.log("Session: " + JSON.stringify(ubotClient.session));
-    let pool = ubotClient.session.sessionPool;
+    console.log("Session: " + session);
 
     let state = await ubotClient.getStateCloudMethod(requestContract.id);
     console.log("State: " + JSON.stringify(state));
@@ -147,10 +146,10 @@ unit.test("ubot_pro_test: start cloud method", async () => {
     assert(typeof state.result === "number" && state.result >= 0 && state.result < 1000);
 
     // waiting pool finished...
-    while (!pool.every(ubot => !ubotMains[ubot].ubot.processors.get(requestContract.id.base64).state.canContinue))
+    while (!session.pool.every(ubot => !ubotMains[ubot].ubot.processors.get(requestContract.id.base64).state.canContinue))
         await sleep(100);
 
-    assert(pool.every(ubot => ubotMains[ubot].ubot.processors.get(requestContract.id.base64).state === UBotPoolState.FINISHED));
+    assert(session.pool.every(ubot => ubotMains[ubot].ubot.processors.get(requestContract.id.base64).state === UBotPoolState.FINISHED));
 
     await ubotClient.shutdown();
     await shutdownUBots(ubotMains);

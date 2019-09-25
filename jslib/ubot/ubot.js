@@ -8,7 +8,7 @@ const ExecutorService = require("executorservice").ExecutorService;
 const UBotCloudNotification = require("ubot/ubot_notification").UBotCloudNotification;
 const UBotConfig = require("ubot/ubot_config").UBotConfig;
 const UBotResultCache = require("ubot/ubot_result_cache").UBotResultCache;
-const UbotClient = require('ubot/ubot_client').UbotClient;
+const UBotClient = require('ubot/ubot_client').UBotClient;
 const Boss = require('boss.js');
 
 const TOPOLOGY_ROOT = "../jslib/ubot/topology/";
@@ -39,12 +39,12 @@ class UBot {
         this.logger.log("  contract.state.data: " + JSON.stringify(contract.state.data));
 
         if (this.client == null)
-            this.client = await new UbotClient(this.nodeKey, TOPOLOGY_ROOT + "universa.pro.json").start();
+            this.client = await new UBotClient(this.nodeKey, TOPOLOGY_ROOT + "universa.pro.json").start();
 
-        await this.client.checkSession(contract.state.data.executable_contract_id, contract.id, this.network.myInfo.number);
-        this.logger.log("executeCloudMethod: session pool = " + JSON.stringify(this.client.session.sessionPool));
+        let session = await this.client.checkSession(contract.state.data.executable_contract_id, contract.id, this.network.myInfo.number);
+        this.logger.log("executeCloudMethod session: " + session);
 
-        let processor = new CloudProcessor(UBotPoolState.SEND_STARTING_CONTRACT, contract.id, this);
+        let processor = new CloudProcessor(UBotPoolState.SEND_STARTING_CONTRACT, contract.id, this, session);
         processor.startingContract = contract;
         processor.startProcessingCurrentState();
         this.processors.set(contract.id.base64, processor);
@@ -62,19 +62,20 @@ class UBot {
             notification.type === UBotCloudNotification.types.DOWNLOAD_STARTING_CONTRACT && !notification.isAnswer) {
 
             if (this.client == null)
-                this.client = await new UbotClient(this.nodeKey, TOPOLOGY_ROOT + "universa.pro.json").start();
+                this.client = await new UBotClient(this.nodeKey, TOPOLOGY_ROOT + "universa.pro.json").start();
 
+            let session = null;
             try {
-                await this.client.checkSession(notification.executableContractId, notification.poolId, this.network.myInfo.number);
+                session = await this.client.checkSession(notification.executableContractId, notification.poolId, this.network.myInfo.number);
             } catch (err) {
                 this.logger.log("Error: check session failed, ubot is not started by notification: " + notification.poolId.base64 +
                     ", message: " + err.message);
                 return;
             }
 
-            this.logger.log("onCloudNotify session checked, session pool = " + JSON.stringify(this.client.session.sessionPool));
+            this.logger.log("onCloudNotify session checked: " + session);
 
-            let processor = new CloudProcessor(UBotPoolState.INIT, notification.poolId, this);
+            let processor = new CloudProcessor(UBotPoolState.INIT, notification.poolId, this, session);
             processor.onNotifyInit(notification);
             this.processors.set(notification.poolId.base64, processor);
 
@@ -91,15 +92,15 @@ class UBot {
         return null;
     }
 
-    getSelectedPoolNumbers(hashId) {
-        if (this.processors.has(hashId.base64)) {
-            let proc = this.processors.get(hashId.base64);
-            let res = [];
-            proc.pool.forEach(i => res.push(i.number));
-            return res;
-        }
-        return null;
-    }
+    // getSelectedPoolNumbers(hashId) {
+    //     if (this.processors.has(hashId.base64)) {
+    //         let proc = this.processors.get(hashId.base64);
+    //         let res = [];
+    //         proc.pool.forEach(i => res.push(i.number));
+    //         return res;
+    //     }
+    //     return null;
+    // }
 
     async getStoragePackedResultByHash(hash, multi) {
         let result = this.resultCache.get(hash);

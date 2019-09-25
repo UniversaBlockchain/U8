@@ -11,12 +11,13 @@ const UBotCloudNotification = require("ubot/ubot_notification").UBotCloudNotific
 const UBotPoolState = require("ubot/ubot_pool_state").UBotPoolState;
 
 class CloudProcessor {
-    constructor(initialState, poolId, ubot) {
+    constructor(initialState, poolId, ubot, session) {
         this.state = initialState;
         this.poolId = poolId;
         this.startingContract = null;
         this.executableContract = null;
         this.ubot = ubot;
+        this.session = session;
         this.logger = ubot.logger;
         this.ledger = ubot.ledger;
         this.currentProcess = null;
@@ -37,7 +38,7 @@ class CloudProcessor {
     }
 
     selectPool() {
-        let pool = this.ubot.client.session.sessionPool;
+        let pool = this.session.pool;
         this.ubot.network.netConfig.toList().forEach(ubot => {
             if (~pool.indexOf(ubot.number))
                 this.pool.push(ubot);
