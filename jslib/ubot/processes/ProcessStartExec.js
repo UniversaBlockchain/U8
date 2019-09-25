@@ -416,36 +416,57 @@ class ProcessStartExec extends ProcessBase {
     }
 
     async getSingleStorage() {
-        let recordId = this.pr.getDefaultRecordId(false);
+        try {
+            let recordId = this.pr.getDefaultRecordId(false);
 
-        // TODO: get actual hash from MainNet by this.executableContract.id (further recordId)
+            // get actual hash from MainNet by this.executableContract.id (further recordId)
+            let actualHash = await this.pr.session.getStorage(false);
 
-        let result = await this.pr.ubot.getStorageResultByRecordId(recordId, false);
+            let result = await this.pr.ubot.getStoragePackedResultByRecordId(recordId, false);
 
-        return result;
+            if (result != null && actualHash.equals(crypto.HashId.of(result)))
+                return await Boss.load(result);
 
-        // if (result != null && actualHash.equals(crypto.HashId.of(result)))
-        //     return result;
-        //
-        // return await this.pr.ubot.network.searchActualStorageResult(recordId, actualHash, false);
+            return await this.pr.ubot.network.searchActualStorageResult(recordId, actualHash, false);
+
+        } catch (err) {
+            this.pr.logger.log("Error get data from single-storage: " + err.message);
+            this.pr.errors.push(new ErrorRecord(Errors.FAILURE, "getSingleStorage",
+                "Error get data from single-storage: " + err.message));
+            this.pr.changeState(UBotPoolState.FAILED);
+
+            throw err;
+        }
     }
 
     async getMultiStorage() {
-        let recordId = this.pr.getDefaultRecordId(true);
+        try {
+            let recordId = this.pr.getDefaultRecordId(true);
 
-        // TODO: get actual hash from MainNet by this.executableContract.id (further recordId)
+            // get actual hash from MainNet by this.executableContract.id (further recordId)
+            let actualHash = await this.pr.session.getStorage(true);
 
-        let result = await this.pr.ubot.getRecordsFromMultiStorageByRecordId(recordId);
+            let result = await this.pr.ubot.getRecordsFromMultiStorageByRecordId(recordId);
 
-        // if (result != null && result.cortegeId.equals(actualHash))
-        //     return result.records;
-        //
-        // result = await this.pr.ubot.network.searchActualStorageResult(recordId, actualHash, true);
+            if (result != null && result.cortegeId.equals(actualHash))
+                return result.records;
 
-        if (result != null)
-            return result.records;
-        else
-            return [];
+            result = await this.pr.ubot.network.searchActualStorageResult(recordId, actualHash, true);
+
+            if (result != null)
+                return result.records;
+            else
+                return [];
+
+        } catch (err) {
+            this.pr.logger.log("Error get data from multi-storage: " + err.message);
+            this.pr.errors.push(new ErrorRecord(Errors.FAILURE, "getMultiStorage",
+                "Error get data from multi-storage: " + err.message));
+            this.pr.changeState(UBotPoolState.FAILED);
+
+            throw err;
+        }
+
     }
 }
 

@@ -377,18 +377,25 @@ class UBotProcess_writeMultiStorage extends UBotProcess_writeSingleStorage {
         }
     }
 
-    generateCortegeId() {
-        let concat = new Uint8Array(this.cortege.size * this.binHashId.digest.length);
-
+    generateCortegeId(full) {
+        let concat = new Uint8Array((full ? this.pr.pool.length : this.cortege.size) * this.binHashId.digest.length);
         let sorted = [];
-        this.cortege.forEach(ubot => sorted.push({
-            ubot_number: this.pr.pool[ubot].number,
-            hash: this.hashes[ubot]
-        }));
+
+        if (full) {
+            for (let i = 0; i < this.pr.pool.length; i++)
+                sorted.push({
+                    ubot_number: this.pr.pool[i].number,
+                    hash: this.hashes[i]
+                });
+        } else
+            this.cortege.forEach(ubot => sorted.push({
+                ubot_number: this.pr.pool[ubot].number,
+                hash: this.hashes[ubot]
+            }));
 
         sorted.sort((a, b) => a.ubot_number - b.ubot_number);
 
-        sorted.forEach((ubot, i) => concat.set(ubot.hash, i * this.binHashId.digest.length));
+        sorted.forEach((ubot, i) => concat.set(ubot.hash.digest, i * this.binHashId.digest.length));
 
         this.cortegeId = crypto.HashId.of(concat);
     }
@@ -407,18 +414,12 @@ class UBotProcess_writeMultiStorage extends UBotProcess_writeSingleStorage {
     checkCortege() {
         this.pr.logger.log("UBotProcess_writeMultiStorage: check cortege");
 
-        // generate common hash
-        let concat = new Uint8Array(this.pr.pool.length * this.binHashId.digest.length);
-
-        for (let i = 0; i < this.pr.pool.length; i++) {
+        for (let i = 0; i < this.pr.pool.length; i++)
             // check previous ID equals
             if (!t.valuesEqual(this.previousRecordId, this.previous[i]))
                 return false;
 
-            concat.set(this.hashes[i], i * this.binHashId.digest.length);
-        }
-
-        this.cortegeId = crypto.HashId.of(concat);
+        this.generateCortegeId(true);
 
         this.otherAnswers.clear();
         this.pulseGetCortegeId();
@@ -500,10 +501,13 @@ class UBotProcess_writeMultiStorage extends UBotProcess_writeSingleStorage {
                 if (fullCortege || this.cortege.has(i))
                     await this.pr.ledger.writeToMultiStorage(this.pr.executableContract.id, this.storageName, this.results[i],
                         this.hashes[i], this.recordId, this.pr.pool[i].number);
+
+            await this.pr.session.updateStorage(this.cortegeId, true);
         } catch (err) {
             this.fail("error writing to multi-storage: " + err.message);
             return;
         }
+
         this.pr.logger.log("UBotProcess_writeMultiStorage... cortege approved");
 
         this.mainProcess.var0 = this.recordId.digest;
@@ -697,7 +701,7 @@ class UBotProcess_writeMultiStorage extends UBotProcess_writeSingleStorage {
         if (Array.from(this.cortege).every(ubot =>
             ubot === this.pr.selfPoolIndex || t.valuesEqual(this.cortege, this.corteges[ubot])
         ) && await this.getDecision()) {
-            this.generateCortegeId();
+            this.generateCortegeId(false);
             return true;
         }
 

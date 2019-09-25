@@ -47,6 +47,7 @@ class UBotClient {
         this.topologyUBotNet = null;
         this.httpUbotClient = null;
         this.ubotPublicKey = null;
+        this.httpNodeClients = [];
     }
 
     async start() {
@@ -73,9 +74,25 @@ class UBotClient {
     }
 
     async shutdown() {
-        await this.httpNodeClient.stop();
+        if (this.httpNodeClients.length === 0)
+            await this.httpNodeClient.stop();
+        for (let nodeClient of this.httpNodeClients)
+            await nodeClient.stop();
         if (this.httpUbotClient != null)
             await this.httpUbotClient.stop();
+    }
+
+    async connectAllNodes() {
+        for (let i = 0; i < this.nodes.length; i++) {
+            if (this.topology[i].number === this.httpNodeClient.nodeNumber)
+                this.httpNodeClients.push(this.httpNodeClient);
+            else {
+                let httpClient = new HttpClient(this.nodes[i].url);
+                httpClient.nodeNumber = this.topology[i].number;
+                await httpClient.start(this.clientPrivateKey, this.nodes[i].key);
+                this.httpNodeClients.push(httpClient);
+            }
+        }
     }
 
     async connectUbot(pool) {
@@ -123,6 +140,33 @@ class UBotClient {
         return sessionData.session;
     }
 
+    async askSession(command, params) {
+        let data = await new Promise(async (resolve, reject) =>
+            await this.httpNodeClient.command(command, params,
+                result => resolve(result),
+                error => reject(error)
+            )
+        );
+
+        console.log("UBotClient.askSession: " + JSON.stringify(data));
+        return data;
+    }
+
+    async askSessionOnAllNodes(command, params) {
+        if (this.httpNodeClients.length === 0)
+            await this.connectAllNodes();
+
+        let data = await Promise.all(this.httpNodeClients.map(nodeClient => new Promise(async (resolve, reject) =>
+            await nodeClient.command(command, params,
+                result => resolve(result),
+                error => reject(error)
+            )
+        )));
+
+        console.log("UBotClient.askSessionOnAllNodes: " + JSON.stringify(data));
+        return data;
+    }
+
     async createSession(requestContract) {
         let session = await this.getSession("ubotCreateSession",
             {packedRequest: await requestContract.getPackedTransaction()});
@@ -156,10 +200,13 @@ class UBotClient {
         if (session.sessionPool == null)
             throw new UBotClientException("Unable to get session pool");
 
-        return new UBotSession(session, this);
+        return new UBotSession(session, this, requestContract.state.data.executable_contract_id);
     }
 
     async startCloudMethod(requestContract) {
+        if (this.httpUbotClient != null)
+            throw new UBotClientException("Ubot is connected to the pool. First disconnect from the pool");
+
         let session = await this.createSession(requestContract);
 
         // get ubot registry
@@ -194,7 +241,7 @@ class UBotClient {
         return session;
     }
 
-    async checkSession(executableContractId, requestContractId, ubotNumber) {
+    async checkSession(executableContractId, requestContractId, ubotNumber, ubot) {
         let session = await this.getSession("ubotGetSession",
             {executableContractId: executableContractId});
 
@@ -224,7 +271,7 @@ class UBotClient {
         if (!~session.sessionPool.indexOf(ubotNumber))
             throw new UBotClientException("Ubot is not in the pool of session");
 
-        return new UBotSession(session, this);
+        return new UBotSession(session, this, executableContractId, ubot);
     }
 
     async getStateCloudMethod(requestContractId) {
@@ -249,6 +296,14 @@ class UBotClient {
         }
 
         return state;
+    }
+
+    async disconnectUbot() {
+        if (this.httpUbotClient == null)
+            throw new UBotClientException("Ubot is not connected to the pool");
+
+        await this.httpUbotClient.stop();
+        this.httpUbotClient = null;
     }
 }
 

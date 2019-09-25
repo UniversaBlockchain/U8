@@ -8,6 +8,7 @@ const ExecutorService = require("executorservice").ExecutorService;
 const UBotCloudNotification = require("ubot/ubot_notification").UBotCloudNotification;
 const UBotConfig = require("ubot/ubot_config").UBotConfig;
 const UBotResultCache = require("ubot/ubot_result_cache").UBotResultCache;
+const UBotSessionStorageCache = require("ubot/ubot_session_storage_cache").UBotSessionStorageCache;
 const UBotClient = require('ubot/ubot_client').UBotClient;
 const Boss = require('boss.js');
 
@@ -21,6 +22,7 @@ class UBot {
         this.network = network;
         this.processors = new Map();
         this.resultCache = new UBotResultCache(UBotConfig.maxResultCacheAge);
+        this.sessionStorageCache = new UBotSessionStorageCache(UBotConfig.maxResultCacheAge);
         this.executorService = new ExecutorService();
         this.nodeKey = nodeKey;
         this.client = null;
@@ -41,7 +43,7 @@ class UBot {
         if (this.client == null)
             this.client = await new UBotClient(this.nodeKey, TOPOLOGY_ROOT + "universa.pro.json").start();
 
-        let session = await this.client.checkSession(contract.state.data.executable_contract_id, contract.id, this.network.myInfo.number);
+        let session = await this.client.checkSession(contract.state.data.executable_contract_id, contract.id, this.network.myInfo.number, this);
         this.logger.log("executeCloudMethod session: " + session);
 
         let processor = new CloudProcessor(UBotPoolState.SEND_STARTING_CONTRACT, contract.id, this, session);
@@ -66,7 +68,7 @@ class UBot {
 
             let session = null;
             try {
-                session = await this.client.checkSession(notification.executableContractId, notification.poolId, this.network.myInfo.number);
+                session = await this.client.checkSession(notification.executableContractId, notification.poolId, this.network.myInfo.number, this);
             } catch (err) {
                 this.logger.log("Error: check session failed, ubot is not started by notification: " + notification.poolId.base64 +
                     ", message: " + err.message);
@@ -175,7 +177,7 @@ class UBot {
                 results.push(await Boss.load(record.storage_data));
 
             ubots.push(record.ubot_number);
-            concat.set(record.hash.digest, i * record.hash.digest);
+            concat.set(record.hash.digest, i * record.hash.digest.length);
             i++;
         }
 

@@ -121,6 +121,8 @@ class UBotProcess_writeSingleStorage extends ProcessBase {
                     await this.pr.ledger.deleteFromSingleStorage(this.previousRecordId);
                 await this.pr.ledger.writeToSingleStorage(this.pr.executableContract.id, this.storageName,
                     this.binToWrite, this.binHashId, this.recordId);
+
+                await this.pr.session.updateStorage(this.binHashId, false);
             } catch (err) {
                 this.pr.logger.log("error: UBotProcess_writeSingleStorage: " + err.message);
                 this.pr.errors.push(new ErrorRecord(Errors.FAILURE, "UBotProcess_writeSingleStorage",
