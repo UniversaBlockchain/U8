@@ -2,15 +2,11 @@
  * Copyright (c) 2019-present Sergey Chernov, iCodici S.n.C, All Rights Reserved.
  */
 
-import {getWorker, farcallWrapper} from 'worker'
+import {getWorker, consoleWrapper, farcallWrapper} from 'worker'
 
 class WorkerExample {
 
-    static workerSrc = farcallWrapper + `
-    function print(text) {
-        wrk.farcall("print", [], {text:text});
-    }
-    
+    static workerSrc = consoleWrapper + farcallWrapper + `
     function callSomethingFromMainScripter(val) {
         return new Promise(resolve => wrk.farcall("callSomethingFromMainScripter", [], {text:val}, ans => {
             resolve(ans);
@@ -19,7 +15,7 @@ class WorkerExample {
     
     wrk.export.calcAxBxC = async (args, kwargs) => {
         let textLen = await callSomethingFromMainScripter("some_parameter");
-        print(textLen);
+        console.log(textLen);
         return args[0] * args[1] * args[2];
     };
     `;
@@ -30,7 +26,7 @@ class WorkerExample {
 
     static async start() {
         let res = new WorkerExample();
-        res.worker = await getWorker(0, WorkerExample.workerSrc);
+        res.worker = await getWorker(1, WorkerExample.workerSrc);
         res.worker.startFarcallCallbacks();
 
         res.worker.export["callSomethingFromMainScripter"] = (args, kwargs) => {
@@ -39,8 +35,9 @@ class WorkerExample {
             return valLength;
         };
 
-        res.worker.export["print"] = (args, kwargs) => {
-            console.log("worker prints: " + kwargs.text);
+        res.worker.export["__worker_bios_print"] = (args, kwargs) => {
+            let out = args[0] === true ? console.error : console.logPut;
+            out(...args[1], args[2]);
         };
 
         return res;
@@ -76,8 +73,7 @@ unit.test("worker_tests: check that all global objects are frozen", async () => 
         try {
             o[functionName]._wefhowegfh_add_some_field_ = true;
             if (o[functionName]._wefhowegfh_add_some_field_ === true) {
-                //console.error(functionName + "._wefhowegfh_add_some_field_: should be frozen");
-                wrk.farcall("print_error", [], {text:functionName + "._wefhowegfh_add_some_field_: should be frozen"});
+                console.error(functionName + "._wefhowegfh_add_some_field_: should be frozen");
                 assert(false);
             }
         } catch (e) {
@@ -87,8 +83,7 @@ unit.test("worker_tests: check that all global objects are frozen", async () => 
         try {
             o[functionName] = null;
             if (o[functionName] === null) {
-                //console.error(functionName + ": " + o[functionName] + " - should be frozen");
-                wrk.farcall("print_error", [], {text:functionName + ": " + o[functionName] + " - should be frozen"});
+                console.error(functionName + ": " + o[functionName] + " - should be frozen");
                 assert(false);
             }
         } catch (e) {
@@ -102,10 +97,7 @@ unit.test("worker_tests: check that all global objects are frozen", async () => 
             let descr = "undefined";
             if (val)
                 descr = val.constructor.name;
-            if (useConsole === true)
                 console.log("k: " + prefix + k + " - " + descr);
-            else
-                wrk.farcall("print_log", [], {text:"k: " + prefix + k + " - " + descr});
             if (descr === "Function")
                 checkFunction(o, k);
             else if (descr === "Object")
@@ -123,17 +115,16 @@ unit.test("worker_tests: check that all global objects are frozen", async () => 
         release() {this.worker.release();}
         static async start(accessLevel) {
             let res = new Worker();
-            res.worker = await getWorker(accessLevel, farcallWrapper+testSrc+`
+            let wrappers = accessLevel === 1 ? consoleWrapper+farcallWrapper : farcallWrapper;
+            res.worker = await getWorker(accessLevel, wrappers+testSrc+`
             wrk.export.checkObject = async (args, kwargs) => {
                 wrk.farcall("say_platform", [], {platform:platform});
                 checkObject("", Function('return this')(), false);
             }
             `);
-            res.worker.export["print_log"] = (args, kwargs) => {
-                console.log("worker prints: " + kwargs.text);
-            };
-            res.worker.export["print_error"] = (args, kwargs) => {
-                console.error("worker prints: " + kwargs.text);
+            res.worker.export["__worker_bios_print"] = (args, kwargs) => {
+                let out = args[0] === true ? console.error : console.logPut;
+                out(...args[1], args[2]);
             };
             res.worker.export["say_platform"] = (args, kwargs) => {
                 console.log("worker say_platform: " + JSON.stringify(kwargs.platform));

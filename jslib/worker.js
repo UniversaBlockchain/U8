@@ -72,6 +72,26 @@ wrk.getWorker = function(accessLevel, workerSrc) {
     });
 };
 
+wrk.consoleWrapper = `
+let console = {
+    log(...args) {
+        wrk.farcall("__worker_bios_print", [false, args, "\\n"], {});
+    },
+    logPut(...args) {
+        wrk.farcall("__worker_bios_print", [false, args, ""], {});
+    },
+    info(...args) {
+        wrk.farcall("__worker_bios_print", [false, args, "\\n"], {});
+    },
+    error(...args) {
+        if (args[0] instanceof Error)
+            wrk.farcall("__worker_bios_print", [true, ["Error: ", args[0].message, ...args.slice(1), "\\n", args[0].stack], "\\n"], {});
+        else
+            wrk.farcall("__worker_bios_print", [true, args, "\\n"], {});
+    }
+};
+`;
+
 wrk.farcallWrapper = `
 wrk.onReceive = async (obj) => {
     let cmd = obj.cmd;
