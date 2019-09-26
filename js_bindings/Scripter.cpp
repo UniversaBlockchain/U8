@@ -191,6 +191,8 @@ void Scripter::initialize(int accessLevel) {
     } else if (accessLevel == 1) {
         global->Set(v8String("__bios_loadRequired"), functionTemplate(JsLoadRequired));
         global->Set(v8String("__bios_initTimers"), functionTemplate(JsInitTimers));
+        global->Set(v8String("utf8Decode"), functionTemplate(JsTypedArrayToString));
+        global->Set(v8String("utf8Encode"), functionTemplate(JsStringToTypedArray));
         global->Set(v8String("__init_workers"), functionTemplate(JsInitWorkers));
         global->Set(v8String("__send_from_worker"), functionTemplate(JsSendFromWorker));
         JsInitCrypto(*this, global);

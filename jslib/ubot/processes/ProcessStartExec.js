@@ -2,7 +2,7 @@
  * Copyright (c) 2019-present Sergey Chernov, iCodici S.n.C, All Rights Reserved.
  */
 
-import {getWorker, farcallWrapper} from 'worker'
+import {getWorker, consoleWrapper, farcallWrapper} from 'worker'
 
 const ProcessBase = require("ubot/processes/ProcessBase").ProcessBase;
 const UBotProcess_writeSingleStorage = require("ubot/processes/UBotProcess_writeSingleStorage").UBotProcess_writeSingleStorage;
@@ -20,7 +20,7 @@ const notSupportedCommandsInMultiVerify = ["call", "writeSingleStorage", "writeM
 
 class ProcessStartExec extends ProcessBase {
 
-    static workerSrc = farcallWrapper + `
+    static workerSrc = consoleWrapper + farcallWrapper + `
     function writeSingleStorage(data) {
         return new Promise(resolve => wrk.farcall("writeSingleStorage", [data], {}, ans => {
             resolve(ans);
@@ -91,7 +91,7 @@ class ProcessStartExec extends ProcessBase {
                     "   }" +
                     "};";
 
-                this.pr.worker = await getWorker(0,
+                this.pr.worker = await getWorker(1,
                     ProcessStartExec.workerSrc + this.pr.executableContract.state.data.js + methodExport);
                 this.pr.worker.startFarcallCallbacks();
 
@@ -109,6 +109,11 @@ class ProcessStartExec extends ProcessBase {
 
                 this.pr.worker.export["getMultiStorage"] = async (args, kwargs) => {
                     return await this.getMultiStorage();
+                };
+
+                this.pr.worker.export["__worker_bios_print"] = async (args, kwargs) => {
+                    let out = args[0] === true ? console.error : console.logPut;
+                    out("worker debug console:", ...args[1], args[2]);
                 };
 
                 let result = await new Promise(resolve => this.pr.worker.farcall(methodName, methodArgs, {}, ans => resolve(ans)));
