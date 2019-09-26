@@ -69,6 +69,8 @@ unit.test("worker_tests: check that all global objects are frozen", async () => 
     };
 
     let testSrc = `
+    const BigDecimal  = require("big").Big;
+    
     let checkFunction = (o, functionName) => {
         try {
             o[functionName]._wefhowegfh_add_some_field_ = true;

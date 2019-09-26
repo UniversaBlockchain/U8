@@ -189,7 +189,7 @@ void Scripter::initialize(int accessLevel) {
         JsInitBossBindings(*this, global);
         JsInitWorkerBindings(*this, global);
     } else if (accessLevel == 1) {
-        global->Set(v8String("__bios_loadRequired"), functionTemplate(JsLoadRequired));
+        global->Set(v8String("__bios_loadRequired"), functionTemplate(JsLoadRequiredRestricted));
         global->Set(v8String("__bios_initTimers"), functionTemplate(JsInitTimers));
         global->Set(v8String("utf8Decode"), functionTemplate(JsTypedArrayToString));
         global->Set(v8String("utf8Encode"), functionTemplate(JsStringToTypedArray));

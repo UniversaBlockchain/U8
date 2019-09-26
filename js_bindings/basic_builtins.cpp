@@ -56,6 +56,36 @@ void JsLoadRequired(const v8::FunctionCallbackInfo<v8::Value> &args) {
     });
 }
 
+static unordered_set<string> validSourcesForRestrictedWorker = {
+    "crypto.js",
+    "FastPriorityQueue.js",
+    "timers.js",
+    "sorted.js",
+    "tools.js",
+    "exceptions.js",
+    "big.js",
+};
+
+void JsLoadRequiredRestricted(const v8::FunctionCallbackInfo<v8::Value> &args) {
+    Scripter::unwrap(args, [&](auto se, auto isolate, auto context) {
+        v8::Local<v8::Array> result = v8::Array::New(isolate);
+        v8::String::Utf8Value v8str(isolate, args[0]);
+
+        string sourceName = *v8::String::Utf8Value(isolate, args[0]);
+        if (validSourcesForRestrictedWorker.find(sourceName) != validSourcesForRestrictedWorker.end()) {
+            string name = se->resolveRequiredFile(sourceName);
+
+            // If it is empty we just return empty array
+            if (!name.empty()) {
+                result->Set(result->Length(), se->v8String(name));
+                result->Set(result->Length(), se->v8String(loadAsString(name)));
+            }
+        }
+
+        args.GetReturnValue().Set(result);
+    });
+}
+
 void JsTimer(const v8::FunctionCallbackInfo<v8::Value> &args) {
     Scripter::unwrapArgs(args, [&](ArgsContext &ac) {
         // resetTimer( millis, callback)
