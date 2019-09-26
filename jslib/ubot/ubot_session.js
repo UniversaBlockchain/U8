@@ -78,8 +78,6 @@ class UBotSession {
             if (result == null || result.current == null || result.pending == null)
                 throw new Error("ubotGetStorage wrong result");
 
-            //Object.values(result.pending[storageName]).forEach(hash => console.error(hash));
-
         } while (result.pending[storageName] == null || Object.keys(result.pending[storageName]).length > 0);
 
         return result.current[storageName];
@@ -89,7 +87,9 @@ class UBotSession {
         if (this.ubot != null)
             this.ubot.logger.log("UBotSession.close");
 
-
+        await this.client.askSessionOnAllNodes("ubotCloseSession", {
+            executableContractId: this.executableContractId
+        });
     }
 
     toString() {
