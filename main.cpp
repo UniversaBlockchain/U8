@@ -36,7 +36,8 @@ void handler(int sig) {
 
 int main(int argc, const char **argv) {
 
-    signal(SIGSEGV, handler);   // install our handler
+    signal(SIGSEGV, handler);   // install our handlers
+    signal(SIGABRT, handler);
     crypto::initCrypto();
     asyncio::initAndRunLoop(5ms);
 

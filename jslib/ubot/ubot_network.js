@@ -222,8 +222,8 @@ class UBotNetwork {
                             ubots: ubots
                         };
 
-                } else if (actualHash.equals(HashId.of(result)))
-                    return result;
+                } else if (actualHash.equals(crypto.HashId.of(result)))
+                    return await Boss.load(result);
             }
         }
 

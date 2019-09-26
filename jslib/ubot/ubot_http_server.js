@@ -116,7 +116,8 @@ class UBotHttpServer extends network.HttpServer {
             result = await Boss.dump(result);
         } else {
             result = await this.ubot.getStoragePackedResultByRecordId(recordId, false);
-            resultHash = HashId.of(result);
+            if (result != null)
+                resultHash = HashId.of(result);
         }
 
         if (result != null && resultHash != null && resultHash.equals(actualHash))

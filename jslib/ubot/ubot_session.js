@@ -27,7 +27,9 @@ class UBotSession {
     }
 
     async updateStorage(hash, multi) {
-        //"executableContractId", executableContract.getId(),"storageName","default","fromValue",oldStorageValue,"toValue", newStorageValue
+        if (this.ubot != null)
+            this.ubot.logger.log("UBotProcess_writeMultiStorage... UBotSession.updateStorage hash = " + hash);
+
         let storageName = multi ? "default_multi" : "default_single";
         let fromValue = null;
 
@@ -55,7 +57,9 @@ class UBotSession {
     }
 
     async getStorage(multi) {
-        //"ubotGetStorage", "executableContractId", executableContract.getId(), "storageNames", Do.listOf("default")
+        if (this.ubot != null)
+            this.ubot.logger.log("UBotSession.getStorage");
+
         let storageName = multi ? "default_multi" : "default_single";
         let result = null;
         let first = true;
@@ -82,6 +86,9 @@ class UBotSession {
     }
 
     async close() {
+        if (this.ubot != null)
+            this.ubot.logger.log("UBotSession.close");
+
 
     }
 

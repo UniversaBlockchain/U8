@@ -96,7 +96,7 @@ async function generateSecureRandomExecutableContract() {
 
         let singleStorage = await getSingleStorage();
         if (hashesHash !== singleStorage.hashesHash)
-            throw new Error("Hash of hashes does not match the previously saved");
+            throw new Error("Hash of hashes does not match the previously saved: " + hashesHash + "!==" + singleStorage.hashesHash);
 
         let randomHash = crypto.HashId.of(rands.join());
         let bigRandom = new BigDecimal(0);

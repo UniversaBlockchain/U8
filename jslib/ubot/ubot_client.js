@@ -38,10 +38,11 @@ class NodeRecord {
 }
 
 class UBotClient {
-    constructor(clientPrivateKey, topologyInput, topologyCacheDir) {
+    constructor(clientPrivateKey, topologyInput, topologyCacheDir, logger = undefined) {
         this.clientPrivateKey = clientPrivateKey;
         this.topologyInput = topologyInput;
         this.topologyCacheDir = topologyCacheDir;
+        this.logger = logger;
         this.nodes = [];
         this.ubots = [];
         this.topologyUBotNet = null;
@@ -136,7 +137,12 @@ class UBotClient {
         if (sessionData == null || !sessionData.hasOwnProperty("session"))
             throw new UBotClientException("Wrong session data");
 
-        console.log("UBotClient.getSession: " + JSON.stringify(sessionData.session));
+        let message = "UBotClient.getSession: " + JSON.stringify(sessionData.session);
+        if (this.logger != null)
+            this.logger.log(message);
+        else
+            console.log(message);
+
         return sessionData.session;
     }
 
@@ -148,7 +154,12 @@ class UBotClient {
             )
         );
 
-        console.log("UBotClient.askSession: " + JSON.stringify(data));
+        let message = "UBotClient.askSession: " + JSON.stringify(data);
+        if (this.logger != null)
+            this.logger.log(message);
+        else
+            console.log(message);
+
         return data;
     }
 
@@ -163,7 +174,12 @@ class UBotClient {
             )
         )));
 
-        console.log("UBotClient.askSessionOnAllNodes: " + JSON.stringify(data));
+        let message = "UBotClient.askSessionOnAllNodes: " + JSON.stringify(data);
+        if (this.logger != null)
+            this.logger.log(message);
+        else
+            console.log(message);
+
         return data;
     }
 
