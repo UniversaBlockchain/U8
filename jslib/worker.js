@@ -62,13 +62,13 @@ wrk.WorkerHandle = class {
     }
 };
 
-wrk.getWorker = function(accessLevel, workerSrc) {
+wrk.getWorker = function(accessLevel, workerSrc, customJsLib = {}) {
     return new Promise(resolve => {
         wrkImpl.__getWorker(accessLevel, workerSrc, workerImpl => {
             let w = new wrk.WorkerHandle(workerImpl);
             w.workerImpl._setOnReceive(obj => w.onReceiveCallback(obj));
             resolve(w);
-        });
+        }, customJsLib);
     });
 };
 

@@ -270,3 +270,57 @@ unit.test("worker_tests: clean wrk object", async () => {
     }
 
 });
+
+unit.test("worker_tests: import custom js lib", async () => {
+    let counter = 1;
+    class Worker {
+        constructor() {
+            this.worker = null;
+        }
+        release() {this.worker.release();}
+        static async start() {
+            let res = new Worker();
+            let customLibFiles = {"lib_file1.js": `
+            function libfunc1(s) {
+                return "lib1 " + s;
+            }
+            module.exports = {libfunc1};
+            `,
+            "lib_file2.js":`
+            function libfunc2(s) {
+                return "lib2 " + s;
+            }
+            module.exports = {libfunc2};
+            `};
+            res.worker = await getWorker(1, consoleWrapper + farcallWrapper+`
+            const libfunc1 = require('lib_file1.js').libfunc1;
+            const libfunc2 = require('lib_file2.js').libfunc2;
+            wrkInner.export.doSomething = async (args, kwargs) => {
+                return libfunc2(libfunc1("func1_result"));
+            }
+            `, customLibFiles);
+            res.worker.startFarcallCallbacks();
+
+            res.worker.export["__worker_bios_print"] = (args, kwargs) => {
+                let out = args[0] === true ? console.error : console.logPut;
+                out(...args[1], args[2]);
+            };
+
+            return res;
+        }
+        doSomething() {
+            return new Promise(resolve => this.worker.farcall("doSomething", [], {}, ans => {
+                resolve(ans);
+            }));
+        }
+    }
+
+    for (let i = 0; i < 200; ++i) {
+        let worker = await Worker.start();
+        let ans = await worker.doSomething();
+        //console.log("ans: " + ans);
+        assert(ans === "lib2 lib1 func1_result");
+        worker.release();
+    }
+
+});

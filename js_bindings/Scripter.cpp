@@ -195,6 +195,7 @@ void Scripter::initialize(int accessLevel) {
         global->Set(v8String("utf8Encode"), functionTemplate(JsStringToTypedArray));
         global->Set(v8String("__init_workers"), functionTemplate(JsInitWorkers));
         global->Set(v8String("__send_from_worker"), functionTemplate(JsSendFromWorker));
+        global->Set(v8String("__require_from_worker"), functionTemplate(JsRequireFromWorker));
         JsInitCrypto(*this, global);
     } else {
         throw runtime_error("scripter's access level is unknown: " + std::to_string(accessLevel));

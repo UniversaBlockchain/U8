@@ -67,7 +67,13 @@ const require = (function () {
             // console.log(`require ${moduleName}: HIT`);
             return m;
         } else {
+            let customLib = false;
             let [name, src] = __bios_loadRequired(moduleName);
+            if (src == "" || !src) {
+                customLib = true;
+                src = __require_from_worker(moduleName);
+                name = moduleName;
+            }
             if (src == "" || !src)
                 throw "import failed: not found " + moduleName;
 
@@ -79,7 +85,8 @@ const require = (function () {
             // a right way. rethrowing an error kills trycatch.Message() info which carries
             // line number of the syntax error!
             safeEval(module, name, src);
-            modules[moduleName] = module.exports;
+            if (!customLib)
+                modules[moduleName] = module.exports;
             return module.exports;
         }
     }
@@ -112,6 +119,7 @@ function freezeGlobals() {
     Object.freeze(global.utf8Encode);
     Object.freeze(global.__init_workers);
     Object.freeze(global.__send_from_worker);
+    Object.freeze(global.__require_from_worker);
     Object.freeze(global.atob);
     Object.freeze(global.btoa);
     Object.freeze(global.__verify_extendedSignature);

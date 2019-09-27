@@ -4,6 +4,8 @@
 
 #include "worker_bindings.h"
 #include "../types/UObject.h"
+#include "../types/UBinder.h"
+#include "../types/UString.h"
 #include "../types/TypesFactory.h"
 #include "../tools/Semaphore.h"
 #include <unordered_map>
@@ -18,6 +20,7 @@ public:
     std::shared_ptr<FunctionHandler> onGetWorker;
     std::shared_ptr<FunctionHandler> onReceiveMain;
     std::shared_ptr<std::thread> loopThread;
+    std::unordered_map<std::string, std::string> customJsLibFiles;
 };
 
 static bool workersPool_isInit = false;
@@ -167,16 +170,31 @@ static void ReleaseWorker(WorkerScripter* pws) {
     }
 }
 
+void extractCustomJsLibFiles(const UObject& obj, unordered_map<string,string>& dest) {
+    try {
+        const UBinder& binder = UBinder::asInstance(obj);
+        for (auto k : binder) {
+            const UString& fileSrc = UString::asInstance(k.second);
+            dest[k.first] = fileSrc.get();
+        }
+    } catch (const std::exception& e) {
+        // can't parse, do nothing. Library files would be missing, without errors in ubot
+    }
+}
+
 static void JsGetWorker(const FunctionCallbackInfo<Value> &args) {
     Scripter::unwrapArgs(args, [](ArgsContext &ac) {
-        if (ac.args.Length() == 3) {
+        if (ac.args.Length() == 4) {
             auto se = ac.scripter;
             int accessLevel = ac.asInt(0);
             auto workerSrc = ac.asString(1);
             auto onComplete = ac.asFunction(2);
-            runAsync([accessLevel, workerSrc, onComplete]() {
+            UObject customJsLibFiles = v8ValueToUObject(ac.isolate, ac.args[3]);
+            runAsync([accessLevel, workerSrc, onComplete, customJsLibFiles{move(customJsLibFiles)}]() {
                 Blocking;
                 auto w = GetWorker(accessLevel);
+                w->customJsLibFiles.clear();
+                extractCustomJsLibFiles(customJsLibFiles, w->customJsLibFiles);
                 Semaphore sem;
                 w->onGetWorker->lockedContext([w,&sem](auto cxt){
                     w->onGetWorker->invoke();
@@ -298,6 +316,26 @@ void JsSendFromWorker(const v8::FunctionCallbackInfo<v8::Value> &args) {
                 auto v8obj = obj.serializeToV8(onReceiveMain->scripter_sp());
                 onReceiveMain->invoke(v8obj);
             });
+            return;
+        }
+        auto se = ac.scripter;
+        se->lockedContext([se](auto cxt){
+            se->throwException("invalid number of arguments");
+        });
+    });
+}
+
+void JsRequireFromWorker(const v8::FunctionCallbackInfo<v8::Value> &args) {
+    Scripter::unwrapArgs(args, [](ArgsContext &ac) {
+        if (ac.args.Length() == 1) {
+            auto fileName = ac.asString(0);
+            WorkerScripter* pws = (WorkerScripter*)ac.isolate->GetData(1);
+            if (pws->customJsLibFiles.find(fileName) != pws->customJsLibFiles.end()) {
+                const std::string& fileSrc = pws->customJsLibFiles[fileName];
+                ac.setReturnValue(Local<Object>::Cast(String::NewFromUtf8(ac.isolate, fileSrc.data())));
+                return;
+            }
+            ac.setReturnValue(Local<Object>::Cast(Null(ac.isolate)));
             return;
         }
         auto se = ac.scripter;

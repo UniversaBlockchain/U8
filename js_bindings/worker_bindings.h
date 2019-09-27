@@ -17,5 +17,6 @@ void JsInitWorkerScripter(Scripter& scripter, const Local<ObjectTemplate> &globa
 
 void JsInitWorkers(const v8::FunctionCallbackInfo<v8::Value> &args);
 void JsSendFromWorker(const v8::FunctionCallbackInfo<v8::Value> &args);
+void JsRequireFromWorker(const v8::FunctionCallbackInfo<v8::Value> &args);
 
 #endif //U8_WORKER_BINDINGS_H
