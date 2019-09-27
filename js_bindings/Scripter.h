@@ -230,6 +230,9 @@ public:
     std::shared_ptr<Persistent<Object>> getPrototype(const std::string& tplName);
     void setPrototype(const std::string& protoName, std::shared_ptr<Persistent<Object>> proto);
 
+    bool isWorkersReady() {return _workersReady;}
+    void setWorkersReady() {_workersReady = true;}
+
     // crypto templates
     Persistent<FunctionTemplate> publicKeyTpl;
     Persistent<FunctionTemplate> privateKeyTpl;
@@ -306,6 +309,8 @@ private:
     Queue<ContextCallback> callbacks;
 
     std::unordered_map<std::string, std::shared_ptr<Persistent<Object>>> prototypesHolder;
+
+    bool _workersReady = false;
 
     // do not construct it manually
     explicit Scripter();

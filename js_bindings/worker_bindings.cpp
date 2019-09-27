@@ -270,15 +270,20 @@ void JsInitWorkerScripter(Scripter& scripter, const Local<ObjectTemplate> &globa
 
 void JsInitWorkers(const v8::FunctionCallbackInfo<v8::Value> &args) {
     Scripter::unwrapArgs(args, [](ArgsContext &ac) {
-        if (ac.args.Length() == 2) {
-            auto se = ac.scripter;
-            auto isolate = ac.isolate;
-            auto psw = (WorkerScripter*)isolate->GetData(1);
-            psw->onReceive = ac.asFunction(0);
-            psw->onGetWorker = ac.asFunction(1);
-            return;
+        if (!ac.scripter->isWorkersReady()) {
+            ac.scripter->setWorkersReady();
+            if (ac.args.Length() == 2) {
+                auto se = ac.scripter;
+                auto isolate = ac.isolate;
+                auto psw = (WorkerScripter *) isolate->GetData(1);
+                psw->onReceive = ac.asFunction(0);
+                psw->onGetWorker = ac.asFunction(1);
+                return;
+            }
+            ac.throwError("invalid number of arguments");
+        } else {
+            ac.throwError("workers already initialized");
         }
-        ac.throwError("invalid number of arguments");
     });
 }
 
