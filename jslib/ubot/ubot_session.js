@@ -9,7 +9,8 @@ const UBotSessionState = {
     COLLECTING_RANDOMS      : {val: "COLLECTING_RANDOMS", ordinal: 1},
     VOTING_SESSION_ID       : {val: "VOTING_SESSION_ID", ordinal: 2},
     OPERATIONAL             : {val: "OPERATIONAL", ordinal: 3},
-    ABORTED                 : {val: "ABORTED", ordinal: 4}
+    CLOSING                 : {val: "CLOSING", ordinal: 4},
+    CLOSED                  : {val: "CLOSED", ordinal: 5}
 };
 
 t.addValAndOrdinalMaps(UBotSessionState);

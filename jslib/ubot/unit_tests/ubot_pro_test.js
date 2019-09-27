@@ -155,17 +155,31 @@ unit.test("ubot_pro_test: start cloud method", async () => {
     if (state.state !== UBotPoolState.FINISHED.val)
         state = await ubotClient.waitCloudMethod(requestContract.id);
 
-    console.log("Final state: " + JSON.stringify(state));
-    assert(state.state === UBotPoolState.FINISHED.val);
+    console.log("State: " + JSON.stringify(state));
 
-    // checking secure random value
-    assert(typeof state.result === "number" && state.result >= 0 && state.result < 1000);
+    let states = await Promise.all(session.pool.map(async (ubotNumber) => {
+        let state = await ubotClient.getStateCloudMethod(requestContract.id, ubotNumber);
+
+        if (state.state !== UBotPoolState.FINISHED.val)
+            state = await ubotClient.waitCloudMethod(requestContract.id, ubotNumber);
+
+        return state;
+    }));
+
+    console.log("Final states: " + JSON.stringify(states));
+
+    assert(states.filter(state =>
+        state.state === UBotPoolState.FINISHED.val &&
+        typeof state.result === "number" && state.result >= 0 && state.result < 1000    // checking secure random value
+    ).length >= executableContract.state.data.cloud_methods.getRandom.quorum.size);
 
     // waiting pool finished...
     while (!session.pool.every(ubot => !ubotMains[ubot].ubot.processors.get(requestContract.id.base64).state.canContinue))
         await sleep(100);
 
-    assert(session.pool.every(ubot => ubotMains[ubot].ubot.processors.get(requestContract.id.base64).state === UBotPoolState.FINISHED));
+    assert(session.pool.filter(
+        ubot => ubotMains[ubot].ubot.processors.get(requestContract.id.base64).state === UBotPoolState.FINISHED).length >=
+        executableContract.state.data.cloud_methods.getRandom.quorum.size);
 
     await ubotClient.shutdown();
     await shutdownUBots(ubotMains);
@@ -188,13 +202,29 @@ unit.test("ubot_pro_test: start cloud method", async () => {
     if (state.state !== UBotPoolState.FINISHED.val)
         state = await ubotClient.waitCloudMethod(requestContract.id);
 
-    console.log("Final state: " + JSON.stringify(state));
-    assert(state.state === UBotPoolState.FINISHED.val);
+    console.log("State: " + JSON.stringify(state));
 
-    // checking secure random value
-    assert(typeof state.result === "number" && state.result >= 0 && state.result < 1000);
+    let states = await Promise.all(session.pool.map(async (ubotNumber) => {
+        let state = await ubotClient.getStateCloudMethod(requestContract.id, ubotNumber);
 
-    let first = state.result;
+        if (state.state !== UBotPoolState.FINISHED.val)
+            state = await ubotClient.waitCloudMethod(requestContract.id, ubotNumber);
+
+        return state;
+    }));
+
+    console.log("Final states: " + JSON.stringify(states));
+
+    let finalized = states.filter(state =>
+        state.state === UBotPoolState.FINISHED.val &&
+        typeof state.result === "number" && state.result >= 0 && state.result < 1000    // checking secure random value
+    );
+
+    assert(finalized.length >= executableContract.state.data.cloud_methods.getRandom.quorum.size);
+
+    let first = finalized[0].result;
+
+    assert(finalized.every(state => state.result === first));
 
     await ubotClient.disconnectUbot();
 
@@ -202,7 +232,11 @@ unit.test("ubot_pro_test: start cloud method", async () => {
     while (!session.pool.every(ubot => !ubotMains[ubot].ubot.processors.get(requestContract.id.base64).state.canContinue))
         await sleep(100);
 
-    assert(session.pool.every(ubot => ubotMains[ubot].ubot.processors.get(requestContract.id.base64).state === UBotPoolState.FINISHED));
+    assert(session.pool.filter(
+        ubot => ubotMains[ubot].ubot.processors.get(requestContract.id.base64).state === UBotPoolState.FINISHED).length >=
+        executableContract.state.data.cloud_methods.getRandom.quorum.size);
+
+    await sleep(5000);
 
     // SECOND METHOD (READ RANDOM)
     requestContract = Contract.fromPrivateKey(userPrivKey);
@@ -212,6 +246,7 @@ unit.test("ubot_pro_test: start cloud method", async () => {
     await cs.addConstraintToContract(requestContract, executableContract, "executableContractConstraint",
         Constraint.TYPE_EXISTING_STATE, ["this.state.data.executable_contract_id == ref.id"], true);
 
+    console.log("SECOND METHOD (READ RANDOM)");
     session = await ubotClient.startCloudMethod(requestContract);
 
     console.log("Session: " + session);
@@ -222,17 +257,31 @@ unit.test("ubot_pro_test: start cloud method", async () => {
     if (state.state !== UBotPoolState.FINISHED.val)
         state = await ubotClient.waitCloudMethod(requestContract.id);
 
-    console.log("Final state: " + JSON.stringify(state));
-    assert(state.state === UBotPoolState.FINISHED.val);
+    console.log("State: " + JSON.stringify(state));
 
-    // checking read random value
-    assert(state.result === first);
+    states = await Promise.all(session.pool.map(async (ubotNumber) => {
+        let state = await ubotClient.getStateCloudMethod(requestContract.id, ubotNumber);
+
+        if (state.state !== UBotPoolState.FINISHED.val)
+            state = await ubotClient.waitCloudMethod(requestContract.id, ubotNumber);
+
+        return state;
+    }));
+
+    console.log("Final states: " + JSON.stringify(states));
+
+    assert(states.filter(state =>
+        state.state === UBotPoolState.FINISHED.val &&
+        state.result === first                           // checking read random value
+    ).length >= executableContract.state.data.cloud_methods.getRandom.quorum.size);
 
     // waiting pool finished...
     while (!session.pool.every(ubot => !ubotMains[ubot].ubot.processors.get(requestContract.id.base64).state.canContinue))
         await sleep(100);
 
-    assert(session.pool.every(ubot => ubotMains[ubot].ubot.processors.get(requestContract.id.base64).state === UBotPoolState.FINISHED));
+    assert(session.pool.filter(
+        ubot => ubotMains[ubot].ubot.processors.get(requestContract.id.base64).state === UBotPoolState.FINISHED).length >=
+        executableContract.state.data.cloud_methods.getRandom.quorum.size);
 
     await ubotClient.shutdown();
     await shutdownUBots(ubotMains);
@@ -262,21 +311,40 @@ unit.test("ubot_pro_test: parallel cloud methods", async () => {
                     if (state.state !== UBotPoolState.FINISHED.val)
                         state = await ubotClient.waitCloudMethod(requestContract.id);
 
-                    console.log("Final state: " + JSON.stringify(state));
-                    assert(state.state === UBotPoolState.FINISHED.val);
+                    console.log("State: " + JSON.stringify(state));
 
-                    // checking secure random value
-                    assert(typeof state.result === "number" && state.result >= 0 && state.result < 1000);
+                    let states = await Promise.all(session.pool.map(async (ubotNumber) => {
+                        let state = await ubotClient.getStateCloudMethod(requestContract.id, ubotNumber);
+
+                        if (state.state !== UBotPoolState.FINISHED.val)
+                            state = await ubotClient.waitCloudMethod(requestContract.id, ubotNumber);
+
+                        return state;
+                    }));
+
+                    console.log("Final states: " + JSON.stringify(states));
+
+                    let finalized = states.filter(state =>
+                        state.state === UBotPoolState.FINISHED.val &&
+                        typeof state.result === "number" && state.result >= 0 && state.result < 1000    // checking secure random value
+                    );
+
+                    assert(finalized.length >= executableContract.state.data.cloud_methods.getRandom.quorum.size);
+
+                    let result = finalized[0].result;
+                    results.push(result);
+
+                    assert(finalized.every(state => state.result === result));
 
                     await ubotClient.disconnectUbot();
-
-                    results.push(state.result);
 
                     // waiting pool finished...
                     while (!session.pool.every(ubot => !ubotMains[ubot].ubot.processors.get(requestContract.id.base64).state.canContinue))
                         await sleep(100);
 
-                    assert(session.pool.every(ubot => ubotMains[ubot].ubot.processors.get(requestContract.id.base64).state === UBotPoolState.FINISHED));
+                    assert(session.pool.filter(
+                        ubot => ubotMains[ubot].ubot.processors.get(requestContract.id.base64).state === UBotPoolState.FINISHED).length >=
+                        executableContract.state.data.cloud_methods.getRandom.quorum.size);
                 }
 
                 await ubotClient.shutdown();
