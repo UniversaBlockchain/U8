@@ -15,6 +15,7 @@ public:
     std::string jsWorkerSrc;
     std::shared_ptr<Scripter> se;
     std::shared_ptr<FunctionHandler> onReceive;
+    std::shared_ptr<FunctionHandler> onGetWorker;
     std::shared_ptr<FunctionHandler> onReceiveMain;
     std::shared_ptr<std::thread> loopThread;
 };
@@ -31,16 +32,6 @@ static std::unordered_map<int, shared_ptr<WorkerScripter>> workersPool_accessLev
 
 static const std::string workerMain = R"End(
 let wrk = {};
-wrk.export = {};
-wrk.nextFarcallSN = 0;
-wrk.callbacksFarcall = new Map();
-wrk.getNextFarcallSN = () => {
-    let res = wrk.nextFarcallSN;
-    ++wrk.nextFarcallSN;
-    if (wrk.nextFarcallSN >= Number.MAX_SAFE_INTEGER)
-        wrk.nextFarcallSN = 0;
-    return res;
-};
 
 __init_workers(async (src, obj) => {
     // this context can be used for something critical to the execution of source.methodName
@@ -57,6 +48,18 @@ __init_workers(async (src, obj) => {
         return wrap(obj)
     })();
 
+}, () => {
+    // onGetWorker event
+    wrk.export = {};
+    wrk.nextFarcallSN = 0;
+    wrk.callbacksFarcall = new Map();
+    wrk.getNextFarcallSN = () => {
+        let res = wrk.nextFarcallSN;
+        ++wrk.nextFarcallSN;
+        if (wrk.nextFarcallSN >= Number.MAX_SAFE_INTEGER)
+            wrk.nextFarcallSN = 0;
+        return res;
+    };
 });
 
 wrk.send = (obj) => {
@@ -173,6 +176,12 @@ static void JsGetWorker(const FunctionCallbackInfo<Value> &args) {
             runAsync([accessLevel, workerSrc, onComplete]() {
                 Blocking;
                 auto w = GetWorker(accessLevel);
+                Semaphore sem;
+                w->onGetWorker->lockedContext([w,&sem](auto cxt){
+                    w->onGetWorker->invoke();
+                    sem.notify();
+                });
+                sem.wait();
                 w->jsWorkerSrc = workerSrc;
                 onComplete->lockedContext([=](Local<Context> cxt) {
                     Local<Value> res = wrap(onComplete->scripter()->WorkerScripterTpl, cxt->GetIsolate(), w.get());
@@ -261,12 +270,12 @@ void JsInitWorkerScripter(Scripter& scripter, const Local<ObjectTemplate> &globa
 
 void JsInitWorkers(const v8::FunctionCallbackInfo<v8::Value> &args) {
     Scripter::unwrapArgs(args, [](ArgsContext &ac) {
-        if (ac.args.Length() == 1) {
+        if (ac.args.Length() == 2) {
             auto se = ac.scripter;
             auto isolate = ac.isolate;
             auto psw = (WorkerScripter*)isolate->GetData(1);
-            auto func = ac.asFunction(0);
-            psw->onReceive = func;
+            psw->onReceive = ac.asFunction(0);
+            psw->onGetWorker = ac.asFunction(1);
             return;
         }
         ac.throwError("invalid number of arguments");

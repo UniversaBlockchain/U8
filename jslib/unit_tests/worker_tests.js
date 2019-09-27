@@ -234,3 +234,39 @@ unit.test("worker_tests: isolate js context", async () => {
     }
     worker.release();
 });
+
+unit.test("worker_tests: clean wrk object", async () => {
+    let counter = 1;
+    class Worker {
+        constructor() {
+            this.worker = null;
+            this.funcName = "func" + counter++;
+        }
+        release() {this.worker.release();}
+        static async start() {
+            let res = new Worker();
+            res.worker = await getWorker(0, farcallWrapper+`
+            wrk.export.`+res.funcName+` = async (args, kwargs) => {
+                return Object.keys(wrk.export).length;
+                //return JSON.stringify(Object.keys(wrk.export));
+            }
+            `);
+            res.worker.startFarcallCallbacks();
+            return res;
+        }
+        doSomething() {
+            return new Promise(resolve => this.worker.farcall(this.funcName, [], {}, ans => {
+                resolve(ans);
+            }));
+        }
+    }
+
+    for (let i = 0; i < 200; ++i) {
+        let worker = await Worker.start();
+        let ans = await worker.doSomething();
+        //console.log("ans: " + ans);
+        assert(ans === 1);
+        worker.release();
+    }
+
+});
