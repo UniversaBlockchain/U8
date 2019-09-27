@@ -8,12 +8,12 @@ class WorkerExample {
 
     static workerSrc = consoleWrapper + farcallWrapper + `
     function callSomethingFromMainScripter(val) {
-        return new Promise(resolve => wrk.farcall("callSomethingFromMainScripter", [], {text:val}, ans => {
+        return new Promise(resolve => wrkInner.farcall("callSomethingFromMainScripter", [], {text:val}, ans => {
             resolve(ans);
         }));
     }
     
-    wrk.export.calcAxBxC = async (args, kwargs) => {
+    wrkInner.export.calcAxBxC = async (args, kwargs) => {
         let textLen = await callSomethingFromMainScripter("some_parameter");
         console.log(textLen);
         return args[0] * args[1] * args[2];
@@ -119,8 +119,8 @@ unit.test("worker_tests: check that all global objects are frozen", async () => 
             let res = new Worker();
             let wrappers = accessLevel === 1 ? consoleWrapper+farcallWrapper : farcallWrapper;
             res.worker = await getWorker(accessLevel, wrappers+testSrc+`
-            wrk.export.checkObject = async (args, kwargs) => {
-                wrk.farcall("say_platform", [], {platform:platform});
+            wrkInner.export.checkObject = async (args, kwargs) => {
+                wrkInner.farcall("say_platform", [], {platform:platform});
                 checkObject("", Function('return this')(), false);
             }
             `);
@@ -173,7 +173,7 @@ unit.test("worker_tests: isolate js context", async () => {
         static async start() {
             let res = new Worker();
             res.worker = await getWorker(0, farcallWrapper+`
-            wrk.export.doSomething = async (args, kwargs) => {
+            wrkInner.export.doSomething = async (args, kwargs) => {
                 return crypto.HashId.of(args[0]).digest;
             }
             `);
@@ -193,7 +193,7 @@ unit.test("worker_tests: isolate js context", async () => {
         static async start() {
             let res = new Worker2();
             res.worker = await getWorker(0, farcallWrapper+`
-            wrk.export.changeCrypto = async (args, kwargs) => {
+            wrkInner.export.changeCrypto = async (args, kwargs) => {
                 crypto.HashId.of = (val) => {
                     return crypto.HashId.of_sync("111");
                 };
@@ -246,9 +246,9 @@ unit.test("worker_tests: clean wrk object", async () => {
         static async start() {
             let res = new Worker();
             res.worker = await getWorker(0, farcallWrapper+`
-            wrk.export.`+res.funcName+` = async (args, kwargs) => {
-                return Object.keys(wrk.export).length;
-                //return JSON.stringify(Object.keys(wrk.export));
+            wrkInner.export.`+res.funcName+` = async (args, kwargs) => {
+                return Object.keys(wrkInner.export).length;
+                //return JSON.stringify(Object.keys(wrkInner.export));
             }
             `);
             res.worker.startFarcallCallbacks();

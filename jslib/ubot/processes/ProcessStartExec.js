@@ -22,25 +22,25 @@ class ProcessStartExec extends ProcessBase {
 
     static workerSrc = consoleWrapper + farcallWrapper + `
     function writeSingleStorage(data) {
-        return new Promise(resolve => wrk.farcall("writeSingleStorage", [data], {}, ans => {
+        return new Promise(resolve => wrkInner.farcall("writeSingleStorage", [data], {}, ans => {
             resolve(ans);
         }));
     }
     
     function writeMultiStorage(data) {
-        return new Promise(resolve => wrk.farcall("writeMultiStorage", [data], {}, ans => {
+        return new Promise(resolve => wrkInner.farcall("writeMultiStorage", [data], {}, ans => {
             resolve(ans);
         }));
     }
     
     function getSingleStorage() {
-        return new Promise(resolve => wrk.farcall("getSingleStorage", [], {}, ans => {
+        return new Promise(resolve => wrkInner.farcall("getSingleStorage", [], {}, ans => {
             resolve(ans);
         }));
     }
     
     function getMultiStorage() {
-        return new Promise(resolve => wrk.farcall("getMultiStorage", [], {}, ans => {
+        return new Promise(resolve => wrkInner.farcall("getMultiStorage", [], {}, ans => {
             resolve(ans);
         }));
     }
@@ -82,8 +82,8 @@ class ProcessStartExec extends ProcessBase {
             }
 
             new ScheduleExecutor(async () => {
-                //let methodExport = "wrk.export." + methodName + " = " + methodName + ";";
-                let methodExport = "wrk.export." + methodName + " = async(params) => {" +
+                //let methodExport = "wrkInner.export." + methodName + " = " + methodName + ";";
+                let methodExport = "wrkInner.export." + methodName + " = async(params) => {" +
                     "   try {" +
                     "      return await " + methodName + "(...params);" +
                     "   } catch (err) {" +

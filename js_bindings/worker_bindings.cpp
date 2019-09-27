@@ -31,7 +31,7 @@ static std::list<shared_ptr<WorkerScripter>> workersPool_accessLevel1;
 static std::unordered_map<int, shared_ptr<WorkerScripter>> workersPool_accessLevel1_used;
 
 static const std::string workerMain = R"End(
-let wrk = {};
+let wrkInner = {};
 
 __init_workers(async (src, obj) => {
     // this context can be used for something critical to the execution of source.methodName
@@ -43,26 +43,27 @@ __init_workers(async (src, obj) => {
         // interpret source
         eval(src);
         // create caller for the methodName
-        let wrap = eval(`(obj) => { return ${"wrk.onReceive"}(obj); }`);
+        let wrap = eval(`(obj) => { return ${"wrkInner.onReceive"}(obj); }`);
         // call it safely
         return wrap(obj)
     })();
 
 }, () => {
     // onGetWorker event
-    wrk.export = {};
-    wrk.nextFarcallSN = 0;
-    wrk.callbacksFarcall = new Map();
-    wrk.getNextFarcallSN = () => {
-        let res = wrk.nextFarcallSN;
-        ++wrk.nextFarcallSN;
-        if (wrk.nextFarcallSN >= Number.MAX_SAFE_INTEGER)
-            wrk.nextFarcallSN = 0;
+    wrkInner.export = {};
+    wrkInner.nextFarcallSN = 0;
+    wrkInner.callbacksFarcall = new Map();
+    wrkInner.onReceive = (obj) => {};
+    wrkInner.getNextFarcallSN = () => {
+        let res = wrkInner.nextFarcallSN;
+        ++wrkInner.nextFarcallSN;
+        if (wrkInner.nextFarcallSN >= Number.MAX_SAFE_INTEGER)
+            wrkInner.nextFarcallSN = 0;
         return res;
     };
 });
 
-wrk.send = (obj) => {
+wrkInner.send = (obj) => {
     __send_from_worker(obj);
 };
 

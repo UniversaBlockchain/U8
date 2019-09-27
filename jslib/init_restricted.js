@@ -119,6 +119,7 @@ function freezeGlobals() {
     Object.freeze(global.__boss_asyncLoad);
     Object.freeze(global.__boss_addPrototype);
     Object.freeze(global.WorkerScripter);
+    Object.freeze(global.wrkInner);
     Object.freeze(global.gc);
     Object.freeze(global.chomp);
     Object.freeze(global.equalArrays);

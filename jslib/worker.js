@@ -75,42 +75,42 @@ wrk.getWorker = function(accessLevel, workerSrc) {
 wrk.consoleWrapper = `
 let console = {
     log(...args) {
-        wrk.farcall("__worker_bios_print", [false, args, "\\n"], {});
+        wrkInner.farcall("__worker_bios_print", [false, args, "\\n"], {});
     },
     logPut(...args) {
-        wrk.farcall("__worker_bios_print", [false, args, ""], {});
+        wrkInner.farcall("__worker_bios_print", [false, args, ""], {});
     },
     info(...args) {
-        wrk.farcall("__worker_bios_print", [false, args, "\\n"], {});
+        wrkInner.farcall("__worker_bios_print", [false, args, "\\n"], {});
     },
     error(...args) {
         if (args[0] instanceof Error)
-            wrk.farcall("__worker_bios_print", [true, ["Error: ", args[0].message, ...args.slice(1), "\\n", args[0].stack], "\\n"], {});
+            wrkInner.farcall("__worker_bios_print", [true, ["Error: ", args[0].message, ...args.slice(1), "\\n", args[0].stack], "\\n"], {});
         else
-            wrk.farcall("__worker_bios_print", [true, args, "\\n"], {});
+            wrkInner.farcall("__worker_bios_print", [true, args, "\\n"], {});
     }
 };
 `;
 
 wrk.farcallWrapper = `
-wrk.onReceive = async (obj) => {
+wrkInner.onReceive = async (obj) => {
     let cmd = obj.cmd;
-    if (cmd && wrk.export[cmd]) {
-        let res = await wrk.export[cmd](obj.args, obj.kwargs);
-        wrk.send({serial:wrk.getNextFarcallSN(), ref:obj.serial, result:res});
+    if (cmd && wrkInner.export[cmd]) {
+        let res = await wrkInner.export[cmd](obj.args, obj.kwargs);
+        wrkInner.send({serial:wrkInner.getNextFarcallSN(), ref:obj.serial, result:res});
     } else if (obj.result !== undefined) {
         let ref = obj.ref;
-        if (wrk.callbacksFarcall.has(ref)) {
-            wrk.callbacksFarcall.get(ref)(obj.result);
-            wrk.callbacksFarcall.delete(ref);
+        if (wrkInner.callbacksFarcall.has(ref)) {
+            wrkInner.callbacksFarcall.get(ref)(obj.result);
+            wrkInner.callbacksFarcall.delete(ref);
         }
     }
 }
-wrk.farcall = (cmd, args, kwargs, onComplete = null) => {
-    let id = wrk.getNextFarcallSN();
+wrkInner.farcall = (cmd, args, kwargs, onComplete = null) => {
+    let id = wrkInner.getNextFarcallSN();
     if (onComplete != null)
-        wrk.callbacksFarcall.set(id, onComplete);
-    wrk.send({serial:id, cmd:cmd, args:args, kwargs:kwargs});
+        wrkInner.callbacksFarcall.set(id, onComplete);
+    wrkInner.send({serial:id, cmd:cmd, args:args, kwargs:kwargs});
 }
 `;
 
