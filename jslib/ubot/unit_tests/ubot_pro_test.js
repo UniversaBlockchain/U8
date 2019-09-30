@@ -131,6 +131,81 @@ async function generateSecureRandomRequestContract(executableContract) {
     return requestContract;
 }
 
+// unit.test("ubot_pro_test: simple", async () => {
+//     for (let i = 0; i < 50; i++) {
+//         let ubotMains = await createUBots(ubotsCount);
+//
+//         await shutdownUBots(ubotMains);
+//     }
+//
+//     console.error("Sleeping...");
+//     await sleep(50000);
+// });
+
+// unit.test("ubot_pro_test: simple 10 cloud methods", async () => {
+//     console.error("Sleeping...");
+//     await sleep(10000);
+//
+//     let ubotMains = await createUBots(ubotsCount);
+//     for (let i = 0; i < 10; i++) {
+//         let ubotClient = await new UBotClient(clientKey, TOPOLOGY_ROOT + "universa.pro.json").start();
+//
+//         let executableContract = await generateSecureRandomExecutableContract();
+//
+//         executableContract.state.data.js = `
+//         async function getRandom(max) {
+//             await writeSingleStorage({result: max});
+//
+//             return max;
+//         }
+//         `;
+//         await executableContract.seal();
+//
+//         let requestContract = await generateSecureRandomRequestContract(executableContract);
+//
+//         let session = await ubotClient.startCloudMethod(requestContract);
+//
+//         console.log("Session: " + session);
+//
+//         let state = await ubotClient.getStateCloudMethod(requestContract.id);
+//         console.log("State: " + JSON.stringify(state));
+//
+//         if (state.state !== UBotPoolState.FINISHED.val)
+//             state = await ubotClient.waitCloudMethod(requestContract.id);
+//
+//         console.log("State: " + JSON.stringify(state));
+//
+//         let states = await Promise.all(session.pool.map(async (ubotNumber) => {
+//             let state = await ubotClient.getStateCloudMethod(requestContract.id, ubotNumber);
+//
+//             if (state.state !== UBotPoolState.FINISHED.val)
+//                 state = await ubotClient.waitCloudMethod(requestContract.id, ubotNumber);
+//
+//             return state;
+//         }));
+//
+//         console.log("Final states: " + JSON.stringify(states));
+//
+//         assert(states.filter(state =>
+//             state.state === UBotPoolState.FINISHED.val &&
+//             typeof state.result === "number" && state.result === 1000    // checking secure random value
+//         ).length >= executableContract.state.data.cloud_methods.getRandom.quorum.size);
+//
+//         // waiting pool finished...
+//         while (!session.pool.every(ubot => !ubotMains[ubot].ubot.processors.get(requestContract.id.base64).state.canContinue))
+//             await sleep(100);
+//
+//         assert(session.pool.filter(
+//             ubot => ubotMains[ubot].ubot.processors.get(requestContract.id.base64).state === UBotPoolState.FINISHED).length >=
+//             executableContract.state.data.cloud_methods.getRandom.quorum.size);
+//
+//         await ubotClient.shutdown();}
+//     await shutdownUBots(ubotMains);
+//
+//     console.error("Sleeping...");
+//     await sleep(50000);
+// });
+
 unit.test("ubot_pro_test: start client", async () => {
     let ubotClient = await new UBotClient(clientKey, TOPOLOGY_ROOT + "universa.pro.json").start();
 
