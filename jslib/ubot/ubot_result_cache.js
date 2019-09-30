@@ -11,7 +11,7 @@ class UBotResultCache {
     constructor(maxAge) {
         this.records = new t.GenericMap();
         this.maxAge = maxAge;
-        this.cleanerExecutor = new ExecutorWithFixedPeriod(() => this.cleanUp(), 5000);
+        this.cleanerExecutor = new ExecutorWithFixedPeriod(() => this.cleanUp(), 20000);
         this.cleanerExecutor.run();
     }
 

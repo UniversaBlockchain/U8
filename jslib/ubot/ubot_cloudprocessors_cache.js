@@ -6,10 +6,11 @@ const ExecutorWithFixedPeriod = require("executorservice").ExecutorWithFixedPeri
 
 const t = require("tools");
 
-class UBotSessionStorageCache {
+class UBotCloudProcessorsCache {
 
-    constructor(maxAge) {
+    constructor(ubot, maxAge) {
         this.records = new t.GenericMap();
+        this.ubot = ubot;
         this.maxAge = maxAge;
         this.cleanerExecutor = new ExecutorWithFixedPeriod(() => this.cleanUp(), 20000);
         this.cleanerExecutor.run();
@@ -25,17 +26,9 @@ class UBotSessionStorageCache {
         this.cleanerExecutor.cancel();
     }
 
-    get(hash) {
-        let i = this.records.get(hash);
-        if (i != null && i.result == null)
-            throw new Error("cache: record with empty result");
-
-        return i != null ? i.result : null;
-    }
-
-    put(hash, result) {
+    put(id) {
         // this will plainly override current if any
-        new Record(hash, result, this);
+        new Record(id, this);
     }
 
     get size() {
@@ -44,19 +37,20 @@ class UBotSessionStorageCache {
 }
 
 class Record {
-    constructor(hash, result, cache) {
+    constructor(id, cache) {
         this.cache = cache;
-        this.hash = hash;
-        this.result = result;
+        this.id = id;
         this.expiresAt = Math.floor(Date.now() / 1000) + this.cache.maxAge;
-        this.cache.records.set(hash, this);
+        this.cache.records.set(id, this);
     }
 
     checkExpiration(now) {
-        if (this.expiresAt < now)
-            this.cache.records.delete(this.hash);
+        if (this.expiresAt < now) {
+            this.ubot.processors.delete(this.id);
+            this.cache.records.delete(this.id);
+        }
     }
 
 }
 
-module.exports = {UBotSessionStorageCache};
+module.exports = {UBotCloudProcessorsCache};

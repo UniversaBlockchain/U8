@@ -71,6 +71,8 @@ class CloudProcessor {
                 break;
             case UBotPoolState.FINISHED:
             case UBotPoolState.FAILED:
+                this.ubot.cloudProcessorsCache.put(this.poolId.base64);
+                this.ProcessStartExec = null;
                 return;
         }
 

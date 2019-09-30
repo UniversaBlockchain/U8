@@ -236,7 +236,11 @@ unit.test("ubot_pro_test: start cloud method", async () => {
         ubot => ubotMains[ubot].ubot.processors.get(requestContract.id.base64).state === UBotPoolState.FINISHED).length >=
         executableContract.state.data.cloud_methods.getRandom.quorum.size);
 
-    await sleep(5000);
+    //await sleep(5000);
+    let sess = null;
+    do {
+        sess = await ubotClient.getSession("ubotGetSession", {executableContractId: executableContract.id});
+    } while (Object.keys(sess).length > 0);
 
     // SECOND METHOD (READ RANDOM)
     requestContract = Contract.fromPrivateKey(userPrivKey);

@@ -8,6 +8,7 @@ const ExecutorService = require("executorservice").ExecutorService;
 const UBotCloudNotification = require("ubot/ubot_notification").UBotCloudNotification;
 const UBotConfig = require("ubot/ubot_config").UBotConfig;
 const UBotResultCache = require("ubot/ubot_result_cache").UBotResultCache;
+const UBotCloudProcessorsCache = require("ubot/ubot_cloudprocessors_cache").UBotCloudProcessorsCache;
 const UBotSessionStorageCache = require("ubot/ubot_session_storage_cache").UBotSessionStorageCache;
 const UBotClient = require('ubot/ubot_client').UBotClient;
 const Boss = require('boss.js');
@@ -22,6 +23,7 @@ class UBot {
         this.network = network;
         this.processors = new Map();
         this.resultCache = new UBotResultCache(UBotConfig.maxResultCacheAge);
+        this.cloudProcessorsCache = new UBotCloudProcessorsCache(this, UBotConfig.maxCloudProcessorsCacheAge);
         this.sessionStorageCache = new UBotSessionStorageCache(UBotConfig.maxResultCacheAge);
         this.executorService = new ExecutorService();
         this.nodeKey = nodeKey;
@@ -29,8 +31,13 @@ class UBot {
     }
 
     async shutdown() {
-        //this.logger.log("UBot.shutdown()...");
+        // waiting processors finished...
+        while (Array.from(this.processors.values()).some(proc => proc.state.canContinue))
+            await sleep(100);
+
         this.resultCache.shutdown();
+        this.cloudProcessorsCache.shutdown();
+        this.sessionStorageCache.shutdown();
         this.executorService.shutdown();
         if (this.client != null)
             await this.client.shutdown();

@@ -13,6 +13,7 @@ class UBotConfig {
     static multi_storage_download_periods = [0, 1000, 1000, 2000, 4000]; // ms
 
     static maxResultCacheAge = 20*60; //20 minutes
+    static maxCloudProcessorsCacheAge = 20*60; //20 minutes
     static maxResultDownloadAttempts = 5;
 
     static maxDownloadActualStorageResultTime = 10000; // ms
