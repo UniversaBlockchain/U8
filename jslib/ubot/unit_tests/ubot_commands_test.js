@@ -191,16 +191,28 @@ unit.test("ubot_commands_test: executeCloudMethod", async () => {
     if (state.state !== UBotPoolState.FINISHED.val)
         state = await ubotClient.waitCloudMethod(requestContract.id);
 
-    console.log("Final state: " + JSON.stringify(state));
-    assert(state.state === UBotPoolState.FINISHED.val);
+    console.log("State: " + JSON.stringify(state));
 
-    assert((await Boss.load(state.result)).val === 4);
+    let states = await Promise.all(session.pool.map(async (ubotNumber) => {
+        let state = await ubotClient.getStateCloudMethod(requestContract.id, ubotNumber);
+        if (state.state !== UBotPoolState.FINISHED.val)
+            state = await ubotClient.waitCloudMethod(requestContract.id, ubotNumber);
+        return state;
+    }))
+
+    console.log("Final states: " + JSON.stringify(states));
+    assert(states.filter(async state =>
+        state.state === UBotPoolState.FINISHED.val &&
+        (await Boss.load(state.result)).val === 4
+    ).length >= executableContract.state.data.cloud_methods.ubotAsm.quorum.size);
 
     //waiting pool finished...
     while (!session.pool.every(ubot => !ubotMains[ubot].ubot.processors.get(requestContract.id.base64).state.canContinue))
         await sleep(100);
 
-    assert(session.pool.every(ubot => ubotMains[ubot].ubot.processors.get(requestContract.id.base64).state === UBotPoolState.FINISHED));
+    assert(session.pool.filter(
+        ubot => ubotMains[ubot].ubot.processors.get(requestContract.id.base64).state === UBotPoolState.FINISHED).length >=
+        executableContract.state.data.cloud_methods.ubotAsm.quorum.size);
 
     await ubotClient.shutdown();
     await shutdownUBots(ubotMains);
@@ -256,17 +268,28 @@ unit.test("ubot_commands_test: generateRandomHash", async () => {
     if (state.state !== UBotPoolState.FINISHED.val)
         state = await ubotClient.waitCloudMethod(requestContract.id);
 
-    console.log("Final state: " + JSON.stringify(state));
-    assert(state.state === UBotPoolState.FINISHED.val);
+    console.log("State: " + JSON.stringify(state));
 
-    // checking length of random hash
-    assert(state.result.length === 96);
+     let states = await Promise.all(session.pool.map(async (ubotNumber) => {
+        let state = await ubotClient.getStateCloudMethod(requestContract.id, ubotNumber);
+        if (state.state !== UBotPoolState.FINISHED.val)
+            state = await ubotClient.waitCloudMethod(requestContract.id, ubotNumber);
+        return state;
+    }))
+
+    console.log("Final states: " + JSON.stringify(states));
+    assert(states.filter(state =>
+        state.state === UBotPoolState.FINISHED.val &&
+        state.result.length === 96  // checking length of random hash
+    ).length >= executableContract.state.data.cloud_methods.ubotAsm.quorum.size);
 
     //waiting pool finished...
     while (!session.pool.every(ubot => !ubotMains[ubot].ubot.processors.get(requestContract.id.base64).state.canContinue))
         await sleep(100);
 
-    assert(session.pool.every(ubot => ubotMains[ubot].ubot.processors.get(requestContract.id.base64).state === UBotPoolState.FINISHED));
+     assert(session.pool.filter(
+        ubot => ubotMains[ubot].ubot.processors.get(requestContract.id.base64).state === UBotPoolState.FINISHED).length >=
+        executableContract.state.data.cloud_methods.ubotAsm.quorum.size);
 
     await ubotClient.shutdown();
     await shutdownUBots(ubotMains);
@@ -322,14 +345,24 @@ unit.test("ubot_commands_test: errorOutput", async () => {
     if (state.state !== UBotPoolState.FINISHED.val)
         state = await ubotClient.waitCloudMethod(requestContract.id);
 
-    console.log("Final state: " + JSON.stringify(state));
-    assert(state.state === UBotPoolState.FAILED.val);
+    console.log("State: " + JSON.stringify(state));
 
-    let errors = state.errors;
-    assert(errors.length === 1);
-    assert(errors[0].error === Errors.FAILURE);
-    assert(errors[0].objectName === "UBotProcess_writeSingleStorage");
-    assert(errors[0].message === "writing to single storage declined");
+    let states = await Promise.all(session.pool.map(async (ubotNumber) => {
+        let state = await ubotClient.getStateCloudMethod(requestContract.id, ubotNumber);
+        if (state.state !== UBotPoolState.FAILED.val)
+            state = await ubotClient.waitCloudMethod(requestContract.id, ubotNumber);
+        return state;
+    }));
+
+    console.log("Final states: " + JSON.stringify(states));
+
+    assert(states.every(state =>
+        state.state === UBotPoolState.FAILED.val &&
+        state.errors.length === 1 &&
+        state.errors[0].error === Errors.FAILURE &&
+        state.errors[0].objectName === "UBotProcess_writeSingleStorage" &&
+        state.errors[0].message === "writing to single storage declined"
+    ));
 
     //waiting pool finished...
     while (!session.pool.every(ubot => !ubotMains[ubot].ubot.processors.get(requestContract.id.base64).state.canContinue))
@@ -401,17 +434,28 @@ unit.test("ubot_commands_test: multi-verify method", async () => {
     if (state.state !== UBotPoolState.FINISHED.val)
         state = await ubotClient.waitCloudMethod(requestContract.id);
 
-    console.log("Final state: " + JSON.stringify(state));
-    assert(state.state === UBotPoolState.FINISHED.val);
+    console.log("State: " + JSON.stringify(state));
 
-    // checking length of random hash
-    assert(state.result.length === 96);
+    let states = await Promise.all(session.pool.map(async (ubotNumber) => {
+        let state = await ubotClient.getStateCloudMethod(requestContract.id, ubotNumber);
+        if (state.state !== UBotPoolState.FINISHED.val)
+            state = await ubotClient.waitCloudMethod(requestContract.id, ubotNumber);
+        return state;
+    }))
+
+    console.log("Final states: " + JSON.stringify(states));
+    assert(states.filter(state =>
+        state.state === UBotPoolState.FINISHED.val &&
+        state.result.length === 96      // checking length of random hash
+    ).length >= executableContract.state.data.cloud_methods.main.quorum.size);
 
     //waiting pool finished...
     while (!session.pool.every(ubot => !ubotMains[ubot].ubot.processors.get(requestContract.id.base64).state.canContinue))
         await sleep(100);
 
-    assert(session.pool.every(ubot => ubotMains[ubot].ubot.processors.get(requestContract.id.base64).state === UBotPoolState.FINISHED));
+    assert(session.pool.filter(
+        ubot => ubotMains[ubot].ubot.processors.get(requestContract.id.base64).state === UBotPoolState.FINISHED).length >=
+        executableContract.state.data.cloud_methods.main.quorum.size);
 
     await ubotClient.shutdown();
     await shutdownUBots(ubotMains);
@@ -477,14 +521,24 @@ unit.test("ubot_commands_test: multi-verify method failed", async () => {
     if (state.state !== UBotPoolState.FINISHED.val)
         state = await ubotClient.waitCloudMethod(requestContract.id);
 
-    console.log("Final state: " + JSON.stringify(state));
-    assert(state.state === UBotPoolState.FAILED.val);
+    console.log("State: " + JSON.stringify(state));
 
-    let errors = state.errors;
-    assert(errors.length === 1);
-    assert(errors[0].error === Errors.FAILURE);
-    assert(errors[0].objectName === "UBotProcess_writeMultiStorage");
-    assert(errors[0].message === "failed self result verification");
+    let states = await Promise.all(session.pool.map(async (ubotNumber) => {
+        let state = await ubotClient.getStateCloudMethod(requestContract.id, ubotNumber);
+        if (state.state !== UBotPoolState.FAILED.val)
+            state = await ubotClient.waitCloudMethod(requestContract.id, ubotNumber);
+        return state;
+    }));
+
+    console.log("Final states: " + JSON.stringify(states));
+
+    assert(states.every(state =>
+        state.state === UBotPoolState.FAILED.val &&
+        state.errors.length === 1 &&
+        state.errors[0].error === Errors.FAILURE &&
+        state.errors[0].objectName === "UBotProcess_writeMultiStorage" &&
+        state.errors[0].message === "failed self result verification"
+    ));
 
     //waiting pool finished...
     while (!session.pool.every(ubot => !ubotMains[ubot].ubot.processors.get(requestContract.id.base64).state.canContinue))
@@ -561,22 +615,34 @@ unit.test("ubot_commands_test: call sub-method", async () => {
     if (state.state !== UBotPoolState.FINISHED.val)
         state = await ubotClient.waitCloudMethod(requestContract.id);
 
-    console.log("Final state: " + JSON.stringify(state));
-    assert(state.state === UBotPoolState.FINISHED.val);
+    console.log("State: " + JSON.stringify(state));
 
-    assert((await Boss.load(state.result)).val === 4);
+    let states = await Promise.all(session.pool.map(async (ubotNumber) => {
+        let state = await ubotClient.getStateCloudMethod(requestContract.id, ubotNumber);
+        if (state.state !== UBotPoolState.FINISHED.val)
+            state = await ubotClient.waitCloudMethod(requestContract.id, ubotNumber);
+        return state;
+    }))
+
+    console.log("Final states: " + JSON.stringify(states));
+    assert(states.filter(async state =>
+        state.state === UBotPoolState.FINISHED.val &&
+        (await Boss.load(state.result)).val === 4
+    ).length >= executableContract.state.data.cloud_methods.main.quorum.size);
 
     //waiting pool finished...
     while (!session.pool.every(ubot => !ubotMains[ubot].ubot.processors.get(requestContract.id.base64).state.canContinue))
         await sleep(100);
 
-    assert(session.pool.every(ubot => ubotMains[ubot].ubot.processors.get(requestContract.id.base64).state === UBotPoolState.FINISHED));
+    assert(session.pool.filter(
+        ubot => ubotMains[ubot].ubot.processors.get(requestContract.id.base64).state === UBotPoolState.FINISHED).length >=
+        executableContract.state.data.cloud_methods.main.quorum.size);
 
     await ubotClient.shutdown();
     await shutdownUBots(ubotMains);
 });
 
-unit.test("ubot_commands_test: secureRandom", async () => {
+/*unit.test("ubot_commands_test: secureRandom", async () => {
     let ubotMains = await createUBots(ubotsCount);
     let ubotClient = await new UBotClient(clientKey, TOPOLOGY_ROOT + "universa.pro.json").start();
 
@@ -700,21 +766,32 @@ unit.test("ubot_commands_test: secureRandom", async () => {
     if (state.state !== UBotPoolState.FINISHED.val)
         state = await ubotClient.waitCloudMethod(requestContract.id);
 
-    console.log("Final state: " + JSON.stringify(state));
-    assert(state.state === UBotPoolState.FINISHED.val);
+    console.log("State: " + JSON.stringify(state));
 
-    // checking length of random hash
-    assert(state.result.length === 96);
+    let states = await Promise.all(session.pool.map(async (ubotNumber) => {
+        let state = await ubotClient.getStateCloudMethod(requestContract.id, ubotNumber);
+        if (state.state !== UBotPoolState.FINISHED.val)
+            state = await ubotClient.waitCloudMethod(requestContract.id, ubotNumber);
+        return state;
+    }))
+
+    console.log("Final states: " + JSON.stringify(states));
+    assert(states.filter(state =>
+        state.state === UBotPoolState.FINISHED.val &&
+        state.result.length === 96      // checking length of random hash
+    ).length >= executableContract.state.data.cloud_methods.getRandom.quorum.size);
 
     //waiting pool finished...
     while (!session.pool.every(ubot => !ubotMains[ubot].ubot.processors.get(requestContract.id.base64).state.canContinue))
         await sleep(100);
 
-    assert(session.pool.every(ubot => ubotMains[ubot].ubot.processors.get(requestContract.id.base64).state === UBotPoolState.FINISHED));
+    assert(session.pool.filter(
+        ubot => ubotMains[ubot].ubot.processors.get(requestContract.id.base64).state === UBotPoolState.FINISHED).length >=
+        executableContract.state.data.cloud_methods.getRandom.quorum.size);
 
     await ubotClient.shutdown();
     await shutdownUBots(ubotMains);
-});
+});*/
 
 unit.test("ubot_commands_test: getDataByRecordId", async () => {
     let ubotMains = await createUBots(ubotsCount);
@@ -775,16 +852,28 @@ unit.test("ubot_commands_test: getDataByRecordId", async () => {
     if (state.state !== UBotPoolState.FINISHED.val)
         state = await ubotClient.waitCloudMethod(requestContract.id);
 
-    console.log("Final state: " + JSON.stringify(state));
-    assert(state.state === UBotPoolState.FINISHED.val);
+    console.log("State: " + JSON.stringify(state));
 
-    assert(state.result);
+    let states = await Promise.all(session.pool.map(async (ubotNumber) => {
+        let state = await ubotClient.getStateCloudMethod(requestContract.id, ubotNumber);
+        if (state.state !== UBotPoolState.FINISHED.val)
+            state = await ubotClient.waitCloudMethod(requestContract.id, ubotNumber);
+        return state;
+    }))
+
+    console.log("Final states: " + JSON.stringify(states));
+    assert(states.filter(state =>
+        state.state === UBotPoolState.FINISHED.val &&
+        state.result
+    ).length >= executableContract.state.data.cloud_methods.ubotAsm.quorum.size);
 
     //waiting pool finished...
     while (!session.pool.every(ubot => !ubotMains[ubot].ubot.processors.get(requestContract.id.base64).state.canContinue))
         await sleep(100);
 
-    assert(session.pool.every(ubot => ubotMains[ubot].ubot.processors.get(requestContract.id.base64).state === UBotPoolState.FINISHED));
+    assert(session.pool.filter(
+        ubot => ubotMains[ubot].ubot.processors.get(requestContract.id.base64).state === UBotPoolState.FINISHED).length >=
+        executableContract.state.data.cloud_methods.ubotAsm.quorum.size);
 
     await ubotClient.shutdown();
     await shutdownUBots(ubotMains);

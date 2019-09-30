@@ -86,6 +86,7 @@ class UBotClient {
      * Complete client work and also closes all connections.
      *
      * @async
+     * @return {Promise<void>}
      */
     async shutdown() {
         if (this.httpNodeClients.length === 0)
@@ -103,6 +104,7 @@ class UBotClient {
      *
      * @private
      * @async
+     * @return {Promise<void>}
      */
     async connectAllNodes() {
         for (let i = 0; i < this.nodes.length; i++) {
@@ -123,6 +125,7 @@ class UBotClient {
      * @private
      * @async
      * @param pool
+     * @return {Promise<void>}
      */
     async connectRandomUbot(pool) {
         if (this.topologyUBotNet == null)
@@ -156,6 +159,14 @@ class UBotClient {
         this.httpUbotClients.set(this.httpUbotClient.nodeNumber, this.httpUbotClient);
     }
 
+    /**
+     * Selects a specific UBot number to which the client connects.
+     *
+     * @private
+     * @async
+     * @param ubotNumber - UBot number.
+     * @return {Promise<HttpClient>}
+     */
     async connectUbot(ubotNumber) {
         if (this.topologyUBotNet == null || this.ubots.length === 0)
             throw new UBotClientException("UBotNet topology not initialized");
@@ -243,7 +254,7 @@ class UBotClient {
     }
 
     /**
-     * Executes a command on all nodes of the Universe network.
+     * Executes a command on all nodes of the Universa network.
      *
      * @private
      * @async
@@ -381,8 +392,8 @@ class UBotClient {
      *
      * @param {HashId} executableContractId - The Executable contract id.
      * @param {HashId} requestContractId - The Request contract id.
-     * @param ubotNumber
-     * @param ubot
+     * @param {number} ubotNumber - UBot number to request the current state.
+     * @param {UBot} ubot - UBot.
      * @private
      * @async
      * @return {Promise<UBotSession>}.
@@ -430,7 +441,7 @@ class UBotClient {
      * then the result of the cloud method execution is in the returned data.
      *
      * @param {HashId} requestContractId - The Request contract id.
-     * @param {number} ubotNumber - Number to request the current state.
+     * @param {number} ubotNumber - UBot number to request the current state.
      *      By default - number of ubot, which connected in {@link startCloudMethod}.
      * @async
      * @return {Promise<Object>} fields in the object: state - method status, result - method result, errors - error list.
@@ -460,7 +471,7 @@ class UBotClient {
      * returns its final state with the result of the cloud method.
      *
      * @param {HashId} requestContractId - The Request contract id.
-     * @param {number} ubotNumber - Number to request the current state.
+     * @param {number} ubotNumber - UBot number to request the current state.
      *      By default - number of ubot, which connected in {@link startCloudMethod}.
      * @async
      * @return {Promise<Object>} fields in the object: state - method status, result - method result, errors - error list.
@@ -483,6 +494,7 @@ class UBotClient {
      * on a new random pool using the startCloudMethod method.
      *
      * @async
+     * @return {Promise<void>}
      */
     async disconnectUbot() {
         if (this.httpUbotClient == null)
