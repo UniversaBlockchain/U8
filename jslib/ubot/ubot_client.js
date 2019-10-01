@@ -337,6 +337,59 @@ class UBotClient {
     }
 
     /**
+     * Check request (request and executable contracts) before create session.
+     *
+     * @param {Contract} requestContract - The Request contract.
+     * @private
+     * @throws {UBotClientException} client exception.
+     */
+    static checkRequest(requestContract) {
+        if (requestContract == null)
+            throw new UBotClientException("Request contract is null");
+
+        if (requestContract.state.data.executable_contract_id == null)
+            throw new UBotClientException("Error request contract: executable contact ID is not defined");
+
+        if (requestContract.transactionPack == null || requestContract.transactionPack.referencedItems == null)
+            throw new UBotClientException("Error request contract: executable contact is not found in transaction pack");
+
+        // get executable contract
+        let executableContract = requestContract.transactionPack.referencedItems.get(requestContract.state.data.executable_contract_id);
+
+        if (executableContract == null)
+            throw new UBotClientException("Error request contract: executable contact is not found in transaction pack");
+
+        // check request contract data
+        if (requestContract.state.data.method_name == null || typeof requestContract.state.data.method_name !== "string")
+            throw new UBotClientException("Error request contract: starting cloud method name is not defined or not string");
+
+        if (!requestContract.state.data.executable_contract_id.equals(executableContract.id))
+            throw new UBotClientException("Error request contract: executable contact ID not match ID saved in request contract");
+
+        let methodName = requestContract.state.data.method_name;
+
+        // check executable contract data
+        if (executableContract.state.data.cloud_methods == null ||
+            !executableContract.state.data.cloud_methods.hasOwnProperty(methodName))
+            throw new UBotClientException("Error executable contract: starting cloud method metadata (in state.data.cloud_methods) is not defined");
+
+        if (executableContract.state.data.cloud_methods[methodName] == null ||
+            typeof executableContract.state.data.cloud_methods[methodName] !== "object")
+            throw new UBotClientException("Error executable contract: starting cloud method metadata (in state.data.cloud_methods) is not object");
+
+        if (executableContract.state.data.cloud_methods[methodName].pool == null ||
+            executableContract.state.data.cloud_methods[methodName].pool.size == null)
+            throw new UBotClientException("Error executable contract: pool of starting cloud method is not defined in metadata (in state.data.cloud_methods)");
+
+        if (executableContract.state.data.cloud_methods[methodName].quorum == null ||
+            executableContract.state.data.cloud_methods[methodName].quorum.size == null)
+            throw new UBotClientException("Error executable contract: quorum of starting cloud method is not defined in metadata (in state.data.cloud_methods)");
+
+        if (executableContract.state.data.js == null && executableContract.state.data.cloud_methods[methodName].ubotAsm == null)
+            throw new UBotClientException("Error executable contract: executable contact JS-code is not defined");
+    }
+
+    /**
     * Start cloud method.
     * Requests the creation of a session with a randomly selected pool using the Request contract.
     * Creates a session with the id of the Request contract or throws an exception if the session is already created
@@ -352,6 +405,8 @@ class UBotClient {
     async startCloudMethod(requestContract) {
         if (this.httpUbotClient != null)
             throw new UBotClientException("Ubot is connected to the pool. First disconnect from the pool");
+
+        UBotClient.checkRequest(requestContract);
 
         let session = await this.createSession(requestContract);
 
