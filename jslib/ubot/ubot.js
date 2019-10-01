@@ -44,7 +44,7 @@ class UBot {
     }
 
     async executeCloudMethod(contract) {
-        this.logger.log("executeCloudMethod: startingContract.id = " + contract.id);
+        this.logger.log("executeCloudMethod: requestContract.id = " + contract.id);
         this.logger.log("  contract.state.data: " + JSON.stringify(contract.state.data));
 
         if (this.client == null)
@@ -54,7 +54,7 @@ class UBot {
         this.logger.log("executeCloudMethod session: " + session);
 
         let processor = new CloudProcessor(UBotPoolState.SEND_STARTING_CONTRACT, contract.id, this, session);
-        processor.startingContract = contract;
+        processor.requestContract = contract;
         processor.startProcessingCurrentState();
         this.processors.set(contract.id.base64, processor);
     }
@@ -92,11 +92,11 @@ class UBot {
             this.logger.log("Warning: unknown notification. Type = " + notification.type.ordinal + ", Type code = " + notification.typeCode);
     }
 
-    getStartingContract(hashId) {
+    getRequestContract(hashId) {
         if (this.processors.has(hashId.base64)) {
             let proc = this.processors.get(hashId.base64);
-            if (proc.startingContract != null)
-                return proc.startingContract;
+            if (proc.requestContract != null)
+                return proc.requestContract;
         }
         return null;
     }

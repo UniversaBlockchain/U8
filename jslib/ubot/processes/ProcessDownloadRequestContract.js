@@ -6,13 +6,13 @@ const ProcessBase = require("ubot/processes/ProcessBase").ProcessBase;
 const UBotCloudNotification = require("ubot/ubot_notification").UBotCloudNotification;
 const Boss = require('boss.js');
 
-class ProcessDownloadStartingContract extends ProcessBase {
+class ProcessDownloadRequestContract extends ProcessBase {
     constructor(processor, onReady) {
         super(processor, onReady)
     }
 
     start() {
-        this.pr.logger.log("start ProcessDownloadStartingContract");
+        this.pr.logger.log("start ProcessDownloadRequestContract");
 
         // periodically try to download starting contract (retry on notify)
         this.pulse();
@@ -21,13 +21,13 @@ class ProcessDownloadStartingContract extends ProcessBase {
     pulse() {
         this.pr.ubot.network.sendGetRequestToUbot(
             this.pr.respondToNotification.from,
-            "/getStartingContract/" + this.pr.poolId.base64,
+            "/getRequestContract/" + this.pr.poolId.base64,
             async (respCode, body) => {
                 if (respCode === 200) {
                     let ans = await Boss.load(body);
-                    this.pr.startingContract = await Contract.fromPackedTransaction(ans.contractBin);
-                    this.pr.executableContract = this.pr.startingContract.transactionPack.referencedItems.get(
-                        this.pr.startingContract.state.data.executable_contract_id);
+                    this.pr.requestContract = await Contract.fromPackedTransaction(ans.contractBin);
+                    this.pr.executableContract = this.pr.requestContract.transactionPack.referencedItems.get(
+                        this.pr.requestContract.state.data.executable_contract_id);
                     this.pr.initPoolAndQuorum();
                     // this.pr.pool = [];
                     // ans.selectedPool.forEach(i => this.pr.pool.push(this.pr.ubot.network.netConfig.getInfo(i)));
@@ -44,7 +44,7 @@ class ProcessDownloadStartingContract extends ProcessBase {
                     );
                     this.onReady();
                 } else {
-                    this.pr.logger.log("warning: getStartingContract respCode = "+ respCode);
+                    this.pr.logger.log("warning: getRequestContract respCode = "+ respCode);
                 }
             }
         );
@@ -57,4 +57,4 @@ class ProcessDownloadStartingContract extends ProcessBase {
     }
 }
 
-module.exports = {ProcessDownloadStartingContract};
+module.exports = {ProcessDownloadRequestContract};

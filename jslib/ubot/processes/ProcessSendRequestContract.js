@@ -8,7 +8,7 @@ const ExecutorWithFixedPeriod = require("executorservice").ExecutorWithFixedPeri
 const t = require("tools");
 const UBotCloudNotification = require("ubot/ubot_notification").UBotCloudNotification;
 
-class ProcessSendStartingContract extends ProcessBase {
+class ProcessSendRequestContract extends ProcessBase {
     constructor(processor, onReady) {
         super(processor, onReady);
         this.currentTask = null;
@@ -32,10 +32,10 @@ class ProcessSendStartingContract extends ProcessBase {
     // }
 
     async start() {
-        this.pr.logger.log("start ProcessSendStartingContract");
+        this.pr.logger.log("start ProcessSendRequestContract");
 
-        this.pr.executableContract = this.pr.startingContract.transactionPack.referencedItems.get(
-            this.pr.startingContract.state.data.executable_contract_id);
+        this.pr.executableContract = this.pr.requestContract.transactionPack.referencedItems.get(
+            this.pr.requestContract.state.data.executable_contract_id);
 
         this.pr.initPoolAndQuorum();
 
@@ -72,4 +72,4 @@ class ProcessSendStartingContract extends ProcessBase {
 
 }
 
-module.exports = {ProcessSendStartingContract};
+module.exports = {ProcessSendRequestContract};

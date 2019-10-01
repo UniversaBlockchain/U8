@@ -14,13 +14,13 @@ const UBotPoolState = {
 
     /**
      * At this state CloudProcessor should select ubots for new pool,
-     * and periodically send to them udp notifications with invite to download startingContract.
-     * Meanwhile, CloudProcessor is waiting for other ubots in pool to downloads startingContract.
+     * and periodically send to them udp notifications with invite to download requestContract.
+     * Meanwhile, CloudProcessor is waiting for other ubots in pool to downloads requestContract.
      */
     SEND_STARTING_CONTRACT                     : {val: "SEND_STARTING_CONTRACT", canContinue: true, ordinal: 1},
 
     /**
-     * CloudProcessor is downloading startingContract from pool starter ubot.
+     * CloudProcessor is downloading requestContract from pool starter ubot.
      */
     DOWNLOAD_STARTING_CONTRACT                 : {val: "DOWNLOAD_STARTING_CONTRACT", canContinue: true, ordinal: 2},
 

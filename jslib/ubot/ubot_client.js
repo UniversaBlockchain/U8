@@ -514,7 +514,7 @@ class UBotClient {
             throw new UBotClientException("Ubot HTTP client is not initialized");
 
         return new Promise(async (resolve, reject) =>
-            await client.command("getState", {startingContractId: requestContractId},
+            await client.command("getState", {requestContractId: requestContractId},
                 result => resolve(result),
                 error => reject(error)
             )

@@ -23,7 +23,7 @@ class UBotHttpServer extends network.HttpServer {
         this.addSecureEndpoint("executeCloudMethod", (params, clientKey) => this.onExecuteCloudMethod(params, clientKey));
         this.addSecureEndpoint("getState", (params, clientKey) => this.getState(params, clientKey));
 
-        this.addRawEndpoint("/getStartingContract", request => this.onGetStartingContract(request));
+        this.addRawEndpoint("/getRequestContract", request => this.onGetRequestContract(request));
         this.addRawEndpoint("/getSingleStorageResult", request => this.onGetStorageResult(request, false));
         this.addRawEndpoint("/getMultiStorageResult", request => this.onGetStorageResult(request, true));
         this.addRawEndpoint("/downloadActualSingleStorageResult", request => this.onDownloadActualStorageResult(request, false));
@@ -51,7 +51,7 @@ class UBotHttpServer extends network.HttpServer {
 
     async getState(params, clientKey) {
       try {
-          let proc = this.ubot.processors.get(params.startingContractId.base64);
+          let proc = this.ubot.processors.get(params.RequestContract.base64);
           let result = {state: proc.state.val};
           if (proc.state === UBotPoolState.FINISHED)
               result.result = proc.output;
@@ -67,11 +67,11 @@ class UBotHttpServer extends network.HttpServer {
         }
     }
 
-    async onGetStartingContract(request) {
+    async onGetRequestContract(request) {
         let paramIndex = request.path.indexOf("/", 1) + 1;
         let encodedString = request.path.substring(paramIndex);
         let hashId = HashId.withBase64Digest(encodedString);
-        let contract = this.ubot.getStartingContract(hashId);
+        let contract = this.ubot.getRequestContract(hashId);
         if (contract != null) {
             let contractBin = await contract.getPackedTransaction();
             //let selectedPool = this.ubot.getSelectedPoolNumbers(hashId);

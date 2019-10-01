@@ -180,19 +180,19 @@ unit.test("ubot_main_test: JS secureRandom", async () => {
 
     await executableContract.seal();
 
-    let startingContract = Contract.fromPrivateKey(userPrivKey);
-    startingContract.state.data.method_name = "getRandom";
-    startingContract.state.data.method_args = [1000];
-    startingContract.state.data.executable_contract_id = executableContract.id;
+    let requestContract = Contract.fromPrivateKey(userPrivKey);
+    requestContract.state.data.method_name = "getRandom";
+    requestContract.state.data.method_args = [1000];
+    requestContract.state.data.executable_contract_id = executableContract.id;
 
-    await cs.addConstraintToContract(startingContract, executableContract, "executableContractConstraint",
+    await cs.addConstraintToContract(requestContract, executableContract, "executableContractConstraint",
         Constraint.TYPE_EXISTING_STATE, ["this.state.data.executable_contract_id == ref.id"], true);
 
     console.log("executableContract.id: " + executableContract.id);
-    console.log("startingContract.id: " + startingContract.id);
+    console.log("requestContract.id: " + requestContract.id);
 
-    let startingContractBin = await startingContract.getPackedTransaction();
-    await client.command("executeCloudMethod", {contract: startingContractBin}, resp=>{
+    let requestContracttBin = await requestContract.getPackedTransaction();
+    await client.command("executeCloudMethod", {contract: requestContractBin}, resp=>{
         console.log("resp: " + JSON.stringify(resp));
     }, err=>{
         console.log("err: " + err);
@@ -202,21 +202,21 @@ unit.test("ubot_main_test: JS secureRandom", async () => {
     await sleep(5000);
 
     let pool = [];
-    let proc = ubotMains[0].ubot.processors.get(startingContract.id.base64);
+    let proc = ubotMains[0].ubot.processors.get(requestContract.id.base64);
 
     for (let i = 0; i < proc.pool.length; i++)
         pool.push(proc.pool[i].number);
 
     //waiting pool finished...
-    while (!pool.every(ubot => !ubotMains[ubot].ubot.processors.get(startingContract.id.base64).state.canContinue))
+    while (!pool.every(ubot => !ubotMains[ubot].ubot.processors.get(requestContract.id.base64).state.canContinue))
         await sleep(100);
 
-    assert(pool.every(ubot => ubotMains[ubot].ubot.processors.get(startingContract.id.base64).state === UBotPoolState.FINISHED));
+    assert(pool.every(ubot => ubotMains[ubot].ubot.processors.get(requestContract.id.base64).state === UBotPoolState.FINISHED));
 
     let fire = null;
     let event = new Promise(resolve => fire = resolve);
 
-    await client.command("getState", {startingContractId: startingContract.id}, resp=>{
+    await client.command("getState", {requestContractId: requestContract.id}, resp=>{
         console.log("resp: " + JSON.stringify(resp));
         fire(resp.result);
     }, err=>{

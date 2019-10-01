@@ -2,8 +2,8 @@
  * Copyright (c) 2019-present Sergey Chernov, iCodici S.n.C, All Rights Reserved.
  */
 
-const ProcessSendStartingContract = require("ubot/processes/ProcessSendStartingContract").ProcessSendStartingContract;
-const ProcessDownloadStartingContract = require("ubot/processes/ProcessDownloadStartingContract").ProcessDownloadStartingContract;
+const ProcessSendRequestContract = require("ubot/processes/ProcessSendRequestContract").ProcessSendRequestContract;
+const ProcessDownloadRequestContract = require("ubot/processes/ProcessDownloadRequestContract").ProcessDownloadRequestContract;
 const ProcessStartExec = require("ubot/processes/ProcessStartExec").ProcessStartExec;
 const ErrorRecord = require("errors").ErrorRecord;
 const Errors = require("errors").Errors;
@@ -14,7 +14,7 @@ class CloudProcessor {
     constructor(initialState, poolId, ubot, session) {
         this.state = initialState;
         this.poolId = poolId;
-        this.startingContract = null;
+        this.requestContract = null;
         this.executableContract = null;
         this.ubot = ubot;
         this.session = session;
@@ -51,14 +51,14 @@ class CloudProcessor {
     startProcessingCurrentState() {
         switch (this.state) {
             case UBotPoolState.SEND_STARTING_CONTRACT:
-                this.currentProcess = new ProcessSendStartingContract(this, ()=>{
-                    this.logger.log("CloudProcessor.ProcessSendStartingContract.onReady");
+                this.currentProcess = new ProcessSendRequestContract(this, ()=>{
+                    this.logger.log("CloudProcessor.ProcessSendRequestContract.onReady");
                     this.changeState(UBotPoolState.START_EXEC);
                 });
                 break;
             case UBotPoolState.DOWNLOAD_STARTING_CONTRACT:
-                this.currentProcess = new ProcessDownloadStartingContract(this, () => {
-                    this.logger.log("CloudProcessor.ProcessDownloadStartingContract.onReady, poolSize = " + this.poolSize);
+                this.currentProcess = new ProcessDownloadRequestContract(this, () => {
+                    this.logger.log("CloudProcessor.ProcessDownloadRequestContract.onReady, poolSize = " + this.poolSize);
                     this.changeState(UBotPoolState.START_EXEC);
                 });
                 break;
@@ -119,10 +119,10 @@ class CloudProcessor {
     }
 
     initPoolAndQuorum() {
-        this.methodName = this.startingContract.state.data.method_name;
+        this.methodName = this.requestContract.state.data.method_name;
 
-        if (this.startingContract.state.data.hasOwnProperty("method_args"))
-            this.methodArgs = this.startingContract.state.data.method_args;
+        if (this.requestContract.state.data.hasOwnProperty("method_args"))
+            this.methodArgs = this.requestContract.state.data.method_args;
 
         if (this.executableContract.state.data.cloud_methods.hasOwnProperty(this.methodName)) {
             if (this.executableContract.state.data.cloud_methods[this.methodName].hasOwnProperty("pool"))
