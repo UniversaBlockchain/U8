@@ -53,6 +53,10 @@ async function generateSecureRandomExecutableContract() {
         getRandom: {
             pool: {size: 5},
             quorum: {size: 4}
+        },
+        readRandom: {
+            pool: {size: 5},
+            quorum: {size: 4}
         }
     };
 
@@ -260,7 +264,7 @@ unit.test("ubot_pro_test: start cloud method", async () => {
     await shutdownUBots(ubotMains);
 });
 
-/*unit.test("ubot_pro_test: 2 cloud method", async () => {
+unit.test("ubot_pro_test: 2 cloud method", async () => {
     let ubotMains = await createUBots(ubotsCount);
     let ubotClient = await new UBotClient(clientKey, TOPOLOGY_ROOT + "universa.pro.json").start();
 
@@ -364,7 +368,7 @@ unit.test("ubot_pro_test: start cloud method", async () => {
 
     await ubotClient.shutdown();
     await shutdownUBots(ubotMains);
-});*/
+});
 
 unit.test("ubot_pro_test: parallel cloud methods", async () => {
     let ubotMains = await createUBots(ubotsCount);
