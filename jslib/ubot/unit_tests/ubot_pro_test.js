@@ -4,6 +4,7 @@
 
 import {expect, assert, unit} from 'test'
 import * as tk from "unit_tests/test_keys";
+import {VerboseLevel} from "node_consts";
 
 const UBotMain = require("ubot/ubot_main").UBotMain;
 const UBotPoolState = require("ubot/ubot_pool_state").UBotPoolState;
@@ -218,7 +219,11 @@ unit.test("ubot_pro_test: start client", async () => {
 
 unit.test("ubot_pro_test: start cloud method", async () => {
     let ubotMains = await createUBots(ubotsCount);
-    //for (let i = 0; i < 10; i++) {
+
+    // ubotMains.forEach(main => main.ubot.network.verboseLevel = VerboseLevel.BASE);
+    // for (let i = 0; i < 10; i++) {
+    // console.error("Iteration = " + i);
+
     let ubotClient = await new UBotClient(clientKey, TOPOLOGY_ROOT + "universa.pro.json").start();
 
     let executableContract = await generateSecureRandomExecutableContract();
@@ -260,7 +265,16 @@ unit.test("ubot_pro_test: start cloud method", async () => {
         ubot => ubotMains[ubot].ubot.processors.get(requestContract.id.base64).state === UBotPoolState.FINISHED).length >=
         executableContract.state.data.cloud_methods.getRandom.quorum.size);
 
-    await ubotClient.shutdown();
+    // close node clients
+    // for (let ubot of session.pool) {
+    //     for (let httpClient of ubotMains[ubot].ubot.client.httpNodeClients)
+    //         if (httpClient.nodeNumber !== ubotMains[ubot].ubot.client.httpNodeClient.nodeNumber)
+    //             await httpClient.stop();
+    //
+    //     ubotMains[ubot].ubot.client.httpNodeClients = [];
+    // }
+
+    await ubotClient.shutdown();//}
     await shutdownUBots(ubotMains);
 });
 

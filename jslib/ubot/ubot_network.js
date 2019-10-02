@@ -48,7 +48,7 @@ class UBotNetwork {
                     if (notification == null) {
                         this.report("bad notification skipped", VerboseLevel.BASE);
                     } else {
-                        //this.logNotification(notification, this.myInfo, fromNode);
+                        this.logNotification(notification, this.myInfo, fromNode);
                         this.consumer(notification);
                     }
                 });
@@ -120,10 +120,14 @@ class UBotNetwork {
         }
     }
 
+    logNotification(notification, to, from) {
+        this.report("Notification " + from.number + " -> " + to.number + ": " + notification.toString(), VerboseLevel.BASE);
+    }
+
     deliver(toUbot, notification) {
         try {
             let data = this.packNotifications(this.myInfo, [notification]);
-            //this.logNotification(notification, toUbot, this.myInfo);
+            this.logNotification(notification, toUbot, this.myInfo);
 
             if (this.adapter != null)
                 this.adapter.send(toUbot.number, data);

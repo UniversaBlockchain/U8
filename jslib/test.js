@@ -91,9 +91,11 @@ const unit = {
                 passedTestsCount++;
                 console.log("ok");
             } catch (e) {
-                console.log("FAILED!");
-                console.error(e.message);
-                console.error(e.stack);
+                console.log("unit test FAILED!");
+                console.error("unit test FAILED: message = " + e.message);
+                console.error("unit test FAILED: stack = " + e.stack);
+                if (e.message === undefined)
+                    console.error("unit test FAILED: error = " + JSON.stringify(e));
                 failedTestsCount++;
             }
         }
