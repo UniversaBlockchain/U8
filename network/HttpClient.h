@@ -119,7 +119,8 @@ private:
     std::string makeFullUrl(const std::string& path);
 
 private:
-    HttpClientWorkerAsync worker_;
+    static std::mutex workerInitMutex_;
+    static std::shared_ptr<HttpClientWorkerAsync> worker_;
     std::shared_ptr<HttpClientSession> session_;
     std::string rootUrl_;
     int startTimeoutMillis_ = 10000;

@@ -12,6 +12,8 @@
 namespace network {
 
 const int HttpClient::CLIENT_VERSION = 2;
+std::mutex HttpClient::workerInitMutex_;
+std::shared_ptr<HttpClientWorkerAsync> HttpClient::worker_;
 
 const std::string idChars = "0123456789_abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
 string randomString(int length) {
@@ -176,13 +178,20 @@ void HttpClientWorkerAsync::stop() {
     pollThread_->join();
 };
 
-HttpClient::HttpClient(const std::string& rootUrl, int pollPeriodMillis)
-  : worker_(1, *this, pollPeriodMillis) {
+HttpClient::HttpClient(const std::string& rootUrl, int pollPeriodMillis) {
+    std::lock_guard lock(HttpClient::workerInitMutex_);
+    if (worker_ == nullptr) {
+        worker_ = std::shared_ptr<HttpClientWorkerAsync>(new HttpClientWorkerAsync(1, *this, pollPeriodMillis), [](auto p){
+            p->stop();
+            delete p;
+        });
+    }
     rootUrl_ = rootUrl;
 }
 
 HttpClient::~HttpClient() {
-    worker_.stop();
+    // do not stop it here because worker_ is static. one worker for all http clients
+    //worker_->stop();
 }
 
 void HttpClient::sendGetRequest(const std::string& path, const std::function<void(int,byte_vector&&)>& callback) {
@@ -192,7 +201,7 @@ void HttpClient::sendGetRequest(const std::string& path, const std::function<voi
 
 void HttpClient::sendGetRequest(const std::string& path, std::function<void(int,byte_vector&&)>&& callback) {
     std::string fullUrl = makeFullUrl(path);
-    worker_.sendGetRequest(fullUrl, std::move(callback));
+    worker_->sendGetRequest(fullUrl, std::move(callback));
 }
 
 void HttpClient::sendGetRequestUrl(const std::string& url, const std::function<void(int,byte_vector&&)>& callback) {
@@ -201,7 +210,7 @@ void HttpClient::sendGetRequestUrl(const std::string& url, const std::function<v
 }
 
 void HttpClient::sendGetRequestUrl(const std::string& url, std::function<void(int,byte_vector&&)>&& callback) {
-    worker_.sendGetRequest(url, std::move(callback));
+    worker_->sendGetRequest(url, std::move(callback));
 }
 
 void HttpClient::sendBinRequest(const std::string& url, const std::string& method, const byte_vector& reqBody, const std::function<void(int,byte_vector&&)>& callback) {
@@ -211,7 +220,7 @@ void HttpClient::sendBinRequest(const std::string& url, const std::string& metho
 
 void HttpClient::sendBinRequest(const std::string& url, const std::string& method, const byte_vector& reqBody, std::function<void(int,byte_vector&&)>&& callback) {
     std::string fullUrl = makeFullUrl(url);
-    worker_.sendBinRequest(fullUrl, method, reqBody, std::move(callback));
+    worker_->sendBinRequest(fullUrl, method, reqBody, std::move(callback));
 }
 
 void HttpClient::sendRawRequestUrl(const std::string& url, const std::string& method, const std::string& extHeaders, const byte_vector& reqBody, const std::function<void(int,byte_vector&&)>& callback) {
@@ -221,7 +230,7 @@ void HttpClient::sendRawRequestUrl(const std::string& url, const std::string& me
 
 void HttpClient::sendRawRequestUrl(const std::string& url, const std::string& method, const std::string& extHeaders, const byte_vector& reqBody, std::function<void(int,byte_vector&&)>&& callback) {
     std::string fullUrl = makeFullUrl(url);
-    worker_.sendRawRequest(fullUrl, method, extHeaders, reqBody, std::move(callback));
+    worker_->sendRawRequest(fullUrl, method, extHeaders, reqBody, std::move(callback));
 }
 
 void HttpClient::start(const crypto::PrivateKey& clientKey, const crypto::PublicKey& nodeKey) {
