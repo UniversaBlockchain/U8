@@ -3,6 +3,8 @@
  */
 
 import {expect, assert, unit} from 'test'
+import {SimpleRole, ListRole, ListRoleMode} from 'roles'
+import {KeyAddress, PublicKey, HashId} from 'crypto'
 import * as tk from "unit_tests/test_keys";
 import * as io from "io";
 import {VerboseLevel} from "node_consts";
@@ -12,6 +14,7 @@ const UBotPoolState = require("ubot/ubot_pool_state").UBotPoolState;
 const UBotClient = require('ubot/ubot_client').UBotClient;
 const cs = require("contractsservice");
 const Constraint = require('constraint').Constraint;
+const BigDecimal  = require("big").Big;
 
 const TOPOLOGY_ROOT = "../jslib/ubot/topology/";
 const CONFIG_ROOT = "../test/config/ubot_config";
@@ -213,16 +216,71 @@ unit.test("ubot_pro_test: start cloud method", async () => {
 
     // close node clients
     // for (let ubot of session.pool) {
-    //     for (let httpClient of ubotMains[ubot].ubot.client.httpNodeClients)
+    //     for (let httpClient of ubotMains[ubot].ubot.client.httpNodeClients.values())
     //         if (httpClient.nodeNumber !== ubotMains[ubot].ubot.client.httpNodeClient.nodeNumber)
     //             await httpClient.stop();
     //
-    //     ubotMains[ubot].ubot.client.httpNodeClients = [];
+    //     ubotMains[ubot].ubot.client.httpNodeClients.clear();
     // }
 
     await ubotClient.shutdown();//}
     await shutdownUBots(ubotMains);
 });
+
+// unit.test("ubot_pro_test: full quorum", async () => {
+//     let ubotMains = await createUBots(ubotsCount);
+//
+//     let ubotClient = await new UBotClient(clientKey, TOPOLOGY_ROOT + "universa.pro.json").start();
+//
+//     let executableContract = await generateSecureRandomExecutableContract();
+//
+//     executableContract.state.data.cloud_methods.getRandom = {
+//         pool: {size: 30},
+//         quorum: {size: 30}
+//     };
+//     await executableContract.seal();
+//
+//     let requestContract = await generateSecureRandomRequestContract(executableContract);
+//
+//     let session = await ubotClient.startCloudMethod(requestContract);
+//
+//     console.log("Session: " + session);
+//
+//     let state = await ubotClient.getStateCloudMethod(requestContract.id);
+//     console.log("State: " + JSON.stringify(state));
+//
+//     if (state.state !== UBotPoolState.FINISHED.val)
+//         state = await ubotClient.waitCloudMethod(requestContract.id);
+//
+//     console.log("State: " + JSON.stringify(state));
+//
+//     let states = await Promise.all(session.pool.map(async (ubotNumber) => {
+//         let state = await ubotClient.getStateCloudMethod(requestContract.id, ubotNumber);
+//
+//         if (state.state !== UBotPoolState.FINISHED.val)
+//             state = await ubotClient.waitCloudMethod(requestContract.id, ubotNumber);
+//
+//         return state;
+//     }));
+//
+//     console.log("Final states: " + JSON.stringify(states));
+//
+//     assert(states.filter(state =>
+//         state.state === UBotPoolState.FINISHED.val &&
+//         typeof state.result === "number" && state.result >= 0 && state.result < 1000    // checking secure random value
+//     ).length >= executableContract.state.data.cloud_methods.getRandom.quorum.size);
+//
+//     // waiting pool finished...
+//     while (!session.pool.every(ubot => !ubotMains[ubot].ubot.processors.get(requestContract.id.base64).state.canContinue))
+//         await sleep(100);
+//
+//     assert(session.pool.filter(
+//         ubot => ubotMains[ubot].ubot.processors.get(requestContract.id.base64).state === UBotPoolState.FINISHED).length >=
+//         executableContract.state.data.cloud_methods.getRandom.quorum.size);
+//
+//     await ubotClient.shutdown();
+//     await shutdownUBots(ubotMains);
+// });
 
 unit.test("ubot_pro_test: 2 cloud method", async () => {
     let ubotMains = await createUBots(ubotsCount);
@@ -405,137 +463,168 @@ unit.test("ubot_pro_test: parallel cloud methods", async () => {
     await shutdownUBots(ubotMains);
 });
 
-// unit.test("ubot_pro_test: lottery", async () => {
-//     let ubotMains = await createUBots(ubotsCount);
-//     let ubotClient = await new UBotClient(clientKey, TOPOLOGY_ROOT + "universa.pro.json").start();
-//
-//     const TICKETS = 10;
-//
-//     let lotteryKey = tk.TestKeys.getKey();
-//     let lotteryContract = Contract.fromPrivateKey(lotteryKey);
-//
-//     lotteryContract.state.data.cloud_methods = {
-//         buyTicket: {
-//             pool: {size: 3},
-//             quorum: {size: 2}
-//         },
-//         raffle: {
-//             pool: {size: 12},
-//             quorum: {size: 10}
-//         }
-//     };
-//
-//     lotteryContract.state.data.js = await io.fileGetContentsAsString(TEST_CONTRACTS_PATH + "lottery.js");
-//
-//     await lotteryContract.seal();
-//
-//     // biy tickets
-//     for (let i = 0; i < TICKETS; i++) {
-//         let payment = Contract.fromPrivateKey(userPrivKey);
-//         let buyContract = Contract.fromPrivateKey(userPrivKey);
-//         buyContract.state.data.method_name = "buyTicket";
-//         buyContract.state.data.method_args = [payment];
-//         buyContract.state.data.executable_contract_id = lotteryContract.id;
-//
-//         await cs.addConstraintToContract(buyContract, lotteryContract, "executableContractConstraint",
-//             Constraint.TYPE_EXISTING_STATE, ["this.state.data.executable_contract_id == ref.id"], true);
-//
-//         let session = await ubotClient.startCloudMethod(buyContract);
-//
-//         console.log("Session: " + session);
-//
-//         let state = await ubotClient.getStateCloudMethod(buyContract.id);
-//         console.log("State: " + JSON.stringify(state));
-//
-//         if (state.state !== UBotPoolState.FINISHED.val)
-//             state = await ubotClient.waitCloudMethod(buyContract.id);
-//
-//         console.log("State: " + JSON.stringify(state));
-//
-//         let states = await Promise.all(session.pool.map(async (ubotNumber) => {
-//             let state = await ubotClient.getStateCloudMethod(buyContract.id, ubotNumber);
-//
-//             if (state.state !== UBotPoolState.FINISHED.val)
-//                 state = await ubotClient.waitCloudMethod(buyContract.id, ubotNumber);
-//
-//             return state;
-//         }));
-//
-//         console.log("Final states: " + JSON.stringify(states));
-//
-//         let finalized = states.filter(state =>
-//             state.state === UBotPoolState.FINISHED.val &&
-//             typeof state.result === "number" && state.result >= 0 && state.result < 1000    // checking secure random value
-//         );
-//
-//         assert(finalized.length >= lotteryContract.state.data.cloud_methods.buyTicket.quorum.size);
-//
-//         let ticket = finalized[0].result;
-//
-//         //assert(finalized.every(state => state.result === first));
-//
-//         await ubotClient.disconnectUbot();
-//
-//         // waiting pool finished...
-//         while (!session.pool.every(ubot => !ubotMains[ubot].ubot.processors.get(buyContract.id.base64).state.canContinue))
-//             await sleep(100);
-//
-//         assert(session.pool.filter(
-//             ubot => ubotMains[ubot].ubot.processors.get(buyContract.id.base64).state === UBotPoolState.FINISHED).length >=
-//             lotteryContract.state.data.cloud_methods.buyTicket.quorum.size);
-//
-//         let sess = null;
-//         do {
-//             sess = await ubotClient.getSession("ubotGetSession", {executableContractId: lotteryContract.id});
-//         } while (Object.keys(sess).length > 0);
-//     }
-//
-//     // raffle
-//     let requestContract = Contract.fromPrivateKey(userPrivKey);
-//     requestContract.state.data.method_name = "raffle";
-//     requestContract.state.data.executable_contract_id = lotteryContract.id;
-//
-//     await cs.addConstraintToContract(requestContract, lotteryContract, "executableContractConstraint",
-//         Constraint.TYPE_EXISTING_STATE, ["this.state.data.executable_contract_id == ref.id"], true);
-//
-//     console.log("RAFFLE LOTTERY");
-//     let session = await ubotClient.startCloudMethod(requestContract);
-//
-//     console.log("Session: " + session);
-//
-//     let state = await ubotClient.getStateCloudMethod(requestContract.id);
-//     console.log("State: " + JSON.stringify(state));
-//
-//     if (state.state !== UBotPoolState.FINISHED.val)
-//         state = await ubotClient.waitCloudMethod(requestContract.id);
-//
-//     console.log("State: " + JSON.stringify(state));
-//
-//     let states = await Promise.all(session.pool.map(async (ubotNumber) => {
-//         let state = await ubotClient.getStateCloudMethod(requestContract.id, ubotNumber);
-//
-//         if (state.state !== UBotPoolState.FINISHED.val)
-//             state = await ubotClient.waitCloudMethod(requestContract.id, ubotNumber);
-//
-//         return state;
-//     }));
-//
-//     console.log("Final states: " + JSON.stringify(states));
-//
-//     // checking result
-//     // assert(states.filter(state =>
-//     //     state.state === UBotPoolState.FINISHED.val &&
-//     //     state.result === first
-//     // ).length >= lotteryContract.state.data.cloud_methods.getRandom.quorum.size);
-//
-//     // waiting pool finished...
-//     while (!session.pool.every(ubot => !ubotMains[ubot].ubot.processors.get(requestContract.id.base64).state.canContinue))
-//         await sleep(100);
-//
-//     assert(session.pool.filter(
-//         ubot => ubotMains[ubot].ubot.processors.get(requestContract.id.base64).state === UBotPoolState.FINISHED).length >=
-//         lotteryContract.state.data.cloud_methods.getRandom.quorum.size);
-//
-//     await ubotClient.shutdown();
-//     await shutdownUBots(ubotMains);
-// });
+unit.test("ubot_pro_test: lottery", async () => {
+    let ubotMains = await createUBots(ubotsCount);
+    let ubotClient = await new UBotClient(clientKey, TOPOLOGY_ROOT + "universa.pro.json").start();
+
+    const TICKETS = 10;
+
+    // test token fro payments
+    let tokenIssuerKey = tk.TestKeys.getKey();
+    let tokenContract = await cs.createTokenContract([tokenIssuerKey], [tokenIssuerKey.publicKey], new BigDecimal("1000"));
+
+    let lotteryKey = tk.TestKeys.getKey();
+    let lotteryContract = Contract.fromPrivateKey(lotteryKey);
+
+    lotteryContract.state.data.cloud_methods = {
+        buyTicket: {
+            pool: {size: 3},
+            quorum: {size: 3}
+        },
+        raffle: {
+            pool: {size: 12},
+            quorum: {size: 10}
+        }
+    };
+
+    lotteryContract.state.data.js = await io.fileGetContentsAsString(TEST_CONTRACTS_PATH + "lottery.js");
+
+    await lotteryContract.seal();
+
+    // UBotNet registry contract load from Universa MainNet by getServiceContracts
+    let serviceContracts = await new Promise(async (resolve, reject) =>
+        await ubotClient.httpNodeClient.command("getServiceContracts", null,
+            result => resolve(result),
+            error => reject(error)
+        )
+    );
+
+    assert(serviceContracts != null && serviceContracts.contracts != null && serviceContracts.contracts.ubot_registry_contract != null);
+
+    let ubotnetRegistry = await Contract.fromSealedBinary(serviceContracts.contracts.ubot_registry_contract);
+    let ubotRoles = [];
+
+    ubotnetRegistry.state.data.topology.forEach(ubot => ubotRoles.push(new SimpleRole("ubot" + ubot.number, new PublicKey(atob(ubot.key)))));
+
+    // biy tickets
+    let userKeys = [];
+    let payments = [];
+    for (let i = 0; i < TICKETS; i++) {
+        let userKey = tk.TestKeys.getKey();
+
+        tokenContract = await cs.createSplit(tokenContract, 10, "amount", [tokenIssuerKey], true);
+        let payment = Array.from(tokenContract.newItems)[0];
+
+        payment.owner = new ListRole("poolRole", ubotRoles, ListRoleMode.QUORUM, 10);
+        await payment.seal();
+
+        let buyContract = Contract.fromPrivateKey(userKey);
+        buyContract.state.data.method_name = "buyTicket";
+        buyContract.state.data.method_args = [payment];
+        buyContract.state.data.executable_contract_id = lotteryContract.id;
+
+        await cs.addConstraintToContract(buyContract, lotteryContract, "executableContractConstraint",
+            Constraint.TYPE_EXISTING_STATE, ["this.state.data.executable_contract_id == ref.id"], true);
+
+        userKeys.push(userKey);
+        payments.push(payment);
+
+        // let session = await ubotClient.startCloudMethod(buyContract);
+        //
+        // console.log("Session: " + session);
+        //
+        // let state = await ubotClient.getStateCloudMethod(buyContract.id);
+        // console.log("State: " + JSON.stringify(state));
+        //
+        // if (state.state !== UBotPoolState.FINISHED.val)
+        //     state = await ubotClient.waitCloudMethod(buyContract.id);
+        //
+        // console.log("State: " + JSON.stringify(state));
+        //
+        // let states = await Promise.all(session.pool.map(async (ubotNumber) => {
+        //     let state = await ubotClient.getStateCloudMethod(buyContract.id, ubotNumber);
+        //
+        //     if (state.state !== UBotPoolState.FINISHED.val)
+        //         state = await ubotClient.waitCloudMethod(buyContract.id, ubotNumber);
+        //
+        //     return state;
+        // }));
+        //
+        // console.log("Final states: " + JSON.stringify(states));
+        //
+        // let finalized = states.filter(state =>
+        //     state.state === UBotPoolState.FINISHED.val &&
+        //     typeof state.result === "number" && state.result >= 0 && state.result < 1000    // checking secure random value
+        // );
+        //
+        // assert(finalized.length >= lotteryContract.state.data.cloud_methods.buyTicket.quorum.size);
+        //
+        // let ticket = finalized[0].result;
+        //
+        // //assert(finalized.every(state => state.result === first));
+        //
+        // await ubotClient.disconnectUbot();
+        //
+        // // waiting pool finished...
+        // while (!session.pool.every(ubot => !ubotMains[ubot].ubot.processors.get(buyContract.id.base64).state.canContinue))
+        //     await sleep(100);
+        //
+        // assert(session.pool.filter(
+        //     ubot => ubotMains[ubot].ubot.processors.get(buyContract.id.base64).state === UBotPoolState.FINISHED).length >=
+        //     lotteryContract.state.data.cloud_methods.buyTicket.quorum.size);
+        //
+        // let sess = null;
+        // do {
+        //     sess = await ubotClient.getSession("ubotGetSession", {executableContractId: lotteryContract.id});
+        // } while (Object.keys(sess).length > 0);
+    }
+
+    // raffle
+    let requestContract = Contract.fromPrivateKey(userPrivKey);
+    requestContract.state.data.method_name = "raffle";
+    requestContract.state.data.executable_contract_id = lotteryContract.id;
+
+    await cs.addConstraintToContract(requestContract, lotteryContract, "executableContractConstraint",
+        Constraint.TYPE_EXISTING_STATE, ["this.state.data.executable_contract_id == ref.id"], true);
+
+    // console.log("RAFFLE LOTTERY");
+    // let session = await ubotClient.startCloudMethod(requestContract);
+    //
+    // console.log("Session: " + session);
+    //
+    // let state = await ubotClient.getStateCloudMethod(requestContract.id);
+    // console.log("State: " + JSON.stringify(state));
+    //
+    // if (state.state !== UBotPoolState.FINISHED.val)
+    //     state = await ubotClient.waitCloudMethod(requestContract.id);
+    //
+    // console.log("State: " + JSON.stringify(state));
+    //
+    // let states = await Promise.all(session.pool.map(async (ubotNumber) => {
+    //     let state = await ubotClient.getStateCloudMethod(requestContract.id, ubotNumber);
+    //
+    //     if (state.state !== UBotPoolState.FINISHED.val)
+    //         state = await ubotClient.waitCloudMethod(requestContract.id, ubotNumber);
+    //
+    //     return state;
+    // }));
+    //
+    // console.log("Final states: " + JSON.stringify(states));
+    //
+    // // checking result
+    // // assert(states.filter(state =>
+    // //     state.state === UBotPoolState.FINISHED.val &&
+    // //     state.result === first
+    // // ).length >= lotteryContract.state.data.cloud_methods.getRandom.quorum.size);
+    //
+    // // waiting pool finished...
+    // while (!session.pool.every(ubot => !ubotMains[ubot].ubot.processors.get(requestContract.id.base64).state.canContinue))
+    //     await sleep(100);
+    //
+    // assert(session.pool.filter(
+    //     ubot => ubotMains[ubot].ubot.processors.get(requestContract.id.base64).state === UBotPoolState.FINISHED).length >=
+    //     lotteryContract.state.data.cloud_methods.getRandom.quorum.size);
+
+    await ubotClient.shutdown();
+    await shutdownUBots(ubotMains);
+});

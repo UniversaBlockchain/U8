@@ -8,6 +8,7 @@ import {UBotSession, UBotSessionState} from 'ubot/ubot_session'
 
 const TopologyBuilder = require("topology_builder").TopologyBuilder;
 const UBotPoolState = require("ubot/ubot_pool_state").UBotPoolState;
+const Lock = require("lock").Lock;
 
 class UBotClientException extends Error {
     constructor(message = undefined) {
@@ -48,8 +49,9 @@ class UBotClient {
         this.topologyUBotNet = null;
         this.httpUbotClient = null;
         this.ubotPublicKey = null;
-        this.httpNodeClients = [];
+        this.httpNodeClients = new Map();
         this.httpUbotClients = new Map();
+        this.lock = new Lock();
     }
 
     /**
@@ -89,9 +91,9 @@ class UBotClient {
      * @return {Promise<void>}
      */
     async shutdown() {
-        if (this.httpNodeClients.length === 0)
+        if (this.httpNodeClients.size === 0)
             await this.httpNodeClient.stop();
-        for (let nodeClient of this.httpNodeClients)
+        for (let nodeClient of this.httpNodeClients.values())
             await nodeClient.stop();
         if (this.httpUbotClient != null && this.httpUbotClients.size === 0)
             await this.httpUbotClient.stop();
@@ -109,12 +111,12 @@ class UBotClient {
     async connectAllNodes() {
         for (let i = 0; i < this.nodes.length; i++) {
             if (this.topology[i].number === this.httpNodeClient.nodeNumber)
-                this.httpNodeClients.push(this.httpNodeClient);
+                this.httpNodeClients.set(this.httpNodeClient.nodeNumber, this.httpNodeClient);
             else {
                 let httpClient = new HttpClient(this.nodes[i].url);
                 httpClient.nodeNumber = this.topology[i].number;
                 await httpClient.start(this.clientPrivateKey, this.nodes[i].key);
-                this.httpNodeClients.push(httpClient);
+                this.httpNodeClients.set(httpClient.nodeNumber, httpClient);
             }
         }
     }
@@ -261,15 +263,19 @@ class UBotClient {
      * @return {Promise<Object>} command result.
      */
     async askSessionOnAllNodes(command, params) {
-        if (this.httpNodeClients.length === 0)
-            await this.connectAllNodes();
+        await this.lock.synchronize("connectNodes", async () => {
+            if (this.httpNodeClients.size === 0)
+                await this.connectAllNodes();
+        });
 
-        let data = await Promise.all(this.httpNodeClients.map(nodeClient => new Promise(async (resolve, reject) =>
-            await nodeClient.command(command, params,
-                result => resolve(result),
-                error => reject(error)
+        let data = await Promise.all(Array.from(this.httpNodeClients.values()).map(nodeClient =>
+            new Promise(async (resolve, reject) =>
+                await nodeClient.command(command, params,
+                    result => resolve(result),
+                    error => reject(error)
+                )
             )
-        )));
+        ));
 
         let message = "UBotClient.askSessionOnAllNodes: " + JSON.stringify(data, (key, value) => {
             if ((key === "requestId" || key === "sessionId") && value != null && value instanceof crypto.HashId)

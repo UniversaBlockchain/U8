@@ -23,7 +23,11 @@ async function getRandom(max) {
 
     hashes.sort();
     let hashesHash = crypto.HashId.of(hashes.join()).base64;
-    await writeSingleStorage({hashesHash : hashesHash});
+
+    let singleStorage = await getSingleStorage();
+    singleStorage.hashesHash = hashesHash;
+
+    await writeSingleStorage(singleStorage);
 
     //add actual random to multi storage
     await writeMultiStorage({hash : hash, rnd : rnd});
@@ -43,7 +47,6 @@ async function getRandom(max) {
     rands.sort();
     hashesHash = crypto.HashId.of(hashes.join()).base64;
 
-    let singleStorage = await getSingleStorage();
     if (hashesHash !== singleStorage.hashesHash)
         throw new Error("Hash of hashes does not match the previously saved: " + hashesHash + "!==" + singleStorage.hashesHash);
 
@@ -52,8 +55,9 @@ async function getRandom(max) {
     randomHash.digest.forEach(byte => bigRandom = bigRandom.mul(256).add(byte));
 
     let result = Number.parseInt(bigRandom.mod(max).toFixed());
+    singleStorage.winner = result;
 
-    await writeSingleStorage({hashesHash: hashesHash, result: result});
+    await writeSingleStorage(singleStorage);
 
     return result;
 }

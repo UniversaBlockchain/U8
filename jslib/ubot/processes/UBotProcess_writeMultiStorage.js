@@ -469,6 +469,7 @@ class UBotProcess_writeMultiStorage extends UBotProcess_writeSingleStorage {
         this.otherAnswers.clear();
         this.approveCounterSet.clear();
         this.declineCounterSet.clear();
+        this.approveCounterSet.add(this.pr.ubot.network.myInfo.number); // self vote
         this.pulseVotingDecision(iteration);
         this.votingDecisionTask = new ExecutorWithFixedPeriod(() => this.pulseVotingDecision(iteration),
             UBotConfig.multi_storage_vote_period, this.pr.ubot.executorService).run();
