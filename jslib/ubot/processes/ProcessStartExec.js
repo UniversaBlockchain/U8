@@ -428,6 +428,8 @@ class ProcessStartExec extends ProcessBase {
 
             // get actual hash from MainNet by this.executableContract.id (further recordId)
             let actualHash = await this.pr.session.getStorage(false);
+            if (actualHash == null)
+                return null;
 
             let result = await this.pr.ubot.getStoragePackedResultByRecordId(recordId, false);
 
@@ -452,6 +454,8 @@ class ProcessStartExec extends ProcessBase {
 
             // get actual hash from MainNet by this.executableContract.id (further recordId)
             let actualHash = await this.pr.session.getStorage(true);
+            if (actualHash == null)
+                return null;
 
             let result = await this.pr.ubot.getRecordsFromMultiStorageByRecordId(recordId);
 
