@@ -346,14 +346,14 @@ template <typename T> T& UBinder::getOrNull(const std::string& key) {
 
 UBinder &UBinder::asInstance(UObject &object) {
     if(!object.dataIsInstanceOf<UBinderData>())
-        throw std::invalid_argument("object is not instance of UDouble");
+        throw std::invalid_argument("object is not instance of UBinder");
 
     return (UBinder&)object;
 }
 
 const UBinder &UBinder::asInstance(const UObject &object) {
     if(!object.dataIsInstanceOf<UBinderData>())
-        throw std::invalid_argument("object is not instance of UDouble");
+        throw std::invalid_argument("object is not instance of UBinder");
 
     return (const UBinder&)object;
 }
