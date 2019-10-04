@@ -120,7 +120,7 @@ class UBotProcess_writeMultiStorage extends UBotProcess_writeSingleStorage {
     }
 
     pulseGetHashes() {
-        this.pr.logger.log("UBotProcess_writeMultiStorage... pulseGetHashes");
+        this.pr.logger.log("UBotProcess_writeMultiStorage... pulseGetHashes. Answers = " + JSON.stringify(Array.from(this.otherAnswers)));
         for (let i = 0; i < this.pr.pool.length; ++i)
             if (this.pr.pool[i].number !== this.pr.ubot.network.myInfo.number && !this.otherAnswers.has(this.pr.pool[i].number))
                 this.pr.ubot.network.deliver(this.pr.pool[i],
@@ -932,6 +932,7 @@ class UBotProcess_writeMultiStorage extends UBotProcess_writeSingleStorage {
                     );
                 } else if (this.getHashesTask != null && !this.getHashesTask.cancelled) {
                     this.otherAnswers.add(notification.from.number);
+                    this.pr.logger.log("UBotProcess_writeMultiStorage... hash received. Answers = " + JSON.stringify(Array.from(this.otherAnswers)));
                     this.hashes[this.pr.poolIndexes.get(notification.from.number)] = notification.params.dataHashId;
                     this.previous[this.pr.poolIndexes.get(notification.from.number)] = notification.params.previousRecordId;
 

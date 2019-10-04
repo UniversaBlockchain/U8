@@ -229,8 +229,9 @@ unit.test("ubot_pro_test: start cloud method", async () => {
 
 // unit.test("ubot_pro_test: full quorum", async () => {
 //     let ubotMains = await createUBots(ubotsCount);
-//
 //     let ubotClient = await new UBotClient(clientKey, TOPOLOGY_ROOT + "universa.pro.json").start();
+//
+//     //ubotMains.forEach(main => main.ubot.network.verboseLevel = VerboseLevel.BASE);
 //
 //     let executableContract = await generateSecureRandomExecutableContract();
 //
