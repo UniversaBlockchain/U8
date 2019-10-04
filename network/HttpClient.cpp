@@ -246,21 +246,28 @@ void HttpClient::start(const crypto::PrivateKey& clientKey, const crypto::Public
         byte_vector paramsBin = BossSerializer::serialize(params).get();
         byte_vector server_nonce;
         atomic<int> server_version(1);
-        sendBinRequest("/connect", "POST", paramsBin, [this,&sem,&server_nonce,&server_version](int respCode, byte_vector&& respBody){
-            UBytes ub(std::move(respBody));
-            UObject uObject = BossSerializer::deserialize(ub);
-            UBinder binderWrap = UBinder::asInstance(uObject);
-            UBinder binder = binderWrap.getBinder("response");
-            std::string strSessionId = binder.getString("session_id");
-            session_->sessionId = std::stol(strSessionId);
-            UBytes serverNonceUb = UBytes::asInstance(binder.get("server_nonce"));
-            server_nonce = serverNonceUb.get();
-            server_version = binder.getIntOrDefault("server_version", 1);
-            session_->version = std::min(int(server_version), HttpClient::CLIENT_VERSION);
+        string error("");
+        sendBinRequest("/connect", "POST", paramsBin, [this,&sem,&server_nonce,&server_version,&error](int respCode, byte_vector&& respBody){
+            try {
+                UBytes ub(std::move(respBody));
+                UObject uObject = BossSerializer::deserialize(ub);
+                UBinder binderWrap = UBinder::asInstance(uObject);
+                UBinder binder = binderWrap.getBinder("response");
+                std::string strSessionId = binder.getString("session_id");
+                session_->sessionId = std::stol(strSessionId);
+                UBytes serverNonceUb = UBytes::asInstance(binder.get("server_nonce"));
+                server_nonce = serverNonceUb.get();
+                server_version = binder.getIntOrDefault("server_version", 1);
+                session_->version = std::min(int(server_version), HttpClient::CLIENT_VERSION);
+            } catch (const std::exception& e) {
+                error = e.what();
+            }
             sem.notify();
         });
         if (!sem.wait(std::chrono::milliseconds(startTimeoutMillis_)))
             throw std::runtime_error("HttpClient timeout while starting secure connection");
+        if (!((string)error).empty())
+            throw std::runtime_error("HttpClient error while starting secure connection: " + (string)error);
         byte_vector client_nonce(47);
         sprng_read(&client_nonce[0], client_nonce.size(), NULL);
         byte_vector client_nonce_copy = client_nonce;
@@ -277,13 +284,21 @@ void HttpClient::start(const crypto::PrivateKey& clientKey, const crypto::Public
                 "session_id", session_->sessionId)).get();
         byte_vector dataRcv;
         byte_vector sigRcv;
-        sendBinRequest("/get_token", "POST", paramsBin, [&sem,&dataRcv,&sigRcv](int respCode, byte_vector&& respBody) {
-            UBinder binder = UBinder::asInstance(BossSerializer::deserialize(UBytes(std::move(respBody)))).getBinder("response");
-            dataRcv = UBytes::asInstance(binder.get("data")).get();
-            sigRcv = UBytes::asInstance(binder.get("signature")).get();
+        sendBinRequest("/get_token", "POST", paramsBin, [&sem,&dataRcv,&sigRcv,&error](int respCode, byte_vector&& respBody) {
+            try {
+                UBinder binder = UBinder::asInstance(
+                        BossSerializer::deserialize(UBytes(std::move(respBody)))).getBinder("response");
+                dataRcv = UBytes::asInstance(binder.get("data")).get();
+                sigRcv = UBytes::asInstance(binder.get("signature")).get();
+            } catch (const std::exception& e) {
+                error = e.what();
+            }
             sem.notify();
         });
-        sem.wait();
+        if (!sem.wait(std::chrono::milliseconds(startTimeoutMillis_)))
+            throw std::runtime_error("HttpClient timeout while starting secure connection (get_token)");
+        if (!((string)error).empty())
+            throw std::runtime_error("HttpClient error while starting secure connection: " + (string)error);
         if (!session_->nodePublicKey->verify(sigRcv, dataRcv, crypto::HashType::SHA512)) {
             throw std::runtime_error("node signature failed");
         }
@@ -301,7 +316,8 @@ void HttpClient::start(const crypto::PrivateKey& clientKey, const crypto::Public
             status = res.getString("status");
             sem.notify();
         });
-        sem.wait();
+        if (!sem.wait(std::chrono::milliseconds(startTimeoutMillis_)))
+            throw std::runtime_error("HttpClient timeout while starting secure connection (hello)");
         if (status != "OK")
             throw std::runtime_error("connection failed: " + session_->connectMessage);
     }
