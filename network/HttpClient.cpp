@@ -311,26 +311,32 @@ void HttpClient::start(const crypto::PrivateKey& clientKey, const crypto::Public
         byte_vector key = UBytes::asInstance(UBinder::asInstance(BossSerializer::deserialize(session_->clientPrivateKey->decrypt(encrypted_token))).get("sk")).get();
         session_->sessionKey = make_shared<crypto::SymmetricKey>(key);
         std::string status = "error";
-        execCommand("hello", UBinder(), [this,&sem,&status](UBinder&& res){
-            session_->connectMessage = res.getString("message");
-            status = res.getString("status");
+        execCommand("hello", UBinder(), [this,&sem,&status,&error](UBinder&& res, bool isError){
+            if (!isError) {
+                session_->connectMessage = res.getString("message");
+                status = res.getString("status");
+            } else {
+                error = "(hello)";
+            }
             sem.notify();
         });
         if (!sem.wait(std::chrono::milliseconds(startTimeoutMillis_)))
             throw std::runtime_error("HttpClient timeout while starting secure connection (hello)");
+        if (!((string)error).empty())
+            throw std::runtime_error("HttpClient error while starting secure connection: " + (string)error);
         if (status != "OK")
             throw std::runtime_error("connection failed: " + session_->connectMessage);
     }
 
 }
 
-void HttpClient::command(const std::string& name, const UBinder& params, std::function<void(UBinder&&)>&& onComplete) {
+void HttpClient::command(const std::string& name, const UBinder& params, std::function<void(UBinder&&,bool)>&& onComplete) {
     UBinder call = UBinder::of("command", name, "params", params);
     byte_vector callBin = BossSerializer::serialize(call).get();
-    execCommand(callBin, [onComplete{std::move(onComplete)}](byte_vector&& decrypted){
+    execCommand(callBin, [onComplete{std::move(onComplete)}](byte_vector&& decrypted, bool isError){
         UBinder decryptedBinder = UBinder::asInstance(BossSerializer::deserialize(UBytes(std::move(decrypted))));
         UBinder result = decryptedBinder.getBinder("result");
-        onComplete(std::move(result));
+        onComplete(std::move(result), isError);
     });
 }
 
@@ -339,16 +345,16 @@ void HttpClient::command(const std::string& name, const UBinder& params, const s
     command(name, params, std::move(onCompleteCopy));
 }
 
-void HttpClient::command(const byte_vector& callBin, std::function<void(byte_vector&&)>&& onComplete) {
+void HttpClient::command(const byte_vector& callBin, std::function<void(byte_vector&&,bool)>&& onComplete) {
     execCommand(callBin, std::move(onComplete));
 }
 
-void HttpClient::command(const byte_vector& callBin, const std::function<void(byte_vector&&)>& onComplete) {
+void HttpClient::command(const byte_vector& callBin, const std::function<void(byte_vector&&,bool)>& onComplete) {
     auto onCompleteCopy = onComplete;
     execCommand(callBin, std::move(onCompleteCopy));
 }
 
-void HttpClient::execCommand(const byte_vector& callBin, std::function<void(byte_vector&&)>&& onComplete) {
+void HttpClient::execCommand(const byte_vector& callBin, std::function<void(byte_vector&&,bool)>&& onComplete) {
     runAsync([this, callBin, onComplete{std::move(onComplete)}](){
         if (!session_ || !session_->sessionKey)
             throw std::runtime_error("Session does not created or session key is not got yet.");
@@ -359,23 +365,34 @@ void HttpClient::execCommand(const byte_vector& callBin, std::function<void(byte
                     UBytes(session_->sessionKey->encrypt(callBin)),
                 "session_id", session_->sessionId);
         sendBinRequest("/command", "POST", BossSerializer::serialize(cmdParams).get(), [this,onComplete{onComplete}](int respCode, byte_vector&& respBody){
-            UBinder ansBinder = UBinder::asInstance(BossSerializer::deserialize(UBytes(std::move(respBody))));
-            UBinder responseBinder = ansBinder.getBinder("response");
-            byte_vector decrypted = session_->version >= 2 ?
-                session_->sessionKey->etaDecrypt(UBytes::asInstance(responseBinder.get("result")).get()) :
-                session_->sessionKey->decrypt(UBytes::asInstance(responseBinder.get("result")).get());
-            onComplete(std::move(decrypted));
+            try {
+                UBinder ansBinder = UBinder::asInstance(BossSerializer::deserialize(UBytes(std::move(respBody))));
+                UBinder responseBinder = ansBinder.getBinder("response");
+                byte_vector decrypted = session_->version >= 2 ?
+                    session_->sessionKey->etaDecrypt(UBytes::asInstance(responseBinder.get("result")).get()) :
+                    session_->sessionKey->decrypt(UBytes::asInstance(responseBinder.get("result")).get());
+                onComplete(std::move(decrypted), false);
+            } catch (const std::exception& e) {
+                std::string error = e.what();
+                onComplete(std::move(stringToBytes(error)), true);
+            }
         });
     });
 }
 
-void HttpClient::execCommand(const std::string& name, const UBinder& params, std::function<void(UBinder&&)>&& onComplete) {
+void HttpClient::execCommand(const std::string& name, const UBinder& params, std::function<void(UBinder&&,bool)>&& onComplete) {
     UBinder call = UBinder::of("command", name, "params", params);
     byte_vector callBin = BossSerializer::serialize(call).get();
-    execCommand(callBin, [onComplete{std::move(onComplete)}](byte_vector&& decrypted){
-        UBinder decryptedBinder = UBinder::asInstance(BossSerializer::deserialize(UBytes(std::move(decrypted))));
-        UBinder result = decryptedBinder.getBinder("result");
-        onComplete(std::move(result));
+    execCommand(callBin, [onComplete{std::move(onComplete)}](byte_vector&& decrypted, bool isError){
+        try {
+            UBinder decryptedBinder = UBinder::asInstance(BossSerializer::deserialize(UBytes(std::move(decrypted))));
+            UBinder result = decryptedBinder.getBinder("result");
+            onComplete(std::move(result), false);
+        } catch (const std::exception& e) {
+            std::string strError(e.what());
+            UBinder errBinder = UBinder::of("error", strError);
+            onComplete(std::move(errBinder), true);
+        }
     });
 }
 

@@ -774,6 +774,7 @@ struct HttpClientAnswer {
 struct HttpClientCommandAnswer {
     int reqId;
     byte_vector decrypted;
+    bool isError;
 };
 
 class HttpClientBuffered {
@@ -848,13 +849,14 @@ public:
     }
 
     void command(int reqId, const byte_vector& callBin) {
-        httpClient_->command(callBin, [this,reqId](byte_vector&& decrypted){
+        httpClient_->command(callBin, [this,reqId](byte_vector&& decrypted, bool isError){
             atomic<bool> needSend(false);
             {
                 lock_guard lock(mutex_);
                 HttpClientCommandAnswer ans;
                 ans.reqId = reqId;
                 ans.decrypted = std::move(decrypted);
+                ans.isError = isError;
                 bufCommand_.emplace_back(ans);
                 if (bufCommand_.size() >= bufSize_)
                     needSend = true;
@@ -925,12 +927,13 @@ private:
             auto bufCopy = bufCommand_;
             bufCommand_.clear();
             bufferedCommandCallback_->lockedContext([this,bufCopy{std::move(bufCopy)}](Local<Context> &cxt){
-                Local<Array> arr = Array::New(cxt->GetIsolate(), bufCopy.size()*2);
+                Local<Array> arr = Array::New(cxt->GetIsolate(), bufCopy.size()*3);
                 for (int i = 0; i < bufCopy.size(); ++i) {
                     auto ab = ArrayBuffer::New(cxt->GetIsolate(), bufCopy[i].decrypted.size());
                     memcpy(ab->GetContents().Data(), &bufCopy[i].decrypted[0], bufCopy[i].decrypted.size());
-                    arr->Set(i * 2 + 0, Integer::New(cxt->GetIsolate(), bufCopy[i].reqId));
-                    arr->Set(i * 2 + 1, Uint8Array::New(ab, 0, bufCopy[i].decrypted.size()));
+                    arr->Set(i * 3 + 0, Integer::New(cxt->GetIsolate(), bufCopy[i].reqId));
+                    arr->Set(i * 3 + 1, Uint8Array::New(ab, 0, bufCopy[i].decrypted.size()));
+                    arr->Set(i * 3 + 2, Boolean::New(cxt->GetIsolate(), bufCopy[i].isError));
                 }
                 bufferedCommandCallback_->invoke(std::move(arr));
             });

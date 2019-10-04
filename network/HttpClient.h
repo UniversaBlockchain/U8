@@ -97,7 +97,7 @@ public:
      * Execute a command over the authenticated and encrypted connection. In the case of network errors, restarts the
      * command.
      */
-    void command(const std::string& name, const UBinder& params, std::function<void(UBinder&&)>&& onComplete);
+    void command(const std::string& name, const UBinder& params, std::function<void(UBinder&&,bool)>&& onComplete);
 
     /**
      * Execute a command over the authenticated and encrypted connection. In the case of network errors, restarts the
@@ -106,16 +106,16 @@ public:
     void command(const std::string& name, const UBinder& params, const std::function<void(UBinder&&)>& onComplete);
 
     /** for js bindings */
-    void command(const byte_vector& callBin, std::function<void(byte_vector&&)>&& onComplete);
+    void command(const byte_vector& callBin, std::function<void(byte_vector&&,bool)>&& onComplete);
 
     /** for js bindings */
-    void command(const byte_vector& callBin, const std::function<void(byte_vector&&)>& onComplete);
+    void command(const byte_vector& callBin, const std::function<void(byte_vector&&,bool)>& onComplete);
 
     void changeStartTimeoutMillis(int newValue) {startTimeoutMillis_ = newValue;}
 
 private:
-    void execCommand(const byte_vector& callBin, std::function<void(byte_vector&&)>&& onComplete);
-    void execCommand(const std::string& name, const UBinder& params, std::function<void(UBinder&&)>&& onComplete);
+    void execCommand(const byte_vector& callBin, std::function<void(byte_vector&&,bool)>&& onComplete);
+    void execCommand(const std::string& name, const UBinder& params, std::function<void(UBinder&&,bool)>&& onComplete);
     std::string makeFullUrl(const std::string& path);
 
 private:

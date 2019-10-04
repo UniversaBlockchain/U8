@@ -439,10 +439,10 @@ network.HttpClient = class {
             }
         });
         this.httpClient_.__setBufferedCommandCallback((ansArr) => {
-            for (let i = 0; i < Math.floor(ansArr.length/2); ++i) {
-                let reqId = ansArr[i*2 + 0];
+            for (let i = 0; i < Math.floor(ansArr.length/3); ++i) {
+                let reqId = ansArr[i*3 + 0];
                 if (this.callbacks_.has(reqId)) {
-                    this.callbacks_.get(reqId)(ansArr[i*2 + 1]);
+                    this.callbacks_.get(reqId)(ansArr[i*3 + 1], ansArr[i*3 + 2]);
                     this.callbacks_.delete(reqId);
                 }
             }
@@ -554,17 +554,21 @@ network.HttpClient = class {
     async command(name, params, onComplete, onError) {
         let paramsBin = await Boss.dump(await BossBiMapper.getInstance().serialize({"command": name, "params": params}));
         let reqId = this.getReqId();
-        this.callbacks_.set(reqId, async (decrypted) => {
-            let binder = await BossBiMapper.getInstance().deserialize(await Boss.load(decrypted));
-            let result = binder.result;
-            if (result) {
-                onComplete(result);
+        this.callbacks_.set(reqId, async (decrypted, isError) => {
+            if (isError !== true) {
+                let binder = await BossBiMapper.getInstance().deserialize(await Boss.load(decrypted));
+                let result = binder.result;
+                if (result) {
+                    onComplete(result);
+                } else {
+                    let errorRecord = new ErrorRecord(Errors.FAILURE, "", "unprocessablereply");
+                    if (binder.error)
+                        errorRecord = await BossBiMapper.getInstance().deserialize(binder.error);
+                    let clientError = ClientError.initFromErrorRecord(errorRecord);
+                    onError(clientError);
+                }
             } else {
-                let errorRecord = new ErrorRecord(Errors.FAILURE, "", "unprocessablereply");
-                if (binder.error)
-                    errorRecord = await BossBiMapper.getInstance().deserialize(binder.error);
-                let clientError = ClientError.initFromErrorRecord(errorRecord);
-                onError(clientError);
+                onError(utf8Decode(decrypted));
             }
         });
         this.httpClient_.__command(reqId, paramsBin);
