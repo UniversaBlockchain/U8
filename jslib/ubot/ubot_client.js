@@ -2,13 +2,15 @@
  * Copyright (c) 2019-present Sergey Chernov, iCodici S.n.C, All Rights Reserved.
  */
 
-import {PublicKey} from 'crypto'
+import {PublicKey, HashId} from 'crypto'
 import {HttpClient} from 'web'
 import {UBotSession, UBotSessionState} from 'ubot/ubot_session'
 
 const TopologyBuilder = require("topology_builder").TopologyBuilder;
 const UBotPoolState = require("ubot/ubot_pool_state").UBotPoolState;
 const Lock = require("lock").Lock;
+const BossBiMapper = require("bossbimapper").BossBiMapper;
+const Boss = require('boss.js');
 
 class UBotClientException extends Error {
     constructor(message = undefined) {
@@ -298,9 +300,12 @@ class UBotClient {
      * @async
      * @return {UBotSession} session.
      */
-    async createSession(requestContract) {
-        let session = await this.getSession("ubotCreateSession",
-            {packedRequest: await requestContract.getPackedTransaction()});
+    async createSession(requestContract, waitPreviousSession = false) {
+        let params = {packedRequest: await requestContract.getPackedTransaction()};
+        let session = await this.getSession("ubotCreateSession", params);
+
+        if (session == null)
+            throw new UBotClientException("Session is null");
 
         // wait session requestId
         while (session.state === UBotSessionState.VOTING_REQUEST_ID.val) {
@@ -309,17 +314,27 @@ class UBotClient {
                 {executableContractId: requestContract.state.data.executable_contract_id});
         }
 
-        if (session == null)
-            throw new UBotClientException("Session is null");
+        if (waitPreviousSession) {
+            while (session.requestId == null || !session.requestId.equals(requestContract.id)) {
+                if (session.state === UBotSessionState.CLOSING.val || session.state === UBotSessionState.CLOSED.val)
+                    await sleep(100);
+                else
+                    await sleep(1000);
+
+                session = await this.getSession("ubotCreateSession", params);
+
+                if (session == null)
+                    throw new UBotClientException("Session is null");
+            }
+
+        } else if (session.requestId == null || !session.requestId.equals(requestContract.id))
+            throw new UBotClientException("Unable to create session by request contract");
 
         if (session.state === UBotSessionState.CLOSING.val)
             throw new UBotClientException("Session is closing");
 
         if (session.state === UBotSessionState.CLOSED.val)
             throw new UBotClientException("Session has been closed");
-
-        if (session.requestId == null || !session.requestId.equals(requestContract.id))
-            throw new UBotClientException("Unable to create session by request contract");
 
         // wait session id and pool
         while (session.state !== UBotSessionState.OPERATIONAL.val && session.state !== UBotSessionState.CLOSING.val &&
@@ -396,6 +411,17 @@ class UBotClient {
     }
 
     /**
+     * Get quorum size of request cloud method.
+     *
+     * @param {Contract} requestContract - The Request contract.
+     * @private
+     */
+    static getRequestQuorumSize(requestContract) {
+        let executableContract = requestContract.transactionPack.referencedItems.get(requestContract.state.data.executable_contract_id);
+        return executableContract.state.data.cloud_methods[requestContract.state.data.method_name].quorum.size;
+    }
+
+    /**
     * Start cloud method.
     * Requests the creation of a session with a randomly selected pool using the Request contract.
     * Creates a session with the id of the Request contract or throws an exception if the session is already created
@@ -405,16 +431,19 @@ class UBotClient {
     * connects to a random UBots from the pool on which he runs the cloud method.
     *
     * @param {Contract} requestContract - The Request contract.
+     *@param {boolean} waitPreviousSession - Wait finished previous session or return his and exit.
+     *      If true - repeated attempts to start the cloud method after 1 second if the session is in OPERATIONAL mode or
+     *      100 ms if the session is in CLOSING mode. By default - false.
     * @async
     * @return {UBotSession} session.
     */
-    async startCloudMethod(requestContract) {
+    async startCloudMethod(requestContract, waitPreviousSession = false) {
         if (this.httpUbotClient != null)
             throw new UBotClientException("Ubot is connected to the pool. First disconnect from the pool");
 
         UBotClient.checkRequest(requestContract);
 
-        let session = await this.createSession(requestContract);
+        let session = await this.createSession(requestContract, waitPreviousSession);
 
         // get ubot registry
         let serviceContracts = await new Promise(async (resolve, reject) =>
@@ -429,7 +458,6 @@ class UBotClient {
             throw new UBotClientException("Unable to get ubot registry contract");
 
         let ubotRegistry = await Contract.fromSealedBinary(serviceContracts.contracts.ubot_registry_contract);
-        //console.log(JSON.stringify(ubotRegistry.state.data.topology, null, 2));
 
         this.topologyUBotNet = ubotRegistry.state.data.topology;
         await this.connectRandomUbot(session.pool);
@@ -446,6 +474,86 @@ class UBotClient {
             throw new UBotClientException("Error execute cloud method, response: " + JSON.stringify(resp));
 
         return session;
+    }
+
+    /**
+     * Execute cloud method.
+     * Start cloud method (@see startCloudMethod) and wait it finished.
+     *
+     * @param {Contract} requestContract - The Request contract.
+     * @param {boolean} waitPreviousSession - Wait finished previous session or return his and exit.
+     *      If true - repeated attempts to start the cloud method after 1 second if the session is in OPERATIONAL mode or
+     *      100 ms if the session is in CLOSING mode. By default - false.
+     * @async
+     * @return {Promise<Object>} cloud method state gathered session pool consensus, fields in the object:
+     *      state - method status,
+     *      result - method result,
+     *      errors - error list.
+     * @throws {UBotClientException} client exception if session pool consensus is not reached.
+     */
+    async executeCloudMethod(requestContract, waitPreviousSession = false) {
+        let session = await this.startCloudMethod(requestContract, waitPreviousSession);
+
+        let quorum = UBotClient.getRequestQuorumSize(requestContract);
+
+        let states = [];
+        let groups = new Map();
+
+        let state = await this.waitCloudMethod(requestContract.id);
+
+        // check consensus
+        if (quorum <= 1)
+            return state;
+
+        states.push(state);
+        groups.set(HashId.of(await Boss.dump(await BossBiMapper.getInstance().serialize(state))).base64, 1);
+
+        let finishFire = null;
+        let finishEvent = new Promise(resolve => finishFire = resolve);
+        let waiting = true;
+
+        session.pool.filter(ubotNumber => ubotNumber !== this.httpUbotClient.nodeNumber).forEach(
+            ubotNumber => this.waitCloudMethod(requestContract.id, ubotNumber).then(async (state) =>
+                await this.lock.synchronize(requestContract.id, async () => {
+                    if (!waiting)
+                        return;
+
+                    states.push(state);
+
+                    let groupKey = HashId.of(await Boss.dump(await BossBiMapper.getInstance().serialize(state))).base64;
+                    let count = groups.get(groupKey);
+                    if (count == null)
+                        count = 0;
+
+                    // check consensus
+                    if (count + 1 >= quorum) {
+                        waiting = false;
+                        finishFire(state);
+                    }
+
+                    groups.set(groupKey, count + 1);
+
+                    // check consensus available
+                    if (Array.from(groups.values()).every(c => c + session.pool.length - states.length < quorum)) {
+                        waiting = false;
+                        finishFire(null);
+                    }
+                })
+            )
+        );
+
+        let result = await finishEvent;
+        if (result != null)
+            return result;
+
+        let message = null;
+        try {
+            message = JSON.stringify(states);
+        } catch (err) {
+            message = "Not stringified";
+        }
+
+        throw new UBotClientException("Cloud method consensus can`t be reached, ubot states: " + message);
     }
 
     /**
@@ -505,7 +613,10 @@ class UBotClient {
      * @param {number} ubotNumber - UBot number to request the current state.
      *      By default - number of ubot, which connected in {@link startCloudMethod}.
      * @async
-     * @return {Promise<Object>} fields in the object: state - method status, result - method result, errors - error list.
+     * @return {Promise<Object>} cloud method state, fields in the object:
+     *      state - method status,
+     *      result - method result,
+     *      errors - error list.
      */
     async getStateCloudMethod(requestContractId, ubotNumber = undefined) {
         let client = null;
@@ -535,7 +646,10 @@ class UBotClient {
      * @param {number} ubotNumber - UBot number to request the current state.
      *      By default - number of ubot, which connected in {@link startCloudMethod}.
      * @async
-     * @return {Promise<Object>} fields in the object: state - method status, result - method result, errors - error list.
+     * @return {Promise<Object>} cloud method state, fields in the object:
+     *      state - method status,
+     *      result - method result,
+     *      errors - error list.
      */
     async waitCloudMethod(requestContractId, ubotNumber = undefined) {
         let state = await this.getStateCloudMethod(requestContractId, ubotNumber);

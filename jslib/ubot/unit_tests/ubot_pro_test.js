@@ -227,6 +227,31 @@ unit.test("ubot_pro_test: start cloud method", async () => {
     await shutdownUBots(ubotMains);
 });
 
+unit.test("ubot_pro_test: execute cloud method", async () => {
+    let ubotMains = await createUBots(ubotsCount);
+
+    // ubotMains.forEach(main => main.ubot.network.verboseLevel = VerboseLevel.BASE);
+    // for (let i = 0; i < 10; i++) {
+    // console.error("Iteration = " + i);
+
+    let ubotClient = await new UBotClient(clientKey, TOPOLOGY_ROOT + "universa.pro.json").start();
+
+    let executableContract = await generateSecureRandomExecutableContract();
+    let requestContract = await generateSecureRandomRequestContract(executableContract);
+
+    let state = await ubotClient.executeCloudMethod(requestContract, true);
+
+    console.log("State: " + JSON.stringify(state));
+
+    assert(state.state === UBotPoolState.FINISHED.val);
+
+    // checking secure random value
+    assert(typeof state.result === "number" && state.result >= 0 && state.result < 1000);
+
+    await ubotClient.shutdown();//}
+    await shutdownUBots(ubotMains);
+});
+
 // unit.test("ubot_pro_test: full quorum", async () => {
 //     let ubotMains = await createUBots(ubotsCount);
 //     let ubotClient = await new UBotClient(clientKey, TOPOLOGY_ROOT + "universa.pro.json").start();
@@ -529,6 +554,13 @@ unit.test("ubot_pro_test: lottery", async () => {
 
         userKeys.push(userKey);
         payments.push(payment);
+
+        // let state = await ubotClient.executeCloudMethod(buyContract, true);
+        //
+        // assert(state.state === UBotPoolState.FINISHED.val);
+        // assert(state.result instanceof Contract);
+
+
 
         // let session = await ubotClient.startCloudMethod(buyContract);
         //
