@@ -325,7 +325,7 @@ unit.test("web_test: cpp exceptions", async () => {
     await httpServer.stopServer();
 });
 
-unit.test("web_test: cpp command exceptions", async () => {
+unit.test("web_test: httpClient retry command", async () => {
     let nodeKey = new crypto.PrivateKey(atob("JgAcAQABvID6D5ZdM9EKrZSztm/R/RcywM4K8Z4VBtX+NZp2eLCWtfAgGcBCQLtNz4scH7dPBerkkxckW6+9CLlnu/tgOxvzS6Z1Ec51++fVP9gaWbBQe9/dSg7xVPg5p9ibhfTB+iRXyevCkNj0hrlLyXl1BkPjN9+lZfXJsp9OnGIJ/AaAb7yA99E65gvZnbb3/oA3rG0pM45af6ppZKe2HeiAK+fcXm5KTQzfTce45f/mJ0jsDmFf1HFosS4waXSAz0ZfcssjPeoF3PuXfJLtM8czJ55+Nz6NMCbzrSk6zkKssGBieYFOb4eG2AdtfjTrpcSSHBgJpsbcmRx4bZNfBAZPqT+Sd20="));
     let clientKey = await crypto.PrivateKey.generate(2048);
     let httpServer = new network.HttpServer("0.0.0.0", 8080, 20);
@@ -338,6 +338,9 @@ unit.test("web_test: cpp command exceptions", async () => {
     await httpServer.stopServer();
     httpServer = new network.HttpServer("0.0.0.0", 8080, 20);
     httpServer.initSecureProtocol(nodeKey);
+    httpServer.addSecureEndpoint("testEndpoint", async (reqParams, clientPublicKey) => {
+        return {hash: crypto.HashId.of(reqParams.testData)};
+    });
     httpServer.startServer();
 
     let testData = t.randomBytes(100);
@@ -356,7 +359,7 @@ unit.test("web_test: cpp command exceptions", async () => {
         await sleep(50);
     }
 
-    assert(errText.includes('Value type founded by key "response" is not 7UBinder') === true);
+    assert(hashOk === true);
 
     await httpClient.stop();
     await httpServer.stopServer();

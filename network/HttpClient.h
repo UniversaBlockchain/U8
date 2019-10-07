@@ -94,6 +94,11 @@ public:
     void start(const crypto::PrivateKey& clientKey, const crypto::PublicKey& nodeKey);
 
     /**
+     * Set current session to null. Required for making restart with new session.
+     */
+    void clearSession() {session_ = nullptr;}
+
+    /**
      * Execute a command over the authenticated and encrypted connection. In the case of network errors, restarts the
      * command.
      */

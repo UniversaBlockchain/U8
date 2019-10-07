@@ -888,6 +888,10 @@ public:
         });
     }
 
+    void clearSession() {
+        httpClient_->clearSession();
+    }
+
     void stop() {
         if (httpClient_ != nullptr) {
             timer_->stop();
@@ -1063,6 +1067,17 @@ void httpClient_start(const FunctionCallbackInfo<Value> &args) {
     });
 }
 
+void httpClient_clearSession(const FunctionCallbackInfo<Value> &args) {
+    Scripter::unwrapArgs(args, [](ArgsContext &ac) {
+        if (ac.args.Length() == 0) {
+            auto httpClient = unwrap<HttpClientBuffered>(ac.args.This());
+            httpClient->clearSession();
+            return;
+        }
+        ac.throwError("invalid arguments");
+    });
+}
+
 void httpClient_stop(const FunctionCallbackInfo<Value> &args) {
     Scripter::unwrap(args, [&](const shared_ptr<Scripter> se, auto isolate, auto context) {
         if (args.Length() == 0) {
@@ -1116,6 +1131,7 @@ Local<FunctionTemplate> initHttpClient(Scripter& scripter) {
     prototype->Set(isolate, "__setBufferedCallback", FunctionTemplate::New(isolate, httpClient_setBufferedCallback));
     prototype->Set(isolate, "__setBufferedCommandCallback", FunctionTemplate::New(isolate, httpClient_setBufferedCommandCallback));
     prototype->Set(isolate, "__start", FunctionTemplate::New(isolate, httpClient_start));
+    prototype->Set(isolate, "__clearSession", FunctionTemplate::New(isolate, httpClient_clearSession));
     prototype->Set(isolate, "__stop", FunctionTemplate::New(isolate, httpClient_stop));
     prototype->Set(isolate, "__changeStartTimeoutMillis", FunctionTemplate::New(isolate, httpClient_changeStartTimeoutMillis));
 

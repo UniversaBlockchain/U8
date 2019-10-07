@@ -426,6 +426,11 @@ network.HttpServer = class {
 
 network.HttpClient = class {
     constructor(rootUrl) {
+        this.autoReconnectOnCommandError = true;
+        this.retryCount = 5; // total count of tries
+        this.retryTimeoutMillis = 2000;
+        this.clientPrivateKey = null;
+        this.nodePublickey = null;
         this.httpClient_ = new network.HttpClientImpl(rootUrl);
         this.callbacks_ = new Map();
         this.nextReqId_ = 1;
@@ -450,6 +455,8 @@ network.HttpClient = class {
     }
 
     start(clientPrivateKey, nodePublickey, session) {
+        this.clientPrivateKey = clientPrivateKey;
+        this.nodePublickey = nodePublickey;
         return new Promise((resolve, reject) => {
             this.httpClient_.__start(clientPrivateKey.packed, nodePublickey.packed, ()=>{
                 resolve();
@@ -457,6 +464,11 @@ network.HttpClient = class {
                 reject(errText);
             });
         });
+    }
+
+    restart() {
+        this.httpClient_.__clearSession();
+        return this.start(this.clientPrivateKey, this.nodePublickey, null);
     }
 
     async stop() {
@@ -553,25 +565,44 @@ network.HttpClient = class {
 
     async command(name, params, onComplete, onError) {
         let paramsBin = await Boss.dump(await BossBiMapper.getInstance().serialize({"command": name, "params": params}));
-        let reqId = this.getReqId();
-        this.callbacks_.set(reqId, async (decrypted, isError) => {
-            if (isError !== true) {
-                let binder = await BossBiMapper.getInstance().deserialize(await Boss.load(decrypted));
-                let result = binder.result;
-                if (result) {
-                    onComplete(result);
-                } else {
-                    let errorRecord = new ErrorRecord(Errors.FAILURE, "", "unprocessablereply");
-                    if (binder.error)
-                        errorRecord = await BossBiMapper.getInstance().deserialize(binder.error);
-                    let clientError = ClientError.initFromErrorRecord(errorRecord);
-                    onError(clientError);
-                }
+
+        let tryCounter = 0;
+
+        let onExecCommandError = async (clientError) => {
+            tryCounter += 1;
+            if (tryCounter >= this.retryCount) {
+                onError(clientError);
             } else {
-                onError(utf8Decode(decrypted));
+                await sleep(this.retryTimeoutMillis);
+                await this.restart();
+                execCommand();
             }
-        });
-        this.httpClient_.__command(reqId, paramsBin);
+        };
+
+        let execCommand = () => {
+            let reqId = this.getReqId();
+            this.callbacks_.set(reqId, async (decrypted, isError) => {
+                if (isError !== true) {
+                    let binder = await BossBiMapper.getInstance().deserialize(await Boss.load(decrypted));
+                    let result = binder.result;
+                    if (result) {
+                        onComplete(result);
+                    } else {
+                        let errorRecord = new ErrorRecord(Errors.FAILURE, "", "unprocessablereply");
+                        if (binder.error)
+                            errorRecord = await BossBiMapper.getInstance().deserialize(binder.error);
+                        let clientError = ClientError.initFromErrorRecord(errorRecord);
+                        await onExecCommandError(clientError);
+                    }
+                } else {
+                    await onExecCommandError(new ClientError(utf8Decode(decrypted)));
+                }
+            });
+            this.httpClient_.__command(reqId, paramsBin);
+        };
+
+        execCommand();
+
     }
 
     getReqId() {
