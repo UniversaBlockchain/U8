@@ -26,6 +26,7 @@ const yaml = require('yaml');
 const BigDecimal  = require("big").Big;
 
 const MAX_API_LEVEL = 4;
+const predefinedRoles = ["creator", "owner", "issuer"];
 
 function Context(base) {
     this.base = base;
@@ -52,7 +53,7 @@ class Transactional extends bs.BiSerializable {
 
         let of = {
             id: this.id,
-            constraints : await serializer.serialize(this.constraints),
+            constraints : this.constraints,
             data : this.data,
         };
 
@@ -108,6 +109,7 @@ class State extends bs.BiSerializable {
         this.data = {};
         this.branchId = null;
         this.constraints = new t.GenericSet();
+        this.roles = new Map();
 
         //TODO:setJS
     }
@@ -140,7 +142,10 @@ class State extends bs.BiSerializable {
         if(!t.valuesEqual(this.branchId,to.branchId))
             return false;
 
-        return t.valuesEqual(this.constraints,to.constraints);;
+        if(!t.valuesEqual(this.roles,to.roles))
+            return false;
+
+        return t.valuesEqual(this.constraints,to.constraints);
     }
 
     getBranchRevision() {
@@ -170,14 +175,18 @@ class State extends bs.BiSerializable {
             of.expires_at = this.expiresAt;
 
         if (this.constraints != null)
-            of.constraints = await serializer.serialize(this.constraints);
+            of.constraints = this.constraints;
+
+        of.roles = {};
+        for (let [k, v] of this.roles)
+            of.roles[k] = v;
 
         return await serializer.serialize(of);
     }
 
     async deserialize(data, deserializer) {
         this.createdAt = await deserializer.deserialize(data.created_at);
-        if(data.hasOwnProperty("expires_at"))
+        if (data.hasOwnProperty("expires_at"))
             this.expiresAt = await deserializer.deserialize(data.expires_at);
         else
             this.expiresAt = null;
@@ -194,35 +203,43 @@ class State extends bs.BiSerializable {
             this.constraints = new t.GenericSet();
 
         let r = this.contract.registerRole(await deserializer.deserialize(data.owner))
-        if(r.name !== "owner")
+        if (r.name !== "owner")
             throw new ex.IllegalArgumentError("bad owner role name");
 
         r = this.contract.registerRole(await deserializer.deserialize(data.created_by))
-        if(r.name !== "creator")
+        if (r.name !== "creator")
             throw new ex.IllegalArgumentError("bad creator role name");
 
-        if(data.hasOwnProperty("data"))
+        if (data.hasOwnProperty("data"))
             this.data = await deserializer.deserialize(data.data);
         else
             this.data = {};
 
-
-        if(data.hasOwnProperty("branch_id"))
+        if (data.hasOwnProperty("branch_id"))
             this.branchId = data.branch_id;
         else
             this.branchId = {};
 
-
-        if(data.hasOwnProperty("parent") && data.parent != null)
+        if (data.hasOwnProperty("parent") && data.parent != null)
             this.parent = await deserializer.deserialize(data.parent);
         else
             this.parent = null;
 
-
-        if(data.hasOwnProperty("origin") && data.origin != null)
+        if (data.hasOwnProperty("origin") && data.origin != null)
             this.origin = await deserializer.deserialize(data.origin);
         else
             this.origin = null;
+
+        this.roles = new Map();
+        if (data.hasOwnProperty("roles") && data.roles != null) {
+            if (data.roles instanceof Object) {
+                for (let key of Object.keys(data.roles))
+                    this.roles[key] = await deserializer.deserialize(data.roles[key]);
+            } else if (data.roles instanceof Array) {
+                let roleObjects = await deserializer.deserialize(data.roles);
+                roleObjects.forEach(ro => this.roles.set(ro.name, ro));
+            }
+        }
     }
 
     initializeWithDsl(root) {
@@ -248,6 +265,16 @@ class State extends bs.BiSerializable {
 
         this.contract.createRole("owner", root.owner);
         this.contract.createRole("creator", root.created_by);
+
+        this.roles = new Map();
+        // if (root.roles != null)
+        //     root.roles.forEach(item => {
+        //         if (item.hasOwnProperty("role")) {
+        //             let role = this.contract.createRole(item.role.name, item.role);
+        //             this.roles.set(role.name, role);
+        //         } else
+        //             throw new ex.IllegalArgumentError("Expected role section");
+        //     });
 
         let constrs = null;
         if (root.constraints != null)
@@ -347,7 +374,7 @@ class Definition extends bs.BiSerializable {
             of.expires_at = this.expiresAt;
 
         if (this.constraints != null)
-            of.constraints = await serializer.serialize(this.constraints);
+            of.constraints = this.constraints;
 
         if (this.extendedType != null)
             of.extended_type = this.extendedType;

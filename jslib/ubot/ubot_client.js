@@ -152,9 +152,6 @@ class UBotClient {
 
         let randomUbot = this.ubots[random];
 
-        if (randomUbot.url.startsWith("https"))
-            randomUbot.url = "http" + randomUbot.url.substring(5);
-
         this.httpUbotClient = new HttpClient(randomUbot.url);
         this.httpUbotClient.nodeNumber = this.topologyUBotNet[random].number;
         this.ubotPublicKey = randomUbot.key;
@@ -182,9 +179,6 @@ class UBotClient {
             });
 
         let ubot = this.ubots[ubotNumber];
-
-        if (ubot.url.startsWith("https"))
-            ubot.url = "http" + ubot.url.substring(5);
 
         let client = new HttpClient(ubot.url);
         client.nodeNumber = this.topologyUBotNet[ubotNumber].number;
