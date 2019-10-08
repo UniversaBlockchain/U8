@@ -89,3 +89,33 @@ unit.test("unpack contract from fromPackedTransaction", async () => {
 
     await tt.assertSameContracts(c1, c2);
 });
+
+unit.test("contract custom roles", async () => {
+    let k = tk.TestKeys.getKey();
+    let c1 = cnt.Contract.fromPrivateKey(k);
+
+    let role = new roles.SimpleRole("qwerty123", k.publicKey.longAddress);
+    role.keyAddresses.add(k.publicKey.longAddress);
+    c1.registerRole(role);
+
+    console.log("c1.roles.owner.name: " + c1.roles.owner.name);
+
+    let link = new roles.RoleLink("owner", "qwerty123");
+    c1.registerRole(link);
+
+    console.log("c1.roles.owner.name: " + c1.roles.owner.name);
+
+    await c1.seal();
+
+    let bb = await c1.getPackedTransaction();
+    let c2 = await cnt.Contract.fromPackedTransaction(bb);
+
+    console.log("c2.roles.owner.name: " + c2.roles.owner.name);
+
+    let r = c2.roles.owner.resolve();
+
+    //assert(r.name === "qwerty123");
+
+    //assert(r instanceof roles.SimpleRole);
+    //assert(r.getSimpleAddress() === TestKeys.publicKey(1).getLongAddress());
+});
