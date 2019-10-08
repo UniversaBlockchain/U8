@@ -12,7 +12,7 @@
 
 namespace network {
 
-const int HttpServer::SERVER_VERSION = 2;
+const int HttpServer::SERVER_VERSION = 3;
 
 struct HttpServerRequestHolder {
     HttpServerRequest* pReq;
@@ -173,6 +173,9 @@ HttpServer::HttpServer(std::string host, int port, int poolSize)
  : service_(host, port, poolSize)
  , minstdRand_(std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now().time_since_epoch()).count()) {
     nextSessionId_ = getCurrentTimeMillis()/1000 + minstdRand_();
+    for (int i = 0; i <= SERVER_VERSION; ++i) {
+        sessionsByKeyAndVersion_.push_back(std::unordered_map<std::string, std::shared_ptr<HttpServerSession>>());
+    }
 }
 
 void HttpServer::start() {
@@ -235,9 +238,10 @@ void HttpServer::initSecureProtocol(const crypto::PrivateKey& nodePrivateKey) {
             auto res = req->parseMultipartData();
             UBinder binder = extractParams(res);
             UObject clientKeyObj = binder.get("client_key");
+            int version = binder.getIntOrDefault("client_version", 0);
             UBytes clientKeyBytes = UBytes::asInstance(clientKeyObj);
             crypto::PublicKey clientKey(clientKeyBytes.get());
-            auto session = getSession(clientKey);
+            auto session = getSession(clientKey, version);
             std::lock_guard lock(session->connectMutex);
             if (session->serverNonce.size() == 0) {
                 session->serverNonce.resize(48);
@@ -365,19 +369,38 @@ void HttpServer::inSession(
     }
 }
 
-std::shared_ptr<HttpServerSession> HttpServer::getSession(crypto::PublicKey& key) {
+std::shared_ptr<HttpServerSession> HttpServer::getSession(crypto::PublicKey& key, int protocolVersion) {
     std::lock_guard lock(mutexSessions_);
-    auto sessionIter = sessionsByKey_.find(base64_encode(key.fingerprint()));
-    if (sessionIter == sessionsByKey_.end()) {
-        auto session = std::make_shared<HttpServerSession>(key);
-        session->sessionId = nextSessionId_++;
-        if (nextSessionId_ >= LONG_MAX)
-            nextSessionId_ = 1;
-        sessionsByKey_[base64_encode(key.fingerprint())] = session;
-        sessionsById_[session->sessionId] = session;
-        return session;
+    try {
+        if (protocolVersion == 0) {
+            auto session = std::make_shared<HttpServerSession>(key);
+            session->sessionId = nextSessionId_++;
+            session->version = protocolVersion;
+            if (nextSessionId_ >= LONG_MAX)
+                nextSessionId_ = 1;
+            sessionsById_[session->sessionId] = session;
+            return session;
+        }
+
+        auto skey = base64_encode(key.fingerprint());
+        auto& protocolSessions = sessionsByKeyAndVersion_.at(protocolVersion);
+        if (protocolSessions.find(skey) != protocolSessions.end()) {
+            auto session = protocolSessions[skey];
+            sessionsById_[session->sessionId] = session;
+            return session;
+        } else {
+            auto session = std::make_shared<HttpServerSession>(key);
+            session->sessionId = nextSessionId_++;
+            session->version = protocolVersion;
+            if (nextSessionId_ >= LONG_MAX)
+                nextSessionId_ = 1;
+            protocolSessions[skey] = session;
+            sessionsById_[session->sessionId] = session;
+            return session;
+        }
+    } catch (const std::exception& e) {
+        throw std::runtime_error(e.what());
     }
-    return sessionIter->second;
 }
 
 std::shared_ptr<HttpServerSession> HttpServer::getSession(long sessionId) {
