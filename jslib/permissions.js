@@ -265,7 +265,7 @@ class ModifyDataPermission extends Permission {
             } else {
                 let acceptedValues = this.fields[field];
                 for (let v of acceptedValues) {
-                    if (t.valuesEqual(v, value)) {
+                    if (t.valuesEqual(v, value) || ((value == null || value === "") && (v == null || v === ""))) {
                         return true;
                     }
                 }

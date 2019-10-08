@@ -109,7 +109,7 @@ class State extends bs.BiSerializable {
         this.data = {};
         this.branchId = null;
         this.constraints = new t.GenericSet();
-        this.roles = new Map();
+        this.roles = {};
 
         //TODO:setJS
     }
@@ -168,7 +168,8 @@ class State extends bs.BiSerializable {
             branch_id: this.branchId,
             origin : this.origin,
             parent : this.parent,
-            data : this.data
+            data : this.data,
+            roles : this.roles
         };
 
         if (this.expiresAt != null)
@@ -176,10 +177,6 @@ class State extends bs.BiSerializable {
 
         if (this.constraints != null)
             of.constraints = this.constraints;
-
-        of.roles = {};
-        for (let [k, v] of this.roles)
-            of.roles[k] = v;
 
         return await serializer.serialize(of);
     }
@@ -230,14 +227,14 @@ class State extends bs.BiSerializable {
         else
             this.origin = null;
 
-        this.roles = new Map();
+        this.roles = {};
         if (data.hasOwnProperty("roles") && data.roles != null) {
             if (data.roles instanceof Object) {
                 for (let key of Object.keys(data.roles))
                     this.roles[key] = await deserializer.deserialize(data.roles[key]);
             } else if (data.roles instanceof Array) {
                 let roleObjects = await deserializer.deserialize(data.roles);
-                roleObjects.forEach(ro => this.roles.set(ro.name, ro));
+                roleObjects.forEach(ro => this.roles[ro.name] = ro);
             }
         }
     }
@@ -266,12 +263,12 @@ class State extends bs.BiSerializable {
         this.contract.createRole("owner", root.owner);
         this.contract.createRole("creator", root.created_by);
 
-        this.roles = new Map();
+        this.roles = {};
         // if (root.roles != null)
         //     root.roles.forEach(item => {
         //         if (item.hasOwnProperty("role")) {
         //             let role = this.contract.createRole(item.role.name, item.role);
-        //             this.roles.set(role.name, role);
+        //             this.roles[role.name] = role;
         //         } else
         //             throw new ex.IllegalArgumentError("Expected role section");
         //     });
@@ -523,7 +520,7 @@ class Definition extends bs.BiSerializable {
                 role = this.contract.registerRole(x);
             else if (Object.getPrototypeOf(x) === Object.prototype)
             // if Object - create role from Object
-                role = this.contract.createRole("@" + name, x);
+                role = this.contract.createRole("@" + name, x, false);
             else
             // yaml, extended form: permission: { role: name, ... }
                 roleName = x;
@@ -531,7 +528,7 @@ class Definition extends bs.BiSerializable {
 
         if (role == null && roleName != null)
         // we need to create alias to existing role
-            role = this.contract.createRole("@" + name, roleName);
+            role = this.contract.createRole("@" + name, roleName, false);
 
         if (role == null)
             throw new ex.IllegalArgumentError("permission " + name + " refers to missing role: " + roleName);
@@ -905,12 +902,15 @@ class Contract extends bs.BiSerializable {
     /**
      * Register new role for contract. If role with the same name already exists it will be replaced with new one
      *
-     *
      * @param role {Role} to register
      * @returns {Role}
      */
     registerRole(role) {
-        this.roles[role.name] = role;
+        if (~predefinedRoles.indexOf(role.name))
+            this.roles[role.name] = role;
+        else
+            this.state.roles[role.name] = role;
+
         role.contract = this;
         return role;
     }
@@ -1660,6 +1660,13 @@ class Contract extends bs.BiSerializable {
                 }
 
             if (!roleConstraint)
+                for (let role of Object.values(this.state.roles))
+                    if (role instanceof roles.Role && role.containConstraint(c.name)) {
+                        roleConstraint = true;
+                        break;
+                    }
+
+            if (!roleConstraint)
                 for (let plist of this.definition.permissions.values()) {
                     for (let perm of plist)
                         if (perm.role.containConstraint(c.name)) {
@@ -1823,17 +1830,20 @@ class Contract extends bs.BiSerializable {
 
         let keys = new t.GenericMap();
 
-        for(let roleName of Object.keys(this.roles)) {
-            roles.RoleExtractor.extractKeys(this.roles[roleName]).forEach(key=>keys.set(key.fingerprints,key));
-            roles.RoleExtractor.extractAddresses(this.roles[roleName]).forEach(ka=>{
-                for(let key of this.transactionPack.keysForPack) {
-                    if(ka.match(key)) {
+        let extractKeys = role => {
+            roles.RoleExtractor.extractKeys(role).forEach(key => keys.set(key.fingerprints, key));
+            roles.RoleExtractor.extractAddresses(role).forEach(ka => {
+                for (let key of this.transactionPack.keysForPack) {
+                    if (ka.match(key)) {
                         keys.set(key.fingerprints, key);
                         break;
                     }
                 }
             });
-        }
+        };
+
+        Object.values(this.roles).forEach(extractKeys);
+        Object.values(this.state.roles).forEach(extractKeys);
 
         // verify signatures
         for (let signature of  data.signatures) {
@@ -1996,24 +2006,33 @@ class Contract extends bs.BiSerializable {
      *
      * @param {string} roleName - Name of the role.
      * @param {object} roleObject - Is object for role creating.
+     * @param {boolean} addToContract - Flag indicating if constructed role should also be added to a contract as persistent named role.
      *
      * @return {Role} role.
      * @throws If can't make role.
      */
-    createRole(roleName, roleObject) {
+    createRole(roleName, roleObject, addToContract = true) {
+        let result = null;
         if (typeof roleObject === "string")
-            return this.registerRole(new roles.RoleLink(roleName, roleObject));
+            result = new roles.RoleLink(roleName, roleObject);
 
         if (roleObject instanceof roles.Role && roleObject.name != null)
             if (roleObject.name === roleName)
-                return this.registerRole(roleObject);
+                result = roleObject;
             else
-                return this.registerRole(new roles.RoleLink(roleName, roleObject.name));
+                result = new roles.RoleLink(roleName, roleObject.name);
 
         if (Object.getPrototypeOf(roleObject) === Object.prototype)
-            return this.registerRole(roles.Role.fromDsl(roleName, roleObject));
+            result = roles.Role.fromDsl(roleName, roleObject);
 
-        throw new ex.IllegalArgumentError("cant make role from " + JSON.stringify(roleObject));
+        if (result == null)
+            throw new ex.IllegalArgumentError("cant make role from " + JSON.stringify(roleObject));
+
+        result.contract = this;
+        if (addToContract)
+            this.registerRole(result);
+
+        return result;
     }
 
     isU(issuerKeys, issuerName) {
