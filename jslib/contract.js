@@ -445,6 +445,38 @@ class Definition extends bs.BiSerializable {
         this.permissions.get(permission.name).push(permission);
     }
 
+  /*  addPermission(permission) {
+        if (this.permissionIds == null) {
+            this.permissionIds = new Set();
+
+            for (let plist of this.permissions.values()) {
+                for (let perm of plist) {
+                    this.permissionIds.add(perm.id);
+                }
+            }
+        }
+
+        // We need to assign contract-unique id
+        if (permission.id == null) {
+            while (true) {
+                let id = t.randomString(6);
+                if (!this.permissionIds.has(id)) {
+                    this.permissionIds.add(id);
+                    permission.id = id;
+                    break;
+                }
+            }
+        } else {
+            if(this.permissionIds.has(permission.id))
+                throw new ex.IllegalArgumentError("Permission with id '" + permission.id + "' already exists in contract");
+
+            this.permissionIds.add(permission.id);
+        }
+
+        permission.role.contract = this.contract;
+        this.permissions.get(permission.name).push(permission);
+    }*/
+
     initializeWithDsl(root) {
         this.contract.createRole("issuer", root.issuer);
 
