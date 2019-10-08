@@ -696,6 +696,8 @@ class Contract extends bs.BiSerializable {
                         return this.findConstraintByNameInSection(name.substring(12), "definition");
                     else if (name.startsWith("references."))
                         return this.findConstraintByNameInSection(name.substring(11), "definition");
+                    else if (name.startsWith("permissions."))
+                        return this.findPermissisonById(name.substring(12));
             }
         } else if (name.startsWith("state.")) {
             name = name.substring(6);
@@ -727,6 +729,8 @@ class Contract extends bs.BiSerializable {
                         return this.findConstraintByNameInSection(name.substring(12), "state");
                     else if (name.startsWith("references."))
                         return this.findConstraintByNameInSection(name.substring(11), "state");
+                    else if (name.startsWith("roles."))
+                        return this.state.roles[name.substring(6)];
             }
         } else if (name.startsWith("transactional.")) {
             if (this.transactional != null) {
