@@ -26,16 +26,16 @@ class Role extends bs.BiSerializable {
     /**
      * Base class for every role. Defines role name and constraints
      * @param {string} name - Name of the role
+     * @param {Contract} contract - Contract with role
      * @constructor
      */
-    constructor(name) {
+    constructor(name, contract = null) {
         super();
         this.name = name;
+        this.contract = contract;
         this.comment = null;
         this.requiredAllConstraints = new Set();
         this.requiredAnyConstraints = new Set();
-
-        this.contract = null;
     }
 
     /**
@@ -199,6 +199,8 @@ class Role extends bs.BiSerializable {
             result = new RoleLink(name);
         else if (type.toLowerCase() === "list")
             result = new ListRole(name);
+        else if (type.toLowerCase() === "quorum_vote")
+            result = new QuorumVoteRole(name);
         else
             throw new ex.IllegalArgumentError("Unknown role type: " + type);
 
@@ -233,10 +235,11 @@ class RoleLink extends Role {
      *
      * @param {string} name - Name of the link
      * @param {string} roleName - Name of the linked role
+     * @param {Contract} contract - Contract with role
      * @constructor
      */
-    constructor(name,roleName) {
-        super(name);
+    constructor(name, roleName, contract = null) {
+        super(name, contract);
         this.roleName = roleName;
     }
 
@@ -284,10 +287,12 @@ class RoleLink extends Role {
         if (Object.getPrototypeOf(RoleLink.prototype).containConstraint.call(this, name))
             return true;
 
-        if (this.contract == null || this.contract.roles.hasOwnProperty(this.roleName))
+        if (this.contract == null || (!this.contract.roles.hasOwnProperty(this.roleName) &&
+            !this.contract.state.roles.hasOwnProperty(this.roleName)))
             return false;
 
-        return this.contract.roles[this.roleName].containConstraint(name);
+        return (this.contract.roles.hasOwnProperty(this.roleName) && this.contract.roles[this.roleName].containConstraint(name)) ||
+               (this.contract.state.roles.hasOwnProperty(this.roleName) && this.contract.state.roles[this.roleName].containConstraint(name));
     }
 
     async deserialize(data, deserializer) {
@@ -306,7 +311,10 @@ class RoleLink extends Role {
      * @returns {Role} linked role
      */
     getRole() {
-        return this.contract.roles[this.roleName];
+        let role = this.contract.roles[this.roleName];
+        if (role == null)
+            role = this.contract.state.roles[this.roleName];
+        return role;
     }
 
     /**
@@ -365,14 +373,15 @@ class ListRole extends Role {
     /**
      * Role combining other roles (sub-roles) in the "and", "or" and "any N of" principle.
      *
-     * @param {string} name - Name of the role.
-     * @param {Array<Role>} roles - Array of sub-roles. Empty by default.
-     * @param {ListRoleMode} mode - Mode of checking sub-roles. "ALL" ("and") by default.
-     * @param {number} quorumSize - N from "any N of" principle of quorum ListRole. 0 by default.
+     * @param {string} name - Name of the role
+     * @param {Array<Role>} roles - Array of sub-roles. Empty by default
+     * @param {ListRoleMode} mode - Mode of checking sub-roles. "ALL" ("and") by default
+     * @param {number} quorumSize - N from "any N of" principle of quorum ListRole. 0 by default
+     * @param {Contract} contract - Contract with role
      * @constructor
      */
-    constructor(name, roles = [], mode = ListRoleMode.ALL, quorumSize = 0) {
-        super(name);
+    constructor(name, roles = [], mode = ListRoleMode.ALL, quorumSize = 0, contract = null) {
+        super(name, contract);
         this.mode = mode;
         this.roles = roles;
         this.quorumSize = quorumSize;
@@ -536,11 +545,12 @@ class SimpleRole extends Role {
 
      * @param name {string} name of the role
      * @param param {crypto.PublicKey|crypto.PrivateKey|crypto.KeyAddress|Iterable<crypto.PublicKey>|Iterable<crypto.PrivateKey>|Iterable<crypto.KeyAddress>}
+     * @param {Contract} contract - Contract with role
      *
      * @constructor
      */
-    constructor(name,param) {
-        super(name);
+    constructor(name, param, contract = null) {
+        super(name, contract);
         this.keyAddresses = new t.GenericSet();
         this.keyRecords = new t.GenericMap();
 
@@ -711,10 +721,162 @@ class SimpleRole extends Role {
     }
 }
 
+///////////////////////////
+//QuorumVoteRole
+///////////////////////////
 
-dbm.DefaultBiMapper.registerAdapter(new bs.BiAdapter("RoleLink",RoleLink));
-dbm.DefaultBiMapper.registerAdapter(new bs.BiAdapter("ListRole",ListRole));
-dbm.DefaultBiMapper.registerAdapter(new bs.BiAdapter("SimpleRole",SimpleRole));
+class QuorumVoteRole extends Role {
+
+    constructor(name, source, quorum, contract = null) {
+        super(name, contract);
+        this.source = source;
+        this.quorum = quorum;
+    }
+
+    isValid() {
+        //TODO: additional check (parse quorum and source)
+        return this.source != null && this.quorum != null;
+    }
+
+    equals(to) {
+        if (this === to)
+            return true;
+
+        if (Object.getPrototypeOf(this) !== Object.getPrototypeOf(to))
+            return false;
+
+        if (!Object.getPrototypeOf(QuorumVoteRole.prototype).equals.call(this, to))
+            return false;
+
+        if (!t.valuesEqual(this.source, to.source))
+            return false;
+
+        return t.valuesEqual(this.quorum, to.quorum);
+    }
+
+    equalsForConstraint(to) {
+        if (this === to)
+            return true;
+
+        if (Object.getPrototypeOf(this) !== Object.getPrototypeOf(to))
+            return false;
+
+        if (!Object.getPrototypeOf(QuorumVoteRole.prototype).equals.call(this, to))
+            return false;
+
+        if (!t.valuesEqual(this.source, to.source))
+            return false;
+
+        return t.valuesEqual(this.quorum, to.quorum);
+    }
+
+    initWithDsl(serializedRole) {
+        this.source = serializedRole.source;
+        this.quorum = serializedRole.quorum;
+    }
+
+    async deserialize(data, deserializer) {
+        await Object.getPrototypeOf(QuorumVoteRole.prototype).deserialize.call(this, data, deserializer);
+
+        this.source = data.source;
+        this.quorum = data.quorum;
+    }
+
+    async serialize(serializer) {
+        let data = await Object.getPrototypeOf(QuorumVoteRole.prototype).serialize.call(this, serializer);
+
+        data.source = this.source;
+        data.quorum = this.quorum;
+
+        return data;
+    }
+
+    /**
+     * Check role is allowed to keys
+     *
+     * @param {Iterable<crypto.PrivateKey> | Iterable<crypto.PublicKey>} keys - Keys to check allowance for
+     * @returns {boolean} if role is allowed for a set of keys
+     */
+    isAllowedForKeys(keys) {
+        if (!Object.getPrototypeOf(QuorumVoteRole.prototype).isAllowedForKeys.call(this, keys))
+            return false;
+
+        let idx = source.indexOf(".");
+        let from = source.substring(0, idx);
+        let what = source.substring(idx + 1);
+        let fromContract = null;
+        if (from === "this")
+            fromContract = this.contract;
+        else {
+            let constr = this.contract.constraints.get(from);
+            if (constr == null)
+                return false;
+
+            if (constr.matchingItems.size === 0)
+                return false;
+            else
+                fromContract = Array.from(constr.matchingItems)[0];
+        }
+        // List<Role> roles;
+        // Object o = fromContract.get(what);
+        // if(o instanceof Role) {
+        //     o = ((Role) o).resolve();
+        //     if(!(o instanceof ListRole)) {
+        //         return false;
+        //     } else {
+        //         roles = new ArrayList(((ListRole) o).getRoles());
+        //     }
+        // } else if(o instanceof List) {
+        //     roles = new ArrayList<>();
+        //     try {
+        //         ((List)o).forEach(item -> {
+        //             if(item instanceof Role) {
+        //                 roles.add((Role) item);
+        //             } else if(item instanceof KeyAddress || item instanceof PublicKey) {
+        //                 roles.add(new SimpleRole("@role"+roles.size(), Do.listOf(item)));
+        //             } else if(item instanceof String) {
+        //                 try {
+        //                     roles.add(new SimpleRole("@role"+roles.size(), Do.listOf(new KeyAddress((String) item))));
+        //                 } catch (KeyAddress.IllegalAddressException e) {
+        //                     throw new IllegalArgumentException();
+        //                 }
+        //             }
+        //         });
+        //     } catch (IllegalArgumentException e) {
+        //         return false;
+        //     }
+        //
+        // } else {
+        //     return false;
+        // }
+        //
+        // int minValidCount;
+        // if(quorum.endsWith("%")) {
+        //     minValidCount = (int) Math.ceil(new BigDecimal(quorum.substring(0,quorum.length()-1)).doubleValue()*roles.size()/100.0f);
+        // } else {
+        //     minValidCount = Integer.parseInt(quorum);
+        // }
+        //
+        // for(Role r : roles) {
+        //     if(r.isAllowedForKeys(keys)) {
+        //         minValidCount--;
+        //     }
+        //
+        //     if(minValidCount == 0) {
+        //         break;
+        //     }
+        // }
+        //
+        // return minValidCount == 0;
+
+        return true;
+    }
+}
+
+dbm.DefaultBiMapper.registerAdapter(new bs.BiAdapter("RoleLink", RoleLink));
+dbm.DefaultBiMapper.registerAdapter(new bs.BiAdapter("ListRole", ListRole));
+dbm.DefaultBiMapper.registerAdapter(new bs.BiAdapter("SimpleRole", SimpleRole));
+dbm.DefaultBiMapper.registerAdapter(new bs.BiAdapter("QuorumVoteRole", QuorumVoteRole));
 
 
 const RoleExtractor = {
@@ -752,4 +914,4 @@ const RoleExtractor = {
 ///////////////////////////
 //EXPORTS
 ///////////////////////////
-module.exports = {RequiredMode,Role,RoleLink,ListRoleMode,ListRole,SimpleRole,RoleExtractor};
+module.exports = {RequiredMode,Role,RoleLink,ListRoleMode,ListRole,SimpleRole,QuorumVoteRole,RoleExtractor};
