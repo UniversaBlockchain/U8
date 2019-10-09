@@ -9,7 +9,10 @@ using namespace std;
 StreamPump::StreamPump(ostream &s) : outs(s) {
     worker = thread([this]() {
         try {
-            while (1) outs << queue.get();
+            while (1) {
+                outs << queue.get();
+                outs.flush();
+            }
         }
         catch (const QueueClosedException &e) {
         }
