@@ -418,34 +418,6 @@ class Definition extends bs.BiSerializable {
     }
 
     addPermission(permission) {
-        if (permission.id == null) {
-            if (this.permissionIds == null) {
-                this.permissionIds = new Set();
-
-                for (let plist of this.permissions.values()) {
-                    for (let perm of plist) {
-                        this.permissionIds.add(perm.id);
-                    }
-                }
-            }
-
-            while (true) {
-                let id = t.randomString(6);
-                if (!this.permissionIds.has(id)) {
-                    this.permissionIds.add(id);
-                    permission.id = id;
-                    break;
-                }
-            }
-        }
-        if(!this.permissions.has(permission.name)) {
-            this.permissions.set(permission.name,[]);
-        }
-        permission.role.contract = this.contract;
-        this.permissions.get(permission.name).push(permission);
-    }
-
-  /*  addPermission(permission) {
         if (this.permissionIds == null) {
             this.permissionIds = new Set();
 
@@ -467,15 +439,18 @@ class Definition extends bs.BiSerializable {
                 }
             }
         } else {
-            if(this.permissionIds.has(permission.id))
+            if (this.permissionIds.has(permission.id))
                 throw new ex.IllegalArgumentError("Permission with id '" + permission.id + "' already exists in contract");
 
             this.permissionIds.add(permission.id);
         }
 
+        if (!this.permissions.has(permission.name))
+            this.permissions.set(permission.name, []);
+
         permission.role.contract = this.contract;
         this.permissions.get(permission.name).push(permission);
-    }*/
+    }
 
     initializeWithDsl(root) {
         this.contract.createRole("issuer", root.issuer);
@@ -721,6 +696,8 @@ class Contract extends bs.BiSerializable {
                         return this.findConstraintByNameInSection(name.substring(12), "definition");
                     else if (name.startsWith("references."))
                         return this.findConstraintByNameInSection(name.substring(11), "definition");
+                    else if (name.startsWith("permissions."))
+                        return this.findPermissisonById(name.substring(12));
             }
         } else if (name.startsWith("state.")) {
             name = name.substring(6);
@@ -752,6 +729,8 @@ class Contract extends bs.BiSerializable {
                         return this.findConstraintByNameInSection(name.substring(12), "state");
                     else if (name.startsWith("references."))
                         return this.findConstraintByNameInSection(name.substring(11), "state");
+                    else if (name.startsWith("roles."))
+                        return this.state.roles[name.substring(6)];
             }
         } else if (name.startsWith("transactional.")) {
             if (this.transactional != null) {
@@ -2106,6 +2085,16 @@ class Contract extends bs.BiSerializable {
     setExpiresAt(dateTime) {
         this.state.expiresAt = dateTime;
         this.state.expiresAt.setMilliseconds(0);
+    }
+
+    findPermissisonById(id) {
+        for (let permArray of this.definition.permissions.values()) {
+            let founded = permArray.filter(permission => permission.id === id);
+            if (founded.length > 0)
+                return founded[0];
+        }
+
+        return null;
     }
 
     /**

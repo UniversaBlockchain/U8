@@ -829,7 +829,8 @@ class Constraint extends bs.BiSerializable {
                         else
                             keys = leftOperandContract.sealedByKeys.keys();
 
-                        ret = right.isAllowedForKeys(keys);
+                        ret = right.requiredAllConstraints.size === 0 && right.requiredAnyConstraints.size === 0 &&
+                            right.isAllowedForKeys(keys);
 
                         break;
                     default:

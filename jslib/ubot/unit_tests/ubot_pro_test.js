@@ -248,8 +248,13 @@ unit.test("ubot_pro_test: execute cloud method", async () => {
     // checking secure random value
     assert(typeof state.result === "number" && state.result >= 0 && state.result < 1000);
 
-    await ubotClient.shutdown();//}
-    await shutdownUBots(ubotMains);
+    await ubotClient.shutdown();
+
+    // waiting pool finished...
+    while (ubotMains.some(main => Array.from(main.ubot.processors.values()).some(proc => proc.state.canContinue)))
+        await sleep(100);
+
+    await shutdownUBots(ubotMains);//}
 });
 
 // unit.test("ubot_pro_test: full quorum", async () => {

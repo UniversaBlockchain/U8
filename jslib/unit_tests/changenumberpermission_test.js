@@ -40,14 +40,11 @@ unit.test("change number permission step", async () => {
     c.transactionPack = new tp.TransactionPack(c);
 
 
-
-
     let c1 = await c.createRevision([k]);
     c1.state.data.field1 = 986;
     await c1.seal();
     c1.transactionPack = new tp.TransactionPack(c1);
     assert(await c1.check());
-
 
     let c2 = await c.createRevision([k]);
     c2.state.data.field1 = 985;
@@ -55,13 +52,11 @@ unit.test("change number permission step", async () => {
     c2.transactionPack = new tp.TransactionPack(c2);
     assert(!await c2.check());
 
-
     let c3 = await c.createRevision([k]);
     c3.state.data.field1 = 989;
     await c3.seal();
     c3.transactionPack = new tp.TransactionPack(c3);
     assert(await c3.check());
-
 
     let c4 = await c.createRevision([k]);
     c4.state.data.field1 = 990;
@@ -85,7 +80,6 @@ unit.test("change number permission value", async () => {
     c.definition.addPermission(cnp);
     await c.seal();
     c.transactionPack = new tp.TransactionPack(c);
-
 
     {
         let c1 = await c.createRevision([k]);
@@ -135,7 +129,6 @@ unit.test("change number permission value", async () => {
         assert(await c3.check());
     }
 
-
     {
         let c4 = await c.createRevision([k]);
         c4.state.data.field1 = 1001;
@@ -153,3 +146,40 @@ unit.test("change number permission value", async () => {
     }
 
 });
+
+/*
+unit.test("change number permission contract ref to permission", async () => {
+    let k = tk.TestKeys.getKey();
+    let contract = cnt.Contract.fromPrivateKey(k);
+    let contract2 = cnt.Contract.fromPrivateKey(k);
+
+    let changeNumberPermission = new perm.ChangeNumberPermission(new RoleLink("@owner", "owner"), Binder.of(
+        "field_name", "field1",
+        "min_value", 33,
+        "max_value", 34,
+        "min_step", 1,
+        "max_step", 1
+        )
+    );
+    let changeNumberPermission2 = new perm.ChangeNumberPermission(new RoleLink("@owner", "owner"), Binder.of(
+        "field_name", "field1",
+        "min_value", 33,
+        "max_value", 34,
+        "min_step", 1,
+        "max_step", 1
+        )
+    );
+    changeNumberPermission.setId("changenumber");
+    changeNumberPermission2.setId("changenumber2");
+    contract.addPermission(changeNumberPermission);
+    contract2.addPermission(changeNumberPermission2);
+    contract.seal();
+    let reference = new Reference(contract2);
+    reference.name = "test1";
+    reference.setConditions(Binder.of("all_of", Do.listOf("ref.id==\""+contract.getId().toBase64String()+"\"","this.definition.permissions.changenumber2==ref.definition.permissions.changenumber")));
+    contract2.addReference(reference);
+    contract2.seal();
+    contract2.getTransactionPack().addReferencedItem(contract);
+    contract2 = Contract.fromPackedTransaction(contract2.getPackedTransaction());
+    assertTrue(contract2.check());
+});*/

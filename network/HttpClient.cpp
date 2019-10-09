@@ -11,7 +11,7 @@
 
 namespace network {
 
-const int HttpClient::CLIENT_VERSION = 2;
+const int HttpClient::CLIENT_VERSION = 3;
 std::mutex HttpClient::workerInitMutex_;
 std::shared_ptr<HttpClientWorkerAsync> HttpClient::worker_;
 
@@ -242,7 +242,8 @@ void HttpClient::start(const crypto::PrivateKey& clientKey, const crypto::Public
         session_ = std::make_shared<HttpClientSession>();
         session_->nodePublicKey = std::make_shared<crypto::PublicKey>(nodeKey);
         session_->clientPrivateKey = std::make_shared<crypto::PrivateKey>(clientKey);
-        UBinder params = UBinder::of("client_key", UBytes(crypto::PublicKey(clientKey).pack()));
+        UBinder params = UBinder::of("client_key", UBytes(crypto::PublicKey(clientKey).pack()),
+                "client_version", HttpClient::CLIENT_VERSION);
         byte_vector paramsBin = BossSerializer::serialize(params).get();
         byte_vector server_nonce;
         atomic<int> server_version(1);

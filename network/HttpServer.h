@@ -109,14 +109,14 @@ private:
     UBinder extractParams(std::unordered_map<std::string, byte_vector>& reqParams);
     void inSession(HttpServerRequest *req, std::function<void(byte_vector& params, std::shared_ptr<HttpServerSession> session,
             std::function<void(const byte_vector& ansBin)>&& sendAnswer)>&& processor);
-    std::shared_ptr<HttpServerSession> getSession(crypto::PublicKey& key);
+    std::shared_ptr<HttpServerSession> getSession(crypto::PublicKey& key, int protocolVersion);
     std::shared_ptr<HttpServerSession> getSession(long sessionId);
 
 private:
     std::shared_ptr<crypto::PrivateKey> myKey_;
     HttpService service_;
     std::mutex mutexSessions_;
-    std::unordered_map<std::string, std::shared_ptr<HttpServerSession>> sessionsByKey_;
+    std::vector<std::unordered_map<std::string, std::shared_ptr<HttpServerSession>>> sessionsByKeyAndVersion_;
     std::unordered_map<long, std::shared_ptr<HttpServerSession>> sessionsById_;
     std::minstd_rand minstdRand_;
     long nextSessionId_;
