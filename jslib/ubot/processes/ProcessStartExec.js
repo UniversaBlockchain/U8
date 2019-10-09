@@ -44,6 +44,12 @@ class ProcessStartExec extends ProcessBase {
             resolve(ans);
         }));
     }
+    
+    function registerContract(contract, initiateLongVote = true) {
+        return new Promise(resolve => wrkInner.farcall("registerContract", [contract, initiateLongVote], {}, ans => {
+            resolve(ans);
+        }));
+    }
     `;
 
     constructor(processor, onReady, cmdStack = []) {
@@ -109,6 +115,10 @@ class ProcessStartExec extends ProcessBase {
 
                 this.pr.worker.export["getMultiStorage"] = async (args, kwargs) => {
                     return await this.getMultiStorage();
+                };
+
+                this.pr.worker.export["registerContract"] = async (args, kwargs) => {
+                    return await this.registerContract(args[0], args[1]);
                 };
 
                 this.pr.worker.export["__worker_bios_print"] = async (args, kwargs) => {
@@ -478,7 +488,20 @@ class ProcessStartExec extends ProcessBase {
 
             throw err;
         }
+    }
 
+    async registerContract(contract, initiateLongVote = true) {
+        try {
+            await this.pr.session.registerContract(contract, initiateLongVote, this.pr.requestContract);
+
+        } catch (err) {
+            this.pr.logger.log("Error register contract: " + err.message);
+            this.pr.errors.push(new ErrorRecord(Errors.FAILURE, "registerContract",
+                "Error register contract: " + err.message));
+            this.pr.changeState(UBotPoolState.FAILED);
+
+            throw err;
+        }
     }
 }
 

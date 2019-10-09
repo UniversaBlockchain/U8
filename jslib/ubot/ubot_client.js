@@ -8,16 +8,11 @@ import {UBotSession, UBotSessionState} from 'ubot/ubot_session'
 
 const TopologyBuilder = require("topology_builder").TopologyBuilder;
 const UBotPoolState = require("ubot/ubot_pool_state").UBotPoolState;
+const UBotClientException = require("ubot/ubot_client_exception").UBotClientException;
+const ItemResult = require('itemresult').ItemResult;
 const Lock = require("lock").Lock;
 const BossBiMapper = require("bossbimapper").BossBiMapper;
 const Boss = require('boss.js');
-
-class UBotClientException extends Error {
-    constructor(message = undefined) {
-        super();
-        this.message = message;
-    }
-}
 
 class NodeRecord {
     constructor(data) {
@@ -152,6 +147,10 @@ class UBotClient {
 
         let randomUbot = this.ubots[random];
 
+        // if (randomUbot.url.startsWith("http://127.0.0.1"))
+        //     randomUbot.url = "http://104.248.143.106" + randomUbot.url.substring(16);
+        // console.error(randomUbot.url);
+
         this.httpUbotClient = new HttpClient(randomUbot.url);
         this.httpUbotClient.nodeNumber = this.topologyUBotNet[random].number;
         this.ubotPublicKey = randomUbot.key;
@@ -179,6 +178,10 @@ class UBotClient {
             });
 
         let ubot = this.ubots[ubotNumber];
+
+        // if (ubot.url.startsWith("http://127.0.0.1"))
+        //     ubot.url = "http://104.248.143.106" + ubot.url.substring(16);
+        // console.error(ubot.url);
 
         let client = new HttpClient(ubot.url);
         client.nodeNumber = this.topologyUBotNet[ubotNumber].number;
@@ -349,6 +352,47 @@ class UBotClient {
             throw new UBotClientException("Unable to get session pool");
 
         return new UBotSession(session, this, requestContract.state.data.executable_contract_id);
+    }
+
+    /**
+     * Register the contract on the network.
+     *
+     * @param {Uint8Array} packed - Binary contract for registration.
+     * @async
+     * @return {ItemResult} Result of registration or current state of registration (if wasn't finished yet).
+     */
+    async register(packed) {
+        // Object binderResult = protect(() -> httpClient.command("approve", "packedItem", packed)
+        //     .get("itemResult"));
+        // if (binderResult instanceof ItemResult) {
+        //     ItemResult lastResult = (ItemResult) binderResult;
+        //     if (millisToWait > 0 && lastResult.state.isPending()) {
+        //         Instant end = Instant.now().plusMillis(millisToWait);
+        //         try {
+        //             Contract c = Contract.fromPackedTransaction(packed);
+        //             int interval = 1000;
+        //             while (Instant.now().isBefore(end) && lastResult.state.isPending()) {
+        //                 Thread.currentThread().sleep(interval);
+        //                 if (interval > 300)
+        //                     interval -= 350;
+        //                 lastResult = getState(c.getId());
+        //                 //System.out.println("test: " + lastResult);
+        //             }
+        //         } catch (InterruptedException e) {
+        //             e.printStackTrace();
+        //         } catch (Quantiser.QuantiserException e) {
+        //             throw new ClientError(e);
+        //         } catch (IOException e) {
+        //             e.printStackTrace();
+        //         }
+        //     }
+        //     return lastResult;
+        // }
+        //
+        // System.err.println("test: " + binderResult);
+        console.error("!!!!!!!!!register!!!!!!!!!");
+
+        return ItemResult.UNDEFINED;
     }
 
     /**

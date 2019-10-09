@@ -85,6 +85,35 @@ async function generateSecureRandomRequestContract(executableContract) {
     return requestContract;
 }
 
+async function generateSimpleRegisterExecutableContract() {
+    let executableContract = Contract.fromPrivateKey(userPrivKey);
+
+    executableContract.state.data.cloud_methods = {
+        register: {
+            pool: {size: 5},
+            quorum: {size: 4}
+        }
+    };
+
+    executableContract.state.data.js = await io.fileGetContentsAsString(TEST_CONTRACTS_PATH + "simpleRegister.js");
+
+    await executableContract.seal();
+
+    return executableContract;
+}
+
+async function generateSimpleRegisterRequestContract(executableContract, contractForRegistration) {
+    let requestContract = Contract.fromPrivateKey(userPrivKey);
+    requestContract.state.data.method_name = "register";
+    requestContract.state.data.method_args = [contractForRegistration];
+    requestContract.state.data.executable_contract_id = executableContract.id;
+
+    await cs.addConstraintToContract(requestContract, executableContract, "executableContractConstraint",
+        Constraint.TYPE_EXISTING_STATE, ["this.state.data.executable_contract_id == ref.id"], true);
+
+    return requestContract;
+}
+
 // unit.test("ubot_pro_test: simple", async () => {
 //     for (let i = 0; i < 50; i++) {
 //         let ubotMains = await createUBots(ubotsCount);
@@ -310,6 +339,35 @@ unit.test("ubot_pro_test: execute cloud method", async () => {
 //         executableContract.state.data.cloud_methods.getRandom.quorum.size);
 //
 //     await ubotClient.shutdown();
+//     await shutdownUBots(ubotMains);
+// });
+
+// unit.test("ubot_pro_test: register contract", async () => {
+//     let ubotMains = await createUBots(ubotsCount);
+//
+//     // simple contract for registration
+//     let simpleContract = Contract.fromPrivateKey(userPrivKey);
+//
+//     let ubotClient = await new UBotClient(clientKey, TOPOLOGY_ROOT + "universa.pro.json").start();
+//
+//     let executableContract = await generateSimpleRegisterExecutableContract();
+//     let requestContract = await generateSimpleRegisterRequestContract(executableContract, simpleContract);
+//
+//     let state = await ubotClient.executeCloudMethod(requestContract, true);
+//
+//     console.log("State: " + JSON.stringify(state));
+//
+//     assert(state.state === UBotPoolState.FINISHED.val);
+//
+//     // checking secure random value
+//     assert(state.result instanceof Contract && state.result.id.equals(simpleContract.id));
+//
+//     await ubotClient.shutdown();
+//
+//     // waiting pool finished...
+//     while (ubotMains.some(main => Array.from(main.ubot.processors.values()).some(proc => proc.state.canContinue)))
+//         await sleep(100);
+//
 //     await shutdownUBots(ubotMains);
 // });
 

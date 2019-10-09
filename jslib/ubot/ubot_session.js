@@ -3,6 +3,7 @@
  */
 
 const t = require("tools");
+const UBotClientException = require("ubot/ubot_client_exception").UBotClientException;
 
 const UBotSessionState = {
     VOTING_REQUEST_ID       : {val: "VOTING_REQUEST_ID", ordinal: 0},
@@ -82,6 +83,31 @@ class UBotSession {
         } while (result.pending[storageName] != null && Object.keys(result.pending[storageName]).length > 0);
 
         return result.current[storageName];
+    }
+
+    async registerContract(contract, initiateLongVote, requestContract) {
+        if (this.ubot != null)
+            this.ubot.logger.log("registerContract... Contract.id = " + contract.id);
+
+        if (initiateLongVote)
+            await this.client.askSessionOnAllNodes("initiateVote", {packedItem: contract.sealedBinary});
+        await this.client.askSessionOnAllNodes("voteForContract", {itemId: contract.id});
+
+        // wait quorum votes
+        let quorum = this.client.getRequestQuorumSize(requestContract);
+        console.error("quorum = " + quorum);
+
+        let votes = null;
+        do {
+            votes = await this.client.askSession("getVotes", {itemId: contract.id});
+            console.error("votes = " + JSON.stringify(votes));
+
+            if (votes == null || votes.keys == null || !votes.keys instanceof Array)
+                throw new UBotClientException("registerContract error: wrong getVotes result");
+        } while (votes.keys.length < quorum);
+
+        // register contract
+        await this.client.register(contract.getPackedTransaction());
     }
 
     async close() {
