@@ -11,6 +11,7 @@
 #include <libplatform/libplatform.h>
 #include <cstring>
 #include <future>
+#include <unordered_map>
 
 #include "../tools/Logging.h"
 #include "../tools/tools.h"
