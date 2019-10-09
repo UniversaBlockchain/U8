@@ -64,6 +64,22 @@ static unordered_set<string> validSourcesForRestrictedWorker = {
     "tools.js",
     "exceptions.js",
     "big.js",
+    "contract.js",
+    "biserializable.js",
+    "defaultbimapper.js",
+    "bossbimapper.js",
+    "transactionpack.js",
+    "quantiser.js",
+    "boss.js",
+    "roles.js",
+    "constraint.js",
+    "permissions.js",
+    "errors.js",
+    "config.js",
+    "contractdelta.js",
+    "extendedsignature.js",
+    "exceptions.js",
+    "yaml.js"
 };
 
 void JsLoadRequiredRestricted(const v8::FunctionCallbackInfo<v8::Value> &args) {

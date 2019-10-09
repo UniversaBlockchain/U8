@@ -2,6 +2,8 @@
  * Copyright (c) 2019-present Sergey Chernov, iCodici S.n.C, All Rights Reserved.
  */
 
+const DefaultBiMapper = require("defaultbimapper").DefaultBiMapper;
+
 let wrk = {};
 
 wrk.WorkerHandle = class {
@@ -28,7 +30,10 @@ wrk.WorkerHandle = class {
             } else {
                 let cmd = obj.cmd;
                 if (cmd && this.export[cmd]) {
-                    let res = await this.export[cmd](obj.args, obj.kwargs);
+                    let res = await this.export[cmd](
+                        await DefaultBiMapper.getInstance().deserialize(obj.args),
+                        await DefaultBiMapper.getInstance().deserialize(obj.kwargs)
+                    );
                     this.send({serial:this.getNextFarcallSN(), ref:obj.serial, result:res});
                 }
             }
@@ -39,11 +44,16 @@ wrk.WorkerHandle = class {
         this.workerImpl._send(obj);
     }
 
-    farcall(cmd, args, kwargs, onComplete = null) {
+    async farcall(cmd, args, kwargs, onComplete = null) {
         let id = this.getNextFarcallSN();
         if (onComplete != null)
             this.callbacksFarcall.set(id, onComplete);
-        this.workerImpl._send({serial:id, cmd:cmd, args:args, kwargs:kwargs});
+        this.workerImpl._send({
+            serial: id,
+            cmd: cmd,
+            args: await DefaultBiMapper.getInstance().serialize(args),
+            kwargs: await DefaultBiMapper.getInstance().serialize(kwargs)
+        });
     }
 
     release() {

@@ -126,7 +126,7 @@ class ProcessStartExec extends ProcessBase {
                     out("worker debug console:", ...args[1], args[2]);
                 };
 
-                let result = await new Promise(resolve => this.pr.worker.farcall(methodName, methodArgs, {}, ans => resolve(ans)));
+                let result = await new Promise(async(resolve) => await this.pr.worker.farcall(methodName, methodArgs, {}, ans => resolve(ans)));
 
                 await this.pr.session.close();
                 this.pr.session = null;

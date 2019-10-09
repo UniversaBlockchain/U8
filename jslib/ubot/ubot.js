@@ -12,6 +12,7 @@ const UBotCloudProcessorsCache = require("ubot/ubot_cloudprocessors_cache").UBot
 const UBotSessionStorageCache = require("ubot/ubot_session_storage_cache").UBotSessionStorageCache;
 const UBotClient = require('ubot/ubot_client').UBotClient;
 const Boss = require('boss.js');
+const t = require("tools");
 
 const TOPOLOGY_ROOT = "../jslib/ubot/topology/";
 
@@ -47,7 +48,7 @@ class UBot {
 
     async executeCloudMethod(contract) {
         this.logger.log("executeCloudMethod: requestContract.id = " + contract.id);
-        this.logger.log("  contract.state.data: " + JSON.stringify(contract.state.data));
+        this.logger.log("  contract.state.data: " + t.secureStringify(contract.state.data));
 
         if (this.client == null)
             this.client = await new UBotClient(this.nodeKey, TOPOLOGY_ROOT + "universa.pro.json", null, this.logger).start();

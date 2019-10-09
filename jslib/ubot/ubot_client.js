@@ -13,6 +13,7 @@ const ItemResult = require('itemresult').ItemResult;
 const Lock = require("lock").Lock;
 const BossBiMapper = require("bossbimapper").BossBiMapper;
 const Boss = require('boss.js');
+const t = require("tools");
 
 class NodeRecord {
     constructor(data) {
@@ -584,14 +585,7 @@ class UBotClient {
         if (result != null)
             return result;
 
-        let message = null;
-        try {
-            message = JSON.stringify(states);
-        } catch (err) {
-            message = "Not stringified";
-        }
-
-        throw new UBotClientException("Cloud method consensus can`t be reached, ubot states: " + message);
+        throw new UBotClientException("Cloud method consensus can`t be reached, ubot states: " + t.secureStringify(states));
     }
 
     /**

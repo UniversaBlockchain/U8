@@ -503,6 +503,16 @@ function dumpObj(obj, prefix = "") {
         console.log(obj);
 }
 
+function secureStringify(obj) {
+    let message = null;
+    try {
+        message = JSON.stringify(obj);
+    } catch (err) {
+        message = "Not stringified";
+    }
+    return message;
+}
+
 module.exports = {arraysEqual, valuesEqual, randomString, MemoiseMixin, PackedEqMixin, DigestEqMixin, GenericMap, GenericSet,
     equals, THROW_EXCEPTIONS, convertToDate, randomBytes, getOrDefault, getOrThrow, addValAndOrdinalMaps, randomChoice,
-    RateCounter, dumpObj};
+    RateCounter, dumpObj, secureStringify};
