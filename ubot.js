@@ -16,5 +16,5 @@ async function main(args) {
 
     await sleep(100000000000);
 
-    await main.shutdown();
+    await ubotMain.shutdown();
 }

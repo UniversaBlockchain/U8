@@ -11,6 +11,7 @@ const dbm = require("defaultbimapper");
 const t = require("tools");
 const KeyRecord = require("keyrecord").KeyRecord;
 const ex = require("exceptions");
+const BigDecimal  = require("big").Big;
 
 ///////////////////////////
 //Role
@@ -817,59 +818,51 @@ class QuorumVoteRole extends Role {
             else
                 fromContract = Array.from(constr.matchingItems)[0];
         }
-        // List<Role> roles;
-        // Object o = fromContract.get(what);
-        // if(o instanceof Role) {
-        //     o = ((Role) o).resolve();
-        //     if(!(o instanceof ListRole)) {
-        //         return false;
-        //     } else {
-        //         roles = new ArrayList(((ListRole) o).getRoles());
-        //     }
-        // } else if(o instanceof List) {
-        //     roles = new ArrayList<>();
-        //     try {
-        //         ((List)o).forEach(item -> {
-        //             if(item instanceof Role) {
-        //                 roles.add((Role) item);
-        //             } else if(item instanceof KeyAddress || item instanceof PublicKey) {
-        //                 roles.add(new SimpleRole("@role"+roles.size(), Do.listOf(item)));
-        //             } else if(item instanceof String) {
-        //                 try {
-        //                     roles.add(new SimpleRole("@role"+roles.size(), Do.listOf(new KeyAddress((String) item))));
-        //                 } catch (KeyAddress.IllegalAddressException e) {
-        //                     throw new IllegalArgumentException();
-        //                 }
-        //             }
-        //         });
-        //     } catch (IllegalArgumentException e) {
-        //         return false;
-        //     }
-        //
-        // } else {
-        //     return false;
-        // }
-        //
-        // int minValidCount;
-        // if(quorum.endsWith("%")) {
-        //     minValidCount = (int) Math.ceil(new BigDecimal(quorum.substring(0,quorum.length()-1)).doubleValue()*roles.size()/100.0f);
-        // } else {
-        //     minValidCount = Integer.parseInt(quorum);
-        // }
-        //
-        // for(Role r : roles) {
-        //     if(r.isAllowedForKeys(keys)) {
-        //         minValidCount--;
-        //     }
-        //
-        //     if(minValidCount == 0) {
-        //         break;
-        //     }
-        // }
-        //
-        // return minValidCount == 0;
 
-        return true;
+        let roles = [];
+        let o = fromContract.get(what);
+        if (o instanceof Role) {
+            if (o instanceof RoleLink)
+                o = o.resolve();
+
+            if (o instanceof ListRole)
+                roles = o.roles;
+            else
+                return false;
+
+        } else if (o instanceof Array) {
+            try {
+                o.forEach(item => {
+                    if (item instanceof Role)
+                        roles.push(item);
+                    else if (item instanceof crypto.KeyAddress || item instanceof crypto.PublicKey)
+                        roles.push(new SimpleRole("@role" + roles.length, item));
+                    else if (typeof item === "string")
+                        roles.push(new SimpleRole("@role" + roles.length, new crypto.KeyAddress(item)));
+                });
+            } catch (err) {
+                return false;
+            }
+
+        } else
+            return false;
+
+        let minValidCount = 0;
+        if (this.quorum.endsWith("%")) {
+            let percent = new BigDecimal(this.quorum.substring(0, this.quorum.length - 1));
+            minValidCount = Math.ceil(Number.parseFloat(percent.mul(roles.length).div(100).toFixed()));
+        } else
+            minValidCount = Number.parseInt(this.quorum);
+
+        for (let r of roles) {
+            if (r.isAllowedForKeys(keys))
+                minValidCount--;
+
+            if (minValidCount === 0)
+                break;
+        }
+
+        return minValidCount === 0;
     }
 }
 
