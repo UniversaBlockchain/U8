@@ -57,7 +57,7 @@ class UBotClient {
      * Connects to the Universa network by its topology.
      *
      * @async
-     * @return {Promise<UBotClient>}
+     * @return {Promise<UBotClient>}.
      */
     async start() {
         let tb = await new TopologyBuilder().build(this.topologyInput, this.topologyCacheDir);
@@ -86,7 +86,7 @@ class UBotClient {
      * Complete client work and also closes all connections.
      *
      * @async
-     * @return {Promise<void>}
+     * @return {Promise<void>}.
      */
     async shutdown() {
         if (this.httpNodeClients.size === 0)
@@ -104,7 +104,7 @@ class UBotClient {
      *
      * @private
      * @async
-     * @return {Promise<void>}
+     * @return {Promise<void>}.
      */
     async connectAllNodes() {
         for (let i = 0; i < this.nodes.length; i++) {
@@ -124,8 +124,8 @@ class UBotClient {
      *
      * @private
      * @async
-     * @param pool
-     * @return {Promise<void>}
+     * @param pool - Session pool.
+     * @return {Promise<void>}.
      */
     async connectRandomUbot(pool) {
         if (this.topologyUBotNet == null)
@@ -166,7 +166,7 @@ class UBotClient {
      * @private
      * @async
      * @param ubotNumber - UBot number.
-     * @return {Promise<HttpClient>}
+     * @return {Promise<HttpClient>}.
      */
     async connectUbot(ubotNumber) {
         if (this.topologyUBotNet == null || this.ubots.length === 0)
@@ -198,6 +198,8 @@ class UBotClient {
      * in the Start method.
      *
      * @private
+     * @param {String} command - Name of the command.
+     * @param {Object} params - Parameters of the command.
      * @async
      * @return {Promise<Object>} command result.
      */
@@ -230,6 +232,8 @@ class UBotClient {
      * Executes a command on the Universa network on the node to which the client was connected, in {@link start}.
      *
      * @private
+     * @param {String} command - Name of the command.
+     * @param {Object} params - Parameters of the command.
      * @async
      * @return {Promise<Object>} command result.
      */
@@ -259,6 +263,8 @@ class UBotClient {
      * Executes a command on all nodes of the Universa network.
      *
      * @private
+     * @param {String} command - Name of the command.
+     * @param {Object} params - Parameters of the command.
      * @async
      * @return {Promise<Object>} command result.
      */
@@ -295,6 +301,8 @@ class UBotClient {
      * Creates a new session for the cloud method.
      *
      * @private
+     * @param {Contract} requestContract - The Request contract.
+     * @param {boolean} waitPreviousSession=false - Wait for the previous session, if true.
      * @async
      * @return {UBotSession} session.
      */
@@ -356,44 +364,73 @@ class UBotClient {
     }
 
     /**
+     * Get the state of the contract (given by its id) on the currently connected node.
+     * Note: limits are applied to number of {@link #getState(Approvable)} calls
+     * per minute per client key. Make sure method is not called too often with the same client connection.
+     *
+     * @param {HashId} itemId - To get state by itemId.
+     * @async
+     * @return known {ItemState} if exist or ItemState.UNDEFINED.
+     * @throws ClientError
+     */
+    async getState(itemId) {
+        /*let result = await new Promise(async (resolve, reject) =>
+            await this.httpNodeClient.command("getState", {itemId: itemId},
+                result => resolve(result),
+                error => reject(error)
+            )
+        );
+
+        let ir = t.getOrThrow(result, "itemResult");
+        if (ir instanceof ItemResult)
+            return ir;
+
+        if (ir instanceof String)
+            console.error(">> " + ir);
+
+        return ItemResult.UNDEFINED;*/
+    }
+
+    /**
      * Register the contract on the network.
      *
      * @param {Uint8Array} packed - Binary contract for registration.
+     * @param millisToWait - Maximum time to wait for final ItemState.
      * @async
-     * @return {ItemResult} Result of registration or current state of registration (if wasn't finished yet).
+     * @return {ItemResult} result of registration or current state of registration (if wasn't finished yet).
      */
-    async register(packed) {
-        // Object binderResult = protect(() -> httpClient.command("approve", "packedItem", packed)
-        //     .get("itemResult"));
-        // if (binderResult instanceof ItemResult) {
-        //     ItemResult lastResult = (ItemResult) binderResult;
-        //     if (millisToWait > 0 && lastResult.state.isPending()) {
-        //         Instant end = Instant.now().plusMillis(millisToWait);
-        //         try {
-        //             Contract c = Contract.fromPackedTransaction(packed);
-        //             int interval = 1000;
-        //             while (Instant.now().isBefore(end) && lastResult.state.isPending()) {
-        //                 Thread.currentThread().sleep(interval);
-        //                 if (interval > 300)
-        //                     interval -= 350;
-        //                 lastResult = getState(c.getId());
-        //                 //System.out.println("test: " + lastResult);
-        //             }
-        //         } catch (InterruptedException e) {
-        //             e.printStackTrace();
-        //         } catch (Quantiser.QuantiserException e) {
-        //             throw new ClientError(e);
-        //         } catch (IOException e) {
-        //             e.printStackTrace();
-        //         }
-        //     }
-        //     return lastResult;
-        // }
-        //
-        // System.err.println("test: " + binderResult);
-        console.error("!!!!!!!!!register!!!!!!!!!");
+    async register(packed, millisToWait = 0) {
+       /* let result = await new Promise(async (resolve, reject) =>
+            await this.httpNodeClient.command("approve", {packedItem: packed},
+                result => resolve(result),
+                error => reject(error)
+            )
+        );
 
-        return ItemResult.UNDEFINED;
+        if (result.itemResult instanceof ItemResult) {
+            let lastResult = result;
+            if (millisToWait > 0 && lastResult.state.isPending) {
+                let end = Date.now() + millisToWait;
+                try {
+                    let c = await Contract.fromPackedTransaction(packed);
+                    let interval = 1000;
+                    while (Date.now() < end && lastResult.state.isPending) {
+                        await sleep(interval);
+                        if (interval > 300)
+                            interval -= 350;
+                        lastResult = await this.getState(c.id);
+                        console.log("test: " + lastResult);
+                    }
+                } catch (e) {
+                    throw new UBotClientException("register error");
+                }
+            }
+            return lastResult;
+        }
+
+        console.error("register!!: " + result);
+
+        return ItemResult.UNDEFINED;*/
     }
 
     /**
