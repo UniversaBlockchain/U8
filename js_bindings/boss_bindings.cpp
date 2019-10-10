@@ -117,15 +117,21 @@ void JsBossAddPrototype(const v8::FunctionCallbackInfo<v8::Value> &args) {
     Scripter::unwrapArgs(args, [](ArgsContext &ac) {
         if (ac.args.Length() == 2) {
             auto se = ac.scripter;
-            string prototypeName = ac.asString(0);
-            Local<Object> obj = ac.args[1]->ToObject(ac.isolate);
-            auto prototype = make_shared<Persistent<Object>>(ac.isolate, obj);
-            if (prototypeName == "HashId")
-                se->setPrototype("HashId", prototype);
-            else if (prototypeName == "PublicKey")
-                se->setPrototype("PublicKey", prototype);
-            else if (prototypeName == "PrivateKey")
-                se->setPrototype("PrivateKey", prototype);
+            if (!se->isPrototypesHolderFreezedForJs()) {
+                string prototypeName = ac.asString(0);
+                Local<Object> obj = ac.args[1]->ToObject(ac.isolate);
+                auto prototype = make_shared<Persistent<Object>>(ac.isolate, obj);
+                if (prototypeName == "HashId")
+                    se->setPrototype("HashId", prototype);
+                else if (prototypeName == "PublicKey")
+                    se->setPrototype("PublicKey", prototype);
+                else if (prototypeName == "PrivateKey")
+                    se->setPrototype("PrivateKey", prototype);
+            }
+            return;
+        } else if (ac.args.Length() == 0) {
+            auto se = ac.scripter;
+            se->freezePrototypesHolderForJs();
             return;
         }
         ac.throwError("invalid arguments");

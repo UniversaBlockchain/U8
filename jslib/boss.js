@@ -8,7 +8,7 @@
 __boss_addPrototype("HashId", crypto.HashId.prototype);
 __boss_addPrototype("PublicKey", crypto.PublicKey.prototype);
 __boss_addPrototype("PrivateKey", crypto.PrivateKey.prototype);
-//eval("__boss_addPrototype = undefined;");
+__boss_addPrototype(); // disable further calls of __boss_addPrototype
 
 const mainNestedLoadMap = {
     TransactionPack: {
