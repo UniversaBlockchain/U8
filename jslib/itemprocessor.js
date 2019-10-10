@@ -208,8 +208,22 @@ class ItemProcessor {
             await this.node.ledger.putItem(this.record, this.item, keepTill);
         });
 
-        if (this.item instanceof Contract && this.item.limitedForTestnet)
-            await this.markContractTest(this.item);
+        if (this.item instanceof Contract) {
+            let tp = this.item.transactionPack;
+            for (let [k,v] of this.node.serviceContracts) {
+                try {
+                    let c = await Contract.fromSealedBinary(v, tp);
+                    tp.addReferencedItem(c);
+                    tp.addTag(TransactionPack.TAG_PREFIX_RESERVED + k, c.id);
+                } catch (err) {
+                    this.node.logger.log(err.stack);
+                    this.node.logger.log("add serviceContracts ERROR: " + err.message);
+                }
+            }
+
+            if (this.item.limitedForTestnet)
+                await this.markContractTest(this.item);
+        }
 
         if (!this.processingState.isProcessedToConsensus)
             this.processingState = ItemProcessingState.DOWNLOADED;

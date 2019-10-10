@@ -14,12 +14,15 @@ const ex = require("exceptions");
 ///////////////////////////
 
 class TransactionPack {
+    static TAG_PREFIX_RESERVED = "universa:";
+
     constructor(contract) {
         this.subItems = new t.GenericMap();
         this.referencedItems = new t.GenericMap();
         this.keysForPack = new t.GenericSet();
+        this.taggedItems = new Map();
         this.contract = contract;
-        if(contract) {
+        if (contract) {
             this.extractAllSubItemsAndReferenced(contract);
             this.contract.transactionPack = this;
         }
@@ -49,6 +52,37 @@ class TransactionPack {
 
         for (let ref of contract.getReferencedItems())
             this.referencedItems.set(ref.id, ref);
+    }
+
+    /**
+     * Add tag to an item of transaction pack by its id
+     *
+     * Note: item with given id should exist in transaction pack as either main contract or subitem or referenced item
+     *
+     * @param {string} tag - Tag to add
+     * @param {HashId} itemId - Id of an item to set tag for
+     */
+    addTag(tag, itemId) {
+        let target = null;
+        if (this.referencedItems.has(itemId))
+            target = this.referencedItems.get(itemId);
+        else if(this.subItems.has(itemId))
+            target = this.subItems.get(itemId);
+        else if(this.contract.id.equals(itemId))
+            target = this.contract;
+
+        if (target != null) {
+            this.packedBinary = null;
+            this.taggedItems.set(tag, target);
+        } else
+            throw new ex.IllegalArgumentError("Item with id " + itemId + " is not found in transaction pack");
+    }
+
+    addReferencedItem(referencedItem) {
+        if (!this.referencedItems.has(referencedItem.id)) {
+            this.packedBinary = null;
+            this.referencedItems.set(referencedItem.id, referencedItem);
+        }
     }
 
     async deserialize(data, deserializer) {
@@ -133,12 +167,22 @@ class TransactionPack {
             }
         } else
             this.contract = await this.Contract.fromSealedBinary(data.contract, this);
+
+        if (data.tags != null && typeof data.tags === "object")
+            for (let tag of Object.keys(data.tags)) {
+                // tags with reserved prefix can only be added at runtime
+                // and can't be stored in packed transaction
+                if (tag.startsWith(TransactionPack.TAG_PREFIX_RESERVED))
+                    continue;
+
+                this.addTag(tag, await deserializer.deserialize(data.tags[tag]));
+            }
     }
 
     async serialize(serializer) {
 
         let subItemBinaries = [];
-        for(let si of this.subItems.values()) {
+        for (let si of this.subItems.values()) {
             subItemBinaries.push(si.sealedBinary);
         }
 
@@ -147,23 +191,29 @@ class TransactionPack {
             subItems : subItemBinaries
         };
 
-        if(this.referencedItems.size > 0) {
+        if (this.referencedItems.size > 0) {
             let referencesItemBinaries = [];
-            for(let ri of this.referencedItems.values()) {
+            for (let ri of this.referencedItems.values()) {
                 referencesItemBinaries.push(ri.sealedBinary);
             }
             res.referencedItems = referencesItemBinaries;
         }
 
-        if(this.keysForPack.size > 0) {
+        if (this.taggedItems.size > 0) {
+            res.tags = {};
+            for (let [k,v] of this.taggedItems)
+                res.tags[k] = await serializer.serialize(v.id);
+        }
+
+        if (this.keysForPack.size > 0) {
             let keyBinaries = [];
-            for(let key of this.keysForPack) {
+            for (let key of this.keysForPack) {
                 keyBinaries.push(key.packed);
             }
             res.keys = keyBinaries;
         }
 
-        if(this.contract.definition.extendedType) {
+        if (this.contract.definition.extendedType) {
             res.extended_type = this.contract.definition.extendedType;
         }
 

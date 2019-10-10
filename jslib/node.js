@@ -48,6 +48,8 @@ class Node {
         this.label = "Node(" + myInfo.number + ") ";
         this.isShuttingDown = false;
 
+        this.serviceContracts = new Map();
+
         this.processors = new t.GenericMap();
         this.parcelProcessors = new t.GenericMap();
         this.resyncProcessors = new t.GenericMap();

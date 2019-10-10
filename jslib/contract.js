@@ -579,23 +579,30 @@ class Contract extends bs.BiSerializable {
 
     async setOwnBinary(result) {
         let tpBackup = null;
-        if(this.transactionPack != null && this.transactionPack.contract === this) {
+        if (this.transactionPack != null && this.transactionPack.contract === this)
             tpBackup = this.transactionPack;
-        }
 
-        if(result.signatures.length === 0) {
+        if (result.signatures.length === 0)
             result.salt = t.randomBytes(12);
-        } else {
-            delete  result.salt;
-        }
+        else
+            delete result.salt;
+
+        let previousId = this.sealedBinary != null ? crypto.HashId.of(this.sealedBinary) : null;
         this.sealedBinary = await Boss.dump(result);
         this.id = await crypto.HashId.of_async(this.sealedBinary);
-        if(tpBackup == null) {
+
+        if (tpBackup == null)
             this.transactionPack = null;
-        } else {
+        else {
             this.transactionPack = new TransactionPack(this);
-            for(let [k,v] of tpBackup.referencedItems) {
+            for (let [k,v] of tpBackup.referencedItems)
                 this.transactionPack.referencedItems.set(k,v);
+
+            for (let [k,v] of tpBackup.taggedItems) {
+                //if main contract was tagged use its new it instead
+                if (previousId != null && v.equals(previousId))
+                    v = id;
+                this.transactionPack.addTag(k, v);
             }
         }
     }
@@ -765,7 +772,7 @@ class Contract extends bs.BiSerializable {
             case "creator":
                 return this.roles.creator;
             case "tag":
-                return {"contractForSearchByTag" : this};
+                return {contractForSearchByTag: this};
         }
         throw new ex.IllegalArgumentError("bad root: " + originalName);
 

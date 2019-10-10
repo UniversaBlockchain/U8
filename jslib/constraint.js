@@ -740,17 +740,13 @@ class Constraint extends bs.BiSerializable {
                                 ((indxOperator === EQUAL) && (leftTime === rightTime)))
                                 ret = true;
 
-                        /*} else if (((left != null) && left instanceof Object && left.hasOwnProperty("contractForSearchByTag"))  ||
-                            ((right != null) && right instanceof Object && right.hasOwnProperty("contractForSearchByTag"))) {
-                            let b = false;
-
-                            if (rightOperand.equals("test_tag_contract2"))
-                                b = true;
+                        } else if ((left != null && typeof left === "object" && left.hasOwnProperty("contractForSearchByTag"))  ||
+                            (right != null && typeof right === "object" && right.hasOwnProperty("contractForSearchByTag"))) {
 
                             let taggedContract = null;
                             let tag = null;
 
-                            if ((left != null) && left instanceof Object && left.hasOwnProperty("contractForSearchByTag")) {
+                            if (left != null && typeof left === "object" && left.hasOwnProperty("contractForSearchByTag")) {
                                 if (left.contractForSearchByTag instanceof Contract && (right == null || typeof right === "string")) {
                                     taggedContract = left.contractForSearchByTag;
 
@@ -773,9 +769,11 @@ class Constraint extends bs.BiSerializable {
                             if (taggedContract == null || tag == null)
                                 throw new ex.IllegalArgumentError("Incorrect operands for search by tag");
 
-                            let foundedContract = taggedContract.transactionPack.getTags().get(tag);
+                            let foundedContract = taggedContract.transactionPack.taggedItems.get(tag);
+
                             let equals = foundedContract != null && foundedContract.id.equals(taggedContract.id);
-                            ret = indxOperator === (equals ? EQUAL : NOT_EQUAL);*/
+
+                            ret = indxOperator === (equals ? EQUAL : NOT_EQUAL);
 
                         } else if ((typeOfLeftOperand === compareOperandType.FIELD) && (typeOfRightOperand === compareOperandType.FIELD)) {   // operands is FIELDs
                             if ((left != null) && (right != null)) {

@@ -443,13 +443,13 @@ unit.test("constraint test: checkConstraintsAPILevel4", async () => {
     tpack.referencedItems.set(contract2.id, contract2);
     tpack.subItems.set(contract3.id, contract3);
     tpack.referencedItems.set(contract3.id, contract3);
-   /* contract2.transactionPack(tp);
-    contract3.transactionPack(tp);
+    contract2.transactionPack = tpack;
+    contract3.transactionPack = tpack;
 
     // tags for check
     tpack.addTag("test_tag_contract1", contract1.id);
     tpack.addTag("test_tag_contract2", contract2.id);
-    tpack.addTag("test_tag_contract3", contract3.id);*/
+    tpack.addTag("test_tag_contract3", contract3.id);
 
     //contract1 = await Contract.fromSealedBinary(contract1.sealedBinary, tpack);
 
@@ -467,6 +467,7 @@ unit.test("constraint test: checkConstraintsAPILevel4", async () => {
     assert(contract1.constraints.get("ref_parent").matchingItems.has(contract3));
     assert(contract1.constraints.get("ref_can_play").matchingItems.has(contract2));
     assert(contract1.constraints.get("ref_arithmetic").matchingItems.has(contract2));
+    assert(contract1.constraints.get("ref_tags").matchingItems.has(contract2));
 });
 
 unit.test("constraint test: checkConstraintsBetweenContracts", async () => {
