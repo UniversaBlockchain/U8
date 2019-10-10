@@ -245,10 +245,10 @@ void HttpClient::start(const crypto::PrivateKey& clientKey, const crypto::Public
         UBinder params = UBinder::of("client_key", UBytes(crypto::PublicKey(clientKey).pack()),
                 "client_version", HttpClient::CLIENT_VERSION);
         byte_vector paramsBin = BossSerializer::serialize(params).get();
-        byte_vector server_nonce;
-        atomic<int> server_version(1);
+        shared_ptr<byte_vector> server_nonce = make_shared<byte_vector>();
+        shared_ptr<int> server_version = make_shared<int>(1);
         shared_ptr<string> error = make_shared<string>("");
-        sendBinRequest("/connect", "POST", paramsBin, [this,&sem,&server_nonce,&server_version,error](int respCode, byte_vector&& respBody){
+        sendBinRequest("/connect", "POST", paramsBin, [this,&sem,server_nonce,server_version,error](int respCode, byte_vector&& respBody){
             try {
                 UBytes ub(std::move(respBody));
                 UObject uObject = BossSerializer::deserialize(ub);
@@ -257,9 +257,10 @@ void HttpClient::start(const crypto::PrivateKey& clientKey, const crypto::Public
                 std::string strSessionId = binder.getString("session_id");
                 session_->sessionId = std::stol(strSessionId);
                 UBytes serverNonceUb = UBytes::asInstance(binder.get("server_nonce"));
-                server_nonce = serverNonceUb.get();
-                server_version = binder.getIntOrDefault("server_version", 1);
-                session_->version = std::min(int(server_version), HttpClient::CLIENT_VERSION);
+                byte_vector serverNonce = serverNonceUb.get();
+                server_nonce.get()->assign(serverNonce.begin(), serverNonce.end());
+                (*server_version) = binder.getIntOrDefault("server_version", 1);
+                session_->version = std::min(int(*server_version), HttpClient::CLIENT_VERSION);
             } catch (const std::exception& e) {
                 error.get()->assign(e.what());
             }
@@ -274,8 +275,8 @@ void HttpClient::start(const crypto::PrivateKey& clientKey, const crypto::Public
         byte_vector client_nonce_copy = client_nonce;
         byte_vector data = BossSerializer::serialize(UBinder::of(
                 "client_nonce", UBytes(std::move(client_nonce_copy)),
-                "server_nonce", UBytes(std::move(server_nonce)),
-                "server_version", int(server_version),
+                "server_nonce", UBytes(std::move(*server_nonce)),
+                "server_version", int(*server_version),
                 "client_version", HttpClient::CLIENT_VERSION
                 )).get();
         byte_vector sig = clientKey.sign(data, crypto::HashType::SHA512);
