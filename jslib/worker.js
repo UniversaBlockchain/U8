@@ -104,9 +104,13 @@ let console = {
 
 wrk.farcallWrapper = `
 wrkInner.onReceive = async (obj) => {
+    const DefaultBiMapper = require("defaultbimapper").DefaultBiMapper;
     let cmd = obj.cmd;
     if (cmd && wrkInner.export[cmd]) {
-        let res = await wrkInner.export[cmd](obj.args, obj.kwargs);
+        let res = await wrkInner.export[cmd](
+            await DefaultBiMapper.getInstance().deserialize(obj.args),
+            await DefaultBiMapper.getInstance().deserialize(obj.kwargs)
+        );
         wrkInner.send({serial:wrkInner.getNextFarcallSN(), ref:obj.serial, result:res});
     } else if (obj.result !== undefined) {
         let ref = obj.ref;
