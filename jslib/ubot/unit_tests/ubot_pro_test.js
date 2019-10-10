@@ -12,9 +12,11 @@ import {VerboseLevel} from "node_consts";
 const UBotMain = require("ubot/ubot_main").UBotMain;
 const UBotPoolState = require("ubot/ubot_pool_state").UBotPoolState;
 const UBotClient = require('ubot/ubot_client').UBotClient;
+const DefaultBiMapper = require("defaultbimapper").DefaultBiMapper;
 const cs = require("contractsservice");
 const Constraint = require('constraint').Constraint;
 const BigDecimal  = require("big").Big;
+const t = require("tools");
 
 const TOPOLOGY_ROOT = "../jslib/ubot/topology/";
 const CONFIG_ROOT = "../test/config/ubot_config";
@@ -348,11 +350,12 @@ unit.test("ubot_pro_test: register contract", async () => {
     // simple contract for registration
     let simpleContract = Contract.fromPrivateKey(userPrivKey);
     await simpleContract.seal();
+    let packedSimpleContract = await simpleContract.getPackedTransaction();
 
     let ubotClient = await new UBotClient(clientKey, TOPOLOGY_ROOT + "universa.pro.json").start();
 
     let executableContract = await generateSimpleRegisterExecutableContract();
-    let requestContract = await generateSimpleRegisterRequestContract(executableContract, simpleContract.getPackedTransaction());
+    let requestContract = await generateSimpleRegisterRequestContract(executableContract, packedSimpleContract);
 
     let state = await ubotClient.executeCloudMethod(requestContract, true);
 
@@ -360,8 +363,9 @@ unit.test("ubot_pro_test: register contract", async () => {
 
     assert(state.state === UBotPoolState.FINISHED.val);
 
-    // checking secure random value
-    assert(state.result instanceof Contract && state.result.id.equals(simpleContract.id));
+    let desResult = await DefaultBiMapper.getInstance().deserialize(state.result);
+    // checking contract
+    assert(desResult instanceof Uint8Array && t.valuesEqual(desResult, packedSimpleContract));
 
     await ubotClient.shutdown();
 

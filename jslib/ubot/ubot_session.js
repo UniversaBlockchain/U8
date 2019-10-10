@@ -85,7 +85,9 @@ class UBotSession {
         return result.current[storageName];
     }
 
-    async registerContract(contract, initiateLongVote, requestContract) {
+    async registerContract(packed, initiateLongVote, requestContract) {
+        let contract = await Contract.fromPackedTransaction(packed);
+
         if (this.ubot != null)
             this.ubot.logger.log("registerContract... Contract.id = " + contract.id);
 
@@ -93,21 +95,19 @@ class UBotSession {
             await this.client.askSessionOnAllNodes("initiateVote", {packedItem: contract.sealedBinary});
         await this.client.askSessionOnAllNodes("voteForContract", {itemId: contract.id});
 
-        // wait quorum votes
         let quorum = this.client.getRequestQuorumSize(requestContract);
-        console.error("quorum = " + quorum);
 
+        // wait quorum votes
         let votes = null;
         do {
             votes = await this.client.askSession("getVotes", {itemId: contract.id});
-            console.error("votes = " + JSON.stringify(votes));
 
             if (votes == null || votes.keys == null || !votes.keys instanceof Array)
                 throw new UBotClientException("registerContract error: wrong getVotes result");
         } while (votes.keys.length < quorum);
 
         // register contract
-        await this.client.register(contract.getPackedTransaction());
+        await this.client.register(packed);
     }
 
     async close() {

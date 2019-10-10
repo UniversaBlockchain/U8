@@ -374,7 +374,7 @@ class UBotClient {
      * @throws ClientError
      */
     async getState(itemId) {
-        /*let result = await new Promise(async (resolve, reject) =>
+        let result = await new Promise(async (resolve, reject) =>
             await this.httpNodeClient.command("getState", {itemId: itemId},
                 result => resolve(result),
                 error => reject(error)
@@ -385,52 +385,61 @@ class UBotClient {
         if (ir instanceof ItemResult)
             return ir;
 
-        if (ir instanceof String)
-            console.error(">> " + ir);
+        if (typeof ir === "string")
+            console.error("Register error, getState failed: " + ir);
 
-        return ItemResult.UNDEFINED;*/
+        return ItemResult.UNDEFINED;
     }
 
     /**
      * Register the contract on the network.
      *
      * @param {Uint8Array} packed - Binary contract for registration.
-     * @param millisToWait - Maximum time to wait for final ItemState.
+     * @param {number} millisToWait - Maximum time to wait for final ItemState or 0 if endless waiting.
      * @async
      * @return {ItemResult} result of registration or current state of registration (if wasn't finished yet).
      */
     async register(packed, millisToWait = 0) {
-       /* let result = await new Promise(async (resolve, reject) =>
+        let result = await new Promise(async (resolve, reject) =>
             await this.httpNodeClient.command("approve", {packedItem: packed},
                 result => resolve(result),
                 error => reject(error)
             )
         );
 
-        if (result.itemResult instanceof ItemResult) {
-            let lastResult = result;
-            if (millisToWait > 0 && lastResult.state.isPending) {
+        let lastResult = result.itemResult;
+
+        if (this.logger != null)
+            this.logger.log("register first result: " + t.secureStringify(lastResult));
+        else
+            console.log("register first result: " + t.secureStringify(lastResult));
+
+        if (lastResult instanceof ItemResult) {
+            if (lastResult.state.isPending) {
                 let end = Date.now() + millisToWait;
                 try {
                     let c = await Contract.fromPackedTransaction(packed);
                     let interval = 1000;
-                    while (Date.now() < end && lastResult.state.isPending) {
+                    while ((Date.now() < end || millisToWait === 0) && lastResult.state.isPending) {
                         await sleep(interval);
                         if (interval > 300)
                             interval -= 350;
+
                         lastResult = await this.getState(c.id);
-                        console.log("test: " + lastResult);
+
+                        if (this.logger != null)
+                            this.logger.log("register getState result: " + t.secureStringify(lastResult));
+                        else
+                            console.log("register getState result: " + t.secureStringify(lastResult));
                     }
-                } catch (e) {
-                    throw new UBotClientException("register error");
+                } catch (err) {
+                    throw new UBotClientException("Register error: " + err.message);
                 }
             }
             return lastResult;
         }
 
-        console.error("register!!: " + result);
-
-        return ItemResult.UNDEFINED;*/
+        return ItemResult.UNDEFINED;
     }
 
     /**
@@ -492,7 +501,7 @@ class UBotClient {
      * @param {Contract} requestContract - The Request contract.
      * @private
      */
-    static getRequestQuorumSize(requestContract) {
+    getRequestQuorumSize(requestContract) {
         let executableContract = requestContract.transactionPack.referencedItems.get(requestContract.state.data.executable_contract_id);
         return executableContract.state.data.cloud_methods[requestContract.state.data.method_name].quorum.size;
     }
@@ -570,7 +579,7 @@ class UBotClient {
     async executeCloudMethod(requestContract, waitPreviousSession = false) {
         let session = await this.startCloudMethod(requestContract, waitPreviousSession);
 
-        let quorum = UBotClient.getRequestQuorumSize(requestContract);
+        let quorum = this.getRequestQuorumSize(requestContract);
 
         let states = [];
         let groups = new Map();

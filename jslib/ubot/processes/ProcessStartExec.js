@@ -134,7 +134,7 @@ class ProcessStartExec extends ProcessBase {
                 this.pr.worker.release();
                 this.pr.worker = null;
 
-                this.pr.logger.log("  method result: " + result);
+                this.pr.logger.log("  method result: " + t.secureStringify(result));
                 this.onReady(result);
             }, 0, this.pr.ubot.executorService).run();
 
