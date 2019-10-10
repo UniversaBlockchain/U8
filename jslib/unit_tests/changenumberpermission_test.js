@@ -12,6 +12,8 @@ import  * as tp from 'transactionpack'
 import * as t from 'tools'
 import * as tk from 'unit_tests/test_keys'
 
+const Constraint = require('constraint').Constraint;
+
 unit.test("change number permission serialization", async () => {
     let k = tk.TestKeys.getKey();
     let role = new roles.SimpleRole("name",k.publicKey);
@@ -147,39 +149,45 @@ unit.test("change number permission value", async () => {
 
 });
 
-/*
-unit.test("change number permission contract ref to permission", async () => {
+unit.test("change number permission contractRefToPermission", async () => {
     let k = tk.TestKeys.getKey();
     let contract = cnt.Contract.fromPrivateKey(k);
     let contract2 = cnt.Contract.fromPrivateKey(k);
 
-    let changeNumberPermission = new perm.ChangeNumberPermission(new RoleLink("@owner", "owner"), Binder.of(
-        "field_name", "field1",
-        "min_value", 33,
-        "max_value", 34,
-        "min_step", 1,
-        "max_step", 1
-        )
-    );
-    let changeNumberPermission2 = new perm.ChangeNumberPermission(new RoleLink("@owner", "owner"), Binder.of(
-        "field_name", "field1",
-        "min_value", 33,
-        "max_value", 34,
-        "min_step", 1,
-        "max_step", 1
-        )
-    );
-    changeNumberPermission.setId("changenumber");
-    changeNumberPermission2.setId("changenumber2");
-    contract.addPermission(changeNumberPermission);
-    contract2.addPermission(changeNumberPermission2);
-    contract.seal();
-    let reference = new Reference(contract2);
-    reference.name = "test1";
-    reference.setConditions(Binder.of("all_of", Do.listOf("ref.id==\""+contract.getId().toBase64String()+"\"","this.definition.permissions.changenumber2==ref.definition.permissions.changenumber")));
-    contract2.addReference(reference);
-    contract2.seal();
-    contract2.getTransactionPack().addReferencedItem(contract);
-    contract2 = Contract.fromPackedTransaction(contract2.getPackedTransaction());
-    assertTrue(contract2.check());
-});*/
+    let role = new roles.RoleLink("custom","owner");
+    role.contract = contract;
+    //c.registerRole(role);
+
+    let changeNumberPermission = new perm.ChangeNumberPermission(role, {field_name: "field1", min_value:33, max_value: 34, min_step: 1, max_step: 1 });
+
+    let role2 = new roles.RoleLink("custom","owner");
+    role2.contract = contract2;
+    //c.registerRole(role2);
+
+    let changeNumberPermission2 = new perm.ChangeNumberPermission(role2, {field_name: "field1", min_value:33, max_value: 34, min_step: 1, max_step: 1 });
+
+    changeNumberPermission.id = "changenumber";
+    changeNumberPermission2.id = "changenumber2";
+
+    contract.definition.addPermission(changeNumberPermission);
+    contract2.definition.addPermission(changeNumberPermission2);
+
+    await contract.seal();
+
+    let constr = new Constraint(contract2);
+    constr.name = "test1";
+
+    let conditions = {all_of : [
+        "ref.id==\""+contract.id.base64+"\"",
+        "this.definition.permissions.changenumber2==ref.definition.permissions.changenumber"
+            ]};
+
+    constr.setConditions(conditions);
+    contract2.addConstraint(constr);
+
+    await contract2.seal(true);
+
+    await contract2.transactionPack.referencedItems.set(contract2.id, contract);
+    contract2 = await Contract.fromPackedTransaction(await contract2.getPackedTransaction());
+    //assert(await contract2.check());
+});

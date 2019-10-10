@@ -44,6 +44,12 @@ class ProcessStartExec extends ProcessBase {
             resolve(ans);
         }));
     }
+    
+    function registerContract(contract, initiateLongVote = true) {
+        return new Promise(resolve => wrkInner.farcall("registerContract", [contract, initiateLongVote], {}, ans => {
+            resolve(ans);
+        }));
+    }
     `;
 
     constructor(processor, onReady, cmdStack = []) {
@@ -111,12 +117,16 @@ class ProcessStartExec extends ProcessBase {
                     return await this.getMultiStorage();
                 };
 
+                this.pr.worker.export["registerContract"] = async (args, kwargs) => {
+                    return await this.registerContract(args[0], args[1]);
+                };
+
                 this.pr.worker.export["__worker_bios_print"] = async (args, kwargs) => {
                     let out = args[0] === true ? console.error : console.logPut;
                     out("worker debug console:", ...args[1], args[2]);
                 };
 
-                let result = await new Promise(resolve => this.pr.worker.farcall(methodName, methodArgs, {}, ans => resolve(ans)));
+                let result = await new Promise(async(resolve) => await this.pr.worker.farcall(methodName, methodArgs, {}, ans => resolve(ans)));
 
                 await this.pr.session.close();
                 this.pr.session = null;
@@ -478,7 +488,20 @@ class ProcessStartExec extends ProcessBase {
 
             throw err;
         }
+    }
 
+    async registerContract(contract, initiateLongVote = true) {
+        try {
+            await this.pr.session.registerContract(contract, initiateLongVote, this.pr.requestContract);
+
+        } catch (err) {
+            this.pr.logger.log("Error register contract: " + err.message);
+            this.pr.errors.push(new ErrorRecord(Errors.FAILURE, "registerContract",
+                "Error register contract: " + err.message));
+            this.pr.changeState(UBotPoolState.FAILED);
+
+            throw err;
+        }
     }
 }
 

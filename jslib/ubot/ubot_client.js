@@ -8,16 +8,12 @@ import {UBotSession, UBotSessionState} from 'ubot/ubot_session'
 
 const TopologyBuilder = require("topology_builder").TopologyBuilder;
 const UBotPoolState = require("ubot/ubot_pool_state").UBotPoolState;
+const UBotClientException = require("ubot/ubot_client_exception").UBotClientException;
+const ItemResult = require('itemresult').ItemResult;
 const Lock = require("lock").Lock;
 const BossBiMapper = require("bossbimapper").BossBiMapper;
 const Boss = require('boss.js');
-
-class UBotClientException extends Error {
-    constructor(message = undefined) {
-        super();
-        this.message = message;
-    }
-}
+const t = require("tools");
 
 class NodeRecord {
     constructor(data) {
@@ -61,7 +57,7 @@ class UBotClient {
      * Connects to the Universa network by its topology.
      *
      * @async
-     * @return {Promise<UBotClient>}
+     * @return {Promise<UBotClient>}.
      */
     async start() {
         let tb = await new TopologyBuilder().build(this.topologyInput, this.topologyCacheDir);
@@ -90,7 +86,7 @@ class UBotClient {
      * Complete client work and also closes all connections.
      *
      * @async
-     * @return {Promise<void>}
+     * @return {Promise<void>}.
      */
     async shutdown() {
         if (this.httpNodeClients.size === 0)
@@ -108,7 +104,7 @@ class UBotClient {
      *
      * @private
      * @async
-     * @return {Promise<void>}
+     * @return {Promise<void>}.
      */
     async connectAllNodes() {
         for (let i = 0; i < this.nodes.length; i++) {
@@ -128,8 +124,8 @@ class UBotClient {
      *
      * @private
      * @async
-     * @param pool
-     * @return {Promise<void>}
+     * @param pool - Session pool.
+     * @return {Promise<void>}.
      */
     async connectRandomUbot(pool) {
         if (this.topologyUBotNet == null)
@@ -152,6 +148,10 @@ class UBotClient {
 
         let randomUbot = this.ubots[random];
 
+        // if (randomUbot.url.startsWith("http://127.0.0.1"))
+        //     randomUbot.url = "http://104.248.143.106" + randomUbot.url.substring(16);
+        // console.error(randomUbot.url);
+
         this.httpUbotClient = new HttpClient(randomUbot.url);
         this.httpUbotClient.nodeNumber = this.topologyUBotNet[random].number;
         this.ubotPublicKey = randomUbot.key;
@@ -166,7 +166,7 @@ class UBotClient {
      * @private
      * @async
      * @param ubotNumber - UBot number.
-     * @return {Promise<HttpClient>}
+     * @return {Promise<HttpClient>}.
      */
     async connectUbot(ubotNumber) {
         if (this.topologyUBotNet == null || this.ubots.length === 0)
@@ -179,6 +179,10 @@ class UBotClient {
             });
 
         let ubot = this.ubots[ubotNumber];
+
+        // if (ubot.url.startsWith("http://127.0.0.1"))
+        //     ubot.url = "http://104.248.143.106" + ubot.url.substring(16);
+        // console.error(ubot.url);
 
         let client = new HttpClient(ubot.url);
         client.nodeNumber = this.topologyUBotNet[ubotNumber].number;
@@ -194,6 +198,8 @@ class UBotClient {
      * in the Start method.
      *
      * @private
+     * @param {String} command - Name of the command.
+     * @param {Object} params - Parameters of the command.
      * @async
      * @return {Promise<Object>} command result.
      */
@@ -226,6 +232,8 @@ class UBotClient {
      * Executes a command on the Universa network on the node to which the client was connected, in {@link start}.
      *
      * @private
+     * @param {String} command - Name of the command.
+     * @param {Object} params - Parameters of the command.
      * @async
      * @return {Promise<Object>} command result.
      */
@@ -255,6 +263,8 @@ class UBotClient {
      * Executes a command on all nodes of the Universa network.
      *
      * @private
+     * @param {String} command - Name of the command.
+     * @param {Object} params - Parameters of the command.
      * @async
      * @return {Promise<Object>} command result.
      */
@@ -291,6 +301,8 @@ class UBotClient {
      * Creates a new session for the cloud method.
      *
      * @private
+     * @param {Contract} requestContract - The Request contract.
+     * @param {boolean} waitPreviousSession=false - Wait for the previous session, if true.
      * @async
      * @return {UBotSession} session.
      */
@@ -349,6 +361,76 @@ class UBotClient {
             throw new UBotClientException("Unable to get session pool");
 
         return new UBotSession(session, this, requestContract.state.data.executable_contract_id);
+    }
+
+    /**
+     * Get the state of the contract (given by its id) on the currently connected node.
+     * Note: limits are applied to number of {@link #getState(Approvable)} calls
+     * per minute per client key. Make sure method is not called too often with the same client connection.
+     *
+     * @param {HashId} itemId - To get state by itemId.
+     * @async
+     * @return known {ItemState} if exist or ItemState.UNDEFINED.
+     * @throws ClientError
+     */
+    async getState(itemId) {
+        /*let result = await new Promise(async (resolve, reject) =>
+            await this.httpNodeClient.command("getState", {itemId: itemId},
+                result => resolve(result),
+                error => reject(error)
+            )
+        );
+
+        let ir = t.getOrThrow(result, "itemResult");
+        if (ir instanceof ItemResult)
+            return ir;
+
+        if (ir instanceof String)
+            console.error(">> " + ir);
+
+        return ItemResult.UNDEFINED;*/
+    }
+
+    /**
+     * Register the contract on the network.
+     *
+     * @param {Uint8Array} packed - Binary contract for registration.
+     * @param millisToWait - Maximum time to wait for final ItemState.
+     * @async
+     * @return {ItemResult} result of registration or current state of registration (if wasn't finished yet).
+     */
+    async register(packed, millisToWait = 0) {
+       /* let result = await new Promise(async (resolve, reject) =>
+            await this.httpNodeClient.command("approve", {packedItem: packed},
+                result => resolve(result),
+                error => reject(error)
+            )
+        );
+
+        if (result.itemResult instanceof ItemResult) {
+            let lastResult = result;
+            if (millisToWait > 0 && lastResult.state.isPending) {
+                let end = Date.now() + millisToWait;
+                try {
+                    let c = await Contract.fromPackedTransaction(packed);
+                    let interval = 1000;
+                    while (Date.now() < end && lastResult.state.isPending) {
+                        await sleep(interval);
+                        if (interval > 300)
+                            interval -= 350;
+                        lastResult = await this.getState(c.id);
+                        console.log("test: " + lastResult);
+                    }
+                } catch (e) {
+                    throw new UBotClientException("register error");
+                }
+            }
+            return lastResult;
+        }
+
+        console.error("register!!: " + result);
+
+        return ItemResult.UNDEFINED;*/
     }
 
     /**
@@ -540,14 +622,7 @@ class UBotClient {
         if (result != null)
             return result;
 
-        let message = null;
-        try {
-            message = JSON.stringify(states);
-        } catch (err) {
-            message = "Not stringified";
-        }
-
-        throw new UBotClientException("Cloud method consensus can`t be reached, ubot states: " + message);
+        throw new UBotClientException("Cloud method consensus can`t be reached, ubot states: " + t.secureStringify(states));
     }
 
     /**
