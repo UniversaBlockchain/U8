@@ -79,7 +79,11 @@ static unordered_set<string> validSourcesForRestrictedWorker = {
     "contractdelta.js",
     "extendedsignature.js",
     "exceptions.js",
-    "yaml.js"
+    "yaml.js",
+    "keyrecord.js",
+    "deltas.js",
+    "buffer.js",
+    "esprima.js"
 };
 
 void JsLoadRequiredRestricted(const v8::FunctionCallbackInfo<v8::Value> &args) {
@@ -96,7 +100,8 @@ void JsLoadRequiredRestricted(const v8::FunctionCallbackInfo<v8::Value> &args) {
                 result->Set(result->Length(), se->v8String(name));
                 result->Set(result->Length(), se->v8String(loadAsString(name)));
             }
-        }
+        } else
+            printf("Source \"%s\" not available in restricted mode\n", sourceName.data());
 
         args.GetReturnValue().Set(result);
     });

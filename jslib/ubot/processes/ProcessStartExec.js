@@ -97,7 +97,7 @@ class ProcessStartExec extends ProcessBase {
                     "   }" +
                     "};";
 
-                this.pr.worker = await getWorker(0,
+                this.pr.worker = await getWorker(1,
                     ProcessStartExec.workerSrc + this.pr.executableContract.state.data.js + methodExport);
                 this.pr.worker.startFarcallCallbacks();
 

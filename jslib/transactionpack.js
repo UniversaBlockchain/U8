@@ -52,6 +52,13 @@ class TransactionPack {
     }
 
     async deserialize(data, deserializer) {
+        if (this.Contract == null) {
+            if (typeof Contract !== "undefined")
+                this.Contract = Contract;
+            else
+                this.Contract = require("contract").Contract;
+        }
+
         if(data.hasOwnProperty("keys")) {
             for(let keyBinary of await deserializer.deserialize(data.keys)) {
                 this.keysForPack.add(new crypto.PublicKey(keyBinary));
@@ -60,7 +67,7 @@ class TransactionPack {
 
         if(data.hasOwnProperty("referencedItems")) {
             for(let referencedBinary of data.referencedItems) {
-                let c = await Contract.fromSealedBinary(referencedBinary, this);
+                let c = await this.Contract.fromSealedBinary(referencedBinary, this);
                 this.referencedItems.set(c.id, c);
             }
         }
@@ -88,7 +95,7 @@ class TransactionPack {
                 if(!found) {
                     removed = true;
                     //TODO: NContracts
-                    let c = await Contract.fromSealedBinary(allDeps[i].binary, this);
+                    let c = await this.Contract.fromSealedBinary(allDeps[i].binary, this);
                     this.subItems.set(c.id,c);
                     missingIds.delete(c.id);
                     allDeps.splice(i,1);
@@ -125,7 +132,7 @@ class TransactionPack {
                 }
             }
         } else
-            this.contract = await Contract.fromSealedBinary(data.contract, this);
+            this.contract = await this.Contract.fromSealedBinary(data.contract, this);
     }
 
     async serialize(serializer) {
@@ -177,7 +184,13 @@ class TransactionPack {
         if (res instanceof TransactionPack)
             return res;
 
-        let c = await Contract.fromSealedBinary(bytes);
+        let impContract = null;
+        if (typeof Contract !== "undefined")
+            impContract = Contract;
+        else
+            impContract = require("contract").Contract;
+
+        let c = await impContract.fromSealedBinary(bytes);
         return c.transactionPack;
     }
 }
