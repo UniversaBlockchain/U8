@@ -238,7 +238,7 @@ void HttpClient::start(const crypto::PrivateKey& clientKey, const crypto::Public
         printf("TODO: restore session\n");
         //TODO: restore session
     } else {
-        Semaphore sem;
+        shared_ptr<Semaphore> sem = make_shared<Semaphore>();
         session_ = std::make_shared<HttpClientSession>();
         session_->nodePublicKey = std::make_shared<crypto::PublicKey>(nodeKey);
         session_->clientPrivateKey = std::make_shared<crypto::PrivateKey>(clientKey);
@@ -248,7 +248,7 @@ void HttpClient::start(const crypto::PrivateKey& clientKey, const crypto::Public
         shared_ptr<byte_vector> server_nonce = make_shared<byte_vector>();
         shared_ptr<int> server_version = make_shared<int>(1);
         shared_ptr<string> error = make_shared<string>("");
-        sendBinRequest("/connect", "POST", paramsBin, [this,&sem,server_nonce,server_version,error](int respCode, byte_vector&& respBody){
+        sendBinRequest("/connect", "POST", paramsBin, [this,sem,server_nonce,server_version,error](int respCode, byte_vector&& respBody){
             try {
                 UBytes ub(std::move(respBody));
                 UObject uObject = BossSerializer::deserialize(ub);
@@ -264,9 +264,9 @@ void HttpClient::start(const crypto::PrivateKey& clientKey, const crypto::Public
             } catch (const std::exception& e) {
                 error.get()->assign(e.what());
             }
-            sem.notify();
+            sem->notify();
         });
-        if (!sem.wait(std::chrono::milliseconds(startTimeoutMillis_)))
+        if (!sem->wait(std::chrono::milliseconds(startTimeoutMillis_)))
             throw std::runtime_error("HttpClient timeout while starting secure connection");
         if (!(*error).empty())
             throw std::runtime_error("HttpClient error while starting secure connection: " + *error);
@@ -284,27 +284,28 @@ void HttpClient::start(const crypto::PrivateKey& clientKey, const crypto::Public
                 "signature", UBytes(std::move(sig)),
                 "data", UBytes(std::move(data)),
                 "session_id", session_->sessionId)).get();
-        byte_vector dataRcv;
-        byte_vector sigRcv;
-        sendBinRequest("/get_token", "POST", paramsBin, [&sem,&dataRcv,&sigRcv,error](int respCode, byte_vector&& respBody) {
+        shared_ptr<byte_vector> dataRcv = make_shared<byte_vector>();
+        shared_ptr<byte_vector> sigRcv = make_shared<byte_vector>();
+        sendBinRequest("/get_token", "POST", paramsBin, [sem,dataRcv,sigRcv,error](int respCode, byte_vector&& respBody) {
             try {
                 UBinder binder = UBinder::asInstance(
                         BossSerializer::deserialize(UBytes(std::move(respBody)))).getBinder("response");
-                dataRcv = UBytes::asInstance(binder.get("data")).get();
-                sigRcv = UBytes::asInstance(binder.get("signature")).get();
+                *dataRcv = UBytes::asInstance(binder.get("data")).get();
+                *sigRcv = UBytes::asInstance(binder.get("signature")).get();
             } catch (const std::exception& e) {
                 error.get()->assign(e.what());
             }
-            sem.notify();
+            sem->notify();
         });
-        if (!sem.wait(std::chrono::milliseconds(startTimeoutMillis_)))
+        if (!sem->wait(std::chrono::milliseconds(startTimeoutMillis_)))
             throw std::runtime_error("HttpClient timeout while starting secure connection (get_token)");
         if (!(*error).empty())
             throw std::runtime_error("HttpClient error while starting secure connection: " + *error);
-        if (!session_->nodePublicKey->verify(sigRcv, dataRcv, crypto::HashType::SHA512)) {
+        if (!session_->nodePublicKey->verify(*sigRcv, *dataRcv, crypto::HashType::SHA512)) {
             throw std::runtime_error("node signature failed");
         }
-        UBinder paramsRcv = UBinder::asInstance(BossSerializer::deserialize(UBytes(std::move(dataRcv))));
+        byte_vector dataRcvBin = *dataRcv;
+        UBinder paramsRcv = UBinder::asInstance(BossSerializer::deserialize(UBytes(std::move(dataRcvBin))));
         byte_vector clientNonceRcv = UBytes::asInstance(paramsRcv.get("client_nonce")).get();
         if (client_nonce != clientNonceRcv) {
             throw std::runtime_error("client nonce mismatch");
@@ -313,16 +314,16 @@ void HttpClient::start(const crypto::PrivateKey& clientKey, const crypto::Public
         byte_vector key = UBytes::asInstance(UBinder::asInstance(BossSerializer::deserialize(session_->clientPrivateKey->decrypt(encrypted_token))).get("sk")).get();
         session_->sessionKey = make_shared<crypto::SymmetricKey>(key);
         shared_ptr<string> status = make_shared<string>("error");
-        execCommand("hello", UBinder(), [this,&sem,status,error](UBinder&& res, bool isError){
+        execCommand("hello", UBinder(), [this,sem,status,error](UBinder&& res, bool isError){
             if (!isError) {
                 session_->connectMessage = res.getString("message");
                 status.get()->assign(res.getString("status"));
             } else {
                 error.get()->assign("(hello)");
             }
-            sem.notify();
+            sem->notify();
         });
-        if (!sem.wait(std::chrono::milliseconds(startTimeoutMillis_)))
+        if (!sem->wait(std::chrono::milliseconds(startTimeoutMillis_)))
             throw std::runtime_error("HttpClient timeout while starting secure connection (hello)");
         if (!(*error).empty())
             throw std::runtime_error("HttpClient error while starting secure connection: " + *error);
