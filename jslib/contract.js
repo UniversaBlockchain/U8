@@ -764,6 +764,8 @@ class Contract extends bs.BiSerializable {
                 return this.roles.owner;
             case "creator":
                 return this.roles.creator;
+            case "tag":
+                return {"contractForSearchByTag" : this};
         }
         throw new ex.IllegalArgumentError("bad root: " + originalName);
 

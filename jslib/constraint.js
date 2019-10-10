@@ -740,6 +740,43 @@ class Constraint extends bs.BiSerializable {
                                 ((indxOperator === EQUAL) && (leftTime === rightTime)))
                                 ret = true;
 
+                        /*} else if (((left != null) && left instanceof Object && left.hasOwnProperty("contractForSearchByTag"))  ||
+                            ((right != null) && right instanceof Object && right.hasOwnProperty("contractForSearchByTag"))) {
+                            let b = false;
+
+                            if (rightOperand.equals("test_tag_contract2"))
+                                b = true;
+
+                            let taggedContract = null;
+                            let tag = null;
+
+                            if ((left != null) && left instanceof Object && left.hasOwnProperty("contractForSearchByTag")) {
+                                if (left.contractForSearchByTag instanceof Contract && (right == null || typeof right === "string")) {
+                                    taggedContract = left.contractForSearchByTag;
+
+                                    if (right != null && typeof right ==="string")
+                                        tag = right;
+                                    else
+                                        tag = rightOperand;
+                                }
+                            } else {
+                                if (right.contractForSearchByTag instanceof Contract && (left == null || typeof left === "string")) {
+                                    taggedContract = right.contractForSearchByTag;
+
+                                    if (left != null && typeof left === "string")
+                                        tag = left;
+                                    else
+                                        tag = leftOperand;
+                                }
+                            }
+
+                            if (taggedContract == null || tag == null)
+                                throw new ex.IllegalArgumentError("Incorrect operands for search by tag");
+
+                            let foundedContract = taggedContract.transactionPack.getTags().get(tag);
+                            let equals = foundedContract != null && foundedContract.id.equals(taggedContract.id);
+                            ret = indxOperator === (equals ? EQUAL : NOT_EQUAL);*/
+
                         } else if ((typeOfLeftOperand === compareOperandType.FIELD) && (typeOfRightOperand === compareOperandType.FIELD)) {   // operands is FIELDs
                             if ((left != null) && (right != null)) {
                                 if ((indxOperator === NOT_EQUAL && left !== right) ||

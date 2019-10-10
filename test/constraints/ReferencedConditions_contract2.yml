@@ -90,6 +90,7 @@ definition:
      __type: unixtime
      seconds: 8200000000000
 
+   tag2: test_tag_contract2
 
 # required section. Data that represent current contract state, could be modified in accordance with
 # 'permissions' section above
@@ -140,6 +141,8 @@ state:
 
  # required section. any application data that could be changed.
  data:
+   tag: test_tag_contract1
+   tag2: test_tag_contract2
    amount: 1000
    int3: 777
    int4: 7777
