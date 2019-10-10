@@ -8,6 +8,7 @@ import {Notification, ItemNotification, ResyncNotification, ParcelNotification} 
 import {ExecutorService, AsyncEvent} from "executorservice";
 
 const Boss = require('boss.js');
+const BossStreams = require('boss_streams.js');
 const Parcel = require("parcel").Parcel;
 const ItemResult = require('itemresult').ItemResult;
 const Lock = require("lock").Lock;
@@ -270,7 +271,7 @@ class NetworkV2 extends Network {
 
         try {
             // packet type code
-            let r = new Boss.Reader(packet);
+            let r = new BossStreams.Reader(packet);
             if (r.read() !== 1)
                 throw new Error("invalid packed notification type code");
 
@@ -297,7 +298,7 @@ class NetworkV2 extends Network {
     }
 
     packNotifications(from, notifications) {
-        let w = new Boss.Writer();
+        let w = new BossStreams.Writer();
         try {
             w.write(1);                         // packet type code
             w.write(from.number);               // from number

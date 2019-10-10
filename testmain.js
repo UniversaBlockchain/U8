@@ -21,6 +21,7 @@ async function testReadLines() {
 }
 
 const Boss = require('boss.js');
+const BossStreams = require('boss_streams.js');
 
 async function testBoss() {
 
@@ -30,10 +31,10 @@ async function testBoss() {
     let src = {hello: 'world', data: [1, 2, 3]};
     let packed = await Boss.dump(src);
     assert(JSON.stringify(await Boss.load(packed)) == JSON.stringify(src));
-    let reader = new Boss.Reader(packed);
+    let reader = new BossStreams.Reader(packed);
     console.log(JSON.stringify(reader.read()));
     console.log(JSON.stringify(reader.read()));
-    let writer = new Boss.Writer();
+    let writer = new BossStreams.Writer();
     writer.write(src);
     assert(packed.toString() == writer.get().toString());
 }

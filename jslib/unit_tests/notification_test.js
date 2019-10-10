@@ -9,7 +9,7 @@ import {HashId} from 'crypto'
 import {randomBytes} from 'tools'
 import * as tk from 'unit_tests/test_keys'
 
-const Boss = require('boss.js');
+const BossStreams = require('boss_streams.js');
 const ItemResult = require('itemresult').ItemResult;
 const ItemState = require('itemstate').ItemState;
 
@@ -19,11 +19,11 @@ unit.test("notification_test: ItemNotification pack", () => {
     let ir = ItemResult.from(ItemState.APPROVED, false, new Date(), new Date());
     let n = new ItemNotification(ni, id, ir, false);
 
-    let w = new Boss.Writer();
+    let w = new BossStreams.Writer();
     Notification.write(w, n);
     let pack = w.get();
 
-    let r = new Boss.Reader(pack);
+    let r = new BossStreams.Reader(pack);
     let nn = Notification.read(ni, r);
 
     assert(nn.equals(n));
@@ -34,22 +34,22 @@ unit.test("notification_test: ResyncNotification pack", () => {
     let id = HashId.of(randomBytes(64));
     let n = new ResyncNotification(ni, id, false, ItemState.DECLINED, true);
 
-    let w = new Boss.Writer();
+    let w = new BossStreams.Writer();
     Notification.write(w, n);
     let pack = w.get();
 
-    let r = new Boss.Reader(pack);
+    let r = new BossStreams.Reader(pack);
     let nn = Notification.read(ni, r);
 
     assert(nn.equals(n));
 
     n = new ResyncNotification(ni, id, true);
 
-    w = new Boss.Writer();
+    w = new BossStreams.Writer();
     Notification.write(w, n);
     pack = w.get();
 
-    r = new Boss.Reader(pack);
+    r = new BossStreams.Reader(pack);
     nn = Notification.read(ni, r);
 
     assert(n.equals(nn));

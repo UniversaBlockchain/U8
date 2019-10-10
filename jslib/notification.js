@@ -6,6 +6,7 @@ import {HashId} from 'crypto'
 
 const ItemResult = require('itemresult').ItemResult;
 const ItemState = require('itemstate').ItemState;
+const BossStreams = require('boss_streams.js');
 const t = require("tools");
 const FollowerCallbackState = require("services/followerCallbackState").FollowerCallbackState;
 
@@ -61,7 +62,7 @@ class Notification {
     }
 
     static pack(notifications) {
-        let writer = new Boss.Writer();
+        let writer = new BossStreams.Writer();
         try {
             notifications.forEach(n => Notification.write(writer, n));
             return writer.get();
@@ -77,7 +78,7 @@ class Notification {
 
     static unpack(from, packed) {
         let notifications = [];
-        let r = new Boss.Reader(packed);
+        let r = new BossStreams.Reader(packed);
         try {
             while (true) {
                 // boss reader throws EOFException

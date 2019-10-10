@@ -1,4 +1,4 @@
-//const Contract = require("contract").Contract;
+const Contract = require("contract").Contract;
 
 async function register(packedContract) {
     //let contract = await Contract.fromPackedTransaction(packedContract);

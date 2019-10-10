@@ -4,13 +4,11 @@
 
 'use strict';
 
-let _boss = require("boss.min");
-
 // init cpp prototype holders
 __boss_addPrototype("HashId", crypto.HashId.prototype);
 __boss_addPrototype("PublicKey", crypto.PublicKey.prototype);
 __boss_addPrototype("PrivateKey", crypto.PrivateKey.prototype);
-eval("__boss_addPrototype = undefined;");
+//eval("__boss_addPrototype = undefined;");
 
 const mainNestedLoadMap = {
     TransactionPack: {
@@ -37,8 +35,5 @@ module.exports = {
 
     asyncLoad(data, nestedLoadMap = null) {
         return new Promise(resolve => __boss_asyncLoad(data, nestedLoadMap, resolve));
-    },
-
-    Reader: _boss.reader,
-    Writer: _boss.writer,
+    }
 };
