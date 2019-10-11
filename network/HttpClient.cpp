@@ -248,19 +248,20 @@ void HttpClient::start(const crypto::PrivateKey& clientKey, const crypto::Public
         shared_ptr<byte_vector> server_nonce = make_shared<byte_vector>();
         shared_ptr<int> server_version = make_shared<int>(1);
         shared_ptr<string> error = make_shared<string>("");
-        sendBinRequest("/connect", "POST", paramsBin, [this,sem,server_nonce,server_version,error](int respCode, byte_vector&& respBody){
+        auto session = session_;
+        sendBinRequest("/connect", "POST", paramsBin, [session,sem,server_nonce,server_version,error](int respCode, byte_vector&& respBody){
             try {
                 UBytes ub(std::move(respBody));
                 UObject uObject = BossSerializer::deserialize(ub);
                 UBinder binderWrap = UBinder::asInstance(uObject);
                 UBinder binder = binderWrap.getBinder("response");
                 std::string strSessionId = binder.getString("session_id");
-                session_->sessionId = std::stol(strSessionId);
+                session->sessionId = std::stol(strSessionId);
                 UBytes serverNonceUb = UBytes::asInstance(binder.get("server_nonce"));
                 byte_vector serverNonce = serverNonceUb.get();
                 server_nonce.get()->assign(serverNonce.begin(), serverNonce.end());
                 (*server_version) = binder.getIntOrDefault("server_version", 1);
-                session_->version = std::min(int(*server_version), HttpClient::CLIENT_VERSION);
+                session->version = std::min(int(*server_version), HttpClient::CLIENT_VERSION);
             } catch (const std::exception& e) {
                 error.get()->assign(e.what());
             }
@@ -314,9 +315,9 @@ void HttpClient::start(const crypto::PrivateKey& clientKey, const crypto::Public
         byte_vector key = UBytes::asInstance(UBinder::asInstance(BossSerializer::deserialize(session_->clientPrivateKey->decrypt(encrypted_token))).get("sk")).get();
         session_->sessionKey = make_shared<crypto::SymmetricKey>(key);
         shared_ptr<string> status = make_shared<string>("error");
-        execCommand("hello", UBinder(), [this,sem,status,error](UBinder&& res, bool isError){
+        execCommand("hello", UBinder(), [session,sem,status,error](UBinder&& res, bool isError){
             if (!isError) {
-                session_->connectMessage = res.getString("message");
+                session->connectMessage = res.getString("message");
                 status.get()->assign(res.getString("status"));
             } else {
                 error.get()->assign("(hello)");
@@ -367,13 +368,14 @@ void HttpClient::execCommand(const byte_vector& callBin, std::function<void(byte
                     UBytes(session_->sessionKey->etaEncrypt(callBin)) :
                     UBytes(session_->sessionKey->encrypt(callBin)),
                 "session_id", session_->sessionId);
-        sendBinRequest("/command", "POST", BossSerializer::serialize(cmdParams).get(), [this,onComplete{onComplete}](int respCode, byte_vector&& respBody){
+        auto session = session_;
+        sendBinRequest("/command", "POST", BossSerializer::serialize(cmdParams).get(), [session,onComplete{onComplete}](int respCode, byte_vector&& respBody){
             try {
                 UBinder ansBinder = UBinder::asInstance(BossSerializer::deserialize(UBytes(std::move(respBody))));
                 UBinder responseBinder = ansBinder.getBinder("response");
-                byte_vector decrypted = session_->version >= 2 ?
-                    session_->sessionKey->etaDecrypt(UBytes::asInstance(responseBinder.get("result")).get()) :
-                    session_->sessionKey->decrypt(UBytes::asInstance(responseBinder.get("result")).get());
+                byte_vector decrypted = session->version >= 2 ?
+                    session->sessionKey->etaDecrypt(UBytes::asInstance(responseBinder.get("result")).get()) :
+                    session->sessionKey->decrypt(UBytes::asInstance(responseBinder.get("result")).get());
                 onComplete(std::move(decrypted), false);
             } catch (const std::exception& e) {
                 std::string error = e.what();
