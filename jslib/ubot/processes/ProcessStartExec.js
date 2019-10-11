@@ -565,7 +565,7 @@ class ProcessStartExec extends ProcessBase {
             // quorum vote role
             let issuer = new roles.QuorumVoteRole(
                 "issuer",
-                "refUbotRegistry.state.role.ubots",
+                "refUbotRegistry.state.roles.ubots",
                 this.pr.ubot.client.getRequestQuorumSize(this.pr.requestContract).toString(),
                 c
             );
@@ -587,7 +587,7 @@ class ProcessStartExec extends ProcessBase {
             constr.name = "refUbotRegistry";
             constr.type = Constraint.TYPE_EXISTING_DEFINITION;
             let conditions = {};
-            conditions[Constraint.conditionsModeType.all_of] = ["ref.tag == \"universa:ubot_registry\""];
+            conditions[Constraint.conditionsModeType.all_of] = ["ref.tag == \"universa:ubot_registry_contract\""];
             constr.setConditions(conditions);
             c.addConstraint(constr);
 

@@ -1816,8 +1816,8 @@ class Constraint extends bs.BiSerializable {
 
 //TODO: The method allows to mark the contract as matching constraint, bypassing the validation
 
-DefaultBiMapper.registerAdapter(new bs.BiAdapter("Reference", Constraint));
 DefaultBiMapper.registerAdapter(new bs.BiAdapter("Constraint", Constraint));
+DefaultBiMapper.registerAdapter(new bs.BiAdapter("Reference", Constraint));     // Constraint proto => Reference
 
 ///////////////////////////
 //EXPORTS

@@ -53,7 +53,7 @@ class Transactional extends bs.BiSerializable {
 
         let of = {
             id: this.id,
-            constraints : this.constraints,
+            references : this.constraints,
             data : this.data,
         };
 
@@ -176,7 +176,7 @@ class State extends bs.BiSerializable {
             of.expires_at = this.expiresAt;
 
         if (this.constraints != null)
-            of.constraints = this.constraints;
+            of.references = this.constraints;   // for backward compatibility
 
         return await serializer.serialize(of);
     }
@@ -371,7 +371,7 @@ class Definition extends bs.BiSerializable {
             of.expires_at = this.expiresAt;
 
         if (this.constraints != null)
-            of.constraints = this.constraints;
+            of.references = this.constraints;
 
         if (this.extendedType != null)
             of.extended_type = this.extendedType;
