@@ -50,6 +50,7 @@ class UBotClient {
         this.httpNodeClients = new Map();
         this.httpUbotClients = new Map();
         this.lock = new Lock();
+        this.ubotRegistryContract = null;
     }
 
     /**
@@ -507,6 +508,30 @@ class UBotClient {
     }
 
     /**
+     * Get ubot registry contract.
+     *
+     * @return {Uint8Array} packed ubot registry contract.
+     */
+    async getUBotRegistryContract() {
+        if (this.ubotRegistryContract == null) {
+            let serviceContracts = await new Promise(async (resolve, reject) =>
+                await this.httpNodeClient.command("getServiceContracts", null,
+                    result => resolve(result),
+                    error => reject(error)
+                )
+            );
+
+            if (serviceContracts == null || serviceContracts.contracts == null ||
+                serviceContracts.contracts.ubot_registry_contract == null)
+                throw new UBotClientException("Unable to get ubot registry contract");
+
+            this.ubotRegistryContract = serviceContracts.contracts.ubot_registry_contract;
+        }
+
+        return this.ubotRegistryContract;
+    }
+
+    /**
     * Start cloud method.
     * Requests the creation of a session with a randomly selected pool using the Request contract.
     * Creates a session with the id of the Request contract or throws an exception if the session is already created
@@ -530,21 +555,10 @@ class UBotClient {
 
         let session = await this.createSession(requestContract, waitPreviousSession);
 
-        // get ubot registry
-        let serviceContracts = await new Promise(async (resolve, reject) =>
-            await this.httpNodeClient.command("getServiceContracts", null,
-                result => resolve(result),
-                error => reject(error)
-            )
-        );
-
-        if (serviceContracts == null || serviceContracts.contracts == null ||
-            serviceContracts.contracts.ubot_registry_contract == null)
-            throw new UBotClientException("Unable to get ubot registry contract");
-
-        let ubotRegistry = await Contract.fromSealedBinary(serviceContracts.contracts.ubot_registry_contract);
-
+        // get ubot registry and topology
+        let ubotRegistry = await Contract.fromSealedBinary(await this.getUBotRegistryContract());
         this.topologyUBotNet = ubotRegistry.state.data.topology;
+
         await this.connectRandomUbot(session.pool);
 
         // execute cloud method

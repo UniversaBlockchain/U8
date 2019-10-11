@@ -15,12 +15,17 @@ const Errors = require("errors").Errors;
 const UBotPoolState = require("ubot/ubot_pool_state").UBotPoolState;
 const UBotCloudNotification_process = require("ubot/ubot_notification").UBotCloudNotification_process;
 const Boss = require('boss.js');
+const roles = require('roles');
+const Constraint = require('constraint').Constraint;
+const permissions = require('permissions');
 
 const notSupportedCommandsInMultiVerify = ["call", "writeSingleStorage", "writeMultiStorage", "replaceSingleStorage", "replaceMultiStorage"];
 
 class ProcessStartExec extends ProcessBase {
 
     static workerSrc = consoleWrapper + farcallWrapper + `
+    const Contract = require("contract").Contract;
+    
     function writeSingleStorage(data) {
         return new Promise(resolve => wrkInner.farcall("writeSingleStorage", [data], {}, ans => {
             resolve(ans);
@@ -47,6 +52,30 @@ class ProcessStartExec extends ProcessBase {
     
     function registerContract(contract, initiateLongVote = true) {
         return new Promise(resolve => wrkInner.farcall("registerContract", [contract, initiateLongVote], {}, ans => {
+            resolve(ans);
+        }));
+    }
+    
+    function createPoolContract() {
+        return new Promise(resolve => wrkInner.farcall("createPoolContract", [], {}, ans => {
+            resolve(ans);
+        }));
+    }
+    
+    function getRequestContract() {
+        return new Promise(resolve => wrkInner.farcall("getRequestContract", [], {}, ans => {
+            resolve(ans);
+        }));
+    }
+    
+    function getExecutableContract() {
+        return new Promise(resolve => wrkInner.farcall("getExecutableContract", [], {}, ans => {
+            resolve(ans);
+        }));
+    }
+    
+    function getUBotRegistryContract() {
+        return new Promise(resolve => wrkInner.farcall("getUBotRegistryContract", [], {}, ans => {
             resolve(ans);
         }));
     }
@@ -119,6 +148,22 @@ class ProcessStartExec extends ProcessBase {
 
                 this.pr.worker.export["registerContract"] = async (args, kwargs) => {
                     return await this.registerContract(args[0], args[1]);
+                };
+
+                this.pr.worker.export["createPoolContract"] = async (args, kwargs) => {
+                    return await this.createPoolContract();
+                };
+
+                this.pr.worker.export["getRequestContract"] = async (args, kwargs) => {
+                    return await this.getRequestContract();
+                };
+
+                this.pr.worker.export["getExecutableContract"] = async (args, kwargs) => {
+                    return await this.getExecutableContract();
+                };
+
+                this.pr.worker.export["getUBotRegistryContract"] = async (args, kwargs) => {
+                    return await this.getUBotRegistryContract();
                 };
 
                 this.pr.worker.export["__worker_bios_print"] = async (args, kwargs) => {
@@ -502,6 +547,75 @@ class ProcessStartExec extends ProcessBase {
 
             throw err;
         }
+    }
+
+    async createPoolContract() {
+        try {
+            let c = new Contract();
+
+            let created = this.pr.requestContract.definition.createdAt;
+            created.setMilliseconds(0);
+            c.definition.createdAt = created;
+            c.state.createdAt = created;
+
+            let expires = new Date(created);
+            expires.setDate(expires.getDate() + 90);
+            c.state.expiresAt = expires;
+
+            // quorum vote role
+            let issuer = new roles.QuorumVoteRole(
+                "issuer",
+                "refUbotRegistry.state.role.ubots",
+                this.pr.ubot.client.getRequestQuorumSize(this.pr.requestContract).toString(),
+                c
+            );
+            c.registerRole(issuer);
+            let owner = new roles.RoleLink("owner", "issuer");
+            c.registerRole(owner);
+            let creator = new roles.RoleLink("creator", "issuer");
+            c.registerRole(creator);
+
+            // change owner permission
+            let chown = new roles.RoleLink("@change_ower_role", "owner");
+            chown.contract = c;
+            let chownPerm = new permissions.ChangeOwnerPermission(chown);
+            chownPerm.id = this.pr.prng.randomString(6);
+            c.definition.addPermission(chownPerm);
+
+            // constraint refUbotRegistry
+            let constr = new Constraint(c);
+            constr.name = "refUbotRegistry";
+            constr.type = Constraint.TYPE_EXISTING_DEFINITION;
+            let conditions = {};
+            conditions[Constraint.conditionsModeType.all_of] = ["ref.tag == \"universa:ubot_registry\""];
+            constr.setConditions(conditions);
+            c.addConstraint(constr);
+
+            // random salt for seal (common for pool)
+            c.state.data.ubot_pool_random_salt = this.pr.prng.randomBytes(12);
+
+            return c;
+
+        } catch (err) {
+            this.pr.logger.log("Error create pool contract: " + err.message);
+            this.pr.errors.push(new ErrorRecord(Errors.FAILURE, "createPoolContract",
+                "Error create pool contract: " + err.message));
+            this.pr.changeState(UBotPoolState.FAILED);
+
+            throw err;
+        }
+    }
+
+    async getRequestContract() {
+        return await this.pr.requestContract.getPackedTransaction();
+    }
+
+    async getExecutableContract() {
+        return await this.pr.executableContract.getPackedTransaction();
+    }
+
+    async getUBotRegistryContract() {
+        return await this.pr.ubot.client.getUBotRegistryContract();
     }
 }
 

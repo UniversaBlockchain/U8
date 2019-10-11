@@ -582,9 +582,14 @@ class Contract extends bs.BiSerializable {
         if (this.transactionPack != null && this.transactionPack.contract === this)
             tpBackup = this.transactionPack;
 
-        if (result.signatures.length === 0)
-            result.salt = t.randomBytes(12);
-        else
+        if (result.signatures.length === 0) {
+            if (this.state.data.hasOwnProperty("ubot_pool_random_salt") &&
+                this.state.data.ubot_pool_random_salt instanceof Uint8Array &&
+                this.state.data.ubot_pool_random_salt.length === 12)
+                result.salt = this.state.data.ubot_pool_random_salt;
+            else
+                result.salt = t.randomBytes(12);
+        } else
             delete result.salt;
 
         let previousId = this.sealedBinary != null ? crypto.HashId.of(this.sealedBinary) : null;

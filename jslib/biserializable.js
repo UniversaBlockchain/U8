@@ -2,6 +2,8 @@
  * Copyright (c) 2019-present Sergey Chernov, iCodici S.n.C, All Rights Reserved.
  */
 
+const t = require("tools");
+
 class BiSerializable {
     constructor() {
 

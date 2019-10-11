@@ -9,6 +9,7 @@ const ErrorRecord = require("errors").ErrorRecord;
 const Errors = require("errors").Errors;
 const UBotCloudNotification = require("ubot/ubot_notification").UBotCloudNotification;
 const UBotPoolState = require("ubot/ubot_pool_state").UBotPoolState;
+const PseudoRandom = require("pseudo_random").PseudoRandom;
 
 class CloudProcessor {
     constructor(initialState, poolId, ubot, session) {
@@ -34,6 +35,7 @@ class CloudProcessor {
         this.localStorage = new Map();
         this.ProcessStartExec = ProcessStartExec;
         this.worker = null;
+        this.prng = new PseudoRandom(poolId);
         this.selectPool();
     }
 

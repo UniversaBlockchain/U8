@@ -40,6 +40,16 @@ class PseudoRandom {
             result[i] = Math.floor(this.rand() * 256);
         return result;
     }
+
+    randomString(length) {
+        let string = "";
+        let possible = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+
+        for (let i = 0; i < length; i++)
+            string += possible.charAt(Math.floor(this.rand() * possible.length));
+
+        return string;
+    }
 }
 
 module.exports = {PseudoRandom};
