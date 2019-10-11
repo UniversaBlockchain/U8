@@ -1,4 +1,5 @@
-const Contract = require("contract").Contract;
+//Contract.js already initialized in worker for serialization/deserialization result of helper method createPoolContract
+//const Contract = require("contract").Contract;
 
 async function register(packedContract) {
     // try {

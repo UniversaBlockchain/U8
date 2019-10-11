@@ -12,7 +12,8 @@ import {VerboseLevel} from "node_consts";
 const UBotMain = require("ubot/ubot_main").UBotMain;
 const UBotPoolState = require("ubot/ubot_pool_state").UBotPoolState;
 const UBotClient = require('ubot/ubot_client').UBotClient;
-const DefaultBiMapper = require("defaultbimapper").DefaultBiMapper;
+const ItemResult = require('itemresult').ItemResult;
+const ItemState = require("itemstate").ItemState;
 const cs = require("contractsservice");
 const Constraint = require('constraint').Constraint;
 const BigDecimal  = require("big").Big;
@@ -364,9 +365,11 @@ unit.test("ubot_pro_test: register contract", async () => {
 
     assert(state.state === UBotPoolState.FINISHED.val);
 
-    let desResult = await DefaultBiMapper.getInstance().deserialize(state.result);
     // checking contract
-    assert(desResult instanceof Uint8Array && t.valuesEqual(desResult, packedSimpleContract));
+    assert(state.result instanceof Uint8Array && t.valuesEqual(state.result, packedSimpleContract));
+
+    let ir = await ubotClient.getState(simpleContract.id);
+    assert(ir instanceof ItemResult && ir.state === ItemState.APPROVED);
 
     await ubotClient.shutdown();
 
@@ -391,9 +394,13 @@ unit.test("ubot_pro_test: create and register contract", async () => {
 
     assert(state.state === UBotPoolState.FINISHED.val);
 
-    let desResult = await DefaultBiMapper.getInstance().deserialize(state.result);
     // checking contract
-    assert(desResult instanceof Uint8Array);
+    assert(state.result instanceof Uint8Array);
+    let assureContract = await Contract.fromPackedTransaction(state.result);
+    assert(assureContract instanceof Contract);
+
+    let ir = await ubotClient.getState(assureContract.id);
+    assert(ir instanceof ItemResult && ir.state === ItemState.APPROVED);
 
     await ubotClient.shutdown();
 
