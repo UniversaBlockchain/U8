@@ -1029,7 +1029,7 @@ class UBotProcess_writeMultiStorage extends UBotProcess_writeSingleStorage {
                                 UBotCloudNotification_process.types.MULTI_STORAGE_GET_CORTEGES,
                                 {
                                     //TODO: for > 200 ubots in pool need HTTP request
-                                    cortege: await Boss.dump(this.iterationsCortege[notification.params.commonCortegeIteration]),
+                                    cortege: await Boss.dump(Array.from(this.iterationsCortege[notification.params.commonCortegeIteration])),
                                     commonCortegeIteration: notification.params.commonCortegeIteration,
                                     isAnswer: true
                                 }
@@ -1038,7 +1038,7 @@ class UBotProcess_writeMultiStorage extends UBotProcess_writeSingleStorage {
                 } else if (this.getCortegesTask != null && !this.getCortegesTask.cancelled &&
                     notification.params.commonCortegeIteration === this.commonCortegeIteration) {
 
-                    let receivedCortege = await Boss.load(notification.params.cortege);
+                    let receivedCortege = new Set(await Boss.load(notification.params.cortege));
                     this.corteges[this.pr.poolIndexes.get(notification.from.number)] = receivedCortege;
                     //TODO: for > 200 ubots in pool need HTTP request (check marker)
 

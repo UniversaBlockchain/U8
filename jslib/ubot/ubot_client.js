@@ -49,6 +49,7 @@ class UBotClient {
         this.ubotPublicKey = null;
         this.httpNodeClients = new Map();
         this.httpUbotClients = new Map();
+        this.closingRequests = new Set();
         this.lock = new Lock();
         this.ubotRegistryContract = null;
     }
@@ -90,6 +91,10 @@ class UBotClient {
      * @return {Promise<void>}.
      */
     async shutdown() {
+        // wait closing requests
+        while (this.closingRequests.size > 0)
+            await sleep(100);
+
         if (this.httpNodeClients.size === 0)
             await this.httpNodeClient.stop();
         for (let nodeClient of this.httpNodeClients.values())
@@ -611,9 +616,16 @@ class UBotClient {
         let finishEvent = new Promise(resolve => finishFire = resolve);
         let waiting = true;
 
+        let waitingRequests = session.pool.length - 1;
+
         session.pool.filter(ubotNumber => ubotNumber !== this.httpUbotClient.nodeNumber).forEach(
             ubotNumber => this.waitCloudMethod(requestContract.id, ubotNumber).then(async (state) =>
                 await this.lock.synchronize(requestContract.id, async () => {
+                    waitingRequests--;
+                    if (waitingRequests === 0)
+                        // remove closing request
+                        this.closingRequests.delete(requestContract.id.base64);
+
                     if (!waiting)
                         return;
 
@@ -628,15 +640,19 @@ class UBotClient {
                     if (count + 1 >= quorum) {
                         waiting = false;
                         finishFire(state);
+                    } else {
+                        groups.set(groupKey, count + 1);
+
+                        // check consensus available
+                        if (Array.from(groups.values()).every(c => c + session.pool.length - states.length < quorum)) {
+                            waiting = false;
+                            finishFire(null);
+                        } else
+                            return;
                     }
 
-                    groups.set(groupKey, count + 1);
-
-                    // check consensus available
-                    if (Array.from(groups.values()).every(c => c + session.pool.length - states.length < quorum)) {
-                        waiting = false;
-                        finishFire(null);
-                    }
+                    // save closing request
+                    this.closingRequests.add(requestContract.id.base64);
                 })
             )
         );
