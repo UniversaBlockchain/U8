@@ -652,7 +652,8 @@ class UBotClient {
                     }
 
                     // save closing request
-                    this.closingRequests.add(requestContract.id.base64);
+                    if (waitingRequests > 0)
+                        this.closingRequests.add(requestContract.id.base64);
                 })
             )
         );

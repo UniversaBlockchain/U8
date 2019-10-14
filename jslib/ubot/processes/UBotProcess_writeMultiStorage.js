@@ -578,7 +578,7 @@ class UBotProcess_writeMultiStorage extends UBotProcess_writeSingleStorage {
         let message = "UBotProcess_writeMultiStorage... voteSuspiciousCortegeId {from: " + notification.from.number +
             ", ubot: " + this.pr.pool[notification.params.dataUbotInPool].number + ", result: ";
 
-        if (this.suspiciousCortegeHashes[notification.params.dataUbotInPool].equals(notification.params.cortegeId)) {
+        if (this.iterationsCortegesIds[this.commonCortegeIteration][notification.params.dataUbotInPool].equals(notification.params.cortegeId)) {
             this.approveCounterFromOthersSets[notification.params.dataUbotInPool].add(notification.from.number);
             message += "approve";
         } else {
@@ -772,14 +772,11 @@ class UBotProcess_writeMultiStorage extends UBotProcess_writeSingleStorage {
 
         this.cortegeEvent = new Promise(resolve => this.cortegeFire = resolve);
 
-        this.suspiciousCortegeHashes = [];
         this.approveCounterSet.clear();
         this.declineCounterSet.clear();
         this.approveCounterFromOthersSets = [];
         this.declineCounterFromOthersSets = [];
         this.suspicious.forEach(su => {
-            // calculate suspicious cortege hashes
-            this.suspiciousCortegeHashes[su] = crypto.HashId.of(JSON.stringify(Array.from(this.corteges[su]).sort((a, b) => a - b)));
             this.approveCounterFromOthersSets[su] = new Set([this.pr.selfPoolIndex, su]);
             this.declineCounterFromOthersSets[su] = new Set();
         });
