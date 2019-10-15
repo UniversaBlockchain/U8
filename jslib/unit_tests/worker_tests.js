@@ -365,3 +365,54 @@ unit.test("worker_tests: exceptions from worker", async () => {
         worker.release();
     }
 });
+
+unit.test("worker_tests: exceptions from main scripter", async () => {
+    class Worker {
+        constructor() {
+            this.worker = null;
+        }
+        release() {this.worker.release();}
+        static async start() {
+            let res = new Worker();
+            res.worker = await getWorker(1, consoleWrapper + farcallWrapper+`
+            function callMeFromWorker(val) {
+                return new Promise((resolve,reject) => wrkInner.farcall("callMeFromWorker", [val], {}, resolve, reject));
+            }
+            
+            wrkInner.export.doSomething = async (args, kwargs) => {
+                await callMeFromWorker(33);
+                return "some_answer";
+            }
+            `);
+            res.worker.startFarcallCallbacks();
+
+            res.worker.export["__worker_bios_print"] = (args, kwargs) => {
+                let out = args[0] === true ? console.error : console.logPut;
+                out(...args[1], args[2]);
+            };
+
+            res.worker.export["callMeFromWorker"] = (args, kwargs) => {
+                //console.log("callMeFromWorker hit: " + args[0]);
+                throw "some_error_text";
+            };
+
+            return res;
+        }
+        doSomething() {
+            return new Promise((resolve,reject) => this.worker.farcall("doSomething", [], {}, resolve, reject));
+        }
+    }
+
+    for (let i = 0; i < 200; ++i) {
+        let worker = await Worker.start();
+        try {
+            let ans = await worker.doSomething();
+            console.log("ans: " + ans);
+            assert(false);
+        } catch (e) {
+            //console.log("e: " + JSON.stringify(e));
+            assert(e.text === "some_error_text");
+        }
+        worker.release();
+    }
+});
