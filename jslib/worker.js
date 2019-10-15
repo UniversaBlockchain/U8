@@ -22,19 +22,29 @@ wrk.WorkerHandle = class {
     startFarcallCallbacks() {
         this.onReceive(async (obj) => {
             let ref = obj.ref;
-            if (ref !== undefined && obj.result !== undefined) {
+            if (ref !== undefined) {
                 if (this.callbacksFarcall.has(ref)) {
-                    this.callbacksFarcall.get(ref)(await DefaultBiMapper.getInstance().deserialize(obj.result));
+                    let ca = this.callbacksFarcall.get(ref);
+                    if (obj.error !== undefined)
+                        ca[1](obj.error);
+                    else
+                        ca[0](await DefaultBiMapper.getInstance().deserialize(obj.result));
                     this.callbacksFarcall.delete(ref);
                 }
             } else {
                 let cmd = obj.cmd;
                 if (cmd && this.export[cmd]) {
-                    let res = await this.export[cmd](
-                        await DefaultBiMapper.getInstance().deserialize(obj.args),
-                        await DefaultBiMapper.getInstance().deserialize(obj.kwargs)
-                    );
-                    await this.send({serial:this.getNextFarcallSN(), ref:obj.serial, result:res});
+                    try {
+                        //console.error("???");
+                        let res = await this.export[cmd](
+                            await DefaultBiMapper.getInstance().deserialize(obj.args),
+                            await DefaultBiMapper.getInstance().deserialize(obj.kwargs)
+                        );
+                        await this.send({serial: this.getNextFarcallSN(), ref: obj.serial, result: res});
+                    } catch (e) {
+                        console.error("~~~");
+                        //await this.send({serial: this.getNextFarcallSN(), ref: obj.serial, error: {class:e.constructor.name, text:e.toString()}});
+                    }
                 }
             }
         });
@@ -51,10 +61,10 @@ wrk.WorkerHandle = class {
         this.workerImpl._send(obj);
     }
 
-    async farcall(cmd, args, kwargs, onComplete = null) {
+    async farcall(cmd, args, kwargs, onComplete = null, onError = (e)=>{}) {
         let id = this.getNextFarcallSN();
         if (onComplete != null)
-            this.callbacksFarcall.set(id, onComplete);
+            this.callbacksFarcall.set(id, [onComplete, onError]);
         await this.send({serial: id, cmd: cmd, args: args, kwargs: kwargs});
     }
 
@@ -109,11 +119,15 @@ wrkInner.onReceive = async (obj) => {
     const DefaultBiMapper = require("defaultbimapper").DefaultBiMapper;
     let cmd = obj.cmd;
     if (cmd && wrkInner.export[cmd]) {
-        let res = await wrkInner.export[cmd](
-            await DefaultBiMapper.getInstance().deserialize(obj.args),
-            await DefaultBiMapper.getInstance().deserialize(obj.kwargs)
-        );
-        await wrkInner.send({serial:wrkInner.getNextFarcallSN(), ref:obj.serial, result:res});
+        try {
+            let res = await wrkInner.export[cmd](
+                await DefaultBiMapper.getInstance().deserialize(obj.args),
+                await DefaultBiMapper.getInstance().deserialize(obj.kwargs)
+            );
+            await wrkInner.send({serial:wrkInner.getNextFarcallSN(), ref:obj.serial, result:res});
+        } catch(e) {
+            await wrkInner.send({serial:wrkInner.getNextFarcallSN(), ref:obj.serial, error: {class:e.constructor.name, text:e.toString()}});
+        }
     } else if (obj.result !== undefined) {
         let ref = obj.ref;
         if (wrkInner.callbacksFarcall.has(ref)) {

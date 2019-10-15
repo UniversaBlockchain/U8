@@ -324,3 +324,44 @@ unit.test("worker_tests: import custom js lib", async () => {
     }
 
 });
+
+unit.test("worker_tests: exceptions from worker", async () => {
+    class Worker {
+        constructor() {
+            this.worker = null;
+        }
+        release() {this.worker.release();}
+        static async start() {
+            let res = new Worker();
+            res.worker = await getWorker(1, consoleWrapper + farcallWrapper+`
+            wrkInner.export.doSomething = async (args, kwargs) => {
+                throw "some_error_text";
+                return "some_answer";
+            }
+            `);
+            res.worker.startFarcallCallbacks();
+
+            res.worker.export["__worker_bios_print"] = (args, kwargs) => {
+                let out = args[0] === true ? console.error : console.logPut;
+                out(...args[1], args[2]);
+            };
+
+            return res;
+        }
+        doSomething() {
+            return new Promise((resolve,reject) => this.worker.farcall("doSomething", [], {}, resolve, reject));
+        }
+    }
+
+    for (let i = 0; i < 200; ++i) {
+        let worker = await Worker.start();
+        try {
+            let ans = await worker.doSomething();
+            console.log("ans: " + ans);
+            assert(false);
+        } catch (e) {
+            assert(e.text === "some_error_text");
+        }
+        worker.release();
+    }
+});
