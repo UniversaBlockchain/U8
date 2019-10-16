@@ -1,12 +1,58 @@
 const BigDecimal  = require("big").Big;
+const roles = require('roles');
+const Constraint = require('constraint').Constraint;
 
-async function buyTicket(payment) {
+async function buyTicket(packedPayment, userKey) {
     // check payment contract
+    let payment = await Contract.fromPackedTransaction(packedPayment);
 
-    // get ticket number
+    let lotteryContract = await Contract.fromPackedTransaction(await getExecutableContract());
+    if (!lotteryContract.state.data.tokenOrigin.equals(payment.getOrigin()))
+        return {error: "Improper token in payment"};
 
-    // increase ticket number
+    if (lotteryContract.state.data.ticketPrice !== payment.state.data.amount)
+        return {error: "Ticket cost = " + lotteryContract.state.data.ticketPrice};
 
+    // quorum vote role
+    if (!payment.owner instanceof roles.QuorumVoteRole ||
+        payment.owner.source !== "refUbotRegistry.state.roles.ubots" || payment.owner.quorum !== "10")
+        return {error: "Invalid payment owner. Must be QuorumVoteRole of 10 ubots"};
+
+    let refUbotRegistry = payment.findConstraintByName("refUbotRegistry");
+    if (payment.transactional === null || refUbotRegistry === null ||
+        refUbotRegistry.type !== Constraint.TYPE_TRANSACTIONAL ||
+        !refUbotRegistry.conditions.equals({all_of: ["ref.tag == \"universa:ubot_registry_contract\""]}))
+        return {error: "Invalid payment constraint: refUbotRegistry"};
+
+    // get storage
+    let storage = await getSingleStorage();
+    let first = false;
+    if (!storage.hasOwnProperty("tickets") && !storage.hasOwnProperty("payments") && !storage.hasOwnProperty("userKeys"))
+        first = true;
+
+    // check storage
+    if (!first && (
+        !(storage.hasOwnProperty("tickets") && storage.hasOwnProperty("payments") && storage.hasOwnProperty("userKeys"))) ||
+        storage.payments.length !== storage.tickets || storage.userKeys.length !== storage.tickets
+        )
+        throw new Error("Error storage checking");
+
+    // get ticket number, save payment and user key and increase number of tickets
+    let ticket = 0;
+    if (!first) {
+        ticket = storage.tickets;
+        storage.push(packedPayment);
+        storage.push(userKey);
+        storage.tickets++;
+    } else {
+        storage.tickets = 1;
+        storage.payments = [packedPayment];
+        storage.userKeys = [userKey];
+    }
+
+    await writeSingleStorage(storage);
+
+    return ticket;
 }
 
 async function getRandom(max) {

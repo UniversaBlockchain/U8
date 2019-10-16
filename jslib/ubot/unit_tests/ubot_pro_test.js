@@ -15,7 +15,9 @@ const UBotClient = require('ubot/ubot_client').UBotClient;
 const ItemResult = require('itemresult').ItemResult;
 const ItemState = require("itemstate").ItemState;
 const cs = require("contractsservice");
+const roles = require('roles');
 const Constraint = require('constraint').Constraint;
+const permissions = require('permissions');
 const BigDecimal  = require("big").Big;
 const t = require("tools");
 
@@ -596,11 +598,48 @@ unit.test("ubot_pro_test: lottery", async () => {
     let ubotMains = await createUBots(ubotsCount);
     let ubotClient = await new UBotClient(clientKey, TOPOLOGY_ROOT + "universa.pro.json").start();
 
+    // init ubot-client (client key in whitelist)
+    ubotMains[0].ubot.client = await new UBotClient(ubotMains[0].ubot.nodeKey, TOPOLOGY_ROOT + "universa.pro.json", null, ubotMains[0].ubot.logger).start();
+
     const TICKETS = 10;
 
-    // test token fro payments
-    let tokenIssuerKey = tk.TestKeys.getKey();
+    // test token for payments
+    let tokenIssuerKey = ubotMains[0].ubot.nodeKey;
     let tokenContract = await cs.createTokenContract([tokenIssuerKey], [tokenIssuerKey.publicKey], new BigDecimal("1000"));
+    let origin = tokenContract.getOrigin();
+
+    console.log("Register base token...");
+    let ir = await ubotMains[0].ubot.client.register(await tokenContract.getPackedTransaction(), 10000);
+
+    assert(ir.state === ItemState.APPROVED);
+
+    let userKeys = [];
+    let payments = [];
+    console.log("Register initial payments...");
+    for (let i = 0; i < TICKETS; i++) {
+        let userKey = tk.TestKeys.getKey();
+
+        tokenContract = await cs.createSplit(tokenContract, 10, "amount", [tokenIssuerKey], true);
+        let payment = Array.from(tokenContract.newItems)[0];
+
+        payment.registerRole(new roles.SimpleRole("owner", userKey, payment));
+        payment.registerRole(new roles.RoleLink("creator", "owner", payment));
+
+        // change owner permission
+        let chown = new roles.RoleLink("@change_owner_role", "owner", payment);
+        let chownPerm = new permissions.ChangeOwnerPermission(chown);
+        payment.definition.addPermission(chownPerm);
+
+        await tokenContract.seal();
+
+        userKeys.push(userKey);
+        payments.push(payment);
+
+        console.log("Register payment " + i + "...");
+        ir = await ubotMains[0].ubot.client.register(await tokenContract.getPackedTransaction(), 10000);
+
+        assert(ir.state === ItemState.APPROVED);
+    }
 
     let lotteryKey = tk.TestKeys.getKey();
     let lotteryContract = Contract.fromPrivateKey(lotteryKey);
@@ -617,149 +656,77 @@ unit.test("ubot_pro_test: lottery", async () => {
     };
 
     lotteryContract.state.data.js = await io.fileGetContentsAsString(TEST_CONTRACTS_PATH + "lottery.js");
+    lotteryContract.state.data.tokenOrigin = origin;
+    lotteryContract.state.data.ticketPrice = "10";
 
     await lotteryContract.seal();
 
-    // UBotNet registry contract load from Universa MainNet by getServiceContracts
-    let serviceContracts = await new Promise(async (resolve, reject) =>
-        await ubotClient.httpNodeClient.command("getServiceContracts", null,
-            result => resolve(result),
-            error => reject(error)
-        )
-    );
-
-    assert(serviceContracts != null && serviceContracts.contracts != null && serviceContracts.contracts.ubot_registry_contract != null);
-
-    let ubotnetRegistry = await Contract.fromSealedBinary(serviceContracts.contracts.ubot_registry_contract);
-    let ubotRoles = [];
-
-    ubotnetRegistry.state.data.topology.forEach(ubot => ubotRoles.push(new SimpleRole("ubot" + ubot.number, new PublicKey(atob(ubot.key)))));
-
-    // biy tickets
-    let userKeys = [];
-    let payments = [];
-    for (let i = 0; i < TICKETS; i++) {
-        let userKey = tk.TestKeys.getKey();
-
-        tokenContract = await cs.createSplit(tokenContract, 10, "amount", [tokenIssuerKey], true);
-        let payment = Array.from(tokenContract.newItems)[0];
-
-        payment.owner = new ListRole("poolRole", ubotRoles, ListRoleMode.QUORUM, 10);
-        await payment.seal();
-
-        let buyContract = Contract.fromPrivateKey(userKey);
-        buyContract.state.data.method_name = "buyTicket";
-        buyContract.state.data.method_args = [payment];
-        buyContract.state.data.executable_contract_id = lotteryContract.id;
-
-        await cs.addConstraintToContract(buyContract, lotteryContract, "executableContractConstraint",
-            Constraint.TYPE_EXISTING_STATE, ["this.state.data.executable_contract_id == ref.id"], true);
-
-        userKeys.push(userKey);
-        payments.push(payment);
-
-        // let state = await ubotClient.executeCloudMethod(buyContract, true);
-        //
-        // assert(state.state === UBotPoolState.FINISHED.val);
-        // assert(state.result instanceof Contract);
-
-
-
-        // let session = await ubotClient.startCloudMethod(buyContract);
-        //
-        // console.log("Session: " + session);
-        //
-        // let state = await ubotClient.getStateCloudMethod(buyContract.id);
-        // console.log("State: " + JSON.stringify(state));
-        //
-        // if (state.state !== UBotPoolState.FINISHED.val)
-        //     state = await ubotClient.waitCloudMethod(buyContract.id);
-        //
-        // console.log("State: " + JSON.stringify(state));
-        //
-        // let states = await Promise.all(session.pool.map(async (ubotNumber) => {
-        //     let state = await ubotClient.getStateCloudMethod(buyContract.id, ubotNumber);
-        //
-        //     if (state.state !== UBotPoolState.FINISHED.val)
-        //         state = await ubotClient.waitCloudMethod(buyContract.id, ubotNumber);
-        //
-        //     return state;
-        // }));
-        //
-        // console.log("Final states: " + JSON.stringify(states));
-        //
-        // let finalized = states.filter(state =>
-        //     state.state === UBotPoolState.FINISHED.val &&
-        //     typeof state.result === "number" && state.result >= 0 && state.result < 1000    // checking secure random value
-        // );
-        //
-        // assert(finalized.length >= lotteryContract.state.data.cloud_methods.buyTicket.quorum.size);
-        //
-        // let ticket = finalized[0].result;
-        //
-        // //assert(finalized.every(state => state.result === first));
-        //
-        // await ubotClient.disconnectUbot();
-        //
-        // // waiting pool finished...
-        // while (!session.pool.every(ubot => !ubotMains[ubot].ubot.processors.get(buyContract.id.base64).state.canContinue))
-        //     await sleep(100);
-        //
-        // assert(session.pool.filter(
-        //     ubot => ubotMains[ubot].ubot.processors.get(buyContract.id.base64).state === UBotPoolState.FINISHED).length >=
-        //     lotteryContract.state.data.cloud_methods.buyTicket.quorum.size);
-        //
-        // let sess = null;
-        // do {
-        //     sess = await ubotClient.getSession("ubotGetSession", {executableContractId: lotteryContract.id});
-        // } while (Object.keys(sess).length > 0);
-    }
+    // // buy tickets
+    // console.log("Buy tickets...");
+    // for (let i = 0; i < TICKETS; i++) {
+    //     let payment = await payments[i].createRevision([userKeys[i]]);
+    //
+    //     // quorum vote role
+    //     payment.registerRole(new roles.QuorumVoteRole("owner", "refUbotRegistry.state.roles.ubots", "10", payment));
+    //     payment.registerRole(new roles.QuorumVoteRole("creator", "refUbotRegistry.state.roles.ubots", "3", payment));
+    //
+    //     // constraint for UBotNet registry contract
+    //     payment.createTransactionalSection();
+    //     let constr = new Constraint(payment);
+    //     constr.name = "refUbotRegistry";
+    //     constr.type = Constraint.TYPE_TRANSACTIONAL;
+    //     let conditions = {};
+    //     conditions[Constraint.conditionsModeType.all_of] = ["ref.tag == \"universa:ubot_registry_contract\""];
+    //     constr.setConditions(conditions);
+    //     payment.addConstraint(constr);
+    //
+    //     await payment.seal();
+    //
+    //     let buyContract = Contract.fromPrivateKey(userKeys[i]);
+    //     buyContract.state.data.method_name = "buyTicket";
+    //     buyContract.state.data.method_args = [await payment.getPackedTransaction(), userKeys[i].publicKey];
+    //     buyContract.state.data.executable_contract_id = lotteryContract.id;
+    //
+    //     await cs.addConstraintToContract(buyContract, lotteryContract, "executableContractConstraint",
+    //         Constraint.TYPE_EXISTING_STATE, ["this.state.data.executable_contract_id == ref.id"], true);
+    //
+    //     let state = await ubotClient.executeCloudMethod(buyContract, true);
+    //
+    //     assert(state.state === UBotPoolState.FINISHED.val);
+    //     assert(state.result === i);     // compare ticket number
+    // }
 
     // raffle
-    let requestContract = Contract.fromPrivateKey(userPrivKey);
-    requestContract.state.data.method_name = "raffle";
-    requestContract.state.data.executable_contract_id = lotteryContract.id;
+    let raffleContract = Contract.fromPrivateKey(userPrivKey);
+    raffleContract.state.data.method_name = "raffle";
+    raffleContract.state.data.executable_contract_id = lotteryContract.id;
 
-    await cs.addConstraintToContract(requestContract, lotteryContract, "executableContractConstraint",
+    await cs.addConstraintToContract(raffleContract, lotteryContract, "executableContractConstraint",
         Constraint.TYPE_EXISTING_STATE, ["this.state.data.executable_contract_id == ref.id"], true);
 
-    // console.log("RAFFLE LOTTERY");
-    // let session = await ubotClient.startCloudMethod(requestContract);
+    // console.log("Raffle lottery...");
+    // let state = await ubotClient.executeCloudMethod(raffleContract, true);
     //
-    // console.log("Session: " + session);
+    // assert(state.state === UBotPoolState.FINISHED.val);
     //
-    // let state = await ubotClient.getStateCloudMethod(requestContract.id);
-    // console.log("State: " + JSON.stringify(state));
+    // // check raffle result
+    // assert(state.result.hasOwnProperty("winTicket") && state.result.prizeContract instanceof Uint8Array);
+    // assert(state.result.hasOwnProperty("prizeContract") && typeof state.result.winTicket === "number" &&
+    //        state.result.winTicket >= 0 && state.result.winTicket < TICKETS);
     //
-    // if (state.state !== UBotPoolState.FINISHED.val)
-    //     state = await ubotClient.waitCloudMethod(requestContract.id);
+    // // check prize contract
+    // let prizeContract = await Contract.fromPackedTransaction(state.result.prizeContract);
+    // assert(prizeContract.owner instanceof roles.SimpleRole);
     //
-    // console.log("State: " + JSON.stringify(state));
+    // let keys = roles.RoleExtractor.extractKeys(prizeContract.owner);
+    // assert(keys.size === 1 && keys.has(userKeys[state.result.winTicket].publicKey));
     //
-    // let states = await Promise.all(session.pool.map(async (ubotNumber) => {
-    //     let state = await ubotClient.getStateCloudMethod(requestContract.id, ubotNumber);
-    //
-    //     if (state.state !== UBotPoolState.FINISHED.val)
-    //         state = await ubotClient.waitCloudMethod(requestContract.id, ubotNumber);
-    //
-    //     return state;
-    // }));
-    //
-    // console.log("Final states: " + JSON.stringify(states));
-    //
-    // // checking result
-    // // assert(states.filter(state =>
-    // //     state.state === UBotPoolState.FINISHED.val &&
-    // //     state.result === first
-    // // ).length >= lotteryContract.state.data.cloud_methods.getRandom.quorum.size);
-    //
-    // // waiting pool finished...
-    // while (!session.pool.every(ubot => !ubotMains[ubot].ubot.processors.get(requestContract.id.base64).state.canContinue))
-    //     await sleep(100);
-    //
-    // assert(session.pool.filter(
-    //     ubot => ubotMains[ubot].ubot.processors.get(requestContract.id.base64).state === UBotPoolState.FINISHED).length >=
-    //     lotteryContract.state.data.cloud_methods.getRandom.quorum.size);
+    // assert(prizeContract.getOrigin().equals(origin));
+    // assert(prizeContract.state.data.amount === "100");
+
+    // waiting pool finished...
+    while (ubotMains.some(main => Array.from(main.ubot.processors.values()).some(proc => proc.state.canContinue)))
+        await sleep(100);
 
     await ubotClient.shutdown();
     await shutdownUBots(ubotMains);

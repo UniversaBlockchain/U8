@@ -122,7 +122,7 @@ class ProcessStartExec extends ProcessBase {
                     "   try {" +
                     "      return await " + methodName + "(...params);" +
                     "   } catch (err) {" +
-                    "       console.error(err.message);" +
+                    "       console.error(err.message);" +      //TODO: to FAILED state
                     "   }" +
                     "};";
 
@@ -576,8 +576,7 @@ class ProcessStartExec extends ProcessBase {
             c.registerRole(creator);
 
             // change owner permission
-            let chown = new roles.RoleLink("@change_ower_role", "owner");
-            chown.contract = c;
+            let chown = new roles.RoleLink("@change_owner_role", "owner", c);
             let chownPerm = new permissions.ChangeOwnerPermission(chown);
             chownPerm.id = this.pr.prng.randomString(6);
             c.definition.addPermission(chownPerm);
