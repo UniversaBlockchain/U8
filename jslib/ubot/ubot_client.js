@@ -683,13 +683,23 @@ class UBotClient {
         if (session == null)
             throw new UBotClientException("Session is null");
 
+        // wait not empty session
+        while (session != null && session.state == null) {
+
+            await sleep(100);
+            session = await this.getSession("ubotGetSession", {executableContractId: executableContractId});
+        }
+
+        if (session == null)
+            throw new UBotClientException("Session is null");
+
         if (session.state !== UBotSessionState.OPERATIONAL.val) {
             if (session.state !== UBotSessionState.VOTING_SESSION_ID.val)
                 throw new UBotClientException("Session is not in operational mode");
 
             // wait session id and pool
             while (session.state !== UBotSessionState.OPERATIONAL.val && session.state !== UBotSessionState.CLOSING.val &&
-            session.state !== UBotSessionState.CLOSED.val) {
+                   session.state !== UBotSessionState.CLOSED.val) {
 
                 await sleep(100);
                 session = await this.getSession("ubotGetSession", {executableContractId: executableContractId});
