@@ -3,6 +3,7 @@
  */
 
 const t = require("tools");
+const ut = require("ubot/ubot_tools");
 const UBotClientException = require("ubot/ubot_client_exception").UBotClientException;
 
 const UBotSessionState = {
@@ -82,6 +83,15 @@ class UBotSession {
 
         } while (result.pending[storageName] != null && Object.keys(result.pending[storageName]).length > 0);
 
+        if (this.ubot != null) {
+            let storages = this.ubot.sessionStorageCache.get(this.executableContractId);
+            if (storages == null)
+                storages = {};
+
+            storages[storageName] = result.current[storageName];
+            this.ubot.sessionStorageCache.put(this.executableContractId, storages);
+        }
+
         return result.current[storageName];
     }
 
@@ -95,7 +105,7 @@ class UBotSession {
             await this.client.askSessionOnAllNodes("initiateVote", {packedItem: contract.sealedBinary});
         await this.client.askSessionOnAllNodes("voteForContract", {itemId: contract.id});
 
-        let quorum = this.client.getRequestQuorumSize(requestContract);
+        let quorum = ut.getRequestQuorumSize(requestContract);
 
         // wait quorum votes
         let votes = null;

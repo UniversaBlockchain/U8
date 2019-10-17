@@ -83,7 +83,8 @@ static unordered_set<string> validSourcesForRestrictedWorker = {
     "keyrecord.js",
     "deltas.js",
     "buffer.js",
-    "esprima.js"
+    "esprima.js",
+    "ubot/ubot_tools.js"
 };
 
 void JsLoadRequiredRestricted(const v8::FunctionCallbackInfo<v8::Value> &args) {

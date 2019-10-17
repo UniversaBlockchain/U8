@@ -10,6 +10,7 @@ const ErrorRecord = require("errors").ErrorRecord;
 const Errors = require("errors").Errors;
 const UBotPoolState = require("ubot/ubot_pool_state").UBotPoolState;
 const UBotCloudNotification_process = require("ubot/ubot_notification").UBotCloudNotification_process;
+const BossBiMapper = require("bossbimapper").BossBiMapper;
 const Boss = require('boss.js');
 const t = require("tools");
 
@@ -342,7 +343,7 @@ class UBotProcess_writeMultiStorage extends UBotProcess_writeSingleStorage {
         if (this.verifyMethod == null)
             return true;
 
-        let current = await Boss.load(result);
+        let current = await BossBiMapper.getInstance().deserialize(await Boss.load(result));
         let previous = null;
         if (previousRecordId != null)
             previous = await this.pr.ubot.getStorageResultByRecordId(previousRecordId, true, ubotNumber);

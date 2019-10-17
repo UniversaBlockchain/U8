@@ -11,6 +11,7 @@ const UBotResultCache = require("ubot/ubot_result_cache").UBotResultCache;
 const UBotCloudProcessorsCache = require("ubot/ubot_cloudprocessors_cache").UBotCloudProcessorsCache;
 const UBotSessionStorageCache = require("ubot/ubot_session_storage_cache").UBotSessionStorageCache;
 const UBotClient = require('ubot/ubot_client').UBotClient;
+const BossBiMapper = require("bossbimapper").BossBiMapper;
 const Boss = require('boss.js');
 const t = require("tools");
 
@@ -129,15 +130,14 @@ class UBot {
 
     async getStorageResultByRecordId(recordId, multi, ubotNumber = undefined) {
         let result = this.resultCache.get(recordId, ubotNumber);
-        if (result != null)
-            return await Boss.load(result);
+        if (result == null) {
+            if (multi)
+                result = await this.ledger.getMultiStorageDataByRecordId(recordId, ubotNumber);
+            else
+                result = await this.ledger.getSingleStorageDataByRecordId(recordId);
+        }
 
-        if (multi)
-            result = await Boss.load(await this.ledger.getMultiStorageDataByRecordId(recordId, ubotNumber));
-        else
-            result = await Boss.load(await this.ledger.getSingleStorageDataByRecordId(recordId));
-
-        return result;
+        return await BossBiMapper.getInstance().deserialize(await Boss.load(result));
     }
 
     async getStoragePackedResultByRecordId(recordId, multi, ubotNumber = undefined) {
@@ -161,7 +161,7 @@ class UBot {
 
         let result = [];
         for (let record of records)
-            result.push(await Boss.load(record.storage_data));
+            result.push(await BossBiMapper.getInstance().deserialize(await Boss.load(record.storage_data)));
 
         return result;
     }
@@ -184,7 +184,7 @@ class UBot {
             if (packed)
                 results.push(record.storage_data);
             else
-                results.push(await Boss.load(record.storage_data));
+                results.push(await BossBiMapper.getInstance().deserialize(await Boss.load(record.storage_data)));
 
             ubots.push(record.ubot_number);
             concat.set(record.hash.digest, i * record.hash.digest.length);

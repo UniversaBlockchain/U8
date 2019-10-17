@@ -9,6 +9,7 @@ const ErrorRecord = require("errors").ErrorRecord;
 const Errors = require("errors").Errors;
 const UBotPoolState = require("ubot/ubot_pool_state").UBotPoolState;
 const UBotCloudNotification_process = require("ubot/ubot_notification").UBotCloudNotification_process;
+const BossBiMapper = require("bossbimapper").BossBiMapper;
 const Boss = require('boss.js');
 const t = require("tools");
 
@@ -27,7 +28,7 @@ class UBotProcess_writeSingleStorage extends ProcessBase {
     }
 
     async init(binToWrite, previousRecordId, storageData) {
-        this.binToWrite = await Boss.dump(binToWrite);
+        this.binToWrite = await Boss.dump(await BossBiMapper.getInstance().serialize(binToWrite));
         this.binHashId = crypto.HashId.of(this.binToWrite);
         this.previousRecordId = previousRecordId;
 

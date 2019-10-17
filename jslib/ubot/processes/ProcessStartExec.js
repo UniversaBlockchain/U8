@@ -10,6 +10,7 @@ const UBotProcess_writeMultiStorage = require("ubot/processes/UBotProcess_writeM
 const UBotProcess_call = require("ubot/processes/UBotProcess_call").UBotProcess_call;
 const ScheduleExecutor = require("executorservice").ScheduleExecutor;
 const t = require("tools");
+const ut = require("ubot/ubot_tools");
 const ErrorRecord = require("errors").ErrorRecord;
 const Errors = require("errors").Errors;
 const UBotPoolState = require("ubot/ubot_pool_state").UBotPoolState;
@@ -68,14 +69,14 @@ class ProcessStartExec extends ProcessBase {
         }));
     }
     
-    function getExecutableContract() {
-        return new Promise(resolve => wrkInner.farcall("getExecutableContract", [], {}, ans => {
+    function getUBotRegistryContract() {
+        return new Promise(resolve => wrkInner.farcall("getUBotRegistryContract", [], {}, ans => {
             resolve(ans);
         }));
     }
     
-    function getUBotRegistryContract() {
-        return new Promise(resolve => wrkInner.farcall("getUBotRegistryContract", [], {}, ans => {
+    function errorFail(methodName, message) {
+        return new Promise(resolve => wrkInner.farcall("errorFail", [methodName, message], {}, ans => {
             resolve(ans);
         }));
     }
@@ -117,12 +118,13 @@ class ProcessStartExec extends ProcessBase {
             }
 
             new ScheduleExecutor(async () => {
-                //let methodExport = "wrkInner.export." + methodName + " = " + methodName + ";";
                 let methodExport = "wrkInner.export." + methodName + " = async(params) => {" +
                     "   try {" +
                     "      return await " + methodName + "(...params);" +
                     "   } catch (err) {" +
-                    "       console.error(err.message);" +      //TODO: to FAILED state
+                    "       console.error(\"Error in cloud method " + methodName + ": \" + err.message);" +
+                    "       console.error(err.stack);" +
+                    "       await errorFail(\"" + methodName + "\", err.message);" +
                     "   }" +
                     "};";
 
@@ -158,12 +160,12 @@ class ProcessStartExec extends ProcessBase {
                     return await this.getRequestContract();
                 };
 
-                this.pr.worker.export["getExecutableContract"] = async (args, kwargs) => {
-                    return await this.getExecutableContract();
-                };
-
                 this.pr.worker.export["getUBotRegistryContract"] = async (args, kwargs) => {
                     return await this.getUBotRegistryContract();
+                };
+
+                this.pr.worker.export["errorFail"] = (args, kwargs) => {
+                    this.errorFail(args[0], args[1]);
                 };
 
                 this.pr.worker.export["__worker_bios_print"] = async (args, kwargs) => {
@@ -566,7 +568,7 @@ class ProcessStartExec extends ProcessBase {
             let issuer = new roles.QuorumVoteRole(
                 "issuer",
                 "refUbotRegistry.state.roles.ubots",
-                this.pr.ubot.client.getRequestQuorumSize(this.pr.requestContract).toString(),
+                ut.getRequestQuorumSize(this.pr.requestContract).toString(),
                 c
             );
             c.registerRole(issuer);
@@ -609,12 +611,15 @@ class ProcessStartExec extends ProcessBase {
         return await this.pr.requestContract.getPackedTransaction();
     }
 
-    async getExecutableContract() {
-        return await this.pr.executableContract.getPackedTransaction();
-    }
-
     async getUBotRegistryContract() {
         return await this.pr.ubot.client.getUBotRegistryContract();
+    }
+
+    errorFail(methodName, message) {
+        this.pr.logger.log("Error in cloud method " + methodName + ": " + message);
+        this.pr.errors.push(new ErrorRecord(Errors.FAILURE, methodName,
+            "Error in cloud method " + methodName + ": " + message));
+        this.pr.changeState(UBotPoolState.FAILED);
     }
 }
 

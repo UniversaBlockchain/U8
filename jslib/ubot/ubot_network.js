@@ -10,6 +10,7 @@ import {AsyncEvent} from "executorservice";
 const Boss = require("boss.js");
 const BossStreams = require('boss_streams.js');
 const UBotConfig = require("ubot/ubot_config").UBotConfig;
+const BossBiMapper = require("bossbimapper").BossBiMapper;
 
 class UBotNetwork {
 
@@ -207,7 +208,7 @@ class UBotNetwork {
             if (result != null) {
                 // check result hash
                 if (multi) {
-                    result = await Boss.load(result);
+                    result = await BossBiMapper.getInstance().deserialize(await Boss.load(result));
 
                     let results = [];
                     let ubots = [];
@@ -228,7 +229,7 @@ class UBotNetwork {
                         };
 
                 } else if (actualHash.equals(crypto.HashId.of(result)))
-                    return await Boss.load(result);
+                    return await BossBiMapper.getInstance().deserialize(await Boss.load(result));
             }
         }
 

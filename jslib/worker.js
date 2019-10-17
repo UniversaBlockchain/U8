@@ -150,10 +150,11 @@ wrkInner.onReceive = async (obj) => {
     }
 }
 wrkInner.farcall = async (cmd, args, kwargs, onComplete = null, onError = (e)=>{}) => {
+    const DefaultBiMapper = require("defaultbimapper").DefaultBiMapper;
     let id = wrkInner.getNextFarcallSN();
     if (onComplete != null)
         wrkInner.callbacksFarcall.set(id, [onComplete, onError]);
-    await wrkInner.send({serial:id, cmd:cmd, args:args, kwargs:kwargs});
+    await wrkInner.send(await DefaultBiMapper.getInstance().serialize({serial:id, cmd:cmd, args:args, kwargs:kwargs}));
 }
 `;
 

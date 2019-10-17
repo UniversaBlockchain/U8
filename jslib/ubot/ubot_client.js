@@ -14,6 +14,7 @@ const Lock = require("lock").Lock;
 const BossBiMapper = require("bossbimapper").BossBiMapper;
 const Boss = require('boss.js');
 const t = require("tools");
+const ut = require("ubot/ubot_tools");
 
 class NodeRecord {
     constructor(data) {
@@ -502,17 +503,6 @@ class UBotClient {
     }
 
     /**
-     * Get quorum size of request cloud method.
-     *
-     * @param {Contract} requestContract - The Request contract.
-     * @private
-     */
-    getRequestQuorumSize(requestContract) {
-        let executableContract = requestContract.transactionPack.referencedItems.get(requestContract.state.data.executable_contract_id);
-        return executableContract.state.data.cloud_methods[requestContract.state.data.method_name].quorum.size;
-    }
-
-    /**
      * Get ubot registry contract.
      *
      * @return {Uint8Array} packed ubot registry contract.
@@ -596,9 +586,18 @@ class UBotClient {
      * @throws {UBotClientException} client exception if session pool consensus is not reached.
      */
     async executeCloudMethod(requestContract, waitPreviousSession = false) {
+        if (this.httpUbotClient != null) {
+            if (waitPreviousSession) {
+                // wait closing requests
+                while (this.closingRequests.size > 0)
+                    await sleep(100);
+            } else
+                throw new UBotClientException("Ubot is already connected to the pool (previous request. Wait disconnect from the pool or force disconnect");
+        }
+
         let session = await this.startCloudMethod(requestContract, waitPreviousSession);
 
-        let quorum = this.getRequestQuorumSize(requestContract);
+        let quorum = ut.getRequestQuorumSize(requestContract);
 
         let states = [];
         let groups = new Map();
@@ -622,9 +621,11 @@ class UBotClient {
             ubotNumber => this.waitCloudMethod(requestContract.id, ubotNumber).then(async (state) =>
                 await this.lock.synchronize(requestContract.id, async () => {
                     waitingRequests--;
-                    if (waitingRequests === 0)
+                    if (waitingRequests === 0) {
+                        await this.disconnectUbot();
                         // remove closing request
                         this.closingRequests.delete(requestContract.id.base64);
+                    }
 
                     if (!waiting)
                         return;

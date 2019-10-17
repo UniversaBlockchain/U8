@@ -661,40 +661,42 @@ unit.test("ubot_pro_test: lottery", async () => {
 
     await lotteryContract.seal();
 
-    // // buy tickets
-    // console.log("Buy tickets...");
-    // for (let i = 0; i < TICKETS; i++) {
-    //     let payment = await payments[i].createRevision([userKeys[i]]);
-    //
-    //     // quorum vote role
-    //     payment.registerRole(new roles.QuorumVoteRole("owner", "refUbotRegistry.state.roles.ubots", "10", payment));
-    //     payment.registerRole(new roles.QuorumVoteRole("creator", "refUbotRegistry.state.roles.ubots", "3", payment));
-    //
-    //     // constraint for UBotNet registry contract
-    //     payment.createTransactionalSection();
-    //     let constr = new Constraint(payment);
-    //     constr.name = "refUbotRegistry";
-    //     constr.type = Constraint.TYPE_TRANSACTIONAL;
-    //     let conditions = {};
-    //     conditions[Constraint.conditionsModeType.all_of] = ["ref.tag == \"universa:ubot_registry_contract\""];
-    //     constr.setConditions(conditions);
-    //     payment.addConstraint(constr);
-    //
-    //     await payment.seal();
-    //
-    //     let buyContract = Contract.fromPrivateKey(userKeys[i]);
-    //     buyContract.state.data.method_name = "buyTicket";
-    //     buyContract.state.data.method_args = [await payment.getPackedTransaction(), userKeys[i].publicKey];
-    //     buyContract.state.data.executable_contract_id = lotteryContract.id;
-    //
-    //     await cs.addConstraintToContract(buyContract, lotteryContract, "executableContractConstraint",
-    //         Constraint.TYPE_EXISTING_STATE, ["this.state.data.executable_contract_id == ref.id"], true);
-    //
-    //     let state = await ubotClient.executeCloudMethod(buyContract, true);
-    //
-    //     assert(state.state === UBotPoolState.FINISHED.val);
-    //     assert(state.result === i);     // compare ticket number
-    // }
+    // buy tickets
+    console.log("Buy tickets...");
+    for (let i = 0; i < TICKETS; i++) {
+        let payment = await payments[i].createRevision([userKeys[i]]);
+
+        // quorum vote role
+        payment.registerRole(new roles.QuorumVoteRole("owner", "refUbotRegistry.state.roles.ubots", "10", payment));
+        payment.registerRole(new roles.QuorumVoteRole("creator", "refUbotRegistry.state.roles.ubots", "3", payment));
+
+        // constraint for UBotNet registry contract
+        payment.createTransactionalSection();
+        let constr = new Constraint(payment);
+        constr.name = "refUbotRegistry";
+        constr.type = Constraint.TYPE_TRANSACTIONAL;
+        let conditions = {};
+        conditions[Constraint.conditionsModeType.all_of] = ["ref.tag == \"universa:ubot_registry_contract\""];
+        constr.setConditions(conditions);
+        payment.addConstraint(constr);
+
+        await payment.seal();
+
+        payment = await payment.getPackedTransaction();
+
+        let buyContract = Contract.fromPrivateKey(userKeys[i]);
+        buyContract.state.data.method_name = "buyTicket";
+        buyContract.state.data.method_args = [payment, userKeys[i].publicKey];
+        buyContract.state.data.executable_contract_id = lotteryContract.id;
+
+        await cs.addConstraintToContract(buyContract, lotteryContract, "executableContractConstraint",
+            Constraint.TYPE_EXISTING_STATE, ["this.state.data.executable_contract_id == ref.id"], true);
+
+        let state = await ubotClient.executeCloudMethod(buyContract, true);
+
+        assert(state.state === UBotPoolState.FINISHED.val);
+        assert(state.result === i);     // compare ticket number
+    }
 
     // raffle
     let raffleContract = Contract.fromPrivateKey(userPrivKey);
