@@ -146,6 +146,8 @@ void Scripter::initialize(int accessLevel) {
         throw runtime_error("SR is already initialized");
     initialized = true;
 
+    selfAccessLevel_ = accessLevel;
+
     create_params.array_buffer_allocator =
             v8::ArrayBuffer::Allocator::NewDefaultAllocator();
     pIsolate = v8::Isolate::New(create_params);

@@ -236,6 +236,8 @@ public:
     bool isWorkersReady() {return _workersReady;}
     void setWorkersReady() {_workersReady = true;}
 
+    int getSelfAcceccLevel() {return selfAccessLevel_;}
+
     // crypto templates
     Persistent<FunctionTemplate> publicKeyTpl;
     Persistent<FunctionTemplate> privateKeyTpl;
@@ -315,6 +317,8 @@ private:
     bool isPrototypesHolderFreezedForJs_ = false;
 
     bool _workersReady = false;
+
+    int selfAccessLevel_;
 
     // do not construct it manually
     explicit Scripter();

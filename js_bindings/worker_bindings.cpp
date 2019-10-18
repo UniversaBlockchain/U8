@@ -187,6 +187,11 @@ static void JsGetWorker(const FunctionCallbackInfo<Value> &args) {
         if (ac.args.Length() == 4) {
             auto se = ac.scripter;
             int accessLevel = ac.asInt(0);
+            if (se->getSelfAcceccLevel() > accessLevel) {
+                ac.throwError("Your worker's access level is " + to_string(se->getSelfAcceccLevel()) +
+                              ", you can't create worker with access level " + to_string(accessLevel));
+                return;
+            }
             auto workerSrc = ac.asString(1);
             auto onComplete = ac.asFunction(2);
             UObject customJsLibFiles = v8ValueToUObject(ac.isolate, ac.args[3]);

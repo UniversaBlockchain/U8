@@ -416,3 +416,14 @@ unit.test("worker_tests: exceptions from main scripter", async () => {
         worker.release();
     }
 });
+
+unit.test("worker_tests: access levels order", async () => {
+    // Today (2019-10-18) there is not able to create subworker from worker code.
+    // However, getWorker function should to check access levels.
+    try {
+        await getWorker(-1, "");
+        assert(false);
+    } catch (e) {
+        assert(true);
+    }
+});
