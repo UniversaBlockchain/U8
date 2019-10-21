@@ -433,6 +433,8 @@ network.HttpClient = class {
         this.nodePublickey = null;
         this.httpClient_ = new network.HttpClientImpl(rootUrl);
         this.callbacks_ = new Map();
+        this.callbacksCommands_ = new Map();
+        this.isRestartingNow = false;
         this.nextReqId_ = 1;
         this.httpClient_.__setBufferedCallback((ansArr) => {
             for (let i = 0; i < Math.floor(ansArr.length/3); ++i) {
@@ -446,9 +448,9 @@ network.HttpClient = class {
         this.httpClient_.__setBufferedCommandCallback((ansArr) => {
             for (let i = 0; i < Math.floor(ansArr.length/3); ++i) {
                 let reqId = ansArr[i*3 + 0];
-                if (this.callbacks_.has(reqId)) {
-                    this.callbacks_.get(reqId)(ansArr[i*3 + 1], ansArr[i*3 + 2]);
-                    this.callbacks_.delete(reqId);
+                if (this.callbacksCommands_.has(reqId)) {
+                    this.callbacksCommands_.get(reqId)(ansArr[i*3 + 1], ansArr[i*3 + 2]);
+                    this.callbacksCommands_.delete(reqId);
                 }
             }
         });
@@ -466,9 +468,15 @@ network.HttpClient = class {
         });
     }
 
-    restart() {
-        this.httpClient_.__clearSession();
-        return this.start(this.clientPrivateKey, this.nodePublickey, null);
+    async restart() {
+        while (this.callbacksCommands_.size > 0)
+            await sleep(100);
+        if (!this.isRestartingNow) {
+            this.isRestartingNow = true;
+            this.httpClient_.__clearSession();
+            await this.start(this.clientPrivateKey, this.nodePublickey, null);
+            this.isRestartingNow = false;
+        }
     }
 
     async stop() {
@@ -570,18 +578,20 @@ network.HttpClient = class {
 
         let onExecCommandError = async (clientError) => {
             tryCounter += 1;
-            if (tryCounter >= this.retryCount) {
+            if ((tryCounter >= this.retryCount) || (clientError && clientError.errorRecord.error == Errors.UNKNOWN_COMMAND)) {
                 onError(clientError);
             } else {
                 await sleep(this.retryTimeoutMillis);
                 await this.restart();
-                execCommand();
+                await execCommand();
             }
         };
 
-        let execCommand = () => {
+        let execCommand = async () => {
+            while (this.isRestartingNow)
+                await sleep(100);
             let reqId = this.getReqId();
-            this.callbacks_.set(reqId, async (decrypted, isError) => {
+            this.callbacksCommands_.set(reqId, async (decrypted, isError) => {
                 if (isError !== true) {
                     let binder = await BossBiMapper.getInstance().deserialize(await Boss.load(decrypted));
                     let result = binder.result;
@@ -601,7 +611,7 @@ network.HttpClient = class {
             this.httpClient_.__command(reqId, paramsBin);
         };
 
-        execCommand();
+        await execCommand();
 
     }
 
