@@ -117,7 +117,7 @@ class UBotSession {
         } while (votes.keys.length < quorum);
 
         // register contract
-        await this.client.register(packed);
+        return await this.client.register(packed);
     }
 
     async close() {

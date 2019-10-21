@@ -17,7 +17,6 @@ const ItemState = require("itemstate").ItemState;
 const cs = require("contractsservice");
 const roles = require('roles');
 const Constraint = require('constraint').Constraint;
-const permissions = require('permissions');
 const BigDecimal  = require("big").Big;
 const t = require("tools");
 
@@ -625,11 +624,8 @@ unit.test("ubot_pro_test: lottery", async () => {
         payment.registerRole(new roles.SimpleRole("owner", userKey, payment));
         payment.registerRole(new roles.RoleLink("creator", "owner", payment));
 
-        // change owner permission
-        let chown = new roles.RoleLink("@change_owner_role", "owner", payment);
-        let chownPerm = new permissions.ChangeOwnerPermission(chown);
-        payment.definition.addPermission(chownPerm);
-
+        await payment.seal();
+        await payment.addSignatureToSeal(userKey);
         await tokenContract.seal();
 
         userKeys.push(userKey);

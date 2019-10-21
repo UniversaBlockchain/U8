@@ -84,6 +84,9 @@ static unordered_set<string> validSourcesForRestrictedWorker = {
     "deltas.js",
     "buffer.js",
     "esprima.js",
+    "itemresult.js",
+    "itemstate.js",
+    "contractsservice.js",
     "ubot/ubot_tools.js"
 };
 

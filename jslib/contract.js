@@ -568,7 +568,7 @@ class Contract extends bs.BiSerializable {
         this.isSuitableForTestnet = false;
         this.isNeedVerifySealedKeys = false;
         this.sealedByKeys = new t.GenericMap();
-        this.effectiveKeys = new Map();
+        this.effectiveKeys = new t.GenericMap();
         this.keysToSignWith = new t.GenericSet();
         this.constraints = new Map();
         this.id = null;
@@ -1158,9 +1158,9 @@ class Contract extends bs.BiSerializable {
         // we won't check U contract
         if (!this.shouldBeU) {
             this.isSuitableForTestnet = true;
-            for (let key of this.effectiveKeys) {
+            for (let key of this.effectiveKeys.keys()) {
                 if (key != null) {
-                    if (key.bitStrength != 2048) {
+                    if (key.bitStrength !== 2048) {
                         this.isSuitableForTestnet = false;
                         if (this.limitedForTestnet) {
                             res = false;
@@ -2197,14 +2197,14 @@ class Contract extends bs.BiSerializable {
                 for(let packed of payload.revoking) {
                     let c = await Contract.fromSealedBinary(packed,transactionPack);
                     result.revokingItems.add(c);
-                    transactionPack.addSubItem(c);
+                    transactionPack.subItems.set(c.id, c);
                 }
 
             if(payload.hasOwnProperty("new"))
                 for(let packed of payload.new) {
                     let c = await Contract.fromSealedBinary(packed,transactionPack);
                     result.newItems.add(c);
-                    transactionPack.addSubItem(c);
+                    transactionPack.subItems.set(c.id, c);
                 }
         } else {
             if(payload.hasOwnProperty("revoking"))

@@ -1,6 +1,7 @@
 const BigDecimal = require("big").Big;
 const roles = require('roles');
 const Constraint = require('constraint').Constraint;
+const ItemState = require("itemstate").ItemState;
 const ut = require("ubot/ubot_tools");
 
 async function buyTicket(packedPayment, userKey) {
@@ -30,7 +31,9 @@ async function buyTicket(packedPayment, userKey) {
         return {error: "Invalid payment constraint: refUbotRegistry"};
 
     // register ticket payment contract
-    // await registerContract(packedPayment);
+    let ir = await registerContract(packedPayment);
+    if (ir.state !== ItemState.APPROVED.val)
+        return {error: "Payment contract is not registered, item state: " + ir.state};
 
     // get storage
     let storage = await getSingleStorage();

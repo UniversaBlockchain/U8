@@ -802,9 +802,9 @@ class QuorumVoteRole extends Role {
         if (!Object.getPrototypeOf(QuorumVoteRole.prototype).isAllowedForKeys.call(this, keys))
             return false;
 
-        let idx = source.indexOf(".");
-        let from = source.substring(0, idx);
-        let what = source.substring(idx + 1);
+        let idx = this.source.indexOf(".");
+        let from = this.source.substring(0, idx);
+        let what = this.source.substring(idx + 1);
         let fromContract = null;
         if (from === "this")
             fromContract = this.contract;
@@ -885,7 +885,8 @@ const RoleExtractor = {
                 extracted.forEach(e => result.add(e));
             });
             return result;
-        }
+        } else
+            return new t.GenericSet();
     },
 
     extractAddresses : function (role) {
@@ -900,7 +901,8 @@ const RoleExtractor = {
                 extracted.forEach(e => result.add(e));
             });
             return result;
-        }
+        } else
+            return new t.GenericSet();
     }
 };
 

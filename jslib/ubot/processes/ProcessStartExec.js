@@ -539,7 +539,7 @@ class ProcessStartExec extends ProcessBase {
 
     async registerContract(contract, initiateLongVote = true) {
         try {
-            await this.pr.session.registerContract(contract, initiateLongVote, this.pr.requestContract);
+            return await this.pr.session.registerContract(contract, initiateLongVote, this.pr.requestContract);
 
         } catch (err) {
             this.pr.logger.log("Error register contract: " + err.message);
