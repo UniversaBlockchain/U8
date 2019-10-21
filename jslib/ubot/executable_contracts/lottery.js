@@ -114,18 +114,76 @@ async function getRandom(max) {
     randomHash.digest.forEach(byte => bigRandom = bigRandom.mul(256).add(byte));
 
     let result = Number.parseInt(bigRandom.mod(max).toFixed());
-    singleStorage.winner = result;
+    singleStorage.winTicket = result;
 
     await writeSingleStorage(singleStorage);
 
     return result;
 }
 
-async function raffle() {
-    // get tickets number
+// from ContractsService
+async function createSplitJoin(contractsToJoin, amountsToSplit, addressesToSplit, ownerKeys, fieldName) {
+    let contract = null;
+    let sum = new BigDecimal(0);
+    for (let c of contractsToJoin) {
+        if (contract == null) {
+            contract = c;
+            contract = await contract.createRevision(ownerKeys);
+        } else
+            contract.revokingItems.add(c);
 
-    let winner = await getRandom(tickets);
+        if (c.state.data[fieldName] == null)
+            throw new ex.IllegalArgumentError("createSplitJoin: not found field state.data." + fieldName);
+
+        sum = sum.add(new BigDecimal(c.state.data[fieldName]));
+    }
+
+    let parts = [];
+    if (amountsToSplit != null && amountsToSplit.length > 0 && addressesToSplit != null && addressesToSplit.length > 0) {
+        parts = await contract.split(amountsToSplit.length);
+        for (let i = 0; i < parts.length; i++) {
+            sum = sum.sub(new BigDecimal(amountsToSplit[i]));
+            parts[i].registerRole(new roles.SimpleRole("owner", addressesToSplit[i]));
+            parts[i].state.data[fieldName] = new BigDecimal(amountsToSplit[i]).toFixed();
+
+            await parts[i].seal();
+        }
+    }
+
+    contract.state.data[fieldName] = sum.toFixed();
+    await contract.seal(true);
+
+    return [contract].concat(parts);
+}
+
+async function raffle() {
+    let result = {};
+
+    // get storage
+    let storage = await getSingleStorage();
+
+    result.winTicket = await getRandom(storage.tickets);
+
+    // join prize
+    let payments = await Promise.all(storage.payments.map(payment => Contract.fromPackedTransaction(payment)));
+    let prize = (await createSplitJoin(payments, null, null, null, "amount"))[0];
+
+    // make as pool contract revision (synchronize state.createdAt and set creator to QuorumVoteRole)
+    prize = await Contract.fromPackedTransaction(await preparePoolRevision(await prize.getPackedTransaction()));
 
     // transfer prize to winner key
+    prize.registerRole(new roles.SimpleRole("owner", storage.userKeys[result.winTicket], prize));
+    await prize.seal(true);
 
+    storage.prizeContract = result.prizeContract = await sealAndGetPackedTransactionByPool(await prize.getPackedTransaction());
+
+    // save prize contract to storage
+    await writeSingleStorage(storage);
+
+    // register prize contract
+    // let ir = await registerContract(result.prizeContract);
+    // if (ir.state !== ItemState.APPROVED.val)
+    //     return {error: "Prize contract is not registered, item state: " + ir.state};
+
+    return result;
 }

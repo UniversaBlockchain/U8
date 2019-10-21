@@ -125,7 +125,7 @@ async function createJoin(contract1, contract2, fieldName, keys) {
  *
  * @param {Iterable<Contract>} contractsToJoin - One or more contracts to join into main contract.
  * @param {Array<number | string | BigDecimal>} amountsToSplit - Array contains one or more amounts to split from main contract.
- * @param {Iterable<crypto.KeyAddress>} addressesToSplit - Addresses the ownership of splitted parts will be transferred to.
+ * @param {Array<crypto.KeyAddress>} addressesToSplit - Addresses the ownership of splitted parts will be transferred to.
  * @param {Iterable<crypto.PrivateKey> | null} ownerKeys - Owner keys of joined contracts.
  * @param {string} fieldName - Name of field that should be join by.
  * @return {Array<Contract>} list of contracts containing main contract followed by splitted parts.
@@ -146,13 +146,16 @@ async function createSplitJoin(contractsToJoin, amountsToSplit, addressesToSplit
         sum = sum.add(new BigDecimal(c.state.data[fieldName]));
     }
 
-    let parts = await contract.split(amountsToSplit.length);
-    for (let i = 0; i < parts.length; i++) {
-        sum = sum.sub(new BigDecimal(amountsToSplit[i]));
-        parts[i].registerRole(new roles.SimpleRole("owner", addressesToSplit[i]));
-        parts[i].state.data[fieldName] = new BigDecimal(amountsToSplit[i]).toFixed();
+    let parts = [];
+    if (amountsToSplit != null && amountsToSplit.length > 0 && addressesToSplit != null && addressesToSplit.length > 0) {
+        parts = await contract.split(amountsToSplit.length);
+        for (let i = 0; i < parts.length; i++) {
+            sum = sum.sub(new BigDecimal(amountsToSplit[i]));
+            parts[i].registerRole(new roles.SimpleRole("owner", addressesToSplit[i]));
+            parts[i].state.data[fieldName] = new BigDecimal(amountsToSplit[i]).toFixed();
 
-        await parts[i].seal();
+            await parts[i].seal();
+        }
     }
 
     contract.state.data[fieldName] = sum.toFixed();

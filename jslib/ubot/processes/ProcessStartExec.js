@@ -63,6 +63,18 @@ class ProcessStartExec extends ProcessBase {
         }));
     }
     
+    function preparePoolRevision(contract) {
+        return new Promise(resolve => wrkInner.farcall("preparePoolRevision", [contract], {}, ans => {
+            resolve(ans);
+        }));
+    }
+    
+    function sealAndGetPackedTransactionByPool(contract) {
+        return new Promise(resolve => wrkInner.farcall("sealAndGetPackedTransactionByPool", [contract], {}, ans => {
+            resolve(ans);
+        }));
+    }
+    
     function getRequestContract() {
         return new Promise(resolve => wrkInner.farcall("getRequestContract", [], {}, ans => {
             resolve(ans);
@@ -154,6 +166,14 @@ class ProcessStartExec extends ProcessBase {
 
                 this.pr.worker.export["createPoolContract"] = async (args, kwargs) => {
                     return await this.createPoolContract();
+                };
+
+                this.pr.worker.export["preparePoolRevision"] = async (args, kwargs) => {
+                    return await this.preparePoolRevision(args[0]);
+                };
+
+                this.pr.worker.export["sealAndGetPackedTransactionByPool"] = async (args, kwargs) => {
+                    return await this.sealAndGetPackedTransactionByPool(args[0]);
                 };
 
                 this.pr.worker.export["getRequestContract"] = async (args, kwargs) => {
@@ -498,6 +518,7 @@ class ProcessStartExec extends ProcessBase {
 
         } catch (err) {
             this.pr.logger.log("Error get data from single-storage: " + err.message);
+            this.pr.logger.log(err.stack);
             this.pr.errors.push(new ErrorRecord(Errors.FAILURE, "getSingleStorage",
                 "Error get data from single-storage: " + err.message));
             this.pr.changeState(UBotPoolState.FAILED);
@@ -529,6 +550,7 @@ class ProcessStartExec extends ProcessBase {
 
         } catch (err) {
             this.pr.logger.log("Error get data from multi-storage: " + err.message);
+            this.pr.logger.log(err.stack);
             this.pr.errors.push(new ErrorRecord(Errors.FAILURE, "getMultiStorage",
                 "Error get data from multi-storage: " + err.message));
             this.pr.changeState(UBotPoolState.FAILED);
@@ -543,6 +565,7 @@ class ProcessStartExec extends ProcessBase {
 
         } catch (err) {
             this.pr.logger.log("Error register contract: " + err.message);
+            this.pr.logger.log(err.stack);
             this.pr.errors.push(new ErrorRecord(Errors.FAILURE, "registerContract",
                 "Error register contract: " + err.message));
             this.pr.changeState(UBotPoolState.FAILED);
@@ -583,7 +606,7 @@ class ProcessStartExec extends ProcessBase {
             chownPerm.id = this.pr.prng.randomString(6);
             c.definition.addPermission(chownPerm);
 
-            // constraint refUbotRegistry
+            // constraint for UBotNet registry contract
             let constr = new Constraint(c);
             constr.name = "refUbotRegistry";
             constr.type = Constraint.TYPE_EXISTING_DEFINITION;
@@ -599,8 +622,69 @@ class ProcessStartExec extends ProcessBase {
 
         } catch (err) {
             this.pr.logger.log("Error create pool contract: " + err.message);
+            this.pr.logger.log(err.stack);
             this.pr.errors.push(new ErrorRecord(Errors.FAILURE, "createPoolContract",
                 "Error create pool contract: " + err.message));
+            this.pr.changeState(UBotPoolState.FAILED);
+
+            throw err;
+        }
+    }
+
+    async sealPoolContract(contract) {
+        // random salt for seal (common for pool)
+        contract.ubot_pool_random_salt = this.pr.prng.randomBytes(12);
+
+        await contract.seal(true);
+        delete contract.ubot_pool_random_salt;
+
+        return await contract.getPackedTransaction();
+    }
+
+    async preparePoolRevision(packedTransaction) {
+        try {
+            let contract = await Contract.fromPackedTransaction(packedTransaction);
+
+            let created = this.pr.requestContract.definition.createdAt;
+            created.setMilliseconds(0);
+            contract.state.createdAt = created;
+
+            contract.registerRole(new roles.QuorumVoteRole("creator", "refUbotRegistry.state.roles.ubots",
+                ut.getRequestQuorumSize(this.pr.requestContract).toString(), contract));
+
+            // constraint for UBotNet registry contract
+            contract.createTransactionalSection();
+            let constr = new Constraint(contract);
+            constr.name = "refUbotRegistry";
+            constr.type = Constraint.TYPE_TRANSACTIONAL;
+            let conditions = {};
+            conditions[Constraint.conditionsModeType.all_of] = ["ref.tag == \"universa:ubot_registry_contract\""];
+            constr.setConditions(conditions);
+            contract.addConstraint(constr);
+
+            return await this.sealPoolContract(contract);
+
+        } catch (err) {
+            this.pr.logger.log("Error prepare contract revision to pool registration: " + err.message);
+            this.pr.logger.log(err.stack);
+            this.pr.errors.push(new ErrorRecord(Errors.FAILURE, "preparePoolRevision",
+                "Error prepare contract revision to pool registration: " + err.message));
+            this.pr.changeState(UBotPoolState.FAILED);
+
+            throw err;
+        }
+    }
+
+    async sealAndGetPackedTransactionByPool(packedTransaction) {
+        try {
+            let contract = await Contract.fromPackedTransaction(packedTransaction);
+            return await this.sealPoolContract(contract);
+
+        } catch (err) {
+            this.pr.logger.log("Error seal contract by pool: " + err.message);
+            this.pr.logger.log(err.stack);
+            this.pr.errors.push(new ErrorRecord(Errors.FAILURE, "sealByPool",
+                "Error seal contract by pool: " + err.message));
             this.pr.changeState(UBotPoolState.FAILED);
 
             throw err;

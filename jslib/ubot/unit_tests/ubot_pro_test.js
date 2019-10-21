@@ -702,25 +702,25 @@ unit.test("ubot_pro_test: lottery", async () => {
     await cs.addConstraintToContract(raffleContract, lotteryContract, "executableContractConstraint",
         Constraint.TYPE_EXISTING_STATE, ["this.state.data.executable_contract_id == ref.id"], true);
 
-    // console.log("Raffle lottery...");
-    // let state = await ubotClient.executeCloudMethod(raffleContract, true);
-    //
-    // assert(state.state === UBotPoolState.FINISHED.val);
-    //
-    // // check raffle result
-    // assert(state.result.hasOwnProperty("winTicket") && state.result.prizeContract instanceof Uint8Array);
-    // assert(state.result.hasOwnProperty("prizeContract") && typeof state.result.winTicket === "number" &&
-    //        state.result.winTicket >= 0 && state.result.winTicket < TICKETS);
-    //
-    // // check prize contract
-    // let prizeContract = await Contract.fromPackedTransaction(state.result.prizeContract);
-    // assert(prizeContract.owner instanceof roles.SimpleRole);
-    //
-    // let keys = roles.RoleExtractor.extractKeys(prizeContract.owner);
-    // assert(keys.size === 1 && keys.has(userKeys[state.result.winTicket].publicKey));
-    //
-    // assert(prizeContract.getOrigin().equals(origin));
-    // assert(prizeContract.state.data.amount === "100");
+    console.log("Raffle lottery...");
+    let state = await ubotClient.executeCloudMethod(raffleContract, true);
+
+    assert(state.state === UBotPoolState.FINISHED.val);
+
+    // check raffle result
+    assert(state.result.hasOwnProperty("winTicket") && state.result.prizeContract instanceof Uint8Array);
+    assert(state.result.hasOwnProperty("prizeContract") && typeof state.result.winTicket === "number" &&
+           state.result.winTicket >= 0 && state.result.winTicket < TICKETS);
+
+    // check prize contract
+    let prizeContract = await Contract.fromPackedTransaction(state.result.prizeContract);
+    assert(prizeContract.roles.owner instanceof roles.SimpleRole);
+
+    let keys = roles.RoleExtractor.extractKeys(prizeContract.roles.owner);
+    assert(keys.size === 1 && keys.has(userKeys[state.result.winTicket].publicKey));
+
+    assert(prizeContract.getOrigin().equals(origin));
+    assert(prizeContract.state.data.amount === "100");
 
     // waiting pool finished...
     while (ubotMains.some(main => Array.from(main.ubot.processors.values()).some(proc => proc.state.canContinue)))

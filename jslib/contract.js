@@ -583,7 +583,11 @@ class Contract extends bs.BiSerializable {
             tpBackup = this.transactionPack;
 
         if (result.signatures.length === 0) {
-            if (this.state.data.hasOwnProperty("ubot_pool_random_salt") &&
+            if (this.hasOwnProperty("ubot_pool_random_salt") &&
+                this.ubot_pool_random_salt instanceof Uint8Array &&
+                this.ubot_pool_random_salt.length === 12)
+                result.salt = this.ubot_pool_random_salt;
+            else if (this.state.data.hasOwnProperty("ubot_pool_random_salt") &&
                 this.state.data.ubot_pool_random_salt instanceof Uint8Array &&
                 this.state.data.ubot_pool_random_salt.length === 12)
                 result.salt = this.state.data.ubot_pool_random_salt;
