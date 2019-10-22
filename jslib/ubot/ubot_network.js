@@ -193,6 +193,7 @@ class UBotNetwork {
         return await downloadEvent.await(UBotConfig.maxDownloadActualStorageResultTime);
     }
 
+    //return packed result for single
     async searchActualStorageResult(recordId, actualHash, multi) {
         let list = this.netConfig.toList();
 
@@ -229,7 +230,7 @@ class UBotNetwork {
                         };
 
                 } else if (actualHash.equals(crypto.HashId.of(result)))
-                    return await BossBiMapper.getInstance().deserialize(await Boss.load(result));
+                    return result;
             }
         }
 

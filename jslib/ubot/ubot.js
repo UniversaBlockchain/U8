@@ -130,13 +130,9 @@ class UBot {
     }
 
     async getStorageResultByRecordId(recordId, multi, ubotNumber = undefined) {
-        let result = this.resultCache.get(recordId, ubotNumber);
-        if (result == null) {
-            if (multi)
-                result = await this.ledger.getMultiStorageDataByRecordId(recordId, ubotNumber);
-            else
-                result = await this.ledger.getSingleStorageDataByRecordId(recordId);
-        }
+        let result = await this.getStoragePackedResultByRecordId(recordId, multi, ubotNumber);
+        if (result == null)
+            return null;
 
         return await BossBiMapper.getInstance().deserialize(await Boss.load(result));
     }

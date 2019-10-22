@@ -9,6 +9,7 @@ const UBotProcess_writeSingleStorage = require("ubot/processes/UBotProcess_write
 const UBotProcess_writeMultiStorage = require("ubot/processes/UBotProcess_writeMultiStorage").UBotProcess_writeMultiStorage;
 const UBotProcess_call = require("ubot/processes/UBotProcess_call").UBotProcess_call;
 const ScheduleExecutor = require("executorservice").ScheduleExecutor;
+const BossBiMapper = require("bossbimapper").BossBiMapper;
 const t = require("tools");
 const ut = require("ubot/ubot_tools");
 const ErrorRecord = require("errors").ErrorRecord;
@@ -511,10 +512,21 @@ class ProcessStartExec extends ProcessBase {
 
             let result = await this.pr.ubot.getStoragePackedResultByRecordId(recordId, false);
 
-            if (result != null && actualHash.equals(crypto.HashId.of(result)))
-                return await Boss.load(result);
+            if (result == null || !actualHash.equals(crypto.HashId.of(result))) {
+                result = await this.pr.ubot.network.searchActualStorageResult(recordId, actualHash, false);
 
-            return await this.pr.ubot.network.searchActualStorageResult(recordId, actualHash, false);
+                if (result == null)
+                    return null;
+
+                this.pr.ubot.resultCache.put(recordId, result);
+
+                new ScheduleExecutor(async () => {
+                    await this.pr.ledger.writeToSingleStorage(this.pr.executableContract.id, "default",
+                        result, crypto.HashId.of(result), recordId);
+                }, 0, this.pr.ubot.executorService).run();
+            }
+
+            return await BossBiMapper.getInstance().deserialize(await Boss.load(result));
 
         } catch (err) {
             this.pr.logger.log("Error get data from single-storage: " + err.message);
