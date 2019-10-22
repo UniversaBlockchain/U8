@@ -3,7 +3,6 @@
  */
 
 import {expect, assert, unit} from 'test'
-import {SimpleRole, ListRole, ListRoleMode} from 'roles'
 import {KeyAddress, PublicKey, HashId} from 'crypto'
 import * as tk from "unit_tests/test_keys";
 import * as io from "io";
@@ -21,6 +20,7 @@ const BigDecimal  = require("big").Big;
 const t = require("tools");
 
 const TOPOLOGY_ROOT = "../jslib/ubot/topology/";
+const TOPOLOGY_FILE = "universa.pro.json";          //test_node_config_v2.json
 const CONFIG_ROOT = "../test/config/ubot_config";
 const TEST_CONTRACTS_PATH = "../jslib/ubot/executable_contracts/";
 const ubotsCount = 30;
@@ -136,7 +136,7 @@ async function generateSimpleRegisterRequestContract(executableContract, contrac
 //
 //     let ubotMains = await createUBots(ubotsCount);
 //     for (let i = 0; i < 10; i++) {
-//         let ubotClient = await new UBotClient(clientKey, TOPOLOGY_ROOT + "universa.pro.json").start();
+//         let ubotClient = await new UBotClient(clientKey, TOPOLOGY_ROOT + TOPOLOGY_FILE).start();
 //
 //         let executableContract = await generateSecureRandomExecutableContract();
 //
@@ -195,7 +195,7 @@ async function generateSimpleRegisterRequestContract(executableContract, contrac
 // });
 
 unit.test("ubot_pro_test: start client", async () => {
-    let ubotClient = await new UBotClient(clientKey, TOPOLOGY_ROOT + "universa.pro.json").start();
+    let ubotClient = await new UBotClient(clientKey, TOPOLOGY_ROOT + TOPOLOGY_FILE).start();
 
     await ubotClient.shutdown();
 });
@@ -207,7 +207,7 @@ unit.test("ubot_pro_test: start cloud method", async () => {
     // for (let i = 0; i < 10; i++) {
     // console.error("Iteration = " + i);
 
-    let ubotClient = await new UBotClient(clientKey, TOPOLOGY_ROOT + "universa.pro.json").start();
+    let ubotClient = await new UBotClient(clientKey, TOPOLOGY_ROOT + TOPOLOGY_FILE).start();
 
     let executableContract = await generateSecureRandomExecutableContract();
     let requestContract = await generateSecureRandomRequestContract(executableContract);
@@ -268,7 +268,7 @@ unit.test("ubot_pro_test: execute cloud method", async () => {
     // for (let i = 0; i < 10; i++) {
     // console.error("Iteration = " + i);
 
-    let ubotClient = await new UBotClient(clientKey, TOPOLOGY_ROOT + "universa.pro.json").start();
+    let ubotClient = await new UBotClient(clientKey, TOPOLOGY_ROOT + TOPOLOGY_FILE).start();
 
     let executableContract = await generateSecureRandomExecutableContract();
     let requestContract = await generateSecureRandomRequestContract(executableContract);
@@ -293,7 +293,7 @@ unit.test("ubot_pro_test: execute cloud method", async () => {
 
 // unit.test("ubot_pro_test: full quorum", async () => {
 //     let ubotMains = await createUBots(ubotsCount);
-//     let ubotClient = await new UBotClient(clientKey, TOPOLOGY_ROOT + "universa.pro.json").start();
+//     let ubotClient = await new UBotClient(clientKey, TOPOLOGY_ROOT + TOPOLOGY_FILE).start();
 //
 //     //ubotMains.forEach(main => main.ubot.network.verboseLevel = VerboseLevel.BASE);
 //
@@ -355,7 +355,7 @@ unit.test("ubot_pro_test: register contract", async () => {
     await simpleContract.seal();
     let packedSimpleContract = await simpleContract.getPackedTransaction();
 
-    let ubotClient = await new UBotClient(clientKey, TOPOLOGY_ROOT + "universa.pro.json").start();
+    let ubotClient = await new UBotClient(clientKey, TOPOLOGY_ROOT + TOPOLOGY_FILE).start();
 
     let executableContract = await generateSimpleRegisterExecutableContract("simpleRegister.js");
     let requestContract = await generateSimpleRegisterRequestContract(executableContract, packedSimpleContract);
@@ -384,7 +384,7 @@ unit.test("ubot_pro_test: register contract", async () => {
 unit.test("ubot_pro_test: create and register contract", async () => {
     let ubotMains = await createUBots(ubotsCount);
 
-    let ubotClient = await new UBotClient(clientKey, TOPOLOGY_ROOT + "universa.pro.json").start();
+    let ubotClient = await new UBotClient(clientKey, TOPOLOGY_ROOT + TOPOLOGY_FILE).start();
 
     let executableContract = await generateSimpleRegisterExecutableContract("createAndRegister.js");
     let requestContract = await generateSimpleRegisterRequestContract(executableContract);
@@ -414,7 +414,7 @@ unit.test("ubot_pro_test: create and register contract", async () => {
 
 unit.test("ubot_pro_test: 2 cloud method", async () => {
     let ubotMains = await createUBots(ubotsCount);
-    let ubotClient = await new UBotClient(clientKey, TOPOLOGY_ROOT + "universa.pro.json").start();
+    let ubotClient = await new UBotClient(clientKey, TOPOLOGY_ROOT + TOPOLOGY_FILE).start();
 
     let executableContract = await generateSecureRandomExecutableContract();
     let requestContract = await generateSecureRandomRequestContract(executableContract);
@@ -525,7 +525,7 @@ unit.test("ubot_pro_test: parallel cloud methods", async () => {
     for (let i = 0; i < 2; i++)
         promises.push(new Promise(async (resolve, reject) => {
             try {
-                let ubotClient = await new UBotClient(clientKey, TOPOLOGY_ROOT + "universa.pro.json").start();
+                let ubotClient = await new UBotClient(clientKey, TOPOLOGY_ROOT + TOPOLOGY_FILE).start();
                 let results = [];
 
                 for (let x = 0; x < 2; x++) {
@@ -595,10 +595,10 @@ unit.test("ubot_pro_test: parallel cloud methods", async () => {
 
 unit.test("ubot_pro_test: lottery", async () => {
     let ubotMains = await createUBots(ubotsCount);
-    let ubotClient = await new UBotClient(clientKey, TOPOLOGY_ROOT + "universa.pro.json").start();
+    let ubotClient = await new UBotClient(clientKey, TOPOLOGY_ROOT + TOPOLOGY_FILE).start();
 
     // init ubot-client (client key in whitelist)
-    ubotMains[0].ubot.client = await new UBotClient(ubotMains[0].ubot.nodeKey, TOPOLOGY_ROOT + "universa.pro.json", null, ubotMains[0].ubot.logger).start();
+    ubotMains[0].ubot.client = await new UBotClient(ubotMains[0].ubot.nodeKey, TOPOLOGY_ROOT + TOPOLOGY_FILE, null, ubotMains[0].ubot.logger).start();
 
     const TICKETS = 10;
 

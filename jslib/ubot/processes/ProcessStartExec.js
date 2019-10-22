@@ -51,8 +51,8 @@ class ProcessStartExec extends ProcessBase {
         }));
     }
     
-    function registerContract(contract, initiateLongVote = true) {
-        return new Promise(resolve => wrkInner.farcall("registerContract", [contract, initiateLongVote], {}, ans => {
+    function registerContract(contract) {
+        return new Promise(resolve => wrkInner.farcall("registerContract", [contract], {}, ans => {
             resolve(ans);
         }));
     }
@@ -161,7 +161,7 @@ class ProcessStartExec extends ProcessBase {
                 };
 
                 this.pr.worker.export["registerContract"] = async (args, kwargs) => {
-                    return await this.registerContract(args[0], args[1]);
+                    return await this.registerContract(args[0]);
                 };
 
                 this.pr.worker.export["createPoolContract"] = async (args, kwargs) => {
@@ -559,9 +559,9 @@ class ProcessStartExec extends ProcessBase {
         }
     }
 
-    async registerContract(contract, initiateLongVote = true) {
+    async registerContract(contract) {
         try {
-            return await this.pr.session.registerContract(contract, initiateLongVote, this.pr.requestContract);
+            return await this.pr.session.registerContract(contract, this.pr.requestContract);
 
         } catch (err) {
             this.pr.logger.log("Error register contract: " + err.message);

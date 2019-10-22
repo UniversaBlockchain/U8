@@ -10,7 +10,7 @@ async function register(packedContract) {
     //     console.error("register ERR stack: " + err.stack);
     // }
 
-    await registerContract(packedContract, false);
+    await registerContract(packedContract);
 
     return packedContract;
 }

@@ -20,6 +20,7 @@ const clientKey = tk.TestKeys.getKey();
 const userPrivKey = tk.TestKeys.getKey();
 
 const TOPOLOGY_ROOT = "../jslib/ubot/topology/";
+const TOPOLOGY_FILE = "universa.pro.json";          //test_node_config_v2.json
 const ubotsCount = 30;
 
 async function prepareConfigFiles(count) {
@@ -144,7 +145,7 @@ async function shutdownUBots(ubots) {
 
 unit.test("ubot_commands_test: executeCloudMethod", async () => {
     let ubotMains = await createUBots(ubotsCount);
-    let ubotClient = await new UBotClient(clientKey, TOPOLOGY_ROOT + "universa.pro.json").start();
+    let ubotClient = await new UBotClient(clientKey, TOPOLOGY_ROOT + TOPOLOGY_FILE).start();
 
     let executableContract = Contract.fromPrivateKey(userPrivKey);
 
@@ -220,7 +221,7 @@ unit.test("ubot_commands_test: executeCloudMethod", async () => {
 
 unit.test("ubot_commands_test: generateRandomHash", async () => {
     let ubotMains = await createUBots(ubotsCount);
-    let ubotClient = await new UBotClient(clientKey, TOPOLOGY_ROOT + "universa.pro.json").start();
+    let ubotClient = await new UBotClient(clientKey, TOPOLOGY_ROOT + TOPOLOGY_FILE).start();
 
     let executableContract = Contract.fromPrivateKey(userPrivKey);
 
@@ -297,7 +298,7 @@ unit.test("ubot_commands_test: generateRandomHash", async () => {
 
 unit.test("ubot_commands_test: errorOutput", async () => {
     let ubotMains = await createUBots(ubotsCount);
-    let ubotClient = await new UBotClient(clientKey, TOPOLOGY_ROOT + "universa.pro.json").start();
+    let ubotClient = await new UBotClient(clientKey, TOPOLOGY_ROOT + TOPOLOGY_FILE).start();
 
     let executableContract = Contract.fromPrivateKey(userPrivKey);
 
@@ -376,7 +377,7 @@ unit.test("ubot_commands_test: errorOutput", async () => {
 
 unit.test("ubot_commands_test: multi-verify method", async () => {
     let ubotMains = await createUBots(ubotsCount);
-    let ubotClient = await new UBotClient(clientKey, TOPOLOGY_ROOT + "universa.pro.json").start();
+    let ubotClient = await new UBotClient(clientKey, TOPOLOGY_ROOT + TOPOLOGY_FILE).start();
 
     let executableContract = Contract.fromPrivateKey(userPrivKey);
 
@@ -463,7 +464,7 @@ unit.test("ubot_commands_test: multi-verify method", async () => {
 
 unit.test("ubot_commands_test: multi-verify method failed", async () => {
     let ubotMains = await createUBots(ubotsCount);
-    let ubotClient = await new UBotClient(clientKey, TOPOLOGY_ROOT + "universa.pro.json").start();
+    let ubotClient = await new UBotClient(clientKey, TOPOLOGY_ROOT + TOPOLOGY_FILE).start();
 
     let executableContract = Contract.fromPrivateKey(userPrivKey);
 
@@ -552,7 +553,7 @@ unit.test("ubot_commands_test: multi-verify method failed", async () => {
 
 unit.test("ubot_commands_test: call sub-method", async () => {
     let ubotMains = await createUBots(ubotsCount);
-    let ubotClient = await new UBotClient(clientKey, TOPOLOGY_ROOT + "universa.pro.json").start();
+    let ubotClient = await new UBotClient(clientKey, TOPOLOGY_ROOT + TOPOLOGY_FILE).start();
 
     let executableContract = Contract.fromPrivateKey(userPrivKey);
 
@@ -644,7 +645,7 @@ unit.test("ubot_commands_test: call sub-method", async () => {
 
 /*unit.test("ubot_commands_test: secureRandom", async () => {
     let ubotMains = await createUBots(ubotsCount);
-    let ubotClient = await new UBotClient(clientKey, TOPOLOGY_ROOT + "universa.pro.json").start();
+    let ubotClient = await new UBotClient(clientKey, TOPOLOGY_ROOT + TOPOLOGY_FILE).start();
 
     let executableContract = Contract.fromPrivateKey(userPrivKey);
 
@@ -795,7 +796,7 @@ unit.test("ubot_commands_test: call sub-method", async () => {
 
 unit.test("ubot_commands_test: getDataByRecordId", async () => {
     let ubotMains = await createUBots(ubotsCount);
-    let ubotClient = await new UBotClient(clientKey, TOPOLOGY_ROOT + "universa.pro.json").start();
+    let ubotClient = await new UBotClient(clientKey, TOPOLOGY_ROOT + TOPOLOGY_FILE).start();
 
     let executableContract = Contract.fromPrivateKey(userPrivKey);
 

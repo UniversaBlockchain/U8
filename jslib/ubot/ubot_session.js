@@ -95,14 +95,14 @@ class UBotSession {
         return result.current[storageName];
     }
 
-    async registerContract(packed, initiateLongVote, requestContract) {
+    async registerContract(packed, requestContract) {
         let contract = await Contract.fromPackedTransaction(packed);
 
         if (this.ubot != null)
             this.ubot.logger.log("registerContract... Contract.id = " + contract.id);
 
-        if (initiateLongVote)
-            await this.client.askSessionOnAllNodes("initiateVote", {packedItem: contract.sealedBinary});
+        // if (initiateLongVote)
+        //     await this.client.askSessionOnAllNodes("initiateVote", {packedItem: contract.sealedBinary});
         await this.client.askSessionOnAllNodes("voteForContract", {itemId: contract.id});
 
         let quorum = ut.getRequestQuorumSize(requestContract);
