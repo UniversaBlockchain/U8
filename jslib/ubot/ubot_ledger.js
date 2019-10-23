@@ -239,8 +239,8 @@ class UBotLedger {
                                         record_id: crypto.HashId.withDigest(rows[i][0]),
                                         storage_data: rows[i][1],
                                         hash: crypto.HashId.withDigest(rows[i][2]),
-                                        ubot_number: Number(rows[i][3]),
-                                        storage_ubots: rows[i][4]
+                                        ubot_number: Number(rows[i][3])
+                                        //storage_ubots: rows[i][4]
                                     });
                         }
 
@@ -250,7 +250,7 @@ class UBotLedger {
                         con.release();
                         reject(e);
                     },
-                    "SELECT record_id, storage_data, hash, ubot_number, storage_ubots FROM multi_records JOIN storage " +
+                    "SELECT record_id, storage_data, hash, ubot_number FROM multi_records JOIN storage " +
                     "ON multi_records.storage_id = storage.id WHERE executable_contract_id = ? AND storage_name = ? AND storage_type = ?",
                     executable_contract_id.digest,
                     storage_name,
@@ -281,8 +281,8 @@ class UBotLedger {
                                     result.push({
                                         storage_data: rows[i][0],
                                         hash: crypto.HashId.withDigest(rows[i][1]),
-                                        ubot_number: Number(rows[i][2]),
-                                        storage_ubots: rows[i][3]
+                                        ubot_number: Number(rows[i][2])
+                                        //storage_ubots: rows[i][3]
                                     });
                         }
 
@@ -292,7 +292,7 @@ class UBotLedger {
                         con.release();
                         reject(e);
                     },
-                    "SELECT storage_data, hash, ubot_number, storage_ubots FROM multi_records WHERE record_id = ?",
+                    "SELECT storage_data, hash, ubot_number FROM multi_records WHERE record_id = ?",
                     recordId.digest
                 );
             });

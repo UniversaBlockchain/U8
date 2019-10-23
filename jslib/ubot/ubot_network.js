@@ -10,7 +10,6 @@ import {AsyncEvent} from "executorservice";
 const Boss = require("boss.js");
 const BossStreams = require('boss_streams.js');
 const UBotConfig = require("ubot/ubot_config").UBotConfig;
-const BossBiMapper = require("bossbimapper").BossBiMapper;
 
 class UBotNetwork {
 
@@ -193,7 +192,6 @@ class UBotNetwork {
         return await downloadEvent.await(UBotConfig.maxDownloadActualStorageResultTime);
     }
 
-    //return packed result for single
     async searchActualStorageResult(recordId, actualHash, multi) {
         let list = this.netConfig.toList();
 
@@ -209,28 +207,17 @@ class UBotNetwork {
             if (result != null) {
                 // check result hash
                 if (multi) {
-                    result = await BossBiMapper.getInstance().deserialize(await Boss.load(result));
+                    result = await Boss.load(result);
 
-                    let results = [];
-                    let ubots = [];
-                    let concat = new Uint8Array(Object.keys(result).length * 96);
-
-                    Object.keys(result).forEach((ubot, i) => {
-                        results.push(result[ubot]);
-                        ubots.push(Number(ubot));
-                        concat.set(crypto.HashId.of(result[ubot]).digest, i * 96);
-                    });
-
+                    let concat = new Uint8Array(result.length * 96);
+                    result.forEach((item, i) => concat.set(crypto.HashId.of(item.result).digest, i * 96));
                     let resultHash = crypto.HashId.of(concat);
 
                     if (actualHash.equals(resultHash))
-                        return {
-                            records: results,
-                            ubots: ubots
-                        };
+                        return result;      //return array with packed results and ubot numbers for multi
 
                 } else if (actualHash.equals(crypto.HashId.of(result)))
-                    return result;
+                    return result;          //return packed result for single
             }
         }
 

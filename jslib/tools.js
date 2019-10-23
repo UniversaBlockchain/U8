@@ -503,13 +503,18 @@ function dumpObj(obj, prefix = "") {
         console.log(obj);
 }
 
-function secureStringify(obj) {
+function secureStringify(obj, maxLength = undefined) {
     let message = null;
     try {
         message = JSON.stringify(obj);
     } catch (err) {
         message = "Not stringified";
     }
+
+    if (maxLength != null && typeof maxLength === "number" && message.length > maxLength) {
+        message = message.substring(0, maxLength) + "…";
+    }
+
     return message;
 }
 

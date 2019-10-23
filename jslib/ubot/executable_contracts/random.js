@@ -51,5 +51,8 @@ async function getRandom(max) {
 }
 
 async function readRandom() {
-    return (await getSingleStorage()).result;
+    return {
+        random: (await getSingleStorage()).result,
+        multi_data: await getMultiStorage()
+    };
 }

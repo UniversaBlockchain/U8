@@ -412,6 +412,25 @@ unit.test("ubot_pro_test: create and register contract", async () => {
     await shutdownUBots(ubotMains);
 });
 
+function checkRandomMultiData(multiData, random) {
+    let rands = [];
+    for (let r of multiData) {
+        if (r.hash !== crypto.HashId.of(r.rnd.toString()).base64)
+            return false;
+
+        rands.push(r.rnd.toString());
+    }
+    rands.sort();
+
+    let randomHash = crypto.HashId.of(rands.join());
+    let bigRandom = new BigDecimal(0);
+    randomHash.digest.forEach(byte => bigRandom = bigRandom.mul(256).add(byte));
+
+    let result = Number.parseInt(bigRandom.mod(1000).toFixed());
+
+    return result === random;
+}
+
 unit.test("ubot_pro_test: 2 cloud method", async () => {
     let ubotMains = await createUBots(ubotsCount);
     let ubotClient = await new UBotClient(clientKey, TOPOLOGY_ROOT + TOPOLOGY_FILE).start();
@@ -503,7 +522,9 @@ unit.test("ubot_pro_test: 2 cloud method", async () => {
 
     assert(states.filter(state =>
         state.state === UBotPoolState.FINISHED.val &&
-        state.result === first                           // checking read random value
+        state.result != null &&
+        state.result.random === first &&                                    // checking read random value
+        checkRandomMultiData(state.result.multi_data, state.result.random)  // checking multi-storage
     ).length >= executableContract.state.data.cloud_methods.getRandom.quorum.size);
 
     // waiting pool finished...

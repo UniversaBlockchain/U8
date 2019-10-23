@@ -4,7 +4,6 @@
 
 import * as network from "web";
 const Contract = require("contract").Contract;
-const BossBiMapper = require("bossbimapper").BossBiMapper;
 const HashId = require("crypto").HashId;
 const Boss = require('boss.js');
 const UBotPoolState = require("ubot/ubot_pool_state").UBotPoolState;
@@ -109,12 +108,18 @@ class UBotHttpServer extends network.HttpServer {
         let resultHash = null;
         if (multi) {
             let storageResults = await this.ubot.getRecordsFromMultiStorageByRecordId(recordId, true);
-            resultHash = storageResults.cortegeId;
+            if (storageResults != null) {
+                resultHash = storageResults.cortegeId;
 
-            // assume result (cortege)
-            result = {};
-            storageResults.records.forEach((record, i) => result[storageResults.ubots[i]] = record);
-            result = await Boss.dump(await BossBiMapper.getInstance().serialize(result));
+                // assume result (cortege)
+                result = [];
+                storageResults.records.forEach((record, i) => result.push({
+                    ubot_number: storageResults.ubots[i],
+                    result: record
+                }));
+
+                result = await Boss.dump(result);
+            }
         } else {
             result = await this.ubot.getStoragePackedResultByRecordId(recordId, false);
             if (result != null)

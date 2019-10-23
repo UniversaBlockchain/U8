@@ -498,7 +498,7 @@ class UBotClient {
             executableContract.state.data.cloud_methods[methodName].quorum.size == null)
             throw new UBotClientException("Error executable contract: quorum of starting cloud method is not defined in metadata (in state.data.cloud_methods)");
 
-        if (executableContract.state.data.js == null && executableContract.state.data.cloud_methods[methodName].ubotAsm == null)
+        if (executableContract.state.data.js == null)   // && executableContract.state.data.cloud_methods[methodName].ubotAsm == null)
             throw new UBotClientException("Error executable contract: executable contact JS-code is not defined");
     }
 

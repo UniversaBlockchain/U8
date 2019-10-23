@@ -164,7 +164,21 @@ class UBot {
     }
 
     async getRecordsFromMultiStorageByRecordId(recordId, packed = false) {
-        let records = await this.ledger.getRecordsFromMultiStorageByRecordId(recordId);
+        let records = this.resultCache.get(recordId);
+        if (records == null)
+            records = await this.ledger.getRecordsFromMultiStorageByRecordId(recordId);
+        else {
+            // convert cache Map to array similar to the one returned from the ledger
+            let results = [];
+            for (let [ubot_number, data] of records)
+                results.push({
+                    storage_data: data,
+                    hash: crypto.HashId.of(data),
+                    ubot_number: ubot_number
+                });
+
+            records = results;
+        }
 
         if (records.length === 0)
             return null;
