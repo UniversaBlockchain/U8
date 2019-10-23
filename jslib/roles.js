@@ -90,7 +90,7 @@ class Role extends bs.BiSerializable {
     }
 
     containConstraint(name) {
-        return (this.requiredAllConstraints.has(name) || this.requiredAnyConstraints.has(name));
+        return (this.requiredAllConstraints.has(name) || this.requiredAnyConstraints.has(name) || this.getSpecialConstraints().has(name));
     }
 
     /**
@@ -219,6 +219,13 @@ class Role extends bs.BiSerializable {
             result.comment = serializedRole.comment;
 
         return result;
+    }
+
+    /**
+     * Get names of {@link Constraint} that are not required but are used in voting.
+     */
+    getSpecialConstraints() {
+        return new Set();
     }
 }
 

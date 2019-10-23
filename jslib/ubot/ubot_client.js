@@ -527,21 +527,22 @@ class UBotClient {
     }
 
     /**
-    * Start cloud method.
-    * Requests the creation of a session with a randomly selected pool using the Request contract.
-    * Creates a session with the id of the Request contract or throws an exception if the session is already created
-    * for another Request contract under the same executable contract.
-    * Waits until the session is assigned an id and a pool is calculated from it.
-    * Then he asks for a contract with the registry and topology of UBots,
-    * connects to a random UBots from the pool on which he runs the cloud method.
-    *
-    * @param {Contract} requestContract - The Request contract.
-     *@param {boolean} waitPreviousSession - Wait finished previous session or return his and exit.
+     * Start cloud method.
+     * Requests the creation of a session with a randomly selected pool using the request contract. By default,
+     * сreates a session with the id of the Request contract or throws an exception if the session is already
+     * created for another Request contract under the same executable contract.
+     * If waitPreviousSession = true, then the method will wait until it is possible to create a session with its request id.
+     * Waits until the session is assigned an id and a pool is calculated from it.
+     * Then he asks for a contract with the registry and topology of UBots, connects to a random UBots from the pool on
+     * which he runs the cloud method.
+     *
+     * @param {Contract} requestContract - The Request contract.
+     * @param {boolean} waitPreviousSession - Wait finished previous session or return his and exit.
      *      If true - repeated attempts to start the cloud method after 1 second if the session is in OPERATIONAL mode or
      *      100 ms if the session is in CLOSING mode. By default - false.
-    * @async
-    * @return {UBotSession} session.
-    */
+     * @async
+     * @return {UBotSession} session.
+     */
     async startCloudMethod(requestContract, waitPreviousSession = false) {
         if (this.httpUbotClient != null)
             throw new UBotClientException("Ubot is connected to the pool. First disconnect from the pool");
@@ -728,6 +729,8 @@ class UBotClient {
     /**
      * Gets the current state of the cloud method, if the state is FINISHED,
      * then the result of the cloud method execution is in the returned data.
+     * If status “FAILED” means that the cloud method has completed with errors and
+     * errors can be viewed in the “errors” field of the result.
      *
      * @param {HashId} requestContractId - The Request contract id.
      * @param {number} ubotNumber - UBot number to request the current state.

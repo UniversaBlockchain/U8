@@ -1820,11 +1820,10 @@ class Constraint extends bs.BiSerializable {
         return constrs;
     }
 
-    /*getInternalConstraintsFromCondition(condition, iteration) {
-        return getInternalConstraintsFromCondition(parseCondition(condition), iteration);
-    }*/
-
     getInternalConstraintsFromCondition(condition, iteration) {
+        if (typeof condition === "string")
+            condition = this.parseCondition(condition);
+
         let constrs = new Set();
 
         let firstPointPos;
