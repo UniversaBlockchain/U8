@@ -864,6 +864,27 @@ class QuorumVoteRole extends Role {
 
         return minValidCount === 0;
     }
+
+    /**
+     * Get names of {@link Constraint} that are not required but are used in voting.
+     */
+    getSpecialConstraints() {
+        let constrs = new Set();
+
+        let sourceConstraint = this.source.substring(0, this.source.indexOf("."));
+        constrs.add(sourceConstraint);
+
+        // add internal constraints
+        let idx = this.source.indexOf(".");
+        let from = this.source.substring(0, idx);
+        if (!from.equals("this")) {
+            let constr = this.contract.constraints.get(from);
+            if (constr != null)
+                constrs.addAll(constr.getInternalConstraints());
+        }
+
+        return constrs;
+    }
 }
 
 dbm.DefaultBiMapper.registerAdapter(new bs.BiAdapter("RoleLink", RoleLink));

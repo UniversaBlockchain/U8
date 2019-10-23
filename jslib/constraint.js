@@ -1413,6 +1413,7 @@ class Constraint extends bs.BiSerializable {
      * @param {Contract} contract - Contract item to check for matching.
      * @param {Set<Contract>} contracts - Contracts list to check for matching.
      * @param {number} iteration - Iteration check inside constraints iteration number.
+     * @private
      * @return {boolean} true if match or false.
      * @throws Recursive checking constraint have more 16 iterations.
      */
@@ -1774,6 +1775,89 @@ class Constraint extends bs.BiSerializable {
             return result;
         } else
             throw new ex.IllegalArgumentError("Expected all_of or any_of");
+    }
+
+    getInternalConstraints(iteration = 0) {
+        if (iteration > 16)
+            throw new ex.IllegalArgumentError("Recursive checking constraints have more 16 iterations");
+
+        return this.getInternalConstraintsFromConditions(this.conditions, iteration);
+    }
+
+    getInternalConstraintsFromConditions(conditions = this.conditions, iteration) {
+        let constrs = new Set();
+
+        if ((conditions == null) || Object.entries(conditions).length === 0)
+            return constrs;
+
+        if (conditions.hasOwnProperty(Constraint.conditionsModeType.all_of)) {
+            let condList = conditions[Constraint.conditionsModeType.all_of];
+            if (condList == null)
+                throw new ex.IllegalArgumentError("Expected all_of conditions");
+
+            for (let item of condList)
+                if (typeof item === "string")
+                    constrs.add(this.getInternalConstraintsFromCondition(item, iteration));      // not pre-parsed (old) version
+                else
+                    constrs.add(this.getInternalConstraintsFromConditions(item, iteration));
+
+        } else if (conditions.hasOwnProperty(Constraint.conditionsModeType.any_of)) {
+            let condList = conditions[Constraint.conditionsModeType.any_of];
+            if (condList == null)
+                throw new ex.IllegalArgumentError("Expected any_of conditions");
+
+            for (let item of condList)
+                if (typeof item === "string")
+                    constrs.add(this.getInternalConstraintsFromCondition(item, iteration));      // not pre-parsed (old) version
+                else
+                    constrs.add(this.getInternalConstraintsFromConditions(item, iteration));
+
+        } else if (conditions.hasOwnProperty("operator"))                                    // pre-parsed version
+            constrs.addAll(this.getInternalConstraintsFromCondition(conditions, iteration));
+        else
+            throw new ex.IllegalArgumentError("Expected all_of or any_of");
+
+        return constrs;
+    }
+
+    /*getInternalConstraintsFromCondition(condition, iteration) {
+        return getInternalConstraintsFromCondition(parseCondition(condition), iteration);
+    }*/
+
+    getInternalConstraintsFromCondition(condition, iteration) {
+        let constrs = new Set();
+
+        let firstPointPos;
+
+        if (condition.typeOfLeftOperand === compareOperandType.FIELD && !condition.leftOperand.startsWith("ref.")  &&
+            !condition.leftOperand.startsWith("this.") && ((firstPointPos = condition.leftOperand.indexOf(".")) > 0)) {
+
+            if (this.baseContract == null)
+                throw new ex.IllegalArgumentError("Use left operand in condition: " + condition.leftOperand + ". But this contract not initialized.");
+
+            let constrName = condition.leftOperand.substring(0, firstPointPos);
+            constrs.add(constrName);
+
+            let constr = this.baseContract.findConstraintByName(constrName);
+            if (constr != null)
+                constrs.add(constr.getInternalConstraints(iteration + 1));
+        }
+
+        if (condition.typeOfRightOperand === compareOperandType.FIELD && !condition.rightOperand.startsWith("ref.") &&
+            !condition.rightOperand.startsWith("this.") && ((firstPointPos = condition.rightOperand.indexOf(".")) > 0)) {
+
+            if (this.baseContract == null)
+                throw new ex.IllegalArgumentError("Use right operand in condition: " + condition.rightOperand + ". But this contract not initialized.");
+
+            let constrName = condition.rightOperand.substring(0, firstPointPos);
+            constrs.add(constrName);
+
+            let constr = this.baseContract.findConstraintByName(constrName);
+            if (constr != null)
+                constrs.add(constr.getInternalConstraints(iteration + 1));
+        }
+
+        return constrs;
     }
 
     toString() {
