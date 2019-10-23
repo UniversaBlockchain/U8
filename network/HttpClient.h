@@ -58,6 +58,8 @@ private:
     std::atomic<long> nextReqId_ = 1;
     std::mutex reqsMutex_;
     std::unordered_map<long, HttpRequestHolder> reqs_;
+private:
+    int requestTimeoutMillis_ = 4000;
 };
 
 struct HttpClientSession {

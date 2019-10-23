@@ -403,3 +403,48 @@ unit.test("web_test: http v3", async () => {
 
     await httpServer.stopServer();
 });
+
+unit.test("web_test: http request timeout", async () => {
+    console.logPut(" please, wait for timeout...");
+    let httpServer = new network.HttpServer("0.0.0.0", 9080, 20);
+    let releaseServer = 0;
+    httpServer.addSecureEndpoint("testEndpoint", async (reqParams, clientPublicKey) => {
+        while (releaseServer !== 1)
+            await sleep(100);
+        releaseServer = 2;
+        return {hash: crypto.HashId.of(reqParams.testData).digest};
+    });
+    let nodeKey = new crypto.PrivateKey(atob("JgAcAQABvID6D5ZdM9EKrZSztm/R/RcywM4K8Z4VBtX+NZp2eLCWtfAgGcBCQLtNz4scH7dPBerkkxckW6+9CLlnu/tgOxvzS6Z1Ec51++fVP9gaWbBQe9/dSg7xVPg5p9ibhfTB+iRXyevCkNj0hrlLyXl1BkPjN9+lZfXJsp9OnGIJ/AaAb7yA99E65gvZnbb3/oA3rG0pM45af6ppZKe2HeiAK+fcXm5KTQzfTce45f/mJ0jsDmFf1HFosS4waXSAz0ZfcssjPeoF3PuXfJLtM8czJ55+Nz6NMCbzrSk6zkKssGBieYFOb4eG2AdtfjTrpcSSHBgJpsbcmRx4bZNfBAZPqT+Sd20="));
+    httpServer.initSecureProtocol(nodeKey);
+    httpServer.startServer();
+
+    let clientKey = nodeKey;
+    let httpClient = new network.HttpClient("http://localhost:9080");
+    try {
+        await httpClient.start(clientKey, new crypto.PublicKey(nodeKey));
+
+        let testData = t.randomBytes(100);
+
+        let done = null;
+        await httpClient.command("testEndpoint", {testData: testData}, async (resp) => {
+            assert(false); // this test should catch timeout
+        }, error => {
+            console.logPut(" exception: " + error.errorRecord.message);
+            done = true;
+            assert(true)
+        });
+
+        while (done == null)
+            await sleep(50);
+        releaseServer = 1;
+        while (releaseServer === 1)
+            await sleep(100);
+    } catch (e) {
+        let s = "" + e;
+        console.error(s);
+        assert(false);
+    }
+    await httpClient.stop();
+
+    await httpServer.stopServer();
+});

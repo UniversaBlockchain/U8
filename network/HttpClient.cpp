@@ -79,17 +79,23 @@ void HttpClientWorkerAsync::sendGetRequest(const std::string& url, std::function
         mg_connect_opts opts;
         memset(&opts, 0, sizeof(opts));
         opts.user_data = ph;
-        mg_connect_http_opt1(ph->workerRef->mgr_.get(), [](mg_connection *nc, int ev, void *ev_data){
+        mg_connection* mgcon = mg_connect_http_opt1(ph->workerRef->mgr_.get(), [](mg_connection *nc, int ev, void *ev_data){
             HttpRequestHolder* ph = (HttpRequestHolder*)nc->user_data;
             if (ev == MG_EV_HTTP_REPLY) {
+                mg_set_timer(nc, 0);
                 http_message *hm = (http_message*)ev_data;
                 byte_vector bv(hm->body.len);
                 memcpy(&bv[0], hm->body.p, hm->body.len);
                 ph->callback(hm->resp_code, std::move(bv));
                 ph->workerRef->removeReq(ph->reqId);
                 nc->flags |= MG_F_CLOSE_IMMEDIATELY;
+            } else if (ev == MG_EV_TIMER) {
+                ph->callback(408, byte_vector());
+                ph->workerRef->removeReq(ph->reqId);
+                nc->flags |= MG_F_CLOSE_IMMEDIATELY;
             }
         }, opts, ph->url.c_str(), nullptr, nullptr, 0, "GET");
+        mg_set_timer(mgcon, double(getCurrentTimeMillis() + requestTimeoutMillis_)/1000.0);
     });
 }
 
@@ -126,17 +132,23 @@ void HttpClientWorkerAsync::sendBinRequest(const std::string& url, const std::st
         string bodyPostfixStr = "\r\n--" + boundary + "--\r\n";
         byte_vector bodyPostfix(bodyPostfixStr.begin(), bodyPostfixStr.end());
         body.insert(body.end(), bodyPostfix.begin(), bodyPostfix.end());
-        mg_connect_http_opt1(ph->workerRef->mgr_.get(), [](mg_connection *nc, int ev, void *ev_data){
+        mg_connection* mgcon = mg_connect_http_opt1(ph->workerRef->mgr_.get(), [](mg_connection *nc, int ev, void *ev_data){
             HttpRequestHolder* ph = (HttpRequestHolder*)nc->user_data;
             if (ev == MG_EV_HTTP_REPLY) {
+                mg_set_timer(nc, 0);
                 http_message *hm = (http_message*)ev_data;
                 byte_vector bv(hm->body.len);
                 memcpy(&bv[0], hm->body.p, hm->body.len);
                 ph->callback(hm->resp_code, std::move(bv));
                 ph->workerRef->removeReq(ph->reqId);
                 nc->flags |= MG_F_CLOSE_IMMEDIATELY;
+            } else if (ev == MG_EV_TIMER) {
+                ph->callback(408, byte_vector());
+                ph->workerRef->removeReq(ph->reqId);
+                nc->flags |= MG_F_CLOSE_IMMEDIATELY;
             }
         }, opts, ph->url.c_str(), extHeaders.c_str(), (const char*)&body[0], (int)body.size(), ph->method.c_str());
+        mg_set_timer(mgcon, double(getCurrentTimeMillis() + requestTimeoutMillis_)/1000.0);
     });
 }
 
@@ -159,17 +171,23 @@ void HttpClientWorkerAsync::sendRawRequest(const std::string& url, const std::st
         memset(&opts, 0, sizeof(opts));
         opts.user_data = ph;
 
-        mg_connect_http_opt1(ph->workerRef->mgr_.get(), [](mg_connection *nc, int ev, void *ev_data){
+        mg_connection* mgcon = mg_connect_http_opt1(ph->workerRef->mgr_.get(), [](mg_connection *nc, int ev, void *ev_data){
             HttpRequestHolder* ph = (HttpRequestHolder*)nc->user_data;
             if (ev == MG_EV_HTTP_REPLY) {
+                mg_set_timer(nc, 0);
                 http_message *hm = (http_message*)ev_data;
                 byte_vector bv(hm->body.len);
                 memcpy(&bv[0], hm->body.p, hm->body.len);
                 ph->callback(hm->resp_code, std::move(bv));
                 ph->workerRef->removeReq(ph->reqId);
                 nc->flags |= MG_F_CLOSE_IMMEDIATELY;
+            } else if (ev == MG_EV_TIMER) {
+                ph->callback(408, byte_vector());
+                ph->workerRef->removeReq(ph->reqId);
+                nc->flags |= MG_F_CLOSE_IMMEDIATELY;
             }
         }, opts, ph->url.c_str(), ph->extHeaders.c_str(), (const char*)&ph->reqBody[0], (int)ph->reqBody.size(), ph->method.c_str());
+        mg_set_timer(mgcon, double(getCurrentTimeMillis() + requestTimeoutMillis_)/1000.0);
     });
 }
 
@@ -371,12 +389,19 @@ void HttpClient::execCommand(const byte_vector& callBin, std::function<void(byte
         auto session = session_;
         sendBinRequest("/command", "POST", BossSerializer::serialize(cmdParams).get(), [session,onComplete{onComplete}](int respCode, byte_vector&& respBody){
             try {
-                UBinder ansBinder = UBinder::asInstance(BossSerializer::deserialize(UBytes(std::move(respBody))));
-                UBinder responseBinder = ansBinder.getBinder("response");
-                byte_vector decrypted = session->version >= 2 ?
-                    session->sessionKey->etaDecrypt(UBytes::asInstance(responseBinder.get("result")).get()) :
-                    session->sessionKey->decrypt(UBytes::asInstance(responseBinder.get("result")).get());
-                onComplete(std::move(decrypted), false);
+                bool isError = false;
+                if (respCode == 408)
+                    isError = true;
+                if (!isError) {
+                    UBinder ansBinder = UBinder::asInstance(BossSerializer::deserialize(UBytes(std::move(respBody))));
+                    UBinder responseBinder = ansBinder.getBinder("response");
+                    byte_vector decrypted = session->version >= 2 ?
+                        session->sessionKey->etaDecrypt(UBytes::asInstance(responseBinder.get("result")).get()) :
+                        session->sessionKey->decrypt(UBytes::asInstance(responseBinder.get("result")).get());
+                    onComplete(std::move(decrypted), isError);
+                } else {
+                    onComplete(stringToBytes("respCode="+to_string(respCode)), isError);
+                }
             } catch (const std::exception& e) {
                 std::string error = e.what();
                 onComplete(std::move(stringToBytes(error)), true);
@@ -392,7 +417,7 @@ void HttpClient::execCommand(const std::string& name, const UBinder& params, std
         try {
             UBinder decryptedBinder = UBinder::asInstance(BossSerializer::deserialize(UBytes(std::move(decrypted))));
             UBinder result = decryptedBinder.getBinder("result");
-            onComplete(std::move(result), false);
+            onComplete(std::move(result), isError);
         } catch (const std::exception& e) {
             std::string strError(e.what());
             UBinder errBinder = UBinder::of("error", strError);
