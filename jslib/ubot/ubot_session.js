@@ -103,17 +103,17 @@ class UBotSession {
 
         // if (initiateLongVote)
         //     await this.client.askSessionOnAllNodes("initiateVote", {packedItem: contract.sealedBinary});
-        await this.client.askSessionOnAllNodes("voteForContract", {itemId: contract.id});
+        await this.client.askSessionOnAllNodes("addKeyToContract", {itemId: contract.id});
 
         let quorum = ut.getRequestQuorumSize(requestContract);
 
         // wait quorum votes
         let votes = null;
         do {
-            votes = await this.client.askSession("getVotes", {itemId: contract.id});
+            votes = await this.client.askSession("getContractKeys", {itemId: contract.id});
 
             if (votes == null || votes.keys == null || !votes.keys instanceof Array)
-                throw new UBotClientException("registerContract error: wrong getVotes result");
+                throw new UBotClientException("registerContract error: wrong getContractKeys result");
         } while (votes.keys.length < quorum);
 
         // register contract

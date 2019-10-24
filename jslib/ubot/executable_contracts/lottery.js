@@ -181,9 +181,9 @@ async function raffle() {
     await writeSingleStorage(storage);
 
     // register prize contract
-    // let ir = await registerContract(result.prizeContract);
-    // if (ir.state !== ItemState.APPROVED.val)
-    //     return {error: "Prize contract is not registered, item state: " + ir.state};
+    let ir = await registerContract(result.prizeContract);
+    if (ir.state !== ItemState.APPROVED.val)
+        return {error: "Prize contract is not registered, item state: " + ir.state};
 
     return result;
 }

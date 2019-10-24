@@ -305,6 +305,45 @@ class UBotClient {
     }
 
     /**
+     * Executes a command on all nodes of the Universa network.
+     *
+     * @private
+     * @param {String} command - Name of the command.
+     * @param {Object} params - Parameters of the command.
+     * @param {number} trustLevel - Trust level of the command.
+     * @async
+     * @return {Promise<Object>} command result.
+     */
+    // async askSessionOnSomeNodes(command, params, trustLevel) {
+    //     await this.lock.synchronize("connectNodes", async () => {
+    //         if (this.httpNodeClients.size === 0)
+    //             await this.connectAllNodes();
+    //     });
+    //
+    //     let data = await Promise.all(Array.from(this.httpNodeClients.values()).map(nodeClient =>
+    //         new Promise(async (resolve, reject) =>
+    //             await nodeClient.command(command, params,
+    //                 result => resolve(result),
+    //                 error => reject(error)
+    //             )
+    //         )
+    //     ));
+    //
+    //     let message = "UBotClient.askSessionOnSomeNodes: " + JSON.stringify(data, (key, value) => {
+    //         if ((key === "requestId" || key === "sessionId") && value != null && value instanceof crypto.HashId)
+    //             return value.toString();
+    //         else
+    //             return value;
+    //     });
+    //     if (this.logger != null)
+    //         this.logger.log(message);
+    //     else
+    //         console.log(message);
+    //
+    //     return data;
+    // }
+
+    /**
      * Creates a new session for the cloud method.
      *
      * @private
