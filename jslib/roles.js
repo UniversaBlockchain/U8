@@ -879,15 +879,13 @@ class QuorumVoteRole extends Role {
         let constrs = new Set();
 
         let sourceConstraint = this.source.substring(0, this.source.indexOf("."));
-        constrs.add(sourceConstraint);
 
-        // add internal constraints
-        let idx = this.source.indexOf(".");
-        let from = this.source.substring(0, idx);
-        if (!from.equals("this")) {
-            let constr = this.contract.constraints.get(from);
+        if (!sourceConstraint.equals("this")) {
+            constrs.add(sourceConstraint);
+            // add internal constraints
+            let constr = this.contract.constraints.get(sourceConstraint);
             if (constr != null)
-                constrs.addAll(constr.getInternalConstraints());
+                constr.getInternalConstraints().forEach(c => constrs.add(c));
         }
 
         return constrs;

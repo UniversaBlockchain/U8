@@ -1784,7 +1784,7 @@ class Constraint extends bs.BiSerializable {
         return this.getInternalConstraintsFromConditions(this.conditions, iteration);
     }
 
-    getInternalConstraintsFromConditions(conditions = this.conditions, iteration) {
+    getInternalConstraintsFromConditions(conditions, iteration) {
         let constrs = new Set();
 
         if ((conditions == null) || Object.entries(conditions).length === 0)
@@ -1796,10 +1796,10 @@ class Constraint extends bs.BiSerializable {
                 throw new ex.IllegalArgumentError("Expected all_of conditions");
 
             for (let item of condList)
-                if (typeof item === "string")
-                    constrs.add(this.getInternalConstraintsFromCondition(item, iteration));      // not pre-parsed (old) version
+                if (typeof item === "string")   // not pre-parsed (old) version
+                    this.getInternalConstraintsFromCondition(item, iteration).forEach(c => constrs.add(c));
                 else
-                    constrs.add(this.getInternalConstraintsFromConditions(item, iteration));
+                    this.getInternalConstraintsFromConditions(item, iteration).forEach(c => constrs.add(c));
 
         } else if (conditions.hasOwnProperty(Constraint.conditionsModeType.any_of)) {
             let condList = conditions[Constraint.conditionsModeType.any_of];
@@ -1807,13 +1807,13 @@ class Constraint extends bs.BiSerializable {
                 throw new ex.IllegalArgumentError("Expected any_of conditions");
 
             for (let item of condList)
-                if (typeof item === "string")
-                    constrs.add(this.getInternalConstraintsFromCondition(item, iteration));      // not pre-parsed (old) version
+                if (typeof item === "string")   // not pre-parsed (old) version
+                    this.getInternalConstraintsFromCondition(item, iteration).forEach(c => constrs.add(c));
                 else
-                    constrs.add(this.getInternalConstraintsFromConditions(item, iteration));
+                    this.getInternalConstraintsFromConditions(item, iteration).forEach(c => constrs.add(c));
 
-        } else if (conditions.hasOwnProperty("operator"))                                    // pre-parsed version
-            constrs.addAll(this.getInternalConstraintsFromCondition(conditions, iteration));
+        } else if (conditions.hasOwnProperty("operator"))                                     // pre-parsed version
+            this.getInternalConstraintsFromCondition(conditions, iteration).forEach(c => constrs.add(c));
         else
             throw new ex.IllegalArgumentError("Expected all_of or any_of");
 
@@ -1827,8 +1827,7 @@ class Constraint extends bs.BiSerializable {
         let constrs = new Set();
 
         let firstPointPos;
-
-        if (condition.typeOfLeftOperand === compareOperandType.FIELD && !condition.leftOperand.startsWith("ref.")  &&
+        if (condition.typeOfLeftOperand === compareOperandType.FIELD && !condition.leftOperand.startsWith("ref.") &&
             !condition.leftOperand.startsWith("this.") && ((firstPointPos = condition.leftOperand.indexOf(".")) > 0)) {
 
             if (this.baseContract == null)
@@ -1839,7 +1838,7 @@ class Constraint extends bs.BiSerializable {
 
             let constr = this.baseContract.findConstraintByName(constrName);
             if (constr != null)
-                constrs.add(constr.getInternalConstraints(iteration + 1));
+                constr.getInternalConstraints(iteration + 1).forEach(c => constrs.add(c));
         }
 
         if (condition.typeOfRightOperand === compareOperandType.FIELD && !condition.rightOperand.startsWith("ref.") &&
@@ -1853,7 +1852,7 @@ class Constraint extends bs.BiSerializable {
 
             let constr = this.baseContract.findConstraintByName(constrName);
             if (constr != null)
-                constrs.add(constr.getInternalConstraints(iteration + 1));
+                constr.getInternalConstraints(iteration + 1).forEach(c => constrs.add(c));
         }
 
         return constrs;

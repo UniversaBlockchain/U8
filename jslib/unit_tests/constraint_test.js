@@ -517,10 +517,10 @@ unit.test("constraint test: checkConstraintsBetweenContracts", async () => {
     assert(!refContract2.constraints.get("ref_cont4").matchingItems.has(contract2));
     assert(refContract2.constraints.get("ref_cont4").matchingItems.has(refContract2));
 
-    /*assert(refContract1.constraints().get("ref_cont").getInternalConstraints().size === 1);
-    assert(refContract1.constraints().get("ref_cont").getInternalConstraints().has("ref_cont2"));
-    assert(refContract2.constraints().get("ref_cont3").getInternalConstraints().size === 1);
-    assert(refContract2.constraints().get("ref_cont3").getInternalConstraints().has("ref_cont4"));*/
+    assert(refContract1.constraints.get("ref_cont").getInternalConstraints().size === 1);
+    assert(refContract1.constraints.get("ref_cont").getInternalConstraints().has("ref_cont2"));
+    assert(refContract2.constraints.get("ref_cont3").getInternalConstraints().size === 1);
+    assert(refContract2.constraints.get("ref_cont3").getInternalConstraints().has("ref_cont4"));
 });
 
 unit.test("constraint test: checkConstraintsBetweenContractsAPILevel4", async () => {
@@ -570,10 +570,10 @@ unit.test("constraint test: checkConstraintsBetweenContractsAPILevel4", async ()
     assert(!refContract2.constraints.get("ref_cont4").matchingItems.has(contract2));
     assert(refContract2.constraints.get("ref_cont4").matchingItems.has(refContract2));
 
-    /*assert(refContract1.constraints().get("ref_cont").getInternalConstraints().size === 1);
-    assert(refContract1.constraints().get("ref_cont").getInternalConstraints().has("ref_cont2"));
-    assert(refContract2.constraints().get("ref_cont3").getInternalConstraints().size === 1);
-    assert(refContract2.constraints().get("ref_cont3").getInternalConstraints().has("ref_cont4"));*/
+    assert(refContract1.constraints.get("ref_cont").getInternalConstraints().size === 1);
+    assert(refContract1.constraints.get("ref_cont").getInternalConstraints().has("ref_cont2"));
+    assert(refContract2.constraints.get("ref_cont3").getInternalConstraints().size === 1);
+    assert(refContract2.constraints.get("ref_cont3").getInternalConstraints().has("ref_cont4"));
 });
 
 unit.test("constraint test: checkConstraintsAssembly", async () => {
