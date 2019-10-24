@@ -65,13 +65,14 @@ class UBotSession {
 
         let storageName = multi ? "default_multi" : "default_single";
         let result = null;
-        let first = true;
+        let tryNumber = 0;
 
         do {
-            if (!first)
-                await sleep(100);
-            else
-                first = false;
+            let delay = tryNumber * 100;
+            ++tryNumber;
+            delay = Math.min(delay, 5000);
+            if (delay > 0)
+                await sleep(delay);
 
             result = await this.client.askSession("ubotGetStorage", {
                 executableContractId: this.executableContractId,

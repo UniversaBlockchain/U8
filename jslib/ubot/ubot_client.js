@@ -252,7 +252,7 @@ class UBotClient {
             )
         );
 
-        let message = "UBotClient.askSession: " + JSON.stringify(data, (key, value) => {
+        let message = "UBotClient.askSession: cmd="+command+" " + JSON.stringify(data, (key, value) => {
             if ((key === "requestId" || key === "sessionId") && value != null && value instanceof crypto.HashId)
                 return value.toString();
             else
