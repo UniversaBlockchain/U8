@@ -9,6 +9,7 @@ const UBotProcess_writeSingleStorage = require("ubot/processes/UBotProcess_write
 const UBotProcess_writeMultiStorage = require("ubot/processes/UBotProcess_writeMultiStorage").UBotProcess_writeMultiStorage;
 const ScheduleExecutor = require("executorservice").ScheduleExecutor;
 const BossBiMapper = require("bossbimapper").BossBiMapper;
+const UBotConfig = require("ubot/ubot_config").UBotConfig;
 const t = require("tools");
 const ut = require("ubot/ubot_tools");
 const ErrorRecord = require("errors").ErrorRecord;
@@ -100,6 +101,9 @@ class ProcessStartExec extends ProcessBase {
         this.procIndex = 0;
         this.readsFrom = new Map();
         this.writesTo = new Map();
+        this.trustLevel = ut.getRequestStorageReadTrustLevel(this.pr.requestContract);
+        if (this.trustLevel == null)
+            this.trustLevel = UBotConfig.storageReadTrustLevel;
 
         // this.ubotAsm = [];
         // this.var0 = null;
@@ -518,7 +522,7 @@ class ProcessStartExec extends ProcessBase {
             let recordId = this.pr.getDefaultRecordId(false);
 
             // get actual hash from MainNet by this.executableContract.id (further recordId)
-            let actualHash = await this.pr.session.getStorage(false);
+            let actualHash = await this.pr.session.getStorage(false, this.trustLevel);
             if (actualHash == null)
                 return null;
 
@@ -555,7 +559,7 @@ class ProcessStartExec extends ProcessBase {
             let recordId = this.pr.getDefaultRecordId(true);
 
             // get actual hash from MainNet by this.executableContract.id (further recordId)
-            let actualHash = await this.pr.session.getStorage(true);
+            let actualHash = await this.pr.session.getStorage(true, this.trustLevel);
             if (actualHash == null)
                 return null;
 

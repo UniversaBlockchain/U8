@@ -664,11 +664,13 @@ unit.test("ubot_pro_test: lottery", async () => {
     lotteryContract.state.data.cloud_methods = {
         buyTicket: {
             pool: {size: 3},
-            quorum: {size: 3}
+            quorum: {size: 3},
+            storage_read_trust_level: 0.51
         },
         raffle: {
             pool: {size: 12},
-            quorum: {size: 10}
+            quorum: {size: 10},
+            storage_read_trust_level: 0.9
         }
     };
 

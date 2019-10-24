@@ -18,7 +18,9 @@ class UBotConfig {
 
     static maxDownloadActualStorageResultTime = 10000; // ms
 
-    static defaultStorageReadTrustLevel = 0.3;
+    static waitPeriod = 100; // ms
+
+    static storageReadTrustLevel = 0.3;
 }
 
 module.exports = {UBotConfig};

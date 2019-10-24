@@ -22,4 +22,14 @@ function getRequestQuorumSize(requestContract) {
     return getExecutableContract(requestContract).state.data.cloud_methods[requestContract.state.data.method_name].quorum.size;
 }
 
-module.exports = {getExecutableContract, getRequestQuorumSize};
+/**
+ * Get storage read trust level of request cloud method.
+ *
+ * @param {Contract} requestContract - The request contract.
+ * @return {number} trust level.
+ */
+function getRequestStorageReadTrustLevel(requestContract) {
+    return getExecutableContract(requestContract).state.data.cloud_methods[requestContract.state.data.method_name].storage_read_trust_level;
+}
+
+module.exports = {getExecutableContract, getRequestQuorumSize, getRequestStorageReadTrustLevel};

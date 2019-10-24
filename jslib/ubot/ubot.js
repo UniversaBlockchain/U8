@@ -37,7 +37,7 @@ class UBot {
         // waiting processors finished...
         // while (Array.from(this.processors.values()).some(proc => proc.state.canContinue)) {
         //     console.error(JSON.stringify(Array.from(this.processors.values()).map(proc => proc.state.val)));
-        //     await sleep(100);
+        //     await sleep(UBotConfig.waitPeriod);
         // }
 
         this.resultCache.shutdown();

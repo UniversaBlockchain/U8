@@ -8,6 +8,7 @@ import {UBotSession, UBotSessionState} from 'ubot/ubot_session'
 
 const TopologyBuilder = require("topology_builder").TopologyBuilder;
 const UBotPoolState = require("ubot/ubot_pool_state").UBotPoolState;
+const UBotConfig = require("ubot/ubot_config").UBotConfig;
 const UBotClientException = require("ubot/ubot_client_exception").UBotClientException;
 const ItemResult = require('itemresult').ItemResult;
 const Lock = require("lock").Lock;
@@ -94,7 +95,7 @@ class UBotClient {
     async shutdown() {
         // wait closing requests
         while (this.closingRequests.size > 0)
-            await sleep(100);
+            await sleep(UBotConfig.waitPeriod);
 
         if (this.httpNodeClients.size === 0)
             await this.httpNodeClient.stop();
@@ -252,7 +253,7 @@ class UBotClient {
             )
         );
 
-        let message = "UBotClient.askSession: cmd="+command+" " + JSON.stringify(data, (key, value) => {
+        let message = "UBotClient.askSession: cmd=" + command + " " + JSON.stringify(data, (key, value) => {
             if ((key === "requestId" || key === "sessionId") && value != null && value instanceof crypto.HashId)
                 return value.toString();
             else
@@ -290,7 +291,7 @@ class UBotClient {
             )
         ));
 
-        let message = "UBotClient.askSessionOnAllNodes: " + JSON.stringify(data, (key, value) => {
+        let message = "UBotClient.askSessionOnAllNodes: cmd=" + command + " " + JSON.stringify(data, (key, value) => {
             if ((key === "requestId" || key === "sessionId") && value != null && value instanceof crypto.HashId)
                 return value.toString();
             else
@@ -305,43 +306,43 @@ class UBotClient {
     }
 
     /**
-     * Executes a command on all nodes of the Universa network.
+     * Executes a command on some nodes of the Universa network.
      *
      * @private
      * @param {String} command - Name of the command.
      * @param {Object} params - Parameters of the command.
-     * @param {number} trustLevel - Trust level of the command.
+     * @param {Array<number>} nodes - Array containing the numbers of the asked nodes.
      * @async
      * @return {Promise<Object>} command result.
      */
-    // async askSessionOnSomeNodes(command, params, trustLevel) {
-    //     await this.lock.synchronize("connectNodes", async () => {
-    //         if (this.httpNodeClients.size === 0)
-    //             await this.connectAllNodes();
-    //     });
-    //
-    //     let data = await Promise.all(Array.from(this.httpNodeClients.values()).map(nodeClient =>
-    //         new Promise(async (resolve, reject) =>
-    //             await nodeClient.command(command, params,
-    //                 result => resolve(result),
-    //                 error => reject(error)
-    //             )
-    //         )
-    //     ));
-    //
-    //     let message = "UBotClient.askSessionOnSomeNodes: " + JSON.stringify(data, (key, value) => {
-    //         if ((key === "requestId" || key === "sessionId") && value != null && value instanceof crypto.HashId)
-    //             return value.toString();
-    //         else
-    //             return value;
-    //     });
-    //     if (this.logger != null)
-    //         this.logger.log(message);
-    //     else
-    //         console.log(message);
-    //
-    //     return data;
-    // }
+    async askSessionOnSomeNodes(command, params, nodes) {
+        await this.lock.synchronize("connectNodes", async () => {
+            if (this.httpNodeClients.size === 0)
+                await this.connectAllNodes();
+        });
+
+        let data = await Promise.all(nodes.map(nodeNumber => this.httpNodeClients.get(nodeNumber)).map(nodeClient =>
+            new Promise(async (resolve, reject) =>
+                await nodeClient.command(command, params,
+                    result => resolve(result),
+                    error => reject(error)
+                )
+            )
+        ));
+
+        let message = "UBotClient.askSessionOnSomeNodes: cmd=" + command + " " + JSON.stringify(data, (key, value) => {
+            if ((key === "requestId" || key === "sessionId") && value != null && value instanceof crypto.HashId)
+                return value.toString();
+            else
+                return value;
+        });
+        if (this.logger != null)
+            this.logger.log(message);
+        else
+            console.log(message);
+
+        return data;
+    }
 
     /**
      * Creates a new session for the cloud method.
@@ -361,7 +362,7 @@ class UBotClient {
 
         // wait session requestId
         while (session.state === UBotSessionState.VOTING_REQUEST_ID.val) {
-            await sleep(100);
+            await sleep(UBotConfig.waitPeriod);
             session = await this.getSession("ubotGetSession",
                 {executableContractId: requestContract.state.data.executable_contract_id});
         }
@@ -369,9 +370,9 @@ class UBotClient {
         if (waitPreviousSession) {
             while (session.requestId == null || !session.requestId.equals(requestContract.id)) {
                 if (session.state === UBotSessionState.CLOSING.val || session.state === UBotSessionState.CLOSED.val)
-                    await sleep(100);
+                    await sleep(UBotConfig.waitPeriod);
                 else
-                    await sleep(1000);
+                    await sleep(UBotConfig.waitPeriod * 10);
 
                 session = await this.getSession("ubotCreateSession", params);
 
@@ -392,7 +393,7 @@ class UBotClient {
         while (session.state !== UBotSessionState.OPERATIONAL.val && session.state !== UBotSessionState.CLOSING.val &&
             session.state !== UBotSessionState.CLOSED.val) {
 
-            await sleep(100);
+            await sleep(UBotConfig.waitPeriod);
             session = await this.getSession("ubotGetSession",
                 {executableContractId: requestContract.state.data.executable_contract_id});
         }
@@ -630,7 +631,7 @@ class UBotClient {
             if (waitPreviousSession) {
                 // wait closing requests
                 while (this.closingRequests.size > 0)
-                    await sleep(100);
+                    await sleep(UBotConfig.waitPeriod);
             } else
                 throw new UBotClientException("Ubot is already connected to the pool (previous request. Wait disconnect from the pool or force disconnect");
         }
@@ -727,7 +728,7 @@ class UBotClient {
         // wait not empty session
         while (session != null && session.state == null) {
 
-            await sleep(100);
+            await sleep(UBotConfig.waitPeriod);
             session = await this.getSession("ubotGetSession", {executableContractId: executableContractId});
         }
 
@@ -742,7 +743,7 @@ class UBotClient {
             while (session.state !== UBotSessionState.OPERATIONAL.val && session.state !== UBotSessionState.CLOSING.val &&
                    session.state !== UBotSessionState.CLOSED.val) {
 
-                await sleep(100);
+                await sleep(UBotConfig.waitPeriod);
                 session = await this.getSession("ubotGetSession", {executableContractId: executableContractId});
             }
 
@@ -818,7 +819,7 @@ class UBotClient {
 
         // waiting pool finished...
         while (UBotPoolState.byVal.get(state.state).canContinue) {
-            await sleep(100);
+            await sleep(UBotConfig.waitPeriod);
             state = await this.getStateCloudMethod(requestContractId, ubotNumber);
         }
 
