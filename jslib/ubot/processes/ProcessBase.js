@@ -3,10 +3,10 @@
  */
 
 class ProcessBase {
-    constructor(processor, onReady) {
+    constructor(processor, onReady, onFailed) {
         this.pr = processor;
         this.onReady = onReady;
-        this.currentTask = null;
+        this.onFailed = onFailed;
     }
 
     start() {

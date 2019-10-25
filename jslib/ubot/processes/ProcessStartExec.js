@@ -101,9 +101,13 @@ class ProcessStartExec extends ProcessBase {
         this.procIndex = 0;
         this.readsFrom = new Map();
         this.writesTo = new Map();
+
         this.trustLevel = ut.getRequestStorageReadTrustLevel(this.pr.requestContract);
         if (this.trustLevel == null)
             this.trustLevel = UBotConfig.storageReadTrustLevel;
+
+        this.requestTimes = [];
+        this.maxWaitUbot = ut.getRequestMaxWaitUbot(this.pr.requestContract);
 
         // this.ubotAsm = [];
         // this.var0 = null;
@@ -479,10 +483,11 @@ class ProcessStartExec extends ProcessBase {
 
     async writeSingleStorage(data) {
         if (data != null) {
-            return new Promise(async (resolve) => {
-                let proc = new UBotProcess_writeSingleStorage(this.pr, (result) => {
-                    resolve(result);
-                }, this, this.procIndex);
+            return new Promise(async (resolve, reject) => {
+                let proc = new UBotProcess_writeSingleStorage(this.pr,
+                    result => resolve(result),
+                    error => reject(error),
+                    this, this.procIndex);
                 this.processes[this.procIndex] = proc;
                 this.procIndex++;
 
@@ -499,10 +504,11 @@ class ProcessStartExec extends ProcessBase {
 
     async writeMultiStorage(data) {
         if (data != null) {
-            return new Promise(async (resolve) => {
-                let proc = new UBotProcess_writeMultiStorage(this.pr, (result) => {
-                    resolve(result);
-                }, this, this.procIndex);
+            return new Promise(async (resolve, reject) => {
+                let proc = new UBotProcess_writeMultiStorage(this.pr,
+                    result => resolve(result),
+                    error => reject(error),
+                    this, this.procIndex);
                 this.processes[this.procIndex] = proc;
                 this.procIndex++;
 

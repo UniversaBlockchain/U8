@@ -32,11 +32,12 @@ class CloudProcessor {
         this.methodArgs = [];
         this.poolSize = 0;
         this.quorumSize = 0;
-        this.localStorage = new Map();
         this.ProcessStartExec = ProcessStartExec;
         this.worker = null;
         this.prng = new PseudoRandom(poolId);
         this.selectPool();
+
+        // this.localStorage = new Map();
     }
 
     selectPool() {
@@ -85,7 +86,7 @@ class CloudProcessor {
         if (~this.state.nextStates.indexOf(newState.ordinal)) {
             this.state = newState;
             this.startProcessingCurrentState();
-        } else
+        } else if (this.state !== newState)
             this.logger.log("Error change state " + this.state.val + " to " + newState.val);
     }
 

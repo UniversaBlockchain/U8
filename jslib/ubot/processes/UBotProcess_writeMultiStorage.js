@@ -26,8 +26,8 @@ class UBotProcess_writeMultiStorage extends UBotProcess_writeSingleStorage {
         ANALYSIS:       {ordinal: 5}
     };
 
-    constructor(processor, onReady, mainProcess, procIndex) {
-        super(processor, onReady, mainProcess, procIndex);
+    constructor(processor, onReady, onFailed, mainProcess, procIndex) {
+        super(processor, onReady, onFailed, mainProcess, procIndex);
         this.results = [];
         this.hashes = [];
         this.previous = [];
@@ -89,6 +89,9 @@ class UBotProcess_writeMultiStorage extends UBotProcess_writeSingleStorage {
         this.hashes[this.pr.selfPoolIndex] = this.binHashId;
         this.previous[this.pr.selfPoolIndex] = this.previousRecordId;
 
+        // save first request times
+        this.saveRequestTimes();
+
         this.pulseGetHashes();
         this.getHashesTask = new ExecutorWithFixedPeriod(() => this.pulseGetHashes(),
             UBotConfig.multi_storage_vote_period, this.pr.ubot.executorService).run();
@@ -118,36 +121,60 @@ class UBotProcess_writeMultiStorage extends UBotProcess_writeSingleStorage {
         this.pr.logger.log("Error UBotProcess_writeMultiStorage: " + error);
         this.pr.errors.push(new ErrorRecord(Errors.FAILURE, "UBotProcess_writeMultiStorage", error));
         this.pr.changeState(UBotPoolState.FAILED);
+
+        this.onFailed();
     }
 
     pulseGetHashes() {
         this.pr.logger.log("UBotProcess_writeMultiStorage... pulseGetHashes. Answers = " + JSON.stringify(Array.from(this.otherAnswers)));
         for (let i = 0; i < this.pr.pool.length; ++i)
-            if (this.pr.pool[i].number !== this.pr.ubot.network.myInfo.number && !this.otherAnswers.has(this.pr.pool[i].number))
-                this.pr.ubot.network.deliver(this.pr.pool[i],
-                    new UBotCloudNotification_process(
-                        this.pr.ubot.network.myInfo,
-                        this.pr.poolId,
-                        this.procIndex,
-                        UBotCloudNotification_process.types.MULTI_STORAGE_GET_DATA_HASHID,
-                        { isAnswer: false }
-                    )
-                );
+            if (this.pr.pool[i].number !== this.pr.ubot.network.myInfo.number && !this.otherAnswers.has(this.pr.pool[i].number) &&
+                !this.notAnswered.has(this.pr.pool[i].number)) {
+                // check max wait period
+                if (this.checkMaxWaitPeriod(i)) {
+                    // check consensus available
+                    if (this.notAnswered.size > this.pr.pool.length - this.quorumSize)
+                        this.fail("consensus was broken when get result hashes from pool");
+                } else
+                    this.pr.ubot.network.deliver(this.pr.pool[i],
+                        new UBotCloudNotification_process(
+                            this.pr.ubot.network.myInfo,
+                            this.pr.poolId,
+                            this.procIndex,
+                            UBotCloudNotification_process.types.MULTI_STORAGE_GET_DATA_HASHID,
+                            { isAnswer: false }
+                        )
+                    );
+            }
     }
 
     pulseGetCortegeId() {
         this.pr.logger.log("UBotProcess_writeMultiStorage... pulseGetCortegeId");
         for (let i = 0; i < this.pr.pool.length; ++i)
-            if (this.pr.pool[i].number !== this.pr.ubot.network.myInfo.number && !this.otherAnswers.has(this.pr.pool[i].number))
-                this.pr.ubot.network.deliver(this.pr.pool[i],
-                    new UBotCloudNotification_process(
-                        this.pr.ubot.network.myInfo,
-                        this.pr.poolId,
-                        this.procIndex,
-                        UBotCloudNotification_process.types.MULTI_STORAGE_GET_CORTEGE_HASHID,
-                        { isAnswer: false }
-                    )
-                );
+            if (this.pr.pool[i].number !== this.pr.ubot.network.myInfo.number && !this.otherAnswers.has(this.pr.pool[i].number) &&
+                !this.notAnswered.has(this.pr.pool[i].number)) {
+                // check max wait period
+                if (this.checkMaxWaitPeriod(i)) {
+                    // check consensus available
+                    if (this.notAnswered.size > this.pr.pool.length - this.quorumSize)
+                        this.fail("consensus was broken when get cortege ID from pool");
+                    else {
+                        if (this.getCortegeIdTask != null)
+                            this.getCortegeIdTask.cancel();
+                        new ScheduleExecutor(() => this.analyzeCortege(), 0, this.pr.ubot.executorService).run();
+                        return;
+                    }
+                } else
+                    this.pr.ubot.network.deliver(this.pr.pool[i],
+                        new UBotCloudNotification_process(
+                            this.pr.ubot.network.myInfo,
+                            this.pr.poolId,
+                            this.procIndex,
+                            UBotCloudNotification_process.types.MULTI_STORAGE_GET_CORTEGE_HASHID,
+                            {isAnswer: false}
+                        )
+                    );
+            }
     }
 
     pulseGetPoolHashes(first = false) {
@@ -200,15 +227,18 @@ class UBotProcess_writeMultiStorage extends UBotProcess_writeSingleStorage {
         }
 
         for (let i = 0; i < this.pr.pool.length; ++i)
-            if (!this.downloadAnswers.has(i)) {
+            if (!this.downloadAnswers.has(i) && !this.notAnswered.has(i)) {
                 this.pr.ubot.network.getMultiStorageResult(this.pr.pool[i], this.hashes[i],
                     async (result) => {
                         let resultHash = crypto.HashId.of(result);
 
-                        if (!resultHash.equals(this.hashes[i]) || !await this.verifyResult(result, this.previousRecordId, this.pr.pool[i].number)) {
+                        if (!resultHash.equals(this.hashes[i]) ||
+                            !await this.verifyResult(result, this.previousRecordId, this.pr.pool[i].number)) {
                             this.excluded.add(i);
-                            if (this.excluded.size > this.pr.pool.length - this.quorumSize)
+                            if (this.excluded.size + this.notAnswered.size > this.pr.pool.length - this.quorumSize) {
                                 this.fail("consensus was broken when downloading result");
+                                return;
+                            }
                         } else {
                             this.cortege.add(i);
                             this.results[i] = result;
@@ -218,7 +248,7 @@ class UBotProcess_writeMultiStorage extends UBotProcess_writeSingleStorage {
                         }
 
                         this.downloadAnswers.add(i);
-                        if (this.downloadAnswers.size >= this.pr.pool.length) {
+                        if (this.downloadAnswers.size + this.notAnswered.size >= this.pr.pool.length) {
                             this.pr.logger.log("UBotProcess_writeMultiStorage... results downloaded");
                             this.downloadTask.cancel();
                             this.downloadFire();
@@ -379,15 +409,16 @@ class UBotProcess_writeMultiStorage extends UBotProcess_writeSingleStorage {
     }
 
     generateCortegeId(full) {
-        let concat = new Uint8Array((full ? this.pr.pool.length : this.cortege.size) * this.binHashId.digest.length);
+        let concat = new Uint8Array((full ? this.pr.pool.length - this.notAnswered.size : this.cortege.size) * this.binHashId.digest.length);
         let sorted = [];
 
         if (full) {
             for (let i = 0; i < this.pr.pool.length; i++)
-                sorted.push({
-                    ubot_number: this.pr.pool[i].number,
-                    hash: this.hashes[i]
-                });
+                if (!this.notAnswered.has(this.pr.pool[i].number))
+                    sorted.push({
+                        ubot_number: this.pr.pool[i].number,
+                        hash: this.hashes[i]
+                    });
         } else
             this.cortege.forEach(ubot => sorted.push({
                 ubot_number: this.pr.pool[ubot].number,
@@ -417,10 +448,13 @@ class UBotProcess_writeMultiStorage extends UBotProcess_writeSingleStorage {
 
         for (let i = 0; i < this.pr.pool.length; i++)
             // check previous ID equals
-            if (!t.valuesEqual(this.previousRecordId, this.previous[i]))
+            if (!this.notAnswered.has(this.pr.pool[i].number) && !t.valuesEqual(this.previousRecordId, this.previous[i]))
                 return false;
 
         this.generateCortegeId(true);
+
+        // save first request times
+        this.saveRequestTimes();
 
         this.otherAnswers.clear();
         this.pulseGetCortegeId();
@@ -436,7 +470,7 @@ class UBotProcess_writeMultiStorage extends UBotProcess_writeSingleStorage {
         await this.downloadEvent;
         this.pr.logger.log("UBotProcess_writeMultiStorage... results received");
 
-        if (this.cortege.size >= this.pr.pool.length && await this.getDecision())
+        if (this.cortege.size >= this.pr.pool.length && this.notAnswered.size === 0 && await this.getDecision())
             await this.approveCortege(true);
         else
             new ScheduleExecutor(() => this.analyzeCortege(), 0, this.pr.ubot.executorService).run();
@@ -521,6 +555,9 @@ class UBotProcess_writeMultiStorage extends UBotProcess_writeSingleStorage {
 
         this.state = UBotProcess_writeMultiStorage.states.ANALYSIS;
 
+        // remove not answered ubots from cortege
+        this.notAnswered.forEach(ubotNumber => this.cortege.delete(this.pr.poolIndexes.get(ubotNumber)));
+
         this.approveCounterSet.clear();
         this.declineCounterSet.clear();
         for (let i = 0; i < this.pr.pool.length; ++i) {
@@ -528,6 +565,9 @@ class UBotProcess_writeMultiStorage extends UBotProcess_writeSingleStorage {
             this.approveCounterFromOthersSets.push(new Set([this.pr.ubot.network.myInfo.number, this.pr.pool[i].number]));
             this.declineCounterFromOthersSets.push(new Set());
         }
+
+        // save first request times
+        this.saveRequestTimes();
 
         this.pulseGetPoolHashes(true);
         this.getPoolHashesTask = new ExecutorWithFixedPeriod(() => this.pulseGetPoolHashes(),
@@ -934,7 +974,8 @@ class UBotProcess_writeMultiStorage extends UBotProcess_writeSingleStorage {
                     this.hashes[this.pr.poolIndexes.get(notification.from.number)] = notification.params.dataHashId;
                     this.previous[this.pr.poolIndexes.get(notification.from.number)] = notification.params.previousRecordId;
 
-                    if (this.otherAnswers.size >= this.pr.pool.length - 1) {
+                    if (this.otherAnswers.size + this.notAnswered.size >= this.pr.pool.length - 1 &&
+                        this.otherAnswers.size >= this.quorumSize) {
                         this.getHashesTask.cancel();
 
                         this.downloadAnswers.add(this.pr.selfPoolIndex);
@@ -970,7 +1011,8 @@ class UBotProcess_writeMultiStorage extends UBotProcess_writeSingleStorage {
                     } else {
                         this.otherAnswers.add(notification.from.number);
 
-                        if (this.otherAnswers.size >= this.pr.pool.length - 1) {
+                        if (this.otherAnswers.size + this.notAnswered.size >= this.pr.pool.length - 1 &&
+                            this.otherAnswers.size >= this.quorumSize) {
                             this.getCortegeIdTask.cancel();
 
                             new ScheduleExecutor(() => this.checkResults(), 0, this.pr.ubot.executorService).run();
@@ -1181,6 +1223,14 @@ class UBotProcess_writeMultiStorage extends UBotProcess_writeSingleStorage {
         } else {
             this.pr.logger.log("warning: UBotProcess_writeMultiStorage - wrong notification received");
         }
+    }
+
+    checkMaxWaitPeriod(ubotInPool) {
+        let res = super.checkMaxWaitPeriod(ubotInPool);
+        if (res)
+            this.cortege.delete(ubotInPool);
+
+        return res;
     }
 }
 

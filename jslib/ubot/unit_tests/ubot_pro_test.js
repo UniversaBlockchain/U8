@@ -62,11 +62,13 @@ async function generateSecureRandomExecutableContract() {
     executableContract.state.data.cloud_methods = {
         getRandom: {
             pool: {size: 5},
-            quorum: {size: 4}
+            quorum: {size: 4},
+            max_wait_ubot: 30
         },
         readRandom: {
             pool: {size: 5},
-            quorum: {size: 4}
+            quorum: {size: 4},
+            max_wait_ubot: 30
         }
     };
 

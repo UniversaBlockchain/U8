@@ -32,4 +32,17 @@ function getRequestStorageReadTrustLevel(requestContract) {
     return getExecutableContract(requestContract).state.data.cloud_methods[requestContract.state.data.method_name].storage_read_trust_level;
 }
 
-module.exports = {getExecutableContract, getRequestQuorumSize, getRequestStorageReadTrustLevel};
+/**
+ * Get max waiting period for ubot answer from request cloud method.
+ *
+ * @param {Contract} requestContract - The request contract.
+ * @return {number | null} max waiting period in milliseconds or null if period is undefined.
+ */
+function getRequestMaxWaitUbot(requestContract) {
+    let seconds = getExecutableContract(requestContract).state.data.cloud_methods[requestContract.state.data.method_name].max_wait_ubot;
+    if (seconds == null)
+        return null;
+    return seconds * 1000;
+}
+
+module.exports = {getExecutableContract, getRequestQuorumSize, getRequestStorageReadTrustLevel, getRequestMaxWaitUbot};
