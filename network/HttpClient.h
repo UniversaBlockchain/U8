@@ -49,6 +49,7 @@ public:
     void stop();
 private:
     std::mutex reqsBufMutex_;
+    std::atomic<int> activeReqsCount_;
     std::list<std::function<void()>> reqsBuf_;
     int id_;
     HttpClient& parentRef_;

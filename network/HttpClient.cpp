@@ -28,15 +28,19 @@ string randomString(int length) {
 HttpClientWorkerAsync::HttpClientWorkerAsync(int newId, HttpClient& parent, int pollPeriodMillis)
 : id_(newId)
 , parentRef_(parent)
-, mgr_(new mg_mgr(), [](auto p){mg_mgr_free(p);delete p;}) {
+, mgr_(new mg_mgr(), [](auto p){mg_mgr_free(p);delete p;})
+, activeReqsCount_(0) {
     mg_mgr_init(mgr_.get(), this);
     pollThread_ = std::make_shared<std::thread>([this,pollPeriodMillis](){
         while (!exitFlag_) {
             {
                 std::lock_guard lock(reqsBufMutex_);
-                for (auto &reqFunc : reqsBuf_)
+                while (!reqsBuf_.empty() && activeReqsCount_ < 20) {
+                    auto& reqFunc = reqsBuf_.front();
                     reqFunc();
-                reqsBuf_.clear();
+                    reqsBuf_.pop_front();
+                    ++activeReqsCount_;
+                }
             }
             mg_mgr_poll(mgr_.get(), pollPeriodMillis);
         }
@@ -87,10 +91,12 @@ void HttpClientWorkerAsync::sendGetRequest(const std::string& url, std::function
                 byte_vector bv(hm->body.len);
                 memcpy(&bv[0], hm->body.p, hm->body.len);
                 ph->callback(hm->resp_code, std::move(bv));
+                ph->workerRef->activeReqsCount_ -= 1;
                 ph->workerRef->removeReq(ph->reqId);
                 nc->flags |= MG_F_CLOSE_IMMEDIATELY;
             } else if (ev == MG_EV_TIMER) {
                 ph->callback(408, byte_vector());
+                ph->workerRef->activeReqsCount_ -= 1;
                 ph->workerRef->removeReq(ph->reqId);
                 nc->flags |= MG_F_CLOSE_IMMEDIATELY;
             }
@@ -140,10 +146,12 @@ void HttpClientWorkerAsync::sendBinRequest(const std::string& url, const std::st
                 byte_vector bv(hm->body.len);
                 memcpy(&bv[0], hm->body.p, hm->body.len);
                 ph->callback(hm->resp_code, std::move(bv));
+                ph->workerRef->activeReqsCount_ -= 1;
                 ph->workerRef->removeReq(ph->reqId);
                 nc->flags |= MG_F_CLOSE_IMMEDIATELY;
             } else if (ev == MG_EV_TIMER) {
                 ph->callback(408, byte_vector());
+                ph->workerRef->activeReqsCount_ -= 1;
                 ph->workerRef->removeReq(ph->reqId);
                 nc->flags |= MG_F_CLOSE_IMMEDIATELY;
             }
@@ -179,10 +187,12 @@ void HttpClientWorkerAsync::sendRawRequest(const std::string& url, const std::st
                 byte_vector bv(hm->body.len);
                 memcpy(&bv[0], hm->body.p, hm->body.len);
                 ph->callback(hm->resp_code, std::move(bv));
+                ph->workerRef->activeReqsCount_ -= 1;
                 ph->workerRef->removeReq(ph->reqId);
                 nc->flags |= MG_F_CLOSE_IMMEDIATELY;
             } else if (ev == MG_EV_TIMER) {
                 ph->callback(408, byte_vector());
+                ph->workerRef->activeReqsCount_ -= 1;
                 ph->workerRef->removeReq(ph->reqId);
                 nc->flags |= MG_F_CLOSE_IMMEDIATELY;
             }
@@ -286,9 +296,9 @@ void HttpClient::start(const crypto::PrivateKey& clientKey, const crypto::Public
             sem->notify();
         });
         if (!sem->wait(std::chrono::milliseconds(startTimeoutMillis_)))
-            throw std::runtime_error("HttpClient timeout while starting secure connection");
+            throw std::runtime_error("HttpClient timeout while starting secure connection(a) ("+rootUrl_+")");
         if (!(*error).empty())
-            throw std::runtime_error("HttpClient error while starting secure connection: " + *error);
+            throw std::runtime_error("HttpClient error while starting secure connection(b) ("+rootUrl_+"): " + *error);
         byte_vector client_nonce(47);
         sprng_read(&client_nonce[0], client_nonce.size(), NULL);
         byte_vector client_nonce_copy = client_nonce;
@@ -317,9 +327,9 @@ void HttpClient::start(const crypto::PrivateKey& clientKey, const crypto::Public
             sem->notify();
         });
         if (!sem->wait(std::chrono::milliseconds(startTimeoutMillis_)))
-            throw std::runtime_error("HttpClient timeout while starting secure connection (get_token)");
+            throw std::runtime_error("HttpClient timeout while starting secure connection(c) (get_token)");
         if (!(*error).empty())
-            throw std::runtime_error("HttpClient error while starting secure connection: " + *error);
+            throw std::runtime_error("HttpClient error while starting secure connection(d): " + *error);
         if (!session_->nodePublicKey->verify(*sigRcv, *dataRcv, crypto::HashType::SHA512)) {
             throw std::runtime_error("node signature failed");
         }
@@ -336,16 +346,19 @@ void HttpClient::start(const crypto::PrivateKey& clientKey, const crypto::Public
         execCommand("hello", UBinder(), [session,sem,status,error](UBinder&& res, bool isError){
             if (!isError) {
                 session->connectMessage = res.getString("message");
-                status.get()->assign(res.getString("status"));
+                std::string strStatus = res.getString("status");
+                status.get()->assign(strStatus);
+                if (strStatus != "OK")
+                    error.get()->assign("(hello failed)");
             } else {
                 error.get()->assign("(hello)");
             }
             sem->notify();
         });
         if (!sem->wait(std::chrono::milliseconds(startTimeoutMillis_)))
-            throw std::runtime_error("HttpClient timeout while starting secure connection (hello)");
+            throw std::runtime_error("HttpClient timeout while starting secure connection(e) (hello)");
         if (!(*error).empty())
-            throw std::runtime_error("HttpClient error while starting secure connection: " + *error);
+            throw std::runtime_error("HttpClient error while starting secure connection(f): " + *error);
         if (*status != "OK")
             throw std::runtime_error("connection failed: " + session_->connectMessage);
     }
