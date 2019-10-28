@@ -391,8 +391,10 @@ void HttpClient::command(const byte_vector& callBin, const std::function<void(by
 
 void HttpClient::execCommand(const byte_vector& callBin, std::function<void(byte_vector&&,bool)>&& onComplete) {
     runAsync([this, callBin, onComplete{std::move(onComplete)}](){
-        if (!session_ || !session_->sessionKey)
-            throw std::runtime_error("Session does not created or session key is not got yet.");
+        if (!session_ || !session_->sessionKey) {
+            onComplete(std::move(stringToBytes("Session does not created or session key is not got yet.")), true);
+            return;
+        }
         UBinder cmdParams = UBinder::of(
                 "command", "command",
                 "params", session_->version >= 2 ?

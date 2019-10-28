@@ -456,7 +456,18 @@ network.HttpClient = class {
         });
     }
 
+    /**
+     * Http client would start automatically on first command, with 'restart' procedure.
+     */
     start(clientPrivateKey, nodePublickey, session) {
+        this.clientPrivateKey = clientPrivateKey;
+        this.nodePublickey = nodePublickey;
+    }
+
+    /**
+     * Really performs start procedure. Used from 'restart' procedure.
+     */
+    start0(clientPrivateKey, nodePublickey, session) {
         this.clientPrivateKey = clientPrivateKey;
         this.nodePublickey = nodePublickey;
         return new Promise((resolve, reject) => {
@@ -474,7 +485,7 @@ network.HttpClient = class {
         if (!this.isRestartingNow) {
             this.isRestartingNow = true;
             this.httpClient_.__clearSession();
-            await this.start(this.clientPrivateKey, this.nodePublickey, null);
+            await this.start0(this.clientPrivateKey, this.nodePublickey, null);
             this.isRestartingNow = false;
         }
     }
