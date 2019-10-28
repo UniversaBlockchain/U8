@@ -738,6 +738,8 @@ unit.test("ubot_pro_test: lottery", async () => {
     assert(state.result.hasOwnProperty("prizeContract") && typeof state.result.winTicket === "number" &&
            state.result.winTicket >= 0 && state.result.winTicket < TICKETS);
 
+    console.log("Win ticket: " + state.result.winTicket);
+
     // check prize contract
     let prizeContract = await Contract.fromPackedTransaction(state.result.prizeContract);
     assert(prizeContract.roles.owner instanceof roles.SimpleRole);
