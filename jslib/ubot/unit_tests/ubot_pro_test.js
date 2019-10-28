@@ -46,6 +46,7 @@ async function createUBots(count) {
     for (let i = 0; i < count; ++i)
         ubotMains.push(createUbotMain("ubot"+i, false));
     ubotMains = await Promise.all(ubotMains);
+    require("ubot/unit_tests/ubot_debugger").ubotDebugger_setMains(ubotMains);
     return ubotMains;
 }
 

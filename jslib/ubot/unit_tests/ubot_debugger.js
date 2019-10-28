@@ -5,6 +5,10 @@ class UbotDebugger {
         this.httpServer.addRawEndpoint("/ubots", req => this.endpoint_ubots(req));
     }
 
+    setMains(ubotMains) {
+        this.ubotMains = ubotMains;
+    }
+
     start() {
         this.httpServer.startServer();
     }
@@ -51,4 +55,21 @@ class UbotDebugger {
     }
 }
 
-module.exports = {UbotDebugger};
+let ubotDebugger = null;
+
+// enable or disable ubot debugger here
+let ubotDebuggerEnabled = false;
+
+if (ubotDebuggerEnabled) {
+    if (ubotDebugger === null) {
+        ubotDebugger = new UbotDebugger(null);
+        ubotDebugger.start();
+    }
+}
+
+function ubotDebugger_setMains(ubotMains) {
+    if (ubotDebugger !== null)
+        ubotDebugger.setMains(ubotMains);
+}
+
+module.exports = {ubotDebugger_setMains};
