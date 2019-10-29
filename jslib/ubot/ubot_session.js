@@ -154,24 +154,45 @@ class UBotSession {
         await this.client.askSessionOnAllNodes("addKeyToContract", {itemId: contract.id});
 
         let quorum = ut.getRequestQuorumSize(requestContract);
+        let maxWaitUbot = ut.getRequestMaxWaitUbot(requestContract);
 
         // wait quorum votes
+        let positive = Math.ceil(this.client.nodes.length * UBotConfig.networkPositiveConsensus);
         let votes = null;
         let tryNumber = 0;
+        let maxTime = null;
+        if (maxWaitUbot != null)
+            maxTime += Date.now() + maxWaitUbot;
+
         do {
             let delay = Math.min(tryNumber, 50) * UBotConfig.waitPeriod;
+
+            if (maxTime != null && Date.now() + delay > maxTime)
+                throw new UBotClientException("Maximum waiting time for votes on the registered contract is exceeded");
+
             ++tryNumber;
             if (delay > 0)
                 await sleep(delay);
 
-            votes = await this.client.askSession("getContractKeys", {itemId: contract.id});
+            votes = await this.client.askSessionOnAllNodes("getContractKeys", {itemId: contract.id});
 
-            if (votes == null || votes.keys == null || !votes.keys instanceof Array)
-                throw new UBotClientException("Error registerContract: wrong getContractKeys result");
-        } while (votes.keys.length < quorum);
+            if (votes == null || !votes instanceof Array)
+                throw new UBotClientException("Wrong getContractKeys result");
+
+            for (let vote of votes)
+                if (vote == null || vote.keys == null || !vote.keys instanceof Array)
+                    throw new UBotClientException("Wrong getContractKeys result from node");
+        } while (votes.filter(vote => vote.keys.length >= quorum).length < positive);
+
+        if (maxWaitUbot == null)
+            maxWaitUbot = 0;
 
         // register contract
-        return await this.client.register(packed);
+        let ir = await this.client.register(packed, maxWaitUbot);
+        if (maxWaitUbot > 0 && ir.state.isPending)
+            throw new UBotClientException("Maximum waiting time for contract registration is exceeded");
+
+        return ir;
     }
 
     async close() {

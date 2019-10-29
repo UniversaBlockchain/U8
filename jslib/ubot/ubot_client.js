@@ -467,7 +467,7 @@ class UBotClient {
                 try {
                     let c = await Contract.fromPackedTransaction(packed);
                     let interval = 1000;
-                    while ((Date.now() < end || millisToWait === 0) && lastResult.state.isPending) {
+                    while ((millisToWait === 0 || Date.now() < end) && lastResult.state.isPending) {
                         await sleep(interval);
                         if (interval > 300)
                             interval -= 350;

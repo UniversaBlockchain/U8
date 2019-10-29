@@ -668,12 +668,14 @@ unit.test("ubot_pro_test: lottery", async () => {
         buyTicket: {
             pool: {size: 3},
             quorum: {size: 3},
-            storage_read_trust_level: 0.51
+            storage_read_trust_level: 0.51,
+            max_wait_ubot: 30
         },
         raffle: {
             pool: {size: 12},
             quorum: {size: 10},
-            storage_read_trust_level: 0.9
+            storage_read_trust_level: 0.9,
+            max_wait_ubot: 30
         }
     };
 

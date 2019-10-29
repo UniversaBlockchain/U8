@@ -20,6 +20,8 @@ class UBotConfig {
 
     static waitPeriod = 100; // ms
 
+    static networkPositiveConsensus = 0.9;
+
     static storageReadTrustLevel = 0.3;
 }
 
