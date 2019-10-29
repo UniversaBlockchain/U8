@@ -445,12 +445,13 @@ network.HttpClient = class {
                 }
             }
         });
-        this.httpClient_.__setBufferedCommandCallback((ansArr) => {
+        this.httpClient_.__setBufferedCommandCallback(async (ansArr) => {
             for (let i = 0; i < Math.floor(ansArr.length/3); ++i) {
                 let reqId = ansArr[i*3 + 0];
                 if (this.callbacksCommands_.has(reqId)) {
-                    this.callbacksCommands_.get(reqId)(ansArr[i*3 + 1], ansArr[i*3 + 2]);
+                    let cb = this.callbacksCommands_.get(reqId)
                     this.callbacksCommands_.delete(reqId);
+                    await cb(ansArr[i*3 + 1], ansArr[i*3 + 2]);
                 }
             }
         });
@@ -462,6 +463,7 @@ network.HttpClient = class {
     start(clientPrivateKey, nodePublickey, session) {
         this.clientPrivateKey = clientPrivateKey;
         this.nodePublickey = nodePublickey;
+        return new Promise((resolve, reject) => {this.command("hello", {}, resolve, reject)});
     }
 
     /**
@@ -485,7 +487,11 @@ network.HttpClient = class {
         if (!this.isRestartingNow) {
             this.isRestartingNow = true;
             this.httpClient_.__clearSession();
-            await this.start0(this.clientPrivateKey, this.nodePublickey, null);
+            try {
+                await this.start0(this.clientPrivateKey, this.nodePublickey, null);
+            } catch (e) {
+                //do nothing, just await rejected promise
+            }
             this.isRestartingNow = false;
         }
     }
@@ -607,7 +613,7 @@ network.HttpClient = class {
                     let binder = await BossBiMapper.getInstance().deserialize(await Boss.load(decrypted));
                     let result = binder.result;
                     if (result) {
-                        onComplete(result);
+                        await onComplete(result);
                     } else {
                         let errorRecord = new ErrorRecord(Errors.FAILURE, "", "unprocessablereply");
                         if (binder.error)

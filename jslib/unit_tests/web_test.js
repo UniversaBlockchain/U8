@@ -318,7 +318,8 @@ unit.test("web_test: cpp exceptions", async () => {
         assert(false); // this test should to produce exception
     } catch (e) {
         let s = "" + e;
-        assert(s.includes("HttpClient error while starting secure connection") === true);
+        //for now, http client tries to reconnect several times
+        assert(s.includes("Session does not created or session key is not got yet") === true);
     }
 
     await httpClient.stop();
