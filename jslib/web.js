@@ -435,6 +435,7 @@ network.HttpClient = class {
         this.callbacks_ = new Map();
         this.callbacksCommands_ = new Map();
         this.isRestartingNow = false;
+        this.isRestartingRequired = false;
         this.nextReqId_ = 1;
         this.httpClient_.__setBufferedCallback((ansArr) => {
             for (let i = 0; i < Math.floor(ansArr.length/3); ++i) {
@@ -446,14 +447,16 @@ network.HttpClient = class {
             }
         });
         this.httpClient_.__setBufferedCommandCallback(async (ansArr) => {
+            let promises = [];
             for (let i = 0; i < Math.floor(ansArr.length/3); ++i) {
                 let reqId = ansArr[i*3 + 0];
                 if (this.callbacksCommands_.has(reqId)) {
                     let cb = this.callbacksCommands_.get(reqId)
                     this.callbacksCommands_.delete(reqId);
-                    await cb(ansArr[i*3 + 1], ansArr[i*3 + 2]);
+                    promises.push(cb(ansArr[i*3 + 1], ansArr[i*3 + 2]));
                 }
             }
+            await Promise.all(promises);
         });
     }
 
@@ -482,6 +485,7 @@ network.HttpClient = class {
     }
 
     async restart() {
+        this.isRestartingRequired = true;
         while (this.callbacksCommands_.size > 0)
             await sleep(100);
         if (!this.isRestartingNow) {
@@ -494,6 +498,7 @@ network.HttpClient = class {
             }
             this.isRestartingNow = false;
         }
+        this.isRestartingRequired = false;
     }
 
     async stop() {
@@ -605,7 +610,7 @@ network.HttpClient = class {
         };
 
         let execCommand = async () => {
-            while (this.isRestartingNow)
+            while (this.isRestartingNow || this.isRestartingRequired)
                 await sleep(100);
             let reqId = this.getReqId();
             this.callbacksCommands_.set(reqId, async (decrypted, isError) => {

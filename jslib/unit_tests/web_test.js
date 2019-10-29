@@ -449,3 +449,90 @@ unit.test("web_test: http request timeout", async () => {
 
     await httpServer.stopServer();
 });
+
+unit.test("web_test: http to restarting node", async () => {
+    const HttpClient = require('web').HttpClient;
+    console.log();
+    let localNodePrivKey = await crypto.PrivateKey.generate(2048);
+    let localNodePubKey = localNodePrivKey.publicKey;
+
+    let httpServer = new network.HttpServer("0.0.0.0", 8080, 20);
+    httpServer.initSecureProtocol(localNodePrivKey);
+    httpServer.addSecureEndpoint("getState", async (reqParams, clientPublicKey) => {
+        return {answer:"answer-from-local-http-server"};
+    });
+    httpServer.startServer();
+
+    let clientPrivKey = await crypto.PrivateKey.generate(2048);
+    let nodeUrl = "http://localhost:8080";
+
+    let someHashId = await crypto.HashId.of(t.randomBytes(64));
+
+    let httpClient = new HttpClient(nodeUrl);
+    await httpClient.start(clientPrivKey, localNodePubKey);
+    console.log("client started");
+
+    let okCounter = 0;
+    let errorCounter = 0;
+    let sendCounter = 0;
+    for (let i = 0; i < 1000; ++i) {
+        ++sendCounter;
+        await httpClient.command("getState", {itemId: someHashId}, async res => {
+            ++okCounter;
+            //console.log("okCounter = " + okCounter + ", errorCounter = " + errorCounter);
+        }, (e) => {
+            console.log(i + " 1 error: " + e);
+            ++errorCounter;
+            console.log("okCounter = " + okCounter + ", errorCounter = " + errorCounter);
+        });
+        if (sendCounter - 100 > okCounter+errorCounter) {
+            //console.log("sendCounter = " + sendCounter);
+            await sleep(100);
+        }
+    }
+    while (okCounter < sendCounter)
+        await sleep(100);
+
+    await sleep(2000);
+    console.log("stop server...");
+    await httpServer.stopServer();
+    console.log("wait...");
+    await sleep(2000);
+    console.log("recreate server...");
+    httpServer = new network.HttpServer("0.0.0.0", 8080, 20);
+    console.log("init server...");
+    httpServer.initSecureProtocol(localNodePrivKey);
+    httpServer.addSecureEndpoint("getState", async (reqParams, clientPublicKey) => {
+        return {answer:"answer-from-local-http-server"};
+    });
+    console.log("start server...");
+    httpServer.startServer();
+    console.log("start server... done!");
+
+    okCounter = 0;
+    errorCounter = 0;
+    sendCounter = 0;
+    for (let i = 0; i < 1000; ++i) {
+        ++sendCounter;
+        await httpClient.command("getState", {itemId: someHashId}, async res => {
+            ++okCounter;
+            //console.log("okCounter = " + okCounter + ", errorCounter = " + errorCounter);
+        }, (e) => {
+            console.log(i + " 1 error: " + e);
+            ++errorCounter;
+            console.log("okCounter = " + okCounter + ", errorCounter = " + errorCounter);
+        });
+        if (sendCounter - 100 > okCounter+errorCounter) {
+            //console.log("sendCounter = " + sendCounter);
+            await sleep(100);
+        }
+    }
+    while (okCounter < sendCounter)
+        await sleep(100);
+
+    assert(true); // this test just should not stuck
+
+    console.log("stop server and client...");
+    await httpServer.stopServer();
+    await httpClient.stop();
+});
