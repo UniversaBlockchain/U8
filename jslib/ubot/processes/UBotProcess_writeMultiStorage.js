@@ -207,6 +207,8 @@ class UBotProcess_writeMultiStorage extends UBotProcess_writeSingleStorage {
                     // check consensus available
                     if (this.cortege.size < this.quorumSize)
                         this.fail("consensus was broken when get all hashes from pool");
+                    else
+                        this.voteUpdateCortege(ubot);
                 } else
                     Array.from(this.cortege).filter(toUbot => toUbot !== this.pr.selfPoolIndex &&
                         !this.approveCounterFromOthersSets[toUbot].has(this.pr.pool[ubot].number) &&
@@ -282,6 +284,8 @@ class UBotProcess_writeMultiStorage extends UBotProcess_writeSingleStorage {
                 // check consensus available
                 if (this.cortege.size < this.quorumSize)
                     this.fail("consensus was broken when get corteges from pool");
+                else
+                    this.checkCortegesReceived();
             } else
                 this.pr.ubot.network.deliver(this.pr.pool[ubot],
                     new UBotCloudNotification_process(
@@ -303,22 +307,30 @@ class UBotProcess_writeMultiStorage extends UBotProcess_writeSingleStorage {
 
         Array.from(this.suspicious).filter(su => !this.approveCounterSet.has(su) && !this.declineCounterSet.has(su)).forEach(su => {
             Array.from(this.cortege).filter(u => u !== this.pr.selfPoolIndex && u !== su &&
-                !this.approveCounterFromOthersSets[su].has(u) && !this.declineCounterFromOthersSets[su].has(u)).forEach(u =>
+                !this.approveCounterFromOthersSets[su].has(u) && !this.declineCounterFromOthersSets[su].has(u)).forEach(u => {
+                if (this.checkMaxWaitPeriod(u)) {
+                    this.suspicious.delete(u);
 
-                this.pr.ubot.network.deliver(this.pr.pool[u],
-                    new UBotCloudNotification_process(
-                        this.pr.ubot.network.myInfo,
-                        this.pr.poolId,
-                        this.procIndex,
-                        UBotCloudNotification_process.types.MULTI_STORAGE_GET_SUSPICIOUS_CORTEGE_HASHID,
-                        {
-                            isAnswer: false,
-                            dataUbotInPool: su,
-                            commonCortegeIteration: this.commonCortegeIteration
-                        }
-                    )
-                )
-            );
+                    // check consensus available
+                    if (this.cortege.size < this.quorumSize)
+                        this.fail("consensus was broken when get suspicious cortege IDs from pool");
+                    else
+                        this.voteSuspiciousCortegeIdUpdateCortege(u);
+                } else
+                    this.pr.ubot.network.deliver(this.pr.pool[u],
+                        new UBotCloudNotification_process(
+                            this.pr.ubot.network.myInfo,
+                            this.pr.poolId,
+                            this.procIndex,
+                            UBotCloudNotification_process.types.MULTI_STORAGE_GET_SUSPICIOUS_CORTEGE_HASHID,
+                            {
+                                isAnswer: false,
+                                dataUbotInPool: su,
+                                commonCortegeIteration: this.commonCortegeIteration
+                            }
+                        )
+                    );
+            });
         });
     }
 
@@ -332,6 +344,8 @@ class UBotProcess_writeMultiStorage extends UBotProcess_writeSingleStorage {
                 // check consensus available
                 if (this.cortege.size < this.quorumSize)
                     this.fail("consensus was broken when get decisions from pool");
+                else
+                    this.decisionVoteDeclined(iteration);
             } else
                 this.pr.ubot.network.deliver(this.pr.pool[ubot],
                     new UBotCloudNotification_process(
@@ -358,6 +372,8 @@ class UBotProcess_writeMultiStorage extends UBotProcess_writeSingleStorage {
                 // check consensus available
                 if (this.cortege.size < this.quorumSize)
                     this.fail("consensus was broken when get decision votes from pool");
+                else
+                    this.checkDecisionDecline(iteration);
             } else
                 this.pr.ubot.network.deliver(this.pr.pool[ubot],
                     new UBotCloudNotification_process(
@@ -380,21 +396,29 @@ class UBotProcess_writeMultiStorage extends UBotProcess_writeSingleStorage {
 
         Array.from(this.cortege).filter(
             ubot => ubot !== this.pr.selfPoolIndex && !this.parallelAnswers[suspect].has(this.pr.pool[ubot].number)
-        ).forEach(ubot =>
-            this.pr.ubot.network.deliver(this.pr.pool[ubot],
-                new UBotCloudNotification_process(
-                    this.pr.ubot.network.myInfo,
-                    this.pr.poolId,
-                    this.procIndex,
-                    UBotCloudNotification_process.types.MULTI_STORAGE_VOTE_EXCLUSION_SUSPICIOUS,
-                    {
-                        isAnswer: false,
-                        commonCortegeIteration: this.commonCortegeIteration,
-                        suspect: suspect
-                    }
-                )
-            )
-        );
+        ).forEach(ubot => {
+            if (this.checkMaxWaitPeriod(ubot)) {
+                // check consensus available
+                if (this.cortege.size < this.quorumSize)
+                    this.fail("consensus was broken when vote exclusion suspicious");
+                else
+                    // check all suspicious exclusion votings
+                    this.suspicious.forEach(su => this.checkVoteExclusionSuspectLeave(su));
+            } else
+                this.pr.ubot.network.deliver(this.pr.pool[ubot],
+                    new UBotCloudNotification_process(
+                        this.pr.ubot.network.myInfo,
+                        this.pr.poolId,
+                        this.procIndex,
+                        UBotCloudNotification_process.types.MULTI_STORAGE_VOTE_EXCLUSION_SUSPICIOUS,
+                        {
+                            isAnswer: false,
+                            commonCortegeIteration: this.commonCortegeIteration,
+                            suspect: suspect
+                        }
+                    )
+                );
+        });
     }
 
     async verifyResult(result, previousRecordId, ubotNumber) {
@@ -661,7 +685,31 @@ class UBotProcess_writeMultiStorage extends UBotProcess_writeSingleStorage {
 
             new ScheduleExecutor(() => this.searchCommonCortege(), 0, this.pr.ubot.executorService).run();
 
-        } else if (Array.from(this.cortege).filter(ubot => !this.declineCounterSet.has(ubot)).length < this.quorumSize ||
+        } else
+            this.voteCheckDecline();
+    }
+
+    voteUpdateCortege(removed) {
+        this.approveCounterSet.delete(removed);
+        this.declineCounterSet.delete(removed);
+
+        let removedNumber = this.pr.pool[removed].number;
+        this.cortege.forEach(ubot => {
+            this.approveCounterFromOthersSets[ubot].delete(removedNumber);
+            this.declineCounterFromOthersSets[ubot].delete(removedNumber);
+
+            if (this.approveCounterFromOthersSets[ubot].size < this.quorumSize)
+                this.approveCounterSet.delete(ubot);
+
+            if (this.declineCounterFromOthersSets[ubot].size <= this.cortege.size - this.quorumSize)
+                this.declineCounterSet.delete(ubot);
+        });
+
+        this.voteCheckDecline();
+    }
+
+    voteCheckDecline() {
+        if (Array.from(this.cortege).filter(ubot => !this.declineCounterSet.has(ubot)).length < this.quorumSize ||
             this.declineCounterSet.has(this.pr.selfPoolIndex)) {
 
             // error
@@ -691,6 +739,29 @@ class UBotProcess_writeMultiStorage extends UBotProcess_writeSingleStorage {
         else if (this.declineCounterFromOthersSets[notification.params.dataUbotInPool].size > this.cortege.size - this.quorumSize)
             this.declineCounterSet.add(notification.params.dataUbotInPool);
 
+        this.voteCheckCortegeFire();
+    }
+
+    voteSuspiciousCortegeIdUpdateCortege(removed) {
+        this.approveCounterSet.delete(removed);
+        this.declineCounterSet.delete(removed);
+
+        let removedNumber = this.pr.pool[removed].number;
+        this.cortege.forEach(ubot => {
+            this.approveCounterFromOthersSets[ubot].delete(removedNumber);
+            this.declineCounterFromOthersSets[ubot].delete(removedNumber);
+
+            if (this.approveCounterFromOthersSets[ubot].size < this.quorumSize)
+                this.approveCounterSet.delete(ubot);
+
+            if (this.declineCounterFromOthersSets[ubot].size <= this.cortege.size - this.quorumSize)
+                this.declineCounterSet.delete(ubot);
+        });
+
+        this.voteCheckCortegeFire();
+    }
+
+    voteCheckCortegeFire() {
         // decision on all suspicious ubots complete
         if (this.approveCounterSet.size + this.declineCounterSet.size >= this.suspicious.size) {
             this.getCortegeIdsTask.cancel();
@@ -724,16 +795,21 @@ class UBotProcess_writeMultiStorage extends UBotProcess_writeSingleStorage {
         } else {
             this.declineCounterSet.add(notification.from.number);
 
-            if (Array.from(this.cortege).filter(ubot => !this.declineCounterSet.has(ubot)).length < this.quorumSize) {
-                this.votingDecisionTask.cancel();
+            this.checkDecisionDecline(notification.params.commonCortegeIteration);
+        }
+    }
 
-                if (notification.params.commonCortegeIteration === -1)
-                    this.state = UBotProcess_writeMultiStorage.states.ANALYSIS;
-                else
-                    this.iterationState[this.commonCortegeIteration] = UBotProcess_writeMultiStorage.states.ANALYSIS;
+    checkDecisionDecline(iteration) {
+        if (Array.from(this.cortege).filter(
+            ubot => !this.declineCounterSet.has(this.pr.pool[ubot].number)).length < this.quorumSize) {
+            this.votingDecisionTask.cancel();
 
-                this.decisionsFire(false);
-            }
+            if (iteration === -1)
+                this.state = UBotProcess_writeMultiStorage.states.ANALYSIS;
+            else
+                this.iterationState[iteration] = UBotProcess_writeMultiStorage.states.ANALYSIS;
+
+            this.decisionsFire(false);
         }
     }
 
@@ -753,10 +829,16 @@ class UBotProcess_writeMultiStorage extends UBotProcess_writeSingleStorage {
         } else {
             this.leaveCounterSet[notification.params.suspect].add(notification.from.number);
 
-            if (this.leaveCounterSet[notification.params.suspect].size > this.pr.pool.length - this.quorumSize) {
-                this.votingExclusionSuspiciousTasks[notification.params.suspect].cancel();
-                this.votingExclusionSuspiciousFires[notification.params.suspect](false);
-            }
+            this.checkVoteExclusionSuspectLeave(notification.params.suspect);
+        }
+    }
+
+    checkVoteExclusionSuspectLeave(suspect) {
+        if (Array.from(this.cortege).filter(
+            ubot => !this.leaveCounterSet[suspect].has(this.pr.pool[ubot].number)).length < this.quorumSize) {
+
+            this.votingExclusionSuspiciousTasks[suspect].cancel();
+            this.votingExclusionSuspiciousFires[suspect](false);
         }
     }
 
@@ -876,6 +958,9 @@ class UBotProcess_writeMultiStorage extends UBotProcess_writeSingleStorage {
             this.declineCounterFromOthersSets[su] = new Set();
         });
 
+        // save first request times
+        this.saveRequestTimes();
+
         this.pulseGetCortegeIds();
         this.getCortegeIdsTask = new ExecutorWithFixedPeriod(() => this.pulseGetCortegeIds(),
             UBotConfig.multi_storage_vote_period, this.pr.ubot.executorService).run();
@@ -955,6 +1040,9 @@ class UBotProcess_writeMultiStorage extends UBotProcess_writeSingleStorage {
         let voteApprove = this.cortege;
         this.suspicious.forEach(su => voteApprove.delete(su));
         this.iterationsVoteLeave[this.commonCortegeIteration] = voteApprove;
+
+        // save first request times
+        this.saveRequestTimes();
 
         // voting for the exclusion of the most suspicious ubots
         await Promise.all(Array.from(this.suspicious).map(async(su) => {
@@ -1145,11 +1233,7 @@ class UBotProcess_writeMultiStorage extends UBotProcess_writeSingleStorage {
 
                     this.otherAnswers.add(notification.from.number);
 
-                    if (Array.from(this.cortege).every(ubot => ubot === this.pr.selfPoolIndex ||
-                        this.otherAnswers.has(this.pr.pool[ubot].number))) {
-                        this.getCortegesTask.cancel();
-                        this.cortegeFire();
-                    }
+                    this.checkCortegesReceived();
                 }
 
             } else if (notification.type === UBotCloudNotification_process.types.MULTI_STORAGE_GET_SUSPICIOUS_CORTEGE_HASHID) {
@@ -1170,6 +1254,7 @@ class UBotProcess_writeMultiStorage extends UBotProcess_writeSingleStorage {
                             )
                         );
                 } else if (this.getCortegeIdsTask != null && !this.getCortegeIdsTask.cancelled &&
+                    this.cortege.has(this.pr.poolIndexes.get(notification.from.number)) &&
                     notification.params.commonCortegeIteration === this.commonCortegeIteration)
                     this.voteSuspiciousCortegeId(notification);
 
@@ -1212,16 +1297,8 @@ class UBotProcess_writeMultiStorage extends UBotProcess_writeSingleStorage {
 
                             this.decisionsFire();
                         }
-                    } else {
-                        this.getDecisionsTask.cancel();
-
-                        if (notification.params.commonCortegeIteration === -1)
-                            this.state = UBotProcess_writeMultiStorage.states.VOTE_DECLINED;
-                        else
-                            this.iterationState[this.commonCortegeIteration] = UBotProcess_writeMultiStorage.states.VOTE_DECLINED;
-
-                        this.decisionsFire();
-                    }
+                    } else
+                        this.decisionVoteDeclined(notification.params.commonCortegeIteration);
                 }
 
             } else if (notification.type === UBotCloudNotification_process.types.MULTI_STORAGE_VOTE_DECISION) {
@@ -1273,6 +1350,7 @@ class UBotProcess_writeMultiStorage extends UBotProcess_writeSingleStorage {
                             )
                         );
                 } else if (this.votingExclusionSuspiciousTasks[notification.params.suspect] != null &&
+                    this.cortege.has(this.pr.poolIndexes.get(notification.from.number)) &&
                     !this.votingExclusionSuspiciousTasks[notification.params.suspect].cancelled &&
                     notification.params.commonCortegeIteration === this.commonCortegeIteration) {
 
@@ -1291,6 +1369,25 @@ class UBotProcess_writeMultiStorage extends UBotProcess_writeSingleStorage {
             this.cortege.delete(ubotInPool);
 
         return res;
+    }
+
+    checkCortegesReceived() {
+        if (Array.from(this.cortege).every(ubot => ubot === this.pr.selfPoolIndex ||
+            this.otherAnswers.has(this.pr.pool[ubot].number))) {
+            this.getCortegesTask.cancel();
+            this.cortegeFire();
+        }
+    }
+
+    decisionVoteDeclined(iteration) {
+        this.getDecisionsTask.cancel();
+
+        if (iteration === -1)
+            this.state = UBotProcess_writeMultiStorage.states.VOTE_DECLINED;
+        else
+            this.iterationState[iteration] = UBotProcess_writeMultiStorage.states.VOTE_DECLINED;
+
+        this.decisionsFire();
     }
 }
 

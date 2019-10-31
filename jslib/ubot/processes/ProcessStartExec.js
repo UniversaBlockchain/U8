@@ -89,6 +89,18 @@ class ProcessStartExec extends ProcessBase {
         ));
     }
     
+    function getUBotNumber() {
+        return new Promise((resolve, reject) => wrkInner.farcall("getUBotNumberInPool", [], {},
+            ans => resolve(ans), err => reject(err)
+        ));
+    }
+    
+    function getUBotNumberInPool() {
+        return new Promise((resolve, reject) => wrkInner.farcall("getUBotNumberInPool", [], {},
+            ans => resolve(ans), err => reject(err)
+        ));
+    }
+    
     function errorFail(methodName, err) {
         return new Promise(resolve => wrkInner.farcall("errorFail", [methodName, err], {}, ans => resolve(ans)));
     }
@@ -194,6 +206,14 @@ class ProcessStartExec extends ProcessBase {
 
                 this.pr.worker.export["getUBotRegistryContract"] = async (args, kwargs) => {
                     return await this.getUBotRegistryContract();
+                };
+
+                this.pr.worker.export["getUBotNumber"] = async (args, kwargs) => {
+                    return this.getUBotNumber();
+                };
+
+                this.pr.worker.export["getUBotNumberInPool"] = async (args, kwargs) => {
+                    return this.getUBotNumberInPool();
                 };
 
                 this.pr.worker.export["errorFail"] = (args, kwargs) => {
@@ -746,6 +766,14 @@ class ProcessStartExec extends ProcessBase {
 
     async getUBotRegistryContract() {
         return await this.pr.ubot.client.getUBotRegistryContract();
+    }
+
+    getUBotNumber() {
+        return this.pr.ubot.network.myInfo.number;
+    }
+
+    getUBotNumberInPool() {
+        return this.pr.selfPoolIndex;
     }
 
     errorFail(methodName, err) {
