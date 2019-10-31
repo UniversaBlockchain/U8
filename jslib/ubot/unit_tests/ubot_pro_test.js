@@ -18,6 +18,7 @@ const roles = require('roles');
 const Constraint = require('constraint').Constraint;
 const BigDecimal  = require("big").Big;
 const t = require("tools");
+const ut = require("ubot/ubot_tools");
 
 const TOPOLOGY_ROOT = "../jslib/ubot/topology/";
 const TOPOLOGY_FILE = "universa.pro.json";          //test_node_config_v2.json
@@ -99,6 +100,23 @@ async function generateSimpleExecutableContract(jsFileName, methodName) {
     executableContract.state.data.cloud_methods[methodName] = {
         pool: {size: 5},
         quorum: {size: 4}
+    };
+
+    executableContract.state.data.js = await io.fileGetContentsAsString(TEST_CONTRACTS_PATH + jsFileName);
+
+    await executableContract.seal();
+
+    return executableContract;
+}
+
+async function generateSimplePercentExecutableContract(jsFileName) {
+    let executableContract = Contract.fromPrivateKey(userPrivKey);
+
+    executableContract.state.data.cloud_methods = {
+        register: {
+            pool: {percent: 20},
+            quorum: {percent: 60}
+        }
     };
 
     executableContract.state.data.js = await io.fileGetContentsAsString(TEST_CONTRACTS_PATH + jsFileName);
@@ -791,3 +809,38 @@ unit.test("ubot_pro_test: lottery", async () => {
 //
 //     await shutdownUBots(ubotMains);//}
 // });
+
+unit.test("ubot_pro_test: quorum as a percentage of the pool", async () => {
+    let ubotMains = await createUBots(ubotsCount);
+
+    // simple contract for registration
+    let simpleContract = Contract.fromPrivateKey(userPrivKey);
+    await simpleContract.seal();
+    let packedSimpleContract = await simpleContract.getPackedTransaction();
+
+    let ubotClient = await new UBotClient(clientKey, TOPOLOGY_ROOT + TOPOLOGY_FILE).start();
+
+    let executableContract = await generateSimplePercentExecutableContract("simpleRegister.js");
+    let requestContract = await generateSimpleRegisterRequestContract(executableContract, packedSimpleContract);
+
+    /*let state = await ubotClient.executeCloudMethod(requestContract, true);
+
+    console.log("State: " + JSON.stringify(state));
+
+    assert(state.state === UBotPoolState.FINISHED.val);*/
+
+    let registryContract = await Contract.fromSealedBinary(await ubotClient.getUBotRegistryContract());
+
+    let result = ut.getQuorumAndPoolSize(requestContract, registryContract);
+
+    console.log("result.pool: " + result.pool);
+    console.log("result.quorum: " + result.quorum);
+
+    await ubotClient.shutdown();
+
+    // waiting pool finished...
+    while (ubotMains.some(main => Array.from(main.ubot.processors.values()).some(proc => proc.state.canContinue)))
+        await sleep(100);
+
+    await shutdownUBots(ubotMains);
+});
