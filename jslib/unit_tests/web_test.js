@@ -536,3 +536,21 @@ unit.test("web_test: http to restarting node", async () => {
     await httpServer.stopServer();
     await httpClient.stop();
 });
+
+unit.test("web_test: http server start exception", async () => {
+    let localNodePrivKey = await crypto.PrivateKey.generate(2048);
+
+    let httpServer1 = new network.HttpServer("0.0.0.0", 8080, 20);
+    httpServer1.initSecureProtocol(localNodePrivKey);
+    httpServer1.startServer();
+
+    try {
+        let httpServer2 = new network.HttpServer("0.0.0.0", 8080, 20);
+        assert(false); // should throw exception
+    } catch (e) {
+        //console.log("exception: " + e);
+        assert(true); // wait for exception
+    }
+
+    await httpServer1.stopServer();
+});

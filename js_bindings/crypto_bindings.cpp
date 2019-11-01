@@ -471,6 +471,7 @@ Local<FunctionTemplate> initSymmetricKey(Isolate *isolate) {
             isolate,
             "SymmetricKey",
             [=](const FunctionCallbackInfo<Value> &args) -> SymmetricKey * {
+                Isolate *isolate = args.GetIsolate();
                 switch (args.Length()) {
                     case 1:
                         if (args[0]->IsTypedArray()) {

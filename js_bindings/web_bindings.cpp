@@ -120,6 +120,7 @@ Local<FunctionTemplate> initNodeInfo(Scripter& scripter) {
             isolate,
             "NodeInfoImpl",
             [=](const FunctionCallbackInfo<Value> &args) -> NodeInfo* {
+                Isolate *isolate = args.GetIsolate();
                 if (args.Length() == 9) {
                     if (!args[0]->IsTypedArray()) {
                         isolate->ThrowException(
@@ -188,6 +189,7 @@ Local<FunctionTemplate> initSocketAddress(Scripter& scripter) {
             isolate,
             "SocketAddressImpl",
             [=](const FunctionCallbackInfo<Value> &args) -> SocketAddress* {
+                Isolate *isolate = args.GetIsolate();
                 if (args.Length() == 2) {
                     return new SocketAddress(
                             string(*String::Utf8Value(isolate, args[0])),                    // host
@@ -406,6 +408,7 @@ Local<FunctionTemplate> initUDPAdapter(Scripter& scripter) {
             isolate,
             "UDPAdapterImpl",
             [=](const FunctionCallbackInfo<Value> &args) -> UDPAdapterWrapper* {
+                Isolate *isolate = args.GetIsolate();
                 if (args.Length() == 3) {
                     try {
                         auto contents = args[0].As<TypedArray>()->Buffer()->GetContents();
@@ -734,6 +737,7 @@ Local<FunctionTemplate> initHttpServer(Scripter& scripter) {
             isolate,
             "HttpServerTpl",
             [=](const FunctionCallbackInfo<Value> &args) -> HttpServerBuffered* {
+                Isolate *isolate = args.GetIsolate();
                 if (args.Length() == 4) {
                     try {
                         auto res = new HttpServerBuffered(
@@ -1107,6 +1111,7 @@ Local<FunctionTemplate> initHttpClient(Scripter& scripter) {
             isolate,
             "HttpClientTpl",
             [=](const FunctionCallbackInfo<Value> &args) -> HttpClientBuffered* {
+                Isolate *isolate = args.GetIsolate();
                 if (args.Length() == 1) {
                     try {
                         auto res = new HttpClientBuffered(

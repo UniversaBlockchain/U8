@@ -138,6 +138,7 @@ Local<FunctionTemplate> initMemoryUser1(Scripter& scripter) {
             isolate,
             "MemoryUser1Tpl",
             [=](const FunctionCallbackInfo<Value> &args) -> MemoryUser1* {
+                Isolate *isolate = args.GetIsolate();
                 if (args.Length() == 0) {
                     try {
                         auto res = new MemoryUser1();
@@ -169,6 +170,7 @@ Local<FunctionTemplate> initMemoryUser2(Scripter& scripter) {
             isolate,
             "MemoryUser2Tpl",
             [=](const FunctionCallbackInfo<Value> &args) -> MemoryUser2* {
+                Isolate *isolate = args.GetIsolate();
                 if (args.Length() == 0) {
                     try {
                         auto res = new MemoryUser2();
@@ -200,6 +202,7 @@ Local<FunctionTemplate> initMemoryUser3(Scripter& scripter) {
             isolate,
             "MemoryUser3Tpl",
             [=](const FunctionCallbackInfo<Value> &args) -> MemoryUser3* {
+                Isolate *isolate = args.GetIsolate();
                 if (args.Length() == 0) {
                     try {
                         auto res = new MemoryUser3();
