@@ -90,7 +90,7 @@ class ProcessStartExec extends ProcessBase {
     }
     
     function getUBotNumber() {
-        return new Promise((resolve, reject) => wrkInner.farcall("getUBotNumberInPool", [], {},
+        return new Promise((resolve, reject) => wrkInner.farcall("getUBotNumber", [], {},
             ans => resolve(ans), err => reject(err)
         ));
     }
@@ -549,16 +549,26 @@ class ProcessStartExec extends ProcessBase {
 
             // get actual hash from MainNet by this.executableContract.id (further recordId)
             let actualHash = await this.pr.session.getStorage(false, this.trustLevel);
-            if (actualHash == null)
+            if (actualHash == null) {
+                this.pr.logger.log("getSingleStorage: getStorage return null");
                 return null;
+            } else
+                this.pr.logger.log("getSingleStorage: actual hash = " + actualHash);
 
             let result = await this.pr.ubot.getStoragePackedResultByRecordId(recordId, false);
+
+            if (result != null)
+                this.pr.logger.log("getSingleStorage: current result hash = " + result.cortegeId);
+            else
+                this.pr.logger.log("getSingleStorage: current result is null");
 
             if (result == null || !actualHash.equals(crypto.HashId.of(result))) {
                 result = await this.pr.ubot.network.searchActualStorageResult(recordId, actualHash, false);
 
-                if (result == null)
+                if (result == null) {
+                    this.pr.logger.log("getSingleStorage: searchActualStorageResult return null");
                     return null;
+                }
 
                 this.pr.ubot.resultCache.put(recordId, result);
 
@@ -586,18 +596,27 @@ class ProcessStartExec extends ProcessBase {
 
             // get actual hash from MainNet by this.executableContract.id (further recordId)
             let actualHash = await this.pr.session.getStorage(true, this.trustLevel);
-            if (actualHash == null)
+            if (actualHash == null) {
+                this.pr.logger.log("getMultiStorage: getStorage return null");
                 return null;
+            } else
+                this.pr.logger.log("getMultiStorage: actual hash = " + actualHash);
 
             let result = await this.pr.ubot.getRecordsFromMultiStorageByRecordId(recordId);
 
-            if (result != null && result.cortegeId.equals(actualHash))
-                return result.records;
+            if (result != null) {
+                this.pr.logger.log("getMultiStorage: current result hash = " + result.cortegeId);
+                if (result.cortegeId.equals(actualHash))
+                    return result.records;
+            } else
+                this.pr.logger.log("getMultiStorage: current result is null");
 
             result = await this.pr.ubot.network.searchActualStorageResult(recordId, actualHash, true);
 
-            if (result == null)
+            if (result == null) {
+                this.pr.logger.log("getMultiStorage: searchActualStorageResult return null");
                 return null;
+            }
 
             let cortege = new Map();
             let records = [];

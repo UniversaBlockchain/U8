@@ -777,39 +777,6 @@ unit.test("ubot_pro_test: lottery", async () => {
     await shutdownUBots(ubotMains);
 });
 
-// unit.test("ubot_pro_test: execute cloud method with ubot delay", async () => {
-//     let ubotMains = await createUBots(ubotsCount);
-//
-//     // ubotMains.forEach(main => main.ubot.network.verboseLevel = VerboseLevel.BASE);
-//     // for (let i = 0; i < 10; i++) {
-//     // console.error("Iteration = " + i);
-//
-//     let ubotClient = await new UBotClient(clientKey, TOPOLOGY_ROOT + TOPOLOGY_FILE).start();
-//
-//     let executableContract = await generateSimpleExecutableContract("ubotDelay.js", "getNumbers");
-//
-//     let requestContract = Contract.fromPrivateKey(userPrivKey);
-//     requestContract.state.data.method_name = "getNumbers";
-//     requestContract.state.data.executable_contract_id = executableContract.id;
-//
-//     await cs.addConstraintToContract(requestContract, executableContract, "executableContractConstraint",
-//         Constraint.TYPE_EXISTING_STATE, ["this.state.data.executable_contract_id == ref.id"], true);
-//
-//     let state = await ubotClient.executeCloudMethod(requestContract, true);
-//
-//     console.log("State: " + JSON.stringify(state));
-//
-//     assert(state.state === UBotPoolState.FINISHED.val);
-//
-//     await ubotClient.shutdown();
-//
-//     // waiting pool finished...
-//     while (ubotMains.some(main => Array.from(main.ubot.processors.values()).some(proc => proc.state.canContinue)))
-//         await sleep(100);
-//
-//     await shutdownUBots(ubotMains);//}
-// });
-
 unit.test("ubot_pro_test: quorum as a percentage of the pool", async () => {
     let ubotMains = await createUBots(ubotsCount);
 
@@ -837,6 +804,52 @@ unit.test("ubot_pro_test: quorum as a percentage of the pool", async () => {
     console.log("result.quorum: " + result.quorum);
 
     await ubotClient.shutdown();
+
+    // waiting pool finished...
+    while (ubotMains.some(main => Array.from(main.ubot.processors.values()).some(proc => proc.state.canContinue)))
+        await sleep(100);
+
+    await shutdownUBots(ubotMains);
+});
+
+unit.test("ubot_pro_test: execute cloud method with ubot delay", async () => {
+    let ubotMains = await createUBots(ubotsCount);
+
+    // ubotMains.forEach(main => main.ubot.network.verboseLevel = VerboseLevel.BASE);
+    // for (let i = 0; i < 10; i++) {
+    // console.error("Iteration = " + i);
+
+    let ubotClient = await new UBotClient(clientKey, TOPOLOGY_ROOT + TOPOLOGY_FILE).start();
+
+    let executableContract = await generateSimpleExecutableContract("ubotDelay.js", "getNumbers");
+
+    executableContract.state.data.cloud_methods.getNumbers.max_wait_ubot = 10;
+    await executableContract.seal();
+
+    let excluded = 3;
+
+    let requestContract = Contract.fromPrivateKey(userPrivKey);
+    requestContract.state.data.method_name = "getNumbers";
+    requestContract.state.data.method_args = [[excluded]];
+    requestContract.state.data.executable_contract_id = executableContract.id;
+
+    await cs.addConstraintToContract(requestContract, executableContract, "executableContractConstraint",
+        Constraint.TYPE_EXISTING_STATE, ["this.state.data.executable_contract_id == ref.id"], true);
+
+    let state = await ubotClient.executeCloudMethod(requestContract, true);
+
+    console.log("State: " + JSON.stringify(state));
+
+    assert(state.state === UBotPoolState.FINISHED.val);
+
+    let poolSet = new Set();
+    assert(state.result.every(numbers => {
+        let res = !poolSet.has(numbers.inPool) && numbers.inPool >= 0 && numbers.inPool < 5 && numbers.inPool !== excluded;
+        poolSet.add(numbers.inPool);
+        return res;
+    }));
+
+    await ubotClient.shutdown();//}
 
     // waiting pool finished...
     while (ubotMains.some(main => Array.from(main.ubot.processors.values()).some(proc => proc.state.canContinue)))
