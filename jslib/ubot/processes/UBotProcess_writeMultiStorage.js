@@ -8,6 +8,7 @@ const UBotProcess_writeSingleStorage = require("ubot/processes/UBotProcess_write
 const UBotConfig = require("ubot/ubot_config").UBotConfig;
 const ErrorRecord = require("errors").ErrorRecord;
 const Errors = require("errors").Errors;
+const UBotProcessException = require("ubot/ubot_exceptions").UBotProcessException;
 const UBotPoolState = require("ubot/ubot_pool_state").UBotPoolState;
 const UBotCloudNotification_process = require("ubot/ubot_notification").UBotCloudNotification_process;
 const BossBiMapper = require("bossbimapper").BossBiMapper;
@@ -130,7 +131,7 @@ class UBotProcess_writeMultiStorage extends UBotProcess_writeSingleStorage {
         this.pr.errors.push(new ErrorRecord(Errors.FAILURE, "UBotProcess_writeMultiStorage", error));
         this.pr.changeState(UBotPoolState.FAILED);
 
-        this.onFailed();
+        this.onFailed(new UBotProcessException("Error UBotProcess_writeMultiStorage: " + error));
     }
 
     pulseGetHashes() {

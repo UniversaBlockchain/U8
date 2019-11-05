@@ -9,7 +9,7 @@ import {UBotSession, UBotSessionState} from 'ubot/ubot_session'
 const TopologyBuilder = require("topology_builder").TopologyBuilder;
 const UBotPoolState = require("ubot/ubot_pool_state").UBotPoolState;
 const UBotConfig = require("ubot/ubot_config").UBotConfig;
-const UBotClientException = require("ubot/ubot_client_exception").UBotClientException;
+const UBotClientException = require("ubot/ubot_exceptions").UBotClientException;
 const ItemResult = require('itemresult').ItemResult;
 const Lock = require("lock").Lock;
 const BossBiMapper = require("bossbimapper").BossBiMapper;

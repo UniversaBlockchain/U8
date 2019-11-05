@@ -136,6 +136,13 @@ class UBotCloudNotification_process extends Notification {
         this.typeCode = CODE_UBOT_CLOUD_NOTIFICATION_PROCESS;
     }
 
+    writeNullableHashId(bw, hash) {
+        if (hash != null)
+            bw.write(hash.digest);
+        else
+            bw.write(null);
+    }
+
     writeTo(bw) {
         bw.write(this.poolId.digest);
 
@@ -169,9 +176,9 @@ class UBotCloudNotification_process extends Notification {
                 bw.write(this.params.dataUbotInPool);
 
                 if (this.params.isAnswer) {
-                    bw.write(this.params.dataHashId.digest);
+                    this.writeNullableHashId(bw, this.params.dataHashId);
                     if (!isFirstRecord)
-                        bw.write(this.params.previousRecordId.digest);
+                        this.writeNullableHashId(bw, this.params.previousRecordId);
                 }
                 break;
             case UBotCloudNotification_process.types.MULTI_STORAGE_GET_CORTEGES:
@@ -197,6 +204,14 @@ class UBotCloudNotification_process extends Notification {
                 if (this.params.isAnswer)
                     bw.write(this.params.decision);
         }
+    }
+
+    readNullableHashId(br) {
+        let hash = br.read();
+        if (hash != null)
+            return crypto.HashId.withDigest(hash);
+        else
+            return null;
     }
 
     readFrom(br) {
@@ -233,9 +248,9 @@ class UBotCloudNotification_process extends Notification {
                 this.params.dataUbotInPool = br.read();
 
                 if (this.params.isAnswer) {
-                    this.params.dataHashId = crypto.HashId.withDigest(br.read());
+                    this.params.dataHashId = this.readNullableHashId(br);
                     if (!isFirstRecord)
-                        this.params.previousRecordId = crypto.HashId.withDigest(br.read());
+                        this.params.previousRecordId = this.readNullableHashId(br);
                     else
                         this.params.previousRecordId = null;
                 }

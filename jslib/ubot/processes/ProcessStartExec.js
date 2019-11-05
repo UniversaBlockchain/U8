@@ -14,6 +14,7 @@ const t = require("tools");
 const ut = require("ubot/ubot_tools");
 const ErrorRecord = require("errors").ErrorRecord;
 const Errors = require("errors").Errors;
+const UBotProcessException = require("ubot/ubot_exceptions").UBotProcessException;
 const UBotPoolState = require("ubot/ubot_pool_state").UBotPoolState;
 const UBotCloudNotification_process = require("ubot/ubot_notification").UBotCloudNotification_process;
 const Boss = require('boss.js');
@@ -519,6 +520,8 @@ class ProcessStartExec extends ProcessBase {
             this.pr.errors.push(new ErrorRecord(Errors.FORBIDDEN, "writeSingleStorage",
                 "Can`t write empty data to single-storage"));
             this.pr.changeState(UBotPoolState.FAILED);
+
+            throw new UBotProcessException("Error writeSingleStorage: Can`t write empty data to single-storage");
         }
     }
 
@@ -540,6 +543,8 @@ class ProcessStartExec extends ProcessBase {
             this.pr.errors.push(new ErrorRecord(Errors.FORBIDDEN, "writeMultiStorage",
                 "Can`t write empty data to multi-storage"));
             this.pr.changeState(UBotPoolState.FAILED);
+
+            throw new UBotProcessException("Error writeMultiStorage: Can`t write empty data to multi-storage");
         }
     }
 

@@ -826,6 +826,27 @@ unit.test("ubot_pro_test: execute cloud method with ubot delay", async () => {
     executableContract.state.data.cloud_methods.getNumbers.max_wait_ubot = 10;
     await executableContract.seal();
 
+    // bad request without consensus
+    let badRequestContract = Contract.fromPrivateKey(userPrivKey);
+    badRequestContract.state.data.method_name = "getNumbers";
+    badRequestContract.state.data.method_args = [[2, 3]];
+    badRequestContract.state.data.executable_contract_id = executableContract.id;
+
+    await cs.addConstraintToContract(badRequestContract, executableContract, "executableContractConstraint",
+        Constraint.TYPE_EXISTING_STATE, ["this.state.data.executable_contract_id == ref.id"], true);
+
+    let errMessage = null;
+    try {
+        await ubotClient.executeCloudMethod(badRequestContract, true);
+    } catch (err) {
+        errMessage = err.message;
+    }
+
+    console.log("Error: " + errMessage);
+
+    assert(errMessage.startsWith("Cloud method consensus can`t be reached"));
+
+    // normal request with minimal consensus (quorum)
     let excluded = 3;
 
     let requestContract = Contract.fromPrivateKey(userPrivKey);

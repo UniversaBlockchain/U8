@@ -9,4 +9,11 @@ class UBotClientException extends Error {
     }
 }
 
-module.exports = {UBotClientException};
+class UBotProcessException extends Error {
+    constructor(message = undefined) {
+        super();
+        this.message = message;
+    }
+}
+
+module.exports = {UBotClientException, UBotProcessException};

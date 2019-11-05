@@ -5,7 +5,7 @@
 const t = require("tools");
 const ut = require("ubot/ubot_tools");
 const UBotConfig = require("ubot/ubot_config").UBotConfig;
-const UBotClientException = require("ubot/ubot_client_exception").UBotClientException;
+const UBotClientException = require("ubot/ubot_exceptions").UBotClientException;
 
 const UBotSessionState = {
     VOTING_REQUEST_ID       : {val: "VOTING_REQUEST_ID", ordinal: 0},
