@@ -2,6 +2,8 @@
  * Copyright (c) 2019-present Sergey Chernov, iCodici S.n.C, All Rights Reserved.
  */
 
+const ex = require("exceptions");
+
 /**
  * Get executable contract of request cloud method.
  *
@@ -32,12 +34,22 @@ function getRequestQuorumSize(requestContract) {
  *      quorum - number of UBots in the quorum.
  */
 function getQuorumAndPoolSize(requestContract, registryContract) {
-    let ubotsCount = registryContract.state.roles.ubots.roles.length;
-    let pool = Math.ceil(ubotsCount * getExecutableContract(requestContract).state.data.cloud_methods
-        [requestContract.state.data.method_name].pool.percent / 100);
+    let pool = getExecutableContract(requestContract).state.data.cloud_methods[requestContract.state.data.method_name].pool.size;
+    if (pool == null) {
+        let ubotsCount = registryContract.state.roles.ubots.roles.length;
+        pool = Math.ceil(ubotsCount * getExecutableContract(requestContract).state.data.cloud_methods
+            [requestContract.state.data.method_name].pool.percent / 100);
+        if (pool == null)
+            throw new ex.IllegalStateError("Pool is not specified in the contract");
+    }
 
     let quorum = Math.ceil(pool * getExecutableContract(requestContract).state.data.cloud_methods
         [requestContract.state.data.method_name].quorum.percent / 100);
+    if (quorum == null) {
+        quorum = getExecutableContract(requestContract).state.data.cloud_methods[requestContract.state.data.method_name].quorum.size;
+        if (quorum == null)
+            throw new ex.IllegalStateError("Quorum is not specified in the contract");
+    }
 
     return {
         pool: pool,
