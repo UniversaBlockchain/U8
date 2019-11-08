@@ -10,6 +10,7 @@ const Errors = require("errors").Errors;
 const UBotCloudNotification = require("ubot/ubot_notification").UBotCloudNotification;
 const UBotPoolState = require("ubot/ubot_pool_state").UBotPoolState;
 const PseudoRandom = require("pseudo_random").PseudoRandom;
+const ut = require("ubot/ubot_tools");
 
 class CloudProcessor {
     constructor(initialState, poolId, ubot, session) {
@@ -128,21 +129,17 @@ class CloudProcessor {
             this.methodArgs = this.requestContract.state.data.method_args;
 
         if (this.executableContract.state.data.cloud_methods.hasOwnProperty(this.methodName)) {
-            if (this.executableContract.state.data.cloud_methods[this.methodName].hasOwnProperty("pool"))
-                this.poolSize = this.executableContract.state.data.cloud_methods[this.methodName].pool.size;
-            else {
-                this.logger.log("Error CloudProcessor.initPoolAndQuorum undefined pool of starting method: " + this.methodName);
-                this.errors.push(new ErrorRecord(Errors.BAD_VALUE, "CloudProcessor.initPoolAndQuorum",
-                    "undefined pool of starting method: " + this.methodName));
-                this.changeState(UBotPoolState.FAILED);
-            }
+            try {
+                let result = ut.getPoolAndQuorumFromMetadata(
+                    this.executableContract.state.data.cloud_methods[this.methodName],
+                    this.ubot.network.netConfig.size);
 
-            if (this.executableContract.state.data.cloud_methods[this.methodName].hasOwnProperty("quorum"))
-                this.quorumSize = this.executableContract.state.data.cloud_methods[this.methodName].quorum.size;
-            else {
-                this.logger.log("Error CloudProcessor.initPoolAndQuorum undefined quorum of starting method: " + this.methodName);
-                this.errors.push(new ErrorRecord(Errors.BAD_VALUE, "CloudProcessor.initPoolAndQuorum",
-                    "undefined quorum of starting method: " + this.methodName));
+                this.poolSize = result.pool;
+                this.quorumSize = result.quorum;
+            } catch (err) {
+                let message = "Failed get pool and quorum of method \"" + this.methodName + "\": " + err.message;
+                this.logger.log("Error CloudProcessor.initPoolAndQuorum. " + message);
+                this.errors.push(new ErrorRecord(Errors.BAD_VALUE, "CloudProcessor.initPoolAndQuorum", message));
                 this.changeState(UBotPoolState.FAILED);
             }
 

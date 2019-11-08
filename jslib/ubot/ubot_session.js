@@ -153,7 +153,12 @@ class UBotSession {
         //     await this.client.askSessionOnAllNodes("initiateVote", {packedItem: contract.sealedBinary});
         await this.client.askSessionOnAllNodes("addKeyToContract", {itemId: contract.id});
 
-        let quorum = ut.getRequestQuorumSize(requestContract);
+        let quorum = 0;
+        if (this.ubot != null)      // UBot session
+            quorum = ut.getRequestPoolAndQuorum(requestContract, this.ubot.network.netConfig.size).quorum;
+        else                        // UBotClient session (without UBot)
+            quorum = this.client.poolAndQuorum.quorum;
+
         let maxWaitUbot = ut.getRequestMaxWaitUbot(requestContract);
 
         // wait quorum votes

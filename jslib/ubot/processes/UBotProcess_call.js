@@ -22,6 +22,7 @@ class UBotProcess_call extends ProcessBase {
         this.methodName = methodName;
 
         if (this.pr.executableContract.state.data.cloud_methods.hasOwnProperty(this.methodName)) {
+            // TODO: if use this replace on: ut.getPoolAndQuorumFromMetadata(this.pr.executableContract.state.data.cloud_methods[this.methodName], this.pr.ubot.network.netConfig.size)
             if (this.pr.executableContract.state.data.cloud_methods[this.methodName].hasOwnProperty("pool"))
                 this.poolSize = this.pr.executableContract.state.data.cloud_methods[this.methodName].pool.size;
             else

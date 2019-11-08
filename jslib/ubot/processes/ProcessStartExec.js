@@ -684,7 +684,7 @@ class ProcessStartExec extends ProcessBase {
             let issuer = new roles.QuorumVoteRole(
                 "issuer",
                 "refUbotRegistry.state.roles.ubots",
-                ut.getRequestQuorumSize(this.pr.requestContract).toString(),
+                this.pr.quorumSize.toString(),
                 c
             );
             c.registerRole(issuer);
@@ -742,8 +742,12 @@ class ProcessStartExec extends ProcessBase {
             created.setMilliseconds(0);
             contract.state.createdAt = created;
 
-            contract.registerRole(new roles.QuorumVoteRole("creator", "refUbotRegistry.state.roles.ubots",
-                ut.getRequestQuorumSize(this.pr.requestContract).toString(), contract));
+            contract.registerRole(new roles.QuorumVoteRole(
+                "creator",
+                "refUbotRegistry.state.roles.ubots",
+                this.pr.quorumSize.toString(),
+                contract
+            ));
 
             // constraint for UBotNet registry contract
             contract.createTransactionalSection();

@@ -12,6 +12,7 @@ const UBotCloudNotification_process = require("ubot/ubot_notification").UBotClou
 const BossBiMapper = require("bossbimapper").BossBiMapper;
 const Boss = require('boss.js');
 const t = require("tools");
+const ut = require("ubot/ubot_tools");
 
 class UBotProcess_writeSingleStorage extends ProcessBase {
     constructor(processor, onReady, onFailed, mainProcess, procIndex) {
@@ -39,29 +40,38 @@ class UBotProcess_writeSingleStorage extends ProcessBase {
         this.storageName = storageData.storage_name;
         if (this.pr.executableContract.state.data.hasOwnProperty("cloud_storages") &&
             this.pr.executableContract.state.data.cloud_storages.hasOwnProperty(this.storageName)) {
-            if (this.pr.executableContract.state.data.cloud_storages[this.storageName].hasOwnProperty("pool"))
-                this.poolSize = this.pr.executableContract.state.data.cloud_storages[this.storageName].pool.size;
-            else
-                this.poolSize = this.pr.poolSize;
 
-            if (this.pr.executableContract.state.data.cloud_storages[this.storageName].hasOwnProperty("quorum"))
-                this.quorumSize = this.pr.executableContract.state.data.cloud_storages[this.storageName].quorum.size;
-            else
-                this.quorumSize = this.pr.quorumSize;
+            let storageData = this.pr.executableContract.state.data.cloud_storages[this.storageName];
+            if (storageData.hasOwnProperty("pool") && storageData.hasOwnProperty("quorum")) {
+                try {
+                    let result = ut.getPoolAndQuorumFromMetadata(storageData, this.pr.ubot.network.netConfig.size);
 
-            if (this.poolSize > this.pr.poolSize || this.quorumSize > this.pr.quorumSize) {
-                this.pr.logger.log("Error: insufficient pool or quorum to use storage '" + this.storageName + "'");
-                this.pr.errors.push(new ErrorRecord(Errors.FAILURE, "UBotProcess_writeStorage",
-                    "insufficient pool or quorum to use storage '" + this.storageName + "'"));
-                this.pr.changeState(UBotPoolState.FAILED);
+                    this.poolSize = result.pool;
+                    this.quorumSize = result.quorum;
+                } catch (err) {
+                    let message = "Failed get pool and quorum of method \"" + this.methodName + "\": " + err.message;
+                    this.pr.logger.log("Error CloudProcessor.initPoolAndQuorum. " + message);
+                    this.pr.errors.push(new ErrorRecord(Errors.BAD_VALUE, "CloudProcessor.initPoolAndQuorum", message));
+                    this.pr.changeState(UBotPoolState.FAILED);
 
-                this.onFailed();
+                    this.onFailed();
+                    return;
+                }
+
+                if (this.poolSize > this.pr.poolSize || this.quorumSize > this.pr.quorumSize) {
+                    this.pr.logger.log("Error: insufficient pool or quorum to use storage '" + this.storageName + "'");
+                    this.pr.errors.push(new ErrorRecord(Errors.FAILURE, "UBotProcess_writeStorage",
+                        "insufficient pool or quorum to use storage '" + this.storageName + "'"));
+                    this.pr.changeState(UBotPoolState.FAILED);
+
+                    this.onFailed();
+                }
+                return;
             }
-
-        } else {
-            this.poolSize = this.pr.poolSize;
-            this.quorumSize = this.pr.quorumSize;
         }
+
+        this.poolSize = this.pr.poolSize;
+        this.quorumSize = this.pr.quorumSize;
     }
 
     async start() {

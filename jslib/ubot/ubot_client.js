@@ -54,6 +54,7 @@ class UBotClient {
         this.closingRequests = new Set();
         this.lock = new Lock();
         this.ubotRegistryContract = null;
+        this.poolAndQuorum = null;
     }
 
     /**
@@ -493,10 +494,11 @@ class UBotClient {
      * Check request (request and executable contracts) before create session.
      *
      * @param {Contract} requestContract - The Request contract.
+     * @param {Contract} registryContract - The UBots registry contract.
      * @private
      * @throws {UBotClientException} client exception.
      */
-    static checkRequest(requestContract) {
+    checkRequest(requestContract, registryContract) {
         if (requestContract == null)
             throw new UBotClientException("Request contract is null");
 
@@ -530,15 +532,16 @@ class UBotClient {
             typeof executableContract.state.data.cloud_methods[methodName] !== "object")
             throw new UBotClientException("Error executable contract: starting cloud method metadata (in state.data.cloud_methods) is not object");
 
-        if (executableContract.state.data.cloud_methods[methodName].pool == null ||
-            executableContract.state.data.cloud_methods[methodName].pool.size == null)
-            throw new UBotClientException("Error executable contract: pool of starting cloud method is not defined in metadata (in state.data.cloud_methods)");
+        try {
+            this.poolAndQuorum = ut.getPoolAndQuorum(requestContract, registryContract);
+        } catch (err) {
+            throw new UBotClientException(
+                "Error executable contract: pool or quorum of starting cloud method is not defined in metadata (in state.data.cloud_methods). Error: "
+                + err.message
+            );
+        }
 
-        if (executableContract.state.data.cloud_methods[methodName].quorum == null ||
-            executableContract.state.data.cloud_methods[methodName].quorum.size == null)
-            throw new UBotClientException("Error executable contract: quorum of starting cloud method is not defined in metadata (in state.data.cloud_methods)");
-
-        if (executableContract.state.data.js == null)   // && executableContract.state.data.cloud_methods[methodName].ubotAsm == null)
+        if (executableContract.state.data.js == null)
             throw new UBotClientException("Error executable contract: executable contact JS-code is not defined");
     }
 
@@ -582,18 +585,19 @@ class UBotClient {
      *      100 ms if the session is in CLOSING mode. By default - false.
      * @async
      * @return {UBotSession} session.
+     * @throws {UBotClientException} client exception if cloud method can`t started.
      */
     async startCloudMethod(requestContract, waitPreviousSession = false) {
         if (this.httpUbotClient != null)
             throw new UBotClientException("Ubot is connected to the pool. First disconnect from the pool");
 
-        UBotClient.checkRequest(requestContract);
-
-        let session = await this.createSession(requestContract, waitPreviousSession);
-
         // get ubot registry and topology
         let ubotRegistry = await Contract.fromSealedBinary(await this.getUBotRegistryContract());
         this.topologyUBotNet = ubotRegistry.state.data.topology;
+
+        this.checkRequest(requestContract, ubotRegistry);
+
+        let session = await this.createSession(requestContract, waitPreviousSession);
 
         await this.connectRandomUbot(session.pool);
 
@@ -638,8 +642,7 @@ class UBotClient {
 
         let session = await this.startCloudMethod(requestContract, waitPreviousSession);
 
-        let quorum = ut.getRequestQuorumSize(requestContract);
-
+        let quorum = this.poolAndQuorum.quorum;
         let states = [];
         let groups = new Map();
 
