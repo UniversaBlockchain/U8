@@ -3,6 +3,7 @@
  */
 
 import {getWorker, consoleWrapper, farcallWrapper} from 'worker'
+import {HttpClient} from 'web'
 
 const ProcessBase = require("ubot/processes/ProcessBase").ProcessBase;
 const UBotProcess_writeSingleStorage = require("ubot/processes/UBotProcess_writeSingleStorage").UBotProcess_writeSingleStorage;
@@ -74,6 +75,12 @@ class ProcessStartExec extends ProcessBase {
     
     function sealAndGetPackedTransactionByPool(contract) {
         return new Promise((resolve, reject) => wrkInner.farcall("sealAndGetPackedTransactionByPool", [contract], {},
+            ans => resolve(ans), err => reject(err)
+        ));
+    }
+    
+    function doHTTPRequest(url, onComplete) {
+        return new Promise((resolve, reject) => wrkInner.farcall("doHTTPRequest", [url], {},
             ans => resolve(ans), err => reject(err)
         ));
     }
@@ -201,6 +208,10 @@ class ProcessStartExec extends ProcessBase {
                     return await this.sealAndGetPackedTransactionByPool(args[0]);
                 };
 
+                this.pr.worker.export["doHTTPRequest"] = async (args, kwargs) => {
+                    return await this.doHTTPRequest(args[0]);
+                };
+
                 this.pr.worker.export["getRequestContract"] = async (args, kwargs) => {
                     return await this.getRequestContract();
                 };
@@ -232,6 +243,11 @@ class ProcessStartExec extends ProcessBase {
 
                 await this.pr.session.close();
                 this.pr.session = null;
+
+                if (this.pr.userHttpClient != null) {
+                    await this.pr.userHttpClient.stop();
+                    this.pr.userHttpClient = null;
+                }
 
                 this.pr.worker.release();
                 this.pr.worker = null;
@@ -782,6 +798,35 @@ class ProcessStartExec extends ProcessBase {
             this.pr.logger.log(err.stack);
             this.pr.errors.push(new ErrorRecord(Errors.FAILURE, "sealByPool",
                 "Error seal contract by pool: " + err.message));
+            this.pr.changeState(UBotPoolState.FAILED);
+
+            throw err;
+        }
+    }
+
+    async doHTTPRequest(url) {
+        try {
+            if (this.pr.userHttpClient == null)
+                this.pr.userHttpClient = new HttpClient();
+
+            return await new Promise(async(resolve, reject) => {
+                try {
+                    this.pr.userHttpClient.sendGetRequestUrl(url, (respCode, body) => {
+                        resolve({
+                            response_code: respCode,
+                            body: body
+                        });
+                    });
+                } catch (err) {
+                    reject(err);
+                }
+            });
+
+        } catch (err) {
+            this.pr.logger.log("Error async HTTP request: " + err.message);
+            this.pr.logger.log(err.stack);
+            this.pr.errors.push(new ErrorRecord(Errors.FAILURE, "asyncHTTPRequest",
+                "Error async HTTP request: " + err.message));
             this.pr.changeState(UBotPoolState.FAILED);
 
             throw err;

@@ -7,6 +7,8 @@ import {KeyAddress, PublicKey, HashId} from 'crypto'
 import * as tk from "unit_tests/test_keys";
 import * as io from "io";
 import {VerboseLevel} from "node_consts";
+import {HttpServer} from 'web'
+import {ExecutorWithFixedPeriod} from "executorservice";
 
 const UBotMain = require("ubot/ubot_main").UBotMain;
 const UBotPoolState = require("ubot/ubot_pool_state").UBotPoolState;
@@ -493,6 +495,70 @@ unit.test("ubot_pro_test: pool and quorum percentage", async () => {
     // waiting pool finished...
     while (ubotMains.some(main => Array.from(main.ubot.processors.values()).some(proc => proc.state.canContinue)))
         await sleep(100);
+
+    await shutdownUBots(ubotMains);
+});
+
+unit.test("ubot_pro_test: http requests", async () => {
+    let ubotMains = await createUBots(ubotsCount);
+
+    let price = 3.8;
+    let stopPrice = 5.073;
+
+    // test HTTP server with prices
+    let httpServer = new HttpServer("0.0.0.0", 8080, 5);
+    httpServer.addEndpoint("/getPrice", async (request) => {
+        request.setHeader("Content-Type", "text/html");
+        return {"price": price};
+    });
+
+    // price cycle
+    let executor = new ExecutorWithFixedPeriod(() => {
+        price += Math.random() / 10;
+        console.log("Current price: " + price);
+    }, 1000).run();
+
+    httpServer.startServer();
+
+    let ubotClient = await new UBotClient(clientKey, TOPOLOGY_ROOT + TOPOLOGY_FILE).start();
+
+    let executableContract = Contract.fromPrivateKey(userPrivKey);
+
+    executableContract.state.data.cloud_methods = {
+        stopOrder: {
+            pool: {size: 5},
+            quorum: {size: 4}
+        }
+    };
+
+    executableContract.state.data.js = await io.fileGetContentsAsString(TEST_CONTRACTS_PATH + "tradeOrder.js");
+    await executableContract.seal();
+
+    let requestContract = Contract.fromPrivateKey(userPrivKey);
+    requestContract.state.data.method_name = "stopOrder";
+    requestContract.state.data.method_args = [stopPrice];
+    requestContract.state.data.executable_contract_id = executableContract.id;
+
+    await cs.addConstraintToContract(requestContract, executableContract, "executableContractConstraint",
+        Constraint.TYPE_EXISTING_STATE, ["this.state.data.executable_contract_id == ref.id"], true);
+
+    let state = await ubotClient.executeCloudMethod(requestContract, true);
+
+    console.log("State: " + JSON.stringify(state));
+
+    assert(state.state === UBotPoolState.FINISHED.val);
+    assert(state.result instanceof Array);
+    assert(state.result.length >= executableContract.state.data.cloud_methods.stopOrder.quorum.size);
+    assert(state.result.every(result => result.price >= stopPrice));
+
+    await ubotClient.shutdown();
+
+    // waiting pool finished...
+    while (ubotMains.some(main => Array.from(main.ubot.processors.values()).some(proc => proc.state.canContinue)))
+        await sleep(100);
+
+    await httpServer.stopServer();
+    executor.cancel();
 
     await shutdownUBots(ubotMains);
 });

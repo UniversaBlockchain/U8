@@ -35,6 +35,7 @@ class CloudProcessor {
         this.quorumSize = 0;
         this.ProcessStartExec = ProcessStartExec;
         this.worker = null;
+        this.userHttpClient = null;
         this.prng = new PseudoRandom(poolId);
         this.selectPool();
 
