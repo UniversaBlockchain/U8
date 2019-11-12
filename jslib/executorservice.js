@@ -172,7 +172,11 @@ class ExecutorWithFixedPeriod extends Executor {
             if (!this.cancelled) {
                 this.timer = trs.timeout(this.period, this.timerCallback);
 
-                await this.lambda();
+                try {
+                    await this.lambda();
+                } catch (e) {
+                    console.error("ExecutorWithFixedPeriod error: " + e);
+                }
             }
         };
 
@@ -250,7 +254,11 @@ class ExecutorWithDynamicPeriod extends Executor {
                 let period = this.periods[(this.waitsCount >= this.periods.length) ? this.periods.length - 1 : this.waitsCount];
                 this.timer = trs.timeout(period, this.timerCallback);
 
-                await this.lambda();
+                try {
+                    await this.lambda();
+                } catch (e) {
+                    console.error("ExecutorWithFixedPeriod error: " + e);
+                }
             }
         };
 
