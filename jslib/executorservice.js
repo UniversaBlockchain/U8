@@ -257,7 +257,7 @@ class ExecutorWithDynamicPeriod extends Executor {
                 try {
                     await this.lambda();
                 } catch (e) {
-                    console.error("ExecutorWithFixedPeriod error: " + e);
+                    console.error("ExecutorWithDynamicPeriod error: " + e);
                 }
             }
         };
