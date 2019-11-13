@@ -349,6 +349,48 @@ unit.test("ubot_pro_test: execute cloud method", async () => {
 //     await shutdownUBots(ubotMains);
 // });
 
+unit.test("ubot_pro_test: execute looped cloud method", async () => {
+    let ubotMains = await createUBots(ubotsCount);
+
+    let ubotClient = await new UBotClient(clientKey, TOPOLOGY_ROOT + TOPOLOGY_FILE).start();
+
+    let executableContract = Contract.fromPrivateKey(userPrivKey);
+    executableContract.state.data.cloud_methods = {
+        loop: {
+            pool: {size: 5},
+            quorum: {size: 4}
+        }
+    };
+
+    executableContract.state.data.js = "function loop() {while(true) {}}";
+
+    await executableContract.seal();
+
+    let requestContract = Contract.fromPrivateKey(userPrivKey);
+    requestContract.state.data.method_name = "loop";
+    requestContract.state.data.executable_contract_id = executableContract.id;
+
+    await cs.addConstraintToContract(requestContract, executableContract, "executableContractConstraint",
+        Constraint.TYPE_EXISTING_STATE, ["this.state.data.executable_contract_id == ref.id"], true);
+
+    let state = await ubotClient.executeCloudMethod(requestContract, true);
+
+    console.log("State: " + JSON.stringify(state));
+
+    assert(state.state === UBotPoolState.FAILED.val);
+
+    assert(state.errors[0].error === "FAILURE" && state.errors[0].objectName === "loop" &&
+           state.errors[0].message === "Cloud method return error: UBot time limit is reached");
+
+    await ubotClient.shutdown();
+
+    // waiting pool finished...
+    while (ubotMains.some(main => Array.from(main.ubot.processors.values()).some(proc => proc.state.canContinue)))
+        await sleep(100);
+
+    await shutdownUBots(ubotMains);
+});
+
 // unit.test("ubot_pro_test: full quorum", async () => {
 //     let ubotMains = await createUBots(ubotsCount);
 //     let ubotClient = await new UBotClient(clientKey, TOPOLOGY_ROOT + TOPOLOGY_FILE).start();
@@ -872,13 +914,13 @@ unit.test("ubot_pro_test: lottery", async () => {
             pool: {size: 3},
             quorum: {size: 3},
             storage_read_trust_level: 0.51,
-            max_wait_ubot: 30
+            max_wait_ubot: 60
         },
         raffle: {
             pool: {size: 12},
             quorum: {size: 10},
             storage_read_trust_level: 0.9,
-            max_wait_ubot: 30
+            max_wait_ubot: 60
         }
     };
 

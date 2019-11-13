@@ -23,6 +23,8 @@ class UBotConfig {
     static networkPositiveConsensus = 0.9;
 
     static storageReadTrustLevel = 0.3;
+
+    static maxRequestLife = 300000; // ms
 }
 
 module.exports = {UBotConfig};

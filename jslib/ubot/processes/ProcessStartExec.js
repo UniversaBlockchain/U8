@@ -241,9 +241,14 @@ class ProcessStartExec extends ProcessBase {
                     out("worker debug console:", ...args[1], args[2]);
                 };
 
-                let result = await new Promise(async(resolve) =>
-                    await this.pr.worker.farcall(methodName, methodArgs, {}, ans => resolve(ans))
-                );
+                let result = await Promise.race([
+                    new Promise(async(resolve) =>
+                        await this.pr.worker.farcall(methodName, methodArgs, {}, ans => resolve(ans))
+                    ),
+                    new Promise(resolve =>
+                        sleep(UBotConfig.maxRequestLife).then(() => resolve(new Error("UBot time limit is reached")))
+                    )
+                ]);
 
                 await this.pr.session.close();
                 this.pr.session = null;
@@ -255,6 +260,14 @@ class ProcessStartExec extends ProcessBase {
 
                 this.pr.worker.release();
                 this.pr.worker = null;
+
+                if (result instanceof Error) {
+                    this.pr.logger.log("Cloud method return error: " + result.message);
+                    this.pr.errors.push(new ErrorRecord(Errors.FAILURE, methodName,
+                        "Cloud method return error: " + result.message));
+                    if (this.pr.state !== UBotPoolState.FAILED)
+                        this.pr.changeState(UBotPoolState.FAILED);
+                }
 
                 if (this.pr.state !== UBotPoolState.FAILED) {
                     this.pr.logger.log("  method result: " + t.secureStringify(result, 1000));
