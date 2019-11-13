@@ -41,6 +41,8 @@ wrk.WorkerHandle = class {
                         );
                         await this.send({serial: this.getNextFarcallSN(), ref: obj.serial, result: res});
                     } catch (e) {
+                        if (e === undefined)
+                            e = new Error("undefined exception");
                         await this.send({serial: this.getNextFarcallSN(), ref: obj.serial, error: {class:e.constructor.name, text:e.toString()}});
                     }
                 }
@@ -125,14 +127,18 @@ wrkInner.onReceive = async (obj) => {
             await wrkInner.send({serial:wrkInner.getNextFarcallSN(), ref:obj.serial, result:res});
         } catch(e) {
             let err = {};
-            if (e.class)
-                err.class = e.class;
-            else
-                err.class = e.constructor.name;
-            if (e.text)
-                err.text = e.text;
-            else
-                err.text = e.toString();
+            if (e === undefined) {
+                err = {class:"unknown", text:"undefined exception"};
+            } else {
+                if (e.class)
+                    err.class = e.class;
+                else
+                    err.class = e.constructor.name;
+                if (e.text)
+                    err.text = e.text;
+                else
+                    err.text = e.toString();
+            }
             await wrkInner.send({serial:wrkInner.getNextFarcallSN(), ref:obj.serial, error: err});
         }
     } else if (obj.error !== undefined) {
