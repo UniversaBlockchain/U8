@@ -296,6 +296,59 @@ unit.test("ubot_pro_test: execute cloud method", async () => {
     await shutdownUBots(ubotMains);//}
 });
 
+// unit.test("ubot_pro_test: random deviation", async () => {
+//     let ubotMains = await createUBots(ubotsCount);
+//
+//     let rands = [];
+//
+//     // ubotMains.forEach(main => main.ubot.network.verboseLevel = VerboseLevel.BASE);
+//     for (let i = 0; i < 10; i++) {
+//         console.log("Random iteration: " + i);
+//
+//         let ubotClient = await new UBotClient(clientKey, TOPOLOGY_ROOT + TOPOLOGY_FILE).start();
+//
+//         let executableContract = await generateSecureRandomExecutableContract();
+//         let requestContract = await generateSecureRandomRequestContract(executableContract);
+//
+//         let state = await ubotClient.executeCloudMethod(requestContract, true);
+//
+//         console.log("State: " + JSON.stringify(state));
+//
+//         assert(state.state === UBotPoolState.FINISHED.val);
+//
+//         // checking secure random value
+//         assert(typeof state.result === "number" && state.result >= 0 && state.result < 1000);
+//
+//         await ubotClient.shutdown();
+//
+//         rands.push(state.result);
+//     }
+//
+//     let summ = new BigDecimal(0);
+//     for (let i = 0; i < 1000; i++)
+//         for (let j = 0; j < 1000; j++)
+//             if (j > i)
+//                 summ = summ.add((i - j) * (i - j));
+//
+//     let variance = summ.div(1000000);
+//
+//     // calculate standard deviation
+//     let avg = 999 / 2;
+//     let s = 0;
+//     rands.forEach(rnd => s += (rnd - avg) * (rnd - avg));
+//     let deviation = Math.sqrt(s / rands.length);
+//
+//     console.log("Randoms: " + JSON.stringify(rands));
+//     console.log("Standard deviation: " + deviation);
+//     console.log("Variance: " + variance.toFixed());
+//
+//     // waiting pool finished...
+//     while (ubotMains.some(main => Array.from(main.ubot.processors.values()).some(proc => proc.state.canContinue)))
+//         await sleep(100);
+//
+//     await shutdownUBots(ubotMains);
+// });
+
 // unit.test("ubot_pro_test: full quorum", async () => {
 //     let ubotMains = await createUBots(ubotsCount);
 //     let ubotClient = await new UBotClient(clientKey, TOPOLOGY_ROOT + TOPOLOGY_FILE).start();
@@ -566,18 +619,20 @@ unit.test("ubot_pro_test: http requests", async () => {
 function checkRandomMultiData(multiData, random) {
     let rands = [];
     for (let r of multiData) {
-        if (r.hash !== crypto.HashId.of(r.rnd.toString()).base64)
+        if (r.hash !== crypto.HashId.of(r.rnd).base64)
             return false;
 
-        rands.push(r.rnd.toString());
+        rands.push(r.rnd);
     }
-    rands.sort();
 
-    let randomHash = crypto.HashId.of(rands.join());
-    let bigRandom = new BigDecimal(0);
-    randomHash.digest.forEach(byte => bigRandom = bigRandom.mul(256).add(byte));
+    let summRandom = new BigDecimal(0);
+    rands.forEach(random => {
+        let bigRandom = new BigDecimal(0);
+        random.forEach(byte => bigRandom = bigRandom.mul(256).add(byte));
+        summRandom = summRandom.add(bigRandom);
+    });
 
-    let result = Number.parseInt(bigRandom.mod(1000).toFixed());
+    let result = Number.parseInt(summRandom.mod(1000).toFixed());
 
     return result === random;
 }

@@ -1,9 +1,13 @@
 const BigDecimal  = require("big").Big;
+const RND_LEN = 96;
 
 async function getRandom(max) {
     //generate random and write its hash to multi storage
-    let rnd = Math.random();
-    let hash = crypto.HashId.of(rnd.toString()).base64;
+    let rnd  = new Uint8Array(RND_LEN);
+    for (let i = 0;  i < RND_LEN; ++i)
+        rnd[i] = Math.floor(Math.random() * 256);
+
+    let hash = crypto.HashId.of(rnd).base64;
 
     await writeMultiStorage({hash : hash});
 
@@ -25,25 +29,27 @@ async function getRandom(max) {
     hashes = [];
     let rands = [];
     for (let r of records) {
-        if (r.hash !== crypto.HashId.of(r.rnd.toString()).base64)
+        if (r.hash !== crypto.HashId.of(r.rnd).base64)
             throw new Error("Hash does not match the random value");
 
         hashes.push(r.hash);
-        rands.push(r.rnd.toString());
+        rands.push(r.rnd);
     }
     hashes.sort();
-    rands.sort();
     hashesHash = crypto.HashId.of(hashes.join()).base64;
 
     let singleStorage = await getSingleStorage();
     if (hashesHash !== singleStorage.hashesHash)
         throw new Error("Hash of hashes does not match the previously saved: " + hashesHash + "!==" + singleStorage.hashesHash);
 
-    let randomHash = crypto.HashId.of(rands.join());
-    let bigRandom = new BigDecimal(0);
-    randomHash.digest.forEach(byte => bigRandom = bigRandom.mul(256).add(byte));
+    let summRandom = new BigDecimal(0);
+    rands.forEach(random => {
+        let bigRandom = new BigDecimal(0);
+        random.forEach(byte => bigRandom = bigRandom.mul(256).add(byte));
+        summRandom = summRandom.add(bigRandom);
+    });
 
-    let result = Number.parseInt(bigRandom.mod(max).toFixed());
+    let result = Number.parseInt(summRandom.mod(max).toFixed());
 
     await writeSingleStorage({hashesHash: hashesHash, result: result});
 
