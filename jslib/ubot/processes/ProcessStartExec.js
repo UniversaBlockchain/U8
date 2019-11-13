@@ -178,7 +178,12 @@ class ProcessStartExec extends ProcessBase {
 
                 this.pr.worker = await getWorker(1,
                     ProcessStartExec.workerSrc + this.pr.executableContract.state.data.js + methodExport);
+
+                this.pr.logger.log("worker initialized");
+
                 this.pr.worker.startFarcallCallbacks();
+
+                this.pr.logger.log("start worker");
 
                 this.pr.worker.export["writeSingleStorage"] = async (args, kwargs) => {
                     return await this.writeSingleStorage(args[0]);
