@@ -46,7 +46,7 @@ class Record {
 
     checkExpiration(now) {
         if (this.expiresAt < now) {
-            this.ubot.processors.delete(this.id);
+            this.cache.ubot.processors.delete(this.id);
             this.cache.records.delete(this.id);
         }
     }

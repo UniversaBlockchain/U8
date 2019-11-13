@@ -79,10 +79,14 @@ class ProcessStartExec extends ProcessBase {
         ));
     }
     
-    function doHTTPRequest(url, onComplete) {
+    function doHTTPRequest(url) {
         return new Promise((resolve, reject) => wrkInner.farcall("doHTTPRequest", [url], {},
             ans => resolve(ans), err => reject(err)
         ));
+    }
+    
+    function doHTTPRequestWithCallback(url, onComplete, onError = (err) => {}) {
+        doHTTPRequest(url).then(onComplete, onError);
     }
     
     function getRequestContract() {
