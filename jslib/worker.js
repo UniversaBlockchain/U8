@@ -68,8 +68,8 @@ wrk.WorkerHandle = class {
         await this.send({serial: id, cmd: cmd, args: args, kwargs: kwargs});
     }
 
-    release() {
-        this.workerImpl._release();
+    release(terminateRequired = false) {
+        this.workerImpl._release(terminateRequired);
     }
 
     async close() {

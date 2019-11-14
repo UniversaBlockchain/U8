@@ -89,7 +89,7 @@ void InitWorkerPools(int accessLevel0_poolSize, int accessLevel1_poolSize) {
                     pws->se->isolate()->SetData(1, pws.get());
                     pws->se->evaluate(workerMain);
                     sem.notify();
-                    pws->se->runMainLoop();
+                    pws->se->runMainLoop(true);
                 });
                 sem.wait();
                 workersPool_accessLevel0.push_back(pws);
@@ -104,7 +104,7 @@ void InitWorkerPools(int accessLevel0_poolSize, int accessLevel1_poolSize) {
                     pws->se->isolate()->SetData(1, pws.get());
                     pws->se->evaluate(workerMain);
                     sem.notify();
-                    pws->se->runMainLoop();
+                    pws->se->runMainLoop(true);
                 });
                 sem.wait();
                 workersPool_accessLevel1.push_back(pws);
@@ -265,8 +265,11 @@ void JsScripterWrap_setOnReceive(const FunctionCallbackInfo<Value> &args) {
 
 void JsScripterWrap_release(const FunctionCallbackInfo<Value> &args) {
     Scripter::unwrapArgs(args, [](ArgsContext &ac) {
-        if (ac.args.Length() == 0) {
+        if (ac.args.Length() == 1) {
+            bool terminateRequired = ac.args[0]->BooleanValue(ac.context).FromJust();
             auto pws = unwrap<WorkerScripter>(ac.args.This());
+            if (terminateRequired)
+                pws->onReceive->isolate()->TerminateExecution();
             ReleaseWorker(pws);
             return;
         }

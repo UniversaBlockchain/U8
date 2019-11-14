@@ -12,7 +12,7 @@ class WorkerExample {
             resolve(ans);
         }));
     }
-    
+
     wrkInner.export.calcAxBxC = async (args, kwargs) => {
         let textLen = await callSomethingFromMainScripter("some_parameter");
         console.log(textLen);
@@ -70,7 +70,7 @@ unit.test("worker_tests: check that all global objects are frozen", async () => 
 
     let testSrc = `
     const BigDecimal  = require("big").Big;
-    
+
     let checkFunction = (o, functionName) => {
         try {
             o[functionName]._wefhowegfh_add_some_field_ = true;
@@ -378,7 +378,7 @@ unit.test("worker_tests: exceptions from main scripter", async () => {
             function callMeFromWorker(val) {
                 return new Promise((resolve,reject) => wrkInner.farcall("callMeFromWorker", [val], {}, resolve, reject));
             }
-            
+
             wrkInner.export.doSomething = async (args, kwargs) => {
                 await callMeFromWorker(33);
                 return "some_answer";
@@ -426,4 +426,70 @@ unit.test("worker_tests: access levels order", async () => {
     } catch (e) {
         assert(true);
     }
+});
+
+unit.test("worker_tests: terminate worker with infinite loop", async () => {
+    class Worker {
+        constructor() {
+            this.worker = null;
+        }
+        release(terminateRequired=false) {this.worker.release(terminateRequired);}
+        static async start() {
+            let res = new Worker();
+            res.worker = await getWorker(1, consoleWrapper + farcallWrapper+`
+            wrkInner.export.doSomething = async (args, kwargs) => {
+                let n = args[0];
+                //console.log("worker("+n+") goes into infinite loop...");
+                await sleep(1000);
+                for (let i = 0; i < 25000000*(1+n/10); /*++i*/);
+                return "some_answer";
+            }
+            `);
+            res.worker.startFarcallCallbacks();
+
+            res.worker.export["__worker_bios_print"] = (args, kwargs) => {
+                let out = args[0] === true ? console.error : console.logPut;
+                out(...args[1], args[2]);
+            };
+
+            return res;
+        }
+        doSomething(n) {
+            return new Promise((resolve,reject) => this.worker.farcall("doSomething", [n], {}, resolve, reject));
+        }
+    }
+
+    console.logPut("this test just should not hangs, plz wait for ~20 sec... ");
+
+    let workerStartPromises = [];
+    let requestCounter = 0;
+    let readyCounter = 0;
+    for (let i = 0; i < 200; ++i) {
+        workerStartPromises.push((async () => {
+            ++requestCounter;
+            let worker = await Worker.start();
+            let isTimeoutCancelled = false;
+            await Promise.race([(async () => {
+                await worker.doSomething(i);
+                isTimeoutCancelled = true;
+                worker.release();
+                //console.log("worker("+i+")... done!");
+                ++readyCounter;
+            })(), (async () => {
+                //console.log("wait for worker("+i+")...");
+                await sleep(5000);
+                if (!isTimeoutCancelled) {
+                    //console.log("timeout, terminate worker("+i+") now...");
+                    worker.release(true);
+                    ++readyCounter;
+                }
+            })()]);
+        })());
+        while (requestCounter > readyCounter + 100)
+            await sleep(50);
+    }
+
+    await Promise.all(workerStartPromises);
+
+    //this test just should not hangs
 });

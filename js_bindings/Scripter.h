@@ -90,7 +90,7 @@ public:
 
     int runAsMain(string sourceScript, const vector<string> &&args, string fileName);
 
-    void runMainLoop();
+    void runMainLoop(bool forWorker = false);
 
     template<typename T>
     string getString(MaybeLocal<T> value) {

@@ -343,7 +343,7 @@ int Scripter::runAsMain(string sourceScript, const vector<string> &&args, string
 
 }
 
-void Scripter::runMainLoop() {
+void Scripter::runMainLoop(bool forWorker) {
     // main loop: we process all callbacks here in the same thread:
     {
         // optimization: the shared context scope - it could be a problem, then move it insude the loop
@@ -359,7 +359,10 @@ void Scripter::runMainLoop() {
             TryCatch tryCatch(pIsolate);
             c(cxt);
             if (tryCatch.HasCaught()) {
-                cerr << "Uncaught exception: " << getString(tryCatch.Exception()) << endl;
+                if (!forWorker)
+                    cerr << "Uncaught exception: " << getString(tryCatch.Exception()) << endl;
+//                else
+//                    cout << "worker execution was terminated" << endl;
             }
         }
     }
