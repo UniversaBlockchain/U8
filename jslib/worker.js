@@ -72,6 +72,10 @@ wrk.WorkerHandle = class {
         this.workerImpl._release(terminateRequired);
     }
 
+    getProcessorTime() {
+        return this.workerImpl._getProcessorTime();
+    }
+
     async close() {
     }
 

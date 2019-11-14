@@ -8,6 +8,7 @@ const ExecutorWithFixedPeriod = require("executorservice").ExecutorWithFixedPeri
 const ErrorRecord = require("errors").ErrorRecord;
 const Errors = require("errors").Errors;
 const UBotPoolState = require("ubot/ubot_pool_state").UBotPoolState;
+const UBotProcessException = require("ubot/ubot_exceptions").UBotProcessException;
 const UBotCloudNotification_process = require("ubot/ubot_notification").UBotCloudNotification_process;
 const BossBiMapper = require("bossbimapper").BossBiMapper;
 const Boss = require('boss.js');
@@ -50,21 +51,21 @@ class UBotProcess_writeSingleStorage extends ProcessBase {
                     this.quorumSize = result.quorum;
                 } catch (err) {
                     let message = "Failed get pool and quorum of method \"" + this.methodName + "\": " + err.message;
-                    this.pr.logger.log("Error CloudProcessor.initPoolAndQuorum. " + message);
-                    this.pr.errors.push(new ErrorRecord(Errors.BAD_VALUE, "CloudProcessor.initPoolAndQuorum", message));
+                    this.pr.logger.log("Error UBotProcess_writeSingleStorage: " + message);
+                    this.pr.errors.push(new ErrorRecord(Errors.BAD_VALUE, "UBotProcess_writeSingleStorage", message));
                     this.pr.changeState(UBotPoolState.FAILED);
 
-                    this.onFailed();
+                    this.onFailed(new UBotProcessException("Error UBotProcess_writeSingleStorage: " + message));
                     return;
                 }
 
                 if (this.poolSize > this.pr.poolSize || this.quorumSize > this.pr.quorumSize) {
-                    this.pr.logger.log("Error: insufficient pool or quorum to use storage '" + this.storageName + "'");
-                    this.pr.errors.push(new ErrorRecord(Errors.FAILURE, "UBotProcess_writeStorage",
-                        "insufficient pool or quorum to use storage '" + this.storageName + "'"));
+                    let message = "Insufficient pool or quorum to use storage '" + this.storageName + "'";
+                    this.pr.logger.log("Error UBotProcess_writeSingleStorage: " + message);
+                    this.pr.errors.push(new ErrorRecord(Errors.FAILURE, "UBotProcess_writeSingleStorage", message));
                     this.pr.changeState(UBotPoolState.FAILED);
 
-                    this.onFailed();
+                    this.onFailed(new UBotProcessException("Error UBotProcess_writeSingleStorage: " + message));
                 }
                 return;
             }
@@ -152,7 +153,7 @@ class UBotProcess_writeSingleStorage extends ProcessBase {
                     "error writing to single storage: " + err.message));
                 this.pr.changeState(UBotPoolState.FAILED);
 
-                this.onFailed();
+                this.onFailed(new UBotProcessException("Error UBotProcess_writeSingleStorage: " + err.message));
                 return;
             }
 
@@ -221,7 +222,7 @@ class UBotProcess_writeSingleStorage extends ProcessBase {
             this.pr.errors.push(new ErrorRecord(Errors.FAILURE, "UBotProcess_writeSingleStorage", "writing to single storage declined"));
             this.pr.changeState(UBotPoolState.FAILED);
 
-            this.onFailed();
+            this.onFailed(new UBotProcessException("Error UBotProcess_writeSingleStorage: writing to single storage declined"));
         }
     }
 }

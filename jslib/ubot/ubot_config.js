@@ -24,7 +24,8 @@ class UBotConfig {
 
     static storageReadTrustLevel = 0.3;
 
-    static maxRequestLife = 300000; // ms
+    static maxRequestLife = 60; // seconds
+    static checkRequestLifePeriod = 10000; // ms
 }
 
 module.exports = {UBotConfig};

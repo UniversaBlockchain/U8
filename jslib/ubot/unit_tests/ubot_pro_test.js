@@ -362,6 +362,7 @@ unit.test("ubot_pro_test: execute looped cloud method", async () => {
         }
     };
 
+    //executableContract.state.data.js = "async function loop() {await sleep(300000); while(true) {}}";
     executableContract.state.data.js = "function loop() {while(true) {}}";
 
     await executableContract.seal();

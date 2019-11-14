@@ -9,11 +9,15 @@
 #include "../types/TypesFactory.h"
 #include "../tools/Semaphore.h"
 #include <unordered_map>
+#include <stdio.h>
+#include <pthread.h>
+#include <time.h>
 
 class WorkerScripter {
 public:
     int id;
     int accessLevel;
+    clockid_t clockId;
     std::string jsWorkerSrc;
     std::shared_ptr<Scripter> se;
     std::shared_ptr<FunctionHandler> onReceive;
@@ -91,6 +95,7 @@ void InitWorkerPools(int accessLevel0_poolSize, int accessLevel1_poolSize) {
                     sem.notify();
                     pws->se->runMainLoop(true);
                 });
+                pthread_getcpuclockid(pws->loopThread->native_handle() , &pws->clockId);
                 sem.wait();
                 workersPool_accessLevel0.push_back(pws);
             }
@@ -106,6 +111,7 @@ void InitWorkerPools(int accessLevel0_poolSize, int accessLevel1_poolSize) {
                     sem.notify();
                     pws->se->runMainLoop(true);
                 });
+                pthread_getcpuclockid(pws->loopThread->native_handle() , &pws->clockId);
                 sem.wait();
                 workersPool_accessLevel1.push_back(pws);
             }
@@ -138,10 +144,24 @@ static shared_ptr<WorkerScripter> GetWorker(int accessLevel) {
     auto pws = pool->front();
     pool->pop_front();
     (*poolUsed)[pws->id] = pws;
+
+//    if (pws->accessLevel == 1) {
+//        timespec ts;
+//        clock_gettime(pws->clockId, &ts);
+//        printf("___GetWorker %i: %i:%i\n", pws->id, ts.tv_sec, ts.tv_nsec);
+//    }
+
     return pws;
 }
 
 static void ReleaseWorker(WorkerScripter* pws) {
+
+//    if (pws->accessLevel == 1) {
+//        timespec ts;
+//        clock_gettime(pws->clockId, &ts);
+//        printf("___ReleaseWorker %i: %i:%i\n", pws->id, ts.tv_sec, ts.tv_nsec);
+//    }
+
     int accessLevel = pws->accessLevel;
     std::mutex* mtx = nullptr;
     std::condition_variable* cv = nullptr;
@@ -277,6 +297,22 @@ void JsScripterWrap_release(const FunctionCallbackInfo<Value> &args) {
     });
 }
 
+void JsScripterWrap_getProcessorTime(const FunctionCallbackInfo<Value> &args) {
+    Scripter::unwrapArgs(args, [](ArgsContext &ac) {
+        if (ac.args.Length() == 0) {
+            auto pws = unwrap<WorkerScripter>(ac.args.This());
+
+            timespec ts;
+            clock_gettime(pws->clockId, &ts);
+            double time = ts.tv_sec + (double) ts.tv_nsec / 1000000000;
+
+            ac.setReturnValue(time);
+            return;
+        }
+        ac.throwError("invalid number of arguments");
+    });
+}
+
 void JsInitWorkerScripter(Scripter& scripter, const Local<ObjectTemplate> &global) {
     Isolate *isolate = scripter.isolate();
     
@@ -289,6 +325,7 @@ void JsInitWorkerScripter(Scripter& scripter, const Local<ObjectTemplate> &globa
     prototype->Set(isolate, "_send", FunctionTemplate::New(isolate, JsScripterWrap_send));
     prototype->Set(isolate, "_setOnReceive", FunctionTemplate::New(isolate, JsScripterWrap_setOnReceive));
     prototype->Set(isolate, "_release", FunctionTemplate::New(isolate, JsScripterWrap_release));
+    prototype->Set(isolate, "_getProcessorTime", FunctionTemplate::New(isolate, JsScripterWrap_getProcessorTime));
 
     // register it into global namespace
     scripter.WorkerScripterTpl.Reset(isolate, tpl);
