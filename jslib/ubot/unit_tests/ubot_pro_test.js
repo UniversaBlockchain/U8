@@ -381,7 +381,7 @@ unit.test("ubot_pro_test: execute looped cloud method", async () => {
     assert(state.state === UBotPoolState.FAILED.val);
 
     assert(state.errors[0].error === "FAILURE" && state.errors[0].objectName === "loop" &&
-           state.errors[0].message === "Cloud method return error: UBot time limit is reached");
+           state.errors[0].message === "Cloud method return error: Quantiser limit is reached");
 
     await ubotClient.shutdown();
 

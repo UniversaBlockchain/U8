@@ -4,6 +4,7 @@
 
 import {getWorker, consoleWrapper, farcallWrapper} from 'worker'
 import {HttpClient} from 'web'
+import {UBotQuantiserProcesses} from "ubot/ubot_quantiser";
 
 const ProcessBase = require("ubot/processes/ProcessBase").ProcessBase;
 const UBotProcess_writeSingleStorage = require("ubot/processes/UBotProcess_writeSingleStorage").UBotProcess_writeSingleStorage;
@@ -246,7 +247,8 @@ class ProcessStartExec extends ProcessBase {
                     out("worker debug console:", ...args[1], args[2]);
                 };
 
-                let startTime = this.pr.worker.getProcessorTime();
+                let startProcessorTime = this.pr.worker.getProcessorTime();
+                let startAbsoluteTime = Date.now();
                 let terminate = false;
                 let result = await Promise.race([
                     new Promise(async (resolve) =>
@@ -254,16 +256,34 @@ class ProcessStartExec extends ProcessBase {
                     ),
                     new Promise(async (resolve) => {
                         do {
-                            await sleep(UBotConfig.checkRequestLifePeriod);
+                            await sleep(UBotConfig.checkQuantiserPeriod);
 
-                            if (this.pr.worker != null &&
-                                this.pr.worker.getProcessorTime() - startTime > UBotConfig.maxRequestLife) {
-                                terminate = true;
-                                resolve(new Error("UBot time limit is reached"));
+                            if (this.pr.worker != null) {
+                                //this.pr.worker.getProcessorTime() - startTime > UBotConfig.maxRequestLife) {
+                                let endProcessorTime = this.pr.worker.getProcessorTime();
+                                let endAbsoluteTime = Date.now();
+                                let processorTime = endProcessorTime - startProcessorTime;
+                                let waitingTime = (endAbsoluteTime - startAbsoluteTime) / 1000 - processorTime;
+                                if (waitingTime < 0)
+                                    waitingTime = 0;
+                                let cost = (UBotQuantiserProcesses.PRICE_WORK_MINUTE * processorTime +
+                                            UBotQuantiserProcesses.PRICE_WAITING_MINUTE * waitingTime) / 60;
+
+                                try {
+                                    this.pr.quantiser.addWorkCost(cost);
+                                } catch (err) {
+                                    terminate = true;
+                                    resolve(err);
+                                }
+
+                                startProcessorTime = endProcessorTime;
+                                startAbsoluteTime = endAbsoluteTime;
                             }
-                        } while (this.pr.worker != null);
+                        } while (this.pr.worker != null && !terminate);
                     })
                 ]);
+
+                this.pr.logger.log("QuantaSum of " + methodName + ": " + this.pr.quantiser.quantaSum_);
 
                 await this.pr.session.close();
                 this.pr.session = null;
@@ -560,6 +580,18 @@ class ProcessStartExec extends ProcessBase {
      */
     async writeSingleStorage(data) {
         if (data != null) {
+            try {
+                this.pr.quantiser.addWorkCost(UBotQuantiserProcesses.PRICE_WRITE_SINGLE_STORAGE);
+            } catch (err) {
+                this.pr.logger.log("Error write data to single-storage: " + err.message);
+                this.pr.logger.log(err.stack);
+                this.pr.errors.push(new ErrorRecord(Errors.FAILURE, "writeSingleStorage",
+                    "Error write data to single-storage: " + err.message));
+                this.pr.changeState(UBotPoolState.FAILED);
+
+                throw err;
+            }
+
             return new Promise(async (resolve, reject) => {
                 let proc = new UBotProcess_writeSingleStorage(this.pr,
                     result => resolve(result),
@@ -591,6 +623,18 @@ class ProcessStartExec extends ProcessBase {
      */
     async writeMultiStorage(data) {
         if (data != null) {
+            try {
+                this.pr.quantiser.addWorkCost(UBotQuantiserProcesses.PRICE_WRITE_MULTI_STORAGE);
+            } catch (err) {
+                this.pr.logger.log("Error write data to multi-storage: " + err.message);
+                this.pr.logger.log(err.stack);
+                this.pr.errors.push(new ErrorRecord(Errors.FAILURE, "writeMultiStorage",
+                    "Error write data to multi-storage: " + err.message));
+                this.pr.changeState(UBotPoolState.FAILED);
+
+                throw err;
+            }
+            
             return new Promise(async (resolve, reject) => {
                 let proc = new UBotProcess_writeMultiStorage(this.pr,
                     result => resolve(result),
@@ -619,6 +663,8 @@ class ProcessStartExec extends ProcessBase {
      */
     async getSingleStorage() {
         try {
+            this.pr.quantiser.addWorkCost(UBotQuantiserProcesses.PRICE_GET_STORAGE);
+            
             let recordId = this.pr.getDefaultRecordId(false);
 
             // get actual hash from MainNet by this.executableContract.id (further recordId)
@@ -671,6 +717,8 @@ class ProcessStartExec extends ProcessBase {
      */
     async getMultiStorage() {
         try {
+            this.pr.quantiser.addWorkCost(UBotQuantiserProcesses.PRICE_GET_STORAGE);
+            
             let recordId = this.pr.getDefaultRecordId(true);
 
             // get actual hash from MainNet by this.executableContract.id (further recordId)
@@ -735,6 +783,10 @@ class ProcessStartExec extends ProcessBase {
      */
     async registerContract(packedTransaction) {
         try {
+            let contract = await Contract.fromPackedTransaction(packedTransaction);
+            await contract.check();
+            this.pr.quantiser.addWorkCostFrom(contract.quantiser);
+
             return await this.pr.session.registerContract(packedTransaction, this.pr.requestContract);
 
         } catch (err) {
@@ -900,6 +952,8 @@ class ProcessStartExec extends ProcessBase {
      */
     async doHTTPRequest(url) {
         try {
+            this.pr.quantiser.addWorkCost(UBotQuantiserProcesses.PRICE_HTTP_REQUEST);
+
             if (this.pr.userHttpClient == null)
                 this.pr.userHttpClient = new HttpClient();
 
@@ -917,10 +971,9 @@ class ProcessStartExec extends ProcessBase {
             });
 
         } catch (err) {
-            this.pr.logger.log("Error async HTTP request: " + err.message);
+            this.pr.logger.log("Error HTTP request: " + err.message);
             this.pr.logger.log(err.stack);
-            this.pr.errors.push(new ErrorRecord(Errors.FAILURE, "asyncHTTPRequest",
-                "Error async HTTP request: " + err.message));
+            this.pr.errors.push(new ErrorRecord(Errors.FAILURE, "doHTTPRequest", "Error HTTP request: " + err.message));
             this.pr.changeState(UBotPoolState.FAILED);
 
             throw err;

@@ -2,6 +2,8 @@
  * Copyright (c) 2019-present Sergey Chernov, iCodici S.n.C, All Rights Reserved.
  */
 
+import {UBotQuantiser, UBotQuantiserProcesses, UBotQuantiserException} from "ubot/ubot_quantiser";
+
 const ProcessSendRequestContract = require("ubot/processes/ProcessSendRequestContract").ProcessSendRequestContract;
 const ProcessDownloadRequestContract = require("ubot/processes/ProcessDownloadRequestContract").ProcessDownloadRequestContract;
 const ProcessStartExec = require("ubot/processes/ProcessStartExec").ProcessStartExec;
@@ -23,8 +25,6 @@ class CloudProcessor {
         this.logger = ubot.logger;
         this.ledger = ubot.ledger;
         this.currentProcess = null;
-        this.pool = [];
-        this.poolIndexes = new Map();
         this.selfPoolIndex = null;
         this.respondToNotification = null;
         this.output = null;
@@ -33,9 +33,25 @@ class CloudProcessor {
         this.methodArgs = [];
         this.poolSize = 0;
         this.quorumSize = 0;
-        this.ProcessStartExec = ProcessStartExec;
         this.worker = null;
         this.userHttpClient = null;
+
+        this.quantiser = new UBotQuantiser();
+        this.quantiser.reset(700);      // TODO: get limit from session
+
+        try {
+            this.quantiser.addWorkCost(UBotQuantiserProcesses.PRICE_START_CLOUD_METHOD);
+        } catch (err) {
+            let message = "Failed initialize cloud processor poolId: " + this.poolId + ", error: " + err.message;
+            this.logger.log(message);
+            this.errors.push(new ErrorRecord(Errors.FAILURE, "CloudProcessor.constructor", message));
+            this.changeState(UBotPoolState.FAILED);
+            return;
+        }
+
+        this.pool = [];
+        this.poolIndexes = new Map();
+        this.ProcessStartExec = ProcessStartExec;
         this.prng = new PseudoRandom(poolId);
         this.selectPool();
 

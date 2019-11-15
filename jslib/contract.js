@@ -1348,7 +1348,7 @@ class Contract extends bs.BiSerializable {
 
     /**
      * Calculates transaction processing cost in U
-     * @returns {number} - transaction processing const in U
+     * @return {number} - transaction processing const in U
      */
     getProcessedCostU() {
         return Math.ceil( this.quantiser.quantaSum_ / Quantiser.quantaPerU);
@@ -1365,7 +1365,7 @@ class Contract extends bs.BiSerializable {
 
     /**
      * Get contract expiration time
-     * @returns {Date} contract expiration time
+     * @return {Date} contract expiration time
      */
     getExpiresAt() {
         return this.state.expiresAt != null ? this.state.expiresAt : this.definition.expiresAt;
