@@ -2294,7 +2294,7 @@ class Contract extends bs.BiSerializable {
      * {@see TransactionPack} instance to save together the contract, revoking and new items (if any). This is a binary
      * format using to submit for approval. Use {@see #fromPackedTransaction} to read this format.
      *
-     * @return {number[]} packed binary form.
+     * @return {number[]} packed binary form of transaction.
      */
     async getPackedTransaction() {
         if (this.transactionPack == null)

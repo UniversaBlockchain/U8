@@ -442,14 +442,14 @@ class UBotClient {
     /**
      * Register the contract on the network.
      *
-     * @param {Uint8Array} packed - Binary contract for registration.
+     * @param {Uint8Array} packedTransaction - Binary contract for registration.
      * @param {number} millisToWait - Maximum time to wait for final ItemState or 0 if endless waiting.
      * @async
      * @return {ItemResult} result of registration or current state of registration (if wasn't finished yet).
      */
-    async register(packed, millisToWait = 0) {
+    async register(packedTransaction, millisToWait = 0) {
         let result = await new Promise(async (resolve, reject) =>
-            await this.httpNodeClient.command("approve", {packedItem: packed},
+            await this.httpNodeClient.command("approve", {packedItem: packedTransaction},
                 result => resolve(result),
                 error => reject(error)
             )
@@ -466,7 +466,7 @@ class UBotClient {
             if (lastResult.state.isPending) {
                 let end = Date.now() + millisToWait;
                 try {
-                    let c = await Contract.fromPackedTransaction(packed);
+                    let c = await Contract.fromPackedTransaction(packedTransaction);
                     let interval = 1000;
                     while ((millisToWait === 0 || Date.now() < end) && lastResult.state.isPending) {
                         await sleep(interval);

@@ -550,6 +550,14 @@ class ProcessStartExec extends ProcessBase {
         }
     }
 
+    /**
+     * Write data to single storage.
+     *
+     * @param {*} data - Data to write to single storage.Data can be primitive JS types or
+     * special U8 types that are packed by the Boss.
+     * @return {Promise<void>}
+     * @throws {UBotProcessException} process exception if can`t write empty data to single-storage.
+     */
     async writeSingleStorage(data) {
         if (data != null) {
             return new Promise(async (resolve, reject) => {
@@ -573,6 +581,14 @@ class ProcessStartExec extends ProcessBase {
         }
     }
 
+    /**
+     * Write data to multi storage.
+     *
+     * @param {*} data - Data to write to multi storage.Data can be primitive JS types or
+     * special U8 types that are packed by the Boss.
+     * @return {Promise<void>}
+     * @throws {UBotProcessException} process exception if can`t write empty data to multi-storage.
+     */
     async writeMultiStorage(data) {
         if (data != null) {
             return new Promise(async (resolve, reject) => {
@@ -596,6 +612,12 @@ class ProcessStartExec extends ProcessBase {
         }
     }
 
+    /**
+     * Get data from single storage.
+     *
+     * @return {Promise<null|*>} data from single storage.
+     * @throws
+     */
     async getSingleStorage() {
         try {
             let recordId = this.pr.getDefaultRecordId(false);
@@ -643,6 +665,12 @@ class ProcessStartExec extends ProcessBase {
         }
     }
 
+    /**
+     * Get data from multi storage.
+     *
+     * @return {Promise<null|[*]>} data from multi storage.
+     * @throws
+     */
     async getMultiStorage() {
         try {
             let recordId = this.pr.getDefaultRecordId(true);
@@ -700,9 +728,17 @@ class ProcessStartExec extends ProcessBase {
         }
     }
 
-    async registerContract(contract) {
+    /**
+     * Register a contract.
+     *
+     * @param {Uint8Array} packedTransaction - Binary contract for registration.
+     * @return {Promise<ItemResult} result of registration or
+     * current state of registration (if wasn't finished yet).
+     * @throws {UBotClientException} client exception if error register contract.
+     */
+    async registerContract(packedTransaction) {
         try {
-            return await this.pr.session.registerContract(contract, this.pr.requestContract);
+            return await this.pr.session.registerContract(packedTransaction, this.pr.requestContract);
 
         } catch (err) {
             this.pr.logger.log("Error register contract: " + err.message);
@@ -715,6 +751,12 @@ class ProcessStartExec extends ProcessBase {
         }
     }
 
+    /**
+     * Create a pool contract. Pool contract a special contract for the formation and registration of the pool.
+     *
+     * @return {Promise<Contract>} pool contract.
+     * @throws
+     */
     async createPoolContract() {
         try {
             let c = new Contract();
@@ -772,6 +814,12 @@ class ProcessStartExec extends ProcessBase {
         }
     }
 
+    /**
+     * Seal pool contract.
+     *
+     * @param {Contract} contract - Pool contract.
+     * @return {Promise<number[]>} packed binary form of transaction.
+     */
     async sealPoolContract(contract) {
         // random salt for seal (common for pool)
         contract.ubot_pool_random_salt = this.pr.prng.randomBytes(12);
@@ -782,6 +830,13 @@ class ProcessStartExec extends ProcessBase {
         return await contract.getPackedTransaction();
     }
 
+    /**
+     * Creation and preparation of a new contract revision for registration by the pool.
+     *
+     * @param {Uint8Array} packedTransaction - Binary contract.
+     * @return {Promise<Contract>} new contract revision.
+     * @throws
+     */
     async preparePoolRevision(packedTransaction) {
         try {
             let contract = await Contract.fromPackedTransaction(packedTransaction);
@@ -820,6 +875,13 @@ class ProcessStartExec extends ProcessBase {
         }
     }
 
+    /**
+     * Seal and get packed transaction by pool.
+     *
+     * @param {Uint8Array} packedTransaction - Binary contract.
+     * @return {Promise<Contract>}
+     * @throws
+     */
     async sealAndGetPackedTransactionByPool(packedTransaction) {
         try {
             let contract = await Contract.fromPackedTransaction(packedTransaction);
@@ -836,6 +898,12 @@ class ProcessStartExec extends ProcessBase {
         }
     }
 
+    /**
+     * Executes an http request to an external service by URL.
+     *
+     * @param {string} url - URL of the external service.
+     * @return {Promise<{Body & response_code}>}
+     */
     async doHTTPRequest(url) {
         try {
             if (this.pr.userHttpClient == null)
@@ -865,10 +933,20 @@ class ProcessStartExec extends ProcessBase {
         }
     }
 
+    /**
+     * Get request contract.
+     *
+     * @return {Promise<number[]>} packed binary form of transaction.
+     */
     async getRequestContract() {
         return await this.pr.requestContract.getPackedTransaction();
     }
 
+    /**
+     * Get ubot registry contract.
+     *
+     * @return {Promise<Uint8Array>} packed ubot registry contract.
+     */
     async getUBotRegistryContract() {
         return await this.pr.ubot.client.getUBotRegistryContract();
     }
