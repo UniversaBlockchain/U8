@@ -35,7 +35,7 @@ class ContractStorage {
     /**
      * Get stored transaction pack.
      *
-     * @return {number[]} stored packed representation (transaction pack).
+     * @return {Uint8Array} stored packed representation (transaction pack).
      */
     getPackedContract() {
         throw new Error("not implemented");

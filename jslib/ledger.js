@@ -1463,7 +1463,7 @@ class Ledger {
      * Get a contract from Ledger by his record.
      *
      * @param {StateRecord} record - Record of the contract you want to get.
-     * @return {Promise<number[]>}
+     * @return {Promise<Uint8Array>} packed transaction with contract.
      */
     getItem(record) {
         return this.simpleQuery("select packed from items where id = ?",
@@ -1532,7 +1532,7 @@ class Ledger {
      *
      * @param {number} environmentId - Environment ID.
      * @param {db.SqlDriverConnection} connection - Transaction connection. Optional.
-     * @return {Promise<{pack: number[], kvStorage: number[], hashDigest: number[]}>} smart contract data.
+     * @return {Promise<{pack: Uint8Array, kvStorage: Uint8Array, hashDigest: Uint8Array}>} smart contract data.
      */
     getSmartContractForEnvironmentId(environmentId, connection = undefined) {
         return new Promise((resolve, reject) => {
@@ -1572,7 +1572,7 @@ class Ledger {
      *
      * @param {number} environmentId - Environment ID.
      * @param {db.SqlDriverConnection} connection - Transaction connection. Optional.
-     * @return {Promise<NContractSubscription[]>} list of contract subscriptions.
+     * @return {Promise<Array<NContractSubscription>>} list of contract subscriptions.
      */
     getContractSubscriptions(environmentId, connection = undefined) {
         return new Promise(async(resolve, reject) => {
@@ -1624,7 +1624,7 @@ class Ledger {
      *
      * @param {number} environmentId - Environment ID.
      * @param {db.SqlDriverConnection} connection - Transaction connection. Optional.
-     * @return {Promise<NContractStorage[]>} list of contract storages.
+     * @return {Promise<Array<NContractStorage>>} list of contract storages.
      */
     getContractStorages(environmentId, connection = undefined) {
         return new Promise(async(resolve, reject) => {
@@ -1676,7 +1676,7 @@ class Ledger {
      *
      * @param {number} environmentId - Environment ID.
      * @param {db.SqlDriverConnection} connection - Transaction connection. Optional.
-     * @return {Promise<string[]>} list of UNS reduced names.
+     * @return {Promise<Array<string>>} list of UNS reduced names.
      */
     getReducedNames(environmentId, connection = undefined) {
         return new Promise(async(resolve, reject) => {
@@ -1850,8 +1850,8 @@ class Ledger {
      * @param {number} id - Environment ID.
      * @param {string} ncontractType - Ncontract type.
      * @param {HashId} ncontractHashId - Ncontract HashId.
-     * @param {number[]} kvStorage - Key-value storage.
-     * @param {number[]} transactionPack - Contract transaction pack.
+     * @param {Uint8Array} kvStorage - Key-value storage.
+     * @param {Uint8Array} transactionPack - Contract transaction pack.
      * @param {db.SqlDriverConnection} con - Transaction connection. Optional.
      * @return {Promise<void>}
      */
@@ -1869,7 +1869,7 @@ class Ledger {
      * Save the contract with the specified ID in the storage.
      *
      * @param {HashId} contractId - Contract ID.
-     * @param {number[]} binData
+     * @param {Uint8Array} binData
      * @param {Date} expiresAt - Expiration time.
      * @param {HashId} origin - Contracts chain origin.
      * @param {number} environmentId - Environment ID.
@@ -2213,7 +2213,7 @@ class Ledger {
      * Get smart contract by ID.
      *
      * @param {crypto.HashId} smartContractId - Contract ID.
-     * @return {Promise<number[]>} - packed smart contract.
+     * @return {Promise<Uint8Array>} - packed transaction with smart contract.
      */
     getSmartContractById(smartContractId) {
         return this.simpleQuery("SELECT transaction_pack FROM environments WHERE ncontract_hash_id=?",
@@ -2226,7 +2226,7 @@ class Ledger {
      * Get a contract from storage.
      *
      * @param {crypto.HashId} contractId - Contract ID.
-     * @return {Promise<number[]>} - packed contract.
+     * @return {Promise<Uint8Array>} packed transaction with contract.
      */
     getContractInStorage(contractId) {
         return this.simpleQuery("SELECT bin_data FROM contract_binary WHERE hash_id=?",
@@ -2240,7 +2240,7 @@ class Ledger {
      *
      * @param {crypto.HashId} slotId - Slot contract ID.
      * @param {crypto.HashId} originId - Contracts chain origin.
-     * @return {Promise<number[][]>} - list of packed contracts.
+     * @return {Promise<Array<Uint8Array>>} - list of packed contracts.
      */
     getContractsInStorageByOrigin(slotId, originId) {
         return new Promise(async(resolve, reject) => {
@@ -2591,7 +2591,7 @@ class Ledger {
     /**
      * Get UNS name record by origin.
      *
-     * @param {number[]} origin - digest of name record origin.
+     * @param {Uint8Array} origin - digest of name record origin.
      *
      * @return {Promise<NNameRecord>} UNS name record.
      */
@@ -2602,8 +2602,8 @@ class Ledger {
     /**
      * Get unavailable names for UNS.
      *
-     * @param {string[]} reducedNames - Array of reduced names for check availability.
-     * @return {Promise<string[]>} array of unavailable names.
+     * @param {Array<string>} reducedNames - Array of reduced names for check availability.
+     * @return {Promise<Array<string>>} array of unavailable names.
      */
     isAllNameRecordsAvailable(reducedNames) {
         if (reducedNames.length < 1)
@@ -2651,8 +2651,8 @@ class Ledger {
     /**
      * Get unavailable origins for UNS.
      *
-     * @param {HashId[]} origins - Array of origins (@see HashId) for check availability.
-     * @return {Promise<string[]>} array of unavailable origins (as base64 strings).
+     * @param {Array<HashId>} origins - Array of origins (@see HashId) for check availability.
+     * @return {Promise<Array<string>>} array of unavailable origins (as base64 strings).
      */
     isAllOriginsAvailable(origins) {
         if (origins.length < 1)
@@ -2704,8 +2704,8 @@ class Ledger {
     /**
      * Get unavailable addresses for UNS.
      *
-     * @param {string[]} addresses - Array of addresses for check availability.
-     * @return {Promise<string[]>} array of unavailable addresses (shorts and longs).
+     * @param {Array<string>} addresses - Array of addresses for check availability.
+     * @return {Promise<Array<string>>} array of unavailable addresses (shorts and longs).
      */
     isAllAddressesAvailable(addresses) {
         if (addresses.length < 1)

@@ -75,7 +75,7 @@ class SortedArray {
     /**
      * map all contained items, much like Array.map, and return results as Array.
      * @param callback to apply to each element.
-     * @returns {any[]}
+     * @returns {Array<*>}
      */
     map(callback) {
         return this.data.map(callback);

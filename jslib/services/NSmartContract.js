@@ -35,7 +35,7 @@ class NSmartContract extends Contract {
      * <p>
      * It is recommended to call {@link #check()} after construction to see the errors.
      *
-     * @param {number[]} sealed - binary sealed contract.
+     * @param {Uint8Array} sealed - binary sealed contract.
      * @param {TransactionPack} pack - the transaction pack to resolve dependencies again.
      *
      * @return {NSmartContract} extracted smart contract.

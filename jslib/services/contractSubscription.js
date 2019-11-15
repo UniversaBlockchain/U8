@@ -84,7 +84,7 @@ class ApprovedEvent extends SubscriptionEvent {
     }
 
     /**
-     * @return {number[]} Packed transaction of the new revision just approved.
+     * @return {Uint8Array} packed transaction of the new revision just approved.
      */
     getPackedTransaction() {
         throw new Error("not implemented");
