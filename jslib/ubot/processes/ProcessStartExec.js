@@ -937,27 +937,27 @@ class ProcessStartExec extends ProcessBase {
     }
 
     /**
-     * Get ubot registry contract (with TransactionPack).
+     * Get UBot registry contract (with TransactionPack).
      *
-     * @return {Promise<Uint8Array>} packed transaction with ubot registry contract.
+     * @return {Promise<Uint8Array>} packed transaction with UBot registry contract.
      */
     async getUBotRegistryContract() {
         return await this.pr.ubot.client.getUBotRegistryContract();
     }
 
     /**
-     * Get number of ubot server.
+     * Get number of UBot server.
      *
-     * @return {number} number of ubot server.
+     * @return {number} number of UBot server.
      */
     getUBotNumber() {
         return this.pr.ubot.network.myInfo.number;
     }
 
     /**
-     * Get ubot index in pool.
+     * Get UBot index in pool.
      *
-     * @return {number} ubot index in pool.
+     * @return {number} UBot index in pool.
      */
     getUBotNumberInPool() {
         return this.pr.selfPoolIndex;
