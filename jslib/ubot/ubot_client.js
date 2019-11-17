@@ -128,6 +128,10 @@ class UBotClient {
         }
     }
 
+    replaceURL(URL) {
+        return URL;
+    }
+
     /**
      * Connects to a random UBot from the session pool.
      *
@@ -157,11 +161,7 @@ class UBotClient {
 
         let randomUbot = this.ubots[random];
 
-        // if (randomUbot.url.startsWith("http://127.0.0.1"))
-        //     randomUbot.url = "http://104.248.143.106" + randomUbot.url.substring(16);
-        // console.error(randomUbot.url);
-
-        this.httpUbotClient = new HttpClient(randomUbot.url);
+        this.httpUbotClient = new HttpClient(this.replaceURL(randomUbot.url));
         this.httpUbotClient.nodeNumber = this.topologyUBotNet[random].number;
         this.ubotPublicKey = randomUbot.key;
         await this.httpUbotClient.start(this.clientPrivateKey, this.ubotPublicKey);
@@ -189,11 +189,7 @@ class UBotClient {
 
         let ubot = this.ubots[ubotNumber];
 
-        // if (ubot.url.startsWith("http://127.0.0.1"))
-        //     ubot.url = "http://104.248.143.106" + ubot.url.substring(16);
-        // console.error(ubot.url);
-
-        let client = new HttpClient(ubot.url);
+        let client = new HttpClient(this.replaceURL(ubot.url));
         client.nodeNumber = this.topologyUBotNet[ubotNumber].number;
         await client.start(this.clientPrivateKey, ubot.key);
 
@@ -850,4 +846,19 @@ class UBotClient {
     }
 }
 
-module.exports = {UBotClient};
+class UBotTestClient extends UBotClient {
+    constructor(hostUbotForReplace, clientPrivateKey, topologyInput, topologyCacheDir) {
+        super(clientPrivateKey, topologyInput, topologyCacheDir);
+        this.hostUbotForReplace = hostUbotForReplace;
+    }
+
+    replaceURL(URL) {
+        if (!URL.startsWith(this.hostUbotForReplace))
+            URL = this.hostUbotForReplace + URL.substring(URL.indexOf(':', 6));
+        console.log("Replaced URL = " + URL);
+
+        return URL;
+    }
+}
+
+module.exports = {UBotClient, UBotTestClient};
