@@ -128,13 +128,9 @@ unit.test("ubot_main_test: start cloud method", async () => {
     assert(states.filter(state =>
         state.state === UBotPoolState.FINISHED.val &&
         typeof state.result === "number" && state.result >= 0 && state.result < 1000    // checking secure random value
-    ).length >= executableContract.state.data.cloud_methods.getRandom.quorum.size); //TODO
+    ).length >= executableContract.state.data.cloud_methods.getRandom.quorum.size);
 
-    /*assert(session.pool.filter(
-        ubot => ubotMains[ubot].ubot.processors.get(requestContract.id.base64).state === UBotPoolState.FINISHED).length >=
-        executableContract.state.data.cloud_methods.getRandom.quorum.size);*/ //TODO
-
-    await ubotClient.shutdown();//}
+    await ubotClient.shutdown();
 });
 
 unit.test("ubot_main_test: secure random", async () => {
@@ -190,7 +186,51 @@ unit.test("ubot_main_test: secure random", async () => {
     await ubotClient.shutdown();
 });*/
 
-/*unit.test("ubot_main_test: register contract", async () => {
+unit.test("ubot_main_test: full quorum", async () => {
+    let ubotClient = await new UBotTestClient("http://104.248.143.106", clientKey, TOPOLOGY_ROOT + TOPOLOGY_FILE).start();
+
+    let executableContract = await generateSecureRandomExecutableContract();
+
+    executableContract.state.data.cloud_methods.getRandom = {
+        pool: {size: 30},
+        quorum: {size: 30}
+    };
+    await executableContract.seal();
+
+    let requestContract = await generateSecureRandomRequestContract(executableContract);
+
+    let session = await ubotClient.startCloudMethod(requestContract);
+
+    console.log("Session: " + session);
+
+    let state = await ubotClient.getStateCloudMethod(requestContract.id);
+    console.log("State: " + JSON.stringify(state));
+
+    if (state.state !== UBotPoolState.FINISHED.val)
+        state = await ubotClient.waitCloudMethod(requestContract.id);
+
+    console.log("State: " + JSON.stringify(state));
+
+    let states = await Promise.all(session.pool.map(async (ubotNumber) => {
+        let state = await ubotClient.getStateCloudMethod(requestContract.id, ubotNumber);
+
+        if (state.state !== UBotPoolState.FINISHED.val)
+            state = await ubotClient.waitCloudMethod(requestContract.id, ubotNumber);
+
+        return state;
+    }));
+
+    console.log("Final states: " + JSON.stringify(states));
+
+    assert(states.filter(state =>
+        state.state === UBotPoolState.FINISHED.val &&
+        typeof state.result === "number" && state.result >= 0 && state.result < 1000    // checking secure random value
+    ).length >= executableContract.state.data.cloud_methods.getRandom.quorum.size);
+
+    await ubotClient.shutdown();
+});
+
+unit.test("ubot_main_test: register contract", async () => {
     // simple contract for registration
     let simpleContract = Contract.fromPrivateKey(userPrivKey);
     await simpleContract.seal();
@@ -214,7 +254,7 @@ unit.test("ubot_main_test: secure random", async () => {
     assert(ir instanceof ItemResult && ir.state === ItemState.APPROVED);
 
     await ubotClient.shutdown();
-});*/
+});
 
 unit.test("ubot_main_test: create and register contract", async () => {
     let ubotClient = await new UBotTestClient("http://104.248.143.106", clientKey, TOPOLOGY_ROOT + TOPOLOGY_FILE).start();
@@ -239,7 +279,7 @@ unit.test("ubot_main_test: create and register contract", async () => {
     await ubotClient.shutdown();
 });
 
-unit.test("ubot_main_test: pool and quorum percentage", async () => {
+/*unit.test("ubot_main_test: pool and quorum percentage", async () => {
     // simple contract for registration
     let simpleContract = Contract.fromPrivateKey(userPrivKey);
     await simpleContract.seal();
@@ -311,9 +351,9 @@ unit.test("ubot_main_test: pool and quorum percentage", async () => {
     // assert(state.state === UBotPoolState.FINISHED.val);
 
     await ubotClient.shutdown();
-});
+});*/
 
-/*unit.test("ubot_main_test:", async () => {
+/*unit.test("ubot_main_test: http requests", async () => {
     let price = 3.8;
     let stopPrice = 5.073;
 
@@ -432,10 +472,6 @@ unit.test("ubot_pro_test: 2 cloud method", async () => {
 
     await ubotClient.disconnectUbot();
 
-    /*assert(session.pool.filter(
-        ubot => ubotMains[ubot].ubot.processors.get(requestContract.id.base64).state === UBotPoolState.FINISHED).length >=
-        executableContract.state.data.cloud_methods.getRandom.quorum.size);*/
-
     //await sleep(5000);
     let sess = null;
     do {
@@ -480,10 +516,6 @@ unit.test("ubot_pro_test: 2 cloud method", async () => {
         state.result.random === first &&                                    // checking read random value
         checkRandomMultiData(state.result.multi_data, state.result.random)  // checking multi-storage
     ).length >= executableContract.state.data.cloud_methods.getRandom.quorum.size);
-
-    /*assert(session.pool.filter(
-        ubot => ubotMains[ubot].ubot.processors.get(requestContract.id.base64).state === UBotPoolState.FINISHED).length >=
-        executableContract.state.data.cloud_methods.getRandom.quorum.size);*/
 
     await ubotClient.shutdown();
 });
@@ -536,10 +568,6 @@ unit.test("ubot_pro_test: parallel cloud methods", async () => {
                     assert(finalized.every(state => state.result === result));
 
                     await ubotClient.disconnectUbot();
-
-                    /*assert(session.pool.filter(
-                        ubot => ubotMains[ubot].ubot.processors.get(requestContract.id.base64).state === UBotPoolState.FINISHED).length >=
-                        executableContract.state.data.cloud_methods.getRandom.quorum.size);*/
                 }
 
                 await ubotClient.shutdown();
@@ -556,7 +584,7 @@ unit.test("ubot_pro_test: parallel cloud methods", async () => {
 });
 
 /*unit.test("ubot_main_test: lottery", async () => {
-    let ubotMains = await createUBots(ubotsCount);
+    //let ubotMains = await createUBots(ubotsCount);
     let ubotClient = await new UBotTestClient("http://104.248.143.106", clientKey, TOPOLOGY_ROOT + TOPOLOGY_FILE).start();
 
     // init ubot-client (client key in whitelist)
@@ -690,12 +718,7 @@ unit.test("ubot_pro_test: parallel cloud methods", async () => {
     assert(prizeContract.getOrigin().equals(origin));
     assert(prizeContract.state.data.amount === "100");
 
-    // waiting pool finished...
-    while (ubotMains.some(main => Array.from(main.ubot.processors.values()).some(proc => proc.state.canContinue)))
-        await sleep(100);
-
     await ubotClient.shutdown();
-    await shutdownUBots(ubotMains);
 });*/
 
 unit.test("ubot_pro_test: execute cloud method with ubot delay", async () => {
@@ -750,5 +773,5 @@ unit.test("ubot_pro_test: execute cloud method with ubot delay", async () => {
         return res;
     }));
 
-    await ubotClient.shutdown();//}
+    await ubotClient.shutdown();
 });
