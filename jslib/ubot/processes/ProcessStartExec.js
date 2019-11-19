@@ -668,7 +668,7 @@ class ProcessStartExec extends ProcessBase {
             let recordId = this.pr.getDefaultRecordId(false);
 
             // get actual hash from MainNet by this.executableContract.id (further recordId)
-            let actualHash = await this.pr.session.getStorage(false, this.trustLevel);
+            let actualHash = await this.pr.session.getStorage(false, this.trustLevel, this.pr.requestContract);
             if (actualHash == null) {
                 this.pr.logger.log("getSingleStorage: getStorage return null");
                 return null;
@@ -722,7 +722,7 @@ class ProcessStartExec extends ProcessBase {
             let recordId = this.pr.getDefaultRecordId(true);
 
             // get actual hash from MainNet by this.executableContract.id (further recordId)
-            let actualHash = await this.pr.session.getStorage(true, this.trustLevel);
+            let actualHash = await this.pr.session.getStorage(true, this.trustLevel, this.pr.requestContract);
             if (actualHash == null) {
                 this.pr.logger.log("getMultiStorage: getStorage return null");
                 return null;

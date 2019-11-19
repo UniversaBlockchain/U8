@@ -60,7 +60,7 @@ class UBotSession {
         }
     }
 
-    async getStorage(multi, trustLevel) {
+    async getStorage(multi, trustLevel, requestContract) {
         if (this.ubot != null)
             this.ubot.logger.log("UBotSession.getStorage");
 
@@ -80,12 +80,20 @@ class UBotSession {
         let groups = new Map();
         let asked = 0;
 
+        let maxTime = ut.getRequestMaxWaitUbot(requestContract);
+        if (maxTime != null)
+            maxTime += Date.now();
+
         do {
             let delay = Math.min(tryNumber, 50) * UBotConfig.waitPeriod;
+
+            if (maxTime != null && Date.now() + delay > maxTime)
+                throw new UBotClientException("Maximum waiting time for votes on the registered contract is exceeded");
+
             ++tryNumber;
             if (delay > 0)
                 await sleep(delay);
-
+//
             let answers = await this.client.askSessionOnSomeNodes("ubotGetStorage", {
                 executableContractId: this.executableContractId,
                 storageNames: [storageName]
@@ -167,7 +175,7 @@ class UBotSession {
         let tryNumber = 0;
         let maxTime = null;
         if (maxWaitUbot != null)
-            maxTime += Date.now() + maxWaitUbot;
+            maxTime = Date.now() + maxWaitUbot;
 
         do {
             let delay = Math.min(tryNumber, 50) * UBotConfig.waitPeriod;

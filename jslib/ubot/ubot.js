@@ -53,7 +53,8 @@ class UBot {
         this.logger.log("  contract.state.data: " + t.secureStringify(contract.state.data));
 
         if (this.client == null)
-            this.client = await new UBotClient(this.nodeKey, TOPOLOGY_ROOT + TOPOLOGY_FILE, null, this.logger).start();
+            this.client = await new UBotClient(this.nodeKey, TOPOLOGY_ROOT + TOPOLOGY_FILE, null,
+                UBotConfig.clientMaxWaitSession, this.logger).start();
 
         let session = await this.client.checkSession(contract.state.data.executable_contract_id, contract.id, this.network.myInfo.number, this);
         this.logger.log("executeCloudMethod session: " + session);
@@ -76,7 +77,8 @@ class UBot {
             notification.type === UBotCloudNotification.types.DOWNLOAD_STARTING_CONTRACT && !notification.isAnswer) {
 
             if (this.client == null)
-                this.client = await new UBotClient(this.nodeKey, TOPOLOGY_ROOT + TOPOLOGY_FILE, null, this.logger).start();
+                this.client = await new UBotClient(this.nodeKey, TOPOLOGY_ROOT + TOPOLOGY_FILE, null,
+                    UBotConfig.clientMaxWaitSession, this.logger).start();
 
             let session = null;
             try {

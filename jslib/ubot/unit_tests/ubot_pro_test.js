@@ -13,6 +13,7 @@ import {ExecutorWithFixedPeriod} from "executorservice";
 const UBotMain = require("ubot/ubot_main").UBotMain;
 const UBotPoolState = require("ubot/ubot_pool_state").UBotPoolState;
 const UBotClient = require('ubot/ubot_client').UBotClient;
+const UBotConfig = require("ubot/ubot_config").UBotConfig;
 const ItemResult = require('itemresult').ItemResult;
 const ItemState = require("itemstate").ItemState;
 const cs = require("contractsservice");
@@ -868,7 +869,8 @@ unit.test("ubot_pro_test: lottery", async () => {
     let ubotClient = await new UBotClient(clientKey, TOPOLOGY_ROOT + TOPOLOGY_FILE).start();
 
     // init ubot-client (client key in whitelist)
-    ubotMains[0].ubot.client = await new UBotClient(ubotMains[0].ubot.nodeKey, TOPOLOGY_ROOT + TOPOLOGY_FILE, null, ubotMains[0].ubot.logger).start();
+    ubotMains[0].ubot.client = await new UBotClient(ubotMains[0].ubot.nodeKey, TOPOLOGY_ROOT + TOPOLOGY_FILE, null,
+        UBotConfig.clientMaxWaitSession, ubotMains[0].ubot.logger).start();
 
     const TICKETS = 10;
 
@@ -1017,7 +1019,7 @@ unit.test("ubot_pro_test: execute cloud method with ubot delay", async () => {
 
     let executableContract = await generateSimpleExecutableContract("ubotDelay.js", "getNumbers");
 
-    executableContract.state.data.cloud_methods.getNumbers.max_wait_ubot = 10;
+    executableContract.state.data.cloud_methods.getNumbers.max_wait_ubot = 30;
     await executableContract.seal();
 
     // bad request without consensus

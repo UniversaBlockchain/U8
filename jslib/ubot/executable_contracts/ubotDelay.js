@@ -8,7 +8,7 @@ async function getNumbers(delayed) {
 
     if (~delayed.indexOf(inPool)) {
         console.log("ubot {" + num + ", " + inPool + "} sleeping...");
-        await sleep(20000);
+        await sleep(35000);
         console.log("ubot {" + num + ", " + inPool + "} is awakened");
     }
 

@@ -39,7 +39,7 @@ class NodeRecord {
 }
 
 class UBotClient {
-    constructor(clientPrivateKey, topologyInput, topologyCacheDir, logger = undefined) {
+    constructor(clientPrivateKey, topologyInput, topologyCacheDir = null, millisToWaitSession = null, logger = undefined) {
         this.clientPrivateKey = clientPrivateKey;
         this.topologyInput = topologyInput;
         this.topologyCacheDir = topologyCacheDir;
@@ -55,6 +55,7 @@ class UBotClient {
         this.lock = new Lock();
         this.ubotRegistryContract = null;
         this.poolAndQuorum = null;
+        this.waitSession = millisToWaitSession;
     }
 
     /**
@@ -357,8 +358,15 @@ class UBotClient {
         if (session == null)
             throw new UBotClientException("Session is null");
 
+        let maxTime = 0;
+        if (this.waitSession != null)
+            maxTime = Date.now() + this.waitSession;
+
         // wait session requestId
         while (session.state === UBotSessionState.VOTING_REQUEST_ID.val) {
+            if (this.waitSession != null && Date.now() > maxTime)
+                throw new UBotClientException("Session timeout limit exceeded");
+
             await sleep(UBotConfig.waitPeriod);
             session = await this.getSession("ubotGetSession",
                 {executableContractId: requestContract.state.data.executable_contract_id});
@@ -377,6 +385,9 @@ class UBotClient {
                     throw new UBotClientException("Session is null");
             }
 
+            if (this.waitSession != null)
+                maxTime = Date.now() + this.waitSession;
+
         } else if (session.requestId == null || !session.requestId.equals(requestContract.id))
             throw new UBotClientException("Unable to create session by request contract");
 
@@ -389,6 +400,9 @@ class UBotClient {
         // wait session id and pool
         while (session.state !== UBotSessionState.OPERATIONAL.val && session.state !== UBotSessionState.CLOSING.val &&
             session.state !== UBotSessionState.CLOSED.val) {
+
+            if (this.waitSession != null && Date.now() > maxTime)
+                throw new UBotClientException("Session timeout limit exceeded");
 
             await sleep(UBotConfig.waitPeriod);
             session = await this.getSession("ubotGetSession",
@@ -718,14 +732,19 @@ class UBotClient {
      * @return {Promise<UBotSession>}.
      */
     async checkSession(executableContractId, requestContractId, ubotNumber, ubot) {
-        let session = await this.getSession("ubotGetSession",
-            {executableContractId: executableContractId});
+        let session = await this.getSession("ubotGetSession", {executableContractId: executableContractId});
 
         if (session == null)
             throw new UBotClientException("Session is null");
 
+        let maxTime = 0;
+        if (this.waitSession != null)
+            maxTime = Date.now() + this.waitSession;
+
         // wait not empty session
         while (session != null && session.state == null) {
+            if (this.waitSession != null && Date.now() > maxTime)
+                throw new UBotClientException("Session timeout limit exceeded");
 
             await sleep(UBotConfig.waitPeriod);
             session = await this.getSession("ubotGetSession", {executableContractId: executableContractId});
@@ -741,6 +760,9 @@ class UBotClient {
             // wait session id and pool
             while (session.state !== UBotSessionState.OPERATIONAL.val && session.state !== UBotSessionState.CLOSING.val &&
                    session.state !== UBotSessionState.CLOSED.val) {
+
+                if (this.waitSession != null && Date.now() > maxTime)
+                    throw new UBotClientException("Session timeout limit exceeded");
 
                 await sleep(UBotConfig.waitPeriod);
                 session = await this.getSession("ubotGetSession", {executableContractId: executableContractId});
