@@ -201,7 +201,7 @@ class UBotSession {
             maxWaitUbot = 0;
 
         // register contract
-        let ir = await this.client.register(packed, maxWaitUbot);
+        let ir = await this.client.ubotRegister(packed, this.sessionId, maxWaitUbot);
         if (maxWaitUbot > 0 && ir.state.isPending)
             throw new UBotClientException("Maximum waiting time for contract registration is exceeded");
 
