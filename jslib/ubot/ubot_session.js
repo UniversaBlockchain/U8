@@ -208,12 +208,13 @@ class UBotSession {
         return ir;
     }
 
-    async close() {
+    async close(finished) {
         if (this.ubot != null)
             this.ubot.logger.log("UBotSession.close");
 
         await this.client.askSessionOnAllNodes("ubotCloseSession", {
-            executableContractId: this.executableContractId
+            executableContractId: this.executableContractId,
+            finished: finished
         });
     }
 
