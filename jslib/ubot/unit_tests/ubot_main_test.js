@@ -151,7 +151,7 @@ unit.test("ubot_main_test: secure random", async () => {
     await ubotClient.shutdown();
 });
 
-/*unit.test("ubot_main_test: execute looped cloud method", async () => {
+unit.test("ubot_main_test: execute looped cloud method", async () => {
     let ubotClient = await new UBotTestClient("http://104.248.143.106", clientKey, TOPOLOGY_ROOT + TOPOLOGY_FILE).start();
 
     let executableContract = Contract.fromPrivateKey(userPrivKey);
@@ -184,7 +184,7 @@ unit.test("ubot_main_test: secure random", async () => {
         state.errors[0].message === "Cloud method return error: Quantiser limit is reached");
 
     await ubotClient.shutdown();
-});*/
+});
 
 unit.test("ubot_main_test: full quorum", async () => {
     let ubotClient = await new UBotTestClient("http://104.248.143.106", clientKey, TOPOLOGY_ROOT + TOPOLOGY_FILE).start();
@@ -230,31 +230,31 @@ unit.test("ubot_main_test: full quorum", async () => {
     await ubotClient.shutdown();
 });
 
-unit.test("ubot_main_test: register contract", async () => {
-    // simple contract for registration
-    let simpleContract = Contract.fromPrivateKey(userPrivKey);
-    await simpleContract.seal();
-    let packedSimpleContract = await simpleContract.getPackedTransaction();
-
-    let ubotClient = await new UBotTestClient("http://104.248.143.106", clientKey, TOPOLOGY_ROOT + TOPOLOGY_FILE).start();
-
-    let executableContract = await generateSimpleExecutableContract("simpleRegister.js", "register");
-    let requestContract = await generateSimpleRegisterRequestContract(executableContract, packedSimpleContract);
-
-    let state = await ubotClient.executeCloudMethod(requestContract, true);
-
-    console.log("State: " + JSON.stringify(state));
-
-    assert(state.state === UBotPoolState.FINISHED.val);
-
-    // checking contract
-    assert(state.result instanceof Uint8Array && t.valuesEqual(state.result, packedSimpleContract));
-
-    let ir = await ubotClient.getState(simpleContract.id);
-    assert(ir instanceof ItemResult && ir.state === ItemState.APPROVED);
-
-    await ubotClient.shutdown();
-});
+// unit.test("ubot_main_test: register contract", async () => {
+//     // simple contract for registration
+//     let simpleContract = Contract.fromPrivateKey(userPrivKey);
+//     await simpleContract.seal();
+//     let packedSimpleContract = await simpleContract.getPackedTransaction();
+//
+//     let ubotClient = await new UBotTestClient("http://104.248.143.106", clientKey, TOPOLOGY_ROOT + TOPOLOGY_FILE).start();
+//
+//     let executableContract = await generateSimpleExecutableContract("simpleRegister.js", "register");
+//     let requestContract = await generateSimpleRegisterRequestContract(executableContract, packedSimpleContract);
+//
+//     let state = await ubotClient.executeCloudMethod(requestContract, true);
+//
+//     console.log("State: " + JSON.stringify(state));
+//
+//     assert(state.state === UBotPoolState.FINISHED.val);
+//
+//     // checking contract
+//     assert(state.result instanceof Uint8Array && t.valuesEqual(state.result, packedSimpleContract));
+//
+//     let ir = await ubotClient.getState(simpleContract.id);
+//     assert(ir instanceof ItemResult && ir.state === ItemState.APPROVED);
+//
+//     await ubotClient.shutdown();
+// });
 
 unit.test("ubot_main_test: create and register contract", async () => {
     let ubotClient = await new UBotTestClient("http://104.248.143.106", clientKey, TOPOLOGY_ROOT + TOPOLOGY_FILE).start();
