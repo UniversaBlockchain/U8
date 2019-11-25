@@ -19,7 +19,7 @@ const Constraint = require('constraint').Constraint;
 const BigDecimal  = require("big").Big;
 
 const TOPOLOGY_ROOT = "../jslib/ubot/topology/";
-const TOPOLOGY_FILE = "universa.pro.json";          //test_node_config_v2.json
+const TOPOLOGY_FILE = "mainnet_topology.json";
 const TEST_CONTRACTS_PATH = "../jslib/ubot/executable_contracts/";
 const ubotsCount = 30;
 

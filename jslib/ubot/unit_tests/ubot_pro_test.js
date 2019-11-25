@@ -24,7 +24,7 @@ const t = require("tools");
 const ut = require("ubot/ubot_tools");
 
 const TOPOLOGY_ROOT = "../jslib/ubot/topology/";
-const TOPOLOGY_FILE = "universa.pro.json";          //test_node_config_v2.json
+const TOPOLOGY_FILE = "mainnet_topology.json";
 const CONFIG_ROOT = "../test/config/ubot_config";
 const TEST_CONTRACTS_PATH = "../jslib/ubot/executable_contracts/";
 const ubotsCount = 30;

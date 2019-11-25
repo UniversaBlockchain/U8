@@ -15,11 +15,10 @@ const BossBiMapper = require("bossbimapper").BossBiMapper;
 const Boss = require('boss.js');
 const t = require("tools");
 
-const TOPOLOGY_ROOT = "../jslib/ubot/topology/";
-const TOPOLOGY_FILE = "universa.pro.json";          //test_node_config_v2.json
+const TOPOLOGY_FILE = "mainnet_topology.json";
 
 class UBot {
-    constructor(logger, network, ledger, nodeKey) {
+    constructor(logger, network, ledger, nodeKey, configRoot) {
         //this.logger = logger;
         this.logger = {log: text => logger.log("UBot"+network.myInfo.number+": " + text)};
         this.ledger = ledger;
@@ -30,6 +29,7 @@ class UBot {
         this.sessionStorageCache = new UBotSessionStorageCache(UBotConfig.maxResultCacheAge);
         this.executorService = new ExecutorService();
         this.nodeKey = nodeKey;
+        this.configRoot = configRoot;
         this.client = null;
     }
 
@@ -53,7 +53,7 @@ class UBot {
         this.logger.log("  contract.state.data: " + t.secureStringify(contract.state.data));
 
         if (this.client == null)
-            this.client = await new UBotClient(this.nodeKey, TOPOLOGY_ROOT + TOPOLOGY_FILE, null,
+            this.client = await new UBotClient(this.nodeKey, this.configRoot + TOPOLOGY_FILE, null,
                 UBotConfig.clientMaxWaitSession, this.logger).start();
 
         let session = await this.client.checkSession(contract.state.data.executable_contract_id, contract.id, this.network.myInfo.number, this);
@@ -77,7 +77,7 @@ class UBot {
             notification.type === UBotCloudNotification.types.DOWNLOAD_STARTING_CONTRACT && !notification.isAnswer) {
 
             if (this.client == null)
-                this.client = await new UBotClient(this.nodeKey, TOPOLOGY_ROOT + TOPOLOGY_FILE, null,
+                this.client = await new UBotClient(this.nodeKey, this.configRoot + TOPOLOGY_FILE, null,
                     UBotConfig.clientMaxWaitSession, this.logger).start();
 
             let session = null;
