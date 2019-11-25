@@ -147,7 +147,7 @@ class ProcessStartExec extends ProcessBase {
             methodName = this.pr.methodName;
         if (methodArgs == null)
             methodArgs = this.pr.methodArgs;
-        this.multiVerifyMethod = multiVerifyMethod;
+        //this.multiVerifyMethod = multiVerifyMethod;
 
         this.pr.logger.log("start ProcessStartExec");
 
@@ -247,41 +247,58 @@ class ProcessStartExec extends ProcessBase {
                     out("worker debug console:", ...args[1], args[2]);
                 };
 
-                let startProcessorTime = this.pr.worker.getProcessorTime();
-                let startAbsoluteTime = Date.now();
+                let expired = Math.min(
+                    this.pr.executableContract.getExpiresAt().getTime(),
+                    this.pr.requestContract.getExpiresAt().getTime(),
+                    Date.now() + UBotConfig.requestExpiredTime
+                );
+
                 let terminate = false;
-                let result = await Promise.race([
-                    new Promise(async (resolve) =>
-                        await this.pr.worker.farcall(methodName, methodArgs, {}, ans => resolve(ans))
-                    ),
-                    new Promise(async (resolve) => {
-                        do {
-                            await sleep(UBotConfig.checkQuantiserPeriod);
+                let result = null;
 
-                            if (this.pr.worker != null) {
-                                //this.pr.worker.getProcessorTime() - startTime > UBotConfig.maxRequestLife) {
-                                let endProcessorTime = this.pr.worker.getProcessorTime();
-                                let endAbsoluteTime = Date.now();
-                                let processorTime = endProcessorTime - startProcessorTime;
-                                let waitingTime = (endAbsoluteTime - startAbsoluteTime) / 1000 - processorTime;
-                                if (waitingTime < 0)
-                                    waitingTime = 0;
-                                let cost = (UBotQuantiserProcesses.PRICE_WORK_MINUTE * processorTime +
-                                            UBotQuantiserProcesses.PRICE_WAITING_MINUTE * waitingTime) / 60;
+                if (Date.now() <= expired) {
+                    let startProcessorTime = this.pr.worker.getProcessorTime();
+                    let startAbsoluteTime = Date.now();
+                    result = await Promise.race([
+                        new Promise(async (resolve) =>
+                            await this.pr.worker.farcall(methodName, methodArgs, {}, ans => resolve(ans))
+                        ),
+                        new Promise(async (resolve) => {
+                            do {
+                                await sleep(UBotConfig.checkQuantiserPeriod);
 
-                                try {
-                                    this.pr.quantiser.addWorkCost(cost);
-                                } catch (err) {
-                                    terminate = true;
-                                    resolve(err);
+                                if (this.pr.worker != null) {
+                                    if (Date.now() > expired) {
+                                        terminate = true;
+                                        resolve(new UBotProcessException("Executable contract or request is expired"));
+                                    }
+
+                                    let endProcessorTime = this.pr.worker.getProcessorTime();
+                                    let endAbsoluteTime = Date.now();
+                                    let processorTime = endProcessorTime - startProcessorTime;
+                                    let waitingTime = (endAbsoluteTime - startAbsoluteTime) / 1000 - processorTime;
+                                    if (waitingTime < 0)
+                                        waitingTime = 0;
+                                    let cost = (UBotQuantiserProcesses.PRICE_WORK_MINUTE * processorTime +
+                                        UBotQuantiserProcesses.PRICE_WAITING_MINUTE * waitingTime) / 60;
+
+                                    try {
+                                        this.pr.quantiser.addWorkCost(cost);
+                                    } catch (err) {
+                                        terminate = true;
+                                        resolve(err);
+                                    }
+
+                                    startProcessorTime = endProcessorTime;
+                                    startAbsoluteTime = endAbsoluteTime;
                                 }
-
-                                startProcessorTime = endProcessorTime;
-                                startAbsoluteTime = endAbsoluteTime;
-                            }
-                        } while (this.pr.worker != null && !terminate);
-                    })
-                ]);
+                            } while (this.pr.worker != null && !terminate);
+                        })
+                    ]);
+                } else {
+                    terminate = true;
+                    result = new UBotProcessException("Executable contract or request is expired");
+                }
 
                 this.pr.logger.log("QuantaSum of " + methodName + ": " + this.pr.quantiser.quantaSum_);
 

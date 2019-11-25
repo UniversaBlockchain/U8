@@ -1827,8 +1827,9 @@ class Constraint extends bs.BiSerializable {
         let constrs = new Set();
 
         let firstPointPos;
-        if (condition.typeOfLeftOperand === compareOperandType.FIELD && !condition.leftOperand.startsWith("ref.") &&
-            !condition.leftOperand.startsWith("this.") && ((firstPointPos = condition.leftOperand.indexOf(".")) > 0)) {
+        if (condition.leftOperand != null && condition.typeOfLeftOperand === compareOperandType.FIELD &&
+            !condition.leftOperand.startsWith("ref.") && !condition.leftOperand.startsWith("this.") &&
+            ((firstPointPos = condition.leftOperand.indexOf(".")) > 0)) {
 
             if (this.baseContract == null)
                 throw new ex.IllegalArgumentError("Use left operand in condition: " + condition.leftOperand + ". But this contract not initialized.");
@@ -1841,8 +1842,9 @@ class Constraint extends bs.BiSerializable {
                 constr.getInternalConstraints(iteration + 1).forEach(c => constrs.add(c));
         }
 
-        if (condition.typeOfRightOperand === compareOperandType.FIELD && !condition.rightOperand.startsWith("ref.") &&
-            !condition.rightOperand.startsWith("this.") && ((firstPointPos = condition.rightOperand.indexOf(".")) > 0)) {
+        if (condition.rightOperand != null && condition.typeOfRightOperand === compareOperandType.FIELD &&
+            !condition.rightOperand.startsWith("ref.") && !condition.rightOperand.startsWith("this.") &&
+            ((firstPointPos = condition.rightOperand.indexOf(".")) > 0)) {
 
             if (this.baseContract == null)
                 throw new ex.IllegalArgumentError("Use right operand in condition: " + condition.rightOperand + ". But this contract not initialized.");

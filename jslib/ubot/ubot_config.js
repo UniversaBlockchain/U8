@@ -25,6 +25,7 @@ class UBotConfig {
     static storageReadTrustLevel = 0.3;
 
     static checkQuantiserPeriod = 10000; // ms
+    static requestExpiredTime = 86400000; // ms
 }
 
 module.exports = {UBotConfig};
