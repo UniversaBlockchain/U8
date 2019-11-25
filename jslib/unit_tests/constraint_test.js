@@ -430,8 +430,8 @@ unit.test("constraint test: checkConstraintsAPILevel4", async () => {
     await contract4.seal();
     await contract5.seal();
     contract1.newItems.add(contract4, contract5);
-//TODO
-    contract2.state.data["ids"] =  Do.listOf(HashId.of(randomBytes(64)), randomHash2.base64);
+
+    contract2.state.data["ids"] =  [HashId.of(randomBytes(64)), randomHash2.base64];
     contract2.state.data["saved_id"] = randomHash2.base64;
     contract2.state.data["saved_id_of_sub_contract1"] = contract4.id.base64;
     contract2.state.data["saved_id_of_sub_contract2"] = contract5.id.base64;
@@ -451,13 +451,13 @@ unit.test("constraint test: checkConstraintsAPILevel4", async () => {
     contract1.state.setBranchNumber(25);
 
     // for checking "in" operator
-    let randomHash = HashId.createRandom();
+    let randomHash = HashId.of(randomBytes(64));
 
     contract1.state.data["ids1"] = [HashId.of(randomBytes(64), contract2.id.base64, randomHash.base64)];
-    contract1.state.data["ids2"] = Do.listOf(contract2.id.base64);
+    contract1.state.data["ids2"] = [contract2.id.base64];
     contract1.state.data["ids3"] = [HashId.of(randomBytes(64)), contract2.id.base64, randomHash2.base64];
-    contract1.state.data["ids4"] = Do.listOf(contract2.id.base64);
-    contract1.state.data["ids5"] = Do.listOf(HashId.of(randomBytes(64)), HashId.of(randomBytes(64)), randomHash.base64);
+    contract1.state.data["ids4"] = [contract2.id.base64];
+    contract1.state.data["ids5"] = [HashId.of(randomBytes(64)), HashId.of(randomBytes(64)), randomHash.base64];
 
     contract1.state.data["saved_contract_id"] = contract2.id.base64;
     contract1.state.data["saved_id"] = randomHash.base64;
@@ -466,12 +466,12 @@ unit.test("constraint test: checkConstraintsAPILevel4", async () => {
     contract1.state.data["saved_sub_contract_id2"] = contract5.id.base64;
 
     contract1.state.data["newItemsId"] = contract4.id.base64;
-    contract1.state.data["newItemsIds"] = Do.listOf(contract4.id.base64, contract5.id.base64);
+    contract1.state.data["newItemsIds"] = [contract4.id.base64, contract5.id.base64];
     contract1.state.data["revokingItemsId"] = contract2.id.base64;
-    contract1.state.data["revokingItemsIds"] = Do.listOf(contract2.id.base64);
+    contract1.state.data["revokingItemsIds"] = [contract2.id.base64];
 
-    conditions = contract1.constraints.get("ref_in").getConditions();
-    condList = conditions.getList(all_of.name(), null);
+    conditions = contract1.constraints.get("ref_in").conditions;
+    condList = conditions["all_of"];
 
     condList.push("\"" + contract2.id.base64 + "\" in this.state.data.ids1");
     condList.push("\"" + contract2.id.base64 + "\" in this.state.data.ids2");
@@ -503,8 +503,8 @@ unit.test("constraint test: checkConstraintsAPILevel4", async () => {
 
     contract1.constraints.get("ref_in").setConditions(conditions);
 
-    conditions = contract1.constraints.get("ref_in_for_revoking").getConditions();
-    condList = conditions.getList(all_of.name(), null);
+    conditions = contract1.constraints.get("ref_in_for_revoking").conditions;
+    condList = conditions["all_of"];
 
     condList.push("\"" + contract2.id.base64  + "\" in ref.revokingItems");
     condList.push("this.state.data.saved_contract_id in ref.revokingItems");

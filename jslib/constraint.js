@@ -405,7 +405,7 @@ class Constraint extends bs.BiSerializable {
         return result;
     }
 
-    prepareRoleToComparison(item) {
+    static prepareRoleToComparison(item) {
         if (item instanceof roles.RoleLink)
             return item.resolve();
 
@@ -733,8 +733,8 @@ class Constraint extends bs.BiSerializable {
                                         compareOperand = leftOperand;
                                 }
 
-                                role = this.prepareRoleToComparison(role);
-                                let compareRole = this.prepareRoleToComparison(compareOperand);
+                                role = Constraint.prepareRoleToComparison(role);
+                                let compareRole = Constraint.prepareRoleToComparison(compareOperand);
 
                                 ret = role.equalsForConstraint(compareRole);
 
@@ -886,7 +886,7 @@ class Constraint extends bs.BiSerializable {
                         if (typeOfRightOperand === compareOperandType.FIELD && right == null)
                             break;
 
-                        if (!(right instanceof Set || right instanceof List)) //TODO
+                        if (!(right instanceof Set || right instanceof Array))
                             break;
 
                         let leftSet = new Set();
@@ -894,25 +894,25 @@ class Constraint extends bs.BiSerializable {
 
                         if (left == null)
                             leftSet.add(leftOperand);
-                        else if (left instanceof Set || left instanceof List)
-                            leftSet.addAll(left);
+                        else if (left instanceof Set || left instanceof Array)
+                            left.forEach(l => leftSet.add(l));
                         else
                             leftSet.add(left);
 
-                        if (leftSet.isEmpty()) {
+                        if (leftSet.size === 0) {
                             ret = true;
                             break;
                         }
 
-                        rightSet.addAll(right);
+                        right.forEach(l => rightSet.add(l));
 
-                        if (leftSet.stream().anyMatch(item => item instanceof HashId) ||
-                            rightSet.stream().anyMatch(item => item instanceof HashId)) {
+                        if (Array.from(leftSet).some(item => item instanceof HashId) ||
+                            Array.from(rightSet).some(item => item instanceof HashId)) {
 
                             let leftHashSet = new Set();
                             let rightHashSet = new Set();
 
-                            for (item of leftSet) {
+                            for (let item of leftSet) {
                                 if (item instanceof HashId)
                                     leftHashSet.add(item);
                                 else if (item instanceof String)
@@ -922,7 +922,7 @@ class Constraint extends bs.BiSerializable {
                                         "collection item in left operand in condition: " + leftOperand);
                             }
 
-                            for (item of rightSet) {
+                            for (let item of rightSet) {
                                 if (item instanceof HashId)
                                     rightHashSet.add(item);
                                 else if (item instanceof String)
@@ -934,34 +934,34 @@ class Constraint extends bs.BiSerializable {
 
                             ret = rightHashSet.containsAll(leftHashSet);
 
-                        } else if (leftSet.stream().anyMatch(item => item instanceof Role) ||
-                            rightSet.stream().anyMatch(item => item instanceof Role)) {
+                        } else if (Array.from(rightSet).some(item => item instanceof roles.Role) ||
+                            Array.from(rightSet).some(item => item instanceof HashId)) {
 
                             let leftRoleSet = new Set();
                             let rightRoleSet = new Set();
 
-                            for (item of leftSet) {
-                                if (item instanceof Role || item instanceof String)
-                                    leftRoleSet.add(prepareRoleToComparison(item));
+                            for (let item of leftSet) {
+                                if (item instanceof roles.Role || item instanceof String)
+                                    leftRoleSet.add(Constraint.prepareRoleToComparison(item));
                                 else
                                     throw new ex.IllegalArgumentError(
                                         "Unexpected type (expect Role or String) of collection item in left operand in condition: " + leftOperand);
                             }
 
-                            for (item of rightSet) {
-                                if (item instanceof Role || item instanceof String)
-                                    rightRoleSet.add(prepareRoleToComparison(item));
+                            for (let item of rightSet) {
+                                if (item instanceof roles.Role || item instanceof String)
+                                    rightRoleSet.add(Constraint.prepareRoleToComparison(item));
                                 else
                                     throw new ex.IllegalArgumentError(
                                         "Unexpected type (expect Role or String) of collection item in right operand in condition: " + rightOperand);
                             }
 
-                            ret = leftRoleSet.stream().allMatch(leftRole => rightRoleSet.stream().anyMatch(leftRole::equalsIgnoreName));
+                            //ret = Array.from(leftRoleSet).some(leftRole => Array.from(rightRoleSet).some(leftRole.equalsForConstraint)); //TODO
 
-                        } else if (leftSet.stream().allMatch(item => item instanceof Constraint) &&
-                            rightSet.stream().allMatch(item => item instanceof Constraint)) {
-                            ret = leftSet.stream().allMatch(leftRef => rightSet.stream().anyMatch(
-                                rightRef => leftRef.equalsIgnoreType(rightRef)));
+                        } else if (Array.from(leftSet).some(item => item instanceof Constraint) &&
+                            Array.from(rightSet).some(item => item instanceof Constraint)) {
+
+                            //ret = Array.from(leftSet).some(leftRef => Array.from(rightSet).some(rightRef => leftRef.equalsIgnoreType(rightRef))); //TODO
 
                         } else
                             ret = rightSet.containsAll(leftSet);
@@ -970,7 +970,7 @@ class Constraint extends bs.BiSerializable {
                     default:
                         throw new ex.IllegalArgumentError("Invalid operator in condition");
                 }
-            } catch (e) {
+            } catch (e){
                 throw new ex.IllegalArgumentError("Error compare operands in condition: " + e.toString());
             }
         } else {       // if rightOperand == null && rightExpression == null, then operation: defined / undefined
@@ -1958,7 +1958,7 @@ class Constraint extends bs.BiSerializable {
     }
 
     toString() {
-        return crypto.HashId.of(t.randomBytes(64)).base64;
+        return HashId.of(t.randomBytes(64)).base64;
     }
 
     stringId() {

@@ -782,6 +782,12 @@ class Contract extends bs.BiSerializable {
                 return this.roles.creator;
             case "tag":
                 return {contractForSearchByTag: this};
+            case "newItems":
+                //return getNewItems().stream().map(c -> (c.id.)collect(Collectors.toSet());
+                return Array.from(this.newItems).map(c => c.id);
+            case "revokingItems":
+                //return getRevokingItems().stream().map(c => (c.id).collect(Collectors.toSet());
+                return Array.from(this.revokingItems).map(c => c.id);
         }
         throw new ex.IllegalArgumentError("bad root: " + originalName);
 

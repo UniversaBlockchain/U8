@@ -112,7 +112,7 @@ async function testES() {
     assert(es != null);
 }
 
-require('unit_tests/worker_tests');
+/*require('unit_tests/worker_tests');
 require('unit_tests/boss_test');
 require('unit_tests/crypto_test');
 require('unit_tests/pseudo_random_test');
@@ -128,9 +128,9 @@ require('unit_tests/changenumberpermission_test');
 require('unit_tests/changeownerpermission_test');
 require('unit_tests/modifydatapermission_test');
 require('unit_tests/revokepermission_test');
-require('unit_tests/splitjoinpermission_test');
+require('unit_tests/splitjoinpermission_test');*/
 require('unit_tests/constraint_test');
-require('unit_tests/pg_test');
+/*require('unit_tests/pg_test');
 require('unit_tests/ledger_test');
 require('unit_tests/itemcache_test');
 require('unit_tests/udp_test');
@@ -145,7 +145,7 @@ require('unit_tests/asyncevent_test');
 require('unit_tests/contractsservice_test');
 require('unit_tests/notification_test');
 require('unit_tests/lock_test');
-require('unit_tests/main_test');
+require('unit_tests/main_test');*/
 // require('unit_tests/stress_test')
 
 async function main() {
