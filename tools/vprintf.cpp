@@ -6,6 +6,7 @@
 #include <vector>
 #include <iostream>
 #include <mutex>
+#include <stdarg.h>
 
 #include "vprintf.h"
 
