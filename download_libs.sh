@@ -2,6 +2,18 @@
 
 platform=$1
 
+if [ -z $platform ]
+then
+    echo "platform is empty, autodetecting"
+    unameOut="$(uname -s)"
+    case "${unameOut}" in
+        Linux*)     platform=linux;;
+        Darwin*)    platform=macos;;
+        *)          platform="UNKNOWN:${unameOut}"
+    esac
+    echo "platform autodetected as $platform"
+fi
+
 download_path=ext/$platform
 
 mkdir -p $download_path
