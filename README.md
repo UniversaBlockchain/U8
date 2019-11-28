@@ -31,15 +31,20 @@ To build U8, you need the following packages installed:
 export CC=/usr/bin/clang-8
 export CXX=/usr/bin/clang++-8
 
-# Build
-cmake -S . -B build-release
-cmake --build build-release --target u8 -- -j
+# Prepare
+cmake -DCMAKE_BUILD_TYPE=Release -G "CodeBlocks - Unix Makefiles" -B./cmake-build-release .
+
+# Clean
+cmake --build ./cmake-build-release/ --target clean -- -j
+
+# Buildbuild-release
+cmake --build ./cmake-build-release --target all -- -j
 ~~~
 
-After that, in the `build-release` directory you get the `u8` binary which may now execute the JavaScript scripts, like:
+After that, in the `cmake-build-release` directory you get the `u8` binary which may now execute the JavaScript scripts, like:
 
 ~~~
-cd build-release
+cd cmake-build-release
 ./u8 ../testmain.js
 ~~~
 
