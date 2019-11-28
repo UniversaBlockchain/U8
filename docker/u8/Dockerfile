@@ -34,10 +34,12 @@ COPY --from=build_clang /code/ext/linux/libssl /code/ext/linux/libssl
 COPY --from=build_clang /code/ext/linux/libtomcrypt /code/ext/linux/libtomcrypt
 COPY --from=build_clang /code/ext/linux/libuv /code/ext/linux/libuv
 COPY --from=build_clang /code/ext/linux/libv8 /code/ext/linux/libv8
+COPY /jslib /code/jslib
 
 RUN echo \
     && mkdir -p /u8 \
     && ln -s /code/cmake-build-release/u8 /u8/u8 \
+    && ln -s /code/jslib /u8/jslib \
     && apt-get update --quiet=2 --yes \
     && apt-get install --quiet=2 --yes --no-install-recommends libcurl4 \
     && apt-get clean --quiet=2 --yes && apt-get autoremove --quiet=2 --yes && rm -rf /var/lib/apt/lists/*
