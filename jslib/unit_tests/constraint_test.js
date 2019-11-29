@@ -429,7 +429,8 @@ unit.test("constraint test: checkConstraintsAPILevel4", async () => {
 
     await contract4.seal();
     await contract5.seal();
-    contract1.newItems.add(contract4, contract5);
+    contract1.newItems.add(contract4);
+    contract1.newItems.add(contract5);
 
     contract2.state.data["ids"] =  [HashId.of(randomBytes(64)), randomHash2.base64];
     contract2.state.data["saved_id"] = randomHash2.base64;
@@ -438,13 +439,13 @@ unit.test("constraint test: checkConstraintsAPILevel4", async () => {
 
     await contract2.seal();
 
-    let contract3 = await contract2.createRevision([key]);
-    await contract3.seal();
-
     // signature to check can_play operator
     await contract2.addSignatureToSeal(key);
 
-    contract1.state.data["contract2_origin"] = contract2.origin.base64;
+    let contract3 = await contract2.createRevision([key]);
+    await contract3.seal();
+
+    contract1.state.data["contract2_origin"] = contract2.getOrigin().base64;
     contract1.state.data["contract2_id"] = contract2.id.base64;
     contract1.state.data["contract3_parent"] = contract3.state.parent.base64;
 
@@ -453,11 +454,11 @@ unit.test("constraint test: checkConstraintsAPILevel4", async () => {
     // for checking "in" operator
     let randomHash = HashId.of(randomBytes(64));
 
-    contract1.state.data["ids1"] = [HashId.of(randomBytes(64), contract2.id.base64, randomHash.base64)];
+    contract1.state.data["ids1"] = [HashId.of(randomBytes(64)).base64, contract2.id.base64, randomHash.base64];
     contract1.state.data["ids2"] = [contract2.id.base64];
-    contract1.state.data["ids3"] = [HashId.of(randomBytes(64)), contract2.id.base64, randomHash2.base64];
+    contract1.state.data["ids3"] = [HashId.of(randomBytes(64)).base64, contract2.id.base64, randomHash2.base64];
     contract1.state.data["ids4"] = [contract2.id.base64];
-    contract1.state.data["ids5"] = [HashId.of(randomBytes(64)), HashId.of(randomBytes(64)), randomHash.base64];
+    contract1.state.data["ids5"] = [HashId.of(randomBytes(64)).base64, HashId.of(randomBytes(64)).base64, randomHash.base64];
 
     contract1.state.data["saved_contract_id"] = contract2.id.base64;
     contract1.state.data["saved_id"] = randomHash.base64;

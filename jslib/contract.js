@@ -555,6 +555,8 @@ class Contract extends bs.BiSerializable {
         super();
         this.revokingItems = new t.GenericSet();
         this.newItems = new t.GenericSet();
+        this.revokingIds = null;
+        this.newIds = null;
         this.roles = {};
         this.definition = new Definition(this);
         this.state = new State(this);
@@ -783,11 +785,15 @@ class Contract extends bs.BiSerializable {
             case "tag":
                 return {contractForSearchByTag: this};
             case "newItems":
-                //return getNewItems().stream().map(c -> (c.id.)collect(Collectors.toSet());
-                return Array.from(this.newItems).map(c => c.id);
+                if (this.newIds == null || this.apiLevel < 3)
+                    return new t.GenericSet(Array.from(this.newItems).map(c => c.id));
+                else
+                    return new t.GenericSet(this.newIds);
             case "revokingItems":
-                //return getRevokingItems().stream().map(c => (c.id).collect(Collectors.toSet());
-                return Array.from(this.revokingItems).map(c => c.id);
+                if (this.revokingIds == null || this.apiLevel < 3)
+                    return new t.GenericSet(Array.from(this.revokingItems).map(c => c.id));
+                else
+                    return new t.GenericSet(this.revokingIds);
         }
         throw new ex.IllegalArgumentError("bad root: " + originalName);
 
@@ -2202,12 +2208,16 @@ class Contract extends bs.BiSerializable {
             payload = await Boss.load(contractBytes, null);
         await result.deserialize(payload.contract, BossBiMapper.getInstance());
 
+        this.newIds = new t.GenericSet();
+        this.revokingIds = new t.GenericSet();
+
         if(result.apiLevel < 3) {
             if(payload.hasOwnProperty("revoking"))
                 for(let packed of payload.revoking) {
                     let c = await Contract.fromSealedBinary(packed,transactionPack);
                     result.revokingItems.add(c);
                     transactionPack.subItems.set(c.id, c);
+                    this.revokingIds.add(c.id);
                 }
 
             if(payload.hasOwnProperty("new"))
@@ -2215,11 +2225,13 @@ class Contract extends bs.BiSerializable {
                     let c = await Contract.fromSealedBinary(packed,transactionPack);
                     result.newItems.add(c);
                     transactionPack.subItems.set(c.id, c);
+                    this.newIds.add(c.id);
                 }
         } else {
             if(payload.hasOwnProperty("revoking"))
                 for(let b of payload.revoking) {
                     let hid = await BossBiMapper.getInstance().deserialize(b);
+                    this.revokingIds.add(hid);
                     let r = transactionPack.subItems.get(hid);
                     if(r != null) {
                         result.revokingItems.add(r);
@@ -2232,6 +2244,7 @@ class Contract extends bs.BiSerializable {
             if(payload.hasOwnProperty("new"))
                 for(let b of payload.new) {
                     let hid = await BossBiMapper.getInstance().deserialize(b);
+                    this.newIds.add(hid);
                     let r = transactionPack.subItems.get(hid);
                     if(r != null) {
                         result.newItems.add(r);
