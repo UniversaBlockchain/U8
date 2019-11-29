@@ -1226,8 +1226,8 @@ class ItemProcessor {
         for (let n of this.node.network.allNodes())
             if (!this.positiveNodes.has(n) && !this.negativeNodes.has(n)) {
                 // if node do not know own vote we do not send notification, just looking for own state
-                if (!this.node.myInfo.equals(node))
-                    this.node.network.deliver(node, notification);
+                if (!this.node.myInfo.equals(n))
+                    this.node.network.deliver(n, notification);
                 else if (this.processingState.isProcessedToConsensus)
                     this.vote(this.node.myInfo, this.record.state);
             }
