@@ -7,6 +7,8 @@ import {expect, unit, assert, assertSilent} from 'test'
 import * as t from 'tools'
 import * as d from 'deltas'
 import * as io from 'io'
+import {HashId} from 'crypto'
+import {randomBytes} from 'tools'
 
 const DefaultBiMapper = require("defaultbimapper").DefaultBiMapper;
 const BossBiMapper = require("bossbimapper").BossBiMapper;
@@ -340,11 +342,11 @@ unit.test("constraint test: checkConstraints", async () => {
 
     await contract2.seal();
 
-    let contract3 = await contract2.createRevision([key]);
-    await contract3.seal();
-
     // signature to check can_play operator
     await contract2.addSignatureToSeal(key);
+
+    let contract3 = await contract2.createRevision([key]);
+    await contract3.seal();
 
     contract1.state.data["contract2_origin"] = contract2.getOrigin().base64;
     contract1.state.data["contract2_id"] = contract2.id.base64;
@@ -419,19 +421,96 @@ unit.test("constraint test: checkConstraintsAPILevel4", async () => {
 
     contract1.constraints.get("ref_time").setConditions(conditions);
 
-    await contract2.seal();
+    // for checking "in" operator
+    let randomHash2 = HashId.of(randomBytes(64));
 
-    let contract3 = await contract2.createRevision([key]);
-    await contract3.seal();
+    let contract4 = Contract.fromPrivateKey(key);
+    let contract5 = Contract.fromPrivateKey(key);
+
+    await contract4.seal();
+    await contract5.seal();
+    contract1.newItems.add(contract4);
+    contract1.newItems.add(contract5);
+
+    contract2.state.data["ids"] =  [HashId.of(randomBytes(64)), randomHash2.base64];
+    contract2.state.data["saved_id"] = randomHash2.base64;
+    contract2.state.data["saved_id_of_sub_contract1"] = contract4.id.base64;
+    contract2.state.data["saved_id_of_sub_contract2"] = contract5.id.base64;
+
+    await contract2.seal();
 
     // signature to check can_play operator
     await contract2.addSignatureToSeal(key);
+
+    let contract3 = await contract2.createRevision([key]);
+    await contract3.seal();
 
     contract1.state.data["contract2_origin"] = contract2.getOrigin().base64;
     contract1.state.data["contract2_id"] = contract2.id.base64;
     contract1.state.data["contract3_parent"] = contract3.state.parent.base64;
 
     contract1.state.setBranchNumber(25);
+
+    // for checking "in" operator
+    let randomHash = HashId.of(randomBytes(64));
+
+    contract1.state.data["ids1"] = [HashId.of(randomBytes(64)).base64, contract2.id.base64, randomHash.base64];
+    contract1.state.data["ids2"] = [contract2.id.base64];
+    contract1.state.data["ids3"] = [HashId.of(randomBytes(64)).base64, contract2.id.base64, randomHash2.base64];
+    contract1.state.data["ids4"] = [contract2.id.base64];
+    contract1.state.data["ids5"] = [HashId.of(randomBytes(64)).base64, HashId.of(randomBytes(64)).base64, randomHash.base64];
+
+    contract1.state.data["saved_contract_id"] = contract2.id.base64;
+    contract1.state.data["saved_id"] = randomHash.base64;
+    contract1.state.data["saved_id_from_contract2"] = randomHash2.base64;
+    contract1.state.data["saved_sub_contract_id1"] = contract4.id.base64;
+    contract1.state.data["saved_sub_contract_id2"] = contract5.id.base64;
+
+    contract1.state.data["newItemsId"] = contract4.id.base64;
+    contract1.state.data["newItemsIds"] = [contract4.id.base64, contract5.id.base64];
+    contract1.state.data["revokingItemsId"] = contract2.id.base64;
+    contract1.state.data["revokingItemsIds"] = [contract2.id.base64];
+
+    conditions = contract1.constraints.get("ref_in").conditions;
+    condList = conditions["all_of"];
+
+    condList.push("\"" + contract2.id.base64 + "\" in this.state.data.ids1");
+    condList.push("\"" + contract2.id.base64 + "\" in this.state.data.ids2");
+    condList.push("\"" + contract2.id.base64  + "\" in this.state.data.ids3");
+    condList.push("\"" + contract2.id.base64  + "\" in this.state.data.ids4");
+    condList.push("this.state.data.saved_contract_id in this.state.data.ids1");
+    condList.push("this.state.data.saved_contract_id in this.state.data.ids2");
+    condList.push("this.state.data.saved_contract_id in this.state.data.ids3");
+    condList.push("this.state.data.saved_contract_id in this.state.data.ids4");
+
+    condList.push("\"" + randomHash.base64 + "\" in this.state.data.ids1");
+    condList.push("\"" + randomHash.base64 + "\" in this.state.data.ids5");
+    condList.push("this.state.data.saved_id in this.state.data.ids1");
+    condList.push("this.state.data.saved_id in this.state.data.ids5");
+
+    condList.push("\"" + randomHash2.base64 + "\" in this.state.data.ids3");
+    condList.push("this.state.data.saved_id_from_contract2 in this.state.data.ids3");
+
+    condList.push("\"" + randomHash2.base64 + "\" in ref.state.data.ids");
+    condList.push("this.state.data.saved_id_from_contract2 in ref.state.data.ids");
+    condList.push("ref.state.data.saved_id in ref.state.data.ids");
+
+    condList.push("\"" + contract4.id.base64 + "\" in this.newItems");
+    condList.push("\"" + contract5.id.base64 + "\" in this.newItems");
+    condList.push("this.state.data.saved_sub_contract_id1 in this.newItems");
+    condList.push("this.state.data.saved_sub_contract_id2 in this.newItems");
+    condList.push("ref.state.data.saved_id_of_sub_contract1 in this.newItems");
+    condList.push("ref.state.data.saved_id_of_sub_contract2 in this.newItems");
+
+    contract1.constraints.get("ref_in").setConditions(conditions);
+
+    conditions = contract1.constraints.get("ref_in_for_revoking").conditions;
+    condList = conditions["all_of"];
+
+    condList.push("\"" + contract2.id.base64  + "\" in ref.revokingItems");
+    condList.push("this.state.data.saved_contract_id in ref.revokingItems");
+
+    contract1.constraints.get("ref_in_for_revoking").setConditions(conditions);
 
     await contract1.seal();
 
@@ -468,6 +547,8 @@ unit.test("constraint test: checkConstraintsAPILevel4", async () => {
     assert(contract1.constraints.get("ref_can_play").matchingItems.has(contract2));
     assert(contract1.constraints.get("ref_arithmetic").matchingItems.has(contract2));
     assert(contract1.constraints.get("ref_tags").matchingItems.has(contract2));
+    assert(contract1.constraints.get("ref_in").matchingItems.has(contract2));
+    assert(contract1.constraints.get("ref_in_for_revoking").matchingItems.has(contract3));
 });
 
 unit.test("constraint test: checkConstraintsBetweenContracts", async () => {

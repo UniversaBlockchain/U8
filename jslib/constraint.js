@@ -16,7 +16,8 @@ const BigDecimal  = require("big").Big;
 const ex = require("exceptions");
 
 //Operators
-const operators = [" defined"," undefined","<=",">=","<",">","!=","=="," matches "," is_a "," is_inherit ","inherits ","inherit "," can_play "];
+const operators = [" defined"," undefined","<=",">=","<",">","!=","=="," matches "," is_a "," is_inherit ","inherits ",
+    "inherit "," can_play ", " in "];
 
 const DEFINED = 0;
 const UNDEFINED = 1;
@@ -32,6 +33,7 @@ const IS_INHERIT = 10;
 const INHERITS = 11;
 const INHERIT = 12;
 const CAN_PLAY = 13;
+const IN = 14;
 
 //Operations
 const operations = ["+", "-", "*", "/"];
@@ -193,13 +195,23 @@ class Constraint extends bs.BiSerializable {
         if(Object.getPrototypeOf(this) !== Object.getPrototypeOf(to))
             return false;
 
+        if(!t.valuesEqual(this.type, to.type))
+            return false;
+
+        return this.equalsIgnoreType(to);
+    }
+
+    equalsIgnoreType(to) {
+        if(this === to)
+            return true;
+
+        if(Object.getPrototypeOf(this) !== Object.getPrototypeOf(to))
+            return false;
+
         if(!t.valuesEqual(this.name, to.name))
             return false;
 
         if(!t.valuesEqual(this.comment, to.comment))
-            return false;
-
-        if(!t.valuesEqual(this.type, to.type))
             return false;
 
         if(!t.valuesEqual(this.transactional_id, to.transactional_id))
@@ -401,6 +413,30 @@ class Constraint extends bs.BiSerializable {
         }
 
         return result;
+    }
+
+    static prepareRoleToComparison(item) {
+        if (item instanceof roles.RoleLink && item.requiredAllConstraints.size === 0 && item.requiredAnyConstraints.size === 0)
+            return item.resolve();
+        else if (typeof item === "string") {
+            try {
+                let roleString = item.replace(/\s/g, "");       // for key in quotes
+
+                if (roleString.length > 72) {
+                    // Key
+                    let publicKey = new PublicKey(atob(roleString));
+                    return new roles.SimpleRole("roleToComparison", [publicKey]);
+                } else {
+                    // Address
+                    let ka = new KeyAddress(roleString);
+                    return new roles.SimpleRole("roleToComparison", [ka]);
+                }
+            }
+            catch (e) {
+                throw new ex.IllegalArgumentError("Key or address compare error in condition: " + e.toString());
+            }
+        } else
+            return item;
     }
 
     /**
@@ -685,8 +721,12 @@ class Constraint extends bs.BiSerializable {
 
                         } else if (((left != null) && left instanceof roles.Role) || ((right != null) && right instanceof roles.Role)) { // if role - compare with role, key or address
                             if (((left != null) && left instanceof roles.Role) && ((right != null) && right instanceof roles.Role)) {
-                                if (((indxOperator === NOT_EQUAL) && !left.equalsForConstraint(right)) ||
-                                    ((indxOperator === EQUAL) && left.equalsForConstraint(right)))
+
+                                let leftRole = Constraint.prepareRoleToComparison(left);
+                                let rightRole = Constraint.prepareRoleToComparison(right);
+
+                                if (((indxOperator === NOT_EQUAL) && !leftRole.equalsForConstraint(rightRole)) ||
+                                    ((indxOperator === EQUAL) && leftRole.equalsForConstraint(rightRole)))
                                     ret = true;
 
                             } else {
@@ -706,26 +746,10 @@ class Constraint extends bs.BiSerializable {
                                         compareOperand = leftOperand;
                                 }
 
-                                if (role instanceof roles.RoleLink)
-                                    role  = role.resolve();
+                                role = Constraint.prepareRoleToComparison(role);
+                                let compareRole = Constraint.prepareRoleToComparison(compareOperand);
 
-                                try {
-                                    compareOperand = compareOperand.replace(/\s/g, "");       // for key in quotes
-
-                                    if (compareOperand.length > 72) {
-                                        // Key
-                                        let publicKey = new PublicKey(atob(compareOperand));
-                                        let simpleRole = new roles.SimpleRole(role.name, [publicKey]);
-                                        ret = role.equalsForConstraint(simpleRole);
-                                    } else {
-                                        // Address
-                                        let ka = new KeyAddress(compareOperand);
-                                        let simpleRole = new roles.SimpleRole(role.name, [ka]);
-                                        ret = role.equalsForConstraint(simpleRole);
-                                    }
-                                } catch (e) {
-                                    throw new ex.IllegalArgumentError("Key or address compare error in condition: " + e.toString());
-                                }
+                                ret = role.equalsForConstraint(compareRole);
 
                                 if (indxOperator === NOT_EQUAL)
                                     ret = !ret;
@@ -740,7 +764,10 @@ class Constraint extends bs.BiSerializable {
                                 ((indxOperator === EQUAL) && (leftTime === rightTime)))
                                 ret = true;
 
-                        } else if ((left != null && typeof left === "object" && left.hasOwnProperty("contractForSearchByTag"))  ||
+                        }  else if (left instanceof Constraint && right instanceof Constraint) {
+                            ret = indxOperator === (left.equalsIgnoreType(right) ? EQUAL : NOT_EQUAL);
+
+                        } else if ((left != null && typeof left === "object" && left.hasOwnProperty("contractForSearchByTag")) ||
                             (right != null && typeof right === "object" && right.hasOwnProperty("contractForSearchByTag"))) {
 
                             let taggedContract = null;
@@ -868,10 +895,102 @@ class Constraint extends bs.BiSerializable {
                             right.isAllowedForKeys(keys);
 
                         break;
+                    case IN:
+                        if (typeOfLeftOperand === compareOperandType.FIELD && left == null)
+                            break;
+
+                        if (typeOfRightOperand === compareOperandType.FIELD && right == null)
+                            break;
+
+                        if (!(right instanceof Set || right instanceof t.GenericSet || right instanceof Array))
+                            break;
+
+                        let leftSet = new t.GenericSet();
+                        let rightSet = new t.GenericSet();
+
+                        if (left == null)
+                            leftSet.add(leftOperand);
+                        else if (left instanceof Set || left instanceof t.GenericSet || left instanceof Array)
+                            left.forEach(item => leftSet.add(item));
+                        else
+                            leftSet.add(left);
+
+                        if (leftSet.size === 0) {
+                            ret = true;
+                            break;
+                        }
+
+                        right.forEach(item => rightSet.add(item));
+
+                        if (Array.from(leftSet).some(item => item instanceof HashId) ||
+                            Array.from(rightSet).some(item => item instanceof HashId)) {
+
+                            let leftHashSet = new t.GenericSet();
+                            let rightHashSet = new t.GenericSet();
+
+                            for (let item of leftSet) {
+                                if (item instanceof HashId)
+                                    leftHashSet.add(item);
+                                else if (typeof item === "string")
+                                    leftHashSet.add(HashId.withBase64Digest(item));
+                                else
+                                    throw new ex.IllegalArgumentError("Unexpected type (expect HashId or String) of " +
+                                        "collection item in left operand in condition: " + leftOperand);
+                            }
+
+                            for (let item of rightSet) {
+                                if (item instanceof HashId)
+                                    rightHashSet.add(item);
+                                else if (typeof item === "string")
+                                    rightHashSet.add(HashId.withBase64Digest(item));
+                                else
+                                    throw new ex.IllegalArgumentError("Unexpected type (expect HashId or String) of " +
+                                        "collection item in right operand in condition: " + rightOperand);
+                            }
+
+                            ret = Array.from(leftHashSet).every(hash => rightHashSet.has(hash));
+
+                        } else if (Array.from(leftSet).some(item => item instanceof roles.Role) ||
+                                   Array.from(rightSet).some(item => item instanceof roles.Role)) {
+
+                            let leftRoleSet = new t.GenericSet();
+                            let rightRoleSet = new t.GenericSet();
+
+                            for (let item of leftSet) {
+                                if (item instanceof roles.Role || typeof item === "string")
+                                    leftRoleSet.add(Constraint.prepareRoleToComparison(item));
+                                else
+                                    throw new ex.IllegalArgumentError(
+                                        "Unexpected type (expect Role or String) of collection item in left operand in condition: " + leftOperand);
+                            }
+
+                            for (let item of rightSet) {
+                                if (item instanceof roles.Role || typeof item === "string")
+                                    rightRoleSet.add(Constraint.prepareRoleToComparison(item));
+                                else
+                                    throw new ex.IllegalArgumentError(
+                                        "Unexpected type (expect Role or String) of collection item in right operand in condition: " + rightOperand);
+                            }
+
+                            ret = Array.from(leftRoleSet).every(leftRole =>
+                                  Array.from(rightRoleSet).some(rightRole =>
+                                      leftRole.equalsForConstraint(rightRole)));
+
+                        } else if (Array.from(leftSet).every(item => item instanceof Constraint) &&
+                                   Array.from(rightSet).every(item => item instanceof Constraint)) {
+
+                            ret = Array.from(leftSet).every(leftConstr =>
+                                  Array.from(rightSet).some(rightConstr =>
+                                      leftConstr.equalsIgnoreType(rightConstr)));
+
+                        } else
+                            ret = Array.from(leftSet).every(leftItem => rightSet.has(leftItem));
+
+                        break;
                     default:
                         throw new ex.IllegalArgumentError("Invalid operator in condition");
                 }
-            } catch (e) {
+            } catch (e){
                 throw new ex.IllegalArgumentError("Error compare operands in condition: " + e.toString());
             }
         } else {       // if rightOperand == null && rightExpression == null, then operation: defined / undefined
@@ -1107,7 +1226,10 @@ class Constraint extends bs.BiSerializable {
             }
         }
 
-        for (let i = 2; i < INHERITS; i++) {
+        for (let i = LESS_OR_EQUAL; i <= IN; i++) {
+            if (i >= INHERITS && i <= CAN_PLAY)     // skipping operators with a different syntax
+                continue;
+
             let operPos = condition.indexOf(operators[i]);
             let firstMarkPos = condition.indexOf("\"");
             let lastMarkPos = condition.lastIndexOf("\"");
@@ -1861,7 +1983,7 @@ class Constraint extends bs.BiSerializable {
     }
 
     toString() {
-        return crypto.HashId.of(t.randomBytes(64)).base64;
+        return HashId.of(t.randomBytes(64)).base64;
     }
 
     stringId() {
