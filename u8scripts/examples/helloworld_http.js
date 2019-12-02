@@ -1,5 +1,11 @@
+/*
+ * Copyright (c) 2019-present Sergey Chernov, iCodici S.n.C, All Rights Reserved.
+ */
+
 // Launch as:
 //   u8 helloworld_http.js
+//
+// See details at https://kb.universablockchain.com/u8_hello_world/221
 
 import {HttpServer} from 'web'
 
