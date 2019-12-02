@@ -6,7 +6,7 @@
 # Multi-stage build
 #
 
-FROM universa/debian-clang:latest AS build_clang
+FROM universa/debian-clang AS build_clang
 
 COPY / /code/
 WORKDIR /code
@@ -35,6 +35,7 @@ COPY --from=build_clang /code/ext/linux/libtomcrypt /code/ext/linux/libtomcrypt
 COPY --from=build_clang /code/ext/linux/libuv /code/ext/linux/libuv
 COPY --from=build_clang /code/ext/linux/libv8 /code/ext/linux/libv8
 COPY /jslib /code/jslib
+COPY /u8scripts /code/u8scripts
 
 RUN echo \
     && mkdir -p /u8 \

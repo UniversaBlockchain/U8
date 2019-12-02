@@ -49,6 +49,11 @@ cd cmake-build-release
 ~~~
 
 
+## Docker image
+
+U8 is runnable as a [universa/u8](https://hub.docker.com/r/universa/u8) Docker image from Docker Hub. For more information, check out the [Github source for the Docker image](https://github.com/UniversaBlockchain/U8/tree/master/docker/u8).
+
+
 ## Licensing
 
 ~~~
