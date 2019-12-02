@@ -58,22 +58,14 @@ docker run \
 
 After this, the script will be available at [http://127.0.0.1:8180/hello](http://127.0.0.1:8180/hello).
 
-#### Running UBotServer
+#### Running **UBotServer**
 
-* Make a logs directory like `logs`;
-* make a config directory like `ubot_config` (and put the needed data in it; see the [/test/config/ubot_config](/test/config/ubot_config) examples in Github); the `ubot_config` directory should contain subdirectories `config` and `tmp`;
-* then run the following command in the root directory of the U8 source taken from Github):
+**UBotServer** is available as a separate Docker image, [universa/ubotserver](https://hub.docker.com/repository/docker/universa/ubotserver/). Please see the description of the image in [appropriate Github section](https://github.com/UniversaBlockchain/U8/tree/master/docker/ubotserver).
 
-~~~bash
-docker run \
-    --mount type=bind,source="$(pwd)",target=/src \
-    --mount type=bind,source="$(pwd)/logs",target=/ubot_logs \
-    --mount type=bind,source="$(pwd)/ubot_config",target=/ubot_config \
-    universa/u8 \
-    /code/u8scripts/ubotserver/ubotserver.js --config /ubot_config > /ubot_logs/log.txt 2> /ubot_logs/errlog.txt
-~~~
+#### Running **node-u8**
 
-Note that for proper execution, you’ll need to have PostgreSQL installed and reachable to the Docker image (you may need to add extra configuration); this may be either dedicated PostgreSQL setup or using the stock [postgres](https://hub.docker.com/_/postgres) Docker image from Docker Hub.
+**node-u8** is available as a separate Docker image, [universa/node-u8](https://hub.docker.com/repository/docker/universa/node-u8/). Please see the description of the image in [appropriate Github section](https://github.com/UniversaBlockchain/U8/tree/master/docker/node-u8).
+
 
 ## Directory structure
 
@@ -83,3 +75,8 @@ Here is a map of source directories, and their in-image counterparts:
 | ------------------------- | ------------------ |
 | [/jslib](/jslib)          | `/code/jslib`      |
 | [/u8scripts](/u8scripts)  | `/code/u8scripts`  |
+
+
+## Read more
+
+All Universa-specific documentation is available in Universa Knowledge Base at [kb.universablockchain.com](https://kb.universablockchain.com).
