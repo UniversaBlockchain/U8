@@ -1,3 +1,14 @@
-cmake-build-debug
-cmake-build-release
-ext
+.git
+.gitignore
+*-nogit
+README.md
+
+cmake-build-debug/
+cmake-build-release/
+.idea/
+ext/
+download_libs.stamp
+download_libs/
+Test*.bin
+.DS_Store
+**/.DS_Store
