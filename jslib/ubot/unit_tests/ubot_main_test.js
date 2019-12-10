@@ -55,7 +55,7 @@ async function generateSecureRandomRequestContract(executableContract) {
     requestContract.state.data.method_args = [1000];
     requestContract.state.data.executable_contract_id = executableContract.id;
 
-    await cs.addConstraintToContract(requestContract, executableContract, "executableContractConstraint",
+    await cs.addConstraintToContract(requestContract, executableContract, "executable_contract_constraint",
         Constraint.TYPE_EXISTING_STATE, ["this.state.data.executable_contract_id == ref.id"], true);
 
     return requestContract;
@@ -84,7 +84,7 @@ async function generateSimpleRegisterRequestContract(executableContract, contrac
         requestContract.state.data.method_args = [contractForRegistration];
     requestContract.state.data.executable_contract_id = executableContract.id;
 
-    await cs.addConstraintToContract(requestContract, executableContract, "executableContractConstraint",
+    await cs.addConstraintToContract(requestContract, executableContract, "executable_contract_constraint",
         Constraint.TYPE_EXISTING_STATE, ["this.state.data.executable_contract_id == ref.id"], true);
 
     return requestContract;
@@ -171,7 +171,7 @@ unit.test("ubot_main_test: execute looped cloud method", async () => {
     requestContract.state.data.method_name = "loop";
     requestContract.state.data.executable_contract_id = executableContract.id;
 
-    await cs.addConstraintToContract(requestContract, executableContract, "executableContractConstraint",
+    await cs.addConstraintToContract(requestContract, executableContract, "executable_contract_constraint",
         Constraint.TYPE_EXISTING_STATE, ["this.state.data.executable_contract_id == ref.id"], true);
 
     let state = await ubotClient.executeCloudMethod(requestContract, true);
@@ -391,7 +391,7 @@ unit.test("ubot_main_test: create and register contract", async () => {
     requestContract.state.data.method_args = [stopPrice];
     requestContract.state.data.executable_contract_id = executableContract.id;
 
-    await cs.addConstraintToContract(requestContract, executableContract, "executableContractConstraint",
+    await cs.addConstraintToContract(requestContract, executableContract, "executable_contract_constraint",
         Constraint.TYPE_EXISTING_STATE, ["this.state.data.executable_contract_id == ref.id"], true);
 
     let state = await ubotClient.executeCloudMethod(requestContract, true);
@@ -483,7 +483,7 @@ unit.test("ubot_pro_test: 2 cloud method", async () => {
     requestContract.state.data.method_name = "readRandom";
     requestContract.state.data.executable_contract_id = executableContract.id;
 
-    await cs.addConstraintToContract(requestContract, executableContract, "executableContractConstraint",
+    await cs.addConstraintToContract(requestContract, executableContract, "executable_contract_constraint",
         Constraint.TYPE_EXISTING_STATE, ["this.state.data.executable_contract_id == ref.id"], true);
 
     console.log("SECOND METHOD (READ RANDOM)");
@@ -679,7 +679,7 @@ unit.test("ubot_pro_test: parallel cloud methods", async () => {
         buyContract.state.data.method_args = [payment, userKeys[i].publicKey];
         buyContract.state.data.executable_contract_id = lotteryContract.id;
 
-        await cs.addConstraintToContract(buyContract, lotteryContract, "executableContractConstraint",
+        await cs.addConstraintToContract(buyContract, lotteryContract, "executable_contract_constraint",
             Constraint.TYPE_EXISTING_STATE, ["this.state.data.executable_contract_id == ref.id"], true);
 
         let state = await ubotClient.executeCloudMethod(buyContract, true);
@@ -693,7 +693,7 @@ unit.test("ubot_pro_test: parallel cloud methods", async () => {
     raffleContract.state.data.method_name = "raffle";
     raffleContract.state.data.executable_contract_id = lotteryContract.id;
 
-    await cs.addConstraintToContract(raffleContract, lotteryContract, "executableContractConstraint",
+    await cs.addConstraintToContract(raffleContract, lotteryContract, "executable_contract_constraint",
         Constraint.TYPE_EXISTING_STATE, ["this.state.data.executable_contract_id == ref.id"], true);
 
     console.log("Raffle lottery...");
@@ -735,7 +735,7 @@ unit.test("ubot_pro_test: execute cloud method with ubot delay", async () => {
     badRequestContract.state.data.method_args = [[2, 3]];
     badRequestContract.state.data.executable_contract_id = executableContract.id;
 
-    await cs.addConstraintToContract(badRequestContract, executableContract, "executableContractConstraint",
+    await cs.addConstraintToContract(badRequestContract, executableContract, "executable_contract_constraint",
         Constraint.TYPE_EXISTING_STATE, ["this.state.data.executable_contract_id == ref.id"], true);
 
     let errMessage = null;
@@ -757,7 +757,7 @@ unit.test("ubot_pro_test: execute cloud method with ubot delay", async () => {
     requestContract.state.data.method_args = [[excluded]];
     requestContract.state.data.executable_contract_id = executableContract.id;
 
-    await cs.addConstraintToContract(requestContract, executableContract, "executableContractConstraint",
+    await cs.addConstraintToContract(requestContract, executableContract, "executable_contract_constraint",
         Constraint.TYPE_EXISTING_STATE, ["this.state.data.executable_contract_id == ref.id"], true);
 
     let state = await ubotClient.executeCloudMethod(requestContract, true);

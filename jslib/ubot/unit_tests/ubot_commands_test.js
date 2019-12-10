@@ -176,7 +176,7 @@ unit.test("ubot_commands_test: executeCloudMethod", async () => {
     requestContract.state.data.method_name = "ubotAsm";
     requestContract.state.data.executable_contract_id = executableContract.id;
 
-    await cs.addConstraintToContract(requestContract, executableContract, "executableContractConstraint",
+    await cs.addConstraintToContract(requestContract, executableContract, "executable_contract_constraint",
         Constraint.TYPE_EXISTING_STATE, ["this.state.data.executable_contract_id == ref.id"], true);
 
     console.log("executableContract.id: " + executableContract.id);
@@ -253,7 +253,7 @@ unit.test("ubot_commands_test: generateRandomHash", async () => {
     requestContract.state.data.method_name = "ubotAsm";
     requestContract.state.data.executable_contract_id = executableContract.id;
 
-    await cs.addConstraintToContract(requestContract, executableContract, "executableContractConstraint",
+    await cs.addConstraintToContract(requestContract, executableContract, "executable_contract_constraint",
         Constraint.TYPE_EXISTING_STATE, ["this.state.data.executable_contract_id == ref.id"], true);
 
     console.log("executableContract.id: " + executableContract.id);
@@ -330,7 +330,7 @@ unit.test("ubot_commands_test: errorOutput", async () => {
     requestContract.state.data.method_name = "ubotAsm";
     requestContract.state.data.executable_contract_id = executableContract.id;
 
-    await cs.addConstraintToContract(requestContract, executableContract, "executableContractConstraint",
+    await cs.addConstraintToContract(requestContract, executableContract, "executable_contract_constraint",
         Constraint.TYPE_EXISTING_STATE, ["this.state.data.executable_contract_id == ref.id"], true);
 
     console.log("executableContract.id: " + executableContract.id);
@@ -419,7 +419,7 @@ unit.test("ubot_commands_test: multi-verify method", async () => {
     requestContract.state.data.method_name = "main";
     requestContract.state.data.executable_contract_id = executableContract.id;
 
-    await cs.addConstraintToContract(requestContract, executableContract, "executableContractConstraint",
+    await cs.addConstraintToContract(requestContract, executableContract, "executable_contract_constraint",
         Constraint.TYPE_EXISTING_STATE, ["this.state.data.executable_contract_id == ref.id"], true);
 
     console.log("executableContract.id: " + executableContract.id);
@@ -506,7 +506,7 @@ unit.test("ubot_commands_test: multi-verify method failed", async () => {
     requestContract.state.data.method_name = "main";
     requestContract.state.data.executable_contract_id = executableContract.id;
 
-    await cs.addConstraintToContract(requestContract, executableContract, "executableContractConstraint",
+    await cs.addConstraintToContract(requestContract, executableContract, "executable_contract_constraint",
         Constraint.TYPE_EXISTING_STATE, ["this.state.data.executable_contract_id == ref.id"], true);
 
     console.log("executableContract.id: " + executableContract.id);
@@ -600,7 +600,7 @@ unit.test("ubot_commands_test: call sub-method", async () => {
     requestContract.state.data.method_name = "main";
     requestContract.state.data.executable_contract_id = executableContract.id;
 
-    await cs.addConstraintToContract(requestContract, executableContract, "executableContractConstraint",
+    await cs.addConstraintToContract(requestContract, executableContract, "executable_contract_constraint",
         Constraint.TYPE_EXISTING_STATE, ["this.state.data.executable_contract_id == ref.id"], true);
 
     console.log("executableContract.id: " + executableContract.id);
@@ -751,7 +751,7 @@ unit.test("ubot_commands_test: call sub-method", async () => {
     requestContract.state.data.method_name = "getRandom";
     requestContract.state.data.executable_contract_id = executableContract.id;
 
-    await cs.addConstraintToContract(requestContract, executableContract, "executableContractConstraint",
+    await cs.addConstraintToContract(requestContract, executableContract, "executable_contract_constraint",
         Constraint.TYPE_EXISTING_STATE, ["this.state.data.executable_contract_id == ref.id"], true);
 
     console.log("executableContract.id: " + executableContract.id);
@@ -837,7 +837,7 @@ unit.test("ubot_commands_test: getDataByRecordId", async () => {
     requestContract.state.data.method_name = "ubotAsm";
     requestContract.state.data.executable_contract_id = executableContract.id;
 
-    await cs.addConstraintToContract(requestContract, executableContract, "executableContractConstraint",
+    await cs.addConstraintToContract(requestContract, executableContract, "executable_contract_constraint",
         Constraint.TYPE_EXISTING_STATE, ["this.state.data.executable_contract_id == ref.id"], true);
 
     console.log("executableContract.id: " + executableContract.id);

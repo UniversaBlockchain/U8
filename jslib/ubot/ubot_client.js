@@ -14,6 +14,8 @@ const ItemResult = require('itemresult').ItemResult;
 const Lock = require("lock").Lock;
 const BossBiMapper = require("bossbimapper").BossBiMapper;
 const Boss = require('boss.js');
+const roles = require('roles');
+const constr = require('constraint');
 const t = require("tools");
 const ut = require("ubot/ubot_tools");
 
@@ -558,6 +560,21 @@ class UBotClient {
         if (executableContract == null)
             throw new UBotClientException("Error request contract: executable contact is not found in transaction pack");
 
+        // check executable contract constraint
+        let executableConstraint = requestContract.constraints.get("executable_contract_constraint");
+        if (executableConstraint == null || !executableConstraint instanceof constr.Constraint)
+            throw new UBotClientException("Error request contract: executable_contract_constraint is not defined");
+
+        let conditions = executableConstraint.exportConditions(executableConstraint.conditions);
+        if (!conditions.hasOwnProperty(constr.Constraint.conditionsModeType.all_of))
+            throw new UBotClientException("Error request contract: executable_contract_constraint has incorrect format (expected all_of)");
+
+        conditions = conditions[constr.Constraint.conditionsModeType.all_of];
+        if (conditions == null || conditions.length !== 1 ||
+            (conditions[0] !== "this.state.data.executable_contract_id==ref.id" &&
+             conditions[0] !== "ref.id==this.state.data.executable_contract_id"))
+            throw new UBotClientException("Error request contract: executable_contract_constraint has incorrect format");
+
         // check request contract data
         if (requestContract.state.data.method_name == null || typeof requestContract.state.data.method_name !== "string")
             throw new UBotClientException("Error request contract: starting cloud method name is not defined or not string");
@@ -575,6 +592,29 @@ class UBotClient {
         if (executableContract.state.data.cloud_methods[methodName] == null ||
             typeof executableContract.state.data.cloud_methods[methodName] !== "object")
             throw new UBotClientException("Error executable contract: starting cloud method metadata (in state.data.cloud_methods) is not object");
+
+        // check launcher role
+        if (executableContract.state.data.cloud_methods[methodName].hasOwnProperty("launcher")) {
+            let launcher = executableContract.state.data.cloud_methods[methodName].launcher;
+            if (typeof launcher !== "string")
+                throw new UBotClientException("Error executable contract: starting cloud launcher role name is not string");
+
+            if (!executableContract.state.roles.hasOwnProperty(launcher) || !executableContract.state.roles.launcher instanceof roles.Role)
+                throw new UBotClientException("Error executable contract: role is not defined");
+
+            // check launcher constraint
+            let launcherConstraint = requestContract.constraints.get("launcher_constraint");
+            if (launcherConstraint == null || !launcherConstraint instanceof constr.Constraint)
+                throw new UBotClientException("Error request contract: launcher_constraint is not defined");
+
+            let conditions = launcherConstraint.exportConditions(launcherConstraint.conditions);
+            if (!conditions.hasOwnProperty(constr.Constraint.conditionsModeType.all_of))
+                throw new UBotClientException("Error request contract: launcher_constraint has incorrect format (expected all_of)");
+
+            conditions = conditions[constr.Constraint.conditionsModeType.all_of];
+            if (conditions == null || conditions.length !== 1 || conditions[0] !== "this can_perform ref.state.roles." + launcher)
+                throw new UBotClientException("Error request contract: launcher_constraint has incorrect format");
+        }
 
         try {
             this.poolAndQuorum = ut.getPoolAndQuorum(requestContract, registryContract);
