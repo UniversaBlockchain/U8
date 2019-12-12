@@ -1095,7 +1095,7 @@ unit.test("ubot_pro_test: execute cloud method with ubot delay", async () => {
 });
 
 unit.test("ubot_pro_test: launcher role", async () => {
- /* let ubotMains = await createUBots(ubotsCount);
+    /* let ubotMains = await createUBots(ubotsCount);
 
     let ubotClient = await new UBotTestClient("http://127.0.0.1", clientKey, TOPOLOGY_ROOT + TOPOLOGY_FILE).start();
 
@@ -1109,18 +1109,18 @@ unit.test("ubot_pro_test: launcher role", async () => {
 
     executableContract.state.data.cloud_methods = {
         method_for_launcher1: {
-            pool: {size: 3},
+            pool: {size: 8},
             quorum: {size: 3},
             launcher: "launcherRole1"
         },
         method_for_launcher2: {
-            pool: {size: 12},
-            quorum: {size: 10},
+            pool: {size: 3},
+            quorum: {size: 2},
             launcher: "launcherRole2"
         },
         method_for_any: {
-            pool: {size: 12},
-            quorum: {size: 10}
+            pool: {size: 3},
+            quorum: {size: 2}
         }
     };
 
@@ -1132,6 +1132,7 @@ unit.test("ubot_pro_test: launcher role", async () => {
     let launcher1Contract = Contract.fromPrivateKey(userKey1);
     launcher1Contract.state.data.method_name = "method_for_launcher1";
     launcher1Contract.state.data.executable_contract_id = executableContract.id;
+    launcher1Contract.newItems.add(executableContract);
 
     await cs.addConstraintToContract(launcher1Contract, executableContract, "executable_contract_constraint",
         Constraint.TYPE_EXISTING_STATE, ["this.state.data.executable_contract_id == ref.id"], true);
@@ -1152,14 +1153,13 @@ unit.test("ubot_pro_test: launcher role", async () => {
     launcher1Contract = Contract.fromPrivateKey(userPrivKey);
     launcher1Contract.state.data.method_name = "method_for_launcher1";
     launcher1Contract.state.data.executable_contract_id = executableContract.id;
+    launcher1Contract.newItems.add(executableContract);
 
     await cs.addConstraintToContract(launcher1Contract, executableContract, "executable_contract_constraint",
         Constraint.TYPE_EXISTING_STATE, ["this.state.data.executable_contract_id == ref.id"], true);
 
     await cs.addConstraintToContract(launcher1Contract, executableContract, "launcher_constraint",
         Constraint.TYPE_EXISTING_STATE, ["this can_perform ref.state.roles.launcherRole1"], true);
-
-    console.log("method_for_launcher1...");
 
     state = await ubotClient.executeCloudMethod(launcher1Contract, true);
 
@@ -1172,6 +1172,7 @@ unit.test("ubot_pro_test: launcher role", async () => {
     let launcher2Contract = Contract.fromPrivateKey(userKey2);
     launcher2Contract.state.data.method_name = "method_for_launcher2";
     launcher2Contract.state.data.executable_contract_id = executableContract.id;
+    launcher2Contract.newItems.add(executableContract);
 
     await cs.addConstraintToContract(launcher2Contract, executableContract, "executable_contract_constraint",
         Constraint.TYPE_EXISTING_STATE, ["this.state.data.executable_contract_id == ref.id"], true);
@@ -1193,6 +1194,7 @@ unit.test("ubot_pro_test: launcher role", async () => {
     launcher2Contract = Contract.fromPrivateKey(userKey1);
     launcher2Contract.state.data.method_name = "method_for_launcher2";
     launcher2Contract.state.data.executable_contract_id = executableContract.id;
+    launcher2Contract.newItems.add(executableContract);
 
     await cs.addConstraintToContract(launcher2Contract, executableContract, "executable_contract_constraint",
         Constraint.TYPE_EXISTING_STATE, ["this.state.data.executable_contract_id == ref.id"], true);
@@ -1213,6 +1215,7 @@ unit.test("ubot_pro_test: launcher role", async () => {
     let anyContract = Contract.fromPrivateKey(userKey1);
     anyContract.state.data.method_name = "method_for_any";
     anyContract.state.data.executable_contract_id = executableContract.id;
+    anyContract.newItems.add(executableContract);
 
     await cs.addConstraintToContract(anyContract, executableContract, "executable_contract_constraint",
         Constraint.TYPE_EXISTING_STATE, ["this.state.data.executable_contract_id == ref.id"], true);
@@ -1232,5 +1235,5 @@ unit.test("ubot_pro_test: launcher role", async () => {
     while (ubotMains.some(main => Array.from(main.ubot.processors.values()).some(proc => proc.state.canContinue)))
         await sleep(100);
 
-    await shutdownUBots(ubotMains);*/
+    await shutdownUBots(ubotMains); */
 });

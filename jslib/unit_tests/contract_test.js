@@ -112,3 +112,20 @@ unit.test("contract custom roles", async () => {
     assert(r instanceof roles.SimpleRole);
     assert(roles.RoleExtractor.extractAddresses(r).has(k.publicKey.longAddress));
 });
+
+/*unit.test("constraint chains good", async () => {
+    let k1 = tk.TestKeys.getKey();
+    let k2 = tk.TestKeys.getKey();
+    let k3 = tk.TestKeys.getKey();
+    let k4 = tk.TestKeys.getKey();
+
+    let a = cnt.Contract.fromPrivateKey(k1);
+    let b = cnt.Contract.fromPrivateKey(k2);
+    let c = cnt.Contract.fromPrivateKey(k3);
+    let d = cnt.Contract.fromPrivateKey(k4);
+
+    let role = new roles.SimpleRole("target", k1.publicKey.longAddress);
+    d.registerRole(role);
+
+    await d.seal();
+});*/

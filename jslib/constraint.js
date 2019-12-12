@@ -17,7 +17,7 @@ const ex = require("exceptions");
 
 //Operators
 const operators = [" defined"," undefined","<=",">=","<",">","!=","=="," matches "," is_a "," is_inherit ","inherits ",
-    "inherit "," can_play ", " in "];
+    "inherit "," can_play ", " in ", " can_perform "];
 
 const DEFINED = 0;
 const UNDEFINED = 1;
@@ -34,6 +34,35 @@ const INHERITS = 11;
 const INHERIT = 12;
 const CAN_PLAY = 13;
 const IN = 14;
+const CAN_PERFORM = 15;
+
+// UPDATE WHEN ADDING NEW OPERATOR
+const OPERATORS_COUNT = 16;
+
+const simpleBinaryOperators = new Set();
+const simpleUnaryOperators = new Set();
+const inheritanceOperators = new Set();
+const roleOperators = new Set();
+
+simpleUnaryOperators.add(DEFINED);
+simpleUnaryOperators.add(UNDEFINED);
+
+simpleBinaryOperators.add(LESS_OR_EQUAL);
+simpleBinaryOperators.add(MORE_OR_EQUAL);
+simpleBinaryOperators.add(LESS);
+simpleBinaryOperators.add(MORE);
+simpleBinaryOperators.add(NOT_EQUAL);
+simpleBinaryOperators.add(EQUAL);
+simpleBinaryOperators.add(MATCHES);
+simpleBinaryOperators.add(IS_A);
+simpleBinaryOperators.add(IS_INHERIT);
+simpleBinaryOperators.add(IN);
+
+inheritanceOperators.add(INHERITS);
+inheritanceOperators.add(INHERIT);
+
+roleOperators.add(CAN_PLAY);
+roleOperators.add(CAN_PERFORM);
 
 //Operations
 const operations = ["+", "-", "*", "/"];
@@ -514,7 +543,7 @@ class Constraint extends bs.BiSerializable {
                     throw new ex.IllegalArgumentError("Invalid format of left operand in condition: " + leftOperand + ". Missing contract field.");
 
             } else if (typeOfLeftOperand === compareOperandType.CONSTOTHER) {
-                if (indxOperator === CAN_PLAY) {
+                if (indxOperator === CAN_PLAY || indxOperator === CAN_PERFORM) {
                     if (leftOperand === "ref") {
                         leftOperandContract = refContract;
                     } else if (leftOperand === "this") {
@@ -580,7 +609,7 @@ class Constraint extends bs.BiSerializable {
 
         // check operator
         if (rightOperand != null || rightExpression != null) {
-            if ((leftOperandContract != null) && (indxOperator !== CAN_PLAY))
+            if ((leftOperandContract != null) && (indxOperator !== CAN_PLAY) && (indxOperator !== CAN_PERFORM))
                 left = leftOperandContract.get(leftOperand);
             if (rightOperandContract != null)
                 right = rightOperandContract.get(rightOperand);
@@ -891,8 +920,27 @@ class Constraint extends bs.BiSerializable {
                         else
                             keys = leftOperandContract.sealedByKeys.keys();
 
+                        //TODO
                         ret = right.requiredAllConstraints.size === 0 && right.requiredAnyConstraints.size === 0 &&
                             right.isAllowedForKeys(keys);
+
+                        break;
+                    case CAN_PERFORM:
+                        if (right == null)
+                            return false;
+
+                        if (!(right instanceof roles.Role))
+                            throw new ex.IllegalArgumentError("Expected role in condition in right operand: " + rightOperand);
+
+                        let keys1;
+                        if (leftOperand === "this")
+                            keys1 = leftOperandContract.effectiveKeys.keys();
+                        else
+                            keys1 = leftOperandContract.sealedByKeys.keys();
+
+                        //TODO
+                        ret = right.requiredAllConstraints.size === 0 && right.requiredAnyConstraints.size === 0 &&
+                            right.isAllowedForKeys(keys1);
 
                         break;
                     case IN:
@@ -1202,7 +1250,7 @@ class Constraint extends bs.BiSerializable {
         let leftConversion = NO_CONVERSION;
         let rightConversion = NO_CONVERSION;
 
-        for (let i = 0; i < 2; i++) {
+        for (let i of simpleUnaryOperators) {
             let operPos = condition.lastIndexOf(operators[i]);
 
             if ((operPos >= 0) && (condition.length - operators[i].length === operPos)) {
@@ -1226,10 +1274,7 @@ class Constraint extends bs.BiSerializable {
             }
         }
 
-        for (let i = LESS_OR_EQUAL; i <= IN; i++) {
-            if (i >= INHERITS && i <= CAN_PLAY)     // skipping operators with a different syntax
-                continue;
-
+        for (let i of simpleBinaryOperators) {
             let operPos = condition.indexOf(operators[i]);
             let firstMarkPos = condition.indexOf("\"");
             let lastMarkPos = condition.lastIndexOf("\"");
@@ -1322,7 +1367,7 @@ class Constraint extends bs.BiSerializable {
             };
         }
 
-        for (let i = INHERITS; i <= INHERIT; i++) {
+        for (let i of inheritanceOperators) {
             let operPos = condition.indexOf(operators[i]);
 
             if ((operPos === 0) || ((operPos > 0) && (condition.charAt(operPos - 1) !== '_'))) {
@@ -1349,39 +1394,41 @@ class Constraint extends bs.BiSerializable {
             }
         }
 
-        let operPos = condition.indexOf(operators[CAN_PLAY]);
-        if (operPos > 0) {
-            // Parsing left operand
-            let subStrL = condition.substring(0, operPos);
-            if (subStrL.length === 0)
-                throw new ex.IllegalArgumentError("Invalid format of condition: " + condition + ". Missing left operand.");
+        for (let i of roleOperators) {
+            let operPos = condition.indexOf(operators[i]);
+            if (operPos > 0) {
+                // Parsing left operand
+                let subStrL = condition.substring(0, operPos);
+                if (subStrL.length === 0)
+                    throw new ex.IllegalArgumentError("Invalid format of condition: " + condition + ". Missing left operand.");
 
-            let leftOperand = subStrL.replace(/\s/g, "");
-            if (~leftOperand.indexOf("."))
-                throw new ex.IllegalArgumentError("Invalid format of condition: " + condition + ". Left operand must be a constraint to a contract.");
+                let leftOperand = subStrL.replace(/\s/g, "");
+                if (~leftOperand.indexOf("."))
+                    throw new ex.IllegalArgumentError("Invalid format of condition: " + condition + ". Left operand must be a constraint to a contract.");
 
-            let subStrR = condition.substring(operPos + operators[CAN_PLAY].length);
-            if (subStrR.length === 0)
-                throw new ex.IllegalArgumentError("Invalid format of condition: " + condition + ". Missing right operand.");
+                let subStrR = condition.substring(operPos + operators[i].length);
+                if (subStrR.length === 0)
+                    throw new ex.IllegalArgumentError("Invalid format of condition: " + condition + ". Missing right operand.");
 
-            // Parsing right operand
-            let rightOperand = subStrR.replace(/\s/g, "");
-            let firstPointPos;
-            if (!(((firstPointPos = rightOperand.indexOf(".")) > 0) &&
-                (rightOperand.length > firstPointPos + 1) &&
-                ((rightOperand.charAt(firstPointPos + 1) < '0') ||
-                    (rightOperand.charAt(firstPointPos + 1) > '9'))))
-                throw new ex.IllegalArgumentError("Invalid format of condition: " + condition + ". Right operand must be a role field.");
+                // Parsing right operand
+                let rightOperand = subStrR.replace(/\s/g, "");
+                let firstPointPos;
+                if (!(((firstPointPos = rightOperand.indexOf(".")) > 0) &&
+                    (rightOperand.length > firstPointPos + 1) &&
+                    ((rightOperand.charAt(firstPointPos + 1) < '0') ||
+                        (rightOperand.charAt(firstPointPos + 1) > '9'))))
+                    throw new ex.IllegalArgumentError("Invalid format of condition: " + condition + ". Right operand must be a role field.");
 
-            return {
-                operator: CAN_PLAY,
-                leftOperand: leftOperand,
-                rightOperand: rightOperand,
-                typeOfLeftOperand: compareOperandType.CONSTOTHER,
-                typeOfRightOperand: compareOperandType.FIELD,
-                leftConversion: leftConversion,
-                rightConversion: rightConversion
-            };
+                return {
+                    operator: i,
+                    leftOperand: leftOperand,
+                    rightOperand: rightOperand,
+                    typeOfLeftOperand: compareOperandType.CONSTOTHER,
+                    typeOfRightOperand: compareOperandType.FIELD,
+                    leftConversion: leftConversion,
+                    rightConversion: rightConversion
+                };
+            }
         }
 
         throw new ex.IllegalArgumentError("Invalid format of condition: " + condition);
