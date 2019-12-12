@@ -269,4 +269,8 @@ TestKeys.getKey = function() {
 
 };
 
-module.exports = {TestKeys};
+function getTestKey() {
+    return new crypto.PrivateKey(atob("JgAcAQABvIDxdLhF++STfUSbcnF7BQD2FsByvNaznuyf3zerGbsNuMgPjc45vnQIlCdGYUADNv/ZD9ZXMVJ7sqU7tuGDwW1Y9KItOpOBfojs/1Ke650543wuvWamkMpojVQpXfO8NmSnWBjm7m8LxgWQf2jZrjlAEkWZ4y+5MCcYTg2UMt9PebyA2I1WqmtpWA5fFhGrxy/LsldTnQVqi85AxHTOXrRlEjGuhMyWHOeA5l7M/GzeW7HWBsRM37amX46UdTcHyCV2rFu2tPgzxhA1qif0u6mU3rUTtqq+p+u2BWWVzj+NcVLOb49ip3CI4WCu1prmfZrI9g8RvOsKWJKMGBn+GzP2aok="));
+}
+
+module.exports = {TestKeys, getTestKey};

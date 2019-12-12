@@ -9,7 +9,7 @@ const io = require("io");
 import {HttpServer} from 'web'
 import {ExecutorWithFixedPeriod} from "executorservice";
 
-const UBotTestClient = require('ubot/ubot_client').UBotTestClient;
+const UBotClient = require('ubot/ubot_client').UBotClient;
 const UBotPoolState = require("ubot/ubot_pool_state").UBotPoolState;
 const ItemResult = require('itemresult').ItemResult;
 const ItemState = require("itemstate").ItemState;
@@ -54,6 +54,7 @@ async function generateSecureRandomRequestContract(executableContract) {
     requestContract.state.data.method_name = "getRandom";
     requestContract.state.data.method_args = [1000];
     requestContract.state.data.executable_contract_id = executableContract.id;
+    requestContract.newItems.add(executableContract);
 
     await cs.addConstraintToContract(requestContract, executableContract, "executable_contract_constraint",
         Constraint.TYPE_EXISTING_STATE, ["this.state.data.executable_contract_id == ref.id"], true);
@@ -83,6 +84,7 @@ async function generateSimpleRegisterRequestContract(executableContract, contrac
     if (contractForRegistration != null)
         requestContract.state.data.method_args = [contractForRegistration];
     requestContract.state.data.executable_contract_id = executableContract.id;
+    requestContract.newItems.add(executableContract);
 
     await cs.addConstraintToContract(requestContract, executableContract, "executable_contract_constraint",
         Constraint.TYPE_EXISTING_STATE, ["this.state.data.executable_contract_id == ref.id"], true);
@@ -170,6 +172,7 @@ unit.test("ubot_main_test: execute looped cloud method", async () => {
     let requestContract = Contract.fromPrivateKey(userPrivKey);
     requestContract.state.data.method_name = "loop";
     requestContract.state.data.executable_contract_id = executableContract.id;
+    requestContract.newItems.add(executableContract);
 
     await cs.addConstraintToContract(requestContract, executableContract, "executable_contract_constraint",
         Constraint.TYPE_EXISTING_STATE, ["this.state.data.executable_contract_id == ref.id"], true);
@@ -279,7 +282,7 @@ unit.test("ubot_main_test: create and register contract", async () => {
     await ubotClient.shutdown();
 });
 
-/*unit.test("ubot_main_test: pool and quorum percentage", async () => {
+unit.test("ubot_main_test: pool and quorum percentage", async () => {
     // simple contract for registration
     let simpleContract = Contract.fromPrivateKey(userPrivKey);
     await simpleContract.seal();
@@ -313,11 +316,11 @@ unit.test("ubot_main_test: create and register contract", async () => {
     console.log("Pool: " + poolAndQuorum.pool);
     console.log("Quorum: " + poolAndQuorum.quorum);
 
-    // let state = await ubotClient.executeCloudMethod(requestContract, true);
-    //
-    // console.log("State: " + JSON.stringify(state));
-    //
-    // assert(state.state === UBotPoolState.FINISHED.val);
+    let state = await ubotClient.executeCloudMethod(requestContract, true);
+
+    console.log("State: " + JSON.stringify(state));
+
+    assert(state.state === UBotPoolState.FINISHED.val);
 
     // pool and quorum as percentage
 
@@ -344,16 +347,16 @@ unit.test("ubot_main_test: create and register contract", async () => {
     console.log("Pool: " + poolAndQuorum.pool);
     console.log("Quorum: " + poolAndQuorum.quorum);
 
-    // state = await ubotClient.executeCloudMethod(requestContract, true);
-    //
-    // console.log("State: " + JSON.stringify(state));
-    //
-    // assert(state.state === UBotPoolState.FINISHED.val);
+    state = await ubotClient.executeCloudMethod(requestContract, true);
+
+    console.log("State: " + JSON.stringify(state));
+
+    assert(state.state === UBotPoolState.FINISHED.val);
 
     await ubotClient.shutdown();
-});*/
+});
 
-/*unit.test("ubot_main_test: http requests", async () => {
+unit.test("ubot_main_test: http requests", async () => {
     let price = 3.8;
     let stopPrice = 5.073;
 
@@ -390,6 +393,7 @@ unit.test("ubot_main_test: create and register contract", async () => {
     requestContract.state.data.method_name = "stopOrder";
     requestContract.state.data.method_args = [stopPrice];
     requestContract.state.data.executable_contract_id = executableContract.id;
+    requestContract.newItems.add(executableContract);
 
     await cs.addConstraintToContract(requestContract, executableContract, "executable_contract_constraint",
         Constraint.TYPE_EXISTING_STATE, ["this.state.data.executable_contract_id == ref.id"], true);
@@ -407,7 +411,7 @@ unit.test("ubot_main_test: create and register contract", async () => {
 
     await httpServer.stopServer();
     executor.cancel();
-});*/
+});
 
 function checkRandomMultiData(multiData, random) {
     let rands = [];
@@ -583,7 +587,7 @@ unit.test("ubot_pro_test: parallel cloud methods", async () => {
     console.log("Results = " + JSON.stringify(results));
 });
 
-/*unit.test("ubot_main_test: lottery", async () => {
+unit.test("ubot_main_test: lottery", async () => {
     //let ubotMains = await createUBots(ubotsCount);
     let ubotClient = await new UBotTestClient("http://104.248.143.106", clientKey, TOPOLOGY_ROOT + TOPOLOGY_FILE).start();
 
@@ -650,6 +654,11 @@ unit.test("ubot_pro_test: parallel cloud methods", async () => {
     lotteryContract.state.data.ticketPrice = "10";
 
     await lotteryContract.seal();
+
+    console.log("Register lottery сontract...");
+    ir = await ubotMains[0].ubot.client.register(await lotteryContract.getPackedTransaction(), 10000);
+
+    assert(ir.state === ItemState.APPROVED);
 
     // buy tickets
     console.log("Buy tickets...");
@@ -719,7 +728,7 @@ unit.test("ubot_pro_test: parallel cloud methods", async () => {
     assert(prizeContract.state.data.amount === "100");
 
     await ubotClient.shutdown();
-});*/
+});
 
 unit.test("ubot_pro_test: execute cloud method with ubot delay", async () => {
     let ubotClient = await new UBotTestClient("http://104.248.143.106", clientKey, TOPOLOGY_ROOT + TOPOLOGY_FILE).start();
@@ -734,6 +743,7 @@ unit.test("ubot_pro_test: execute cloud method with ubot delay", async () => {
     badRequestContract.state.data.method_name = "getNumbers";
     badRequestContract.state.data.method_args = [[2, 3]];
     badRequestContract.state.data.executable_contract_id = executableContract.id;
+    badRequestContract.newItems.add(executableContract);
 
     await cs.addConstraintToContract(badRequestContract, executableContract, "executable_contract_constraint",
         Constraint.TYPE_EXISTING_STATE, ["this.state.data.executable_contract_id == ref.id"], true);
@@ -756,6 +766,7 @@ unit.test("ubot_pro_test: execute cloud method with ubot delay", async () => {
     requestContract.state.data.method_name = "getNumbers";
     requestContract.state.data.method_args = [[excluded]];
     requestContract.state.data.executable_contract_id = executableContract.id;
+    requestContract.newItems.add(executableContract);
 
     await cs.addConstraintToContract(requestContract, executableContract, "executable_contract_constraint",
         Constraint.TYPE_EXISTING_STATE, ["this.state.data.executable_contract_id == ref.id"], true);

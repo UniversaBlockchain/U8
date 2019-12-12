@@ -18,6 +18,8 @@ const roles = require('roles');
 const constr = require('constraint');
 const t = require("tools");
 const ut = require("ubot/ubot_tools");
+const Parcel = require("parcel").Parcel;
+const ParcelProcessingState = require("parcelprocessor").ParcelProcessingState;
 
 class NodeRecord {
     constructor(data) {
@@ -514,6 +516,79 @@ class UBotClient {
         );
 
         return await this.waitRegister(result, packedTransaction, millisToWait);
+    }
+
+    /**
+     * Get the processing state of given parcel.
+     *
+     * @param parcelId - Id of the parcel to get state of
+     * @return processing state of the parcel
+     * @throws UBotClientException
+     */
+    async getParcelProcessingState(parcelId) {
+        let result = await new Promise(async (resolve, reject) =>
+            await this.httpNodeClient.command("getParcelProcessingState", {parcelId: parcelId},
+                result => resolve(result),
+                error => reject(error)
+            )
+        );
+
+        return ParcelProcessingState.byVal(result.processingState.state);
+    }
+
+    /**
+     * Register the contract on the network using parcel (to provide payment).
+     *
+     * @param packedParcel - Binary parcel
+     * @param millisToWait - Maximum time to wait for final {@link ItemState}
+     * @return either final result of registration or last known status of registration.
+     * Getting {@link ItemState#UNDEFINED} means either
+     * payment wasn't processed yet or something is wrong with it (invalid or insufficient U)
+     * @throws UBotClientException
+     */
+    async registerParcelWithState(packedParcel, millisToWait = 0) {
+        let result = await new Promise(async (resolve, reject) =>
+            await this.httpNodeClient.command("approveParcel", {packedItem: packedParcel},
+                result => resolve(result),
+                error => reject(error)
+            )
+        );
+
+        result = result.result;
+
+        if (typeof result === "string") {
+            throw new UBotClientException("registerParcel: approveParcel returns: " + result);
+        } else {
+            if (millisToWait > 0) {
+                let end = Date.now() + millisToWait;
+                try {
+                    let parcel = Parcel.unpack(packedParcel);
+                    let pState = await this.getParcelProcessingState(parcel.hashId);
+                    let interval = 1000;
+                    while ((millisToWait === 0 || Date.now() < end) && pState.isProcessing) {
+                        await sleep(interval);
+                        interval -= 350;
+                        interval = Math.max(interval, 300);
+                        pState = await this.getParcelProcessingState(parcel.hashId);
+                    }
+
+                    let lastResult = await this.getState(parcel.getPayloadContract().id);
+                    while ((millisToWait === 0 || Date.now() < end) && lastResult.state.isPending) {
+                        await sleep(interval);
+                        interval -= 350;
+                        interval = Math.max(interval, 300);
+                        lastResult = await this.getState(parcel.getPayloadContract().id);
+                    }
+
+                    return lastResult;
+
+                } catch (err) {
+                    console.error(err.stack);
+                    throw new UBotClientException(err.message);
+                }
+            } else
+                throw new UBotClientException("registerParcel: waiting time is up, please update payload state later");
+        }
     }
 
     /**

@@ -2271,7 +2271,7 @@ class Contract extends bs.BiSerializable {
      * @return {Promise<Contract | NSmartContract | SlotContract | UnsContract | FollowerContract>} initialized contract.
      */
     static async fromDslFile(fileName, contract = undefined) {
-        let input = await io.openRead(fileName);
+        let input = await require('io').openRead(fileName);
         let data = await input.allAsString();
         await input.close();
 
