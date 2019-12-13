@@ -88,6 +88,8 @@ class UBotProcess_writeSingleStorage extends ProcessBase {
     }
 
     pulse() {
+        this.pr.logger.log("UBotProcess_writeSingleStorage... pulse. Answers = " + JSON.stringify(Array.from(this.otherAnswers)));
+
         for (let i = 0; i < this.pr.pool.length; ++i)
             if (!this.approveCounterSet.has(this.pr.pool[i].number) && !this.declineCounterSet.has(this.pr.pool[i].number) &&
                 !this.notAnswered.has(this.pr.pool[i].number)) {
@@ -125,11 +127,19 @@ class UBotProcess_writeSingleStorage extends ProcessBase {
     }
 
     async vote(notification) {
+        let message = "UBotProcess_writeSingleStorage... vote {from: " + notification.from.number + ", result: ";
+
         if (this.binHashId.equals(notification.params.dataHashId) &&
-            t.valuesEqual(this.previousRecordId, notification.params.previousRecordId))
+            t.valuesEqual(this.previousRecordId, notification.params.previousRecordId)) {
             this.approveCounterSet.add(notification.from.number);
-        else
+            message += "approve";
+        } else {
             this.declineCounterSet.add(notification.from.number);
+            message += "decline";
+        }
+
+        message += "}";
+        this.pr.logger.log(message);
 
         if (this.approveCounterSet.size >= this.quorumSize) {
             // ok

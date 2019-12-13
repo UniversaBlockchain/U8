@@ -52,6 +52,9 @@ class UBotHttpServer extends network.HttpServer {
     async getState(params, clientKey) {
       try {
           let proc = this.ubot.processors.get(params.requestContractId.base64);
+          if (proc == null)
+              return null;
+
           let result = {state: proc.state.val};
           if (proc.state === UBotPoolState.FINISHED)
               result.result = proc.output;
