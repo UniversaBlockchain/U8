@@ -88,7 +88,7 @@ class UBotProcess_writeSingleStorage extends ProcessBase {
     }
 
     pulse() {
-        this.pr.logger.log("UBotProcess_writeSingleStorage... pulse. Answers = " + JSON.stringify(Array.from(this.otherAnswers)));
+        this.pr.logger.log("UBotProcess_writeSingleStorage... pulse. Not answered = " + JSON.stringify(Array.from(this.notAnswered)));
 
         for (let i = 0; i < this.pr.pool.length; ++i)
             if (!this.approveCounterSet.has(this.pr.pool[i].number) && !this.declineCounterSet.has(this.pr.pool[i].number) &&
