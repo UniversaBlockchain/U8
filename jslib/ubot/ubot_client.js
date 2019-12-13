@@ -134,6 +134,9 @@ class UBotClient {
     }
 
     replaceURL(URL) {
+        console.log("URL = " + URL);
+        URL = "http://127.0.0.1" + URL.substring(URL.indexOf(':', 6));
+        console.log("Replaced URL = " + URL);
         return URL;
     }
 
