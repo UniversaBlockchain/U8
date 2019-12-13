@@ -488,36 +488,36 @@ unit.test("ubot_pro_test: execute looped cloud method", async () => {
 //     await shutdownUBots(ubotMains);
 // });
 
-// unit.test("ubot_pro_test: create and register contract", async () => {
-//     let ubotMains = await createUBots(ubotsCount);
-//
-//     let ubotClient = await new UBotTestClient("http://127.0.0.1", clientKey, TOPOLOGY_ROOT + TOPOLOGY_FILE).start();
-//
-//     let executableContract = await generateSimpleExecutableContract("createAndRegister.js", "register");
-//     let requestContract = await generateSimpleRegisterRequestContract(executableContract);
-//
-//     let state = await ubotClient.executeCloudMethod(requestContract, true);
-//
-//     console.log("State: " + JSON.stringify(state));
-//
-//     assert(state.state === UBotPoolState.FINISHED.val);
-//
-//     // checking contract
-//     assert(state.result instanceof Uint8Array);
-//     let assureContract = await Contract.fromPackedTransaction(state.result);
-//     assert(assureContract instanceof Contract);
-//
-//     let ir = await ubotClient.getState(assureContract.id);
-//     assert(ir instanceof ItemResult && ir.state === ItemState.APPROVED);
-//
-//     await ubotClient.shutdown();
-//
-//     // waiting pool finished...
-//     while (ubotMains.some(main => Array.from(main.ubot.processors.values()).some(proc => proc.state.canContinue)))
-//         await sleep(100);
-//
-//     await shutdownUBots(ubotMains);
-// });
+unit.test("ubot_pro_test: create and register contract", async () => {
+    let ubotMains = await createUBots(ubotsCount);
+
+    let ubotClient = await new UBotTestClient("http://127.0.0.1", clientKey, TOPOLOGY_ROOT + TOPOLOGY_FILE).start();
+
+    let executableContract = await generateSimpleExecutableContract("createAndRegister.js", "register");
+    let requestContract = await generateSimpleRegisterRequestContract(executableContract);
+
+    let state = await ubotClient.executeCloudMethod(requestContract, true);
+
+    console.log("State: " + JSON.stringify(state));
+
+    assert(state.state === UBotPoolState.FINISHED.val);
+
+    // checking contract
+    assert(state.result instanceof Uint8Array);
+    let assureContract = await Contract.fromPackedTransaction(state.result);
+    assert(assureContract instanceof Contract);
+
+    let ir = await ubotClient.getState(assureContract.id);
+    assert(ir instanceof ItemResult && ir.state === ItemState.APPROVED);
+
+    await ubotClient.shutdown();
+
+    // waiting pool finished...
+    while (ubotMains.some(main => Array.from(main.ubot.processors.values()).some(proc => proc.state.canContinue)))
+        await sleep(100);
+
+    await shutdownUBots(ubotMains);
+});
 
 unit.test("ubot_pro_test: pool and quorum percentage", async () => {
     let ubotMains = await createUBots(ubotsCount);
@@ -884,7 +884,6 @@ unit.test("ubot_pro_test: lottery", async () => {
     let ir = await netClient.register(await U.getPackedTransaction(), 10000);
 
     assert(ir.state === ItemState.APPROVED);
-
     //registerParcelWithState
 
     const TICKETS = 10;
@@ -1067,7 +1066,6 @@ unit.test("ubot_pro_test: execute cloud method with ubot delay", async () => {
     requestContract.state.data.method_name = "getNumbers";
     requestContract.state.data.method_args = [[excluded]];
     requestContract.state.data.executable_contract_id = executableContract.id;
-    requestContract.newItems.add(executableContract);
 
     await cs.addConstraintToContract(requestContract, executableContract, "executable_contract_constraint",
         Constraint.TYPE_EXISTING_STATE, ["this.state.data.executable_contract_id == ref.id"], true);

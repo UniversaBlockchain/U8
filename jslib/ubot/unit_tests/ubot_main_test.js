@@ -15,6 +15,7 @@ const ItemResult = require('itemresult').ItemResult;
 const ItemState = require("itemstate").ItemState;
 const ut = require("ubot/ubot_tools");
 const cs = require("contractsservice");
+const roles = require('roles');
 const Constraint = require('constraint').Constraint;
 const BigDecimal  = require("big").Big;
 
@@ -356,62 +357,62 @@ unit.test("ubot_main_test: pool and quorum percentage", async () => {
     await ubotClient.shutdown();
 });
 
-unit.test("ubot_main_test: http requests", async () => {
-    let price = 3.8;
-    let stopPrice = 5.073;
-
-    // test HTTP server with prices
-    let httpServer = new HttpServer("0.0.0.0", 8080, 5);
-    httpServer.addEndpoint("/getPrice", async (request) => {
-        request.setHeader("Content-Type", "text/html");
-        return {"price": price};
-    });
-
-    // price cycle
-    let executor = new ExecutorWithFixedPeriod(() => {
-        price += Math.random() / 10;
-        console.log("Current price: " + price);
-    }, 1000).run();
-
-    httpServer.startServer();
-
-    let ubotClient = await new UBotClient(clientKey, TOPOLOGY_ROOT + TOPOLOGY_FILE).start();
-
-    let executableContract = Contract.fromPrivateKey(userPrivKey);
-
-    executableContract.state.data.cloud_methods = {
-        stopOrder: {
-            pool: {size: 5},
-            quorum: {size: 4}
-        }
-    };
-
-    executableContract.state.data.js = await io.fileGetContentsAsString(TEST_CONTRACTS_PATH + "tradeOrder.js");
-    await executableContract.seal();
-
-    let requestContract = Contract.fromPrivateKey(userPrivKey);
-    requestContract.state.data.method_name = "stopOrder";
-    requestContract.state.data.method_args = [stopPrice];
-    requestContract.state.data.executable_contract_id = executableContract.id;
-    requestContract.newItems.add(executableContract);
-
-    await cs.addConstraintToContract(requestContract, executableContract, "executable_contract_constraint",
-        Constraint.TYPE_EXISTING_STATE, ["this.state.data.executable_contract_id == ref.id"], true);
-
-    let state = await ubotClient.executeCloudMethod(requestContract, true);
-
-    console.log("State: " + JSON.stringify(state));
-
-    assert(state.state === UBotPoolState.FINISHED.val);
-    assert(state.result instanceof Array);
-    assert(state.result.length >= executableContract.state.data.cloud_methods.stopOrder.quorum.size);
-    assert(state.result.every(result => result.price >= stopPrice));
-
-    await ubotClient.shutdown();
-
-    await httpServer.stopServer();
-    executor.cancel();
-});
+// unit.test("ubot_main_test: http requests", async () => {
+//     let price = 3.8;
+//     let stopPrice = 5.073;
+//
+//     // test HTTP server with prices
+//     let httpServer = new HttpServer("0.0.0.0", 8080, 5);
+//     httpServer.addEndpoint("/getPrice", async (request) => {
+//         request.setHeader("Content-Type", "text/html");
+//         return {"price": price};
+//     });
+//
+//     // price cycle
+//     let executor = new ExecutorWithFixedPeriod(() => {
+//         price += Math.random() / 10;
+//         console.log("Current price: " + price);
+//     }, 1000).run();
+//
+//     httpServer.startServer();
+//
+//     let ubotClient = await new UBotClient(clientKey, TOPOLOGY_ROOT + TOPOLOGY_FILE).start();
+//
+//     let executableContract = Contract.fromPrivateKey(userPrivKey);
+//
+//     executableContract.state.data.cloud_methods = {
+//         stopOrder: {
+//             pool: {size: 5},
+//             quorum: {size: 4}
+//         }
+//     };
+//
+//     executableContract.state.data.js = await io.fileGetContentsAsString(TEST_CONTRACTS_PATH + "tradeOrder.js");
+//     await executableContract.seal();
+//
+//     let requestContract = Contract.fromPrivateKey(userPrivKey);
+//     requestContract.state.data.method_name = "stopOrder";
+//     requestContract.state.data.method_args = [stopPrice];
+//     requestContract.state.data.executable_contract_id = executableContract.id;
+//     requestContract.newItems.add(executableContract);
+//
+//     await cs.addConstraintToContract(requestContract, executableContract, "executable_contract_constraint",
+//         Constraint.TYPE_EXISTING_STATE, ["this.state.data.executable_contract_id == ref.id"], true);
+//
+//     let state = await ubotClient.executeCloudMethod(requestContract, true);
+//
+//     console.log("State: " + JSON.stringify(state));
+//
+//     assert(state.state === UBotPoolState.FINISHED.val);
+//     assert(state.result instanceof Array);
+//     assert(state.result.length >= executableContract.state.data.cloud_methods.stopOrder.quorum.size);
+//     assert(state.result.every(result => result.price >= stopPrice));
+//
+//     await ubotClient.shutdown();
+//
+//     await httpServer.stopServer();
+//     executor.cancel();
+// });
 
 function checkRandomMultiData(multiData, random) {
     let rands = [];
@@ -588,21 +589,18 @@ unit.test("ubot_pro_test: parallel cloud methods", async () => {
 });
 
 unit.test("ubot_main_test: lottery", async () => {
-    //let ubotMains = await createUBots(ubotsCount);
     let ubotClient = await new UBotClient(clientKey, TOPOLOGY_ROOT + TOPOLOGY_FILE).start();
-
-    // init ubot-client (client key in whitelist)
-    ubotMains[0].ubot.client = await new UBotClient(ubotMains[0].ubot.nodeKey, TOPOLOGY_ROOT + TOPOLOGY_FILE, null, ubotMains[0].ubot.logger).start();
+    let netClient = await new UBotClient(tk.getTestKey(), TOPOLOGY_ROOT + TOPOLOGY_FILE).start();
 
     const TICKETS = 10;
 
     // test token for payments
-    let tokenIssuerKey = ubotMains[0].ubot.nodeKey;
+    let tokenIssuerKey = tk.TestKeys.getKey();
     let tokenContract = await cs.createTokenContract([tokenIssuerKey], [tokenIssuerKey.publicKey], new BigDecimal("1000"));
     let origin = tokenContract.getOrigin();
 
     console.log("Register base token...");
-    let ir = await ubotMains[0].ubot.client.register(await tokenContract.getPackedTransaction(), 10000);
+    let ir = await netClient.register(await tokenContract.getPackedTransaction(), 10000);
 
     assert(ir.state === ItemState.APPROVED);
 
@@ -626,7 +624,7 @@ unit.test("ubot_main_test: lottery", async () => {
         payments.push(payment);
 
         console.log("Register payment " + i + "...");
-        ir = await ubotMains[0].ubot.client.register(await tokenContract.getPackedTransaction(), 10000);
+        ir = await netClient.register(await tokenContract.getPackedTransaction(), 10000);
 
         assert(ir.state === ItemState.APPROVED);
     }
@@ -656,7 +654,7 @@ unit.test("ubot_main_test: lottery", async () => {
     await lotteryContract.seal();
 
     console.log("Register lottery сontract...");
-    ir = await ubotMains[0].ubot.client.register(await lotteryContract.getPackedTransaction(), 10000);
+    ir = await netClient.register(await lotteryContract.getPackedTransaction(), 10000);
 
     assert(ir.state === ItemState.APPROVED);
 
@@ -727,6 +725,7 @@ unit.test("ubot_main_test: lottery", async () => {
     assert(prizeContract.getOrigin().equals(origin));
     assert(prizeContract.state.data.amount === "100");
 
+    await netClient.shutdown();
     await ubotClient.shutdown();
 });
 
@@ -766,7 +765,6 @@ unit.test("ubot_pro_test: execute cloud method with ubot delay", async () => {
     requestContract.state.data.method_name = "getNumbers";
     requestContract.state.data.method_args = [[excluded]];
     requestContract.state.data.executable_contract_id = executableContract.id;
-    requestContract.newItems.add(executableContract);
 
     await cs.addConstraintToContract(requestContract, executableContract, "executable_contract_constraint",
         Constraint.TYPE_EXISTING_STATE, ["this.state.data.executable_contract_id == ref.id"], true);

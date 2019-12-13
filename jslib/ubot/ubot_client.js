@@ -359,41 +359,46 @@ class UBotClient {
         let params = {packedRequest: await requestContract.getPackedTransaction()};
         let session = await this.getSession("ubotCreateSession", params);
 
-        if (session == null)
+        if (session == null || session.state == null)
             throw new UBotClientException("Session is null");
 
         let maxTime = 0;
         if (this.waitSession != null)
             maxTime = Date.now() + this.waitSession;
 
-        // wait session requestId
-        while (session.state === UBotSessionState.VOTING_REQUEST_ID.val) {
-            if (this.waitSession != null && Date.now() > maxTime)
-                throw new UBotClientException("Session timeout limit exceeded");
+        do {
+            // wait session requestId
+            while (session.state === UBotSessionState.VOTING_REQUEST_ID.val) {
+                if (this.waitSession != null && Date.now() > maxTime)
+                    throw new UBotClientException("Session timeout limit exceeded");
 
-            await sleep(UBotConfig.waitPeriod);
-            session = await this.getSession("ubotGetSession",
-                {executableContractId: requestContract.state.data.executable_contract_id});
-        }
-
-        if (waitPreviousSession) {
-            while (session.requestId == null || !session.requestId.equals(requestContract.id)) {
-                if (session.state === UBotSessionState.CLOSING.val || session.state === UBotSessionState.CLOSED.val)
-                    await sleep(UBotConfig.waitPeriod);
-                else
-                    await sleep(UBotConfig.waitPeriod * 10);
-
-                session = await this.getSession("ubotCreateSession", params);
-
-                if (session == null)
-                    throw new UBotClientException("Session is null");
+                await sleep(UBotConfig.waitPeriod);
+                session = await this.getSession("ubotGetSession",
+                    {executableContractId: requestContract.state.data.executable_contract_id});
             }
 
-            if (this.waitSession != null)
-                maxTime = Date.now() + this.waitSession;
+            if (session == null || session.state == null)
+                throw new UBotClientException("Can`t establish session. Session is null");
 
-        } else if (session.requestId == null || !session.requestId.equals(requestContract.id))
-            throw new UBotClientException("Unable to create session by request contract");
+            if (waitPreviousSession) {
+                while (session.requestId != null && !session.requestId.equals(requestContract.id)) {
+                    if (session.state === UBotSessionState.CLOSING.val || session.state === UBotSessionState.CLOSED.val)
+                        await sleep(UBotConfig.waitPeriod);
+                    else
+                        await sleep(UBotConfig.waitPeriod * 10);
+
+                    session = await this.getSession("ubotCreateSession", params);
+
+                    if (session == null || session.state == null)
+                        throw new UBotClientException("Session is null");
+                }
+
+                if (this.waitSession != null)
+                    maxTime = Date.now() + this.waitSession;
+
+            } else if (session.requestId == null || !session.requestId.equals(requestContract.id))
+                throw new UBotClientException("Unable to create session by request contract");
+        } while (session.requestId == null);
 
         if (session.state === UBotSessionState.CLOSING.val)
             throw new UBotClientException("Session is closing");
@@ -411,6 +416,9 @@ class UBotClient {
             await sleep(UBotConfig.waitPeriod);
             session = await this.getSession("ubotGetSession",
                 {executableContractId: requestContract.state.data.executable_contract_id});
+
+            if (session == null || session.state == null)
+                throw new UBotClientException("Can`t establish session. Session is null");
         }
 
         if (session.state === UBotSessionState.CLOSING.val)

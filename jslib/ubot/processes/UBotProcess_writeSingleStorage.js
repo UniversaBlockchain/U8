@@ -98,7 +98,7 @@ class UBotProcess_writeSingleStorage extends ProcessBase {
                     if (this.checkMaxWaitPeriod(i))
                         this.checkDecline();        // check consensus available
                     else {
-                        this.pr.logger.log("UBotProcess_writeSingleStorage... deliver notification to " + this.pr.pool[i]);
+                        this.pr.logger.log("UBotProcess_writeSingleStorage... deliver notification to " + this.pr.pool[i].number);
                         this.pr.ubot.network.deliver(this.pr.pool[i],
                             new UBotCloudNotification_process(
                                 this.pr.ubot.network.myInfo,
