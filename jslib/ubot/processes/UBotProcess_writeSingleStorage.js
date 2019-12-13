@@ -97,16 +97,18 @@ class UBotProcess_writeSingleStorage extends ProcessBase {
                     // check max wait period
                     if (this.checkMaxWaitPeriod(i))
                         this.checkDecline();        // check consensus available
-                    else
+                    else {
+                        this.pr.logger.log("UBotProcess_writeSingleStorage... deliver notification to " + this.pr.pool[i]);
                         this.pr.ubot.network.deliver(this.pr.pool[i],
                             new UBotCloudNotification_process(
                                 this.pr.ubot.network.myInfo,
                                 this.pr.poolId,
                                 this.procIndex,
                                 UBotCloudNotification_process.types.SINGLE_STORAGE_GET_DATA_HASHID,
-                                { isAnswer: false }
+                                {isAnswer: false}
                             )
                         );
+                    }
                 }   
         } catch (err) {
             console.error("UBotProcess_writeSingleStorage. pulse error: " + err.message);
