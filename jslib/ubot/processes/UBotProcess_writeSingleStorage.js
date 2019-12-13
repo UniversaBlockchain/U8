@@ -90,23 +90,28 @@ class UBotProcess_writeSingleStorage extends ProcessBase {
     pulse() {
         this.pr.logger.log("UBotProcess_writeSingleStorage... pulse. Not answered = " + JSON.stringify(Array.from(this.notAnswered)));
 
-        for (let i = 0; i < this.pr.pool.length; ++i)
-            if (!this.approveCounterSet.has(this.pr.pool[i].number) && !this.declineCounterSet.has(this.pr.pool[i].number) &&
-                !this.notAnswered.has(this.pr.pool[i].number)) {
-                // check max wait period
-                if (this.checkMaxWaitPeriod(i))
-                    this.checkDecline();        // check consensus available
-                else
-                    this.pr.ubot.network.deliver(this.pr.pool[i],
-                        new UBotCloudNotification_process(
-                            this.pr.ubot.network.myInfo,
-                            this.pr.poolId,
-                            this.procIndex,
-                            UBotCloudNotification_process.types.SINGLE_STORAGE_GET_DATA_HASHID,
-                            { isAnswer: false }
-                        )
-                    );
-            }
+        try {
+            for (let i = 0; i < this.pr.pool.length; ++i)
+                if (!this.approveCounterSet.has(this.pr.pool[i].number) && !this.declineCounterSet.has(this.pr.pool[i].number) &&
+                    !this.notAnswered.has(this.pr.pool[i].number)) {
+                    // check max wait period
+                    if (this.checkMaxWaitPeriod(i))
+                        this.checkDecline();        // check consensus available
+                    else
+                        this.pr.ubot.network.deliver(this.pr.pool[i],
+                            new UBotCloudNotification_process(
+                                this.pr.ubot.network.myInfo,
+                                this.pr.poolId,
+                                this.procIndex,
+                                UBotCloudNotification_process.types.SINGLE_STORAGE_GET_DATA_HASHID,
+                                { isAnswer: false }
+                            )
+                        );
+                }   
+        } catch (err) {
+            console.error("UBotProcess_writeSingleStorage. pulse error: " + err.message);
+            console.error(err.stack);
+        }
     }
 
     generateSelfRecordID() {
