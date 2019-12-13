@@ -4,4 +4,5 @@
 
 FROM universa/u8
 
-ENTRYPOINT ["/u8/u8", "/code/u8scripts/node/node.js"]
+WORKDIR /code/cmake-build-release
+ENTRYPOINT ["./u8", "../u8scripts/node/node.js"]

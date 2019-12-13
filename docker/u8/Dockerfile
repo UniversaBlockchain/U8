@@ -45,4 +45,5 @@ RUN echo \
     && apt-get install --quiet=2 --yes --no-install-recommends libcurl4 \
     && apt-get clean --quiet=2 --yes && apt-get autoremove --quiet=2 --yes && rm -rf /var/lib/apt/lists/*
 
-ENTRYPOINT ["/u8/u8"]
+WORKDIR /code/cmake-build-release
+ENTRYPOINT ["./u8"]
