@@ -29,7 +29,7 @@ namespace network {
         nextPacketId_ = minstdRand_();
 
         receiveCallback_ = receiveCallback;
-        socket_.open(ownNodeInfo_.getNodeAddress().host.c_str(), ownNodeInfo_.getNodeAddress().port, UDP_BUFFER_SIZE);
+        socket_.open("0.0.0.0", ownNodeInfo_.getNodeAddress().port, UDP_BUFFER_SIZE);
         socket_.recv([=](ssize_t result, const asyncio::byte_vector& data, const char* IP, unsigned int port) {
             if (result > 0)
                 receiverPool_.execute([&,data](){
