@@ -891,24 +891,12 @@ class UBotClient {
     async checkSession(executableContractId, requestContractId, ubotNumber, ubot) {
         let session = await this.getSession("ubotGetSession", {executableContractId: executableContractId});
 
-        if (session == null)
+        if (session == null || session.state == null)
             throw new UBotClientException("Session is null");
 
         let maxTime = 0;
         if (this.waitSession != null)
             maxTime = Date.now() + this.waitSession;
-
-        // wait not empty session
-        while (session != null && session.state == null) {
-            if (this.waitSession != null && Date.now() > maxTime)
-                throw new UBotClientException("Session timeout limit exceeded");
-
-            await sleep(UBotConfig.waitPeriod);
-            session = await this.getSession("ubotGetSession", {executableContractId: executableContractId});
-        }
-
-        if (session == null)
-            throw new UBotClientException("Session is null");
 
         if (session.state !== UBotSessionState.OPERATIONAL.val) {
             if (session.state !== UBotSessionState.VOTING_SESSION_ID.val)
@@ -923,6 +911,9 @@ class UBotClient {
 
                 await sleep(UBotConfig.waitPeriod);
                 session = await this.getSession("ubotGetSession", {executableContractId: executableContractId});
+
+                if (session == null || session.state == null)
+                    throw new UBotClientException("Session is null");
             }
 
             if (session.state === UBotSessionState.CLOSING.val)

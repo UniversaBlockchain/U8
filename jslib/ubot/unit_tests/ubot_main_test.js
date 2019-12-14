@@ -196,8 +196,8 @@ unit.test("ubot_main_test: full quorum", async () => {
     let executableContract = await generateSecureRandomExecutableContract();
 
     executableContract.state.data.cloud_methods.getRandom = {
-        pool: {size: 30},
-        quorum: {size: 30}
+        pool: {size: 16},
+        quorum: {size: 16}
     };
     await executableContract.seal();
 
