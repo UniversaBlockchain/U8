@@ -193,16 +193,29 @@ class UBotNetwork {
         } else
             this.report("UDPAdapter is null", VerboseLevel.DETAILED);
 
-        if (this.httpClient.clientPrivateKey == null)
-            await this.httpClient.start(this.myKey, this.myInfo.publicKey, null);
+        let client = null;
+        let tcpResult = -1;
+        try {
+            let client = new HttpClient(this.netConfig.getInfo(toNumber).serverUrlString());
+            await client.start(this.myKey, this.netConfig.getInfo(toNumber).publicKey, null);
 
-        let start = Date.now();
-        let tcpResult = await new Promise(async (resolve) =>
-            await this.httpClient.command("sping", {},
-                () => resolve(Date.now() - start),
-                () => resolve(-1)
-            )
-        );
+            let start = Date.now();
+            tcpResult = await new Promise(async (resolve) => {
+                try {
+                    await client.command("sping", {},
+                        () => resolve(Date.now() - start),
+                        () => resolve(-1)
+                    );
+                } catch (e) {
+                    resolve(-1);
+                }
+            });
+        } catch (e) {
+            resolve(-1);
+        }
+
+        if (client != null)
+            await client.stop();
 
         return {UDP: udpResult, TCP: tcpResult};
     }
