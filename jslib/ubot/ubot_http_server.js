@@ -71,7 +71,7 @@ class UBotHttpServer extends network.HttpServer {
         }
     }
 
-    async pingNode(params, clientKey) {
+    async pingUBot(params, clientKey) {
         try {
             return {UDP : this.ubot.network.pingUbot(params.ubotNumber,params.timeoutMillis)};
         } catch (err) {
