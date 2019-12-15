@@ -11,6 +11,10 @@ const Boss = require("boss.js");
 const BossStreams = require('boss_streams.js');
 const UBotConfig = require("ubot/ubot_config").UBotConfig;
 
+const PACKET_TYPE_NOTIFICATION = 1;
+const PACKET_TYPE_PING = 2;
+
+
 class UBotNetwork {
 
     constructor(netConfig, myInfo, myKey, logger) {
@@ -27,6 +31,8 @@ class UBotNetwork {
 
         // this.httpClient is used for connection to all other ubots, so it's does not matter which rootUrl we use
         this.httpClient = new HttpClient(this.myInfo.serverUrlString());
+
+        this.pingWaiters = {};
     }
 
     async shutdown() {
@@ -68,13 +74,16 @@ class UBotNetwork {
         this.consumer = notificationConsumer;
     }
 
+
+
     unpack(packet) {
         let notifications = [];
 
         try {
             // packet type code
             let r = new BossStreams.Reader(packet);
-            if (r.read() !== 1)
+            let packetType = r.read();
+            if (packetType !== PACKET_TYPE_NOTIFICATION && packetType !== PACKET_TYPE_PING)
                 throw new Error("invalid packed notification type code");
 
             // from node number
@@ -83,15 +92,36 @@ class UBotNetwork {
             if (from == null)
                 throw new Error(this.myInfo.number + ": unknown node number: " + number);
 
-            // number of notifications in the packet
-            let count = r.read();
-            if (count < 0 || count > 1000)
-                throw new Error("invalid packed notifications count: " + count);
 
-            for (let i = 0; i < count; i++)
-                notifications.push(Notification.read(from, r));
+            if(packetType === PACKET_TYPE_NOTIFICATION) {
+                // number of notifications in the packet
+                let count = r.read();
+                if (count < 0 || count > 1000)
+                    throw new Error("invalid packed notifications count: " + count);
 
-            return notifications;
+                for (let i = 0; i < count; i++)
+                    notifications.push(Notification.read(from, r));
+
+                return notifications;
+            } else if(packetType === PACKET_TYPE_PING) {
+                let id = r.read();
+
+                if(this.pingWaiters.hasOwnProperty(id)) {
+                    this.pingWaiters[id].fire();
+                    this.pingWaiters.delete(id)
+                } else {
+                    let w = new BossStreams.Writer();
+                    w.write(PACKET_TYPE_PING);                         // packet type code
+                    w.write(this.myInfo.number);               // from number
+                    w.write(id);
+
+                    if (this.adapter != null)
+                        this.adapter.send(from.number, w.get());
+                    else
+                        this.report("UDPAdapter is null", VerboseLevel.DETAILED);
+                }
+                return notifications;
+            }
 
         } catch (err) {
             this.report("failed to unpack notification: " + err.message, VerboseLevel.BASE);
@@ -102,7 +132,7 @@ class UBotNetwork {
     packNotifications(from, notifications) {
         let w = new BossStreams.Writer();
         try {
-            w.write(1);                         // packet type code
+            w.write(PACKET_TYPE_NOTIFICATION);                         // packet type code
             w.write(from.number);               // from number
             w.write(notifications.length);      // count notifications
 
@@ -138,6 +168,29 @@ class UBotNetwork {
         } catch (err) {
             this.report("deliver exception: " + err.message, VerboseLevel.DETAILED);
         }
+    }
+
+    async pingUbot(toNumber,timeoutMills = 1000) {
+        let id = Math.random().toFixed(6);
+        let w = new BossStreams.Writer();
+        w.write(PACKET_TYPE_PING);
+        w.write(this.myInfo.number);
+        w.write(id);
+
+        if (this.adapter != null) {
+            let ae = new AsyncEvent();
+            this.pingWaiters[id] = ae;
+            let start = Date.now();
+            this.adapter.send(toNumber, w.get());
+            ae.await(timeoutMills);
+            let end = Date.now();
+            if(ae.fired) {
+                return end-start;
+            } else {
+                return -1;
+            }
+        } else
+            this.report("UDPAdapter is null", VerboseLevel.DETAILED);
     }
 
     broadcast(exceptNode, notification) {

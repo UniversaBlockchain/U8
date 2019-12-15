@@ -22,6 +22,7 @@ class UBotHttpServer extends network.HttpServer {
 
         this.addSecureEndpoint("executeCloudMethod", (params, clientKey) => this.onExecuteCloudMethod(params, clientKey));
         this.addSecureEndpoint("getState", (params, clientKey) => this.getState(params, clientKey));
+        this.addSecureEndpoint("pingUBot", (params, clientKey) => this.pingUBot(params, clientKey));
 
         this.addRawEndpoint("/getRequestContract", request => this.onGetRequestContract(request));
         this.addRawEndpoint("/getSingleStorageResult", request => this.onGetStorageResult(request, false));
@@ -62,6 +63,17 @@ class UBotHttpServer extends network.HttpServer {
               result.errors = proc.errors;
           return result;
 
+        } catch (err) {
+            this.logger.log(err.stack);
+            this.logger.log("getState ERROR: " + err.message);
+
+            return {errors : [new ErrorRecord(Errors.COMMAND_FAILED, "getState", err.message)]};
+        }
+    }
+
+    async pingNode(params, clientKey) {
+        try {
+            return {UDP : this.ubot.network.pingUbot(params.ubotNumber,params.timeoutMillis)};
         } catch (err) {
             this.logger.log(err.stack);
             this.logger.log("getState ERROR: " + err.message);
