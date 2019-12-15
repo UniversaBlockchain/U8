@@ -54,7 +54,7 @@ class UBotHttpServer extends network.HttpServer {
       try {
           let proc = this.ubot.processors.get(params.requestContractId.base64);
           if (proc == null)
-              return null;
+              return {};
 
           let result = {state: proc.state.val};
           if (proc.state === UBotPoolState.FINISHED)
@@ -73,7 +73,7 @@ class UBotHttpServer extends network.HttpServer {
 
     async pingUBot(params, clientKey) {
         try {
-            return {UDP : await this.ubot.network.pingUbot(params.ubotNumber,params.timeoutMillis)};
+            return await this.ubot.network.pingUbot(params.ubotNumber, params.timeoutMillis);
         } catch (err) {
             this.logger.log(err.stack);
             this.logger.log("getState ERROR: " + err.message);

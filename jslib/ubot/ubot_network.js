@@ -177,6 +177,7 @@ class UBotNetwork {
         w.write(this.myInfo.number);
         w.write(id);
 
+        let udpResult = -1;
         if (this.adapter != null) {
             let ae = new AsyncEvent();
             this.pingWaiters[id] = ae;
@@ -185,12 +186,25 @@ class UBotNetwork {
             try {
                 await ae.await(timeoutMills);
                 let end = Date.now();
-                return end - start;
+                udpResult = end - start;
             } catch (e) {
-                return -1;
+                udpResult = -1;
             }
         } else
             this.report("UDPAdapter is null", VerboseLevel.DETAILED);
+
+        if (this.httpClient.clientPrivateKey == null)
+            await this.httpClient.start(this.myKey, this.myInfo.publicKey, null);
+
+        let start = Date.now();
+        let tcpResult = await new Promise(async (resolve) =>
+            await this.httpClient.command("sping", {},
+                () => resolve(Date.now() - start),
+                () => resolve(-1)
+            )
+        );
+
+        return {UDP: udpResult, TCP: tcpResult};
     }
 
     broadcast(exceptNode, notification) {

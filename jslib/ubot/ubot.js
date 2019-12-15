@@ -84,7 +84,7 @@ class UBot {
             try {
                 session = await this.client.checkSession(notification.executableContractId, notification.poolId, this.network.myInfo.number, this);
             } catch (err) {
-                this.logger.log("Error: check session failed, ubot is not started by notification: " + notification.poolId.base64 +
+                this.logger.log("Error: check session failed, ubot is not started by notification: " + notification.poolId +
                     ", message: " + err.message);
                 return;
             }

@@ -34,6 +34,27 @@ const ubotsCount = 30;
 const clientKey = tk.TestKeys.getKey();
 const userPrivKey = tk.TestKeys.getKey();
 
+async function createPayment(cost) {
+    let netClient = await new UBotClient(tk.getTestKey(), TOPOLOGY_ROOT + TOPOLOGY_FILE).start();
+
+    let U = await tt.createFreshU(100000000, [userPrivKey.publicKey]);
+    U.registerRole(new roles.SimpleRole("issuer", tk.getTestKey().longAddress));
+    await U.seal(true);
+
+    await U.addSignatureToSeal(tk.getTestKey());
+    let ir = await netClient.register(await U.getPackedTransaction(), 10000);
+
+    assert(ir.state === ItemState.APPROVED);
+
+    U = await U.createRevision([userPrivKey]);
+    U.state.data.transaction_units = U.state.data.transaction_units - cost;
+    await U.seal();
+
+    await netClient.shutdown();
+
+    return U;
+}
+
 async function createUbotMain(name, nolog) {
     let args = ["--config", CONFIG_ROOT+"/"+name];
     if (nolog)
@@ -210,6 +231,20 @@ unit.test("ubot_pro_test: start client", async () => {
     await ubotClient.shutdown();
 });
 
+unit.test("ubot_pro_test: ping", async () => {
+    let ubotMains = await createUBots(ubotsCount);
+    let ubotClient = await new UBotTestClient("http://127.0.0.1", clientKey, TOPOLOGY_ROOT + TOPOLOGY_FILE).start();
+
+    let result = await ubotClient.pingUBot(5, 10, 5000);
+
+    console.log("Ping result: " + JSON.stringify(result));
+
+    assert(result.UDP > -1 && result.TCP > -1);
+
+    await ubotClient.shutdown();
+    await shutdownUBots(ubotMains);
+});
+
 unit.test("ubot_pro_test: start cloud method", async () => {
     let ubotMains = await createUBots(ubotsCount);
 
@@ -222,7 +257,7 @@ unit.test("ubot_pro_test: start cloud method", async () => {
     let executableContract = await generateSecureRandomExecutableContract();
     let requestContract = await generateSecureRandomRequestContract(executableContract);
 
-    let session = await ubotClient.startCloudMethod(requestContract);
+    let session = await ubotClient.startCloudMethod(requestContract, await createPayment(20));
 
     console.log("Session: " + session);
 
@@ -283,7 +318,7 @@ unit.test("ubot_pro_test: execute cloud method", async () => {
     let executableContract = await generateSecureRandomExecutableContract();
     let requestContract = await generateSecureRandomRequestContract(executableContract);
 
-    let state = await ubotClient.executeCloudMethod(requestContract, true);
+    let state = await ubotClient.executeCloudMethod(requestContract, await createPayment(20), true);
 
     console.log("State: " + JSON.stringify(state));
 
@@ -380,7 +415,7 @@ unit.test("ubot_pro_test: execute looped cloud method", async () => {
     await cs.addConstraintToContract(requestContract, executableContract, "executable_contract_constraint",
         Constraint.TYPE_EXISTING_STATE, ["this.state.data.executable_contract_id == ref.id"], true);
 
-    let state = await ubotClient.executeCloudMethod(requestContract, true);
+    let state = await ubotClient.executeCloudMethod(requestContract, await createPayment(2), true);
 
     console.log("State: " + JSON.stringify(state));
 
@@ -414,7 +449,7 @@ unit.test("ubot_pro_test: execute looped cloud method", async () => {
 
      let requestContract = await generateSecureRandomRequestContract(executableContract);
 
-     let session = await ubotClient.startCloudMethod(requestContract);
+     let session = await ubotClient.startCloudMethod(requestContract, await createPayment(64));
 
      console.log("Session: " + session);
 
@@ -496,7 +531,7 @@ unit.test("ubot_pro_test: create and register contract", async () => {
     let executableContract = await generateSimpleExecutableContract("createAndRegister.js", "register");
     let requestContract = await generateSimpleRegisterRequestContract(executableContract);
 
-    let state = await ubotClient.executeCloudMethod(requestContract, true);
+    let state = await ubotClient.executeCloudMethod(requestContract, await createPayment(20), true);
 
     console.log("State: " + JSON.stringify(state));
 
@@ -555,7 +590,7 @@ unit.test("ubot_pro_test: pool and quorum percentage", async () => {
     console.log("Pool: " + poolAndQuorum.pool);
     console.log("Quorum: " + poolAndQuorum.quorum);
 
-    let state = await ubotClient.executeCloudMethod(requestContract, true);
+    let state = await ubotClient.executeCloudMethod(requestContract, await createPayment(20), true);
 
     console.log("State: " + JSON.stringify(state));
 
@@ -586,7 +621,7 @@ unit.test("ubot_pro_test: pool and quorum percentage", async () => {
     console.log("Pool: " + poolAndQuorum.pool);
     console.log("Quorum: " + poolAndQuorum.quorum);
 
-    state = await ubotClient.executeCloudMethod(requestContract, true);
+    state = await ubotClient.executeCloudMethod(requestContract, await createPayment(20), true);
 
     console.log("State: " + JSON.stringify(state));
 
@@ -645,7 +680,7 @@ unit.test("ubot_pro_test: http requests", async () => {
     await cs.addConstraintToContract(requestContract, executableContract, "executable_contract_constraint",
         Constraint.TYPE_EXISTING_STATE, ["this.state.data.executable_contract_id == ref.id"], true);
 
-    let state = await ubotClient.executeCloudMethod(requestContract, true);
+    let state = await ubotClient.executeCloudMethod(requestContract, await createPayment(20), true);
 
     console.log("State: " + JSON.stringify(state));
 
@@ -694,7 +729,7 @@ unit.test("ubot_pro_test: 2 cloud method", async () => {
     let executableContract = await generateSecureRandomExecutableContract();
     let requestContract = await generateSecureRandomRequestContract(executableContract);
 
-    let session = await ubotClient.startCloudMethod(requestContract);
+    let session = await ubotClient.startCloudMethod(requestContract, await createPayment(20));
 
     console.log("Session: " + session);
 
@@ -753,7 +788,7 @@ unit.test("ubot_pro_test: 2 cloud method", async () => {
         Constraint.TYPE_EXISTING_STATE, ["this.state.data.executable_contract_id == ref.id"], true);
 
     console.log("SECOND METHOD (READ RANDOM)");
-    session = await ubotClient.startCloudMethod(requestContract);
+    session = await ubotClient.startCloudMethod(requestContract, await createPayment(20));
 
     console.log("Session: " + session);
 
@@ -795,6 +830,44 @@ unit.test("ubot_pro_test: 2 cloud method", async () => {
     await shutdownUBots(ubotMains);
 });
 
+// unit.test("ubot_pro_test: 2 cloud method with executeCloudMethod waiting", async () => {
+//     let ubotMains = await createUBots(ubotsCount);
+//     let ubotClient = await new UBotTestClient("http://127.0.0.1", clientKey, TOPOLOGY_ROOT + TOPOLOGY_FILE).start();
+//
+//     let executableContract = await generateSecureRandomExecutableContract();
+//     let requestContract = await generateSecureRandomRequestContract(executableContract);
+//
+//     await ubotClient.startCloudMethod(requestContract, await createPayment(20));
+//
+//     await ubotClient.disconnectUbot();
+//
+//     // WAITING METHOD (READ RANDOM)
+//     requestContract = Contract.fromPrivateKey(userPrivKey);
+//     requestContract.state.data.method_name = "readRandom";
+//     requestContract.state.data.executable_contract_id = executableContract.id;
+//
+//     await cs.addConstraintToContract(requestContract, executableContract, "executable_contract_constraint",
+//         Constraint.TYPE_EXISTING_STATE, ["this.state.data.executable_contract_id == ref.id"], true);
+//
+//     console.log("WAITING METHOD (READ RANDOM)");
+//     let state = await ubotClient.executeCloudMethod(requestContract, await createPayment(20), true);
+//
+//     console.log("State: " + JSON.stringify(state));
+//
+//     assert(state.state === UBotPoolState.FINISHED.val);
+//
+//     // checking secure random value
+//     assert(typeof state.result.random === "number" && state.result.random >= 0 && state.result.random < 1000);
+//
+//     await ubotClient.shutdown();
+//
+//     // waiting pool finished...
+//     while (ubotMains.some(main => Array.from(main.ubot.processors.values()).some(proc => proc.state.canContinue)))
+//         await sleep(100);
+//
+//     await shutdownUBots(ubotMains);
+// });
+
 unit.test("ubot_pro_test: parallel cloud methods", async () => {
     let ubotMains = await createUBots(ubotsCount);
 
@@ -809,7 +882,7 @@ unit.test("ubot_pro_test: parallel cloud methods", async () => {
                     let executableContract = await generateSecureRandomExecutableContract();
                     let requestContract = await generateSecureRandomRequestContract(executableContract);
 
-                    let session = await ubotClient.startCloudMethod(requestContract);
+                    let session = await ubotClient.startCloudMethod(requestContract, await createPayment(20));
 
                     console.log("Session: " + session);
 
@@ -875,17 +948,6 @@ unit.test("ubot_pro_test: lottery", async () => {
     let ubotClient = await new UBotTestClient("http://127.0.0.1", clientKey, TOPOLOGY_ROOT + TOPOLOGY_FILE).start();
     let netClient = await new UBotClient(tk.getTestKey(), TOPOLOGY_ROOT + TOPOLOGY_FILE).start();
 
-    console.log("Register U...");
-    let U = await tt.createFreshU(100000000, [userPrivKey.publicKey]);
-    U.registerRole(new roles.SimpleRole("issuer", tk.getTestKey().longAddress));
-    await U.seal(true);
-
-    await U.addSignatureToSeal(tk.getTestKey());
-    let ir = await netClient.register(await U.getPackedTransaction(), 10000);
-
-    assert(ir.state === ItemState.APPROVED);
-    //registerParcelWithState
-
     const TICKETS = 10;
 
     // test token for payments
@@ -894,7 +956,7 @@ unit.test("ubot_pro_test: lottery", async () => {
     let origin = tokenContract.getOrigin();
 
     console.log("Register base token...");
-    ir = await netClient.register(await tokenContract.getPackedTransaction(), 10000);
+    let ir = await netClient.register(await tokenContract.getPackedTransaction(), 10000);
 
     assert(ir.state === ItemState.APPROVED);
 
@@ -983,7 +1045,7 @@ unit.test("ubot_pro_test: lottery", async () => {
         await cs.addConstraintToContract(buyContract, lotteryContract, "executable_contract_constraint",
             Constraint.TYPE_EXISTING_STATE, ["this.state.data.executable_contract_id == ref.id"], true);
 
-        let state = await ubotClient.executeCloudMethod(buyContract, true);
+        let state = await ubotClient.executeCloudMethod(buyContract, await createPayment(12), true);
 
         assert(state.state === UBotPoolState.FINISHED.val);
         assert(state.result === i);     // compare ticket number
@@ -998,7 +1060,7 @@ unit.test("ubot_pro_test: lottery", async () => {
         Constraint.TYPE_EXISTING_STATE, ["this.state.data.executable_contract_id == ref.id"], true);
 
     console.log("Raffle lottery...");
-    let state = await ubotClient.executeCloudMethod(raffleContract, true);
+    let state = await ubotClient.executeCloudMethod(raffleContract, await createPayment(50), true);
 
     assert(state.state === UBotPoolState.FINISHED.val);
 
@@ -1050,7 +1112,7 @@ unit.test("ubot_pro_test: execute cloud method with ubot delay", async () => {
 
     let errMessage = null;
     try {
-        await ubotClient.executeCloudMethod(badRequestContract, true);
+        await ubotClient.executeCloudMethod(badRequestContract, await createPayment(20), true);
     } catch (err) {
         errMessage = err.message;
     }
@@ -1070,7 +1132,7 @@ unit.test("ubot_pro_test: execute cloud method with ubot delay", async () => {
     await cs.addConstraintToContract(requestContract, executableContract, "executable_contract_constraint",
         Constraint.TYPE_EXISTING_STATE, ["this.state.data.executable_contract_id == ref.id"], true);
 
-    let state = await ubotClient.executeCloudMethod(requestContract, true);
+    let state = await ubotClient.executeCloudMethod(requestContract, await createPayment(20), true);
 
     console.log("State: " + JSON.stringify(state));
 
@@ -1092,146 +1154,146 @@ unit.test("ubot_pro_test: execute cloud method with ubot delay", async () => {
     await shutdownUBots(ubotMains);
 });
 
-unit.test("ubot_pro_test: launcher role", async () => {
-    /* let ubotMains = await createUBots(ubotsCount);
-
-    let ubotClient = await new UBotTestClient("http://127.0.0.1", clientKey, TOPOLOGY_ROOT + TOPOLOGY_FILE).start();
-
-    let executableContract = Contract.fromPrivateKey(userPrivKey);
-
-    let userKey1 = tk.TestKeys.getKey();
-    let userKey2 = tk.TestKeys.getKey();
-
-    executableContract.registerRole(new roles.SimpleRole("launcherRole1", userKey1));
-    executableContract.registerRole(new roles.SimpleRole("launcherRole2", userKey2));
-
-    executableContract.state.data.cloud_methods = {
-        method_for_launcher1: {
-            pool: {size: 8},
-            quorum: {size: 3},
-            launcher: "launcherRole1"
-        },
-        method_for_launcher2: {
-            pool: {size: 3},
-            quorum: {size: 2},
-            launcher: "launcherRole2"
-        },
-        method_for_any: {
-            pool: {size: 3},
-            quorum: {size: 2}
-        }
-    };
-
-    executableContract.state.data.js = await io.fileGetContentsAsString(TEST_CONTRACTS_PATH + "launcherRole.js");
-
-    await executableContract.seal();
-
-    // method_for_launcher1
-    let launcher1Contract = Contract.fromPrivateKey(userKey1);
-    launcher1Contract.state.data.method_name = "method_for_launcher1";
-    launcher1Contract.state.data.executable_contract_id = executableContract.id;
-    launcher1Contract.newItems.add(executableContract);
-
-    await cs.addConstraintToContract(launcher1Contract, executableContract, "executable_contract_constraint",
-        Constraint.TYPE_EXISTING_STATE, ["this.state.data.executable_contract_id == ref.id"], true);
-
-    await cs.addConstraintToContract(launcher1Contract, executableContract, "launcher_constraint",
-        Constraint.TYPE_EXISTING_STATE, ["this can_perform ref.state.roles.launcherRole1"], true);
-
-    console.log("method_for_launcher1...");
-
-    let state = await ubotClient.executeCloudMethod(launcher1Contract, true);
-
-    assert(state.state === UBotPoolState.FINISHED.val);
-
-    // checking contract
-    assert(state.result === 1);
-
-    //TODO negative test
-    launcher1Contract = Contract.fromPrivateKey(userPrivKey);
-    launcher1Contract.state.data.method_name = "method_for_launcher1";
-    launcher1Contract.state.data.executable_contract_id = executableContract.id;
-    launcher1Contract.newItems.add(executableContract);
-
-    await cs.addConstraintToContract(launcher1Contract, executableContract, "executable_contract_constraint",
-        Constraint.TYPE_EXISTING_STATE, ["this.state.data.executable_contract_id == ref.id"], true);
-
-    await cs.addConstraintToContract(launcher1Contract, executableContract, "launcher_constraint",
-        Constraint.TYPE_EXISTING_STATE, ["this can_perform ref.state.roles.launcherRole1"], true);
-
-    state = await ubotClient.executeCloudMethod(launcher1Contract, true);
-
-    assert(state.state === UBotPoolState.FINISHED.val);
-
-    // checking contract
-    assert(state.result === 1);
-
-    // method_for_launcher2
-    let launcher2Contract = Contract.fromPrivateKey(userKey2);
-    launcher2Contract.state.data.method_name = "method_for_launcher2";
-    launcher2Contract.state.data.executable_contract_id = executableContract.id;
-    launcher2Contract.newItems.add(executableContract);
-
-    await cs.addConstraintToContract(launcher2Contract, executableContract, "executable_contract_constraint",
-        Constraint.TYPE_EXISTING_STATE, ["this.state.data.executable_contract_id == ref.id"], true);
-
-    await cs.addConstraintToContract(launcher1Contract, executableContract, "launcher_constraint",
-        Constraint.TYPE_EXISTING_STATE, ["this can_perform ref.state.roles.launcherRole2"], true);
-
-    console.log("method_for_launcher2...");
-
-    state = await ubotClient.executeCloudMethod(launcher2Contract, true);
-
-    assert(state.state === UBotPoolState.FINISHED.val);
-
-    // checking contract
-    assert(state.result === 2);
-
-    // method_for_launcher2
-    //TODO negative test
-    launcher2Contract = Contract.fromPrivateKey(userKey1);
-    launcher2Contract.state.data.method_name = "method_for_launcher2";
-    launcher2Contract.state.data.executable_contract_id = executableContract.id;
-    launcher2Contract.newItems.add(executableContract);
-
-    await cs.addConstraintToContract(launcher2Contract, executableContract, "executable_contract_constraint",
-        Constraint.TYPE_EXISTING_STATE, ["this.state.data.executable_contract_id == ref.id"], true);
-
-    await cs.addConstraintToContract(launcher1Contract, executableContract, "launcher_constraint",
-        Constraint.TYPE_EXISTING_STATE, ["this can_perform ref.state.roles.launcherRole2"], true);
-
-    console.log("method_for_launcher2...");
-
-    state = await ubotClient.executeCloudMethod(launcher2Contract, true);
-
-    assert(state.state === UBotPoolState.FINISHED.val);
-
-    // checking contract
-    assert(state.result === 2);
-
-    // method_for_any
-    let anyContract = Contract.fromPrivateKey(userKey1);
-    anyContract.state.data.method_name = "method_for_any";
-    anyContract.state.data.executable_contract_id = executableContract.id;
-    anyContract.newItems.add(executableContract);
-
-    await cs.addConstraintToContract(anyContract, executableContract, "executable_contract_constraint",
-        Constraint.TYPE_EXISTING_STATE, ["this.state.data.executable_contract_id == ref.id"], true);
-
-    console.log("method_for_any...");
-
-    state = await ubotClient.executeCloudMethod(anyContract, true);
-
-    assert(state.state === UBotPoolState.FINISHED.val);
-
-    // checking contract
-    assert(state.result === 3);
-
-    await ubotClient.shutdown();
-
-    // waiting pool finished...
-    while (ubotMains.some(main => Array.from(main.ubot.processors.values()).some(proc => proc.state.canContinue)))
-        await sleep(100);
-
-    await shutdownUBots(ubotMains); */
-});
+// unit.test("ubot_pro_test: launcher role", async () => {
+//     let ubotMains = await createUBots(ubotsCount);
+//
+//     let ubotClient = await new UBotTestClient("http://127.0.0.1", clientKey, TOPOLOGY_ROOT + TOPOLOGY_FILE).start();
+//
+//     let executableContract = Contract.fromPrivateKey(userPrivKey);
+//
+//     let userKey1 = tk.TestKeys.getKey();
+//     let userKey2 = tk.TestKeys.getKey();
+//
+//     executableContract.registerRole(new roles.SimpleRole("launcherRole1", userKey1));
+//     executableContract.registerRole(new roles.SimpleRole("launcherRole2", userKey2));
+//
+//     executableContract.state.data.cloud_methods = {
+//         method_for_launcher1: {
+//             pool: {size: 8},
+//             quorum: {size: 3},
+//             launcher: "launcherRole1"
+//         },
+//         method_for_launcher2: {
+//             pool: {size: 3},
+//             quorum: {size: 2},
+//             launcher: "launcherRole2"
+//         },
+//         method_for_any: {
+//             pool: {size: 3},
+//             quorum: {size: 2}
+//         }
+//     };
+//
+//     executableContract.state.data.js = await io.fileGetContentsAsString(TEST_CONTRACTS_PATH + "launcherRole.js");
+//
+//     await executableContract.seal();
+//
+//     // method_for_launcher1
+//     let launcher1Contract = Contract.fromPrivateKey(userKey1);
+//     launcher1Contract.state.data.method_name = "method_for_launcher1";
+//     launcher1Contract.state.data.executable_contract_id = executableContract.id;
+//     launcher1Contract.newItems.add(executableContract);
+//
+//     await cs.addConstraintToContract(launcher1Contract, executableContract, "executable_contract_constraint",
+//         Constraint.TYPE_EXISTING_STATE, ["this.state.data.executable_contract_id == ref.id"], true);
+//
+//     await cs.addConstraintToContract(launcher1Contract, executableContract, "launcher_constraint",
+//         Constraint.TYPE_EXISTING_STATE, ["this can_perform ref.state.roles.launcherRole1"], true);
+//
+//     console.log("method_for_launcher1...");
+//
+//     let state = await ubotClient.executeCloudMethod(launcher1Contract, true);
+//
+//     assert(state.state === UBotPoolState.FINISHED.val);
+//
+//     // checking contract
+//     assert(state.result === 1);
+//
+//     //TODO negative test
+//     launcher1Contract = Contract.fromPrivateKey(userPrivKey);
+//     launcher1Contract.state.data.method_name = "method_for_launcher1";
+//     launcher1Contract.state.data.executable_contract_id = executableContract.id;
+//     launcher1Contract.newItems.add(executableContract);
+//
+//     await cs.addConstraintToContract(launcher1Contract, executableContract, "executable_contract_constraint",
+//         Constraint.TYPE_EXISTING_STATE, ["this.state.data.executable_contract_id == ref.id"], true);
+//
+//     await cs.addConstraintToContract(launcher1Contract, executableContract, "launcher_constraint",
+//         Constraint.TYPE_EXISTING_STATE, ["this can_perform ref.state.roles.launcherRole1"], true);
+//
+//     state = await ubotClient.executeCloudMethod(launcher1Contract, true);
+//
+//     assert(state.state === UBotPoolState.FINISHED.val);
+//
+//     // checking contract
+//     assert(state.result === 1);
+//
+//     // method_for_launcher2
+//     let launcher2Contract = Contract.fromPrivateKey(userKey2);
+//     launcher2Contract.state.data.method_name = "method_for_launcher2";
+//     launcher2Contract.state.data.executable_contract_id = executableContract.id;
+//     launcher2Contract.newItems.add(executableContract);
+//
+//     await cs.addConstraintToContract(launcher2Contract, executableContract, "executable_contract_constraint",
+//         Constraint.TYPE_EXISTING_STATE, ["this.state.data.executable_contract_id == ref.id"], true);
+//
+//     await cs.addConstraintToContract(launcher1Contract, executableContract, "launcher_constraint",
+//         Constraint.TYPE_EXISTING_STATE, ["this can_perform ref.state.roles.launcherRole2"], true);
+//
+//     console.log("method_for_launcher2...");
+//
+//     state = await ubotClient.executeCloudMethod(launcher2Contract, true);
+//
+//     assert(state.state === UBotPoolState.FINISHED.val);
+//
+//     // checking contract
+//     assert(state.result === 2);
+//
+//     // method_for_launcher2
+//     //TODO negative test
+//     launcher2Contract = Contract.fromPrivateKey(userKey1);
+//     launcher2Contract.state.data.method_name = "method_for_launcher2";
+//     launcher2Contract.state.data.executable_contract_id = executableContract.id;
+//     launcher2Contract.newItems.add(executableContract);
+//
+//     await cs.addConstraintToContract(launcher2Contract, executableContract, "executable_contract_constraint",
+//         Constraint.TYPE_EXISTING_STATE, ["this.state.data.executable_contract_id == ref.id"], true);
+//
+//     await cs.addConstraintToContract(launcher1Contract, executableContract, "launcher_constraint",
+//         Constraint.TYPE_EXISTING_STATE, ["this can_perform ref.state.roles.launcherRole2"], true);
+//
+//     console.log("method_for_launcher2...");
+//
+//     state = await ubotClient.executeCloudMethod(launcher2Contract, true);
+//
+//     assert(state.state === UBotPoolState.FINISHED.val);
+//
+//     // checking contract
+//     assert(state.result === 2);
+//
+//     // method_for_any
+//     let anyContract = Contract.fromPrivateKey(userKey1);
+//     anyContract.state.data.method_name = "method_for_any";
+//     anyContract.state.data.executable_contract_id = executableContract.id;
+//     anyContract.newItems.add(executableContract);
+//
+//     await cs.addConstraintToContract(anyContract, executableContract, "executable_contract_constraint",
+//         Constraint.TYPE_EXISTING_STATE, ["this.state.data.executable_contract_id == ref.id"], true);
+//
+//     console.log("method_for_any...");
+//
+//     state = await ubotClient.executeCloudMethod(anyContract, true);
+//
+//     assert(state.state === UBotPoolState.FINISHED.val);
+//
+//     // checking contract
+//     assert(state.result === 3);
+//
+//     await ubotClient.shutdown();
+//
+//     // waiting pool finished...
+//     while (ubotMains.some(main => Array.from(main.ubot.processors.values()).some(proc => proc.state.canContinue)))
+//         await sleep(100);
+//
+//     await shutdownUBots(ubotMains);
+// });

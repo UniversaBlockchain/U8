@@ -28,6 +28,7 @@ class UBotSession {
         this.closeVotes = session.closeVotes;
         this.executableContractId = executableContractId;
         this.ubot = ubot;
+        this.quantaLimit = session.quantaLimit;
     }
 
     async updateStorage(hash, multi) {

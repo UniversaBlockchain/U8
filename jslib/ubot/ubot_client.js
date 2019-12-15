@@ -11,6 +11,7 @@ const UBotPoolState = require("ubot/ubot_pool_state").UBotPoolState;
 const UBotConfig = require("ubot/ubot_config").UBotConfig;
 const UBotClientException = require("ubot/ubot_exceptions").UBotClientException;
 const ItemResult = require('itemresult').ItemResult;
+const ItemState = require('itemstate').ItemState;
 const Lock = require("lock").Lock;
 const BossBiMapper = require("bossbimapper").BossBiMapper;
 const Boss = require('boss.js');
@@ -137,6 +138,17 @@ class UBotClient {
         return URL;
     }
 
+    async initTopology(ubotRegistry) {
+        this.topologyUBotNet = ubotRegistry.state.data.topology;
+
+        this.topologyUBotNet.forEach(topologyItem => {
+            let keyString = topologyItem.key;
+            topologyItem.key = atob(topologyItem.key.replace(/\s/g, ""));
+            this.ubots.push(new NodeRecord(topologyItem));
+            topologyItem.key = keyString;
+        });
+    }
+
     /**
      * Connects to a random UBot from the session pool.
      *
@@ -146,15 +158,8 @@ class UBotClient {
      * @return {Promise<void>}.
      */
     async connectRandomUbot(pool) {
-        if (this.topologyUBotNet == null)
+        if (this.topologyUBotNet == null || this.ubots.length === 0)
             throw new UBotClientException("UBotNet topology not initialized");
-
-        this.topologyUBotNet.forEach(topologyItem => {
-            let keyString = topologyItem.key;
-            topologyItem.key = atob(topologyItem.key.replace(/\s/g, ""));
-            this.ubots.push(new NodeRecord(topologyItem));
-            topologyItem.key = keyString;
-        });
 
         let random = pool[Math.floor(Math.random() * pool.length)];
 
@@ -347,17 +352,105 @@ class UBotClient {
     }
 
     /**
+     * Get the processing state of paid operation.
+     *
+     * @param operationId - Id of the paid operation to get state of
+     * @return processing state of the paid operation
+     * @throws UBotClientException
+     */
+    async getPaidOperationProcessingState(operationId) {
+        let result = await new Promise(async (resolve, reject) =>
+            await this.httpNodeClient.command("getPaidOperationProcessingState", {operationId: operationId},
+                result => resolve(result),
+                error => reject(error)
+            )
+        );
+
+        let message = "UBotClient.getPaidOperationProcessingState state: " + result.processingState.state;
+        if (this.logger != null)
+            this.logger.log(message);
+        else
+            console.log(message);
+
+        return ParcelProcessingState.byVal.get(result.processingState.state);
+    }
+
+    /**
+     * Process paid operation before creating session.
+     *
+     * @private
+     * @param {Object} params - Parameters fro command "ubotCreateSessionPaid".
+     * @param {HashId} paymentId - ID of payment contract.
+     * @throws UBotClientException
+     * @async
+     * @return {boolean} Paid operation result.
+     */
+    async processPaidOperation(params, paymentId) {
+        let paidOperationResult = await new Promise(async (resolve, reject) =>
+            await this.httpNodeClient.command("ubotCreateSessionPaid", params,
+                result => resolve(result),
+                error => reject(error)
+            )
+        );
+
+        let message = "UBotClient.processPaidOperation ubotCreateSessionPaid result: " + JSON.stringify(paidOperationResult, (key, value) => {
+            if ((key === "paidOperationId") && value != null && value instanceof crypto.HashId)
+                return value.toString();
+            else
+                return value;
+        });
+        if (this.logger != null)
+            this.logger.log(message);
+        else
+            console.log(message);
+
+        if (!paidOperationResult.result)
+            throw new UBotClientException("ubotCreateSessionPaid failed");
+
+        while ((await this.getPaidOperationProcessingState(paidOperationResult.paidOperationId)).isProcessing)
+            await sleep(100);
+
+        let lastResult = await this.getState(paymentId);
+        while (lastResult.state.isPending) {
+            await sleep(100);
+            lastResult = await this.getState(paymentId);
+        }
+
+        if (lastResult.state === ItemState.DECLINED)
+            throw new UBotClientException("ubotCreateSessionPaid payment is DECLINED");
+
+        return lastResult.state === ItemState.APPROVED;
+    }
+
+    /**
      * Creates a new session for the cloud method.
      *
      * @private
      * @param {Contract} requestContract - The Request contract.
+     * @param {Contract | null} payment - The payment contract.
      * @param {boolean} waitPreviousSession=false - Wait for the previous session, if true.
      * @async
      * @return {UBotSession} session.
      */
-    async createSession(requestContract, waitPreviousSession = false) {
+    async createSession(requestContract, payment, waitPreviousSession = false) {
         let params = {packedRequest: await requestContract.getPackedTransaction()};
-        let session = await this.getSession("ubotCreateSession", params);
+        let session = null;
+        if (payment != null) {
+            params.packedU = await payment.getPackedTransaction();
+
+            let result;
+            while (!(result = await this.processPaidOperation(params, payment.id)) && waitPreviousSession)
+                await sleep(UBotConfig.waitPeriod * 10);
+
+            if (!waitPreviousSession && !result)
+                throw new UBotClientException("Paid operation is not processed");
+            waitPreviousSession = false;
+
+            while (session == null || session.state == null)
+                session = await this.getSession("ubotGetSession",
+                    {executableContractId: requestContract.state.data.executable_contract_id});
+        } else
+            session = await this.getSession("ubotCreateSession", params);
 
         if (session == null || session.state == null)
             throw new UBotClientException("Session is null");
@@ -441,7 +534,6 @@ class UBotClient {
      * @param {HashId} itemId - To get state by itemId.
      * @async
      * @return known {ItemState} if exist or ItemState.UNDEFINED.
-     * @throws ClientError
      */
     async getState(itemId) {
         let result = await new Promise(async (resolve, reject) =>
@@ -541,7 +633,7 @@ class UBotClient {
             )
         );
 
-        return ParcelProcessingState.byVal(result.processingState.state);
+        return ParcelProcessingState.byVal.get(result.processingState.state);
     }
 
     /**
@@ -747,6 +839,7 @@ class UBotClient {
      * which he runs the cloud method.
      *
      * @param {Contract} requestContract - The Request contract.
+     * @param {Contract | null} payment - The payment contract.
      * @param {boolean} waitPreviousSession - Wait finished previous session or return his and exit.
      *      If true - repeated attempts to start the cloud method after 1 second if the session is in OPERATIONAL mode or
      *      100 ms if the session is in CLOSING mode. By default - false.
@@ -754,17 +847,18 @@ class UBotClient {
      * @return {UBotSession} session.
      * @throws {UBotClientException} client exception if cloud method can`t started.
      */
-    async startCloudMethod(requestContract, waitPreviousSession = false) {
+    async startCloudMethod(requestContract, payment, waitPreviousSession = false) {
         if (this.httpUbotClient != null)
             throw new UBotClientException("Ubot is connected to the pool. First disconnect from the pool");
 
         // get ubot registry and topology
         let ubotRegistry = await Contract.fromSealedBinary(await this.getUBotRegistryContract());
-        this.topologyUBotNet = ubotRegistry.state.data.topology;
+        if (this.topologyUBotNet == null)
+            await this.initTopology(ubotRegistry);
 
         this.checkRequest(requestContract, ubotRegistry);
 
-        let session = await this.createSession(requestContract, waitPreviousSession);
+        let session = await this.createSession(requestContract, payment, waitPreviousSession);
 
         await this.connectRandomUbot(session.pool);
 
@@ -787,6 +881,7 @@ class UBotClient {
      * Start cloud method (@see startCloudMethod) and wait it finished.
      *
      * @param {Contract} requestContract - The Request contract.
+     * @param {Contract | null} payment - The payment contract.
      * @param {boolean} waitPreviousSession - Wait finished previous session or return his and exit.
      *      If true - repeated attempts to start the cloud method after 1 second if the session is in OPERATIONAL mode or
      *      100 ms if the session is in CLOSING mode. By default - false.
@@ -797,7 +892,7 @@ class UBotClient {
      *      errors - error list.
      * @throws {UBotClientException} client exception if session pool consensus is not reached.
      */
-    async executeCloudMethod(requestContract, waitPreviousSession = false) {
+    async executeCloudMethod(requestContract, payment, waitPreviousSession = false) {
         if (this.httpUbotClient != null) {
             if (waitPreviousSession) {
                 // wait closing requests
@@ -807,7 +902,7 @@ class UBotClient {
                 throw new UBotClientException("Ubot is already connected to the pool (previous request. Wait disconnect from the pool or force disconnect");
         }
 
-        let session = await this.startCloudMethod(requestContract, waitPreviousSession);
+        let session = await this.startCloudMethod(requestContract, payment, waitPreviousSession);
 
         let quorum = this.poolAndQuorum.quorum;
         let states = [];
@@ -1013,6 +1108,26 @@ class UBotClient {
 
         await Promise.all(Array.from(this.httpUbotClients.values()).map(client => client.stop()));
         this.httpUbotClients.clear();
+    }
+
+    async pingUBot(from, to, timeout) {
+        if (this.httpUbotClient != null)
+            throw new UBotClientException("Ubot is connected to the pool. First disconnect from the pool");
+
+        if (this.topologyUBotNet == null) {
+            // get ubot registry and topology
+            let ubotRegistry = await Contract.fromSealedBinary(await this.getUBotRegistryContract());
+            await this.initTopology(ubotRegistry);
+        }
+
+        let client = await this.connectUbot(from);
+
+        return await new Promise(async (resolve, reject) =>
+            await client.command("pingUBot", {ubotNumber: to, timeoutMillis: timeout},
+                result => resolve(result),
+                error => reject(error)
+            )
+        );
     }
 }
 

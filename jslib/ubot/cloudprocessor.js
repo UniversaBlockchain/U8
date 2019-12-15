@@ -37,7 +37,7 @@ class CloudProcessor {
         this.userHttpClient = null;
 
         this.quantiser = new UBotQuantiser();
-        this.quantiser.reset(700);      // TODO: get limit from session
+        this.quantiser.reset(this.session.quantaLimit / this.session.pool.length);
 
         try {
             this.quantiser.addWorkCost(UBotQuantiserProcesses.PRICE_START_CLOUD_METHOD);
