@@ -182,11 +182,11 @@ class UBotNetwork {
             this.pingWaiters[id] = ae;
             let start = Date.now();
             this.adapter.send(toNumber, w.get());
-            await ae.await(timeoutMills);
-            let end = Date.now();
-            if(ae.fired) {
-                return end-start;
-            } else {
+            try {
+                await ae.await(timeoutMills);
+                let end = Date.now();
+                return end - start;
+            } catch (e) {
                 return -1;
             }
         } else
