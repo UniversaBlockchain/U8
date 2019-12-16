@@ -303,7 +303,7 @@ void JsScripterWrap_getProcessorTime(const FunctionCallbackInfo<Value> &args) {
 #ifdef __APPLE__
             ac.setReturnValue(0);
             return;
-#endif
+#else
             auto pws = unwrap<WorkerScripter>(ac.args.This());
 
             timespec ts;
@@ -312,6 +312,7 @@ void JsScripterWrap_getProcessorTime(const FunctionCallbackInfo<Value> &args) {
 
             ac.setReturnValue(time);
             return;
+#endif
         }
         ac.throwError("invalid number of arguments");
     });
