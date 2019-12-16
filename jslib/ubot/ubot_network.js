@@ -211,8 +211,16 @@ class UBotNetwork {
             try {
                 let client = new HttpClient("");
                 let start = Date.now();
+                let pingParameter = Math.random().toFixed(6);
                 let url = this.netConfig.getInfo(toNumber).serverUrlString()+"/ping";
-                client.sendGetRequestUrl(url, () => resolve(Date.now() - start));
+                client.sendMultipartRequestUrl(url, "POST", {param:pingParameter}, {}, (respCode, body) => {
+                    if (respCode === 200) {
+                        let resp = utf8Decode(body);
+                        if (resp.includes(pingParameter))
+                            resolve(Date.now() - start);
+                    }
+                    resolve(-1);
+                });
             } catch (e) {
                 resolve(-1);
             }
