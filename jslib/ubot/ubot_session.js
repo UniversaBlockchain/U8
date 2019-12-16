@@ -33,7 +33,7 @@ class UBotSession {
 
     async updateStorage(hash, multi) {
         if (this.ubot != null)
-            this.ubot.logger.log("UBotProcess_writeMultiStorage... UBotSession.updateStorage hash = " + hash);
+            this.ubot.logger.log("UBotProcess_write" + (multi ? "Multi" : "Single") + "Storage... UBotSession.updateStorage hash = " + hash);
 
         let storageName = multi ? "default_multi" : "default_single";
         let fromValue = null;
