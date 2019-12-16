@@ -209,14 +209,10 @@ class UBotNetwork {
         let tcpPingRequest = new Promise(async resolve => {
             let client = null;
             try {
-                let client = new HttpClient(this.netConfig.getInfo(toNumber).serverUrlString());
-                await client.start(this.myKey, this.netConfig.getInfo(toNumber).publicKey, null);
-
+                let client = new HttpClient("");
                 let start = Date.now();
-                await client.command("sping", {},
-                    () => resolve(Date.now() - start),
-                    () => resolve(-1)
-                );
+                let url = this.netConfig.getInfo(toNumber).serverUrlString()+"/ping";
+                client.sendGetRequestUrl(url, () => resolve(Date.now() - start));
             } catch (e) {
                 resolve(-1);
             }

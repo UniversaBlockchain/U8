@@ -29,6 +29,7 @@ class UBotHttpServer extends network.HttpServer {
         this.addRawEndpoint("/getMultiStorageResult", request => this.onGetStorageResult(request, true));
         this.addRawEndpoint("/downloadActualSingleStorageResult", request => this.onDownloadActualStorageResult(request, false));
         this.addRawEndpoint("/downloadActualMultiStorageResult", request => this.onDownloadActualStorageResult(request, true));
+        this.addRawEndpoint("/ping", request => this.onPing(request));
 
         super.startServer();
     }
@@ -146,6 +147,11 @@ class UBotHttpServer extends network.HttpServer {
         else
             request.setStatusCode(204);
 
+        request.sendAnswer();
+    }
+
+    async onPing(request) {
+        request.setAnswerBody(request.requestBody);
         request.sendAnswer();
     }
 }
