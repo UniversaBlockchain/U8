@@ -23,7 +23,6 @@ const tt = require("test_tools");
 const TOPOLOGY_ROOT = "../jslib/ubot/topology/";
 const TOPOLOGY_FILE = "mainnet_topology.json";
 const TEST_CONTRACTS_PATH = "../jslib/ubot/executable_contracts/";
-const ubotsCount = 30;
 
 const clientKey = tk.TestKeys.getKey();
 const userPrivKey = tk.TestKeys.getKey();
@@ -376,10 +375,10 @@ unit.test("ubot_main_test: pool and quorum percentage", async () => {
 
     poolAndQuorum = ut.getPoolAndQuorum(requestContract, registryContract);
 
-    console.log("Pool: " + poolAndQuorum.pool + " === " + Math.ceil(ubotsCount * 20 / 100));
+    console.log("Pool: " + poolAndQuorum.pool + " === " + Math.ceil(registryContract.state.roles.ubots.roles.length * 20 / 100));
     console.log("Quorum: " + poolAndQuorum.quorum + " === " + Math.ceil(poolAndQuorum.pool * 80 / 100));
 
-    assert(poolAndQuorum.pool === Math.ceil(ubotsCount * 20 / 100));
+    assert(poolAndQuorum.pool === Math.ceil(registryContract.state.roles.ubots.roles.length * 20 / 100));
     assert(poolAndQuorum.quorum === Math.ceil(poolAndQuorum.pool * 80 / 100));
 
     state = await ubotClient.executeCloudMethod(requestContract, await createPayment(20), true);
@@ -819,7 +818,7 @@ unit.test("ubot_main_test: execute cloud method with ubot delay", async () => {
     await ubotClient.shutdown();
 });
 
-unit.test("ubot_main_test: sequential launch ", async () => {
+unit.test("ubot_main_test: sequential launch", async () => {
 
     let ubotClient = await new UBotClient(clientKey, TOPOLOGY_ROOT + TOPOLOGY_FILE).start();
 
