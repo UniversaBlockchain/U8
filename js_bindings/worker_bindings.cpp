@@ -300,6 +300,10 @@ void JsScripterWrap_release(const FunctionCallbackInfo<Value> &args) {
 void JsScripterWrap_getProcessorTime(const FunctionCallbackInfo<Value> &args) {
     Scripter::unwrapArgs(args, [](ArgsContext &ac) {
         if (ac.args.Length() == 0) {
+#ifdef __APPLE__
+            ac.setReturnValue(0);
+            return;
+#endif
             auto pws = unwrap<WorkerScripter>(ac.args.This());
 
             timespec ts;
