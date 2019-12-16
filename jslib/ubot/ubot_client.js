@@ -163,11 +163,10 @@ class UBotClient {
 
         let random = pool[Math.floor(Math.random() * pool.length)];
 
-        if (this.topologyUBotNet[random].number !== random)
-            this.topologyUBotNet.forEach((topologyItem, i) => {
-                if (topologyItem.number === random)
-                    random = i;
-            });
+        this.topologyUBotNet.forEach((topologyItem, i) => {
+            if (topologyItem.number === random)
+                random = i;
+        });
 
         let randomUbot = this.ubots[random];
 
@@ -191,11 +190,10 @@ class UBotClient {
         if (this.topologyUBotNet == null || this.ubots.length === 0)
             throw new UBotClientException("UBotNet topology not initialized");
 
-        if (this.topologyUBotNet[ubotNumber].number !== ubotNumber)
-            this.topologyUBotNet.forEach((topologyItem, i) => {
-                if (topologyItem.number === ubotNumber)
-                    ubotNumber = i;
-            });
+        this.topologyUBotNet.forEach((topologyItem, i) => {
+            if (topologyItem.number === ubotNumber)
+                ubotNumber = i;
+        });
 
         let ubot = this.ubots[ubotNumber];
 
