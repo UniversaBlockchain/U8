@@ -95,7 +95,9 @@ void InitWorkerPools(int accessLevel0_poolSize, int accessLevel1_poolSize) {
                     sem.notify();
                     pws->se->runMainLoop(true);
                 });
+#ifndef __APPLE__
                 pthread_getcpuclockid(pws->loopThread->native_handle() , &pws->clockId);
+#endif
                 sem.wait();
                 workersPool_accessLevel0.push_back(pws);
             }
@@ -111,7 +113,9 @@ void InitWorkerPools(int accessLevel0_poolSize, int accessLevel1_poolSize) {
                     sem.notify();
                     pws->se->runMainLoop(true);
                 });
+#ifndef __APPLE__
                 pthread_getcpuclockid(pws->loopThread->native_handle() , &pws->clockId);
+#endif
                 sem.wait();
                 workersPool_accessLevel1.push_back(pws);
             }
