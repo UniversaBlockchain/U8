@@ -235,7 +235,9 @@ unit.test("ubot_pro_test: ping", async () => {
     let ubotMains = await createUBots(ubotsCount);
     let ubotClient = await new UBotTestClient("http://127.0.0.1", clientKey, TOPOLOGY_ROOT + TOPOLOGY_FILE).start();
 
-    let result = await ubotClient.pingUBot(5, 10, 5000);
+    //await ubotMains[10].shutdown();
+
+    let result = await ubotClient.pingUBot(5, 10);
 
     console.log("Ping result: " + JSON.stringify(result));
 

@@ -1110,7 +1110,7 @@ class UBotClient {
         this.httpUbotClients.clear();
     }
 
-    async pingUBot(from, to, timeout) {
+    async pingUBot(from, to, timeout = 1500) {
         if (this.httpUbotClient != null)
             throw new UBotClientException("Ubot is connected to the pool. First disconnect from the pool");
 
