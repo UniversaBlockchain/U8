@@ -121,7 +121,7 @@ network.NodeInfo = class {
     serverUrlString() {
         return this.publicHost === "localhost" ?
             "http://localhost:" + this.clientAddress.port :
-            "http://" + (this.hostV6 != null ? "[" + this.hostV6 + "]" : this.host) + ":" + this.publicPort;
+            "http://" + ((this.hostV6 != null && this.hostV6 !== "null") ? "[" + this.hostV6 + "]" : this.host) + ":" + this.publicPort;
     }
 
     domainUrlStringV4() {
