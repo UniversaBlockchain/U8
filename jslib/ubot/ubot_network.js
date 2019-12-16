@@ -170,52 +170,61 @@ class UBotNetwork {
         }
     }
 
-    async pingUbot(toNumber,timeoutMills = 1000) {
+    async pingUbot(toNumber,timeoutMills = 1500) {
         let id = Math.random().toFixed(6);
         let w = new BossStreams.Writer();
         w.write(PACKET_TYPE_PING);
         w.write(this.myInfo.number);
         w.write(id);
 
-        let udpResult = -1;
-        if (this.adapter != null) {
-            let ae = new AsyncEvent();
-            this.pingWaiters[id] = ae;
-            let start = Date.now();
-            this.adapter.send(toNumber, w.get());
-            try {
-                await ae.await(timeoutMills);
-                let end = Date.now();
-                udpResult = end - start;
-            } catch (e) {
-                udpResult = -1;
-            }
-        } else
-            this.report("UDPAdapter is null", VerboseLevel.DETAILED);
-
-        let client = null;
-        let tcpResult = -1;
-        try {
-            let client = new HttpClient(this.netConfig.getInfo(toNumber).serverUrlString());
-            await client.start(this.myKey, this.netConfig.getInfo(toNumber).publicKey, null);
-
-            let start = Date.now();
-            tcpResult = await new Promise(async (resolve) => {
-                try {
-                    await client.command("sping", {},
-                        () => resolve(Date.now() - start),
-                        () => resolve(-1)
-                    );
-                } catch (e) {
-                    resolve(-1);
-                }
-            });
-        } catch (e) {
+        let udpPingTimeout = new Promise(async resolve => {
+            await sleep(timeoutMills);
             resolve(-1);
-        }
+        });
+        let udpPingRequest = new Promise(async resolve => {
+            if (this.adapter != null) {
+                let ae = new AsyncEvent();
+                this.pingWaiters[id] = ae;
+                let start = Date.now();
+                let res = -1;
+                this.adapter.send(toNumber, w.get());
+                try {
+                    await ae.await(timeoutMills);
+                    let end = Date.now();
+                    res = end - start;
+                } catch (e) {
+                    res = -1;
+                }
+                resolve(res);
+            } else {
+                this.report("UDPAdapter is null", VerboseLevel.DETAILED);
+            }
+        });
+        let udpResult = await Promise.race([udpPingTimeout, udpPingRequest]);
 
-        if (client != null)
-            await client.stop();
+        let tcpPingTimeout = new Promise(async resolve => {
+            await sleep(timeoutMills);
+            resolve(-1);
+        });
+        let tcpPingRequest = new Promise(async resolve => {
+            let client = null;
+            try {
+                let client = new HttpClient(this.netConfig.getInfo(toNumber).serverUrlString());
+                await client.start(this.myKey, this.netConfig.getInfo(toNumber).publicKey, null);
+
+                let start = Date.now();
+                await client.command("sping", {},
+                    () => resolve(Date.now() - start),
+                    () => resolve(-1)
+                );
+            } catch (e) {
+                resolve(-1);
+            }
+
+            if (client != null)
+                await client.stop();
+        });
+        let tcpResult = await Promise.race([tcpPingTimeout, tcpPingRequest]);
 
         return {UDP: udpResult, TCP: tcpResult};
     }
