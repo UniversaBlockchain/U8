@@ -72,35 +72,37 @@ class UBot {
      * @param notification UBotCloudNotification
      */
     async onCloudNotify(notification) {
-        await this.lock.synchronize(notification.poolId, async () => {
-            if (this.processors.has(notification.poolId.base64)) {
-                await this.processors.get(notification.poolId.base64).onNotify(notification);
+        if (this.processors.has(notification.poolId.base64)) {
+            await this.processors.get(notification.poolId.base64).onNotify(notification);
 
-            } else if (notification instanceof UBotCloudNotification &&
-                notification.type === UBotCloudNotification.types.DOWNLOAD_STARTING_CONTRACT && !notification.isAnswer) {
+        } else if (notification instanceof UBotCloudNotification &&
+            notification.type === UBotCloudNotification.types.DOWNLOAD_STARTING_CONTRACT && !notification.isAnswer) {
 
-                if (this.client == null)
-                    this.client = await new UBotClient(this.nodeKey, this.configRoot + TOPOLOGY_FILE, null,
-                        UBotConfig.clientMaxWaitSession, this.logger).start();
+            await this.lock.synchronize(notification.poolId, async () => {
+                if (!this.processors.has(notification.poolId.base64)) {
+                    if (this.client == null)
+                        this.client = await new UBotClient(this.nodeKey, this.configRoot + TOPOLOGY_FILE, null,
+                            UBotConfig.clientMaxWaitSession, this.logger).start();
 
-                let session = null;
-                try {
-                    session = await this.client.checkSession(notification.executableContractId, notification.poolId, this.network.myInfo.number, this);
-                } catch (err) {
-                    this.logger.log("Error: check session failed, ubot is not started by notification: " + notification.poolId +
-                        ", message: " + err.message);
-                    return;
+                    let session = null;
+                    try {
+                        session = await this.client.checkSession(notification.executableContractId, notification.poolId, this.network.myInfo.number, this);
+                    } catch (err) {
+                        this.logger.log("Error: check session failed, ubot is not started by notification: " + notification.poolId +
+                            ", message: " + err.message);
+                        return;
+                    }
+
+                    this.logger.log("onCloudNotify session checked: " + session);
+
+                    let processor = new CloudProcessor(UBotPoolState.INIT, notification.poolId, this, session);
+                    processor.onNotifyInit(notification);
+                    this.processors.set(notification.poolId.base64, processor);
                 }
+            });
 
-                this.logger.log("onCloudNotify session checked: " + session);
-
-                let processor = new CloudProcessor(UBotPoolState.INIT, notification.poolId, this, session);
-                processor.onNotifyInit(notification);
-                this.processors.set(notification.poolId.base64, processor);
-
-            } else
-                this.logger.log("Warning: unknown notification. Type = " + notification.type.ordinal + ", Type code = " + notification.typeCode);
-        });
+        } else
+            this.logger.log("Warning: unknown notification. Type = " + notification.type.ordinal + ", Type code = " + notification.typeCode);
     }
 
     getRequestContract(hashId) {
