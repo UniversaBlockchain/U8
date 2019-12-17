@@ -13,7 +13,6 @@ import {ExecutorWithFixedPeriod} from "executorservice";
 const UBotMain = require("ubot/ubot_main").UBotMain;
 const UBotPoolState = require("ubot/ubot_pool_state").UBotPoolState;
 const UBotClient = require('ubot/ubot_client').UBotClient;
-const UBotTestClient = require('ubot/ubot_client').UBotTestClient;
 const UBotConfig = require("ubot/ubot_config").UBotConfig;
 const ItemResult = require('itemresult').ItemResult;
 const ItemState = require("itemstate").ItemState;
@@ -167,7 +166,7 @@ async function generateSimpleRegisterRequestContract(executableContract, contrac
 //
 //     let ubotMains = await createUBots(ubotsCount);
 //     for (let i = 0; i < 10; i++) {
-//         let ubotClient = await new UBotTestClient("http://127.0.0.1", clientKey, TOPOLOGY_ROOT + TOPOLOGY_FILE).start();
+//         let ubotClient = await new UBotClient(clientKey, TOPOLOGY_ROOT + TOPOLOGY_FILE).start();
 //
 //         let executableContract = await generateSecureRandomExecutableContract();
 //
@@ -226,14 +225,14 @@ async function generateSimpleRegisterRequestContract(executableContract, contrac
 // });
 
 unit.test("ubot_pro_test: start client", async () => {
-    let ubotClient = await new UBotTestClient("http://127.0.0.1", clientKey, TOPOLOGY_ROOT + TOPOLOGY_FILE).start();
+    let ubotClient = await new UBotClient(clientKey, TOPOLOGY_ROOT + TOPOLOGY_FILE).start();
 
     await ubotClient.shutdown();
 });
 
 unit.test("ubot_pro_test: ping", async () => {
     let ubotMains = await createUBots(ubotsCount);
-    let ubotClient = await new UBotTestClient("http://127.0.0.1", clientKey, TOPOLOGY_ROOT + TOPOLOGY_FILE).start();
+    let ubotClient = await new UBotClient(clientKey, TOPOLOGY_ROOT + TOPOLOGY_FILE).start();
 
     //await ubotMains[10].shutdown();
 
@@ -254,7 +253,7 @@ unit.test("ubot_pro_test: start cloud method", async () => {
     // for (let i = 0; i < 10; i++) {
     // console.error("Iteration = " + i);
 
-    let ubotClient = await new UBotTestClient("http://127.0.0.1", clientKey, TOPOLOGY_ROOT + TOPOLOGY_FILE).start();
+    let ubotClient = await new UBotClient(clientKey, TOPOLOGY_ROOT + TOPOLOGY_FILE).start();
 
     let executableContract = await generateSecureRandomExecutableContract();
     let requestContract = await generateSecureRandomRequestContract(executableContract);
@@ -315,7 +314,7 @@ unit.test("ubot_pro_test: execute cloud method", async () => {
     // for (let i = 0; i < 10; i++) {
     // console.error("Iteration = " + i);
 
-    let ubotClient = await new UBotTestClient("http://127.0.0.1", clientKey, TOPOLOGY_ROOT + TOPOLOGY_FILE).start();
+    let ubotClient = await new UBotClient(clientKey, TOPOLOGY_ROOT + TOPOLOGY_FILE).start();
 
     let executableContract = await generateSecureRandomExecutableContract();
     let requestContract = await generateSecureRandomRequestContract(executableContract);
@@ -347,7 +346,7 @@ unit.test("ubot_pro_test: execute cloud method", async () => {
 //     for (let i = 0; i < 10; i++) {
 //         console.log("Random iteration: " + i);
 //
-//         let ubotClient = await new UBotTestClient("http://127.0.0.1", clientKey, TOPOLOGY_ROOT + TOPOLOGY_FILE).start();
+//         let ubotClient = await new UBotClient(clientKey, TOPOLOGY_ROOT + TOPOLOGY_FILE).start();
 //
 //         let executableContract = await generateSecureRandomExecutableContract();
 //         let requestContract = await generateSecureRandomRequestContract(executableContract);
@@ -394,7 +393,7 @@ unit.test("ubot_pro_test: execute cloud method", async () => {
 unit.test("ubot_pro_test: execute looped cloud method", async () => {
     let ubotMains = await createUBots(ubotsCount);
 
-    let ubotClient = await new UBotTestClient("http://127.0.0.1", clientKey, TOPOLOGY_ROOT + TOPOLOGY_FILE).start();
+    let ubotClient = await new UBotClient(clientKey, TOPOLOGY_ROOT + TOPOLOGY_FILE).start();
 
     let executableContract = Contract.fromPrivateKey(userPrivKey);
     executableContract.state.data.cloud_methods = {
@@ -437,7 +436,7 @@ unit.test("ubot_pro_test: execute looped cloud method", async () => {
 
  unit.test("ubot_pro_test: full quorum", async () => {
      let ubotMains = await createUBots(ubotsCount);
-     let ubotClient = await new UBotTestClient("http://127.0.0.1", clientKey, TOPOLOGY_ROOT + TOPOLOGY_FILE).start();
+     let ubotClient = await new UBotClient(clientKey, TOPOLOGY_ROOT + TOPOLOGY_FILE).start();
 
      //ubotMains.forEach(main => main.ubot.network.verboseLevel = VerboseLevel.BASE);
 
@@ -499,7 +498,7 @@ unit.test("ubot_pro_test: execute looped cloud method", async () => {
 //     await simpleContract.seal();
 //     let packedSimpleContract = await simpleContract.getPackedTransaction();
 //
-//     let ubotClient = await new UBotTestClient("http://127.0.0.1", clientKey, TOPOLOGY_ROOT + TOPOLOGY_FILE).start();
+//     let ubotClient = await new UBotClient(clientKey, TOPOLOGY_ROOT + TOPOLOGY_FILE).start();
 //
 //     let executableContract = await generateSimpleExecutableContract("simpleRegister.js", "register");
 //     let requestContract = await generateSimpleRegisterRequestContract(executableContract, packedSimpleContract);
@@ -528,7 +527,7 @@ unit.test("ubot_pro_test: execute looped cloud method", async () => {
 unit.test("ubot_pro_test: create and register contract", async () => {
     let ubotMains = await createUBots(ubotsCount);
 
-    let ubotClient = await new UBotTestClient("http://127.0.0.1", clientKey, TOPOLOGY_ROOT + TOPOLOGY_FILE).start();
+    let ubotClient = await new UBotClient(clientKey, TOPOLOGY_ROOT + TOPOLOGY_FILE).start();
 
     let executableContract = await generateSimpleExecutableContract("createAndRegister.js", "register");
     let requestContract = await generateSimpleRegisterRequestContract(executableContract);
@@ -564,7 +563,7 @@ unit.test("ubot_pro_test: pool and quorum percentage", async () => {
     await simpleContract.seal();
     let packedSimpleContract = await simpleContract.getPackedTransaction();
 
-    let ubotClient = await new UBotTestClient("http://127.0.0.1", clientKey, TOPOLOGY_ROOT + TOPOLOGY_FILE).start();
+    let ubotClient = await new UBotClient(clientKey, TOPOLOGY_ROOT + TOPOLOGY_FILE).start();
 
     // pool as constant, quorum as percentage
 
@@ -659,7 +658,7 @@ unit.test("ubot_pro_test: http requests", async () => {
 
     httpServer.startServer();
 
-    let ubotClient = await new UBotTestClient("http://127.0.0.1", clientKey, TOPOLOGY_ROOT + TOPOLOGY_FILE).start();
+    let ubotClient = await new UBotClient(clientKey, TOPOLOGY_ROOT + TOPOLOGY_FILE).start();
 
     let executableContract = Contract.fromPrivateKey(userPrivKey);
 
@@ -726,7 +725,7 @@ function checkRandomMultiData(multiData, random) {
 
 unit.test("ubot_pro_test: 2 cloud method", async () => {
     let ubotMains = await createUBots(ubotsCount);
-    let ubotClient = await new UBotTestClient("http://127.0.0.1", clientKey, TOPOLOGY_ROOT + TOPOLOGY_FILE).start();
+    let ubotClient = await new UBotClient(clientKey, TOPOLOGY_ROOT + TOPOLOGY_FILE).start();
 
     let executableContract = await generateSecureRandomExecutableContract();
     let requestContract = await generateSecureRandomRequestContract(executableContract);
@@ -834,7 +833,7 @@ unit.test("ubot_pro_test: 2 cloud method", async () => {
 
 // unit.test("ubot_pro_test: 2 cloud method with executeCloudMethod waiting", async () => {
 //     let ubotMains = await createUBots(ubotsCount);
-//     let ubotClient = await new UBotTestClient("http://127.0.0.1", clientKey, TOPOLOGY_ROOT + TOPOLOGY_FILE).start();
+//     let ubotClient = await new UBotClient(clientKey, TOPOLOGY_ROOT + TOPOLOGY_FILE).start();
 //
 //     let executableContract = await generateSecureRandomExecutableContract();
 //     let requestContract = await generateSecureRandomRequestContract(executableContract);
@@ -877,7 +876,7 @@ unit.test("ubot_pro_test: parallel cloud methods", async () => {
     for (let i = 0; i < 2; i++)
         promises.push(new Promise(async (resolve, reject) => {
             try {
-                let ubotClient = await new UBotTestClient("http://127.0.0.1", clientKey, TOPOLOGY_ROOT + TOPOLOGY_FILE).start();
+                let ubotClient = await new UBotClient(clientKey, TOPOLOGY_ROOT + TOPOLOGY_FILE).start();
                 let results = [];
 
                 for (let x = 0; x < 2; x++) {
@@ -947,7 +946,7 @@ unit.test("ubot_pro_test: parallel cloud methods", async () => {
 
 unit.test("ubot_pro_test: lottery", async () => {
     let ubotMains = await createUBots(ubotsCount);
-    let ubotClient = await new UBotTestClient("http://127.0.0.1", clientKey, TOPOLOGY_ROOT + TOPOLOGY_FILE).start();
+    let ubotClient = await new UBotClient(clientKey, TOPOLOGY_ROOT + TOPOLOGY_FILE).start();
     let netClient = await new UBotClient(tk.getTestKey(), TOPOLOGY_ROOT + TOPOLOGY_FILE).start();
 
     const TICKETS = 10;
@@ -1095,7 +1094,7 @@ unit.test("ubot_pro_test: lottery", async () => {
 unit.test("ubot_pro_test: execute cloud method with ubot delay", async () => {
     let ubotMains = await createUBots(ubotsCount);
 
-    let ubotClient = await new UBotTestClient("http://127.0.0.1", clientKey, TOPOLOGY_ROOT + TOPOLOGY_FILE).start();
+    let ubotClient = await new UBotClient(clientKey, TOPOLOGY_ROOT + TOPOLOGY_FILE).start();
 
     let executableContract = await generateSimpleExecutableContract("ubotDelay.js", "getNumbers");
 
@@ -1159,7 +1158,7 @@ unit.test("ubot_pro_test: execute cloud method with ubot delay", async () => {
 // unit.test("ubot_pro_test: launcher role", async () => {
 //     let ubotMains = await createUBots(ubotsCount);
 //
-//     let ubotClient = await new UBotTestClient("http://127.0.0.1", clientKey, TOPOLOGY_ROOT + TOPOLOGY_FILE).start();
+//     let ubotClient = await new UBotClient(clientKey, TOPOLOGY_ROOT + TOPOLOGY_FILE).start();
 //
 //     let executableContract = Contract.fromPrivateKey(userPrivKey);
 //
