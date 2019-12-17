@@ -38,6 +38,8 @@ class ProcessSendRequestContract extends ProcessBase {
 
         this.pr.initPoolAndQuorum();
 
+        this.maxTime = Date.now() + UBotConfig.maxDownloadRequestTime;
+
         // periodically send notifications
         this.pulse();
         this.currentTask = new ExecutorWithFixedPeriod(() => {
@@ -46,21 +48,33 @@ class ProcessSendRequestContract extends ProcessBase {
     }
 
     pulse() {
-        for (let i = 0; i < this.pr.pool.length; ++i)
-            if (!this.otherAnswers.has(this.pr.pool[i].number) && this.pr.pool[i].number !== this.pr.ubot.network.myInfo.number)
-                this.pr.ubot.network.deliver(this.pr.pool[i],
-                    new UBotCloudNotification(
-                        this.pr.ubot.network.myInfo,
-                        this.pr.poolId,
-                        this.pr.executableContract.id,
-                        UBotCloudNotification.types.DOWNLOAD_STARTING_CONTRACT,
-                        false
-                    )
-                );
+        if (Date.now() > this.maxTime && this.currentTask != null && !this.currentTask.cancelled) {
+            this.currentTask.cancel();
+            if (this.otherAnswers.size + 1 >= this.pr.quorumSize)
+                this.onReady();
+            else {
+                this.pr.logger.log("Error ProcessSendRequestContract.pulse: Failed send request contract to quorum UBots in pool");
+                this.pr.errors.push(new ErrorRecord(Errors.FAILURE, "ProcessSendRequestContract.pulse", "Failed send request contract to quorum UBots in pool"));
+                this.pr.changeState(UBotPoolState.FAILED);
+            }
+        } else
+            for (let i = 0; i < this.pr.pool.length; ++i)
+                if (!this.otherAnswers.has(this.pr.pool[i].number) && this.pr.pool[i].number !== this.pr.ubot.network.myInfo.number)
+                    this.pr.ubot.network.deliver(this.pr.pool[i],
+                        new UBotCloudNotification(
+                            this.pr.ubot.network.myInfo,
+                            this.pr.poolId,
+                            this.pr.executableContract.id,
+                            UBotCloudNotification.types.DOWNLOAD_STARTING_CONTRACT,
+                            false
+                        )
+                    );
     }
 
     onNotify(notification) {
-        if (notification.type === UBotCloudNotification.types.DOWNLOAD_STARTING_CONTRACT && notification.isAnswer) {
+        if (notification.type === UBotCloudNotification.types.DOWNLOAD_STARTING_CONTRACT && notification.isAnswer &&
+            this.currentTask != null && !this.currentTask.cancelled) {
+
             this.otherAnswers.add(notification.from.number);
             if (this.otherAnswers.size >= this.pr.pool.length - 1) {
                 this.currentTask.cancel();

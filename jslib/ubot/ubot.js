@@ -51,6 +51,9 @@ class UBot {
     }
 
     async executeCloudMethod(contract) {
+        if (this.processors.has(contract.id.base64))
+            throw new Error("Cloud processor already exist");
+
         this.logger.log("executeCloudMethod: requestContract.id = " + contract.id);
         this.logger.log("  contract.state.data: " + t.secureStringify(contract.state.data));
 
@@ -64,6 +67,8 @@ class UBot {
         let processor = new CloudProcessor(UBotPoolState.SEND_STARTING_CONTRACT, contract.id, this, session);
         processor.requestContract = contract;
         processor.startProcessingCurrentState();
+
+        this.logger.log("Create cloud processor " + contract.id);
         this.processors.set(contract.id.base64, processor);
     }
 
@@ -97,6 +102,8 @@ class UBot {
 
                     let processor = new CloudProcessor(UBotPoolState.INIT, notification.poolId, this, session);
                     processor.onNotifyInit(notification);
+
+                    this.logger.log("Create cloud processor " + notification.poolId);
                     this.processors.set(notification.poolId.base64, processor);
                 }
             });

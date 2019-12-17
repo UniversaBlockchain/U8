@@ -999,7 +999,7 @@ unit.test("ubot_pro_test: lottery", async () => {
         raffle: {
             pool: {size: 12},
             quorum: {size: 10},
-            storage_read_trust_level: 0.9,
+            storage_read_trust_level: 0.75,
             max_wait_ubot: 60
         }
     };
@@ -1154,6 +1154,49 @@ unit.test("ubot_pro_test: execute cloud method with ubot delay", async () => {
 
     await shutdownUBots(ubotMains);
 });
+
+// unit.test("ubot_main_test: sequential launch", async () => {
+//     let ubotMains = await createUBots(ubotsCount);
+//
+//     let ubotClient = await new UBotClient(clientKey, TOPOLOGY_ROOT + TOPOLOGY_FILE).start();
+//
+//     let executableContract = Contract.fromPrivateKey(userPrivKey);
+//
+//     executableContract.state.data.cloud_methods = {
+//         method_for_launcher1: {
+//             pool: {size: 8},
+//             quorum: {size: 3}
+//         }
+//     };
+//
+//     executableContract.state.data.js = await io.fileGetContentsAsString(TEST_CONTRACTS_PATH + "launcherRole.js");
+//
+//     await executableContract.seal();
+//
+//     for (let i = 0; i < 10; i++) {
+//         let requestContract = Contract.fromPrivateKey(userPrivKey);
+//         requestContract.state.data.method_name = "method_for_launcher1";
+//         requestContract.state.data.executable_contract_id = executableContract.id;
+//         if (i === 0)
+//             requestContract.newItems.add(executableContract);
+//
+//         await cs.addConstraintToContract(requestContract, executableContract, "executable_contract_constraint",
+//             Constraint.TYPE_EXISTING_STATE, ["this.state.data.executable_contract_id == ref.id"], true);
+//
+//         let state = await ubotClient.executeCloudMethod(requestContract, await createPayment(20), true);
+//
+//         assert(state.state === UBotPoolState.FINISHED.val);
+//         assert(state.result === 1);
+//     }
+//
+//     await ubotClient.shutdown();
+//
+//     // waiting pool finished...
+//     while (ubotMains.some(main => Array.from(main.ubot.processors.values()).some(proc => proc.state.canContinue)))
+//         await sleep(100);
+//
+//     await shutdownUBots(ubotMains);
+// });
 
 // unit.test("ubot_pro_test: launcher role", async () => {
 //     let ubotMains = await createUBots(ubotsCount);

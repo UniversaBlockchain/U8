@@ -818,40 +818,38 @@ unit.test("ubot_main_test: execute cloud method with ubot delay", async () => {
     await ubotClient.shutdown();
 });
 
-unit.test("ubot_main_test: sequential launch", async () => {
-
-    let ubotClient = await new UBotClient(clientKey, TOPOLOGY_ROOT + TOPOLOGY_FILE).start();
-
-    let executableContract = Contract.fromPrivateKey(userPrivKey);
-
-    let userKey1 = tk.TestKeys.getKey();
-
-    executableContract.state.data.cloud_methods = {
-        method_for_launcher1: {
-            pool: {size: 8},
-            quorum: {size: 3}
-        }
-    };
-
-    executableContract.state.data.js = await io.fileGetContentsAsString(TEST_CONTRACTS_PATH + "launcherRole.js");
-
-    await executableContract.seal();
-
-    for (let i = 0; i < 10; i++) {
-        let requestContract = Contract.fromPrivateKey(userKey1);
-        requestContract.state.data.method_name = "method_for_launcher1";
-        requestContract.state.data.executable_contract_id = executableContract.id;
-        if (i === 0)
-            requestContract.newItems.add(executableContract);
-
-        await cs.addConstraintToContract(requestContract, executableContract, "executable_contract_constraint",
-            Constraint.TYPE_EXISTING_STATE, ["this.state.data.executable_contract_id == ref.id"], true);
-
-        let state = await ubotClient.executeCloudMethod(requestContract, await createPayment(20), true);
-
-        assert(state.state === UBotPoolState.FINISHED.val);
-        assert(state.result === 1);
-    }
-
-    await ubotClient.shutdown();
-});
+// unit.test("ubot_main_test: sequential launch", async () => {
+//
+//     let ubotClient = await new UBotClient(clientKey, TOPOLOGY_ROOT + TOPOLOGY_FILE).start();
+//
+//     let executableContract = Contract.fromPrivateKey(userPrivKey);
+//
+//     executableContract.state.data.cloud_methods = {
+//         method_for_launcher1: {
+//             pool: {size: 8},
+//             quorum: {size: 3}
+//         }
+//     };
+//
+//     executableContract.state.data.js = await io.fileGetContentsAsString(TEST_CONTRACTS_PATH + "launcherRole.js");
+//
+//     await executableContract.seal();
+//
+//     for (let i = 0; i < 10; i++) {
+//         let requestContract = Contract.fromPrivateKey(userPrivKey);
+//         requestContract.state.data.method_name = "method_for_launcher1";
+//         requestContract.state.data.executable_contract_id = executableContract.id;
+//         if (i === 0)
+//             requestContract.newItems.add(executableContract);
+//
+//         await cs.addConstraintToContract(requestContract, executableContract, "executable_contract_constraint",
+//             Constraint.TYPE_EXISTING_STATE, ["this.state.data.executable_contract_id == ref.id"], true);
+//
+//         let state = await ubotClient.executeCloudMethod(requestContract, await createPayment(20), true);
+//
+//         assert(state.state === UBotPoolState.FINISHED.val);
+//         assert(state.result === 1);
+//     }
+//
+//     await ubotClient.shutdown();
+// });

@@ -102,6 +102,7 @@ class CloudProcessor {
 
     changeState(newState) {
         if (~this.state.nextStates.indexOf(newState.ordinal)) {
+            this.logger.log("Change state processor " + this.poolId + " to " + newState.val);
             this.state = newState;
             this.startProcessingCurrentState();
         } else if (this.state !== newState)

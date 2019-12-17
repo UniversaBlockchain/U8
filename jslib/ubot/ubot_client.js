@@ -970,6 +970,31 @@ class UBotClient {
         throw new UBotClientException("Cloud method consensus can`t be reached, ubot states: " + t.secureStringify(states));
     }
 
+    async getSessionWithTrust(executableContractId) {
+        let session = await this.getSession("ubotGetSession", {executableContractId: executableContractId});
+
+        if (session != null && session.state != null)
+            return session;
+
+        let nodes = this.topology.map(node => node.number);
+        let trust = Math.ceil(nodes.length * UBotConfig.checkSessionTrustLevel);
+        if (trust > nodes.length)
+            trust = nodes.length;
+
+        let selected = t.randomChoice(nodes, trust);
+
+        let sessions = await this.askSessionOnSomeNodes("ubotGetSession", {executableContractId: executableContractId}, selected);
+
+        if (sessions == null || !sessions instanceof Array || sessions.length !== selected.length)
+            throw new Error("askSessionOnSomeNodes must return array");
+
+        for (let i = 0; i < sessions.length; i++)
+            if (sessions[i] != null && sessions[i].state != null)
+                return sessions[i];
+
+        return null;
+    }
+
     /**
      * Verification of the session on the id of the Executable contract and the Request contract.
      *
@@ -982,7 +1007,7 @@ class UBotClient {
      * @return {Promise<UBotSession>}.
      */
     async checkSession(executableContractId, requestContractId, ubotNumber, ubot) {
-        let session = await this.getSession("ubotGetSession", {executableContractId: executableContractId});
+        let session = await this.getSessionWithTrust(executableContractId);
 
         if (session == null || session.state == null)
             throw new UBotClientException("Session is null");
@@ -1003,7 +1028,7 @@ class UBotClient {
                     throw new UBotClientException("Session timeout limit exceeded");
 
                 await sleep(UBotConfig.waitPeriod);
-                session = await this.getSession("ubotGetSession", {executableContractId: executableContractId});
+                session = await this.getSessionWithTrust(executableContractId);
 
                 if (session == null || session.state == null)
                     throw new UBotClientException("Session is null");
@@ -1080,7 +1105,7 @@ class UBotClient {
         let state = await this.getStateCloudMethod(requestContractId, ubotNumber);
 
         // waiting pool finished...
-        while (UBotPoolState.byVal.get(state.state).canContinue) {
+        while (state.state == null || UBotPoolState.byVal.get(state.state).canContinue) {
             await sleep(UBotConfig.waitPeriod);
             state = await this.getStateCloudMethod(requestContractId, ubotNumber);
         }

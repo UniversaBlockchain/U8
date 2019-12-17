@@ -94,7 +94,7 @@ class UBotSession {
             ++tryNumber;
             if (delay > 0)
                 await sleep(delay);
-//
+
             let answers = await this.client.askSessionOnSomeNodes("ubotGetStorage", {
                 executableContractId: this.executableContractId,
                 storageNames: [storageName]
