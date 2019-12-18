@@ -29,7 +29,7 @@ namespace network {
         nextPacketId_ = minstdRand_();
 
         receiveCallback_ = receiveCallback;
-        socket_.open("0.0.0.0", ownNodeInfo_.getNodeAddress().port, UDP_BUFFER_SIZE);
+        socket_.open("::", ownNodeInfo_.getNodeAddress().port, UDP_BUFFER_SIZE);
         socket_.recv([=](ssize_t result, const asyncio::byte_vector& data, const char* IP, unsigned int port) {
             if (result > 0)
                 receiverPool_.execute([&,data](){
@@ -414,10 +414,14 @@ namespace network {
     void UDPAdapter::sendPacket(const NodeInfo& dest, const byte_vector& data) {
         if (data.size() > MAX_PACKET_SIZE)
             writeErr(std::string("datagram size too long, MAX_PACKET_SIZE is ") + std::to_string(MAX_PACKET_SIZE));
-        if (testMode_ && (minstdRand_() % 1000 < 500))
+        if (testMode_ && (minstdRand_() % 1000 < 500)) {
             writeLog("test mode, skip socket_.send");
-        else
-            socket_.send(data, dest.getNodeAddress().host.c_str(), dest.getNodeAddress().port, [&](ssize_t result){});
+        } else {
+            string host = dest.getNodeAddress().host;
+            if (host == "null")
+                host = dest.getHostV6();
+            socket_.send(data, host.c_str(), dest.getNodeAddress().port, [&](ssize_t result) {});
+        }
     }
 
     int UDPAdapter::getNextPacketId() {

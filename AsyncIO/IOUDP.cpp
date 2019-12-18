@@ -312,11 +312,12 @@ namespace asyncio {
     bool IOUDP::isIPv4(const char *ip)
     {
         struct sockaddr_in sa;
+        struct sockaddr_in6 sa6;
         int result = inet_pton(AF_INET, ip, &(sa.sin_addr));
         if (result > 0)
             return true;
 
-        result = inet_pton(AF_INET6, ip, &(sa.sin_addr));
+        result = inet_pton(AF_INET6, ip, &(sa6.sin6_addr));
         if (result > 0)
             return false;
 
