@@ -1173,7 +1173,7 @@ unit.test("ubot_main_test: sequential launch", async () => {
 
     await executableContract.seal();
 
-    for (let i = 0; i < 50; i++) {
+    for (let i = 0; i < 10; i++) {
         let requestContract = Contract.fromPrivateKey(userPrivKey);
         requestContract.state.data.method_name = "method_for_launcher1";
         requestContract.state.data.executable_contract_id = executableContract.id;
@@ -1253,23 +1253,30 @@ unit.test("ubot_pro_test: launcher role", async () => {
     // checking contract
     assert(state.result === 1);
 
-    //TODO negative test
-    launcher1Contract = Contract.fromPrivateKey(userPrivKey);
-    launcher1Contract.state.data.method_name = "method_for_launcher1";
-    launcher1Contract.state.data.executable_contract_id = executableContract.id;
-
-    await cs.addConstraintToContract(launcher1Contract, executableContract, "executable_contract_constraint",
-        Constraint.TYPE_EXISTING_STATE, ["this.state.data.executable_contract_id == ref.id"], true);
-
-    await cs.addConstraintToContract(launcher1Contract, executableContract, "launcher_constraint",
-        Constraint.TYPE_EXISTING_STATE, ["this can_perform ref.state.roles.launcherRole1"], true);
-
-    state = await ubotClient.executeCloudMethod(launcher1Contract, await createPayment(5), true);
-
-    assert(state.state === UBotPoolState.FAILED.val);
-
-    // checking contract
-    console.error(JSON.stringify(state));
+    // method_for_launcher1 failure
+    // launcher1Contract = Contract.fromPrivateKey(userPrivKey);
+    // launcher1Contract.state.data.method_name = "method_for_launcher1";
+    // launcher1Contract.state.data.executable_contract_id = executableContract.id;
+    //
+    // await cs.addConstraintToContract(launcher1Contract, executableContract, "executable_contract_constraint",
+    //     Constraint.TYPE_EXISTING_STATE, ["this.state.data.executable_contract_id == ref.id"], true);
+    //
+    // await cs.addConstraintToContract(launcher1Contract, executableContract, "launcher_constraint",
+    //     Constraint.TYPE_EXISTING_STATE, ["this can_perform ref.state.roles.launcherRole1"], true);
+    //
+    // console.log("method_for_launcher1 failure...");
+    //
+    // let errMessage = null;
+    // try {
+    //     await ubotClient.executeCloudMethod(launcher1Contract, await createPayment(5), true);
+    // } catch (err) {
+    //     errMessage = err.message;
+    // }
+    //
+    // console.log("Error: " + errMessage);
+    //
+    // // checking error
+    // assert(errMessage === "Paid operation with waiting previous session is failed");
 
     // method_for_launcher2
     let launcher2Contract = Contract.fromPrivateKey(userKey2);
@@ -1291,9 +1298,7 @@ unit.test("ubot_pro_test: launcher role", async () => {
     // checking contract
     assert(state.result === 2);
 
-    // method_for_launcher2
-    //TODO negative test
-
+    // method_for_launcher2 failure
     // launcher2Contract = Contract.fromPrivateKey(userKey1);
     // launcher2Contract.state.data.method_name = "method_for_launcher2";
     // launcher2Contract.state.data.executable_contract_id = executableContract.id;
@@ -1304,14 +1309,19 @@ unit.test("ubot_pro_test: launcher role", async () => {
     // await cs.addConstraintToContract(launcher2Contract, executableContract, "launcher_constraint",
     //     Constraint.TYPE_EXISTING_STATE, ["this can_perform ref.state.roles.launcherRole2"], true);
     //
-    // console.log("method_for_launcher2...");
+    // console.log("method_for_launcher2 failure...");
     //
-    // state = await ubotClient.executeCloudMethod(launcher2Contract, await createPayment(5), true);
+    // errMessage = null;
+    // try {
+    //     await ubotClient.executeCloudMethod(launcher2Contract, await createPayment(5), true);
+    // } catch (err) {
+    //     errMessage = err.message;
+    // }
     //
-    // assert(state.state === UBotPoolState.FINISHED.val);
+    // console.log("Error: " + errMessage);
     //
-    // // checking contract
-    // assert(state.result === 2);
+    // // checking error
+    // assert(errMessage === "Paid operation with waiting previous session is failed");
 
     // method_for_any
     let anyContract = Contract.fromPrivateKey(userKey1);

@@ -302,16 +302,22 @@ class ProcessStartExec extends ProcessBase {
 
                 this.pr.logger.log("QuantaSum of " + methodName + ": " + this.pr.quantiser.quantaSum_);
 
-                await this.pr.session.close(this.pr.state !== UBotPoolState.FAILED && !terminate);
-                this.pr.session = null;
+                try {
+                    await this.pr.session.close(this.pr.state !== UBotPoolState.FAILED && !terminate);
+                    this.pr.session = null;
 
-                if (this.pr.userHttpClient != null) {
-                    await this.pr.userHttpClient.stop();
-                    this.pr.userHttpClient = null;
+                    if (this.pr.userHttpClient != null) {
+                        await this.pr.userHttpClient.stop();
+                        this.pr.userHttpClient = null;
+                    }
+
+                    this.pr.worker.release(terminate);
+                    this.pr.worker = null;
+                } catch (err) {
+                    console.error(err.stack);
+                    console.error("Error closing session or worker: " + err.message);
                 }
 
-                this.pr.worker.release(terminate);
-                this.pr.worker = null;
 
                 if (terminate) {
                     this.pr.logger.log("Cloud method return error: " + result.message);

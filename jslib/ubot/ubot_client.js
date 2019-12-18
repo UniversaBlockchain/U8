@@ -122,16 +122,33 @@ class UBotClient {
      * @return {Promise<void>}.
      */
     async connectAllNodes() {
-        for (let i = 0; i < this.nodes.length; i++) {
-            if (this.topology[i].number === this.httpNodeClient.nodeNumber)
-                this.httpNodeClients.set(this.httpNodeClient.nodeNumber, this.httpNodeClient);
-            else {
-                let httpClient = new HttpClient(this.nodes[i].url);
-                httpClient.nodeNumber = this.topology[i].number;
-                await httpClient.start(this.clientPrivateKey, this.nodes[i].key);
-                this.httpNodeClients.set(httpClient.nodeNumber, httpClient);
+        for (let i = 0; i < this.nodes.length; i++)
+            if (!this.httpNodeClients.has(this.topology[i].number)) {
+                if (this.topology[i].number === this.httpNodeClient.nodeNumber)
+                    this.httpNodeClients.set(this.httpNodeClient.nodeNumber, this.httpNodeClient);
+                else {
+                    let connectAttempts = 3;
+                    while (connectAttempts > 0) {
+                        try {
+                            let httpClient = new HttpClient(this.nodes[i].url);
+                            httpClient.nodeNumber = this.topology[i].number;
+                            await httpClient.start(this.clientPrivateKey, this.nodes[i].key);
+                            this.httpNodeClients.set(httpClient.nodeNumber, httpClient);
+                            break;
+
+                        } catch (err) {
+                            let message = "Failed connection to node " + this.topology[i].number + ". Error: " + err.message;
+                            if (this.logger != null)
+                                this.logger.log(message);
+                            else
+                                console.log(message);
+                        }
+
+                        await sleep(UBotConfig.waitPeriod);
+                        connectAttempts--;
+                    }
+                }
             }
-        }
     }
 
     replaceURL(URL) {
@@ -283,7 +300,7 @@ class UBotClient {
      */
     async askSessionOnAllNodes(command, params) {
         await this.lock.synchronize("connectNodes", async () => {
-            if (this.httpNodeClients.size === 0)
+            if (this.httpNodeClients.size !== this.nodes.length)
                 await this.connectAllNodes();
         });
 
@@ -322,7 +339,7 @@ class UBotClient {
      */
     async askSessionOnSomeNodes(command, params, nodes) {
         await this.lock.synchronize("connectNodes", async () => {
-            if (this.httpNodeClients.size === 0)
+            if (this.httpNodeClients.size !== this.nodes.length)
                 await this.connectAllNodes();
         });
 
@@ -435,13 +452,32 @@ class UBotClient {
         let session = null;
         if (payment != null) {
             params.packedU = await payment.getPackedTransaction();
+            let paidAttempts = 3;
 
-            let result;
-            while (!(result = await this.processPaidOperation(params, payment.id)) && waitPreviousSession)
-                await sleep(UBotConfig.waitPeriod * 10);
+            while (!await this.processPaidOperation(params, payment.id)) {
+                if (waitPreviousSession) {
+                    session = await this.getSession("ubotGetSession",
+                        {executableContractId: requestContract.state.data.executable_contract_id});
 
-            if (!waitPreviousSession && !result)
-                throw new UBotClientException("Paid operation is not processed");
+                    if (session == null || session.requestId == null || session.requestId.equals(requestContract.id)) {
+                        paidAttempts--;
+                        if (paidAttempts === 0)
+                            throw new UBotClientException("Paid operation with waiting previous session is failed");
+                    }
+
+                    while (session != null && session.requestId != null && !session.requestId.equals(requestContract.id)) {
+                        if (session.state === UBotSessionState.CLOSING.val || session.state === UBotSessionState.CLOSED.val)
+                            await sleep(UBotConfig.waitPeriod);
+                        else
+                            await sleep(UBotConfig.waitPeriod * 10);
+
+                        session = await this.getSession("ubotGetSession",
+                            {executableContractId: requestContract.state.data.executable_contract_id});
+                    }
+                } else
+                    throw new UBotClientException("Paid operation is not processed");
+            }
+
             waitPreviousSession = false;
 
             while (session == null || session.state == null)
