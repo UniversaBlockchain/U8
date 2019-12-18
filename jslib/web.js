@@ -113,19 +113,19 @@ network.NodeInfo = class {
     }
 
     publicUrlString() {
-            "http://" + this.publicHost + ":" + this.publicPort;
+        return "http://" + this.publicHost + ":" + this.publicPort;
     }
 
     serverUrlString() {
-            "http://" + ((this.hostV6 != null && this.hostV6 !== "null") ? "[" + this.hostV6 + "]" : this.host) + ":" + this.publicPort;
+        return "http://" + ((this.hostV6 != null && this.hostV6 !== "null") ? "[" + this.hostV6 + "]" : this.host) + ":" + this.publicPort;
     }
 
     domainUrlStringV4() {
-            "https://" + this.publicHost + ":" + this.publicPort;
+        return "https://" + this.publicHost + ":" + this.publicPort;
     }
 
     directUrlStringV4() {
-            "http://" + this.host + ":" + this.publicPort;
+        return "http://" + this.host + ":" + this.publicPort;
     }
 
     stringId() {
