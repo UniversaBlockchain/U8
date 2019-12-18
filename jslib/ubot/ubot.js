@@ -12,6 +12,7 @@ const UBotCloudProcessorsCache = require("ubot/ubot_cloudprocessors_cache").UBot
 const UBotSessionStorageCache = require("ubot/ubot_session_storage_cache").UBotSessionStorageCache;
 const UBotClient = require('ubot/ubot_client').UBotClient;
 const BossBiMapper = require("bossbimapper").BossBiMapper;
+const Lock = require("lock").Lock;
 const Boss = require('boss.js');
 const t = require("tools");
 
@@ -31,6 +32,7 @@ class UBot {
         this.nodeKey = nodeKey;
         this.configRoot = configRoot;
         this.client = null;
+        this.lock = new Lock();
     }
 
     async shutdown() {
@@ -49,6 +51,9 @@ class UBot {
     }
 
     async executeCloudMethod(contract) {
+        if (this.processors.has(contract.id.base64))
+            throw new Error("Cloud processor already exist");
+
         this.logger.log("executeCloudMethod: requestContract.id = " + contract.id);
         this.logger.log("  contract.state.data: " + t.secureStringify(contract.state.data));
 
@@ -62,6 +67,8 @@ class UBot {
         let processor = new CloudProcessor(UBotPoolState.SEND_STARTING_CONTRACT, contract.id, this, session);
         processor.requestContract = contract;
         processor.startProcessingCurrentState();
+
+        this.logger.log("Create cloud processor " + contract.id);
         this.processors.set(contract.id.base64, processor);
     }
 
@@ -76,24 +83,30 @@ class UBot {
         } else if (notification instanceof UBotCloudNotification &&
             notification.type === UBotCloudNotification.types.DOWNLOAD_STARTING_CONTRACT && !notification.isAnswer) {
 
-            if (this.client == null)
-                this.client = await new UBotClient(this.nodeKey, this.configRoot + TOPOLOGY_FILE, null,
-                    UBotConfig.clientMaxWaitSession, this.logger).start();
+            await this.lock.synchronize(notification.poolId, async () => {
+                if (!this.processors.has(notification.poolId.base64)) {
+                    if (this.client == null)
+                        this.client = await new UBotClient(this.nodeKey, this.configRoot + TOPOLOGY_FILE, null,
+                            UBotConfig.clientMaxWaitSession, this.logger).start();
 
-            let session = null;
-            try {
-                session = await this.client.checkSession(notification.executableContractId, notification.poolId, this.network.myInfo.number, this);
-            } catch (err) {
-                this.logger.log("Error: check session failed, ubot is not started by notification: " + notification.poolId +
-                    ", message: " + err.message);
-                return;
-            }
+                    let session = null;
+                    try {
+                        session = await this.client.checkSession(notification.executableContractId, notification.poolId, this.network.myInfo.number, this);
+                    } catch (err) {
+                        this.logger.log("Error: check session failed, ubot is not started by notification: " + notification.poolId +
+                            ", message: " + err.message);
+                        return;
+                    }
 
-            this.logger.log("onCloudNotify session checked: " + session);
+                    this.logger.log("onCloudNotify session checked: " + session);
 
-            let processor = new CloudProcessor(UBotPoolState.INIT, notification.poolId, this, session);
-            processor.onNotifyInit(notification);
-            this.processors.set(notification.poolId.base64, processor);
+                    let processor = new CloudProcessor(UBotPoolState.INIT, notification.poolId, this, session);
+                    processor.onNotifyInit(notification);
+
+                    this.logger.log("Create cloud processor " + notification.poolId);
+                    this.processors.set(notification.poolId.base64, processor);
+                }
+            });
 
         } else
             this.logger.log("Warning: unknown notification. Type = " + notification.type.ordinal + ", Type code = " + notification.typeCode);

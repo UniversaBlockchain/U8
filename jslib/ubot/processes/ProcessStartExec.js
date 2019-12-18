@@ -695,11 +695,12 @@ class ProcessStartExec extends ProcessBase {
             let result = await this.pr.ubot.getStoragePackedResultByRecordId(recordId, false);
 
             if (result != null)
-                this.pr.logger.log("getSingleStorage: current result hash = " + result.cortegeId);
+                this.pr.logger.log("getSingleStorage: current result hash = " + crypto.HashId.of(result));
             else
                 this.pr.logger.log("getSingleStorage: current result is null");
 
             if (result == null || !actualHash.equals(crypto.HashId.of(result))) {
+                this.pr.logger.log("getSingleStorage: searchActualStorageResult...");
                 result = await this.pr.ubot.network.searchActualStorageResult(recordId, actualHash, false);
 
                 if (result == null) {
@@ -755,6 +756,7 @@ class ProcessStartExec extends ProcessBase {
             } else
                 this.pr.logger.log("getMultiStorage: current result is null");
 
+            this.pr.logger.log("getMultiStorage: searchActualStorageResult...");
             result = await this.pr.ubot.network.searchActualStorageResult(recordId, actualHash, true);
 
             if (result == null) {

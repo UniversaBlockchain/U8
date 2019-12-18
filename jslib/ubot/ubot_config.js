@@ -17,12 +17,14 @@ class UBotConfig {
     static maxResultDownloadAttempts = 5;
 
     static maxDownloadActualStorageResultTime = 10000; // ms
+    static maxDownloadRequestTime = 40000; // ms
     static clientMaxWaitSession = 60000; // ms
 
     static waitPeriod = 100; // ms
 
     static networkPositiveConsensus = 0.9;
     static storageReadTrustLevel = 0.3;
+    static checkSessionTrustLevel = 0.3;
 
     static checkQuantiserPeriod = 10000; // ms
     static requestExpiredTime = 86400000; // ms

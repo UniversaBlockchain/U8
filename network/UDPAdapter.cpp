@@ -507,6 +507,7 @@ namespace network {
     }
 
     void UDPAdapter::acceptSessionReaderCandidate(SessionReader& sessionReader) {
+        sessionReaders_.erase(sessionReader.remoteNodeInfo.getNumber());
         sessionReaders_.insert(std::make_pair(sessionReader.remoteNodeInfo.getNumber(), sessionReader));
         sessionReaderCandidates_.erase(sessionReader.remoteNodeInfo.getNumber());
     }
