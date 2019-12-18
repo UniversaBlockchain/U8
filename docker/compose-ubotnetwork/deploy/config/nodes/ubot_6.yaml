@@ -2,7 +2,7 @@
 http_client_port: 17006
 http_public_port: 17006
 udp_server_port: 16006
-database: host=localhost port=5432 dbname=ubot_t6
+database: host=ubotdb port=5432 dbname=ubot6db user=ubot6user password=uniPass
 node_number: 6
 public_host: localhost
 node_name: ubot_6

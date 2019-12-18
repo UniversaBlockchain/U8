@@ -2,7 +2,7 @@
 http_client_port: 17014
 http_public_port: 17014
 udp_server_port: 16014
-database: host=localhost port=5432 dbname=ubot_t14
+database: host=ubotdb port=5432 dbname=ubot14db user=ubot14user password=uniPass
 node_number: 14
 public_host: localhost
 node_name: ubot_14

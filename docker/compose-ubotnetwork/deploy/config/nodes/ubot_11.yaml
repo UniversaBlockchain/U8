@@ -2,7 +2,7 @@
 http_client_port: 17011
 http_public_port: 17011
 udp_server_port: 16011
-database: host=localhost port=5432 dbname=ubot_t11
+database: host=ubotdb port=5432 dbname=ubot11db user=ubot11user password=uniPass
 node_number: 11
 public_host: localhost
 node_name: ubot_11

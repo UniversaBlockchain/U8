@@ -2,7 +2,7 @@
 http_client_port: 17009
 http_public_port: 17009
 udp_server_port: 16009
-database: host=localhost port=5432 dbname=ubot_t9
+database: host=ubotdb port=5432 dbname=ubot9db user=ubot9user password=uniPass
 node_number: 9
 public_host: localhost
 node_name: ubot_9

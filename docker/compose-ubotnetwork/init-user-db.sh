@@ -37,7 +37,7 @@ psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname "$POSTGRES_DB" <<-E
 EOSQL
 
 psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname "$POSTGRES_DB" <<-EOSQL
-	CREATE USER ubo54user;
+	CREATE USER ubot5user;
 	ALTER USER ubot5user with encrypted password 'uniPass';
 	CREATE DATABASE ubot5db;
 	GRANT ALL PRIVILEGES ON DATABASE ubot5db TO ubot5user;
@@ -114,3 +114,5 @@ psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname "$POSTGRES_DB" <<-E
 EOSQL
 
 touch /var/tmp/db_init_completed.lock
+
+

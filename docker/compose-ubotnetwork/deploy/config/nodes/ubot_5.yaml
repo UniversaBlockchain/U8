@@ -2,7 +2,7 @@
 http_client_port: 17005
 http_public_port: 17005
 udp_server_port: 16005
-database: host=localhost port=5432 dbname=ubot_t5
+database: host=ubotdb port=5432 dbname=ubot5db user=ubot5user password=uniPass
 node_number: 5
 public_host: localhost
 node_name: ubot_5

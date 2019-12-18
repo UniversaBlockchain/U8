@@ -2,7 +2,7 @@
 http_client_port: 17008
 http_public_port: 17008
 udp_server_port: 16008
-database: host=localhost port=5432 dbname=ubot_t8
+database: host=ubotdb port=5432 dbname=ubot8db user=ubot8user password=uniPass
 node_number: 8
 public_host: localhost
 node_name: ubot_8

@@ -1,6 +1,6 @@
 version: '2.1'
 services:
-  db:
+  ubotdb:
     image: postgres:latest
     #    ports:
     #      - 5432:5432
@@ -17,7 +17,7 @@ services:
     networks:
       net_16ubots:
         aliases:
-          - db
+          - ubotdb
         ipv4_address: 10.6.0.10
         ipv6_address: fdf0:e132:efcf:2fae::10
   ubot-0-local:
@@ -25,11 +25,11 @@ services:
     command: --config /deploy/
     #entrypoint: tail -f /dev/null
     links:
-     - db
+     - ubotdb
     ports:
       - 17000:17000
     depends_on:
-      db:
+      ubotdb:
         condition: service_healthy
     volumes:
      - ./deploy/config/nodes/ubot_0.yaml:/deploy/config/config.yaml
@@ -49,11 +49,11 @@ services:
     image: universa/ubotserver:latest-debug
     command: --config /deploy/
     links:
-      - db
+      - ubotdb
     ports:
       - 17001:17001
     depends_on:
-      db:
+      ubotdb:
         condition: service_healthy
     volumes:
       - ./deploy/config/nodes/ubot_1.yaml:/deploy/config/config.yaml
