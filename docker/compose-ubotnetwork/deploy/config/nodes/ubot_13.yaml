@@ -1,0 +1,12 @@
+---
+http_client_port: 17013
+http_public_port: 17013
+udp_server_port: 16013
+database: host=localhost port=5432 dbname=ubot_t13
+node_number: 13
+public_host: localhost
+node_name: ubot_13
+ip:
+- 127.0.0.1
+ipv6:
+  - fdf0:e132:efcf:2fae::24

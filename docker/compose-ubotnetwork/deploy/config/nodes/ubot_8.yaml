@@ -1,0 +1,12 @@
+---
+http_client_port: 17008
+http_public_port: 17008
+udp_server_port: 16008
+database: host=localhost port=5432 dbname=ubot_t8
+node_number: 8
+public_host: localhost
+node_name: ubot_8
+ip:
+- 127.0.0.1
+ipv6:
+  - fdf0:e132:efcf:2fae::19
