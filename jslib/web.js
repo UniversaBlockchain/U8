@@ -113,26 +113,18 @@ network.NodeInfo = class {
     }
 
     publicUrlString() {
-        return this.publicHost === "localhost" ?
-            "http://localhost:" + this.clientAddress.port :
             "http://" + this.publicHost + ":" + this.publicPort;
     }
 
     serverUrlString() {
-        return this.publicHost === "localhost" ?
-            "http://localhost:" + this.clientAddress.port :
             "http://" + ((this.hostV6 != null && this.hostV6 !== "null") ? "[" + this.hostV6 + "]" : this.host) + ":" + this.publicPort;
     }
 
     domainUrlStringV4() {
-        return this.publicHost === "localhost" ?
-            "https://localhost:" + this.clientAddress.port :
             "https://" + this.publicHost + ":" + this.publicPort;
     }
 
     directUrlStringV4() {
-        return this.publicHost === "localhost" ?
-            "http://localhost:" + this.clientAddress.port :
             "http://" + this.host + ":" + this.publicPort;
     }
 
