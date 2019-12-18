@@ -417,9 +417,9 @@ namespace network {
         if (testMode_ && (minstdRand_() % 1000 < 500)) {
             writeLog("test mode, skip socket_.send");
         } else {
-            string host = dest.getNodeAddress().host;
+            string host = dest.getHostV6();
             if (host == "null")
-                host = dest.getHostV6();
+                host = dest.getHost();
             socket_.send(data, host.c_str(), dest.getNodeAddress().port, [&](ssize_t result) {});
         }
     }
