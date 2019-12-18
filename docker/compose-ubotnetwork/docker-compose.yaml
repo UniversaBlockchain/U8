@@ -18,8 +18,8 @@ services:
       net_16ubots:
         aliases:
           - ubotdb
-        ipv4_address: 10.6.0.10
-        ipv6_address: fdf0:e132:efcf:2fae::10
+        ipv4_address: 11.6.0.10
+        ipv6_address: fdaa:745e:3098:5739::10
   ubot-0-local:
     image: universa/ubotserver:latest-debug
     command: --config /deploy/
@@ -43,8 +43,8 @@ services:
       net_16ubots:
         aliases:
           - ubot0
-        ipv4_address: 10.6.0.11
-        ipv6_address: fdf0:e132:efcf:2fae::11
+        ipv4_address: 11.6.0.11
+        ipv6_address: fdaa:745e:3098:5739::11
   ubot-1-local:
     image: universa/ubotserver:latest-debug
     command: --config /deploy/
@@ -67,17 +67,17 @@ services:
       net_16ubots:
         aliases:
           - ubot1
-        ipv4_address: 10.6.0.12
-        ipv6_address: fdf0:e132:efcf:2fae::12
+        ipv4_address: 11.6.0.12
+        ipv6_address: fdaa:745e:3098:5739::12
 networks:
   net_16ubots:
     driver: bridge
     enable_ipv6: true
     ipam:
       config:
-        - subnet:  10.6.0.0/16
-          gateway: 10.6.0.1
+        - subnet:  11.6.0.0/16
+          gateway: 11.6.0.1
         # Generated using https://simpledns.com/private-ipv6
-        - subnet:  fdf0:e132:efcf:2fae::/64
-          gateway: fdf0:e132:efcf:2fae::1
-        # IPs:     fdf0:e132:efcf:2fae:xxxx:xxxx:xxxx:xxxx
+        - subnet:  fdaa:745e:3098:5739::/64
+          gateway: fdaa:745e:3098:5739::1
+        # IPs:     fdaa:745e:3098:5739:xxxx:xxxx:xxxx:xxxx
