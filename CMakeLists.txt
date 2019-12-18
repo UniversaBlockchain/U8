@@ -3,6 +3,7 @@ project(u8)
 
 add_definitions(-DGMP_DESC)
 add_definitions(-DMG_HIDE_SERVER_INFO)
+add_definitions(-DMG_ENABLE_IPV6)
 
 # v8 lib
 # g++ -I/usr/local/Cellar/v8/7.1.302.28 -I/usr/local/Cellar/v8/7.1.302.28/include -Gs tests/hello-world.cc -o hello_world -L/usr/local/Cellar/v8/7.1.302.28 -lv8 -lv8_libplatform -lv8_libbase -Lout.gn/x64.release.sample/obj/ -pthread -std=c++0x -O2
