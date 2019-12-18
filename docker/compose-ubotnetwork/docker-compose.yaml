@@ -25,18 +25,18 @@ services:
     command: --config /deploy/
     #entrypoint: tail -f /dev/null
     links:
-     - ubotdb
+      - ubotdb
     ports:
       - 17000:17000
     depends_on:
       ubotdb:
         condition: service_healthy
     volumes:
-     - ./deploy/config/nodes/ubot_0.yaml:/deploy/config/config.yaml
-     - ./deploy/config/mainnet_topology.json:/deploy/config/mainnet_topology.json
-     - ./deploy/config/keys:/deploy/config/keys
-     - ./deploy/config/nodes:/deploy/config/nodes
-     - ./deploy/ubot0-tmp:/deploy/tmp
+      - ./deploy/config/nodes/ubot_0.yaml:/deploy/config/config.yaml
+      - ./deploy/config/mainnet_topology.json:/deploy/config/mainnet_topology.json
+      - ./deploy/config/keys:/deploy/config/keys
+      - ./deploy/config/nodes:/deploy/config/nodes
+      - ./deploy/ubot0-tmp:/deploy/tmp
     environment:
       NODE_INDEX: 0
     networks:
@@ -48,6 +48,7 @@ services:
   ubot-1-local:
     image: universa/ubotserver:latest-debug
     command: --config /deploy/
+    #entrypoint: tail -f /dev/null
     links:
       - ubotdb
     ports:
@@ -62,13 +63,363 @@ services:
       - ./deploy/config/nodes:/deploy/config/nodes
       - ./deploy/ubot1-tmp:/deploy/tmp
     environment:
-      NODE_INDEX: 1
+      NODE_INDEX: 0
     networks:
       net_16ubots:
         aliases:
           - ubot1
         ipv4_address: 11.6.0.12
         ipv6_address: fdaa:745e:3098:5739::12
+  ubot-2-local:
+    image: universa/ubotserver:latest-debug
+    command: --config /deploy/
+    #entrypoint: tail -f /dev/null
+    links:
+      - ubotdb
+    ports:
+      - 17002:17002
+    depends_on:
+      ubotdb:
+        condition: service_healthy
+    volumes:
+      - ./deploy/config/nodes/ubot_2.yaml:/deploy/config/config.yaml
+      - ./deploy/config/mainnet_topology.json:/deploy/config/mainnet_topology.json
+      - ./deploy/config/keys:/deploy/config/keys
+      - ./deploy/config/nodes:/deploy/config/nodes
+      - ./deploy/ubot2-tmp:/deploy/tmp
+    environment:
+      NODE_INDEX: 0
+    networks:
+      net_16ubots:
+        aliases:
+          - ubot2
+        ipv4_address: 11.6.0.13
+        ipv6_address: fdaa:745e:3098:5739::13
+  ubot-3-local:
+    image: universa/ubotserver:latest-debug
+    command: --config /deploy/
+    #entrypoint: tail -f /dev/null
+    links:
+      - ubotdb
+    ports:
+      - 17003:17003
+    depends_on:
+      ubotdb:
+        condition: service_healthy
+    volumes:
+      - ./deploy/config/nodes/ubot_3.yaml:/deploy/config/config.yaml
+      - ./deploy/config/mainnet_topology.json:/deploy/config/mainnet_topology.json
+      - ./deploy/config/keys:/deploy/config/keys
+      - ./deploy/config/nodes:/deploy/config/nodes
+      - ./deploy/ubot3-tmp:/deploy/tmp
+    environment:
+      NODE_INDEX: 0
+    networks:
+      net_16ubots:
+        aliases:
+          - ubot3
+        ipv4_address: 11.6.0.14
+        ipv6_address: fdaa:745e:3098:5739::14
+  ubot-4-local:
+    image: universa/ubotserver:latest-debug
+    command: --config /deploy/
+    #entrypoint: tail -f /dev/null
+    links:
+      - ubotdb
+    ports:
+      - 17004:17004
+    depends_on:
+      ubotdb:
+        condition: service_healthy
+    volumes:
+      - ./deploy/config/nodes/ubot_4.yaml:/deploy/config/config.yaml
+      - ./deploy/config/mainnet_topology.json:/deploy/config/mainnet_topology.json
+      - ./deploy/config/keys:/deploy/config/keys
+      - ./deploy/config/nodes:/deploy/config/nodes
+      - ./deploy/ubot4-tmp:/deploy/tmp
+    environment:
+      NODE_INDEX: 0
+    networks:
+      net_16ubots:
+        aliases:
+          - ubot4
+        ipv4_address: 11.6.0.15
+        ipv6_address: fdaa:745e:3098:5739::15
+  ubot-5-local:
+    image: universa/ubotserver:latest-debug
+    command: --config /deploy/
+    #entrypoint: tail -f /dev/null
+    links:
+      - ubotdb
+    ports:
+      - 17005:17005
+    depends_on:
+      ubotdb:
+        condition: service_healthy
+    volumes:
+      - ./deploy/config/nodes/ubot_5.yaml:/deploy/config/config.yaml
+      - ./deploy/config/mainnet_topology.json:/deploy/config/mainnet_topology.json
+      - ./deploy/config/keys:/deploy/config/keys
+      - ./deploy/config/nodes:/deploy/config/nodes
+      - ./deploy/ubot5-tmp:/deploy/tmp
+    environment:
+      NODE_INDEX: 0
+    networks:
+      net_16ubots:
+        aliases:
+          - ubot5
+        ipv4_address: 11.6.0.16
+        ipv6_address: fdaa:745e:3098:5739::16
+  ubot-6-local:
+    image: universa/ubotserver:latest-debug
+    command: --config /deploy/
+    #entrypoint: tail -f /dev/null
+    links:
+      - ubotdb
+    ports:
+      - 17006:17006
+    depends_on:
+      ubotdb:
+        condition: service_healthy
+    volumes:
+      - ./deploy/config/nodes/ubot_6.yaml:/deploy/config/config.yaml
+      - ./deploy/config/mainnet_topology.json:/deploy/config/mainnet_topology.json
+      - ./deploy/config/keys:/deploy/config/keys
+      - ./deploy/config/nodes:/deploy/config/nodes
+      - ./deploy/ubot6-tmp:/deploy/tmp
+    environment:
+      NODE_INDEX: 0
+    networks:
+      net_16ubots:
+        aliases:
+          - ubot6
+        ipv4_address: 11.6.0.17
+        ipv6_address: fdaa:745e:3098:5739::17
+  ubot-7-local:
+    image: universa/ubotserver:latest-debug
+    command: --config /deploy/
+    #entrypoint: tail -f /dev/null
+    links:
+      - ubotdb
+    ports:
+      - 17007:17007
+    depends_on:
+      ubotdb:
+        condition: service_healthy
+    volumes:
+      - ./deploy/config/nodes/ubot_7.yaml:/deploy/config/config.yaml
+      - ./deploy/config/mainnet_topology.json:/deploy/config/mainnet_topology.json
+      - ./deploy/config/keys:/deploy/config/keys
+      - ./deploy/config/nodes:/deploy/config/nodes
+      - ./deploy/ubot7-tmp:/deploy/tmp
+    environment:
+      NODE_INDEX: 0
+    networks:
+      net_16ubots:
+        aliases:
+          - ubot7
+        ipv4_address: 11.6.0.18
+        ipv6_address: fdaa:745e:3098:5739::18
+  ubot-8-local:
+    image: universa/ubotserver:latest-debug
+    command: --config /deploy/
+    #entrypoint: tail -f /dev/null
+    links:
+      - ubotdb
+    ports:
+      - 17008:17008
+    depends_on:
+      ubotdb:
+        condition: service_healthy
+    volumes:
+      - ./deploy/config/nodes/ubot_8.yaml:/deploy/config/config.yaml
+      - ./deploy/config/mainnet_topology.json:/deploy/config/mainnet_topology.json
+      - ./deploy/config/keys:/deploy/config/keys
+      - ./deploy/config/nodes:/deploy/config/nodes
+      - ./deploy/ubot8-tmp:/deploy/tmp
+    environment:
+      NODE_INDEX: 0
+    networks:
+      net_16ubots:
+        aliases:
+          - ubot8
+        ipv4_address: 11.6.0.19
+        ipv6_address: fdaa:745e:3098:5739::19
+  ubot-9-local:
+    image: universa/ubotserver:latest-debug
+    command: --config /deploy/
+    #entrypoint: tail -f /dev/null
+    links:
+      - ubotdb
+    ports:
+      - 17009:17009
+    depends_on:
+      ubotdb:
+        condition: service_healthy
+    volumes:
+      - ./deploy/config/nodes/ubot_9.yaml:/deploy/config/config.yaml
+      - ./deploy/config/mainnet_topology.json:/deploy/config/mainnet_topology.json
+      - ./deploy/config/keys:/deploy/config/keys
+      - ./deploy/config/nodes:/deploy/config/nodes
+      - ./deploy/ubot9-tmp:/deploy/tmp
+    environment:
+      NODE_INDEX: 0
+    networks:
+      net_16ubots:
+        aliases:
+          - ubot9
+        ipv4_address: 11.6.0.20
+        ipv6_address: fdaa:745e:3098:5739::20
+  ubot-10-local:
+    image: universa/ubotserver:latest-debug
+    command: --config /deploy/
+    #entrypoint: tail -f /dev/null
+    links:
+      - ubotdb
+    ports:
+      - 17010:17010
+    depends_on:
+      ubotdb:
+        condition: service_healthy
+    volumes:
+      - ./deploy/config/nodes/ubot_10.yaml:/deploy/config/config.yaml
+      - ./deploy/config/mainnet_topology.json:/deploy/config/mainnet_topology.json
+      - ./deploy/config/keys:/deploy/config/keys
+      - ./deploy/config/nodes:/deploy/config/nodes
+      - ./deploy/ubot10-tmp:/deploy/tmp
+    environment:
+      NODE_INDEX: 0
+    networks:
+      net_16ubots:
+        aliases:
+          - ubot10
+        ipv4_address: 11.6.0.21
+        ipv6_address: fdaa:745e:3098:5739::21
+  ubot-11-local:
+    image: universa/ubotserver:latest-debug
+    command: --config /deploy/
+    #entrypoint: tail -f /dev/null
+    links:
+      - ubotdb
+    ports:
+      - 17011:17011
+    depends_on:
+      ubotdb:
+        condition: service_healthy
+    volumes:
+      - ./deploy/config/nodes/ubot_11.yaml:/deploy/config/config.yaml
+      - ./deploy/config/mainnet_topology.json:/deploy/config/mainnet_topology.json
+      - ./deploy/config/keys:/deploy/config/keys
+      - ./deploy/config/nodes:/deploy/config/nodes
+      - ./deploy/ubot11-tmp:/deploy/tmp
+    environment:
+      NODE_INDEX: 0
+    networks:
+      net_16ubots:
+        aliases:
+          - ubot11
+        ipv4_address: 11.6.0.22
+        ipv6_address: fdaa:745e:3098:5739::22
+  ubot-12-local:
+    image: universa/ubotserver:latest-debug
+    command: --config /deploy/
+    #entrypoint: tail -f /dev/null
+    links:
+      - ubotdb
+    ports:
+      - 17012:17012
+    depends_on:
+      ubotdb:
+        condition: service_healthy
+    volumes:
+      - ./deploy/config/nodes/ubot_12.yaml:/deploy/config/config.yaml
+      - ./deploy/config/mainnet_topology.json:/deploy/config/mainnet_topology.json
+      - ./deploy/config/keys:/deploy/config/keys
+      - ./deploy/config/nodes:/deploy/config/nodes
+      - ./deploy/ubot12-tmp:/deploy/tmp
+    environment:
+      NODE_INDEX: 0
+    networks:
+      net_16ubots:
+        aliases:
+          - ubot12
+        ipv4_address: 11.6.0.23
+        ipv6_address: fdaa:745e:3098:5739::23
+  ubot-13-local:
+    image: universa/ubotserver:latest-debug
+    command: --config /deploy/
+    #entrypoint: tail -f /dev/null
+    links:
+      - ubotdb
+    ports:
+      - 17013:17013
+    depends_on:
+      ubotdb:
+        condition: service_healthy
+    volumes:
+      - ./deploy/config/nodes/ubot_13.yaml:/deploy/config/config.yaml
+      - ./deploy/config/mainnet_topology.json:/deploy/config/mainnet_topology.json
+      - ./deploy/config/keys:/deploy/config/keys
+      - ./deploy/config/nodes:/deploy/config/nodes
+      - ./deploy/ubot13-tmp:/deploy/tmp
+    environment:
+      NODE_INDEX: 0
+    networks:
+      net_16ubots:
+        aliases:
+          - ubot13
+        ipv4_address: 11.6.0.24
+        ipv6_address: fdaa:745e:3098:5739::24
+  ubot-14-local:
+    image: universa/ubotserver:latest-debug
+    command: --config /deploy/
+    #entrypoint: tail -f /dev/null
+    links:
+      - ubotdb
+    ports:
+      - 17014:17014
+    depends_on:
+      ubotdb:
+        condition: service_healthy
+    volumes:
+      - ./deploy/config/nodes/ubot_14.yaml:/deploy/config/config.yaml
+      - ./deploy/config/mainnet_topology.json:/deploy/config/mainnet_topology.json
+      - ./deploy/config/keys:/deploy/config/keys
+      - ./deploy/config/nodes:/deploy/config/nodes
+      - ./deploy/ubot14-tmp:/deploy/tmp
+    environment:
+      NODE_INDEX: 0
+    networks:
+      net_16ubots:
+        aliases:
+          - ubot14
+        ipv4_address: 11.6.0.25
+        ipv6_address: fdaa:745e:3098:5739::25
+  ubot-15-local:
+    image: universa/ubotserver:latest-debug
+    command: --config /deploy/
+    #entrypoint: tail -f /dev/null
+    links:
+      - ubotdb
+    ports:
+      - 17015:17015
+    depends_on:
+      ubotdb:
+        condition: service_healthy
+    volumes:
+      - ./deploy/config/nodes/ubot_15.yaml:/deploy/config/config.yaml
+      - ./deploy/config/mainnet_topology.json:/deploy/config/mainnet_topology.json
+      - ./deploy/config/keys:/deploy/config/keys
+      - ./deploy/config/nodes:/deploy/config/nodes
+      - ./deploy/ubot15-tmp:/deploy/tmp
+    environment:
+      NODE_INDEX: 0
+    networks:
+      net_16ubots:
+        aliases:
+          - ubot15
+        ipv4_address: 11.6.0.26
+        ipv6_address: fdaa:745e:3098:5739::26
 networks:
   net_16ubots:
     driver: bridge
