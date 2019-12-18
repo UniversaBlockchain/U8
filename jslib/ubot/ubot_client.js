@@ -56,7 +56,7 @@ class UBotClient {
         this.ubotPublicKey = null;
         this.httpNodeClients = new Map();
         this.httpUbotClients = new Map();
-        this.closingRequests = new Set();
+        //this.closingRequests = new Set();
         this.lock = new Lock();
         this.ubotRegistryContract = null;
         this.poolAndQuorum = null;
@@ -101,8 +101,8 @@ class UBotClient {
      */
     async shutdown() {
         // wait closing requests
-        while (this.closingRequests.size > 0)
-            await sleep(UBotConfig.waitPeriod);
+        // while (this.closingRequests.size > 0)
+        //     await sleep(UBotConfig.waitPeriod);
 
         if (this.httpNodeClients.size === 0)
             await this.httpNodeClient.stop();
@@ -891,49 +891,26 @@ class UBotClient {
      * @throws {UBotClientException} client exception if session pool consensus is not reached.
      */
     async executeCloudMethod(requestContract, payment, waitPreviousSession = false) {
-        if (this.httpUbotClient != null) {
-            if (waitPreviousSession) {
-                // wait closing requests
-                while (this.closingRequests.size > 0)
-                    await sleep(UBotConfig.waitPeriod);
-            } else
-                throw new UBotClientException("Ubot is already connected to the pool (previous request. Wait disconnect from the pool or force disconnect");
-        }
-
         let session = await this.startCloudMethod(requestContract, payment, waitPreviousSession);
 
         let quorum = this.poolAndQuorum.quorum;
         let states = [];
         let groups = new Map();
+        let answered = new Set();
 
-        let state = await this.waitCloudMethod(requestContract.id);
+        while (true) {
+            let gotStates = await Promise.all(session.pool.filter(ubotNumber => !answered.has(ubotNumber)).map(async (ubotNumber) => {
+                let state = await this.getStateCloudMethod(requestContract.id, ubotNumber);
 
-        // check consensus
-        if (quorum <= 1)
-            return state;
+                if (state.state != null && !UBotPoolState.byVal.get(state.state).canContinue) {
+                    answered.add(ubotNumber);
+                    return state;
+                } else
+                    return null;
+            }));
 
-        states.push(state);
-        groups.set(HashId.of(await Boss.dump(await BossBiMapper.getInstance().serialize(state))).base64, 1);
-
-        let finishFire = null;
-        let finishEvent = new Promise(resolve => finishFire = resolve);
-        let waiting = true;
-
-        let waitingRequests = session.pool.length - 1;
-
-        session.pool.filter(ubotNumber => ubotNumber !== this.httpUbotClient.nodeNumber).forEach(
-            ubotNumber => this.waitCloudMethod(requestContract.id, ubotNumber).then(async (state) =>
-                await this.lock.synchronize(requestContract.id, async () => {
-                    waitingRequests--;
-                    if (waitingRequests === 0) {
-                        await this.disconnectUbot();
-                        // remove closing request
-                        this.closingRequests.delete(requestContract.id.base64);
-                    }
-
-                    if (!waiting)
-                        return;
-
+            for (let state of gotStates)
+                if (state != null) {
                     states.push(state);
 
                     let groupKey = HashId.of(await Boss.dump(await BossBiMapper.getInstance().serialize(state))).base64;
@@ -943,31 +920,21 @@ class UBotClient {
 
                     // check consensus
                     if (count + 1 >= quorum) {
-                        waiting = false;
-                        finishFire(state);
+                        await this.disconnectUbot();
+                        return state;
                     } else {
                         groups.set(groupKey, count + 1);
 
                         // check consensus available
                         if (Array.from(groups.values()).every(c => c + session.pool.length - states.length < quorum)) {
-                            waiting = false;
-                            finishFire(null);
-                        } else
-                            return;
+                            await this.disconnectUbot();
+                            throw new UBotClientException("Cloud method consensus can`t be reached, ubot states: " + t.secureStringify(states));
+                        }
                     }
+                }
 
-                    // save closing request
-                    if (waitingRequests > 0)
-                        this.closingRequests.add(requestContract.id.base64);
-                })
-            )
-        );
-
-        let result = await finishEvent;
-        if (result != null)
-            return result;
-
-        throw new UBotClientException("Cloud method consensus can`t be reached, ubot states: " + t.secureStringify(states));
+            await sleep(UBotConfig.waitPeriod);
+        }
     }
 
     async getSessionWithTrust(executableContractId) {
