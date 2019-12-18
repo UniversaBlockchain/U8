@@ -52,7 +52,7 @@ class UBotMain {
 
         this.ubot = new UBot(this.logger, this.network, this.ledger, this.nodeKey, this.configRoot + "/config/");
 
-        this.httpServer = new UBotHttpServer(this.nodeKey, "0.0.0.0", this.myInfo.clientAddress.port, this.logger, this.ubot);
+        this.httpServer = new UBotHttpServer(this.nodeKey, "[::]", this.myInfo.clientAddress.port, this.logger, this.ubot);
 
         this.network.subscribe(async(notification) => {
             if ((notification instanceof UBotCloudNotification) ||
