@@ -992,8 +992,8 @@ class UBotClient {
             throw new Error("askSessionOnSomeNodes must return array");
 
         for (let i = 0; i < sessions.length; i++)
-            if (sessions[i] != null && sessions[i].state != null)
-                return sessions[i];
+            if (sessions[i] != null && sessions[i].session != null && sessions[i].session.state != null)
+                return sessions[i].session;
 
         return null;
     }
