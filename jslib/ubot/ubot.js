@@ -52,24 +52,28 @@ class UBot {
 
     async executeCloudMethod(contract) {
         if (this.processors.has(contract.id.base64))
-            throw new Error("Cloud processor already exist");
+            return;
 
-        this.logger.log("executeCloudMethod: requestContract.id = " + contract.id);
-        this.logger.log("  contract.state.data: " + t.secureStringify(contract.state.data));
+        await this.lock.synchronize(contract.id, async () => {
+            if (!this.processors.has(contract.id.base64)) {
+                this.logger.log("executeCloudMethod: requestContract.id = " + contract.id);
+                this.logger.log("  contract.state.data: " + t.secureStringify(contract.state.data));
 
-        if (this.client == null)
-            this.client = await new UBotClient(this.nodeKey, this.configRoot + TOPOLOGY_FILE, null,
-                UBotConfig.clientMaxWaitSession, this.logger).start();
+                if (this.client == null)
+                    this.client = await new UBotClient(this.nodeKey, this.configRoot + TOPOLOGY_FILE, null,
+                        UBotConfig.clientMaxWaitSession, this.logger).start();
 
-        let session = await this.client.checkSession(contract.state.data.executable_contract_id, contract.id, this.network.myInfo.number, this);
-        this.logger.log("executeCloudMethod session: " + session);
+                let session = await this.client.checkSession(contract.state.data.executable_contract_id, contract.id, this.network.myInfo.number, this);
+                this.logger.log("executeCloudMethod session: " + session);
 
-        let processor = new CloudProcessor(UBotPoolState.SEND_STARTING_CONTRACT, contract.id, this, session);
-        processor.requestContract = contract;
-        processor.startProcessingCurrentState();
+                let processor = new CloudProcessor(UBotPoolState.SEND_STARTING_CONTRACT, contract.id, this, session);
+                processor.requestContract = contract;
+                processor.startProcessingCurrentState();
 
-        this.logger.log("Create cloud processor " + contract.id);
-        this.processors.set(contract.id.base64, processor);
+                this.logger.log("Create cloud processor " + contract.id);
+                this.processors.set(contract.id.base64, processor);
+            }
+        });
     }
 
     /**

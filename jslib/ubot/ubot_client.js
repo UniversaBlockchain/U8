@@ -298,7 +298,7 @@ class UBotClient {
      * @async
      * @return {Promise<Object>} command result.
      */
-    async askSessionOnAllNodes(command, params) {
+    async askOnAllNodes(command, params) {
         await this.lock.synchronize("connectNodes", async () => {
             if (this.httpNodeClients.size !== this.nodes.length)
                 await this.connectAllNodes();
@@ -313,8 +313,8 @@ class UBotClient {
             )
         ));
 
-        let message = "UBotClient.askSessionOnAllNodes: cmd=" + command + " " + JSON.stringify(data, (key, value) => {
-            if ((key === "requestId" || key === "sessionId") && value != null && value instanceof crypto.HashId)
+        let message = "UBotClient.askOnAllNodes: cmd=" + command + " " + JSON.stringify(data, (key, value) => {
+            if (value != null && value instanceof crypto.HashId)
                 return value.toString();
             else
                 return value;
@@ -337,13 +337,15 @@ class UBotClient {
      * @async
      * @return {Promise<Object>} command result.
      */
-    async askSessionOnSomeNodes(command, params, nodes) {
+    async askOnSomeNodes(command, params, nodes) {
         await this.lock.synchronize("connectNodes", async () => {
             if (this.httpNodeClients.size !== this.nodes.length)
                 await this.connectAllNodes();
         });
 
-        let data = await Promise.all(nodes.map(nodeNumber => this.httpNodeClients.get(nodeNumber)).map(nodeClient =>
+        let data = await Promise.all(nodes
+            .filter(nodeNumber => this.httpNodeClients.has(nodeNumber))
+            .map(nodeNumber => this.httpNodeClients.get(nodeNumber)).map(nodeClient =>
             new Promise(async (resolve, reject) =>
                 await nodeClient.command(command, params,
                     result => resolve(result),
@@ -352,8 +354,9 @@ class UBotClient {
             )
         ));
 
-        let message = "UBotClient.askSessionOnSomeNodes: cmd=" + command + " " + JSON.stringify(data, (key, value) => {
-            if ((key === "requestId" || key === "sessionId") && value != null && value instanceof crypto.HashId)
+        let message = "UBotClient.askOnSomeNodes: cmd=" + command + " nodes=" + JSON.stringify(nodes) + " " +
+            JSON.stringify(data, (key, value) => {
+            if (value != null && value instanceof crypto.HashId)
                 return value.toString();
             else
                 return value;
@@ -430,6 +433,12 @@ class UBotClient {
             await sleep(100);
             lastResult = await this.getState(paymentId);
         }
+
+        message = "UBotClient.processPaidOperation item state: " + lastResult.state.val;
+        if (this.logger != null)
+            this.logger.log(message);
+        else
+            console.log(message);
 
         if (lastResult.state === ItemState.DECLINED)
             throw new UBotClientException("ubotCreateSessionPaid payment is DECLINED");
@@ -986,7 +995,7 @@ class UBotClient {
 
         let selected = t.randomChoice(nodes, trust);
 
-        let sessions = await this.askSessionOnSomeNodes("ubotGetSession", {executableContractId: executableContractId}, selected);
+        let sessions = await this.askOnSomeNodes("ubotGetSession", {executableContractId: executableContractId}, selected);
 
         if (sessions == null || !sessions instanceof Array || sessions.length !== selected.length)
             throw new Error("askSessionOnSomeNodes must return array");

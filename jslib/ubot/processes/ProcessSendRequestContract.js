@@ -7,6 +7,7 @@ const UBotConfig = require("ubot/ubot_config").UBotConfig;
 const ExecutorWithFixedPeriod = require("executorservice").ExecutorWithFixedPeriod;
 const UBotCloudNotification = require("ubot/ubot_notification").UBotCloudNotification;
 const ErrorRecord = require("errors").ErrorRecord;
+const Errors = require("errors").Errors;
 
 class ProcessSendRequestContract extends ProcessBase {
     constructor(processor, onReady) {

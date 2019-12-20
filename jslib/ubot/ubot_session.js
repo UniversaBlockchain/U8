@@ -44,7 +44,7 @@ class UBotSession {
                 fromValue = storages[storageName];
         }
 
-        await this.client.askSessionOnAllNodes("ubotUpdateStorage", {
+        await this.client.askOnAllNodes("ubotUpdateStorage", {
             executableContractId: this.executableContractId,
             storageName: storageName,
             fromValue: fromValue,
@@ -78,9 +78,6 @@ class UBotSession {
 
         let selected = t.randomChoice(nodes, trust, false);
 
-        let groups = new Map();
-        let asked = 0;
-
         let maxTime = ut.getRequestMaxWaitUbot(requestContract);
         if (maxTime != null)
             maxTime += Date.now();
@@ -95,7 +92,7 @@ class UBotSession {
             if (delay > 0)
                 await sleep(delay);
 
-            let answers = await this.client.askSessionOnSomeNodes("ubotGetStorage", {
+            let answers = await this.client.askOnSomeNodes("ubotGetStorage", {
                 executableContractId: this.executableContractId,
                 storageNames: [storageName]
             }, selected);
@@ -103,13 +100,15 @@ class UBotSession {
             if (answers == null || !answers instanceof Array || answers.length !== selected.length)
                 throw new Error("askSessionOnSomeNodes must return array");
 
+            let groups = new Map();
+            let asked = 0;
+
             for (let i = 0; i < answers.length; i++) {
                 let answer = answers[i];
                 if (answer == null || answer.current == null || answer.pending == null)
                     throw new Error("ubotGetStorage wrong result");
 
                 if (answer.pending[storageName] == null || Object.keys(answer.pending[storageName]).length === 0) {
-                    selected.splice(i, 1);
                     asked++;
 
                     let hash = answer.current[storageName];
@@ -160,7 +159,7 @@ class UBotSession {
 
         // if (initiateLongVote)
         //     await this.client.askSessionOnAllNodes("initiateVote", {packedItem: contract.sealedBinary});
-        await this.client.askSessionOnAllNodes("addKeyToContract", {itemId: contract.id});
+        await this.client.askOnAllNodes("addKeyToContract", {itemId: contract.id});
 
         let quorum = 0;
         if (this.ubot != null)      // UBot session
@@ -188,7 +187,7 @@ class UBotSession {
             if (delay > 0)
                 await sleep(delay);
 
-            votes = await this.client.askSessionOnAllNodes("getContractKeys", {itemId: contract.id});
+            votes = await this.client.askOnAllNodes("getContractKeys", {itemId: contract.id});
 
             if (votes == null || !votes instanceof Array)
                 throw new UBotClientException("Wrong getContractKeys result");
@@ -213,7 +212,7 @@ class UBotSession {
         if (this.ubot != null)
             this.ubot.logger.log("UBotSession.close");
 
-        await this.client.askSessionOnAllNodes("ubotCloseSession", {
+        await this.client.askOnAllNodes("ubotCloseSession", {
             executableContractId: this.executableContractId,
             finished: finished
         });
