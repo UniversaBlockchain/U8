@@ -10,7 +10,7 @@ let t = require("tools");
 
 import {unit} from 'test'
 
-//require('ubot/unit_tests/ubot_pro_test');
+//require('ubot/unit_tests/ubot_local_test');
 require('ubot/unit_tests/ubot_main_test');
 //require('ubot/unit_tests/ubot_commands_test');
 

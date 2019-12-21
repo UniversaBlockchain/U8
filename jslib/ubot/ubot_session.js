@@ -170,7 +170,7 @@ class UBotSession {
         let maxWaitUbot = ut.getRequestMaxWaitUbot(requestContract);
 
         // wait quorum votes
-        let positive = Math.ceil(this.client.nodes.length * UBotConfig.networkPositiveConsensus);
+        let positive = UBotConfig.getNetworkPositiveConsensus(this.client.nodes.length);
         let votes = null;
         let tryNumber = 0;
         let maxTime = null;

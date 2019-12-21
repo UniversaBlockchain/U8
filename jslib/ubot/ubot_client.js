@@ -470,28 +470,29 @@ class UBotClient {
         let session = null;
         if (payment != null) {
             params.packedU = await payment.getPackedTransaction();
-            let paidAttempts = 3;
+            //let paidAttempts = 3;
 
             while (!await this.processPaidOperation(params, payment.id)) {
                 if (waitPreviousSession) {
-                    session = await this.getSession("ubotGetSession",
-                        {executableContractId: requestContract.state.data.executable_contract_id});
-
-                    if (session == null || session.requestId == null || session.requestId.equals(requestContract.id)) {
-                        paidAttempts--;
-                        if (paidAttempts === 0)
-                            throw new UBotClientException("Paid operation with waiting previous session is failed");
-                    }
-
-                    while (session != null && session.requestId != null && !session.requestId.equals(requestContract.id)) {
-                        if (session.state === UBotSessionState.CLOSING.val || session.state === UBotSessionState.CLOSED.val)
-                            await sleep(UBotConfig.waitPeriod);
-                        else
-                            await sleep(UBotConfig.waitPeriod * 10);
-
-                        session = await this.getSession("ubotGetSession",
-                            {executableContractId: requestContract.state.data.executable_contract_id});
-                    }
+                    await sleep(UBotConfig.waitPaidPeriod);
+                    // session = await this.getSession("ubotGetSession",
+                    //     {executableContractId: requestContract.state.data.executable_contract_id});
+                    //
+                    // if (session == null || session.requestId == null || session.requestId.equals(requestContract.id)) {
+                    //     paidAttempts--;
+                    //     if (paidAttempts === 0)
+                    //         throw new UBotClientException("Paid operation with waiting previous session is failed");
+                    // }
+                    //
+                    // while (session != null && session.requestId != null && !session.requestId.equals(requestContract.id)) {
+                    //     if (session.state === UBotSessionState.CLOSING.val || session.state === UBotSessionState.CLOSED.val)
+                    //         await sleep(UBotConfig.waitPeriod);
+                    //     else
+                    //         await sleep(UBotConfig.waitPeriod * 10);
+                    //
+                    //     session = await this.getSession("ubotGetSession",
+                    //         {executableContractId: requestContract.state.data.executable_contract_id});
+                    // }
                 } else
                     throw new UBotClientException("Paid operation is not processed");
             }
@@ -516,8 +517,9 @@ class UBotClient {
                     throw new UBotClientException("Session timeout limit exceeded");
 
                 await sleep(UBotConfig.waitPeriod);
-                session = await this.getSession("ubotGetSession",
-                    {executableContractId: requestContract.state.data.executable_contract_id});
+                session = await this.getSession("ubotGetSession", waitPreviousSession ?
+                    {executableContractId: requestContract.state.data.executable_contract_id} :
+                    {requestId: requestContract.id});
             }
 
             this.checkSessionIsNull(session);

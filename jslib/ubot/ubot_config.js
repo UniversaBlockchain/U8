@@ -21,13 +21,22 @@ class UBotConfig {
     static clientMaxWaitSession = 60000; // ms
 
     static waitPeriod = 100; // ms
+    static waitPaidPeriod = 2000; // ms
 
-    static networkPositiveConsensus = 0.9;
     static storageReadTrustLevel = 0.3;
     static checkSessionTrustLevel = 0.3;
 
     static checkQuantiserPeriod = 10000; // ms
     static requestExpiredTime = 86400000; // ms
+
+    static getNetworkPositiveConsensus(count) {
+        if (count < 3)
+            return count;
+        else if (count < 10)
+            return count - 1;
+        else
+            return Math.ceil(count * 0.9);
+    }
 }
 
 module.exports = {UBotConfig};
