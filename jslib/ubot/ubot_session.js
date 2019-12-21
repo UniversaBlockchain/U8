@@ -210,10 +210,10 @@ class UBotSession {
 
     async close(finished) {
         if (this.ubot != null)
-            this.ubot.logger.log("UBotSession.close");
+            this.ubot.logger.log("UBotSession.close finished = " + finished);
 
         await this.client.askOnAllNodes("ubotCloseSession", {
-            executableContractId: this.executableContractId,
+            requestId: this.requestId,
             finished: finished
         });
     }
