@@ -1254,29 +1254,30 @@ unit.test("ubot_pro_test: launcher role", async () => {
     assert(state.result === 1);
 
     // method_for_launcher1 failure
-    // launcher1Contract = Contract.fromPrivateKey(userPrivKey);
-    // launcher1Contract.state.data.method_name = "method_for_launcher1";
-    // launcher1Contract.state.data.executable_contract_id = executableContract.id;
-    //
-    // await cs.addConstraintToContract(launcher1Contract, executableContract, "executable_contract_constraint",
-    //     Constraint.TYPE_EXISTING_STATE, ["this.state.data.executable_contract_id == ref.id"], true);
-    //
-    // await cs.addConstraintToContract(launcher1Contract, executableContract, "launcher_constraint",
-    //     Constraint.TYPE_EXISTING_STATE, ["this can_perform ref.state.roles.launcherRole1"], true);
-    //
-    // console.log("method_for_launcher1 failure...");
-    //
-    // let errMessage = null;
-    // try {
-    //     await ubotClient.executeCloudMethod(launcher1Contract, await createPayment(5), true);
-    // } catch (err) {
-    //     errMessage = err.message;
-    // }
-    //
-    // console.log("Error: " + errMessage);
-    //
-    // // checking error
-    // assert(errMessage === "Paid operation with waiting previous session is failed");
+    launcher1Contract = Contract.fromPrivateKey(userPrivKey);
+    launcher1Contract.state.data.method_name = "method_for_launcher1";
+    launcher1Contract.state.data.executable_contract_id = executableContract.id;
+
+    await cs.addConstraintToContract(launcher1Contract, executableContract, "executable_contract_constraint",
+        Constraint.TYPE_EXISTING_STATE, ["this.state.data.executable_contract_id == ref.id"], true);
+
+    await cs.addConstraintToContract(launcher1Contract, executableContract, "launcher_constraint",
+        Constraint.TYPE_EXISTING_STATE, ["this can_perform ref.state.roles.launcherRole1"], true);
+
+    console.log("method_for_launcher1 failure...");
+
+    let errMessage = null;
+    try {
+        await ubotClient.executeCloudMethod(launcher1Contract, await createPayment(5), true);
+    } catch (err) {
+        errMessage = err.message;
+    }
+
+    console.log("Error: " + errMessage);
+
+    // checking error
+    assert(errMessage === "Session is aborted. Errors: [{\"error\":\"FAILED_CHECK\",\"objectName\":\"checkReferencedItems for contract (hashId=" +
+        launcher1Contract.id + "): false\",\"message\":\"\"},{\"error\":\"FAILURE\",\"objectName\":\"requestContract\",\"message\":\"Request contract state is not APPROVED\"}]");
 
     // method_for_launcher2
     let launcher2Contract = Contract.fromPrivateKey(userKey2);
@@ -1299,29 +1300,30 @@ unit.test("ubot_pro_test: launcher role", async () => {
     assert(state.result === 2);
 
     // method_for_launcher2 failure
-    // launcher2Contract = Contract.fromPrivateKey(userKey1);
-    // launcher2Contract.state.data.method_name = "method_for_launcher2";
-    // launcher2Contract.state.data.executable_contract_id = executableContract.id;
-    //
-    // await cs.addConstraintToContract(launcher2Contract, executableContract, "executable_contract_constraint",
-    //     Constraint.TYPE_EXISTING_STATE, ["this.state.data.executable_contract_id == ref.id"], true);
-    //
-    // await cs.addConstraintToContract(launcher2Contract, executableContract, "launcher_constraint",
-    //     Constraint.TYPE_EXISTING_STATE, ["this can_perform ref.state.roles.launcherRole2"], true);
-    //
-    // console.log("method_for_launcher2 failure...");
-    //
-    // errMessage = null;
-    // try {
-    //     await ubotClient.executeCloudMethod(launcher2Contract, await createPayment(5), true);
-    // } catch (err) {
-    //     errMessage = err.message;
-    // }
-    //
-    // console.log("Error: " + errMessage);
-    //
-    // // checking error
-    // assert(errMessage === "Paid operation with waiting previous session is failed");
+    launcher2Contract = Contract.fromPrivateKey(userKey1);
+    launcher2Contract.state.data.method_name = "method_for_launcher2";
+    launcher2Contract.state.data.executable_contract_id = executableContract.id;
+
+    await cs.addConstraintToContract(launcher2Contract, executableContract, "executable_contract_constraint",
+        Constraint.TYPE_EXISTING_STATE, ["this.state.data.executable_contract_id == ref.id"], true);
+
+    await cs.addConstraintToContract(launcher2Contract, executableContract, "launcher_constraint",
+        Constraint.TYPE_EXISTING_STATE, ["this can_perform ref.state.roles.launcherRole2"], true);
+
+    console.log("method_for_launcher2 failure...");
+
+    errMessage = null;
+    try {
+        await ubotClient.executeCloudMethod(launcher2Contract, await createPayment(5), true);
+    } catch (err) {
+        errMessage = err.message;
+    }
+
+    console.log("Error: " + errMessage);
+
+    // checking error
+    assert(errMessage === "Session is aborted. Errors: [{\"error\":\"FAILED_CHECK\",\"objectName\":\"checkReferencedItems for contract (hashId=" +
+        launcher2Contract.id + "): false\",\"message\":\"\"},{\"error\":\"FAILURE\",\"objectName\":\"requestContract\",\"message\":\"Request contract state is not APPROVED\"}]");
 
     // method_for_any
     let anyContract = Contract.fromPrivateKey(userKey1);

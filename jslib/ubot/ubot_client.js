@@ -446,6 +446,15 @@ class UBotClient {
         return lastResult.state === ItemState.APPROVED;
     }
 
+    checkSessionIsNull(session) {
+        if (session == null || session.state == null) {
+            if (session.errors != null)
+                throw new UBotClientException("Session is aborted. Errors: " + JSON.stringify(session.errors));
+            else
+                throw new UBotClientException("Session is null");
+        }
+    }
+
     /**
      * Creates a new session for the cloud method.
      *
@@ -489,14 +498,12 @@ class UBotClient {
 
             waitPreviousSession = false;
 
-            while (session == null || session.state == null)
-                session = await this.getSession("ubotGetSession",
-                    {executableContractId: requestContract.state.data.executable_contract_id});
+            while (session == null || (session.state == null && session.errors == null))
+                session = await this.getSession("ubotGetSession", {requestId: requestContract.id});
         } else
             session = await this.getSession("ubotCreateSession", params);
 
-        if (session == null || session.state == null)
-            throw new UBotClientException("Session is null");
+        this.checkSessionIsNull(session);
 
         let maxTime = 0;
         if (this.waitSession != null)
@@ -513,8 +520,7 @@ class UBotClient {
                     {executableContractId: requestContract.state.data.executable_contract_id});
             }
 
-            if (session == null || session.state == null)
-                throw new UBotClientException("Can`t establish session. Session is null");
+            this.checkSessionIsNull(session);
 
             if (waitPreviousSession) {
                 while (session.requestId != null && !session.requestId.equals(requestContract.id)) {
@@ -525,8 +531,7 @@ class UBotClient {
 
                     session = await this.getSession("ubotCreateSession", params);
 
-                    if (session == null || session.state == null)
-                        throw new UBotClientException("Session is null");
+                    this.checkSessionIsNull(session);
                 }
 
                 if (this.waitSession != null)
@@ -550,11 +555,9 @@ class UBotClient {
                 throw new UBotClientException("Session timeout limit exceeded");
 
             await sleep(UBotConfig.waitPeriod);
-            session = await this.getSession("ubotGetSession",
-                {executableContractId: requestContract.state.data.executable_contract_id});
+            session = await this.getSession("ubotGetSession", {requestId: requestContract.id});
 
-            if (session == null || session.state == null)
-                throw new UBotClientException("Can`t establish session. Session is null");
+            this.checkSessionIsNull(session);
         }
 
         if (session.state === UBotSessionState.CLOSING.val)
@@ -982,8 +985,8 @@ class UBotClient {
         }
     }
 
-    async getSessionWithTrust(executableContractId) {
-        let session = await this.getSession("ubotGetSession", {executableContractId: executableContractId});
+    async getSessionWithTrust(requestId) {
+        let session = await this.getSession("ubotGetSession", {requestId: requestId});
 
         if (session != null && session.state != null)
             return session;
@@ -995,7 +998,7 @@ class UBotClient {
 
         let selected = t.randomChoice(nodes, trust);
 
-        let sessions = await this.askOnSomeNodes("ubotGetSession", {executableContractId: executableContractId}, selected);
+        let sessions = await this.askOnSomeNodes("ubotGetSession", {requestId: requestId}, selected);
 
         if (sessions == null || !sessions instanceof Array || sessions.length !== selected.length)
             throw new Error("askSessionOnSomeNodes must return array");
@@ -1019,10 +1022,9 @@ class UBotClient {
      * @return {Promise<UBotSession>}.
      */
     async checkSession(executableContractId, requestContractId, ubotNumber, ubot) {
-        let session = await this.getSessionWithTrust(executableContractId);
+        let session = await this.getSessionWithTrust(requestContractId);
 
-        if (session == null || session.state == null)
-            throw new UBotClientException("Session is null");
+        this.checkSessionIsNull(session);
 
         let maxTime = 0;
         if (this.waitSession != null)
@@ -1040,10 +1042,9 @@ class UBotClient {
                     throw new UBotClientException("Session timeout limit exceeded");
 
                 await sleep(UBotConfig.waitPeriod);
-                session = await this.getSessionWithTrust(executableContractId);
+                session = await this.getSessionWithTrust(requestContractId);
 
-                if (session == null || session.state == null)
-                    throw new UBotClientException("Session is null");
+                this.checkSessionIsNull(session);
             }
 
             if (session.state === UBotSessionState.CLOSING.val)
