@@ -41,7 +41,7 @@ async function createPayment(cost) {
     await U.seal(true);
 
     await U.addSignatureToSeal(tk.getTestKey());
-    let ir = await netClient.register(await U.getPackedTransaction(), 10000);
+    let ir = await netClient.register(await U.getPackedTransaction(), 20000);
 
     assert(ir.state === ItemState.APPROVED);
 
@@ -1155,7 +1155,7 @@ unit.test("ubot_local_test: execute cloud method with ubot delay", async () => {
     await shutdownUBots(ubotMains);
 });
 
-unit.test("ubot_main_test: sequential launch", async () => {
+unit.test("ubot_local_test: sequential launch", async () => {
     let ubotMains = await createUBots(ubotsCount);
 
     let ubotClient = await new UBotClient(clientKey, TOPOLOGY_ROOT + TOPOLOGY_FILE).start();
