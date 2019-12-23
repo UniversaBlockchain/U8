@@ -56,6 +56,7 @@ class UBotSession {
             throw new Error("askOnAllNodes must return array");
 
         let failed = 0;
+        let errors = [];
 
         for (let i = 0; i < answers.length; i++) {
             if (answers[i] == null)
@@ -63,8 +64,11 @@ class UBotSession {
 
             if (answers[i] instanceof Error) {
                 failed++;
+                errors.push(answers[i].toString());
                 if (failed >= UBotConfig.getNetworkNegativeConsensus(this.client.topology.length))
-                    throw new Error("Error UBotSession.updateStorage: error in answers from some nodes - consensus was broken");
+                    throw new Error(
+                        "Error UBotSession.updateStorage: error in answers from some nodes - consensus was broken. Errors: " +
+                        JSON.stringify(errors));
             }
         }
 
@@ -120,13 +124,14 @@ class UBotSession {
             let groups = new Map();
             let asked = 0;
             let failed = 0;
+            let errors = [];
 
             for (let i = 0; i < answers.length; i++) {
                 let answer = answers[i];
                 if (answer == null)
                     throw new Error("ubotGetStorage return null");
 
-                if (!answer instanceof Error) {
+                if (!(answer instanceof Error)) {
                     if (answer.current == null || answer.pending == null)
                         throw new Error("ubotGetStorage wrong result");
 
@@ -155,8 +160,11 @@ class UBotSession {
                 } else {
                     asked++;
                     failed++;
+                    errors.push(answers[i].toString());
                     if (failed >= UBotConfig.getNetworkNegativeConsensus(this.client.topology.length))
-                        throw new Error("Error UBotSession.getStorage: error in answers from some nodes - consensus was broken");
+                        throw new Error(
+                            "Error UBotSession.getStorage: error in answers from some nodes - consensus was broken. Errors: " +
+                            JSON.stringify(errors));
                 }
             }
 
