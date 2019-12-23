@@ -90,12 +90,12 @@ async function generateSecureRandomExecutableContract() {
         getRandom: {
             pool: {size: 5},
             quorum: {size: 4},
-            max_wait_ubot: 30
+            max_wait_ubot: 120
         },
         readRandom: {
             pool: {size: 5},
             quorum: {size: 4},
-            max_wait_ubot: 30
+            max_wait_ubot: 120
         }
     };
 

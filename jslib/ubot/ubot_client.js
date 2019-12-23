@@ -83,12 +83,37 @@ class UBotClient {
         });
 
         let random = Math.floor(Math.random() * this.topology.length);
-        let randomNode = this.nodes[random];
+        let randoms = new Set();
+        randoms.add(random);
+        let attempts = Math.min(3, this.topology.length);
 
-        this.httpNodeClient = new HttpClient(randomNode.url);
-        this.httpNodeClient.nodeNumber = this.topology[random].number;
-        this.nodePublicKey = randomNode.key;
-        await this.httpNodeClient.start(this.clientPrivateKey, this.nodePublicKey);
+        while (true) {
+            try {
+                let randomNode = this.nodes[random];
+
+                this.httpNodeClient = new HttpClient(randomNode.url);
+                this.httpNodeClient.nodeNumber = this.topology[random].number;
+                this.nodePublicKey = randomNode.key;
+                await this.httpNodeClient.start(this.clientPrivateKey, this.nodePublicKey);
+                break;
+
+            } catch (err) {
+                let message = "Failed connection to node " + this.topology[random].number + ". Error: " + err.message;
+                if (this.logger != null)
+                    this.logger.log(message);
+                else
+                    console.log(message);
+
+                if (randoms.size >= attempts)
+                    break;
+
+                do {
+                    random = Math.floor(Math.random() * this.topology.length);
+                } while (randoms.has(random));
+
+                randoms.add(random);
+            }
+        }
 
         return this;
     }
@@ -344,14 +369,16 @@ class UBotClient {
         });
 
         let data = await Promise.all(nodes
-            .filter(nodeNumber => this.httpNodeClients.has(nodeNumber))
             .map(nodeNumber => this.httpNodeClients.get(nodeNumber)).map(nodeClient =>
-            new Promise(async (resolve) =>
-                await nodeClient.command(command, params,
-                    result => resolve(result),
-                    error => resolve(error)
-                )
-            )
+            new Promise(async (resolve) => {
+                if (nodeClient == null)
+                    resolve(new Error("Node is not connected"));
+                else
+                    await nodeClient.command(command, params,
+                        result => resolve(result),
+                        error => resolve(error)
+                    )
+            })
         ));
 
         let message = "UBotClient.askOnSomeNodes: cmd=" + command + " nodes=" + JSON.stringify(nodes) + " " +

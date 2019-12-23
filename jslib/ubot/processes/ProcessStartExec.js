@@ -117,6 +117,14 @@ class ProcessStartExec extends ProcessBase {
     function errorFail(methodName, err) {
         return new Promise(resolve => wrkInner.farcall("errorFail", [methodName, err], {}, ans => resolve(ans)));
     }
+    
+    function startTransaction(string) {
+        return new Promise((resolve, reject) => resolve());
+    }
+    
+    function finishTransaction(string) {
+        return new Promise((resolve, reject) => resolve());
+    }
     `;
 
     constructor(processor, onReady /*, cmdStack = []*/) {

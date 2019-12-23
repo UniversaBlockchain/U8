@@ -52,8 +52,11 @@ class UBotSession {
         });
 
         // check answers
-        if (answers == null || !answers instanceof Array || answers.length !== this.client.nodes.length)
-            throw new Error("askOnAllNodes must return array");
+        if (answers == null || !answers instanceof Array || answers.length !== this.client.httpNodeClients.size)
+            throw new UBotClientException("Error UBotSession.updateStorage: askOnAllNodes must return array");
+
+        if (this.client.httpNodeClients.size < UBotConfig.getNetworkPositiveConsensus(this.client.nodes.length))
+            throw new UBotClientException("Error UBotSession.updateStorage: not enough answers for consensus");
 
         let failed = 0;
         let errors = [];
@@ -66,7 +69,7 @@ class UBotSession {
                 failed++;
                 errors.push(answers[i].toString());
                 if (failed >= UBotConfig.getNetworkNegativeConsensus(this.client.topology.length))
-                    throw new Error(
+                    throw new UBotClientException(
                         "Error UBotSession.updateStorage: error in answers from some nodes - consensus was broken. Errors: " +
                         JSON.stringify(errors));
             }
@@ -107,7 +110,7 @@ class UBotSession {
             let delay = Math.min(tryNumber, 50) * UBotConfig.waitPeriod;
 
             if (maxTime != null && Date.now() + delay > maxTime)
-                throw new UBotClientException("Maximum waiting time for votes on the registered contract is exceeded");
+                throw new UBotClientException("Error UBotSession.getStorage: Maximum waiting time is exceeded");
 
             ++tryNumber;
             if (delay > 0)
@@ -119,7 +122,7 @@ class UBotSession {
             }, selected);
 
             if (answers == null || !answers instanceof Array || answers.length !== selected.length)
-                throw new Error("askOnSomeNodes must return array");
+                throw new UBotClientException("Error UBotSession.getStorage: askOnSomeNodes must return array");
 
             let groups = new Map();
             let asked = 0;
@@ -129,11 +132,11 @@ class UBotSession {
             for (let i = 0; i < answers.length; i++) {
                 let answer = answers[i];
                 if (answer == null)
-                    throw new Error("ubotGetStorage return null");
+                    throw new UBotClientException("Error UBotSession.getStorage: ubotGetStorage return null");
 
                 if (!(answer instanceof Error)) {
                     if (answer.current == null || answer.pending == null)
-                        throw new Error("ubotGetStorage wrong result");
+                        throw new UBotClientException("Error UBotSession.getStorage: ubotGetStorage wrong result");
 
                     if (answer.pending[storageName] == null || Object.keys(answer.pending[storageName]).length === 0) {
                         asked++;
@@ -154,7 +157,7 @@ class UBotSession {
 
                             // check trust level available
                             if (Array.from(groups.values()).every(c => c + this.client.topology.length - asked < trust))
-                                throw new Error("Error UBotSession.getStorage: trust level can`t be reached");
+                                throw new UBotClientException("Error UBotSession.getStorage: trust level can`t be reached");
                         }
                     }
                 } else {
@@ -162,7 +165,7 @@ class UBotSession {
                     failed++;
                     errors.push(answers[i].toString());
                     if (failed >= UBotConfig.getNetworkNegativeConsensus(this.client.topology.length))
-                        throw new Error(
+                        throw new UBotClientException(
                             "Error UBotSession.getStorage: error in answers from some nodes - consensus was broken. Errors: " +
                             JSON.stringify(errors));
                 }
@@ -217,7 +220,7 @@ class UBotSession {
             let delay = Math.min(tryNumber, 50) * UBotConfig.waitPeriod;
 
             if (maxTime != null && Date.now() + delay > maxTime)
-                throw new UBotClientException("Maximum waiting time for votes on the registered contract is exceeded");
+                throw new UBotClientException("Error UBotSession.registerContract: Maximum waiting time for votes on the registered contract is exceeded");
 
             ++tryNumber;
             if (delay > 0)
@@ -226,11 +229,11 @@ class UBotSession {
             votes = await this.client.askOnAllNodes("getContractKeys", {itemId: contract.id});
 
             if (votes == null || !votes instanceof Array)
-                throw new UBotClientException("Wrong getContractKeys result");
+                throw new UBotClientException("Error UBotSession.registerContract: Wrong getContractKeys result");
 
             for (let vote of votes)
                 if (vote == null || vote.keys == null || !vote.keys instanceof Array)
-                    throw new UBotClientException("Wrong getContractKeys result from node");
+                    throw new UBotClientException("Error UBotSession.registerContract: Wrong getContractKeys result from node");
         } while (votes.filter(vote => vote.keys.length >= quorum).length < positive);
 
         if (maxWaitUbot == null)
@@ -239,7 +242,7 @@ class UBotSession {
         // register contract
         let ir = await this.client.ubotRegister(packed, this.sessionId, maxWaitUbot);
         if (maxWaitUbot > 0 && ir.state.isPending)
-            throw new UBotClientException("Maximum waiting time for contract registration is exceeded");
+            throw new UBotClientException("Error UBotSession.registerContract: Maximum waiting time for contract registration is exceeded");
 
         return ir;
     }
