@@ -45,7 +45,7 @@ class UBotSession {
         }
 
         await this.client.askOnAllNodes("ubotUpdateStorage", {
-            executableContractId: this.executableContractId,
+            requestId: this.requestId,
             storageName: storageName,
             fromValue: fromValue,
             toValue: hash
@@ -93,7 +93,7 @@ class UBotSession {
                 await sleep(delay);
 
             let answers = await this.client.askOnSomeNodes("ubotGetStorage", {
-                executableContractId: this.executableContractId,
+                requestId: this.requestId,
                 storageNames: [storageName]
             }, selected);
 
