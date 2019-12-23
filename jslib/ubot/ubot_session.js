@@ -52,7 +52,7 @@ class UBotSession {
         });
 
         // check answers
-        if (answers == null || !answers instanceof Array || answers.length !== selected.length)
+        if (answers == null || !answers instanceof Array || answers.length !== this.client.nodes.length)
             throw new Error("askOnAllNodes must return array");
 
         let failed = 0;
