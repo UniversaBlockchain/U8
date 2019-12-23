@@ -44,12 +44,29 @@ class UBotSession {
                 fromValue = storages[storageName];
         }
 
-        await this.client.askOnAllNodes("ubotUpdateStorage", {
+        let answers = await this.client.askOnAllNodes("ubotUpdateStorage", {
             requestId: this.requestId,
             storageName: storageName,
             fromValue: fromValue,
             toValue: hash
         });
+
+        // check answers
+        if (answers == null || !answers instanceof Array || answers.length !== selected.length)
+            throw new Error("askOnAllNodes must return array");
+
+        let failed = 0;
+
+        for (let i = 0; i < answers.length; i++) {
+            if (answers[i] == null)
+                throw new Error("ubotUpdateStorage return null");
+
+            if (answers[i] instanceof Error) {
+                failed++;
+                if (failed >= UBotConfig.getNetworkNegativeConsensus(this.client.topology.length))
+                    throw new Error("Error UBotSession.updateStorage: error in answers from some nodes - consensus was broken");
+            }
+        }
 
         if (this.ubot != null) {
             let storages = this.ubot.sessionStorageCache.get(this.executableContractId);
@@ -98,37 +115,48 @@ class UBotSession {
             }, selected);
 
             if (answers == null || !answers instanceof Array || answers.length !== selected.length)
-                throw new Error("askSessionOnSomeNodes must return array");
+                throw new Error("askOnSomeNodes must return array");
 
             let groups = new Map();
             let asked = 0;
+            let failed = 0;
 
             for (let i = 0; i < answers.length; i++) {
                 let answer = answers[i];
-                if (answer == null || answer.current == null || answer.pending == null)
-                    throw new Error("ubotGetStorage wrong result");
+                if (answer == null)
+                    throw new Error("ubotGetStorage return null");
 
-                if (answer.pending[storageName] == null || Object.keys(answer.pending[storageName]).length === 0) {
-                    asked++;
+                if (!answer instanceof Error) {
+                    if (answer.current == null || answer.pending == null)
+                        throw new Error("ubotGetStorage wrong result");
 
-                    let hash = answer.current[storageName];
-                    let key = (hash != null) ? hash.base64 : "null";
+                    if (answer.pending[storageName] == null || Object.keys(answer.pending[storageName]).length === 0) {
+                        asked++;
 
-                    let count = groups.get(key);
-                    if (count == null)
-                        count = 0;
+                        let hash = answer.current[storageName];
+                        let key = (hash != null) ? hash.base64 : "null";
 
-                    // check trust level
-                    if (count + 1 >= trust) {
-                        result = hash;
-                        break;
-                    } else {
-                        groups.set(key, count + 1);
+                        let count = groups.get(key);
+                        if (count == null)
+                            count = 0;
 
-                        // check trust level available
-                        if (Array.from(groups.values()).every(c => c + this.client.topology.length - asked < trust))
-                            throw new Error("Error UBotSession.getStorage: trust level can`t be reached");
+                        // check trust level
+                        if (count + 1 >= trust) {
+                            result = hash;
+                            break;
+                        } else {
+                            groups.set(key, count + 1);
+
+                            // check trust level available
+                            if (Array.from(groups.values()).every(c => c + this.client.topology.length - asked < trust))
+                                throw new Error("Error UBotSession.getStorage: trust level can`t be reached");
+                        }
                     }
+                } else {
+                    asked++;
+                    failed++;
+                    if (failed >= UBotConfig.getNetworkNegativeConsensus(this.client.topology.length))
+                        throw new Error("Error UBotSession.getStorage: error in answers from some nodes - consensus was broken");
                 }
             }
 

@@ -305,10 +305,10 @@ class UBotClient {
         });
 
         let data = await Promise.all(Array.from(this.httpNodeClients.values()).map(nodeClient =>
-            new Promise(async (resolve, reject) =>
+            new Promise(async (resolve) =>
                 await nodeClient.command(command, params,
                     result => resolve(result),
-                    error => reject(error)
+                    error => resolve(error)
                 )
             )
         ));
@@ -346,10 +346,10 @@ class UBotClient {
         let data = await Promise.all(nodes
             .filter(nodeNumber => this.httpNodeClients.has(nodeNumber))
             .map(nodeNumber => this.httpNodeClients.get(nodeNumber)).map(nodeClient =>
-            new Promise(async (resolve, reject) =>
+            new Promise(async (resolve) =>
                 await nodeClient.command(command, params,
                     result => resolve(result),
-                    error => reject(error)
+                    error => resolve(error)
                 )
             )
         ));

@@ -37,6 +37,15 @@ class UBotConfig {
         else
             return Math.ceil(count * 0.9);
     }
+
+    static getNetworkNegativeConsensus(count) {
+        if (count < 3)
+            return 1;
+        else if (count < 10)
+            return 2;
+        else
+            return count + 1 - Math.ceil(count * 0.9);
+    }
 }
 
 module.exports = {UBotConfig};
