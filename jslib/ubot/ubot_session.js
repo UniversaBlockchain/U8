@@ -36,18 +36,18 @@ class UBotSession {
             this.ubot.logger.log("UBotProcess_write" + (multi ? "Multi" : "Single") + "Storage... UBotSession.updateStorage hash = " + hash);
 
         let storageName = multi ? "default_multi" : "default_single";
-        let fromValue = null;
-
-        if (this.ubot != null) {
-            let storages = this.ubot.sessionStorageCache.get(this.executableContractId);
-            if (storages != null)
-                fromValue = storages[storageName];
-        }
+        // let fromValue = null;
+        //
+        // if (this.ubot != null) {
+        //     let storages = this.ubot.sessionStorageCache.get(this.executableContractId);
+        //     if (storages != null)
+        //         fromValue = storages[storageName];
+        // }
 
         let answers = await this.client.askOnAllNodes("ubotUpdateStorage", {
             requestId: this.requestId,
             storageName: storageName,
-            fromValue: fromValue,
+            //fromValue: fromValue,
             toValue: hash
         });
 
@@ -75,14 +75,14 @@ class UBotSession {
             }
         }
 
-        if (this.ubot != null) {
-            let storages = this.ubot.sessionStorageCache.get(this.executableContractId);
-            if (storages == null)
-                storages = {};
-
-            storages[storageName] = hash;
-            this.ubot.sessionStorageCache.put(this.executableContractId, storages);
-        }
+        // if (this.ubot != null) {
+        //     let storages = this.ubot.sessionStorageCache.get(this.executableContractId);
+        //     if (storages == null)
+        //         storages = {};
+        //
+        //     storages[storageName] = hash;
+        //     this.ubot.sessionStorageCache.put(this.executableContractId, storages);
+        // }
     }
 
     async getStorage(multi, trustLevel, requestContract) {
@@ -178,14 +178,14 @@ class UBotSession {
 
         } while (result === undefined);
 
-        if (this.ubot != null) {
-            let storages = this.ubot.sessionStorageCache.get(this.executableContractId);
-            if (storages == null)
-                storages = {};
-
-            storages[storageName] = result;
-            this.ubot.sessionStorageCache.put(this.executableContractId, storages);
-        }
+        // if (this.ubot != null) {
+        //     let storages = this.ubot.sessionStorageCache.get(this.executableContractId);
+        //     if (storages == null)
+        //         storages = {};
+        //
+        //     storages[storageName] = result;
+        //     this.ubot.sessionStorageCache.put(this.executableContractId, storages);
+        // }
 
         return result;
     }
