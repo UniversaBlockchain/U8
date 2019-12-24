@@ -766,6 +766,17 @@ unit.test("ubot_local_test: 2 cloud method", async () => {
 
     await ubotClient.disconnectUbot();
 
+    // for (let i = 0; i < ubotsCount; i++) {
+    //     await ubotClient.connectUbot(i);
+    //     let res = await new Promise(async (resolve, reject) =>
+    //         await ubotClient.httpUbotClients.get(i).command("getStorage", {executableContractId: executableContract.id},
+    //             result => resolve(result),
+    //             error => reject(error)
+    //         )
+    //     );
+    //     console.error("Result from " + i + ": " + JSON.stringify(res));
+    // }
+
     // waiting pool finished...
     while (!session.pool.every(ubot => !ubotMains[ubot].ubot.processors.get(requestContract.id.base64).state.canContinue))
         await sleep(100);

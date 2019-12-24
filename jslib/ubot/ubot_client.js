@@ -805,7 +805,7 @@ class UBotClient {
             throw new UBotClientException("Error request contract: executable contact is not found in transaction pack");
 
         // get executable contract
-        let executableContract = requestContract.transactionPack.referencedItems.get(requestContract.state.data.executable_contract_id);
+        let executableContract = ut.getExecutableContract(requestContract);
 
         if (executableContract == null)
             throw new UBotClientException("Error request contract: executable contact is not found in transaction pack");

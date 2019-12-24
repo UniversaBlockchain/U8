@@ -5,6 +5,7 @@
 const ProcessBase = require("ubot/processes/ProcessBase").ProcessBase;
 const UBotCloudNotification = require("ubot/ubot_notification").UBotCloudNotification;
 const Boss = require('boss.js');
+const ut = require("ubot/ubot_tools");
 
 class ProcessDownloadRequestContract extends ProcessBase {
     constructor(processor, onReady) {
@@ -26,8 +27,7 @@ class ProcessDownloadRequestContract extends ProcessBase {
                 if (respCode === 200) {
                     let ans = await Boss.load(body);
                     this.pr.requestContract = await Contract.fromPackedTransaction(ans.contractBin);
-                    this.pr.executableContract = this.pr.requestContract.transactionPack.referencedItems.get(
-                        this.pr.requestContract.state.data.executable_contract_id);
+                    this.pr.executableContract = ut.getExecutableContract(this.pr.requestContract);
                     this.pr.initPoolAndQuorum();
                     // this.pr.pool = [];
                     // ans.selectedPool.forEach(i => this.pr.pool.push(this.pr.ubot.network.netConfig.getInfo(i)));

@@ -227,6 +227,35 @@ class UBot {
             ubots: ubots
         };
     }
+
+    static getDefaultRecordId(executableContractId, multi) {
+        let concat = new Uint8Array(executableContractId.digest.length + 1);
+        concat[0] = multi ? 1 : 0;
+        concat.set(executableContractId.digest, 1);
+
+        return crypto.HashId.of(concat);
+    }
+
+    async getStorage(executableContractId, storageNames) {
+        let storage = {};
+
+        // multi storage
+        let recordId = UBot.getDefaultRecordId(executableContractId, true);
+        let result = await this.getRecordsFromMultiStorageByRecordId(recordId);
+
+        if (result != null) {
+            storage.multi = [];
+            for (let i = 0; i < result.records.length; i++)
+                storage.multi.push({ubot_number: result.ubots[i], result: result.records[i]});
+        } else
+            storage.multi = null;
+
+        // single storage
+        recordId = UBot.getDefaultRecordId(executableContractId, false);
+        storage.single = await this.getStorageResultByRecordId(recordId, false);
+
+        return storage;
+    }
 }
 
 module.exports = {UBot};

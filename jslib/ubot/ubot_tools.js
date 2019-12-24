@@ -11,7 +11,14 @@ const ex = require("exceptions");
  * @return {Contract} executable contract.
  */
 function getExecutableContract(requestContract) {
-    return requestContract.transactionPack.referencedItems.get(requestContract.state.data.executable_contract_id);
+    let executableContract = requestContract.transactionPack.referencedItems.get(requestContract.state.data.executable_contract_id);
+    if (executableContract == null)
+        executableContract = requestContract.transactionPack.subItems.get(requestContract.state.data.executable_contract_id);
+
+    if (executableContract == null)
+        throw new ex.IllegalArgumentError("Error request contract: executable contact is not found in transaction pack");
+
+    return executableContract;
 }
 
 /**
