@@ -1262,10 +1262,10 @@ unit.test("ubot_local_test: launcher role", async () => {
     launcher1Contract.newItems.add(executableContract);
 
     await cs.addConstraintToContract(launcher1Contract, executableContract, "executable_contract_constraint",
-        Constraint.TYPE_EXISTING_STATE, ["this.state.data.executable_contract_id == ref.id"], true);
-
-    await cs.addConstraintToContract(launcher1Contract, executableContract, "launcher_constraint",
-        Constraint.TYPE_EXISTING_STATE, ["this can_perform ref.state.roles.launcherRole1"], true);
+        Constraint.TYPE_EXISTING_STATE, [
+            "this.state.data.executable_contract_id == ref.id",
+            "this can_perform ref.state.roles.launcherRole1"
+        ], true);
 
     console.log("method_for_launcher1...");
 
@@ -1282,10 +1282,10 @@ unit.test("ubot_local_test: launcher role", async () => {
     launcher1Contract.state.data.executable_contract_id = executableContract.id;
 
     await cs.addConstraintToContract(launcher1Contract, executableContract, "executable_contract_constraint",
-        Constraint.TYPE_EXISTING_STATE, ["this.state.data.executable_contract_id == ref.id"], true);
-
-    await cs.addConstraintToContract(launcher1Contract, executableContract, "launcher_constraint",
-        Constraint.TYPE_EXISTING_STATE, ["this can_perform ref.state.roles.launcherRole1"], true);
+        Constraint.TYPE_EXISTING_STATE, [
+            "this.state.data.executable_contract_id == ref.id",
+            "this can_perform ref.state.roles.launcherRole1"
+        ], true);
 
     console.log("method_for_launcher1 failure...");
 
@@ -1308,10 +1308,10 @@ unit.test("ubot_local_test: launcher role", async () => {
     launcher2Contract.state.data.executable_contract_id = executableContract.id;
 
     await cs.addConstraintToContract(launcher2Contract, executableContract, "executable_contract_constraint",
-        Constraint.TYPE_EXISTING_STATE, ["this.state.data.executable_contract_id == ref.id"], true);
-
-    await cs.addConstraintToContract(launcher2Contract, executableContract, "launcher_constraint",
-        Constraint.TYPE_EXISTING_STATE, ["this can_perform ref.state.roles.launcherRole2"], true);
+        Constraint.TYPE_EXISTING_STATE, [
+            "this.state.data.executable_contract_id == ref.id",
+            "this can_perform ref.state.roles.launcherRole2"
+        ], true);
 
     console.log("method_for_launcher2...");
 
@@ -1328,10 +1328,10 @@ unit.test("ubot_local_test: launcher role", async () => {
     launcher2Contract.state.data.executable_contract_id = executableContract.id;
 
     await cs.addConstraintToContract(launcher2Contract, executableContract, "executable_contract_constraint",
-        Constraint.TYPE_EXISTING_STATE, ["this.state.data.executable_contract_id == ref.id"], true);
-
-    await cs.addConstraintToContract(launcher2Contract, executableContract, "launcher_constraint",
-        Constraint.TYPE_EXISTING_STATE, ["this can_perform ref.state.roles.launcherRole2"], true);
+        Constraint.TYPE_EXISTING_STATE, [
+            "this.state.data.executable_contract_id == ref.id",
+            "this can_perform ref.state.roles.launcherRole2"
+        ], true);
 
     console.log("method_for_launcher2 failure...");
 

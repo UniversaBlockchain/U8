@@ -822,9 +822,9 @@ class UBotClient {
             throw new UBotClientException("Error request contract: executable_contract_constraint has incorrect format (expected all_of)");
 
         conditions = conditions[constr.Constraint.conditionsModeType.all_of];
-        if (conditions == null || conditions.length !== 1 ||
-            (conditions[0] !== "this.state.data.executable_contract_id==ref.id" &&
-             conditions[0] !== "ref.id==this.state.data.executable_contract_id"))
+        if (conditions == null || conditions.length === 0 ||
+            (!conditions.includes("this.state.data.executable_contract_id==ref.id") &&
+             !conditions.includes("ref.id==this.state.data.executable_contract_id")))
             throw new UBotClientException("Error request contract: executable_contract_constraint has incorrect format");
 
         // check request contract data
@@ -854,18 +854,12 @@ class UBotClient {
             if (!executableContract.state.roles.hasOwnProperty(launcher) || !executableContract.state.roles.launcher instanceof roles.Role)
                 throw new UBotClientException("Error executable contract: role is not defined");
 
-            // check launcher constraint
-            let launcherConstraint = requestContract.constraints.get("launcher_constraint");
-            if (launcherConstraint == null || !launcherConstraint instanceof constr.Constraint)
-                throw new UBotClientException("Error request contract: launcher_constraint is not defined");
+            // check launcher condition
+            if (conditions == null || conditions.length < 2)
+                throw new UBotClientException("Error request contract: launcher condition not found");
 
-            let conditions = launcherConstraint.exportConditions(launcherConstraint.conditions);
-            if (!conditions.hasOwnProperty(constr.Constraint.conditionsModeType.all_of))
-                throw new UBotClientException("Error request contract: launcher_constraint has incorrect format (expected all_of)");
-
-            conditions = conditions[constr.Constraint.conditionsModeType.all_of];
-            if (conditions == null || conditions.length !== 1 || conditions[0] !== "this can_perform ref.state.roles." + launcher)
-                throw new UBotClientException("Error request contract: launcher_constraint has incorrect format");
+            if (!conditions.includes("this can_perform ref.state.roles." + launcher))
+                throw new UBotClientException("Error request contract: launcher condition has incorrect format");
         }
 
         try {
