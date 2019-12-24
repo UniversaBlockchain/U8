@@ -59,6 +59,8 @@ class UBotHttpServer extends network.HttpServer {
               return {};
 
           let result = {state: proc.state.val};
+          if (params.hasOwnProperty("getQuanta") && params.getQuanta)
+              result.quanta = proc.quantiser.quantaSum_;
           if (proc.state === UBotPoolState.FINISHED)
               result.result = proc.output;
           if (proc.state === UBotPoolState.FAILED)

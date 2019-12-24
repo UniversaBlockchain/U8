@@ -20,13 +20,13 @@ class UBotConfig {
     static maxDownloadRequestTime = 40000; // ms
     static clientMaxWaitSession = 60000; // ms
 
-    static waitPeriod = 100; // ms
+    static waitPeriod = 300; // ms
     static waitPaidPeriod = 2000; // ms
 
     static storageReadTrustLevel = 0.3;
     static checkSessionTrustLevel = 0.3;
 
-    static checkQuantiserPeriod = 10000; // ms
+    static checkQuantiserPeriod = 100; // ms
     static requestExpiredTime = 86400000; // ms
 
     static getNetworkPositiveConsensus(count) {
