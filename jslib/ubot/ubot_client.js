@@ -399,8 +399,9 @@ class UBotClient {
     /**
      * Get the processing state of paid operation.
      *
-     * @param operationId - Id of the paid operation to get state of
-     * @return processing state of the paid operation
+     * @param {HashId} operationId - Id of the paid operation to get state of.
+     * @async
+     * @return {Promise<ParcelProcessingState>} processing state of the paid operation.
      * @throws UBotClientException
      */
     async getPaidOperationProcessingState(operationId) {
@@ -680,7 +681,7 @@ class UBotClient {
      * @param {Uint8Array} packedTransaction - Binary contract for registration.
      * @param {number} millisToWait - Maximum time to wait for final ItemState or 0 if endless waiting.
      * @async
-     * @return {ItemResult} result of registration or current state of registration (if wasn't finished yet).
+     * @return {Promise<ItemResult>} result of registration or current state of registration (if wasn't finished yet).
      */
     async register(packedTransaction, millisToWait = 0) {
         let result = await new Promise(async (resolve, reject) =>
@@ -690,14 +691,15 @@ class UBotClient {
             )
         );
 
-        return await this.waitRegister(result, packedTransaction, millisToWait);
+        return this.waitRegister(result, packedTransaction, millisToWait);
     }
 
     /**
      * Get the processing state of given parcel.
      *
-     * @param parcelId - Id of the parcel to get state of
-     * @return processing state of the parcel
+     * @param {HashId} parcelId - Id of the parcel to get state.
+     * @async
+     * @return {Promise<ParcelProcessingState>} processing state of the parcel.
      * @throws UBotClientException
      */
     async getParcelProcessingState(parcelId) {
@@ -714,11 +716,11 @@ class UBotClient {
     /**
      * Register the contract on the network using parcel (to provide payment).
      *
-     * @param packedParcel - Binary parcel
-     * @param millisToWait - Maximum time to wait for final {@link ItemState}
-     * @return either final result of registration or last known status of registration.
-     * Getting {@link ItemState#UNDEFINED} means either
-     * payment wasn't processed yet or something is wrong with it (invalid or insufficient U)
+     * @param {Uint8Array} packedParcel - Binary parcel.
+     * @param {number} millisToWait - Maximum time to wait for final {@link ItemState}.
+     * @return {Promise<ItemState>} either final result of registration or last known status of registration.
+     * Getting {@link ItemState#UNDEFINED} means either.
+     * payment wasn't processed yet or something is wrong with it (invalid or insufficient U).
      * @throws UBotClientException
      */
     async registerParcelWithState(packedParcel, millisToWait = 0) {
@@ -773,7 +775,7 @@ class UBotClient {
      * @param {HashId} sessionId - Session ID.
      * @param {number} millisToWait - Maximum time to wait for final ItemState or 0 if endless waiting.
      * @async
-     * @return {ItemResult} result of registration or current state of registration (if wasn't finished yet).
+     * @return {Promise<ItemResult>} result of registration or current state of registration (if wasn't finished yet).
      */
     async ubotRegister(packedTransaction, sessionId, millisToWait = 0) {
         let result = await new Promise(async (resolve, reject) =>
@@ -783,7 +785,7 @@ class UBotClient {
             )
         );
 
-        return await this.waitRegister(result, packedTransaction, millisToWait);
+        return this.waitRegister(result, packedTransaction, millisToWait);
     }
 
     /**
@@ -880,9 +882,10 @@ class UBotClient {
     }
 
     /**
-     * Get ubot registry contract.
+     * Get UBot registry contract.
      *
-     * @return {Uint8Array} packed ubot registry contract.
+     * @async
+     * @return {Uint8Array} packed UBot registry contract.
      */
     async getUBotRegistryContract() {
         if (this.ubotRegistryContract == null) {
@@ -1014,6 +1017,13 @@ class UBotClient {
         }
     }
 
+    /**
+     * Gets a session from several nodes (until it receives).
+     *
+     * @param {HashId} requestId - The Request contract id.
+     * @async
+     * @return {Promise<{state}|Object|null>}
+     */
     async getSessionWithTrust(requestId) {
         let session = await this.getSession("ubotGetSession", {requestId: requestId});
 
@@ -1161,7 +1171,7 @@ class UBotClient {
      * on a new random pool using the startCloudMethod method.
      *
      * @async
-     * @return {Promise<void>}
+     * @return {Promise<void>}.
      */
     async disconnectUbot() {
         if (this.httpUbotClient == null)
@@ -1175,6 +1185,16 @@ class UBotClient {
         this.httpUbotClients.clear();
     }
 
+    /**
+     * Connects the client to the UBot from which the ping command
+     * will be sent to the specified UBot with a specific timeout.
+     *
+     * @param from - The UBot number to which the client connects and sends a ping command from it.
+     * @param to - UBot number to which the ping team is sent.
+     * @param {number} timeout - Ping timeout.
+     * @async
+     * @return {Promise<Object>} command result.
+     */
     async pingUBot(from, to, timeout = 1500) {
         if (this.httpUbotClient != null)
             throw new UBotClientException("Ubot is connected to the pool. First disconnect from the pool");
