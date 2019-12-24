@@ -831,43 +831,55 @@ unit.test("ubot_local_test: 2 cloud method", async () => {
     await shutdownUBots(ubotMains);
 });
 
-// unit.test("ubot_local_test: 2 cloud method with executeCloudMethod waiting", async () => {
-//     let ubotMains = await createUBots(ubotsCount);
-//     let ubotClient = await new UBotClient(clientKey, TOPOLOGY_ROOT + TOPOLOGY_FILE).start();
-//
-//     let executableContract = await generateSecureRandomExecutableContract();
-//     let requestContract = await generateSecureRandomRequestContract(executableContract);
-//
-//     await ubotClient.startCloudMethod(requestContract, await createPayment(20));
-//
-//     await ubotClient.disconnectUbot();
-//
-//     // WAITING METHOD (READ RANDOM)
-//     requestContract = Contract.fromPrivateKey(userPrivKey);
-//     requestContract.state.data.method_name = "readRandom";
-//     requestContract.state.data.executable_contract_id = executableContract.id;
-//
-//     await cs.addConstraintToContract(requestContract, executableContract, "executable_contract_constraint",
-//         Constraint.TYPE_EXISTING_STATE, ["this.state.data.executable_contract_id == ref.id"], true);
-//
-//     console.log("WAITING METHOD (READ RANDOM)");
-//     let state = await ubotClient.executeCloudMethod(requestContract, await createPayment(20), true);
-//
-//     console.log("State: " + JSON.stringify(state));
-//
-//     assert(state.state === UBotPoolState.FINISHED.val);
-//
-//     // checking secure random value
-//     assert(typeof state.result.random === "number" && state.result.random >= 0 && state.result.random < 1000);
-//
-//     await ubotClient.shutdown();
-//
-//     // waiting pool finished...
-//     while (ubotMains.some(main => Array.from(main.ubot.processors.values()).some(proc => proc.state.canContinue)))
-//         await sleep(100);
-//
-//     await shutdownUBots(ubotMains);
-// });
+unit.test("ubot_local_test: many cloud method with executeCloudMethod", async () => {
+    let ubotMains = await createUBots(ubotsCount);
+    let ubotClient = await new UBotClient(clientKey, TOPOLOGY_ROOT + TOPOLOGY_FILE).start();
+
+    let executableContract = await generateSecureRandomExecutableContract();
+
+    let ITERATIONS = 3;
+    for (let i = 0; i < ITERATIONS; i++) {
+        // GET RANDOM
+        let requestContract = Contract.fromPrivateKey(userPrivKey);
+        requestContract.state.data.method_name = "getRandom";
+        requestContract.state.data.method_args = [1000];
+        requestContract.state.data.executable_contract_id = executableContract.id;
+        if (i === 0)
+            requestContract.newItems.add(executableContract);
+
+        await cs.addConstraintToContract(requestContract, executableContract, "executable_contract_constraint",
+            Constraint.TYPE_EXISTING_STATE, ["this.state.data.executable_contract_id == ref.id"], true);
+
+        console.log("GET RANDOM");
+        await ubotClient.executeCloudMethod(requestContract, await createPayment(20));
+
+        // READ RANDOM
+        requestContract = Contract.fromPrivateKey(userPrivKey);
+        requestContract.state.data.method_name = "readRandom";
+        requestContract.state.data.executable_contract_id = executableContract.id;
+
+        await cs.addConstraintToContract(requestContract, executableContract, "executable_contract_constraint",
+            Constraint.TYPE_EXISTING_STATE, ["this.state.data.executable_contract_id == ref.id"], true);
+
+        console.log("READ RANDOM");
+        let state = await ubotClient.executeCloudMethod(requestContract, await createPayment(20), true);
+
+        console.log("State: " + JSON.stringify(state));
+
+        assert(state.state === UBotPoolState.FINISHED.val);
+
+        // checking secure random value
+        assert(typeof state.result.random === "number" && state.result.random >= 0 && state.result.random < 1000);
+    }
+
+    await ubotClient.shutdown();
+
+    // waiting pool finished...
+    while (ubotMains.some(main => Array.from(main.ubot.processors.values()).some(proc => proc.state.canContinue)))
+        await sleep(100);
+
+    await shutdownUBots(ubotMains);
+});
 
 unit.test("ubot_local_test: parallel cloud methods", async () => {
     let ubotMains = await createUBots(ubotsCount);

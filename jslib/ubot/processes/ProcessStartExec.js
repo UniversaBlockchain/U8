@@ -785,7 +785,7 @@ class ProcessStartExec extends ProcessBase {
             // put result to cache
             this.pr.ubot.resultCache.put(recordId, cortege);
 
-            await this.pr.ledger.deleteFromSingleStorage(recordId);
+            await this.pr.ledger.deleteFromMultiStorage(recordId);
             //TODO: replace on multi-insert
             for (let item of result) {
                 records.push(await BossBiMapper.getInstance().deserialize(await Boss.load(item.result)));
