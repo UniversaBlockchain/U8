@@ -1051,10 +1051,12 @@ class ProcessStartExec extends ProcessBase {
 
     errorFail(methodName, err) {
         let message = null;
-        if (err.message != null)
-            message = err.message;
-        else if (err.text != null)
-            message = err.text;
+        if (err != null) {
+            if (err.message != null)
+                message = err.message;
+            else if (err.text != null)
+                message = err.text;
+        }
 
         this.pr.logger.log("Error in cloud method " + methodName + ": " + message);
         this.pr.errors.push(new ErrorRecord(Errors.FAILURE, methodName,
