@@ -119,4 +119,18 @@ hashidAdapter.deserialize = async function(data,d) {
 DefaultBiMapper.registerAdapter(hashidAdapter);
 
 
+
+let typeErrorAdapter = new bs.BiAdapter("TypeError", TypeError);
+typeErrorAdapter.serialize = async function(o,s) {
+    return {
+        composite3 : await s.serialize(o.message)
+    };
+};
+typeErrorAdapter.deserialize = async function(data,d) {
+    return new TypeError(await d.deserialize(data.composite3));
+};
+DefaultBiMapper.registerAdapter(typeErrorAdapter);
+
+
+
 module.exports = {DefaultBiMapper};

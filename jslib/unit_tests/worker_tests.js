@@ -380,7 +380,14 @@ unit.test("worker_tests: exceptions from main scripter", async () => {
             }
 
             wrkInner.export.doSomething = async (args, kwargs) => {
-                await callMeFromWorker(33);
+                let te = null;
+                try {
+                    let x = null;
+                    let y = x.q;
+                } catch (e) {
+                    te = e;
+                }
+                await callMeFromWorker(te);
                 return "some_answer";
             }
             `);
@@ -393,6 +400,8 @@ unit.test("worker_tests: exceptions from main scripter", async () => {
 
             res.worker.export["callMeFromWorker"] = (args, kwargs) => {
                 //console.log("callMeFromWorker hit: " + args[0]);
+                assert(args[0].constructor.name === "TypeError");
+                assert(args[0].message === "Cannot read property 'q' of null");
                 throw "some_error_text";
             };
 
