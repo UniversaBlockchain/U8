@@ -1,17 +1,19 @@
-//const Boss = require('boss.js');
+/**
+ * Example demonstrates the creation of a pool contract and its registration from pool of UBots.
+ */
 
+/**
+ * Create and register a pool contract.
+ *
+ * @return {Uint8Array} packed transaction with pool contract
+ */
 async function register() {
     let packedContract = null;
     try {
+        // creation of a pool contract
         let contract = await createPoolContract();
-        //console.log("before contract.id = " + contract.id);
 
         await contract.seal(true);
-
-        //console.log("contract.id = " + contract.id);
-
-        //let res =  await Boss.load((await Boss.load(contract.sealedBinary)).data);
-        //console.error("compare = " + JSON.stringify(res));
 
         packedContract = await contract.getPackedTransaction();
     } catch (err) {
@@ -19,6 +21,7 @@ async function register() {
         console.error("register ERR stack: " + err.stack);
     }
 
+    // register transaction with pool contract
     await registerContract(packedContract);
 
     return packedContract;

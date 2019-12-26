@@ -1,6 +1,16 @@
+/**
+ * Example demonstrates generate a distributed random number and reading it from storage.
+ */
+
 const BigDecimal  = require("big").Big;
 const RND_LEN = 96;
 
+/**
+ * Calculate a distributed random number.
+ *
+ * @param {number} max - Random number generated in the range 0 >= random < max
+ * @return {number} random number
+ */
 async function getRandom(max) {
     //generate random and write its hash to multi storage
     let rnd  = new Uint8Array(RND_LEN);
@@ -56,6 +66,11 @@ async function getRandom(max) {
     return result;
 }
 
+/**
+ * Reading generated distributed random number from storage.
+ *
+ * @return {number} generated random number
+ */
 async function readRandom() {
     return {
         random: (await getSingleStorage()).result,

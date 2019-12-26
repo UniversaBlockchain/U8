@@ -1,3 +1,10 @@
+/**
+ * Example demonstrates the 2-stage lottery:
+ * 1) Users buy tickets, forming contracts for token transfer to the role of UBots quorum. See method "buyTicket".
+ * 2) A lottery is drawn, during which the winner is determined by means of a distributed random number, and a contract
+ *    for his key is formed, with all tokens played. See method "raffle".
+ */
+
 const BigDecimal = require("big").Big;
 const roles = require('roles');
 const Constraint = require('constraint').Constraint;
@@ -6,6 +13,13 @@ const ut = require("ubot/ubot_tools");
 
 const RND_LEN = 96;
 
+/**
+ * Buy ticket by user
+ *
+ * @param {Uint8Array} packedPayment - Packed transaction with token contract for ticket payment
+ * @param {PublicKey} userKey - Key to transfer winnings
+ * @return {number} ticket number
+ */
 async function buyTicket(packedPayment, userKey) {
     // check payment contract
     let payment = await Contract.fromPackedTransaction(packedPayment);
@@ -70,6 +84,12 @@ async function buyTicket(packedPayment, userKey) {
     return ticket;
 }
 
+/**
+ * Calculate a distributed random number.
+ *
+ * @param {number} max - Random number generated in the range 0 >= random < max
+ * @return {number} random number
+ */
 async function getRandom(max) {
     let rnd  = new Uint8Array(RND_LEN);
     for (let i = 0;  i < RND_LEN; ++i)
@@ -128,7 +148,21 @@ async function getRandom(max) {
     return result;
 }
 
-// from ContractsService
+/**
+ * Implementing join procedure (from ContractsService).
+ * Service create new revision of first contract, update amount field with sum of amount fields in the both contracts
+ * and put second contract in revoking items of created new revision.
+ * Given contract should have splitjoin permission for given keys.
+ *
+ * Not cloud method.
+ *
+ * @param {Iterable<Contract>} contractsToJoin - One or more contracts to join into main contract.
+ * @param {Array<number | string | BigDecimal>} amountsToSplit - Array contains one or more amounts to split from main contract.
+ * @param {Array<crypto.KeyAddress>} addressesToSplit - Addresses the ownership of splitted parts will be transferred to.
+ * @param {Iterable<crypto.PrivateKey> | null} ownerKeys - Owner keys of joined contracts.
+ * @param {string} fieldName - Name of field that should be join by.
+ * @return {Array<Contract>} list of contracts containing main contract followed by splitted parts.
+ */
 async function createSplitJoin(contractsToJoin, amountsToSplit, addressesToSplit, ownerKeys, fieldName) {
     let contract = null;
     let sum = new BigDecimal(0);
@@ -163,6 +197,15 @@ async function createSplitJoin(contractsToJoin, amountsToSplit, addressesToSplit
     return [contract].concat(parts);
 }
 
+/**
+ * Raffle the lottery and generate winning.
+ *
+ * @return {object} lottery result:
+ *      {
+ *          {number} winTicket - win ticket number
+ *          {Uint8Array} prizeContract - packed transaction with lottery winning
+ *      }
+ */
 async function raffle() {
     let result = {};
 
