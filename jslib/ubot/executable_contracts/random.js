@@ -69,7 +69,7 @@ async function getRandom(max) {
 /**
  * Reading generated distributed random number from storage.
  *
- * @return {number} generated random number
+ * @return {object} generated random number and multi-storage data
  */
 async function readRandom() {
     return {
