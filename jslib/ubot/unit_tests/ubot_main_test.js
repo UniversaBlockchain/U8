@@ -818,6 +818,151 @@ unit.test("ubot_main_test: execute cloud method with ubot delay", async () => {
     await ubotClient.shutdown();
 });
 
+unit.test("ubot_main_test: launcher role", async () => {
+    let ubotClient = await new UBotClient(clientKey, TOPOLOGY_ROOT + TOPOLOGY_FILE).start();
+
+    let executableContract = Contract.fromPrivateKey(userPrivKey);
+
+    let userKey1 = tk.TestKeys.getKey();
+    let userKey2 = tk.TestKeys.getKey();
+
+    executableContract.registerRole(new roles.SimpleRole("launcherRole1", userKey1));
+    executableContract.registerRole(new roles.SimpleRole("launcherRole2", userKey2));
+
+    executableContract.state.data.cloud_methods = {
+        method_for_launcher1: {
+            pool: {size: 5},
+            quorum: {size: 3},
+            launcher: "launcherRole1"
+        },
+        method_for_launcher2: {
+            pool: {size: 3},
+            quorum: {size: 2},
+            launcher: "launcherRole2"
+        },
+        method_for_any: {
+            pool: {size: 3},
+            quorum: {size: 2}
+        }
+    };
+
+    executableContract.state.data.js = await io.fileGetContentsAsString(TEST_CONTRACTS_PATH + "launcherRole.js");
+
+    await executableContract.seal();
+
+    // method_for_launcher1
+    let launcher1Contract = Contract.fromPrivateKey(userKey1);
+    launcher1Contract.state.data.method_name = "method_for_launcher1";
+    launcher1Contract.state.data.executable_contract_id = executableContract.id;
+    launcher1Contract.newItems.add(executableContract);
+
+    await cs.addConstraintToContract(launcher1Contract, executableContract, "executable_contract_constraint",
+        Constraint.TYPE_EXISTING_STATE, [
+            "this.state.data.executable_contract_id == ref.id",
+            "this can_perform ref.state.roles.launcherRole1"
+        ], true);
+
+    console.log("method_for_launcher1...");
+
+    let state = await ubotClient.executeCloudMethod(launcher1Contract, await createPayment(5), true);
+
+    assert(state.state === UBotPoolState.FINISHED.val);
+
+    // checking contract
+    assert(state.result === 1);
+
+    // method_for_launcher1 failure
+ /*   launcher1Contract = Contract.fromPrivateKey(userPrivKey);
+    launcher1Contract.state.data.method_name = "method_for_launcher1";
+    launcher1Contract.state.data.executable_contract_id = executableContract.id;
+
+    await cs.addConstraintToContract(launcher1Contract, executableContract, "executable_contract_constraint",
+        Constraint.TYPE_EXISTING_STATE, [
+            "this.state.data.executable_contract_id == ref.id",
+            "this can_perform ref.state.roles.launcherRole1"
+        ], true);
+
+    console.log("method_for_launcher1 failure...");
+
+    let errMessage = null;
+    try {
+        await ubotClient.executeCloudMethod(launcher1Contract, await createPayment(5), true);
+    } catch (err) {
+        errMessage = err.message;
+    }
+
+    console.log("Error: " + errMessage);
+
+    // checking error
+    assert(errMessage === "Session is aborted. Errors: [{\"error\":\"FAILED_CHECK\",\"objectName\":\"checkReferencedItems for contract (hashId=" +
+        launcher1Contract.id + "): false\",\"message\":\"\"},{\"error\":\"FAILURE\",\"objectName\":\"requestContract\",\"message\":\"Request contract state is not APPROVED\"}]");
+*/
+    // method_for_launcher2
+    let launcher2Contract = Contract.fromPrivateKey(userKey2);
+    launcher2Contract.state.data.method_name = "method_for_launcher2";
+    launcher2Contract.state.data.executable_contract_id = executableContract.id;
+
+    await cs.addConstraintToContract(launcher2Contract, executableContract, "executable_contract_constraint",
+        Constraint.TYPE_EXISTING_STATE, [
+            "this.state.data.executable_contract_id == ref.id",
+            "this can_perform ref.state.roles.launcherRole2"
+        ], true);
+
+    console.log("method_for_launcher2...");
+
+    state = await ubotClient.executeCloudMethod(launcher2Contract, await createPayment(5), true);
+
+    assert(state.state === UBotPoolState.FINISHED.val);
+
+    // checking contract
+    assert(state.result === 2);
+
+    // method_for_launcher2 failure
+  /*  launcher2Contract = Contract.fromPrivateKey(userKey1);
+    launcher2Contract.state.data.method_name = "method_for_launcher2";
+    launcher2Contract.state.data.executable_contract_id = executableContract.id;
+
+    await cs.addConstraintToContract(launcher2Contract, executableContract, "executable_contract_constraint",
+        Constraint.TYPE_EXISTING_STATE, [
+            "this.state.data.executable_contract_id == ref.id",
+            "this can_perform ref.state.roles.launcherRole2"
+        ], true);
+
+    console.log("method_for_launcher2 failure...");
+
+    let errMessage = null;
+    try {
+        await ubotClient.executeCloudMethod(launcher2Contract, await createPayment(5), true);
+    } catch (err) {
+        errMessage = err.message;
+    }
+
+    console.log("Error: " + errMessage);
+
+    // checking error
+    assert(errMessage === "Session is aborted. Errors: [{\"error\":\"FAILED_CHECK\",\"objectName\":\"checkReferencedItems for contract (hashId=" +
+        launcher2Contract.id + "): false\",\"message\":\"\"},{\"error\":\"FAILURE\",\"objectName\":\"requestContract\",\"message\":\"Request contract state is not APPROVED\"}]");
+*/
+    // method_for_any
+    let anyContract = Contract.fromPrivateKey(userKey1);
+    anyContract.state.data.method_name = "method_for_any";
+    anyContract.state.data.executable_contract_id = executableContract.id;
+
+    await cs.addConstraintToContract(anyContract, executableContract, "executable_contract_constraint",
+        Constraint.TYPE_EXISTING_STATE, ["this.state.data.executable_contract_id == ref.id"], true);
+
+    console.log("method_for_any...");
+
+    state = await ubotClient.executeCloudMethod(anyContract, await createPayment(5), true);
+
+    assert(state.state === UBotPoolState.FINISHED.val);
+
+    // checking contract
+    assert(state.result === 3);
+
+    await ubotClient.shutdown();
+});
+
 // unit.test("ubot_main_test: sequential launch", async () => {
 //
 //     let ubotClient = await new UBotClient(clientKey, TOPOLOGY_ROOT + TOPOLOGY_FILE).start();
