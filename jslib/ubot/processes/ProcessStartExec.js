@@ -905,7 +905,14 @@ class ProcessStartExec extends ProcessBase {
         // random salt for seal (common for pool)
         contract.ubot_pool_random_salt = this.pr.prng.randomBytes(12);
 
+        await Promise.all(Array.from(contract.newItems).map(async (ni) => {
+            ni.ubot_pool_random_salt = contract.ubot_pool_random_salt;
+            await ni.seal(false);
+            delete ni.ubot_pool_random_salt;
+        }));
+
         await contract.seal(true);
+
         delete contract.ubot_pool_random_salt;
 
         return await contract.getPackedTransaction();
@@ -919,30 +926,36 @@ class ProcessStartExec extends ProcessBase {
      */
     async preparePoolRevision(packedTransaction) {
         try {
-            let contract = await Contract.fromPackedTransaction(packedTransaction);
+            let mainContract = await Contract.fromPackedTransaction(packedTransaction);
 
             let created = this.pr.requestContract.definition.createdAt;
             created.setMilliseconds(0);
-            contract.state.createdAt = created;
 
-            contract.registerRole(new roles.QuorumVoteRole(
-                "creator",
-                "refUbotRegistry.state.roles.ubots",
-                this.pr.quorumSize.toString(),
-                contract
-            ));
+            let preparePool = (contract) => {
+                contract.state.createdAt = created;
 
-            // constraint for UBotNet registry contract
-            contract.createTransactionalSection();
-            let constr = new Constraint(contract);
-            constr.name = "refUbotRegistry";
-            constr.type = Constraint.TYPE_TRANSACTIONAL;
-            let conditions = {};
-            conditions[Constraint.conditionsModeType.all_of] = ["ref.tag == \"universa:ubot_registry_contract\""];
-            constr.setConditions(conditions);
-            contract.addConstraint(constr);
+                contract.registerRole(new roles.QuorumVoteRole(
+                    "creator",
+                    "refUbotRegistry.state.roles.ubots",
+                    this.pr.quorumSize.toString(),
+                    contract
+                ));
 
-            return await this.sealPoolContract(contract);
+                // constraint for UBotNet registry contract
+                contract.createTransactionalSection();
+                let constr = new Constraint(contract);
+                constr.name = "refUbotRegistry";
+                constr.type = Constraint.TYPE_TRANSACTIONAL;
+                let conditions = {};
+                conditions[Constraint.conditionsModeType.all_of] = ["ref.tag == \"universa:ubot_registry_contract\""];
+                constr.setConditions(conditions);
+                contract.addConstraint(constr);
+            };
+
+            preparePool(mainContract);
+            mainContract.newItems.forEach(ni => preparePool(ni));
+
+            return await this.sealPoolContract(mainContract);
 
         } catch (err) {
             this.pr.logger.log("Error prepare contract revision to pool registration: " + err.message);

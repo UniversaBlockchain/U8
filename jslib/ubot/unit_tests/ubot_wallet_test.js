@@ -6,6 +6,7 @@ import * as tk from "unit_tests/test_keys";
 import {expect, assert, unit} from 'test'
 
 const wallet = require("ubot/ubot_wallet");
+const UBotMain = require("ubot/ubot_main").UBotMain;
 const UBotClient = require('ubot/ubot_client').UBotClient;
 const UBotPoolState = require("ubot/ubot_pool_state").UBotPoolState;
 const ItemState = require("itemstate").ItemState;
@@ -17,9 +18,13 @@ const tt = require("test_tools");
 
 const TOPOLOGY_ROOT = "../jslib/ubot/topology/";
 const TOPOLOGY_FILE = "mainnet_topology.json";
+const CONFIG_ROOT = "../test/config/ubot_config";
 
 const clientKey = tk.TestKeys.getKey();
 const userPrivKey = tk.TestKeys.getKey();
+
+const LOCAL_UBOTS = false;
+const ubotsCount = 30;
 
 async function createPayment(cost) {
     let netClient = await new UBotClient(tk.getTestKey(), TOPOLOGY_ROOT + TOPOLOGY_FILE).start();
@@ -42,7 +47,40 @@ async function createPayment(cost) {
     return U;
 }
 
+async function createUbotMain(name, nolog) {
+    let args = ["--config", CONFIG_ROOT+"/"+name];
+    if (nolog)
+        args.push("--nolog");
+
+    return new Promise(async resolve => {
+        let ubotMain = new UBotMain(...args);
+        await ubotMain.start();
+        resolve(ubotMain);
+    });
+}
+
+async function createUBots(count) {
+    //await prepareConfigFiles(count);
+    let ubotMains = [];
+    for (let i = 0; i < count; ++i)
+        ubotMains.push(createUbotMain("ubot"+i, false));
+    ubotMains = await Promise.all(ubotMains);
+    require("ubot/unit_tests/ubot_debugger").ubotDebugger_setMains(ubotMains);
+    return ubotMains;
+}
+
+async function shutdownUBots(ubots) {
+    let promises = [];
+    for (let i = 0; i < ubots.length; ++i)
+        promises.push(ubots[i].shutdown());
+    return Promise.all(promises);
+}
+
 unit.test("ubot_wallet_test: wallet put and transfer", async () => {
+    let ubotMains = [];
+    if (LOCAL_UBOTS)
+        ubotMains = await createUBots(ubotsCount);
+
     let ubotClient = await new UBotClient(clientKey, TOPOLOGY_ROOT + TOPOLOGY_FILE).start();
     let netClient = await new UBotClient(tk.getTestKey(), TOPOLOGY_ROOT + TOPOLOGY_FILE).start();
 
@@ -79,24 +117,27 @@ unit.test("ubot_wallet_test: wallet put and transfer", async () => {
     assert(state.state === UBotPoolState.FINISHED.val && state.result === "1000");
 
     // make transfer
-    // let recipientKey = tk.TestKeys.getKey();
-    // requestContract = Contract.fromPrivateKey(walletKey);
-    // requestContract.state.data.method_name = "makeTranfer";
-    // requestContract.state.data.method_args = [120, new crypto.KeyAddress(recipientKey.publicKey, 0, true)];
-    // requestContract.state.data.executable_contract_id = walletContract.id;
-    //
-    // await cs.addConstraintToContract(requestContract, walletContract, "executable_contract_constraint",
-    //     Constraint.TYPE_EXISTING_STATE, [
-    //         "this.state.data.executable_contract_id == ref.id",
-    //         "this can_perform ref.state.roles.walletOwner"
-    //     ], true);
-    //
-    // state = await ubotClient.executeCloudMethod(requestContract, await createPayment(20), true);
-    //
-    // console.log("State: " + JSON.stringify(state));
-    //
-    // assert(state.state === UBotPoolState.FINISHED.val && state.result instanceof Uint8Array);
+    let recipientKey = tk.TestKeys.getKey();
+    requestContract = Contract.fromPrivateKey(walletKey);
+    requestContract.state.data.method_name = "makeTranfer";
+    requestContract.state.data.method_args = [120, new crypto.KeyAddress(recipientKey.publicKey, 0, true)];
+    requestContract.state.data.executable_contract_id = walletContract.id;
+
+    await cs.addConstraintToContract(requestContract, walletContract, "executable_contract_constraint",
+        Constraint.TYPE_EXISTING_STATE, [
+            "this.state.data.executable_contract_id == ref.id",
+            "this can_perform ref.state.roles.walletOwner"
+        ], true);
+
+    state = await ubotClient.executeCloudMethod(requestContract, await createPayment(20), true);
+
+    console.log("State: " + JSON.stringify(state));
+
+    assert(state.state === UBotPoolState.FINISHED.val && state.result instanceof Uint8Array);
 
     await netClient.shutdown();
     await ubotClient.shutdown();
+
+    if (LOCAL_UBOTS)
+        await shutdownUBots(ubotMains);
 });

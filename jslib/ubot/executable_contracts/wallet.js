@@ -127,7 +127,7 @@ async function createSplitJoin(contractsToJoin, amountsToSplit, addressesToSplit
  *
  * @param {string | number | BigDecimal} amount - Amount of tokens to transfer
  * @param {crypto.KeyAddress} recipientAddress - Address of recipient
- * @return {Uint8Array} packed transaction with token contract to transfer
+ * @return {Uint8Array} sealed binary of token contract to transfer
  */
 async function makeTranfer(amount, recipientAddress) {
     let storage = await getSingleStorage();
@@ -145,16 +145,11 @@ async function makeTranfer(amount, recipientAddress) {
     // make join and split
     let tokens = await Promise.all(storage.tokens.map(token => Contract.fromPackedTransaction(token)));
     let splits = await createSplitJoin(tokens, [amount], [recipientAddress], null, "amount");
-    let remainder = splits[0];
-    let transfer = splits[1];
 
     // make as pool contract revisions (synchronize state.createdAt and set creator to QuorumVoteRole)
-    remainder = await Contract.fromPackedTransaction(await preparePoolRevision(await remainder.getPackedTransaction()));
-    transfer = await Contract.fromPackedTransaction(await preparePoolRevision(await transfer.getPackedTransaction()));
+    let remainder = await preparePoolRevision(await splits[0].getPackedTransaction());
 
-    remainder.newItems.add(transfer);
-
-    remainder = await sealAndGetPackedTransactionByPool(await remainder.getPackedTransaction());
+    let transfer = Array.from((await Contract.fromPackedTransaction(remainder)).newItems)[0];
 
     // register SplitJoin
     let ir = await registerContract(remainder);
@@ -171,7 +166,7 @@ async function makeTranfer(amount, recipientAddress) {
 
     await writeSingleStorage(storage);
 
-    return await transfer.getPackedTransaction();
+    return transfer.sealedBinary;
 }
 
 /**
