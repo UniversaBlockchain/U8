@@ -101,7 +101,8 @@ void HttpClientWorkerAsync::sendGetRequest(const std::string& url, std::function
                 nc->flags |= MG_F_CLOSE_IMMEDIATELY;
             }
         }, opts, ph->url.c_str(), nullptr, nullptr, 0, "GET");
-        mg_set_timer(mgcon, double(getCurrentTimeMillis() + requestTimeoutMillis_)/1000.0);
+        if (mgcon != nullptr)
+            mg_set_timer(mgcon, double(getCurrentTimeMillis() + requestTimeoutMillis_)/1000.0);
     });
 }
 
@@ -156,7 +157,8 @@ void HttpClientWorkerAsync::sendBinRequest(const std::string& url, const std::st
                 nc->flags |= MG_F_CLOSE_IMMEDIATELY;
             }
         }, opts, ph->url.c_str(), extHeaders.c_str(), (const char*)&body[0], (int)body.size(), ph->method.c_str());
-        mg_set_timer(mgcon, double(getCurrentTimeMillis() + requestTimeoutMillis_)/1000.0);
+        if (mgcon != nullptr)
+            mg_set_timer(mgcon, double(getCurrentTimeMillis() + requestTimeoutMillis_)/1000.0);
     });
 }
 
@@ -197,7 +199,8 @@ void HttpClientWorkerAsync::sendRawRequest(const std::string& url, const std::st
                 nc->flags |= MG_F_CLOSE_IMMEDIATELY;
             }
         }, opts, ph->url.c_str(), ph->extHeaders.c_str(), (const char*)&ph->reqBody[0], (int)ph->reqBody.size(), ph->method.c_str());
-        mg_set_timer(mgcon, double(getCurrentTimeMillis() + requestTimeoutMillis_)/1000.0);
+        if (mgcon != nullptr)
+            mg_set_timer(mgcon, double(getCurrentTimeMillis() + requestTimeoutMillis_)/1000.0);
     });
 }
 
