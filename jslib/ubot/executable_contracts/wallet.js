@@ -42,7 +42,7 @@ async function putTokenIntoWallet(packedToken) {
         storage.operations = [];
     } else if (storage.currency == null || storage.balance == null ||
         !(storage.tokens instanceof Array) || !(storage.operations instanceof Array))       // check storage
-        throw new Error("Error storage checking");
+        return {error: "Error storage checking"};
 
     // check token currency
     if (storage.currency != null && storage.currency !== token.definition.data.currency)
@@ -126,7 +126,7 @@ async function createSplitJoin(contractsToJoin, amountsToSplit, addressesToSplit
  * Transfer token from wallet to specified address.
  *
  * @param {string | number | BigDecimal} amount - Amount of tokens to transfer
- * @param {crypto.KeyAddress} recipientAddress - Address of recipient
+ * @param {string} recipientAddress - Address of recipient (as string)
  * @return {Uint8Array} sealed binary of token contract to transfer
  */
 async function makeTranfer(amount, recipientAddress) {
@@ -134,17 +134,17 @@ async function makeTranfer(amount, recipientAddress) {
 
     // check storage
     if (storage == null)
-        throw new Error("Wallet is empty");
+        return {error: "Wallet is empty"};
     else if (storage.currency == null || storage.balance == null ||
         !(storage.tokens instanceof Array) || !(storage.operations instanceof Array))
-        throw new Error("Error storage checking");
+        return {error: "Error storage checking"};
 
     if (new BigDecimal(storage.balance).lt(new BigDecimal(amount)))
-        throw new Error("Insufficient funds");
+        return {error: "Insufficient funds"};
 
     // make join and split
     let tokens = await Promise.all(storage.tokens.map(token => Contract.fromPackedTransaction(token)));
-    let splits = await createSplitJoin(tokens, [amount], [recipientAddress], null, "amount");
+    let splits = await createSplitJoin(tokens, [amount], [new crypto.KeyAddress(recipientAddress)], null, "amount");
 
     // make as pool contract revisions (synchronize state.createdAt and set creator to QuorumVoteRole)
     let remainder = await preparePoolRevision(await splits[0].getPackedTransaction());
@@ -156,11 +156,15 @@ async function makeTranfer(amount, recipientAddress) {
     if (ir.state !== ItemState.APPROVED.val)
         return {error: "SplitJoin is not registered, item state: " + ir.state};
 
+    // update wallet balance
+    amount = new BigDecimal(amount);
+    storage.balance = new BigDecimal(storage.balance).sub(amount).toFixed();
+
     // save operation to storage
     storage.tokens = [remainder];
     storage.operations.push({
         operation: "transfer",
-        amount: new BigDecimal(amount).toFixed(),
+        amount: amount.toFixed(),
         recipient: recipientAddress
     });
 
@@ -176,13 +180,13 @@ async function makeTranfer(amount, recipientAddress) {
  * {
  *      operation: {string} "put" or "transfer"
  *      amount: {string} amount of tokens
- *      recipient {KeyAddress} address of recipient (if operation is "transfer")
+ *      recipient {string} address (as string) of recipient (if operation is "transfer")
  * }
  * or null - if no operations in wallet
  */
 async function getLastOperation() {
     let storage = await getSingleStorage();
-    if (storage.operations == null)
+    if (storage == null)
         return null;
 
     return storage.operations[storage.operations.length - 1];
@@ -195,12 +199,12 @@ async function getLastOperation() {
  * {
  *      operation: {string} "put" or "transfer"
  *      amount: {string} amount of tokens
- *      recipient {KeyAddress} address of recipient (if operation is "transfer")
+ *      recipient {string} address (as string) of recipient (if operation is "transfer")
  * })
  */
 async function getOperations() {
     let storage = await getSingleStorage();
-    if (storage.operations == null)
+    if (storage == null)
         return [];
 
     return storage.operations;
@@ -213,7 +217,7 @@ async function getOperations() {
  */
 async function getBalance() {
     let storage = await getSingleStorage();
-    if (storage.balance == null)
+    if (storage == null)
         return "0";
 
     return storage.balance;
