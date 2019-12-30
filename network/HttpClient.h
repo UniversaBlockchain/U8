@@ -111,7 +111,7 @@ public:
      * Execute a command over the authenticated and encrypted connection. In the case of network errors, restarts the
      * command.
      */
-    void command(const std::string& name, const UBinder& params, const std::function<void(UBinder&&)>& onComplete);
+    void command(const std::string& name, const UBinder& params, const std::function<void(UBinder&&,bool)>& onComplete);
 
     /** for js bindings */
     void command(const byte_vector& callBin, std::function<void(byte_vector&&,bool)>&& onComplete);

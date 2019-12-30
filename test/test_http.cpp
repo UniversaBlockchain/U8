@@ -174,7 +174,7 @@ TEST_CASE("http_secure_endpoints") {
     atomic<long> ts0 = getCurrentTimeMillis();
     atomic<int> counter0 = 0;
 
-    auto onComplete = [&sem,&readyCounter,countToSend,&ts0,&counter0](UBinder&& resp){
+    function<void(UBinder&&,bool)> onComplete = [&sem,&readyCounter,countToSend,&ts0,&counter0](UBinder&& resp, bool isError){
 //        long U = resp.getInt("U");
 //        printf("resp: U=%li\n", U);
         if (++readyCounter >= countToSend)

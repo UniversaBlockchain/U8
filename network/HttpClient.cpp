@@ -375,7 +375,7 @@ void HttpClient::command(const std::string& name, const UBinder& params, std::fu
     });
 }
 
-void HttpClient::command(const std::string& name, const UBinder& params, const std::function<void(UBinder&&)>& onComplete) {
+void HttpClient::command(const std::string& name, const UBinder& params, const std::function<void(UBinder&&,bool)>& onComplete) {
     auto onCompleteCopy = onComplete;
     command(name, params, std::move(onCompleteCopy));
 }
