@@ -23,7 +23,7 @@ const CONFIG_ROOT = "../test/config/ubot_config";
 const clientKey = tk.TestKeys.getKey();
 const userPrivKey = tk.TestKeys.getKey();
 
-const LOCAL_UBOTS = true;
+const LOCAL_UBOTS = false;
 const ubotsCount = 30;
 
 async function createPayment(cost) {
@@ -376,6 +376,97 @@ unit.test("ubot_wallet_test: insufficient balance", async () => {
     console.log("State: " + JSON.stringify(state));
 
     assert(state.state === UBotPoolState.FINISHED.val && state.result.operation === "put" && state.result.amount === "100");
+
+    await netClient.shutdown();
+    await ubotClient.shutdown();
+
+    if (LOCAL_UBOTS)
+        await shutdownUBots(ubotMains);
+});
+
+unit.test("ubot_wallet_test: put incompatible token", async () => {
+    let ubotMains = [];
+    if (LOCAL_UBOTS)
+        ubotMains = await createUBots(ubotsCount);
+
+    let ubotClient = await new UBotClient(clientKey, TOPOLOGY_ROOT + TOPOLOGY_FILE).start();
+    let netClient = await new UBotClient(tk.getTestKey(), TOPOLOGY_ROOT + TOPOLOGY_FILE).start();
+
+    let walletKey = tk.TestKeys.getKey();
+    let walletContract = await wallet.createWallet(walletKey, 10, 12);
+
+    console.log("Register wallet...");
+    let ir = await netClient.register(await walletContract.getPackedTransaction(), 10000);
+    assert(ir.state === ItemState.APPROVED);
+
+    // test token
+    let tokenIssuerKey = tk.TestKeys.getKey();
+    let tokenContract = await cs.createTokenContract([tokenIssuerKey], [tokenIssuerKey.publicKey], new BigDecimal("1000"));
+
+    console.log("Register base token...");
+    ir = await netClient.register(await tokenContract.getPackedTransaction(), 10000);
+    assert(ir.state === ItemState.APPROVED);
+
+    // test incompatible token
+    let incompatibleTokenIssuerKey = tk.TestKeys.getKey();
+    let incompatibleTokenContract = await cs.createTokenContract([incompatibleTokenIssuerKey],
+        [incompatibleTokenIssuerKey.publicKey], new BigDecimal("100"));
+
+    console.log("Register incompatible token...");
+    ir = await netClient.register(await incompatibleTokenContract.getPackedTransaction(), 10000);
+    assert(ir.state === ItemState.APPROVED);
+
+    // put token into wallet
+    let packedToken = await wallet.prepareToken(walletContract, tokenContract, [tokenIssuerKey]);
+
+    let requestContract = Contract.fromPrivateKey(userPrivKey);
+    requestContract.state.data.method_name = "putTokenIntoWallet";
+    requestContract.state.data.method_args = [packedToken];
+    requestContract.state.data.executable_contract_id = walletContract.id;
+
+    await cs.addConstraintToContract(requestContract, walletContract, "executable_contract_constraint",
+        Constraint.TYPE_EXISTING_STATE, ["this.state.data.executable_contract_id == ref.id"], true);
+
+    let state = await ubotClient.executeCloudMethod(requestContract, await createPayment(20), true);
+
+    console.log("State: " + JSON.stringify(state));
+
+    assert(state.state === UBotPoolState.FINISHED.val && state.result === "1000");
+
+    // attempt put incompatible token into wallet
+    packedToken = await wallet.prepareToken(walletContract, incompatibleTokenContract, [incompatibleTokenIssuerKey]);
+
+    requestContract = Contract.fromPrivateKey(userPrivKey);
+    requestContract.state.data.method_name = "putTokenIntoWallet";
+    requestContract.state.data.method_args = [packedToken];
+    requestContract.state.data.executable_contract_id = walletContract.id;
+
+    await cs.addConstraintToContract(requestContract, walletContract, "executable_contract_constraint",
+        Constraint.TYPE_EXISTING_STATE, ["this.state.data.executable_contract_id == ref.id"], true);
+
+    state = await ubotClient.executeCloudMethod(requestContract, await createPayment(20), true);
+
+    console.log("State: " + JSON.stringify(state));
+
+    assert(state.state === UBotPoolState.FINISHED.val &&
+        state.result.error === "Invalid token currency, does not match value of join match field: state.origin");
+
+    // check balance
+    requestContract = Contract.fromPrivateKey(walletKey);
+    requestContract.state.data.method_name = "getBalance";
+    requestContract.state.data.executable_contract_id = walletContract.id;
+
+    await cs.addConstraintToContract(requestContract, walletContract, "executable_contract_constraint",
+        Constraint.TYPE_EXISTING_STATE, [
+            "this.state.data.executable_contract_id == ref.id",
+            "this can_perform ref.state.roles.walletOwner"
+        ], true);
+
+    state = await ubotClient.executeCloudMethod(requestContract, await createPayment(4), true);
+
+    console.log("State: " + JSON.stringify(state));
+
+    assert(state.state === UBotPoolState.FINISHED.val && state.result === "1000");
 
     await netClient.shutdown();
     await ubotClient.shutdown();

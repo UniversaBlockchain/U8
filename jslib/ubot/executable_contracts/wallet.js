@@ -45,16 +45,36 @@ async function putTokenIntoWallet(packedToken) {
         return {error: "Error storage checking"};
 
     // check token currency
-    if (storage.currency != null && storage.currency !== token.definition.data.currency)
-        return {error: "Invalid token currency, need: " + storage.currency};
+    let join_match_fields = new Set();
+    token.definition.permissions.get("split_join").forEach(sjp => sjp.params.join_match_fields.forEach(jmf => join_match_fields.add(jmf)));
+
+    if (storage.currency != null) {
+        if (join_match_fields.size !== storage.currency.fields.length)
+            return {error: "Invalid token currency, does not match join match fields count"};
+
+        for (let jmf of join_match_fields) {
+            if (!~storage.currency.fields.indexOf(jmf))
+                return {error: "Invalid token currency, not found join match field: " + jmf};
+
+            if (!token.get(jmf).equals(storage.currency.values[storage.currency.fields.indexOf(jmf)]))
+                return {error: "Invalid token currency, does not match value of join match field: " + jmf};
+        }
+    }
 
     // register token contract
     let ir = await registerContract(packedToken);
     if (ir.state !== ItemState.APPROVED.val)
         return {error: "Token contract is not registered, item state: " + ir.state};
 
-    if (storage.currency == null)
-        storage.currency = token.definition.data.currency;
+    if (storage.currency == null) {
+        storage.currency = {};
+        storage.currency.fields = [];
+        storage.currency.values = [];
+        join_match_fields.forEach(jmf => {
+            storage.currency.fields.push(jmf);
+            storage.currency.values.push(token.get(jmf));
+        });
+    }
 
     let amount = new BigDecimal(token.state.data.amount);
     if (storage.balance == null)
