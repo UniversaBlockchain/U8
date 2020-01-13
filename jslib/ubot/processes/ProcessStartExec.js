@@ -118,12 +118,16 @@ class ProcessStartExec extends ProcessBase {
         return new Promise(resolve => wrkInner.farcall("errorFail", [methodName, err], {}, ans => resolve(ans)));
     }
     
-    function startTransaction(string) {
-        return new Promise((resolve, reject) => resolve());
+    function startTransaction(name) {
+        return new Promise((resolve, reject) => wrkInner.farcall("startTransaction", [name], {},
+            ans => resolve(ans), err => reject(err)
+        ));
     }
     
-    function finishTransaction(string) {
-        return new Promise((resolve, reject) => resolve());
+    function finishTransaction(name) {
+        return new Promise((resolve, reject) => wrkInner.farcall("finishTransaction", [name], {},
+            ans => resolve(ans), err => reject(err)
+        ));
     }
     `;
 
@@ -244,6 +248,14 @@ class ProcessStartExec extends ProcessBase {
 
                 this.pr.worker.export["getUBotNumberInPool"] = async (args, kwargs) => {
                     return this.getUBotNumberInPool();
+                };
+
+                this.pr.worker.export["startTransaction"] = async (args, kwargs) => {
+                    return await this.startTransaction(args[0]);
+                };
+
+                this.pr.worker.export["finishTransaction"] = async (args, kwargs) => {
+                    return await this.finishTransaction(args[0]);
                 };
 
                 this.pr.worker.export["errorFail"] = (args, kwargs) => {
@@ -1060,6 +1072,46 @@ class ProcessStartExec extends ProcessBase {
      */
     getUBotNumberInPool() {
         return this.pr.selfPoolIndex;
+    }
+
+    /**
+     * Start named transaction.
+     *
+     * @param {string} name - Transaction name.
+     * @return {Promise<boolean>} true if started.
+     */
+    async startTransaction(name) {
+        try {
+            return true;
+
+        } catch (err) {
+            this.pr.logger.log("Error start transaction: " + err.message);
+            this.pr.logger.log(err.stack);
+            this.pr.errors.push(new ErrorRecord(Errors.FAILURE, "startTransaction", "Error start transaction: " + err.message));
+            this.pr.changeState(UBotPoolState.FAILED);
+
+            throw err;
+        }
+    }
+
+    /**
+     * End named transaction.
+     *
+     * @param {string} name - Transaction name.
+     * @return {Promise<boolean>} true if finished successful.
+     */
+    async finishTransaction(name) {
+        try {
+            return true;
+
+        } catch (err) {
+            this.pr.logger.log("Error finish transaction: " + err.message);
+            this.pr.logger.log(err.stack);
+            this.pr.errors.push(new ErrorRecord(Errors.FAILURE, "finishTransaction", "Error finish transaction: " + err.message));
+            this.pr.changeState(UBotPoolState.FAILED);
+
+            throw err;
+        }
     }
 
     errorFail(methodName, err) {
