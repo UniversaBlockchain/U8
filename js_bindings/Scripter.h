@@ -77,7 +77,7 @@ public:
      *
      * @return shared pointer to scripter environment.
      */
-    static shared_ptr<Scripter> New(int accessLevel);
+    static shared_ptr<Scripter> New(int accessLevel, bool forWorker);
 
 
     /**
@@ -274,6 +274,8 @@ public:
     // worker templates
     Persistent<FunctionTemplate> WorkerScripterTpl;
 
+    static int workerMemLimitMegabytes;
+
 private:
 
     std::string expandPath(const std::string &path);
@@ -289,7 +291,7 @@ private:
 
 
     // we should not put this code in the constructor as it uses shared_from_this()
-    void initialize(int accessLevel);
+    void initialize(int accessLevel, bool forWorker);
 
     // Sleep timer is in exclusive use of this function:
     friend void JsTimer(const v8::FunctionCallbackInfo<v8::Value> &args);

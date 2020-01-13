@@ -18,6 +18,7 @@
 #include "worker_bindings.h"
 
 static const char *ARGV0 = nullptr;
+int Scripter::workerMemLimitMegabytes = 200;
 
 std::unique_ptr<v8::Platform> Scripter::initV8(const char *argv0) {
 
@@ -49,7 +50,7 @@ void Scripter::closeV8(std::unique_ptr<v8::Platform> &platform) {
 int Scripter::Application(const char *argv0, function<int(shared_ptr<Scripter>)> &&block) {
     try {
         auto platform = initV8(argv0);
-        auto se = New(0);
+        auto se = New(0, false);
         return block(se);
     }
     catch (const ScriptError &e) {
@@ -67,12 +68,12 @@ int Scripter::Application(const char *argv0, function<int(shared_ptr<Scripter>)>
 
 }
 
-shared_ptr<Scripter> Scripter::New(int accessLevel) {
+shared_ptr<Scripter> Scripter::New(int accessLevel, bool forWorker) {
     if (!ARGV0)
         throw runtime_error("Platform in not initialized");
     // we can not use make_shared as our constructor is intentionally private:
     shared_ptr<Scripter> scripter(new Scripter);
-    scripter->initialize(accessLevel);
+    scripter->initialize(accessLevel, forWorker);
     return scripter;
 }
 
@@ -141,7 +142,7 @@ static void JsThrowScripterException(const FunctionCallbackInfo<Value> &args) {
     });
 }
 
-void Scripter::initialize(int accessLevel) {
+void Scripter::initialize(int accessLevel, bool forWorker) {
     if (initialized)
         throw runtime_error("SR is already initialized");
     initialized = true;
@@ -150,6 +151,8 @@ void Scripter::initialize(int accessLevel) {
 
     create_params.array_buffer_allocator =
             v8::ArrayBuffer::Allocator::NewDefaultAllocator();
+    if (forWorker)
+        create_params.constraints.set_max_old_space_size(workerMemLimitMegabytes);
     pIsolate = v8::Isolate::New(create_params);
     v8::Isolate::Scope isolate_scope(pIsolate);
 

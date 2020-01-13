@@ -89,7 +89,7 @@ void InitWorkerPools(int accessLevel0_poolSize, int accessLevel1_poolSize) {
                 pws->accessLevel = 0;
                 Semaphore sem;
                 pws->loopThread = std::make_shared<std::thread>([pws, &sem]() {
-                    pws->se = Scripter::New(0);
+                    pws->se = Scripter::New(0, true);
                     pws->se->isolate()->SetData(1, pws.get());
                     pws->se->evaluate(workerMain);
                     sem.notify();
@@ -107,7 +107,7 @@ void InitWorkerPools(int accessLevel0_poolSize, int accessLevel1_poolSize) {
                 pws->accessLevel = 1;
                 Semaphore sem;
                 pws->loopThread = std::make_shared<std::thread>([pws, &sem]() {
-                    pws->se = Scripter::New(1);
+                    pws->se = Scripter::New(1, true);
                     pws->se->isolate()->SetData(1, pws.get());
                     pws->se->evaluate(workerMain);
                     sem.notify();
