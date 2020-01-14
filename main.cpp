@@ -54,9 +54,18 @@ int main(int argc, const char **argv) {
     } else {
         return Scripter::Application(argv[0], [=](shared_ptr<Scripter> se) {
             vector<string> args(argv + 1, argv + argc);
-            // TODO: read config file from somewhere, get workerMemLimitMegabytes and worker pool size ans set it
-            Scripter::workerMemLimitMegabytes = 150;
-            InitWorkerPools(64, 64);
+
+            auto u8param_workersPoolSize = std::getenv("U8_PARAM_WORKERS_POOL_SIZE");
+            auto u8param_workersMemLimit = std::getenv("U8_PARAM_WORKERS_MEM_LIMIT");
+            int workersPoolSize = 64;
+            if (u8param_workersPoolSize != nullptr)
+                workersPoolSize = std::stoi(std::string(u8param_workersPoolSize));
+            int workerMemLimitMegabytes = 150;
+            if (u8param_workersMemLimit != nullptr)
+                workerMemLimitMegabytes = std::stoi(std::string(u8param_workersMemLimit));
+
+            Scripter::workerMemLimitMegabytes = workerMemLimitMegabytes;
+            InitWorkerPools(workersPoolSize, workersPoolSize);
             // important note. At this point secipter instance is initialized but not locked (owning)
             // the current thread, so can be used in any thread, but only with lockging the context:
             // so we lock the context to execute evaluate:
