@@ -13,6 +13,13 @@ wrk.WorkerHandle = class {
         this.nextFarcallSN = 0;
         this.callbacksFarcall = new Map();
         this.export = {};
+        this.lowMemoryPromiseResolver = null;
+    }
+
+    waitForOnLowMemory() {
+        return new Promise(resolve => {
+            this.lowMemoryPromiseResolver = resolve;
+        });
     }
 
     onReceive(block) {
@@ -68,8 +75,11 @@ wrk.WorkerHandle = class {
         await this.send({serial: id, cmd: cmd, args: args, kwargs: kwargs});
     }
 
-    release(terminateRequired = false) {
+    async release(terminateRequired = false) {
         this.workerImpl._release(terminateRequired);
+        if (terminateRequired) {
+            await sleep(100); //!important: wait for gc deadline, see deadline value in JsScripterWrap_release
+        }
     }
 
     getProcessorTime() {
@@ -93,6 +103,9 @@ wrk.getWorker = function(accessLevel, workerSrc, customJsLib = {}) {
         wrkImpl.__getWorker(accessLevel, workerSrc, workerImpl => {
             let w = new wrk.WorkerHandle(workerImpl);
             w.workerImpl._setOnReceive(obj => w.onReceiveCallback(obj));
+            w.workerImpl._setOnLowMemory(() => {
+                w.lowMemoryPromiseResolver();
+            });
             resolve(w);
         }, customJsLib);
     });

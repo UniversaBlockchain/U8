@@ -13,20 +13,6 @@
 #include <pthread.h>
 #include <time.h>
 
-class WorkerScripter {
-public:
-    int id;
-    int accessLevel;
-    clockid_t clockId;
-    std::string jsWorkerSrc;
-    std::shared_ptr<Scripter> se;
-    std::shared_ptr<FunctionHandler> onReceive;
-    std::shared_ptr<FunctionHandler> onGetWorker;
-    std::shared_ptr<FunctionHandler> onReceiveMain;
-    std::shared_ptr<std::thread> loopThread;
-    std::unordered_map<std::string, std::string> customJsLibFiles;
-};
-
 static bool workersPool_isInit = false;
 static std::mutex workersPool_accessLevel0_mutex;
 std::condition_variable workersPool_accessLevel0_cv;
@@ -187,6 +173,7 @@ static void ReleaseWorker(WorkerScripter* pws) {
 
     std::lock_guard lock(*mtx);
     if (poolUsed->find(pws->id) != poolUsed->end()) {
+        //pws->onLowMemoryMain.reset();
         auto w = (*poolUsed)[pws->id];
         pool->push_back(w);
         poolUsed->erase(pws->id);
@@ -287,13 +274,31 @@ void JsScripterWrap_setOnReceive(const FunctionCallbackInfo<Value> &args) {
     });
 }
 
+void JsScripterWrap_setOnLowMemory(const FunctionCallbackInfo<Value> &args) {
+    Scripter::unwrapArgs(args, [](ArgsContext &ac) {
+        if (ac.args.Length() == 1) {
+            auto pws = unwrap<WorkerScripter>(ac.args.This());
+            pws->onLowMemoryMain = ac.asFunction(0);
+            return;
+        }
+        ac.throwError("invalid number of arguments");
+    });
+}
+
 void JsScripterWrap_release(const FunctionCallbackInfo<Value> &args) {
     Scripter::unwrapArgs(args, [](ArgsContext &ac) {
         if (ac.args.Length() == 1) {
             bool terminateRequired = ac.args[0]->BooleanValue(ac.context).FromJust();
             auto pws = unwrap<WorkerScripter>(ac.args.This());
-            if (terminateRequired)
+            if (terminateRequired) {
                 pws->onReceive->isolate()->TerminateExecution();
+                if (pws->onLowMemoryMain != nullptr)
+                    pws->pauseOnLowMemory->notify();
+                auto onReceive = pws->onReceive;
+                onReceive->lockedContext([onReceive](auto cxt){
+                    while(!onReceive->isolate()->IdleNotificationDeadline(0.1)){}
+                });
+            }
             ReleaseWorker(pws);
             return;
         }
@@ -333,6 +338,7 @@ void JsInitWorkerScripter(Scripter& scripter, const Local<ObjectTemplate> &globa
     prototype->Set(isolate, "version", String::NewFromUtf8(isolate, "0.0.1"));
     prototype->Set(isolate, "_send", FunctionTemplate::New(isolate, JsScripterWrap_send));
     prototype->Set(isolate, "_setOnReceive", FunctionTemplate::New(isolate, JsScripterWrap_setOnReceive));
+    prototype->Set(isolate, "_setOnLowMemory", FunctionTemplate::New(isolate, JsScripterWrap_setOnLowMemory));
     prototype->Set(isolate, "_release", FunctionTemplate::New(isolate, JsScripterWrap_release));
     prototype->Set(isolate, "_getProcessorTime", FunctionTemplate::New(isolate, JsScripterWrap_getProcessorTime));
 

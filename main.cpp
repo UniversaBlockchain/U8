@@ -60,7 +60,7 @@ int main(int argc, const char **argv) {
             int workersPoolSize = 64;
             if (u8param_workersPoolSize != nullptr)
                 workersPoolSize = std::stoi(std::string(u8param_workersPoolSize));
-            int workerMemLimitMegabytes = 150;
+            int workerMemLimitMegabytes = 50;
             if (u8param_workersMemLimit != nullptr)
                 workerMemLimitMegabytes = std::stoi(std::string(u8param_workersMemLimit));
 

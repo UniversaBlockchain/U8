@@ -331,7 +331,7 @@ class ProcessStartExec extends ProcessBase {
                         this.pr.userHttpClient = null;
                     }
 
-                    this.pr.worker.release(terminate);
+                    await this.pr.worker.release(terminate);
                     this.pr.worker = null;
                 } catch (err) {
                     console.error(err.stack);

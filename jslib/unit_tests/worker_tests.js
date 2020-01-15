@@ -43,8 +43,8 @@ class WorkerExample {
         return res;
     }
 
-    release() {
-        this.worker.release();
+    async release() {
+        await this.worker.release();
     }
 
     calcAxBxC(a, b, c) {
@@ -58,7 +58,7 @@ unit.test("worker_tests: hello worker", async () => {
     let worker = await WorkerExample.start();
     for (let i = 0; i < 10; ++i)
         console.log("3 * 4 * " + i + " = " + await worker.calcAxBxC(3, 4, i));
-    worker.release();
+    await worker.release();
 });
 
 unit.test("worker_tests: check that all global objects are frozen", async () => {
@@ -114,7 +114,7 @@ unit.test("worker_tests: check that all global objects are frozen", async () => 
 
     class Worker {
         constructor() {this.worker = null;}
-        release() {this.worker.release();}
+        async release() {await this.worker.release();}
         static async start(accessLevel) {
             let res = new Worker();
             let wrappers = accessLevel === 1 ? consoleWrapper+farcallWrapper : farcallWrapper;
@@ -153,12 +153,12 @@ unit.test("worker_tests: check that all global objects are frozen", async () => 
     console.log("worker scripter accessLevel0:");
     let worker0 = await Worker.start(0);
     await worker0.checkObject();
-    worker0.release();
+    await worker0.release();
 
     console.log("worker scripter accessLevel1:");
     let worker1 = await Worker.start(1);
     await worker1.checkObject();
-    worker1.release();
+    await worker1.release();
 
     if (fails !== "") {
         console.error(fails);
@@ -169,7 +169,7 @@ unit.test("worker_tests: check that all global objects are frozen", async () => 
 unit.test("worker_tests: isolate js context", async () => {
     class Worker {
         constructor() {this.worker = null;}
-        release() {this.worker.release();}
+        async release() {await this.worker.release();}
         static async start() {
             let res = new Worker();
             res.worker = await getWorker(0, farcallWrapper+`
@@ -189,7 +189,7 @@ unit.test("worker_tests: isolate js context", async () => {
 
     class Worker2 {
         constructor() {this.worker = null;}
-        release() {this.worker.release();}
+        async release() {await this.worker.release();}
         static async start() {
             let res = new Worker2();
             res.worker = await getWorker(0, farcallWrapper+`
@@ -216,13 +216,13 @@ unit.test("worker_tests: isolate js context", async () => {
         //console.log("i=" + i + ", " + res.base64);
         assert(res.equals(crypto.HashId.of(val)));
     }
-    worker.release();
+    await worker.release();
 
     // iterate all workers in pool, call changeCrypto() for each of them
     for (let i = 0; i < 200; ++i) {
         let worker2 = await Worker2.start();
         await worker2.changeCrypto();
-        worker2.release();
+        await worker2.release();
     }
 
     worker = await Worker.start();
@@ -232,7 +232,7 @@ unit.test("worker_tests: isolate js context", async () => {
         //console.log("i=" + i + ", " + res.base64);
         assert(res.equals(crypto.HashId.of(val)));
     }
-    worker.release();
+    await worker.release();
 });
 
 unit.test("worker_tests: clean wrk object", async () => {
@@ -242,7 +242,7 @@ unit.test("worker_tests: clean wrk object", async () => {
             this.worker = null;
             this.funcName = "func" + counter++;
         }
-        release() {this.worker.release();}
+        async release() {await this.worker.release();}
         static async start() {
             let res = new Worker();
             res.worker = await getWorker(0, farcallWrapper+`
@@ -266,7 +266,7 @@ unit.test("worker_tests: clean wrk object", async () => {
         let ans = await worker.doSomething();
         //console.log("ans: " + ans);
         assert(ans === 1);
-        worker.release();
+        await worker.release();
     }
 
 });
@@ -277,7 +277,7 @@ unit.test("worker_tests: import custom js lib", async () => {
         constructor() {
             this.worker = null;
         }
-        release() {this.worker.release();}
+        async release() {await this.worker.release();}
         static async start() {
             let res = new Worker();
             let customLibFiles = {"lib_file1.js": `
@@ -320,7 +320,7 @@ unit.test("worker_tests: import custom js lib", async () => {
         let ans = await worker.doSomething();
         //console.log("ans: " + ans);
         assert(ans === "lib2 lib1 func1_result");
-        worker.release();
+        await worker.release();
     }
 
 });
@@ -330,7 +330,7 @@ unit.test("worker_tests: exceptions from worker", async () => {
         constructor() {
             this.worker = null;
         }
-        release() {this.worker.release();}
+        async release() {await this.worker.release();}
         static async start() {
             let res = new Worker();
             res.worker = await getWorker(1, consoleWrapper + farcallWrapper+`
@@ -362,7 +362,7 @@ unit.test("worker_tests: exceptions from worker", async () => {
         } catch (e) {
             assert(e.text === "some_error_text");
         }
-        worker.release();
+        await worker.release();
     }
 });
 
@@ -371,7 +371,7 @@ unit.test("worker_tests: exceptions from main scripter", async () => {
         constructor() {
             this.worker = null;
         }
-        release() {this.worker.release();}
+        async release() {await this.worker.release();}
         static async start() {
             let res = new Worker();
             res.worker = await getWorker(1, consoleWrapper + farcallWrapper+`
@@ -422,7 +422,7 @@ unit.test("worker_tests: exceptions from main scripter", async () => {
             //console.log("e: " + JSON.stringify(e));
             assert(e.text === "some_error_text");
         }
-        worker.release();
+        await worker.release();
     }
 });
 
@@ -442,7 +442,7 @@ unit.test("worker_tests: terminate worker with infinite loop", async () => {
         constructor() {
             this.worker = null;
         }
-        release(terminateRequired=false) {this.worker.release(terminateRequired);}
+        async release(terminateRequired=false) {await this.worker.release(terminateRequired);}
         static async start() {
             let res = new Worker();
             res.worker = await getWorker(1, consoleWrapper + farcallWrapper+`
@@ -450,7 +450,7 @@ unit.test("worker_tests: terminate worker with infinite loop", async () => {
                 let n = args[0];
                 //console.log("worker("+n+") goes into infinite loop...");
                 await sleep(1000);
-                for (let i = 0; i < 25000000*(1+n/10); /*++i*/);
+                for (let i = 0; i < 25000000*(1+n/10); );//++i);
                 return "some_answer";
             }
             `);
@@ -481,7 +481,7 @@ unit.test("worker_tests: terminate worker with infinite loop", async () => {
             await Promise.race([(async () => {
                 await worker.doSomething(i);
                 isTimeoutCancelled = true;
-                worker.release();
+                await worker.release();
                 //console.log("worker("+i+")... done!");
                 ++readyCounter;
             })(), (async () => {
@@ -489,7 +489,89 @@ unit.test("worker_tests: terminate worker with infinite loop", async () => {
                 await sleep(5000);
                 if (!isTimeoutCancelled) {
                     //console.log("timeout, terminate worker("+i+") now...");
-                    worker.release(true);
+                    await worker.release(true);
+                    ++readyCounter;
+                }
+            })()]);
+        })());
+        while (requestCounter > readyCounter + 100)
+            await sleep(50);
+    }
+
+    await Promise.all(workerStartPromises);
+
+    //this test just should not hangs
+});
+
+unit.test("worker_tests: terminate worker with high memory usage", async () => {
+    class Worker {
+        constructor() {
+            this.worker = null;
+        }
+        async release(terminateRequired=false) {await this.worker.release(terminateRequired);}
+        static async start() {
+            let res = new Worker();
+            res.worker = await getWorker(1, consoleWrapper + farcallWrapper+`
+            wrkInner.export.doSomething = async (args, kwargs) => {
+                let n = args[0];
+                //console.log("worker("+n+") starts eating memory");
+                await sleep(100);
+                let arr = [];
+                for (;;) {
+                    for (let i = 0; i < 10000; ++i)
+                        arr.push(0);
+                    await sleep(10);
+                }
+                return arr.length;
+            }
+            `);
+            res.worker.startFarcallCallbacks();
+
+            res.worker.export["__worker_bios_print"] = (args, kwargs) => {
+                let out = args[0] === true ? console.error : console.logPut;
+                out(...args[1], args[2]);
+            };
+
+            return res;
+        }
+        doSomething(n) {
+            return new Promise((resolve,reject) => this.worker.farcall("doSomething", [n], {}, resolve, reject));
+        }
+    }
+
+    console.logPut("this test just should not crashes, plz wait for ~15 sec... ");
+
+    let workerStartPromises = [];
+    let requestCounter = 0;
+    let readyCounter = 0;
+    for (let i = 0; i < 200; ++i) {
+        workerStartPromises.push((async () => {
+            ++requestCounter;
+            let worker = await Worker.start();
+            let isTimeoutCancelled = false;
+            let isOomCancelled = false;
+            await Promise.race([(async () => {
+                await worker.doSomething(i);
+                isTimeoutCancelled = true;
+                isOomCancelled = true;
+                await worker.release();
+                //console.log("worker("+i+")... done!");
+                ++readyCounter;
+            })(), (async () => {
+                //console.log("wait for worker("+i+")...");
+                await sleep(50000);
+                if (!isTimeoutCancelled) {
+                    console.log("timeout, terminate worker("+i+") now...");
+                    isOomCancelled = true;
+                    await worker.release(true);
+                    ++readyCounter;
+                }
+            })(), (async () => {
+                await worker.worker.waitForOnLowMemory();
+                if (!isOomCancelled) {
+                    //console.log("worker-" + i + " memory is low");
+                    isTimeoutCancelled = true;
+                    await worker.release(true);
                     ++readyCounter;
                 }
             })()]);

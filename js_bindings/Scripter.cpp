@@ -18,7 +18,7 @@
 #include "worker_bindings.h"
 
 static const char *ARGV0 = nullptr;
-int Scripter::workerMemLimitMegabytes = 200;
+int Scripter::workerMemLimitMegabytes = 200; // actual default value is set in main.cpp
 
 std::unique_ptr<v8::Platform> Scripter::initV8(const char *argv0) {
 
@@ -349,6 +349,31 @@ int Scripter::runAsMain(string sourceScript, const vector<string> &&args, string
 void Scripter::runMainLoop(bool forWorker) {
     // main loop: we process all callbacks here in the same thread:
     {
+        if (forWorker) {
+            pIsolate->AddNearHeapLimitCallback([](void *data, size_t current_heap_limit, size_t initial_heap_limit) {
+                Isolate *iso = (Isolate *) data;
+                WorkerScripter *ws = (WorkerScripter *) iso->GetData(1);
+                if (ws != nullptr) {
+                    auto onLowMemoryMain = ws->onLowMemoryMain;
+                    if (onLowMemoryMain != nullptr) {
+                        onLowMemoryMain->lockedContext([onLowMemoryMain](auto cxt) {
+                            onLowMemoryMain->invoke();
+                        });
+                        ws->pauseOnLowMemory->wait();
+                    }
+                }
+//                iso->AutomaticallyRestoreInitialHeapLimit();
+//                size_t res = Scripter::workerMemLimitMegabytes*2;
+//                if (res > 1400)
+//                    res = 1400;
+//                res *= 1024 * 1024;
+//                if (res < current_heap_limit)
+//                    res = current_heap_limit;
+//                return res;
+                return current_heap_limit;
+            }, pIsolate);
+        }
+
         // optimization: the shared context scope - it could be a problem, then move it insude the loop
         // actually we do not want to create separate context for every call
         v8::HandleScope handle_scope(pIsolate);

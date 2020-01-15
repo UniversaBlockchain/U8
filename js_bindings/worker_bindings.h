@@ -6,9 +6,26 @@
 #define U8_WORKER_BINDINGS_H
 
 #include "Scripter.h"
+#include "../tools/Semaphore.h"
 
 using namespace v8;
 using namespace std;
+
+class WorkerScripter {
+public:
+    int id;
+    int accessLevel;
+    clockid_t clockId;
+    std::string jsWorkerSrc;
+    std::shared_ptr<Scripter> se;
+    std::shared_ptr<FunctionHandler> onReceive;
+    std::shared_ptr<FunctionHandler> onGetWorker;
+    std::shared_ptr<FunctionHandler> onReceiveMain; // receiver is parent scripter
+    std::shared_ptr<FunctionHandler> onLowMemoryMain; // receiver is parent scripter
+    std::shared_ptr<std::thread> loopThread;
+    std::unordered_map<std::string, std::string> customJsLibFiles;
+    std::shared_ptr<Semaphore> pauseOnLowMemory = std::make_shared<Semaphore>();
+};
 
 void InitWorkerPools(int accessLevel0_poolSize, int accessLevel1_poolSize);
 
