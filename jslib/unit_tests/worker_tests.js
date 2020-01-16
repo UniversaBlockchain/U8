@@ -513,16 +513,20 @@ unit.test("worker_tests: terminate worker with high memory usage", async () => {
             let res = new Worker();
             res.worker = await getWorker(1, consoleWrapper + farcallWrapper+`
             wrkInner.export.doSomething = async (args, kwargs) => {
-                let n = args[0];
-                //console.log("worker("+n+") starts eating memory");
-                await sleep(100);
-                let arr = [];
-                for (;;) {
-                    for (let i = 0; i < 10000; ++i)
-                        arr.push(0);
-                    await sleep(10);
+                try {
+                    let n = args[0];
+                    //console.log("worker("+n+") starts eating memory");
+                    await sleep(100);
+                    let arr = [];
+                    for (;;) {
+                        for (let i = 0; i < 10000; ++i)
+                            arr.push(0);
+                        await sleep(10);
+                    }
+                    return arr.length;
+                } catch(e) {
+                    return "error: "+e;
                 }
-                return arr.length;
             }
             `);
             res.worker.startFarcallCallbacks();
@@ -551,17 +555,17 @@ unit.test("worker_tests: terminate worker with high memory usage", async () => {
             let isTimeoutCancelled = false;
             let isOomCancelled = false;
             await Promise.race([(async () => {
-                await worker.doSomething(i);
+                let r = await worker.doSomething(i);
                 isTimeoutCancelled = true;
                 isOomCancelled = true;
                 await worker.release();
-                //console.log("worker("+i+")... done!");
+                //console.log("worker("+i+")... done! " + r);
                 ++readyCounter;
             })(), (async () => {
                 //console.log("wait for worker("+i+")...");
                 await sleep(50000);
                 if (!isTimeoutCancelled) {
-                    console.log("timeout, terminate worker("+i+") now...");
+                    //console.log("timeout, terminate worker("+i+") now...");
                     isOomCancelled = true;
                     await worker.release(true);
                     ++readyCounter;
@@ -582,5 +586,8 @@ unit.test("worker_tests: terminate worker with high memory usage", async () => {
 
     await Promise.all(workerStartPromises);
 
-    //this test just should not hangs
+    while (readyCounter < requestCounter) {
+        await sleep(1000);
+        console.log("readyCounter = " + readyCounter + ", requestCounter = " + requestCounter);
+    }
 });

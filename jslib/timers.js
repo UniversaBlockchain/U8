@@ -9,6 +9,7 @@
 // and the js library does it, so client scripts can not access it dynamically anymore.
 
 import {FastPriorityQueue} from "sorted";
+const t = require("tools");
 
 let timerHandler = __bios_initTimers();
 

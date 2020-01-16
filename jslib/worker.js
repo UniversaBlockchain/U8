@@ -78,7 +78,7 @@ wrk.WorkerHandle = class {
     async release(terminateRequired = false) {
         this.workerImpl._release(terminateRequired);
         if (terminateRequired) {
-            await sleep(100); //!important: wait for gc deadline, see deadline value in JsScripterWrap_release
+            await sleep(120); //!important: wait for gc deadline, see deadline value in JsScripterWrap_release
         }
     }
 
