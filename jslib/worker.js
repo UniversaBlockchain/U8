@@ -129,7 +129,7 @@ let console = {
 `;
 
 wrk.farcallWrapper = `
-//gc();
+gc();
 wrkInner.onReceive = async (obj) => {
     const DefaultBiMapper = require("defaultbimapper").DefaultBiMapper;
     let cmd = obj.cmd;
