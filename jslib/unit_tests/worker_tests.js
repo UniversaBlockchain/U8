@@ -547,19 +547,25 @@ unit.test("worker_tests: terminate worker with high memory usage", async () => {
 
     let workerStartPromises = [];
     let requestCounter = 0;
+    let startedCounter = 0;
     let readyCounter = 0;
+    let doneCounter = 0;
+    let terminateCounter = 0;
+    let lowMemCounter = 0;
     for (let i = 0; i < 200; ++i) {
         workerStartPromises.push((async () => {
             ++requestCounter;
             let worker = await Worker.start();
             let isTimeoutCancelled = false;
             let isOomCancelled = false;
+            ++startedCounter;
             await Promise.race([(async () => {
                 let r = await worker.doSomething(i);
                 isTimeoutCancelled = true;
                 isOomCancelled = true;
                 await worker.release();
                 //console.log("worker("+i+")... done! " + r);
+                ++doneCounter;
                 ++readyCounter;
             })(), (async () => {
                 //console.log("wait for worker("+i+")...");
@@ -568,6 +574,7 @@ unit.test("worker_tests: terminate worker with high memory usage", async () => {
                     //console.log("timeout, terminate worker("+i+") now...");
                     isOomCancelled = true;
                     await worker.release(true);
+                    ++terminateCounter;
                     ++readyCounter;
                 }
             })(), (async () => {
@@ -576,18 +583,25 @@ unit.test("worker_tests: terminate worker with high memory usage", async () => {
                     //console.log("worker-" + i + " memory is low");
                     isTimeoutCancelled = true;
                     await worker.release(true);
+                    ++lowMemCounter;
                     ++readyCounter;
                 }
             })()]);
         })());
-        while (requestCounter > readyCounter + 100)
-            await sleep(50);
+        while (requestCounter > readyCounter + 1000) {
+            // console.log("---");
+            // console.log("readyCounter = " + readyCounter + ", requestCounter = " + requestCounter + ", startedCounter = " + startedCounter);
+            // console.log("doneCounter = " + doneCounter+ ", terminateCounter = " + terminateCounter + ", lowMemCounter = " + lowMemCounter);
+            await sleep(1000);
+        }
     }
-
-    await Promise.all(workerStartPromises);
 
     while (readyCounter < requestCounter) {
         await sleep(1000);
-        console.log("readyCounter = " + readyCounter + ", requestCounter = " + requestCounter);
+        // console.log("---");
+        // console.log("readyCounter = " + readyCounter + ", requestCounter = " + requestCounter + ", startedCounter = " + startedCounter);
+        // console.log("doneCounter = " + doneCounter+ ", terminateCounter = " + terminateCounter + ", lowMemCounter = " + lowMemCounter);
     }
+
+    await Promise.all(workerStartPromises);
 });
