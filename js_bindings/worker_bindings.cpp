@@ -294,10 +294,6 @@ void JsScripterWrap_release(const FunctionCallbackInfo<Value> &args) {
                 pws->onReceive->isolate()->TerminateExecution();
                 if (pws->onLowMemoryMain != nullptr)
                     pws->pauseOnLowMemory->notify();
-                auto onReceive = pws->onReceive;
-                onReceive->lockedContext([onReceive](auto cxt){
-                    while(!onReceive->isolate()->IdleNotificationDeadline(0.1)){}
-                });
             }
             ReleaseWorker(pws);
             return;

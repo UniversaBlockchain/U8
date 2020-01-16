@@ -77,9 +77,6 @@ wrk.WorkerHandle = class {
 
     async release(terminateRequired = false) {
         this.workerImpl._release(terminateRequired);
-        if (terminateRequired) {
-            await sleep(120); //!important: wait for gc deadline, see deadline value in JsScripterWrap_release
-        }
     }
 
     getProcessorTime() {
@@ -132,6 +129,7 @@ let console = {
 `;
 
 wrk.farcallWrapper = `
+//gc();
 wrkInner.onReceive = async (obj) => {
     const DefaultBiMapper = require("defaultbimapper").DefaultBiMapper;
     let cmd = obj.cmd;
