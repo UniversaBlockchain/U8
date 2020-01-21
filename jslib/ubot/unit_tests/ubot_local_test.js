@@ -434,6 +434,55 @@ unit.test("ubot_local_test: execute looped cloud method", async () => {
     await shutdownUBots(ubotMains);
 });
 
+unit.test("ubot_local_test: execute high memory cloud method", async () => {
+    let ubotMains = await createUBots(ubotsCount);
+
+    let ubotClient = await new UBotClient(clientKey, TOPOLOGY_ROOT + TOPOLOGY_FILE).start();
+
+    let executableContract = Contract.fromPrivateKey(userPrivKey);
+    executableContract.state.data.cloud_methods = {
+        loop: {
+            pool: {size: 2},
+            quorum: {size: 2}
+        }
+    };
+
+    executableContract.state.data.js = `function loop() {
+        let arr = [];
+        while(true) {
+            arr.push(0);
+        }
+    }`;
+
+    await executableContract.seal();
+
+    let requestContract = Contract.fromPrivateKey(userPrivKey);
+    requestContract.state.data.method_name = "loop";
+    requestContract.state.data.executable_contract_id = executableContract.id;
+    requestContract.newItems.add(executableContract);
+
+    await cs.addConstraintToContract(requestContract, executableContract, "executable_contract_constraint",
+        Constraint.TYPE_EXISTING_STATE, ["this.state.data.executable_contract_id == ref.id"], true);
+
+    let state = await ubotClient.executeCloudMethod(requestContract, await createPayment(2), true);
+
+    console.log("State: " + JSON.stringify(state));
+
+    assert(state.state === UBotPoolState.FAILED.val);
+
+    assert(state.errors[0].error === "FAILURE" && state.errors[0].objectName === "loop" &&
+        state.errors[0].message === "Cloud method return error: Executable contract uses too more memory");
+
+    await ubotClient.shutdown();
+
+    // waiting pool finished...
+    while (ubotMains.some(main => Array.from(main.ubot.processors.values()).some(proc => proc.state.canContinue)))
+        await sleep(100);
+
+    await shutdownUBots(ubotMains);
+});
+
+
  unit.test("ubot_local_test: full quorum", async () => {
      let ubotMains = await createUBots(ubotsCount);
      let ubotClient = await new UBotClient(clientKey, TOPOLOGY_ROOT + TOPOLOGY_FILE).start();

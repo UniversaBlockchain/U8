@@ -313,6 +313,13 @@ class ProcessStartExec extends ProcessBase {
                                     startAbsoluteTime = endAbsoluteTime;
                                 }
                             } while (this.pr.worker != null && !terminate);
+                        }),
+                        new Promise(async resolve => {
+                            await this.pr.worker.waitForOnLowMemory();
+                            if (this.pr.worker != null && !terminate) {
+                                terminate = true;
+                                resolve(new UBotProcessException("Executable contract uses too more memory"));
+                            }
                         })
                     ]);
                 } else {

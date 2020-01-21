@@ -13,7 +13,7 @@ wrk.WorkerHandle = class {
         this.nextFarcallSN = 0;
         this.callbacksFarcall = new Map();
         this.export = {};
-        this.lowMemoryPromiseResolver = null;
+        this.lowMemoryPromiseResolver = () => {};
     }
 
     waitForOnLowMemory() {
