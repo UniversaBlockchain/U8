@@ -1422,3 +1422,72 @@ unit.test("ubot_local_test: launcher role", async () => {
 
     await shutdownUBots(ubotMains);
 });
+
+/*unit.test("ubot_local_test: concurrent transactions", async () => {
+    let ubotMains = await createUBots(ubotsCount);
+
+    let executableContract = await generateSimpleExecutableContract("transaction.js", "transaction");
+
+    await executableContract.seal();
+
+    let n = 3;
+
+    let requestContracts = [];
+    let uContracts = [];
+    let clients = [];
+
+    for (let i = 0; i < 10; i++) {
+        let ubotClient = await new UBotClient(clientKey, TOPOLOGY_ROOT + TOPOLOGY_FILE).start();
+        clients.push(ubotClient);
+
+        let requestContract = Contract.fromPrivateKey(userPrivKey);
+        requestContract.state.data.method_name = "transaction";
+        requestContract.state.data.method_args = [i];
+        requestContract.state.data.executable_contract_id = executableContract.id;
+
+        await cs.addConstraintToContract(requestContract, executableContract, "executable_contract_constraint",
+            Constraint.TYPE_EXISTING_STATE, ["this.state.data.executable_contract_id == ref.id"], true);
+
+        requestContracts.push(requestContract);
+    }
+
+    let promises = [];
+    for (let i = 0; i < n; i++)
+        promises.push(clients[i].startCloudMethod(requestContracts[i], await createPayment(20)));
+
+    let sessions = await Promise.all(promises);
+
+    let promises2 = [];
+    for (let i = 0; i < n; i++) {
+        promises2.push(new Promise(async (resolve, reject) => {
+
+            let states = await Promise.all(sessions[i].pool.map(async (ubotNumber) => {
+                let state = await clients[i].getStateCloudMethod(requestContracts[i], ubotNumber);
+
+                if (state.state !== UBotPoolState.FINISHED.val)
+                    state = await clients[i].waitCloudMethod(requestContracts[i], ubotNumber);
+
+                return state;
+            }));
+
+            let state = await clients[i].getStateCloudMethod(requestContracts[i]);
+
+            if (state.state !== UBotPoolState.FINISHED.val)
+                state = await clients[i].waitCloudMethod(requestContracts[i]);
+
+            resolve(state);
+        }));
+    }
+
+
+    for (let i = 0; i < n; i++) {
+        await clients[i].shutdown();
+    }
+
+    // waiting pool finished...
+    while (ubotMains.some(main => Array.from(main.ubot.processors.values()).some(proc => proc.state.canContinue)))
+        await sleep(100);
+
+    await shutdownUBots(ubotMains);
+
+});*/
