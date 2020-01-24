@@ -504,6 +504,9 @@ unit.test("worker_tests: terminate worker with infinite loop", async () => {
 });
 
 unit.test("worker_tests: terminate worker with high memory usage", async () => {
+    let N = 200;
+    let messageFromWorkerCounter = 0;
+
     class Worker {
         constructor() {
             this.worker = null;
@@ -512,11 +515,16 @@ unit.test("worker_tests: terminate worker with high memory usage", async () => {
         static async start() {
             let res = new Worker();
             res.worker = await getWorker(1, consoleWrapper + farcallWrapper+`
+            function sendMessageFromWorker() {
+                return new Promise((resolve,reject) => wrkInner.farcall("messageFromWorker", [], {}, resolve, reject));
+            }
+            
             wrkInner.export.doSomething = async (args, kwargs) => {
                 try {
                     let n = args[0];
                     //console.log("worker("+n+") starts eating memory");
                     await sleep(100);
+                    sendMessageFromWorker();
                     let arr = [];
                     for (;;) {
                         for (let i = 0; i < 10000; ++i)
@@ -536,6 +544,10 @@ unit.test("worker_tests: terminate worker with high memory usage", async () => {
                 out(...args[1], args[2]);
             };
 
+            res.worker.export["messageFromWorker"] = (args, kwargs) => {
+                ++messageFromWorkerCounter;
+            };
+
             return res;
         }
         doSomething(n) {
@@ -552,7 +564,7 @@ unit.test("worker_tests: terminate worker with high memory usage", async () => {
     let doneCounter = 0;
     let terminateCounter = 0;
     let lowMemCounter = 0;
-    for (let i = 0; i < 200; ++i) {
+    for (let i = 0; i < N; ++i) {
         workerStartPromises.push((async () => {
             ++requestCounter;
             let worker = await Worker.start();
@@ -590,7 +602,7 @@ unit.test("worker_tests: terminate worker with high memory usage", async () => {
         })());
         while (requestCounter > readyCounter + 1000) {
             // console.log("---");
-            // console.log("readyCounter = " + readyCounter + ", requestCounter = " + requestCounter + ", startedCounter = " + startedCounter);
+            // console.log("readyCounter = " + readyCounter + ", requestCounter = " + requestCounter + ", startedCounter = " + startedCounter + ", messageFromWorkerCounter = " + messageFromWorkerCounter);
             // console.log("doneCounter = " + doneCounter+ ", terminateCounter = " + terminateCounter + ", lowMemCounter = " + lowMemCounter);
             await sleep(1000);
         }
@@ -598,10 +610,11 @@ unit.test("worker_tests: terminate worker with high memory usage", async () => {
 
     while (readyCounter < requestCounter) {
         await sleep(1000);
-        // console.log("---");
-        // console.log("readyCounter = " + readyCounter + ", requestCounter = " + requestCounter + ", startedCounter = " + startedCounter);
+        // console.log("---!");
+        // console.log("readyCounter = " + readyCounter + ", requestCounter = " + requestCounter + ", startedCounter = " + startedCounter + ", messageFromWorkerCounter = " + messageFromWorkerCounter);
         // console.log("doneCounter = " + doneCounter+ ", terminateCounter = " + terminateCounter + ", lowMemCounter = " + lowMemCounter);
     }
 
     await Promise.all(workerStartPromises);
+    assert(messageFromWorkerCounter === N);
 });

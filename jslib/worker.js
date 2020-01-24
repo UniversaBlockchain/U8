@@ -76,7 +76,14 @@ wrk.WorkerHandle = class {
     }
 
     async release(terminateRequired = false) {
-        this.workerImpl._release(terminateRequired);
+        if (terminateRequired === true) {
+            await this.workerImpl._terminate();
+            await Promise.race([new Promise(resolve => this.farcall("_some_nonexistent_command", [], {}, resolve, resolve)),
+                this.waitForOnLowMemory()]);
+            this.workerImpl._release(true);
+        } else {
+            this.workerImpl._release(terminateRequired);
+        }
     }
 
     getProcessorTime() {
@@ -168,6 +175,8 @@ wrkInner.onReceive = async (obj) => {
             wrkInner.callbacksFarcall.get(ref)[0](await DefaultBiMapper.getInstance().deserialize(obj.result));
             wrkInner.callbacksFarcall.delete(ref);
         }
+    } else {
+        await wrkInner.send({serial:wrkInner.getNextFarcallSN(), ref:obj.serial, error: "Unknown cmd"});
     }
 }
 wrkInner.farcall = async (cmd, args, kwargs, onComplete = null, onError = (e)=>{}) => {

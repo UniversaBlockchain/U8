@@ -279,6 +279,7 @@ void JsScripterWrap_setOnLowMemory(const FunctionCallbackInfo<Value> &args) {
         if (ac.args.Length() == 1) {
             auto pws = unwrap<WorkerScripter>(ac.args.This());
             pws->onLowMemoryMain = ac.asFunction(0);
+            pws->pauseOnLowMemory = make_shared<Semaphore>();
             return;
         }
         ac.throwError("invalid number of arguments");
@@ -294,8 +295,36 @@ void JsScripterWrap_release(const FunctionCallbackInfo<Value> &args) {
                 pws->onReceive->isolate()->TerminateExecution();
                 if (pws->onLowMemoryMain != nullptr)
                     pws->pauseOnLowMemory->notify();
+
+                Semaphore sem;
+                pws->onGetWorker->lockedContext([pws,&sem](auto cxt){
+                    pws->onGetWorker->invoke();
+                    sem.notify();
+                });
+                sem.wait();
             }
             ReleaseWorker(pws);
+            return;
+        }
+        ac.throwError("invalid number of arguments");
+    });
+}
+
+void JsScripterWrap_terminate(const FunctionCallbackInfo<Value> &args) {
+    Scripter::unwrapArgs(args, [](ArgsContext &ac) {
+        if (ac.args.Length() == 0) {
+            auto pws = unwrap<WorkerScripter>(ac.args.This());
+            pws->onReceive->isolate()->TerminateExecution();
+            if (pws->onLowMemoryMain != nullptr)
+                pws->pauseOnLowMemory->notify();
+
+            Semaphore sem;
+            pws->onGetWorker->lockedContext([pws,&sem](auto cxt){
+                pws->onGetWorker->invoke();
+                sem.notify();
+            });
+            sem.wait();
+
             return;
         }
         ac.throwError("invalid number of arguments");
@@ -336,6 +365,7 @@ void JsInitWorkerScripter(Scripter& scripter, const Local<ObjectTemplate> &globa
     prototype->Set(isolate, "_setOnReceive", FunctionTemplate::New(isolate, JsScripterWrap_setOnReceive));
     prototype->Set(isolate, "_setOnLowMemory", FunctionTemplate::New(isolate, JsScripterWrap_setOnLowMemory));
     prototype->Set(isolate, "_release", FunctionTemplate::New(isolate, JsScripterWrap_release));
+    prototype->Set(isolate, "_terminate", FunctionTemplate::New(isolate, JsScripterWrap_terminate));
     prototype->Set(isolate, "_getProcessorTime", FunctionTemplate::New(isolate, JsScripterWrap_getProcessorTime));
 
     // register it into global namespace
