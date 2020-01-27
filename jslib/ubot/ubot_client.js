@@ -489,43 +489,18 @@ class UBotClient {
      * @private
      * @param {Contract} requestContract - The Request contract.
      * @param {Contract | null} payment - The payment contract.
-     * @param {boolean} waitPreviousSession=false - Wait for the previous session, if true.
      * @async
      * @return {UBotSession} session.
      */
-    async createSession(requestContract, payment, waitPreviousSession = false) {
+    async createSession(requestContract, payment) {
         let params = {packedRequest: await requestContract.getPackedTransaction()};
         let session = null;
         if (payment != null) {
             params.packedU = await payment.getPackedTransaction();
             //let paidAttempts = 3;
 
-            while (!await this.processPaidOperation(params, payment.id)) {
-                if (waitPreviousSession) {
-                    await sleep(UBotConfig.waitPaidPeriod);
-                    // session = await this.getSession("ubotGetSession",
-                    //     {executableContractId: requestContract.state.data.executable_contract_id});
-                    //
-                    // if (session == null || session.requestId == null || session.requestId.equals(requestContract.id)) {
-                    //     paidAttempts--;
-                    //     if (paidAttempts === 0)
-                    //         throw new UBotClientException("Paid operation with waiting previous session is failed");
-                    // }
-                    //
-                    // while (session != null && session.requestId != null && !session.requestId.equals(requestContract.id)) {
-                    //     if (session.state === UBotSessionState.CLOSING.val || session.state === UBotSessionState.CLOSED.val)
-                    //         await sleep(UBotConfig.waitPeriod);
-                    //     else
-                    //         await sleep(UBotConfig.waitPeriod * 10);
-                    //
-                    //     session = await this.getSession("ubotGetSession",
-                    //         {executableContractId: requestContract.state.data.executable_contract_id});
-                    // }
-                } else
-                    throw new UBotClientException("Paid operation is not processed");
-            }
-
-            waitPreviousSession = false;
+            if (!await this.processPaidOperation(params, payment.id))
+                throw new UBotClientException("Paid operation is not processed");
 
             while (session == null || (session.state == null && session.errors == null))
                 session = await this.getSession("ubotGetSession", {requestId: requestContract.id});
@@ -545,29 +520,12 @@ class UBotClient {
                     throw new UBotClientException("Session timeout limit exceeded");
 
                 await sleep(UBotConfig.waitPeriod);
-                session = await this.getSession("ubotGetSession", waitPreviousSession ?
-                    {executableContractId: requestContract.state.data.executable_contract_id} :
-                    {requestId: requestContract.id});
+                session = await this.getSession("ubotGetSession", {requestId: requestContract.id});
             }
 
             this.checkSessionIsNull(session);
 
-            if (waitPreviousSession) {
-                while (session.requestId != null && !session.requestId.equals(requestContract.id)) {
-                    if (session.state === UBotSessionState.CLOSING.val || session.state === UBotSessionState.CLOSED.val)
-                        await sleep(UBotConfig.waitPeriod);
-                    else
-                        await sleep(UBotConfig.waitPeriod * 10);
-
-                    session = await this.getSession("ubotCreateSession", params);
-
-                    this.checkSessionIsNull(session);
-                }
-
-                if (this.waitSession != null)
-                    maxTime = Date.now() + this.waitSession;
-
-            } else if (session.requestId == null || !session.requestId.equals(requestContract.id))
+            if (session.requestId == null || !session.requestId.equals(requestContract.id))
                 throw new UBotClientException("Unable to create session by request contract");
         } while (session.requestId == null);
 
@@ -903,23 +861,18 @@ class UBotClient {
     /**
      * Start cloud method.
      * Requests the creation of a session with a randomly selected pool using the request contract. By default,
-     * сreates a session with the id of the Request contract or throws an exception if the session is already
-     * created for another Request contract under the same executable contract.
-     * If waitPreviousSession = true, then the method will wait until it is possible to create a session with its request id.
+     * сreates a session with the id of the Request contract or throws an exception.
      * Waits until the session is assigned an id and a pool is calculated from it.
      * Then he asks for a contract with the registry and topology of UBots, connects to a random UBots from the pool on
      * which he runs the cloud method.
      *
      * @param {Contract} requestContract - The Request contract.
      * @param {Contract | null} payment - The payment contract.
-     * @param {boolean} waitPreviousSession - Wait finished previous session or return his and exit.
-     *      If true - repeated attempts to start the cloud method after 1 second if the session is in OPERATIONAL mode or
-     *      100 ms if the session is in CLOSING mode. By default - false.
      * @async
      * @return {UBotSession} session.
      * @throws {UBotClientException} client exception if cloud method can`t started.
      */
-    async startCloudMethod(requestContract, payment, waitPreviousSession = false) {
+    async startCloudMethod(requestContract, payment) {
         if (this.httpUbotClient != null)
             throw new UBotClientException("Ubot is connected to the pool. First disconnect from the pool");
 
@@ -930,7 +883,7 @@ class UBotClient {
 
         this.checkRequest(requestContract, ubotRegistry);
 
-        let session = await this.createSession(requestContract, payment, waitPreviousSession);
+        let session = await this.createSession(requestContract, payment, false);
 
         await this.connectRandomUbot(session.pool);
 
@@ -954,9 +907,6 @@ class UBotClient {
      *
      * @param {Contract} requestContract - The Request contract.
      * @param {Contract | null} payment - The payment contract.
-     * @param {boolean} waitPreviousSession - Wait finished previous session or return his and exit.
-     *      If true - repeated attempts to start the cloud method after 1 second if the session is in OPERATIONAL mode or
-     *      100 ms if the session is in CLOSING mode. By default - false.
      * @async
      * @return {Promise<Object>} cloud method state gathered session pool consensus, fields in the object:
      *      state - method status,
@@ -964,8 +914,8 @@ class UBotClient {
      *      errors - error list.
      * @throws {UBotClientException} client exception if session pool consensus is not reached.
      */
-    async executeCloudMethod(requestContract, payment, waitPreviousSession = false) {
-        let session = await this.startCloudMethod(requestContract, payment, waitPreviousSession);
+    async executeCloudMethod(requestContract, payment) {
+        let session = await this.startCloudMethod(requestContract, payment);
 
         let quorum = this.poolAndQuorum.quorum;
         let states = [];

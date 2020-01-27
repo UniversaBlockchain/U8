@@ -23,7 +23,7 @@ const CONFIG_ROOT = "../test/config/ubot_config";
 const clientKey = tk.TestKeys.getKey();
 const userPrivKey = tk.TestKeys.getKey();
 
-const LOCAL_UBOTS = false;
+const LOCAL_UBOTS = true;
 const ubotsCount = 30;
 
 async function createPayment(cost) {
@@ -110,7 +110,7 @@ unit.test("ubot_wallet_test: wallet put and transfer", async () => {
     await cs.addConstraintToContract(requestContract, walletContract, "executable_contract_constraint",
         Constraint.TYPE_EXISTING_STATE, ["this.state.data.executable_contract_id == ref.id"], true);
 
-    let state = await ubotClient.executeCloudMethod(requestContract, await createPayment(20), true);
+    let state = await ubotClient.executeCloudMethod(requestContract, await createPayment(20));
 
     console.log("State: " + JSON.stringify(state));
 
@@ -130,7 +130,7 @@ unit.test("ubot_wallet_test: wallet put and transfer", async () => {
             "this can_perform ref.state.roles.walletOwner"
         ], true);
 
-    state = await ubotClient.executeCloudMethod(requestContract, await createPayment(20), true);
+    state = await ubotClient.executeCloudMethod(requestContract, await createPayment(20));
 
     console.log("State: " + JSON.stringify(state));
 
@@ -150,7 +150,7 @@ unit.test("ubot_wallet_test: wallet put and transfer", async () => {
             "this can_perform ref.state.roles.walletOwner"
         ], true);
 
-    state = await ubotClient.executeCloudMethod(requestContract, await createPayment(4), true);
+    state = await ubotClient.executeCloudMethod(requestContract, await createPayment(4));
 
     console.log("State: " + JSON.stringify(state));
 
@@ -167,7 +167,7 @@ unit.test("ubot_wallet_test: wallet put and transfer", async () => {
             "this can_perform ref.state.roles.walletOwner"
         ], true);
 
-    state = await ubotClient.executeCloudMethod(requestContract, await createPayment(4), true);
+    state = await ubotClient.executeCloudMethod(requestContract, await createPayment(4));
 
     console.log("State: " + JSON.stringify(state));
 
@@ -216,7 +216,7 @@ unit.test("ubot_wallet_test: empty wallet", async () => {
             "this can_perform ref.state.roles.walletOwner"
         ], true);
 
-    let state = await ubotClient.executeCloudMethod(requestContract, await createPayment(4), true);
+    let state = await ubotClient.executeCloudMethod(requestContract, await createPayment(4));
 
     console.log("State: " + JSON.stringify(state));
 
@@ -233,7 +233,7 @@ unit.test("ubot_wallet_test: empty wallet", async () => {
             "this can_perform ref.state.roles.walletOwner"
         ], true);
 
-    state = await ubotClient.executeCloudMethod(requestContract, await createPayment(4), true);
+    state = await ubotClient.executeCloudMethod(requestContract, await createPayment(4));
 
     console.log("State: " + JSON.stringify(state));
 
@@ -250,7 +250,7 @@ unit.test("ubot_wallet_test: empty wallet", async () => {
             "this can_perform ref.state.roles.walletOwner"
         ], true);
 
-    state = await ubotClient.executeCloudMethod(requestContract, await createPayment(4), true);
+    state = await ubotClient.executeCloudMethod(requestContract, await createPayment(4));
 
     console.log("State: " + JSON.stringify(state));
 
@@ -270,7 +270,7 @@ unit.test("ubot_wallet_test: empty wallet", async () => {
             "this can_perform ref.state.roles.walletOwner"
         ], true);
 
-    state = await ubotClient.executeCloudMethod(requestContract, await createPayment(20), true);
+    state = await ubotClient.executeCloudMethod(requestContract, await createPayment(20));
 
     console.log("State: " + JSON.stringify(state));
 
@@ -317,7 +317,7 @@ unit.test("ubot_wallet_test: insufficient balance", async () => {
     await cs.addConstraintToContract(requestContract, walletContract, "executable_contract_constraint",
         Constraint.TYPE_EXISTING_STATE, ["this.state.data.executable_contract_id == ref.id"], true);
 
-    let state = await ubotClient.executeCloudMethod(requestContract, await createPayment(20), true);
+    let state = await ubotClient.executeCloudMethod(requestContract, await createPayment(20));
 
     console.log("State: " + JSON.stringify(state));
 
@@ -337,7 +337,7 @@ unit.test("ubot_wallet_test: insufficient balance", async () => {
             "this can_perform ref.state.roles.walletOwner"
         ], true);
 
-    state = await ubotClient.executeCloudMethod(requestContract, await createPayment(20), true);
+    state = await ubotClient.executeCloudMethod(requestContract, await createPayment(20));
 
     console.log("State: " + JSON.stringify(state));
 
@@ -354,7 +354,7 @@ unit.test("ubot_wallet_test: insufficient balance", async () => {
             "this can_perform ref.state.roles.walletOwner"
         ], true);
 
-    state = await ubotClient.executeCloudMethod(requestContract, await createPayment(4), true);
+    state = await ubotClient.executeCloudMethod(requestContract, await createPayment(4));
 
     console.log("State: " + JSON.stringify(state));
 
@@ -371,7 +371,7 @@ unit.test("ubot_wallet_test: insufficient balance", async () => {
             "this can_perform ref.state.roles.walletOwner"
         ], true);
 
-    state = await ubotClient.executeCloudMethod(requestContract, await createPayment(4), true);
+    state = await ubotClient.executeCloudMethod(requestContract, await createPayment(4));
 
     console.log("State: " + JSON.stringify(state));
 
@@ -427,7 +427,7 @@ unit.test("ubot_wallet_test: put incompatible token", async () => {
     await cs.addConstraintToContract(requestContract, walletContract, "executable_contract_constraint",
         Constraint.TYPE_EXISTING_STATE, ["this.state.data.executable_contract_id == ref.id"], true);
 
-    let state = await ubotClient.executeCloudMethod(requestContract, await createPayment(20), true);
+    let state = await ubotClient.executeCloudMethod(requestContract, await createPayment(20));
 
     console.log("State: " + JSON.stringify(state));
 
@@ -444,7 +444,7 @@ unit.test("ubot_wallet_test: put incompatible token", async () => {
     await cs.addConstraintToContract(requestContract, walletContract, "executable_contract_constraint",
         Constraint.TYPE_EXISTING_STATE, ["this.state.data.executable_contract_id == ref.id"], true);
 
-    state = await ubotClient.executeCloudMethod(requestContract, await createPayment(20), true);
+    state = await ubotClient.executeCloudMethod(requestContract, await createPayment(20));
 
     console.log("State: " + JSON.stringify(state));
 
@@ -462,7 +462,7 @@ unit.test("ubot_wallet_test: put incompatible token", async () => {
             "this can_perform ref.state.roles.walletOwner"
         ], true);
 
-    state = await ubotClient.executeCloudMethod(requestContract, await createPayment(4), true);
+    state = await ubotClient.executeCloudMethod(requestContract, await createPayment(4));
 
     console.log("State: " + JSON.stringify(state));
 
@@ -534,7 +534,7 @@ unit.test("ubot_wallet_test: many operations", async () => {
         await cs.addConstraintToContract(requestContract, walletContract, "executable_contract_constraint",
             Constraint.TYPE_EXISTING_STATE, ["this.state.data.executable_contract_id == ref.id"], true);
 
-        let state = await ubotClient.executeCloudMethod(requestContract, await createPayment(20), true);
+        let state = await ubotClient.executeCloudMethod(requestContract, await createPayment(20));
 
         console.log("State: " + JSON.stringify(state));
 
@@ -553,7 +553,7 @@ unit.test("ubot_wallet_test: many operations", async () => {
                 "this can_perform ref.state.roles.walletOwner"
             ], true);
 
-        state = await ubotClient.executeCloudMethod(requestContract, await createPayment(4), true);
+        state = await ubotClient.executeCloudMethod(requestContract, await createPayment(4));
 
         console.log("State: " + JSON.stringify(state));
 
@@ -578,7 +578,7 @@ unit.test("ubot_wallet_test: many operations", async () => {
                 "this can_perform ref.state.roles.walletOwner"
             ], true);
 
-        let state = await ubotClient.executeCloudMethod(requestContract, await createPayment(20), true);
+        let state = await ubotClient.executeCloudMethod(requestContract, await createPayment(20));
 
         console.log("State: " + JSON.stringify(state));
 
@@ -598,7 +598,7 @@ unit.test("ubot_wallet_test: many operations", async () => {
                 "this can_perform ref.state.roles.walletOwner"
             ], true);
 
-        state = await ubotClient.executeCloudMethod(requestContract, await createPayment(4), true);
+        state = await ubotClient.executeCloudMethod(requestContract, await createPayment(4));
 
         console.log("State: " + JSON.stringify(state));
 
@@ -615,7 +615,7 @@ unit.test("ubot_wallet_test: many operations", async () => {
                 "this can_perform ref.state.roles.walletOwner"
             ], true);
 
-        state = await ubotClient.executeCloudMethod(requestContract, await createPayment(4), true);
+        state = await ubotClient.executeCloudMethod(requestContract, await createPayment(4));
 
         console.log("State: " + JSON.stringify(state));
 
@@ -645,7 +645,7 @@ unit.test("ubot_wallet_test: many operations", async () => {
     await cs.addConstraintToContract(requestContract, walletContract, "executable_contract_constraint",
         Constraint.TYPE_EXISTING_STATE, ["this.state.data.executable_contract_id == ref.id"], true);
 
-    let state = await ubotClient.executeCloudMethod(requestContract, await createPayment(20), true);
+    let state = await ubotClient.executeCloudMethod(requestContract, await createPayment(20));
 
     console.log("State: " + JSON.stringify(state));
 
@@ -665,7 +665,7 @@ unit.test("ubot_wallet_test: many operations", async () => {
             "this can_perform ref.state.roles.walletOwner"
         ], true);
 
-    state = await ubotClient.executeCloudMethod(requestContract, await createPayment(20), true);
+    state = await ubotClient.executeCloudMethod(requestContract, await createPayment(20));
 
     console.log("State: " + JSON.stringify(state));
 
@@ -686,7 +686,7 @@ unit.test("ubot_wallet_test: many operations", async () => {
             "this can_perform ref.state.roles.walletOwner"
         ], true);
 
-    state = await ubotClient.executeCloudMethod(requestContract, await createPayment(4), true);
+    state = await ubotClient.executeCloudMethod(requestContract, await createPayment(4));
 
     console.log("State: " + JSON.stringify(state));
 
@@ -703,7 +703,7 @@ unit.test("ubot_wallet_test: many operations", async () => {
             "this can_perform ref.state.roles.walletOwner"
         ], true);
 
-    state = await ubotClient.executeCloudMethod(requestContract, await createPayment(4), true);
+    state = await ubotClient.executeCloudMethod(requestContract, await createPayment(4));
 
     console.log("State: " + JSON.stringify(state));
 
@@ -730,7 +730,7 @@ unit.test("ubot_wallet_test: many operations", async () => {
             "this can_perform ref.state.roles.walletOwner"
         ], true);
 
-    state = await ubotClient.executeCloudMethod(requestContract, await createPayment(4), true);
+    state = await ubotClient.executeCloudMethod(requestContract, await createPayment(4));
 
     console.log("State: " + JSON.stringify(state));
 

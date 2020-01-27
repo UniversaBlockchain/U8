@@ -175,7 +175,7 @@ unit.test("ubot_main_test: secure random", async () => {
     let executableContract = await generateSecureRandomExecutableContract();
     let requestContract = await generateSecureRandomRequestContract(executableContract);
 
-    let state = await ubotClient.executeCloudMethod(requestContract, await createPayment(20), true);
+    let state = await ubotClient.executeCloudMethod(requestContract, await createPayment(20));
 
     console.log("State: " + JSON.stringify(state));
 
@@ -211,7 +211,7 @@ unit.test("ubot_main_test: execute looped cloud method", async () => {
     await cs.addConstraintToContract(requestContract, executableContract, "executable_contract_constraint",
         Constraint.TYPE_EXISTING_STATE, ["this.state.data.executable_contract_id == ref.id"], true);
 
-    let state = await ubotClient.executeCloudMethod(requestContract, await createPayment(2), true);
+    let state = await ubotClient.executeCloudMethod(requestContract, await createPayment(2));
 
     console.log("State: " + JSON.stringify(state));
 
@@ -278,7 +278,7 @@ unit.test("ubot_main_test: full quorum", async () => {
 //     let executableContract = await generateSimpleExecutableContract("simpleRegister.js", "register");
 //     let requestContract = await generateSimpleRegisterRequestContract(executableContract, packedSimpleContract);
 //
-//     let state = await ubotClient.executeCloudMethod(requestContract, true);
+//     let state = await ubotClient.executeCloudMethod(requestContract);
 //
 //     console.log("State: " + JSON.stringify(state));
 //
@@ -299,7 +299,7 @@ unit.test("ubot_main_test: create and register contract", async () => {
     let executableContract = await generateSimpleExecutableContract("createAndRegister.js", "register");
     let requestContract = await generateSimpleRegisterRequestContract(executableContract);
 
-    let state = await ubotClient.executeCloudMethod(requestContract, await createPayment(20), true);
+    let state = await ubotClient.executeCloudMethod(requestContract, await createPayment(20));
 
     console.log("State: " + JSON.stringify(state));
 
@@ -350,7 +350,7 @@ unit.test("ubot_main_test: pool and quorum percentage", async () => {
     console.log("Pool: " + poolAndQuorum.pool);
     console.log("Quorum: " + poolAndQuorum.quorum);
 
-    let state = await ubotClient.executeCloudMethod(requestContract, await createPayment(20), true);
+    let state = await ubotClient.executeCloudMethod(requestContract, await createPayment(20));
 
     console.log("State: " + JSON.stringify(state));
 
@@ -381,7 +381,7 @@ unit.test("ubot_main_test: pool and quorum percentage", async () => {
     assert(poolAndQuorum.pool === Math.ceil(registryContract.state.roles.ubots.roles.length * 20 / 100));
     assert(poolAndQuorum.quorum === Math.ceil(poolAndQuorum.pool * 80 / 100));
 
-    state = await ubotClient.executeCloudMethod(requestContract, await createPayment(20), true);
+    state = await ubotClient.executeCloudMethod(requestContract, await createPayment(20));
 
     console.log("State: " + JSON.stringify(state));
 
@@ -432,7 +432,7 @@ unit.test("ubot_main_test: pool and quorum percentage", async () => {
 //     await cs.addConstraintToContract(requestContract, executableContract, "executable_contract_constraint",
 //         Constraint.TYPE_EXISTING_STATE, ["this.state.data.executable_contract_id == ref.id"], true);
 //
-//     let state = await ubotClient.executeCloudMethod(requestContract, true);
+//     let state = await ubotClient.executeCloudMethod(requestContract);
 //
 //     console.log("State: " + JSON.stringify(state));
 //
@@ -722,7 +722,7 @@ unit.test("ubot_main_test: lottery", async () => {
         await cs.addConstraintToContract(buyContract, lotteryContract, "executable_contract_constraint",
             Constraint.TYPE_EXISTING_STATE, ["this.state.data.executable_contract_id == ref.id"], true);
 
-        let state = await ubotClient.executeCloudMethod(buyContract, await createPayment(12), true);
+        let state = await ubotClient.executeCloudMethod(buyContract, await createPayment(12));
 
         assert(state.state === UBotPoolState.FINISHED.val);
         assert(state.result === i);     // compare ticket number
@@ -737,7 +737,7 @@ unit.test("ubot_main_test: lottery", async () => {
         Constraint.TYPE_EXISTING_STATE, ["this.state.data.executable_contract_id == ref.id"], true);
 
     console.log("Raffle lottery...");
-    let state = await ubotClient.executeCloudMethod(raffleContract, await createPayment(50), true);
+    let state = await ubotClient.executeCloudMethod(raffleContract, await createPayment(50));
 
     assert(state.state === UBotPoolState.FINISHED.val);
 
@@ -782,7 +782,7 @@ unit.test("ubot_main_test: execute cloud method with ubot delay", async () => {
 
     let errMessage = null;
     try {
-        await ubotClient.executeCloudMethod(badRequestContract, await createPayment(20), true);
+        await ubotClient.executeCloudMethod(badRequestContract, await createPayment(20));
     } catch (err) {
         errMessage = err.message;
     }
@@ -802,7 +802,7 @@ unit.test("ubot_main_test: execute cloud method with ubot delay", async () => {
     await cs.addConstraintToContract(requestContract, executableContract, "executable_contract_constraint",
         Constraint.TYPE_EXISTING_STATE, ["this.state.data.executable_contract_id == ref.id"], true);
 
-    let state = await ubotClient.executeCloudMethod(requestContract, await createPayment(20), true);
+    let state = await ubotClient.executeCloudMethod(requestContract, await createPayment(20));
 
     console.log("State: " + JSON.stringify(state));
 
@@ -864,7 +864,7 @@ unit.test("ubot_main_test: launcher role", async () => {
 
     console.log("method_for_launcher1...");
 
-    let state = await ubotClient.executeCloudMethod(launcher1Contract, await createPayment(5), true);
+    let state = await ubotClient.executeCloudMethod(launcher1Contract, await createPayment(5));
 
     assert(state.state === UBotPoolState.FINISHED.val);
 
@@ -886,7 +886,7 @@ unit.test("ubot_main_test: launcher role", async () => {
 
     let errMessage = null;
     try {
-        await ubotClient.executeCloudMethod(launcher1Contract, await createPayment(5), true);
+        await ubotClient.executeCloudMethod(launcher1Contract, await createPayment(5));
     } catch (err) {
         errMessage = err.message;
     }
@@ -910,7 +910,7 @@ unit.test("ubot_main_test: launcher role", async () => {
 
     console.log("method_for_launcher2...");
 
-    state = await ubotClient.executeCloudMethod(launcher2Contract, await createPayment(5), true);
+    state = await ubotClient.executeCloudMethod(launcher2Contract, await createPayment(5));
 
     assert(state.state === UBotPoolState.FINISHED.val);
 
@@ -932,7 +932,7 @@ unit.test("ubot_main_test: launcher role", async () => {
 
     let errMessage = null;
     try {
-        await ubotClient.executeCloudMethod(launcher2Contract, await createPayment(5), true);
+        await ubotClient.executeCloudMethod(launcher2Contract, await createPayment(5));
     } catch (err) {
         errMessage = err.message;
     }
@@ -953,7 +953,7 @@ unit.test("ubot_main_test: launcher role", async () => {
 
     console.log("method_for_any...");
 
-    state = await ubotClient.executeCloudMethod(anyContract, await createPayment(5), true);
+    state = await ubotClient.executeCloudMethod(anyContract, await createPayment(5));
 
     assert(state.state === UBotPoolState.FINISHED.val);
 
@@ -990,7 +990,7 @@ unit.test("ubot_main_test: launcher role", async () => {
 //         await cs.addConstraintToContract(requestContract, executableContract, "executable_contract_constraint",
 //             Constraint.TYPE_EXISTING_STATE, ["this.state.data.executable_contract_id == ref.id"], true);
 //
-//         let state = await ubotClient.executeCloudMethod(requestContract, await createPayment(20), true);
+//         let state = await ubotClient.executeCloudMethod(requestContract, await createPayment(20));
 //
 //         assert(state.state === UBotPoolState.FINISHED.val);
 //         assert(state.result === 1);
