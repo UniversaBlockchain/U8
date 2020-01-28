@@ -19,7 +19,7 @@ private:
         UPrivateKeyData(const crypto::PrivateKey &val);
         ~UPrivateKeyData() override = default;
 
-        Local<Object> serializeToV8(shared_ptr<Scripter> scripter) override {
+        Local<Object> serializeToV8(Local<Context> cxt, shared_ptr<Scripter> scripter) override {
             auto res = wrapPrivateKey(scripter, new crypto::PrivateKey(*privateKey.get()));
             auto obj = Local<Object>::Cast(res);
             auto unused = obj->SetPrototype(scripter->isolate()->GetCurrentContext(), getPrivateKeyPrototype(scripter)->Get(scripter->isolate()));

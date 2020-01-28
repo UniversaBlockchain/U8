@@ -140,7 +140,7 @@ Fn *fnptr(Callable &&c) {
  */
 template<typename T, typename F>
 Local<FunctionTemplate> bindCppClass(Isolate *isolate, const char *class_name, F &&constructor) {
-    auto name = String::NewFromUtf8(isolate, class_name);
+    auto name = String::NewFromUtf8(isolate, class_name).ToLocalChecked();
     Local<FunctionTemplate> tpl =
             FunctionTemplate::New(
                     isolate,
@@ -150,7 +150,7 @@ Local<FunctionTemplate> bindCppClass(Isolate *isolate, const char *class_name, F
                                 if (!args.IsConstructCall()) {
                                     isolate->ThrowException(
                                             Exception::TypeError(String::NewFromUtf8(isolate,
-                                                                                     "calling constructor as function")));
+                                                                                     "calling constructor as function").ToLocalChecked()));
                                 } else {
                                     try {
                                         T *cppObject = constructor(args);
@@ -161,7 +161,7 @@ Local<FunctionTemplate> bindCppClass(Isolate *isolate, const char *class_name, F
                                             if( result->InternalFieldCount() < 1)
                                             isolate->ThrowException(
                                                     Exception::TypeError(String::NewFromUtf8(isolate,
-                                                                                             "bindCppClass: Bad tebplate: internal field count is 0")));
+                                                                                             "bindCppClass: Bad tebplate: internal field count is 0").ToLocalChecked()));
                                             else {
                                                 result->SetInternalField(0, External::New(isolate, cppObject));
                                                 SimpleFinalizer(result, cppObject);
@@ -173,7 +173,7 @@ Local<FunctionTemplate> bindCppClass(Isolate *isolate, const char *class_name, F
                                         string message = "unhandled C++ exception: "s + e.what();
                                         isolate->ThrowException(
                                                 Exception::TypeError(String::NewFromUtf8(isolate,
-                                                                                         message.data())));
+                                                                                         message.data()).ToLocalChecked()));
                                     }
                                 }
                             }));
@@ -239,7 +239,7 @@ Local<Value> wrap(Persistent<FunctionTemplate>& objectTemplate, Isolate *isolate
     Local<Object> obj;
     if (objMaybeLocal.ToLocal(&obj)) {
         if (obj->InternalFieldCount() < 1) {
-            isolate->ThrowException(Exception::Error(String::NewFromUtf8(isolate, "no internal field")));
+            isolate->ThrowException(Exception::Error(String::NewFromUtf8(isolate, "no internal field").ToLocalChecked()));
             delete cppObject;
             return Undefined(isolate);
         } else {
@@ -249,7 +249,7 @@ Local<Value> wrap(Persistent<FunctionTemplate>& objectTemplate, Isolate *isolate
             return obj;
         }
     } else {
-        isolate->ThrowException(Exception::Error(String::NewFromUtf8(isolate, "objMaybeLocal.ToLocal returns false")));
+        isolate->ThrowException(Exception::Error(String::NewFromUtf8(isolate, "objMaybeLocal.ToLocal returns false").ToLocalChecked()));
         delete cppObject;
         return Undefined(isolate);
     }

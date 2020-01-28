@@ -391,7 +391,7 @@ public:
     }
 
     Local<String> toString(byte_vector &&result) {
-        return String::NewFromUtf8(isolate, (const char *) result.data());
+        return String::NewFromUtf8(isolate, (const char *) result.data()).ToLocalChecked();
     }
 
     void throwError(const char *text) {

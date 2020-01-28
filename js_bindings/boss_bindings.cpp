@@ -92,7 +92,7 @@ void JsBossAsyncLoad(const v8::FunctionCallbackInfo<v8::Value> &args) {
                 }
 
                 onReady->lockedContext([=](Local<Context> &cxt) {
-                    onReady->invoke(obj.serializeToV8(se));
+                    onReady->invoke(obj.serializeToV8(cxt, se));
                 });
             });
             return;
@@ -119,7 +119,7 @@ void JsBossAddPrototype(const v8::FunctionCallbackInfo<v8::Value> &args) {
             auto se = ac.scripter;
             if (!se->isPrototypesHolderFreezedForJs()) {
                 string prototypeName = ac.asString(0);
-                Local<Object> obj = ac.args[1]->ToObject(ac.isolate);
+                Local<Object> obj = ac.args[1]->ToObject(ac.isolate->GetCurrentContext()).ToLocalChecked();
                 auto prototype = make_shared<Persistent<Object>>(ac.isolate, obj);
                 if (prototypeName == "HashId")
                     se->setPrototype("HashId", prototype);
@@ -140,7 +140,7 @@ void JsBossAddPrototype(const v8::FunctionCallbackInfo<v8::Value> &args) {
 
 void JsInitBossBindings(Scripter& scripter, const Local<ObjectTemplate> &global) {
     Isolate *isolate = scripter.isolate();
-    global->Set(String::NewFromUtf8(isolate, "__boss_asyncDump"), FunctionTemplate::New(isolate, JsBossAsyncDump));
-    global->Set(String::NewFromUtf8(isolate, "__boss_asyncLoad"), FunctionTemplate::New(isolate, JsBossAsyncLoad));
-    global->Set(String::NewFromUtf8(isolate, "__boss_addPrototype"), FunctionTemplate::New(isolate, JsBossAddPrototype));
+    global->Set(String::NewFromUtf8(isolate, "__boss_asyncDump").ToLocalChecked(), FunctionTemplate::New(isolate, JsBossAsyncDump));
+    global->Set(String::NewFromUtf8(isolate, "__boss_asyncLoad").ToLocalChecked(), FunctionTemplate::New(isolate, JsBossAsyncLoad));
+    global->Set(String::NewFromUtf8(isolate, "__boss_addPrototype").ToLocalChecked(), FunctionTemplate::New(isolate, JsBossAddPrototype));
 }

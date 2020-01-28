@@ -19,7 +19,7 @@ private:
         UBytesData();
         ~UBytesData() override = default;
 
-        Local<Object> serializeToV8(shared_ptr<Scripter> scripter) override {
+        Local<Object> serializeToV8(Local<Context> cxt, shared_ptr<Scripter> scripter) override {
             auto ab = ArrayBuffer::New(scripter->isolate(), value.size());
             memcpy(ab->GetContents().Data(), &value[0], value.size());
             return Uint8Array::New(ab, 0, value.size());

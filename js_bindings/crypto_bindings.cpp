@@ -225,7 +225,7 @@ static void keyAddressMatch(const FunctionCallbackInfo<Value> &args) {
                 return;;
             }
             isolate->ThrowException(
-                    Exception::TypeError(String::NewFromUtf8(isolate, "public key expected")));
+                    Exception::TypeError(String::NewFromUtf8(isolate, "public key expected").ToLocalChecked()));
             return;
         }
         ac.throwError("invalid arguments");
@@ -286,7 +286,7 @@ Local<FunctionTemplate> initPrivateKey(Scripter& scripter, Isolate *isolate) {
                     }
                 }
                 isolate->ThrowException(
-                        Exception::TypeError(String::NewFromUtf8(isolate, "bad constructor arguments")));
+                        Exception::TypeError(String::NewFromUtf8(isolate, "bad constructor arguments").ToLocalChecked()));
                 return nullptr;
             });
     auto prototype = tpl->PrototypeTemplate();
@@ -317,12 +317,12 @@ Local<FunctionTemplate> initPublicKey(Scripter& scripter, Isolate *isolate) {
                         if (pkt->HasInstance(obj))
                             return new PublicKey(*unwrap<PrivateKey>(obj));
                         isolate->ThrowException(
-                                Exception::TypeError(String::NewFromUtf8(isolate, "private key expected")));
+                                Exception::TypeError(String::NewFromUtf8(isolate, "private key expected").ToLocalChecked()));
                     }
                 }
                 cout << "error1\n";
                 isolate->ThrowException(
-                        Exception::TypeError(String::NewFromUtf8(isolate, "bad constructor arguments")));
+                        Exception::TypeError(String::NewFromUtf8(isolate, "bad constructor arguments").ToLocalChecked()));
                 return nullptr;
             });
     auto prototype = tpl->PrototypeTemplate();
@@ -362,12 +362,12 @@ Local<FunctionTemplate> initKeyAddress(Scripter& scripter, Isolate *isolate) {
                                               args[2]->BooleanValue(isolate));
                     }
                     isolate->ThrowException(
-                            Exception::TypeError(String::NewFromUtf8(isolate, "public key expected")));
+                            Exception::TypeError(String::NewFromUtf8(isolate, "public key expected").ToLocalChecked()));
                     return nullptr;
 
                 }
                 isolate->ThrowException(
-                        Exception::TypeError(String::NewFromUtf8(isolate, "bad constructor arguments")));
+                        Exception::TypeError(String::NewFromUtf8(isolate, "bad constructor arguments").ToLocalChecked()));
                 return nullptr;
             });
     auto prototype = tpl->PrototypeTemplate();
@@ -398,12 +398,12 @@ Local<FunctionTemplate> initHashId(Scripter& scripter, Isolate *isolate) {
                         return new HashId(isDigest ? HashId::withDigest(data, size) : HashId::of(data, size));
                     } else {
                         isolate->ThrowException(
-                                Exception::TypeError(String::NewFromUtf8(isolate, "typed data array expected")));
+                                Exception::TypeError(String::NewFromUtf8(isolate, "typed data array expected").ToLocalChecked()));
                         return nullptr;
                     }
                 }
                 isolate->ThrowException(
-                        Exception::TypeError(String::NewFromUtf8(isolate, "bad constructor arguments")));
+                        Exception::TypeError(String::NewFromUtf8(isolate, "bad constructor arguments").ToLocalChecked()));
                 return nullptr;
             });
     auto prototype = tpl->PrototypeTemplate();
@@ -482,7 +482,7 @@ Local<FunctionTemplate> initSymmetricKey(Isolate *isolate) {
                             return new SymmetricKey(data, size);
                         } else {
                             isolate->ThrowException(
-                                    Exception::TypeError(String::NewFromUtf8(isolate, "typed data array expected")));
+                                    Exception::TypeError(String::NewFromUtf8(isolate, "typed data array expected").ToLocalChecked()));
                             return nullptr;
                         }
                     case 0:
@@ -491,7 +491,7 @@ Local<FunctionTemplate> initSymmetricKey(Isolate *isolate) {
                         break;
                 }
                 isolate->ThrowException(
-                        Exception::TypeError(String::NewFromUtf8(isolate, "bad constructor arguments")));
+                        Exception::TypeError(String::NewFromUtf8(isolate, "bad constructor arguments").ToLocalChecked()));
                 return nullptr;
             });
     auto prototype = tpl->PrototypeTemplate();
@@ -600,16 +600,16 @@ static void JsVerifyExtendedSignature(const FunctionCallbackInfo<Value> &args) {
                         bool isAllOk = isHashValid && isHash2Valid;
                         onComplete->lockedContext([isAllOk, es, onComplete, se](Local<Context> cxt) {
                             if (isAllOk) {
-                                onComplete->invoke(es.serializeToV8(onComplete->scripter_sp()));
+                                onComplete->invoke(es.serializeToV8(cxt, onComplete->scripter_sp()));
                             } else {
-                                onComplete->invoke(UObject().serializeToV8(onComplete->scripter_sp()));
+                                onComplete->invoke(UObject().serializeToV8(cxt, onComplete->scripter_sp()));
                             }
                         });
                     }
                 } catch (const std::exception& e) {
                     cerr << "JsVerifyExtendedSignature error: " << e.what() << endl;
                     onComplete->lockedContext([onComplete, se](Local<Context> cxt) {
-                        onComplete->invoke(UObject().serializeToV8(onComplete->scripter_sp()));
+                        onComplete->invoke(UObject().serializeToV8(cxt, onComplete->scripter_sp()));
                     });
                 }
             });
@@ -630,7 +630,7 @@ void JsInitCrypto(Scripter& scripter, const Local<ObjectTemplate> &global) {
     crypto->Set(isolate, "KeyAddress", initKeyAddress(scripter, isolate));
     crypto->Set(isolate, "SymmetricKeyImpl", initSymmetricKey(isolate));
     // endo of critical order
-    crypto->Set(isolate, "version", String::NewFromUtf8(isolate, "0.0.1"));
+    crypto->Set(isolate, "version", String::NewFromUtf8(isolate, "0.0.1").ToLocalChecked());
     crypto->Set(isolate, "HashIdImpl", initHashId(scripter, isolate));
     crypto->Set(isolate, "__digest", FunctionTemplate::New(isolate, digest));
 

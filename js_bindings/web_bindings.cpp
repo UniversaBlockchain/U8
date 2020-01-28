@@ -124,7 +124,7 @@ Local<FunctionTemplate> initNodeInfo(Scripter& scripter) {
                 if (args.Length() == 9) {
                     if (!args[0]->IsTypedArray()) {
                         isolate->ThrowException(
-                                Exception::TypeError(String::NewFromUtf8(isolate, "bad constructor argument #0")));
+                                Exception::TypeError(String::NewFromUtf8(isolate, "bad constructor argument #0").ToLocalChecked()));
                         return nullptr;
                     }
                     auto contents = args[0].As<TypedArray>()->Buffer()->GetContents();
@@ -143,7 +143,7 @@ Local<FunctionTemplate> initNodeInfo(Scripter& scripter) {
                     );
                 }
                 isolate->ThrowException(
-                        Exception::TypeError(String::NewFromUtf8(isolate, "invalid number of arguments")));
+                        Exception::TypeError(String::NewFromUtf8(isolate, "invalid number of arguments").ToLocalChecked()));
                 return nullptr;
             });
     auto prototype = tpl->PrototypeTemplate();
@@ -197,7 +197,7 @@ Local<FunctionTemplate> initSocketAddress(Scripter& scripter) {
                     );
                 }
                 isolate->ThrowException(
-                        Exception::TypeError(String::NewFromUtf8(isolate, "invalid number of arguments")));
+                        Exception::TypeError(String::NewFromUtf8(isolate, "invalid number of arguments").ToLocalChecked()));
                 return nullptr;
             });
     auto prototype = tpl->PrototypeTemplate();
@@ -265,7 +265,7 @@ void netConfig_toList(const FunctionCallbackInfo<Value> &args) {
             vector<NodeInfo*> list = netConfig->toList();
             Local<Array> arr = Array::New(ac.isolate, list.size());
             for (int i = 0; i < list.size(); ++i)
-                arr->Set(i, wrap(ac.scripter->NodeInfoTpl, ac.isolate, list[i]));
+                auto unused = arr->Set(ac.context, i, wrap(ac.scripter->NodeInfoTpl, ac.isolate, list[i]));
             ac.setReturnValue(arr);
             return;
         }
@@ -349,8 +349,8 @@ private:
                     auto &p = bufCopy[i].first;
                     auto ab = ArrayBuffer::New(cxt->GetIsolate(), p.size());
                     memcpy(ab->GetContents().Data(), &p[0], p.size());
-                    arr->Set(i * 2, Uint8Array::New(ab, 0, p.size()));
-                    arr->Set(i * 2 + 1, Integer::New(cxt->GetIsolate(), bufCopy[i].second));
+                    auto unused = arr->Set(cxt, i * 2, Uint8Array::New(ab, 0, p.size()));
+                    auto unused2 = arr->Set(cxt, i * 2 + 1, Integer::New(cxt->GetIsolate(), bufCopy[i].second));
                 }
                 receiveCallback_->invoke(std::move(arr));
             });
@@ -422,12 +422,12 @@ Local<FunctionTemplate> initUDPAdapter(Scripter& scripter) {
                         return res;
                     } catch (const std::exception& e) {
                         isolate->ThrowException(
-                                Exception::TypeError(String::NewFromUtf8(isolate, e.what())));
+                                Exception::TypeError(String::NewFromUtf8(isolate, e.what()).ToLocalChecked()));
                         return nullptr;
                     }
                 }
                 isolate->ThrowException(
-                        Exception::TypeError(String::NewFromUtf8(isolate, "invalid number of arguments")));
+                        Exception::TypeError(String::NewFromUtf8(isolate, "invalid number of arguments").ToLocalChecked()));
                 return nullptr;
             });
     auto prototype = tpl->PrototypeTemplate();
@@ -749,12 +749,12 @@ Local<FunctionTemplate> initHttpServer(Scripter& scripter) {
                         return res;
                     } catch (const std::exception& e) {
                         isolate->ThrowException(
-                                Exception::TypeError(String::NewFromUtf8(isolate, e.what())));
+                                Exception::TypeError(String::NewFromUtf8(isolate, e.what()).ToLocalChecked()));
                         return nullptr;
                     }
                 }
                 isolate->ThrowException(
-                        Exception::TypeError(String::NewFromUtf8(isolate, "invalid number of arguments")));
+                        Exception::TypeError(String::NewFromUtf8(isolate, "invalid number of arguments").ToLocalChecked()));
                 return nullptr;
             });
     auto prototype = tpl->PrototypeTemplate();
@@ -920,9 +920,9 @@ private:
                 for (int i = 0; i < bufCopy.size(); ++i) {
                     auto ab = ArrayBuffer::New(cxt->GetIsolate(), bufCopy[i].body.size());
                     memcpy(ab->GetContents().Data(), &bufCopy[i].body[0], bufCopy[i].body.size());
-                    arr->Set(i * 3 + 0, Integer::New(cxt->GetIsolate(), bufCopy[i].reqId));
-                    arr->Set(i * 3 + 1, Integer::New(cxt->GetIsolate(), bufCopy[i].respStatus));
-                    arr->Set(i * 3 + 2, Uint8Array::New(ab, 0, bufCopy[i].body.size()));
+                    auto unused = arr->Set(cxt, i * 3 + 0, Integer::New(cxt->GetIsolate(), bufCopy[i].reqId));
+                    auto unused2 = arr->Set(cxt, i * 3 + 1, Integer::New(cxt->GetIsolate(), bufCopy[i].respStatus));
+                    auto unused3 = arr->Set(cxt, i * 3 + 2, Uint8Array::New(ab, 0, bufCopy[i].body.size()));
                 }
                 bufferedCallback_->invoke(std::move(arr));
             });
@@ -939,9 +939,9 @@ private:
                 for (int i = 0; i < bufCopy.size(); ++i) {
                     auto ab = ArrayBuffer::New(cxt->GetIsolate(), bufCopy[i].decrypted.size());
                     memcpy(ab->GetContents().Data(), &bufCopy[i].decrypted[0], bufCopy[i].decrypted.size());
-                    arr->Set(i * 3 + 0, Integer::New(cxt->GetIsolate(), bufCopy[i].reqId));
-                    arr->Set(i * 3 + 1, Uint8Array::New(ab, 0, bufCopy[i].decrypted.size()));
-                    arr->Set(i * 3 + 2, Boolean::New(cxt->GetIsolate(), bufCopy[i].isError));
+                    auto unused = arr->Set(cxt, i * 3 + 0, Integer::New(cxt->GetIsolate(), bufCopy[i].reqId));
+                    auto unused2 = arr->Set(cxt, i * 3 + 1, Uint8Array::New(ab, 0, bufCopy[i].decrypted.size()));
+                    auto unused3 = arr->Set(cxt, i * 3 + 2, Boolean::New(cxt->GetIsolate(), bufCopy[i].isError));
                 }
                 bufferedCommandCallback_->invoke(std::move(arr));
             });
@@ -1120,12 +1120,12 @@ Local<FunctionTemplate> initHttpClient(Scripter& scripter) {
                         return res;
                     } catch (const std::exception& e) {
                         isolate->ThrowException(
-                                Exception::TypeError(String::NewFromUtf8(isolate, e.what())));
+                                Exception::TypeError(String::NewFromUtf8(isolate, e.what()).ToLocalChecked()));
                         return nullptr;
                     }
                 }
                 isolate->ThrowException(
-                        Exception::TypeError(String::NewFromUtf8(isolate, "invalid number of arguments")));
+                        Exception::TypeError(String::NewFromUtf8(isolate, "invalid number of arguments").ToLocalChecked()));
                 return nullptr;
             });
     auto prototype = tpl->PrototypeTemplate();
@@ -1264,7 +1264,7 @@ void HttpServerRequestBuf_getMultipartParams(const FunctionCallbackInfo<Value> &
                 auto &p = it.second;
                 auto b = ArrayBuffer::New(ac.isolate, p.size());
                 memcpy(b->GetContents().Data(), &p[0], p.size());
-                ab->Set(String::NewFromUtf8(ac.isolate, it.first.data()), Uint8Array::New(b, 0, p.size()));
+                auto unused = ab->Set(ac.context, String::NewFromUtf8(ac.isolate, it.first.data()).ToLocalChecked(), Uint8Array::New(b, 0, p.size()));
                 //ab->Set(String::NewFromUtf8(ac.isolate, it.first.data()), Integer::New(ac.isolate, 33));
             }
 
@@ -1305,7 +1305,7 @@ void JsInitHttpServerRequest(Scripter& scripter, const Local<ObjectTemplate> &gl
 
     // instance methods
     auto prototype = tpl->PrototypeTemplate();
-    prototype->Set(isolate, "version", String::NewFromUtf8(isolate, "0.0.1"));
+    prototype->Set(isolate, "version", String::NewFromUtf8(isolate, "0.0.1").ToLocalChecked());
     prototype->Set(isolate, "setStatusCode", FunctionTemplate::New(isolate, HttpServerRequestBuf_setStatusCode));
     prototype->Set(isolate, "setHeader", FunctionTemplate::New(isolate, HttpServerRequestBuf_setHeader));
     prototype->Set(isolate, "setAnswerBody", FunctionTemplate::New(isolate, HttpServerRequestBuf_setAnswerBody));
@@ -1378,7 +1378,7 @@ void JsInitHttpServerSecureRequest(Scripter& scripter, const Local<ObjectTemplat
 
     // instance methods
     auto prototype = tpl->PrototypeTemplate();
-    prototype->Set(isolate, "version", String::NewFromUtf8(isolate, "0.0.1"));
+    prototype->Set(isolate, "version", String::NewFromUtf8(isolate, "0.0.1").ToLocalChecked());
     prototype->Set(isolate, "getBufLength", FunctionTemplate::New(isolate, HttpServerSecureRequestBuf_getBufLength));
     prototype->Set(isolate, "getParamsBin", FunctionTemplate::New(isolate, HttpServerSecureRequestBuf_getParamsBin));
     prototype->Set(isolate, "getPublicKeyBin", FunctionTemplate::New(isolate, HttpServerSecureRequestBuf_getPublicKeyBin));

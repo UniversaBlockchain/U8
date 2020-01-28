@@ -22,10 +22,10 @@ private:
         UBinderData();
         ~UBinderData() override;
 
-        Local<Object> serializeToV8(shared_ptr<Scripter> scripter) override {
+        Local<Object> serializeToV8(Local<Context> cxt, shared_ptr<Scripter> scripter) override {
             auto res = Object::New(scripter->isolate());
             for (auto& it: binder)
-                res->Set(String::NewFromUtf8(scripter->isolate(), it.first.data()), it.second.serializeToV8(scripter));
+                res->Set(cxt, String::NewFromUtf8(scripter->isolate(), it.first.data()).ToLocalChecked(), it.second.serializeToV8(cxt, scripter));
             return res;
         };
 

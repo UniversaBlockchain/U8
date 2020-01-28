@@ -39,7 +39,7 @@ public:
         this->empty = empty;
     }
 
-    virtual Local<Object> serializeToV8(shared_ptr<Scripter> scripter) {
+    virtual Local<Object> serializeToV8(Local<Context> cxt, shared_ptr<Scripter> scripter) {
         return Local<Object>::Cast(Null(scripter->isolate()));
     };
 
@@ -84,8 +84,8 @@ public:
 
     };
 
-    Local<Object> serializeToV8(shared_ptr<Scripter> scripter) const {
-        return ptr.get()->serializeToV8(scripter);
+    Local<Object> serializeToV8(Local<Context> cxt, shared_ptr<Scripter> scripter) const {
+        return ptr.get()->serializeToV8(cxt, scripter);
     }
 
     void dbgPrint(std::string prefix = "") const {

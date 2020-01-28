@@ -22,10 +22,10 @@ int Scripter::workerMemLimitMegabytes = 200; // actual default value is set in m
 
 std::unique_ptr<v8::Platform> Scripter::initV8(const char *argv0) {
 
-    int _argc = 4;
+    int _argc = 3;
     char *_argv[] = {(char *) argv0,
                      (char *) "--expose_gc",
-                     (char *) "--harmony-await-optimization",
+                     //(char *) "--harmony-await-optimization",   // <--- unrecognized in v8 8.0, enabled by default
                      (char *) "--async-stack-traces"
     };
 
@@ -129,7 +129,7 @@ static void JsThrowScripterException(const FunctionCallbackInfo<Value> &args) {
             case 3: {
                 TryCatch tryCatch(ac.isolate);
                 cout << "we will create a string... ";
-                auto s = String::NewFromUtf8(ac.isolate, "test constant string");
+                auto s = String::NewFromUtf8(ac.isolate, "test constant string").ToLocalChecked();
                 cout << ac.scripter->getString(s) << " ==\n";
                 auto e = Exception::Error(s);
                 cout << "exception object created";
@@ -311,23 +311,23 @@ int Scripter::runAsMain(string sourceScript, const vector<string> &&args, string
         ScriptOrigin origin(v8String(fileName));
         auto global = context->Global();
         // fix imports
-        global->Set(v8String("__source"), v8String(sourceScript));
+        auto unused = global->Set(context, v8String("__source"), v8String(sourceScript));
         string script = evaluate(
                 "let r = __fix_imports(__source); __source = undefined; r",
                 true);
         // run fixed script
         evaluate(script, false, &origin);
         // run main if any
-        Local<Function> callmain = Local<Function>::Cast(global->Get(v8String("__call_main")));
+        Local<Function> callmain = Local<Function>::Cast(global->Get(context, v8String("__call_main")).ToLocalChecked());
 
         auto jsArgs = Array::New(pIsolate);
         for (int i = 0; i < args.size(); i++) {
-            jsArgs->Set(i, String::NewFromUtf8(pIsolate, args[i].c_str()));
+            auto unused = jsArgs->Set(context, i, String::NewFromUtf8(pIsolate, args[i].c_str()).ToLocalChecked());
         }
         auto param = Local<Value>::Cast(jsArgs);
         TryCatch tryCatch(pIsolate);
-        context->Global()->Set(v8String("__args"), param);
-        auto unused = callmain->Call(context, global, 1, &param);
+        auto unused2 = context->Global()->Set(context,v8String("__args"), param);
+        auto unused3 = callmain->Call(context, global, 1, &param);
         throwPendingException<ScriptError>(tryCatch, context);
     });
 
@@ -441,6 +441,7 @@ void Scripter::unwrap(
     v8::Isolate *isolate = args.GetIsolate();
     v8::HandleScope handle_scope(isolate);
 
+    cout << "~~~~~~~~~~ unwrap" << endl;
     auto ext = isolate->GetEnteredContext()->GetEmbedderData(1);
     v8::Local<v8::External> wrap = v8::Local<v8::External>::Cast(ext);
 

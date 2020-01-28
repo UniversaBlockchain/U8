@@ -16,7 +16,7 @@ private:
         UDoubleData(double v);
         ~UDoubleData() override = default;
 
-        Local<Object> serializeToV8(shared_ptr<Scripter> scripter) override {
+        Local<Object> serializeToV8(Local<Context> cxt, shared_ptr<Scripter> scripter) override {
             return Local<Object>::Cast(Number::New(scripter->isolate(), value));
         }
 

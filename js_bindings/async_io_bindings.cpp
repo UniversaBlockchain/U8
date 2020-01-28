@@ -332,7 +332,7 @@ void JsAsyncUDPRecv(const FunctionCallbackInfo<Value> &args) {
                     auto pBuffer = new Persistent<ArrayBuffer>(cxt->GetIsolate(), ab);
 
                     Local<Value> res[4]{pResult->Get(cxt->GetIsolate()), Integer::New(cxt->GetIsolate(), result),
-                                        String::NewFromUtf8(cxt->GetIsolate(), strIP.data()), Integer::New(cxt->GetIsolate(), port)};
+                                        String::NewFromUtf8(cxt->GetIsolate(), strIP.data()).ToLocalChecked(), Integer::New(cxt->GetIsolate(), port)};
                     onRecv->invoke(4, res);
 
                     pResult->Reset();
@@ -409,7 +409,7 @@ void JsInitIOFile(Scripter& scripter, const Local<ObjectTemplate> &global) {
 
     // instance methods
     auto prototype = tpl->PrototypeTemplate();
-    prototype->Set(isolate, "version", String::NewFromUtf8(isolate, "0.0.1"));
+    prototype->Set(isolate, "version", String::NewFromUtf8(isolate, "0.0.1").ToLocalChecked());
     prototype->Set(isolate, "open", FunctionTemplate::New(isolate, JsAsyncFileOpen));
     prototype->Set(isolate, "_read_raw", FunctionTemplate::New(isolate, JsAsyncHandleRead));
     prototype->Set(isolate, "_write_raw", FunctionTemplate::New(isolate, JsAsyncHandleWrite));
@@ -433,7 +433,7 @@ void JsInitIOTCP(Scripter& scripter, const Local<ObjectTemplate> &global) {
 
     // instance methods
     auto prototype = tpl->PrototypeTemplate();
-    prototype->Set(isolate, "version", String::NewFromUtf8(isolate, "0.0.1"));
+    prototype->Set(isolate, "version", String::NewFromUtf8(isolate, "0.0.1").ToLocalChecked());
     prototype->Set(isolate, "_read_raw", FunctionTemplate::New(isolate, JsAsyncHandleRead));
     prototype->Set(isolate, "_write_raw", FunctionTemplate::New(isolate, JsAsyncHandleWrite));
     prototype->Set(isolate, "_close_raw", FunctionTemplate::New(isolate, JsAsyncHandleClose));
@@ -457,7 +457,7 @@ void JsInitIOTLS(Scripter& scripter, const Local<ObjectTemplate> &global) {
 
     // instance methods
     auto prototype = tpl->PrototypeTemplate();
-    prototype->Set(isolate, "version", String::NewFromUtf8(isolate, "0.0.1"));
+    prototype->Set(isolate, "version", String::NewFromUtf8(isolate, "0.0.1").ToLocalChecked());
     prototype->Set(isolate, "_read_raw", FunctionTemplate::New(isolate, JsAsyncHandleRead));
     prototype->Set(isolate, "_write_raw", FunctionTemplate::New(isolate, JsAsyncHandleWrite));
     prototype->Set(isolate, "_close_raw", FunctionTemplate::New(isolate, JsAsyncHandleClose));
@@ -481,7 +481,7 @@ void JsInitIOUDP(Scripter& scripter, const Local<ObjectTemplate> &global) {
 
     // instance methods
     auto prototype = tpl->PrototypeTemplate();
-    prototype->Set(isolate, "version", String::NewFromUtf8(isolate, "0.0.1"));
+    prototype->Set(isolate, "version", String::NewFromUtf8(isolate, "0.0.1").ToLocalChecked());
     prototype->Set(isolate, "_open", FunctionTemplate::New(isolate, JsAsyncUDPOpen));
     prototype->Set(isolate, "_recv", FunctionTemplate::New(isolate, JsAsyncUDPRecv));
     prototype->Set(isolate, "_send", FunctionTemplate::New(isolate, JsAsyncUDPSend));
@@ -520,7 +520,7 @@ void JsAsyncDirNext(const FunctionCallbackInfo<Value> &args) {
         if (h->next(&entry)) {
             v8::Local<v8::Array> result = v8::Array::New(ac.isolate);
 
-            result->Set(result->Length(), ac.scripter->v8String(entry.name));
+            auto unused = result->Set(ac.context, result->Length(), ac.scripter->v8String(entry.name));
 
             unsigned int type = 2;
             if (asyncio::isFile(entry))
@@ -528,7 +528,7 @@ void JsAsyncDirNext(const FunctionCallbackInfo<Value> &args) {
             else if (asyncio::isDir(entry))
                 type = 1;
 
-            result->Set(result->Length(), Integer::New(ac.isolate, type));
+            auto unused2 = result->Set(ac.context, result->Length(), Integer::New(ac.isolate, type));
 
             ac.args.GetReturnValue().Set(result);
         } else
@@ -574,7 +574,7 @@ void JsInitIODir(Scripter& scripter, const Local<ObjectTemplate> &global) {
 
     // instance methods
     auto prototype = tpl->PrototypeTemplate();
-    prototype->Set(isolate, "version", String::NewFromUtf8(isolate, "0.0.1"));
+    prototype->Set(isolate, "version", String::NewFromUtf8(isolate, "0.0.1").ToLocalChecked());
     prototype->Set(isolate, "open", FunctionTemplate::New(isolate, JsAsyncDirOpen));
     prototype->Set(isolate, "next", FunctionTemplate::New(isolate, JsAsyncDirNext));
 

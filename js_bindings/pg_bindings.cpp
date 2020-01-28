@@ -86,13 +86,13 @@ void JsBusyConnectionExecuteQuery(const FunctionCallbackInfo<Value> &args) {
             vector<any> params;
             auto arr = v8::Handle<v8::Array>::Cast(ac.args[3]);
             for (size_t i = 0, count = arr->Length(); i < count; ++i) {
-                if (arr->Get(i)->IsTypedArray()) {
-                    auto contents = v8::Handle<v8::Uint8Array>::Cast(arr->Get(i))->Buffer()->GetContents();
+                if (arr->Get(ac.context, i).ToLocalChecked()->IsTypedArray()) {
+                    auto contents = v8::Handle<v8::Uint8Array>::Cast(arr->Get(ac.context,i).ToLocalChecked())->Buffer()->GetContents();
                     byte_vector bv(contents.ByteLength());
                     memcpy(&bv[0], contents.Data(), contents.ByteLength());
                     params.push_back(bv);
                 } else {
-                    params.push_back(ac.scripter->getString(arr->Get(i)));
+                    params.push_back(ac.scripter->getString(arr->Get(ac.context,i)));
                 }
             }
 
@@ -125,13 +125,13 @@ void JsBusyConnectionExecuteUpdate(const FunctionCallbackInfo<Value> &args) {
             vector<any> params;
             auto arr = v8::Handle<v8::Array>::Cast(ac.args[3]);
             for (size_t i = 0, count = arr->Length(); i < count; ++i) {
-                if (arr->Get(i)->IsTypedArray()) {
-                    auto contents = v8::Handle<v8::Uint8Array>::Cast(arr->Get(i))->Buffer()->GetContents();
+                if (arr->Get(ac.context,i).ToLocalChecked()->IsTypedArray()) {
+                    auto contents = v8::Handle<v8::Uint8Array>::Cast(arr->Get(ac.context,i).ToLocalChecked())->Buffer()->GetContents();
                     byte_vector bv(contents.ByteLength());
                     memcpy(&bv[0], contents.Data(), contents.ByteLength());
                     params.push_back(bv);
                 } else {
-                    params.push_back(ac.scripter->getString(arr->Get(i)));
+                    params.push_back(ac.scripter->getString(arr->Get(ac.context,i)));
                 }
             }
 
@@ -209,7 +209,7 @@ void JsInitPGPool(Scripter& scripter, const Local<ObjectTemplate> &global) {
 
     // instance methods
     auto prototype = tpl->PrototypeTemplate();
-    prototype->Set(isolate, "version", String::NewFromUtf8(isolate, "0.0.1"));
+    prototype->Set(isolate, "version", String::NewFromUtf8(isolate, "0.0.1").ToLocalChecked());
     prototype->Set(isolate, "_connect", FunctionTemplate::New(isolate, JsPGPoolConnect));
     prototype->Set(isolate, "_withConnection", FunctionTemplate::New(isolate, JsPGPoolWithConnection));
     prototype->Set(isolate, "_totalConnections", FunctionTemplate::New(isolate, JsPGPoolTotalConnections));
@@ -229,7 +229,7 @@ void JsInitBusyConnection(Scripter& scripter, const Local<ObjectTemplate> &globa
 
     // instance methods
     auto prototype = tpl->PrototypeTemplate();
-    prototype->Set(isolate, "version", String::NewFromUtf8(isolate, "0.0.1"));
+    prototype->Set(isolate, "version", String::NewFromUtf8(isolate, "0.0.1").ToLocalChecked());
     prototype->Set(isolate, "_executeQuery", FunctionTemplate::New(isolate, JsBusyConnectionExecuteQuery));
     prototype->Set(isolate, "_executeUpdate", FunctionTemplate::New(isolate, JsBusyConnectionExecuteUpdate));
     prototype->Set(isolate, "_exec", FunctionTemplate::New(isolate, JsBusyConnectionExec));
@@ -395,7 +395,7 @@ void JsInitQueryResult(Scripter& scripter, const Local<ObjectTemplate> &global) 
 
     // instance methods
     auto prototype = tpl->PrototypeTemplate();
-    prototype->Set(isolate, "version", String::NewFromUtf8(isolate, "0.0.1"));
+    prototype->Set(isolate, "version", String::NewFromUtf8(isolate, "0.0.1").ToLocalChecked());
     prototype->Set(isolate, "_getRowsCount", FunctionTemplate::New(isolate, JsQueryResultGetRowsCount));
     prototype->Set(isolate, "_getColsCount", FunctionTemplate::New(isolate, JsQueryResultGetColsCount));
     prototype->Set(isolate, "_getAffectedRows", FunctionTemplate::New(isolate, JsQueryResultGetAffectedRows));

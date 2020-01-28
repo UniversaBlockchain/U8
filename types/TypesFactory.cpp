@@ -20,9 +20,9 @@ static std::unordered_map<std::string, std::function<UObject(Isolate* isolate, L
     {"Array", [](Isolate* isolate, Local<Object> obj){
         if (obj->IsArray()) {
             UArray res;
-            int length = obj->Get(String::NewFromUtf8(isolate, "length"))->Int32Value(isolate->GetCurrentContext()).FromJust();
+            int length = obj->Get(isolate->GetCurrentContext(), String::NewFromUtf8(isolate, "length").ToLocalChecked()).ToLocalChecked()->Int32Value(isolate->GetCurrentContext()).FromJust();
             for (int i = 0; i < length; ++i) {
-                Local<Value> item = obj->Get(i);
+                Local<Value> item = obj->Get(isolate->GetCurrentContext(), i).ToLocalChecked();
                 res.push_back(v8ValueToUObject(isolate, item));
             }
             return res;
@@ -35,10 +35,10 @@ static std::unordered_map<std::string, std::function<UObject(Isolate* isolate, L
         Local<Array> keysArr = obj->GetOwnPropertyNames(isolate->GetCurrentContext()).ToLocalChecked();
         auto length = keysArr->Length();
         for (auto i = 0; i < length; ++i) {
-            Local<Value> key = keysArr->Get(i);
+            Local<Value> key = keysArr->Get(isolate->GetCurrentContext(), i).ToLocalChecked();
             if (key->IsString()) {
-                Local<String> skey = key->ToString(isolate);
-                Local<Value> val = obj->Get(skey);
+                Local<String> skey = key->ToString(isolate->GetCurrentContext()).ToLocalChecked();
+                Local<Value> val = obj->Get(isolate->GetCurrentContext(), skey).ToLocalChecked();
                 auto str = String::Utf8Value(isolate, key);
                 std::string s(*str);
                 res.set(s, v8ValueToUObject(isolate, val));
@@ -118,7 +118,7 @@ static std::unordered_map<std::string, std::function<UObject(Isolate* isolate, L
 
 UObject v8ValueToUObject(v8::Isolate* isolate, v8::Local<Value> v8value) {
     if (v8value->IsObject()) {
-        Local<Object> obj = v8value->ToObject(isolate);
+        Local<Object> obj = v8value->ToObject(isolate->GetCurrentContext()).ToLocalChecked();
         auto constructorNameStr = String::Utf8Value(isolate, obj->GetConstructorName());
         std::string constructorName(*constructorNameStr);
         if (v8ObjectToUObjectFactory.find(constructorName) != v8ObjectToUObjectFactory.end()) {

@@ -29,7 +29,7 @@ void JsPrint(const v8::FunctionCallbackInfo<v8::Value> &args) {
         } else {
             ss << ' ';
         }
-        v8::String::Utf8Value str(args.GetIsolate(), args[i]->ToString(args.GetIsolate()));
+        v8::String::Utf8Value str(args.GetIsolate(), args[i]->ToString(args.GetIsolate()->GetCurrentContext()).ToLocalChecked());
         const char *cstr = *str;
         ss << (cstr ? cstr : "(undefined)");
     }
@@ -49,8 +49,8 @@ void JsLoadRequired(const v8::FunctionCallbackInfo<v8::Value> &args) {
 
         // If it is empty we just return empty array
         if (!name.empty()) {
-            result->Set(result->Length(), se->v8String(name));
-            result->Set(result->Length(), se->v8String(loadAsString(name)));
+            auto unused = result->Set(context, result->Length(), se->v8String(name));
+            auto unused2 = result->Set(context, result->Length(), se->v8String(loadAsString(name)));
         }
         args.GetReturnValue().Set(result);
     });
@@ -101,8 +101,8 @@ void JsLoadRequiredRestricted(const v8::FunctionCallbackInfo<v8::Value> &args) {
 
             // If it is empty we just return empty array
             if (!name.empty()) {
-                result->Set(result->Length(), se->v8String(name));
-                result->Set(result->Length(), se->v8String(loadAsString(name)));
+                auto unused = result->Set(context, result->Length(), se->v8String(name));
+                auto unused2 = result->Set(context, result->Length(), se->v8String(loadAsString(name)));
             }
         } else
             printf("Source \"%s\" not available in restricted mode\n", sourceName.data());
@@ -166,7 +166,7 @@ void JsTypedArrayToString(const FunctionCallbackInfo<v8::Value> &args) {
 
 void JsStringToTypedArray(const FunctionCallbackInfo<v8::Value> &args) {
     Scripter::unwrapArgs(args, [&](ArgsContext &ac) {
-        String::Utf8Value s(ac.isolate, args[0]->ToString(ac.isolate));
+        String::Utf8Value s(ac.isolate, args[0]->ToString(ac.isolate->GetCurrentContext()).ToLocalChecked());
         args.GetReturnValue().Set(ac.toBinary(*s, s.length()));
     });
 }

@@ -145,12 +145,12 @@ Local<FunctionTemplate> initMemoryUser1(Scripter& scripter) {
                         return res;
                     } catch (const std::exception& e) {
                         isolate->ThrowException(
-                                Exception::TypeError(String::NewFromUtf8(isolate, e.what())));
+                                Exception::TypeError(String::NewFromUtf8(isolate, e.what()).ToLocalChecked()));
                         return nullptr;
                     }
                 }
                 isolate->ThrowException(
-                        Exception::TypeError(String::NewFromUtf8(isolate, "invalid number of arguments")));
+                        Exception::TypeError(String::NewFromUtf8(isolate, "invalid number of arguments").ToLocalChecked()));
                 return nullptr;
             });
     auto prototype = tpl->PrototypeTemplate();
@@ -177,12 +177,12 @@ Local<FunctionTemplate> initMemoryUser2(Scripter& scripter) {
                         return res;
                     } catch (const std::exception& e) {
                         isolate->ThrowException(
-                                Exception::TypeError(String::NewFromUtf8(isolate, e.what())));
+                                Exception::TypeError(String::NewFromUtf8(isolate, e.what()).ToLocalChecked()));
                         return nullptr;
                     }
                 }
                 isolate->ThrowException(
-                        Exception::TypeError(String::NewFromUtf8(isolate, "invalid number of arguments")));
+                        Exception::TypeError(String::NewFromUtf8(isolate, "invalid number of arguments").ToLocalChecked()));
                 return nullptr;
             });
     auto prototype = tpl->PrototypeTemplate();
@@ -209,12 +209,12 @@ Local<FunctionTemplate> initMemoryUser3(Scripter& scripter) {
                         return res;
                     } catch (const std::exception& e) {
                         isolate->ThrowException(
-                                Exception::TypeError(String::NewFromUtf8(isolate, e.what())));
+                                Exception::TypeError(String::NewFromUtf8(isolate, e.what()).ToLocalChecked()));
                         return nullptr;
                     }
                 }
                 isolate->ThrowException(
-                        Exception::TypeError(String::NewFromUtf8(isolate, "invalid number of arguments")));
+                        Exception::TypeError(String::NewFromUtf8(isolate, "invalid number of arguments").ToLocalChecked()));
                 return nullptr;
             });
     auto prototype = tpl->PrototypeTemplate();

@@ -251,8 +251,8 @@ void JsScripterWrap_send(const FunctionCallbackInfo<Value> &args) {
             auto se = ac.scripter;
             runAsync([psw,onReceive,se,obj{move(obj)}](){
                 onReceive->lockedContext([psw,onReceive,obj{move(obj)}](Local<Context> &cxt){
-                    auto src = Local<Object>::Cast(String::NewFromUtf8(onReceive->scripter()->isolate(), psw->jsWorkerSrc.data()));
-                    auto v8obj = obj.serializeToV8(onReceive->scripter_sp());
+                    auto src = Local<Object>::Cast(String::NewFromUtf8(onReceive->scripter()->isolate(), psw->jsWorkerSrc.data()).ToLocalChecked());
+                    auto v8obj = obj.serializeToV8(cxt, onReceive->scripter_sp());
                     Local<Value> args[2] {src, v8obj};
                     onReceive->invoke(2, args);
                 });
@@ -289,7 +289,7 @@ void JsScripterWrap_setOnLowMemory(const FunctionCallbackInfo<Value> &args) {
 void JsScripterWrap_release(const FunctionCallbackInfo<Value> &args) {
     Scripter::unwrapArgs(args, [](ArgsContext &ac) {
         if (ac.args.Length() == 1) {
-            bool terminateRequired = ac.args[0]->BooleanValue(ac.context).FromJust();
+            bool terminateRequired = ac.args[0]->BooleanValue(ac.isolate);
             auto pws = unwrap<WorkerScripter>(ac.args.This());
             if (terminateRequired) {
                 pws->onReceive->isolate()->TerminateExecution();
@@ -360,7 +360,7 @@ void JsInitWorkerScripter(Scripter& scripter, const Local<ObjectTemplate> &globa
 
     // instance methods
     auto prototype = tpl->PrototypeTemplate();
-    prototype->Set(isolate, "version", String::NewFromUtf8(isolate, "0.0.1"));
+    prototype->Set(isolate, "version", String::NewFromUtf8(isolate, "0.0.1").ToLocalChecked());
     prototype->Set(isolate, "_send", FunctionTemplate::New(isolate, JsScripterWrap_send));
     prototype->Set(isolate, "_setOnReceive", FunctionTemplate::New(isolate, JsScripterWrap_setOnReceive));
     prototype->Set(isolate, "_setOnLowMemory", FunctionTemplate::New(isolate, JsScripterWrap_setOnLowMemory));
@@ -399,7 +399,7 @@ void JsSendFromWorker(const v8::FunctionCallbackInfo<v8::Value> &args) {
             WorkerScripter* pws = (WorkerScripter*)ac.isolate->GetData(1);
             auto onReceiveMain = pws->onReceiveMain;
             onReceiveMain->lockedContext([onReceiveMain,obj](auto cxt){
-                auto v8obj = obj.serializeToV8(onReceiveMain->scripter_sp());
+                auto v8obj = obj.serializeToV8(cxt, onReceiveMain->scripter_sp());
                 onReceiveMain->invoke(v8obj);
             });
             return;
@@ -418,7 +418,7 @@ void JsRequireFromWorker(const v8::FunctionCallbackInfo<v8::Value> &args) {
             WorkerScripter* pws = (WorkerScripter*)ac.isolate->GetData(1);
             if (pws->customJsLibFiles.find(fileName) != pws->customJsLibFiles.end()) {
                 const std::string& fileSrc = pws->customJsLibFiles[fileName];
-                ac.setReturnValue(Local<Object>::Cast(String::NewFromUtf8(ac.isolate, fileSrc.data())));
+                ac.setReturnValue(Local<Object>::Cast(String::NewFromUtf8(ac.isolate, fileSrc.data()).ToLocalChecked()));
                 return;
             }
             ac.setReturnValue(Local<Object>::Cast(Null(ac.isolate)));
