@@ -441,7 +441,6 @@ void Scripter::unwrap(
     v8::Isolate *isolate = args.GetIsolate();
     v8::HandleScope handle_scope(isolate);
 
-    cout << "~~~~~~~~~~ unwrap" << endl;
     auto ext = isolate->GetEnteredContext()->GetEmbedderData(1);
     v8::Local<v8::External> wrap = v8::Local<v8::External>::Cast(ext);
 
