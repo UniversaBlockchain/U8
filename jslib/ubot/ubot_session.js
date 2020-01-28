@@ -247,6 +247,78 @@ class UBotSession {
         return ir;
     }
 
+    /**
+     * Start named transaction.
+     *
+     * @param {string} name - Transaction name.
+     * @param {number} waitMillis - Waiting transaction time in milliseconds. 0 - indefinitely.
+     * @return {Promise<boolean>} true if started.
+     */
+    async startTransaction(name, waitMillis) {
+        let maxTime = null;
+        let delay = UBotConfig.waitPeriod;
+        let tryNumber = 1;
+        if (waitMillis !== 0)
+            maxTime = Date.now() + waitMillis;
+
+        do {
+            let answers = await this.client.askOnAllNodes("ubotStartTransaction", {
+                requestId: this.requestId,
+                transactionName: name
+            });
+
+            if (answers == null || !answers instanceof Array)
+                throw new UBotClientException("Error UBotSession.startTransaction: Wrong ubotStartTransaction results");
+
+            let accepted = 0;
+            let failed = 0;
+            let errors = new Set();
+            for (let answer of answers) {
+                if (answer == null)
+                    throw new UBotClientException("Error UBotSession.startTransaction: Wrong ubotStartTransaction result from node");
+
+                if (answer.current != null && answer.current.equals(this.requestId))
+                    accepted++;
+                else if (answer.errorRecord != null && answer.message != null) {
+                    failed++;
+                    errors.add(answer.message);
+                }
+            }
+
+            if (accepted >= UBotConfig.getNetworkPositiveConsensus(this.client.nodes.length))
+                return true;
+            else if (failed >= UBotConfig.getNetworkNegativeConsensus(this.client.nodes.length))
+                throw new UBotClientException("Error UBotSession.startTransaction, command errors:" +
+                    t.secureStringify(Array.from(errors)));
+
+            if (maxTime == null)
+                delay = Math.min(tryNumber, 50) * UBotConfig.waitPeriod;
+
+            if (maxTime != null && Date.now() + delay > maxTime)
+                return false;
+
+            ++tryNumber;
+            await sleep(delay);
+        } while (maxTime == null || Date.now() < maxTime);
+
+        return false;
+    }
+
+    /**
+     * End named transaction.
+     *
+     * @param {string} name - Transaction name.
+     * @return {Promise<boolean>} true if finished successful.
+     */
+    async finishTransaction(name) {
+        await this.client.askOnAllNodes("ubotFinishTransaction", {
+            requestId: this.requestId,
+            transactionName: name
+        });
+
+        return true;
+    }
+
     async close(finished) {
         if (this.ubot != null)
             this.ubot.logger.log("UBotSession.close finished = " + finished);

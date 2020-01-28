@@ -1412,21 +1412,27 @@ unit.test("ubot_local_test: launcher role", async () => {
     await shutdownUBots(ubotMains);
 });
 
-/*unit.test("ubot_local_test: concurrent transactions", async () => {
+unit.test("ubot_local_test: concurrent transactions", async () => {
     let ubotMains = await createUBots(ubotsCount);
+    let netClient = await new UBotClient(tk.getTestKey(), TOPOLOGY_ROOT + TOPOLOGY_FILE).start();
 
     let executableContract = await generateSimpleExecutableContract("transaction.js", "transaction");
 
-    await executableContract.seal();
+    console.log("Register executable contract...");
+    let ir = await netClient.register(await executableContract.getPackedTransaction(), 10000);
+
+    assert(ir.state === ItemState.APPROVED);
 
     let n = 3;
 
     let requestContracts = [];
-    let uContracts = [];
+    let clientsKeys = [];
     let clients = [];
 
-    for (let i = 0; i < 10; i++) {
-        let ubotClient = await new UBotClient(clientKey, TOPOLOGY_ROOT + TOPOLOGY_FILE).start();
+    for (let i = 0; i < n; i++) {
+        let key = tk.TestKeys.getKey();
+        let ubotClient = await new UBotClient(key, TOPOLOGY_ROOT + TOPOLOGY_FILE).start();
+        clientsKeys.push(key);
         clients.push(ubotClient);
 
         let requestContract = Contract.fromPrivateKey(userPrivKey);
@@ -1440,36 +1446,54 @@ unit.test("ubot_local_test: launcher role", async () => {
         requestContracts.push(requestContract);
     }
 
-    let promises = [];
+    let promisesStart = [];
     for (let i = 0; i < n; i++)
-        promises.push(clients[i].startCloudMethod(requestContracts[i], await createPayment(20)));
+        promisesStart.push(clients[i].startCloudMethod(requestContracts[i], await createPayment(20)));
 
-    let sessions = await Promise.all(promises);
+    let sessions = await Promise.all(promisesStart);
 
-    let promises2 = [];
+    let promisesWork = [];
     for (let i = 0; i < n; i++) {
-        promises2.push(new Promise(async (resolve, reject) => {
+        promisesWork.push(new Promise(async (resolve) => {
 
             let states = await Promise.all(sessions[i].pool.map(async (ubotNumber) => {
-                let state = await clients[i].getStateCloudMethod(requestContracts[i], ubotNumber);
+                let state = await clients[i].getStateCloudMethod(requestContracts[i].id, ubotNumber);
 
-                if (state.state !== UBotPoolState.FINISHED.val)
-                    state = await clients[i].waitCloudMethod(requestContracts[i], ubotNumber);
+                if (state.state !== UBotPoolState.FINISHED.val || state.state !== UBotPoolState.FAILED.val)
+                    state = await clients[i].waitCloudMethod(requestContracts[i].id, ubotNumber);
 
                 return state;
             }));
 
-            let state = await clients[i].getStateCloudMethod(requestContracts[i]);
+            console.log("Session states: " + JSON.stringify(states));
 
-            if (state.state !== UBotPoolState.FINISHED.val)
-                state = await clients[i].waitCloudMethod(requestContracts[i]);
+            let res = null;
+            let count = 0;
+            for (let state of states)
+                if (state.state === UBotPoolState.FINISHED.val && typeof state.result === "number") {
+                    if (res == null) {
+                        res = state.result;
+                        count = 1;
+                    }
+                    else if (res === state.result)
+                        count++;
+                    else {
+                        res = null;
+                        break;
+                    }
+                }
 
-            resolve(state);
+            if (count < executableContract.state.data.cloud_methods.transaction.quorum.size)
+                res = null;
+
+            resolve(res);
         }));
     }
 
+    let results = await Promise.all(promisesWork);
 
     for (let i = 0; i < n; i++) {
+        assert(results[i] === i);
         await clients[i].shutdown();
     }
 
@@ -1477,6 +1501,6 @@ unit.test("ubot_local_test: launcher role", async () => {
     while (ubotMains.some(main => Array.from(main.ubot.processors.values()).some(proc => proc.state.canContinue)))
         await sleep(100);
 
+    await netClient.shutdown();
     await shutdownUBots(ubotMains);
-
-});*/
+});
