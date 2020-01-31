@@ -1503,12 +1503,23 @@ unit.test("ubot_local_test: concurrent transactions", async () => {
     await shutdownUBots(ubotMains);
 });
 
-/*unit.test("ubot_local_test: parallel purchase of lottery tickets", async () => {
+/*
+unit.test("ubot_local_test: parallel purchase of lottery tickets", async () => {
     let ubotMains = await createUBots(ubotsCount);
-    let ubotClient = await new UBotClient(clientKey, TOPOLOGY_ROOT + TOPOLOGY_FILE).start();
-    let netClient = await new UBotClient(tk.getTestKey(), TOPOLOGY_ROOT + TOPOLOGY_FILE).start();
 
     const TICKETS = 10;
+
+    //let ubotClient = await new UBotClient(clientKey, TOPOLOGY_ROOT + TOPOLOGY_FILE).start();
+
+    let clients = [];
+
+    for (let i = 0; i < TICKETS; i++) {
+        let key = tk.TestKeys.getKey();
+        let ubotClient = await new UBotClient(key, TOPOLOGY_ROOT + TOPOLOGY_FILE).start();
+        clients.push(ubotClient);
+    }
+
+    let netClient = await new UBotClient(tk.getTestKey(), TOPOLOGY_ROOT + TOPOLOGY_FILE).start();
 
     // test token for payments
     let tokenIssuerKey = tk.TestKeys.getKey();
@@ -1522,6 +1533,7 @@ unit.test("ubot_local_test: concurrent transactions", async () => {
 
     let userKeys = [];
     let payments = [];
+
     console.log("Register initial payments...");
     for (let i = 0; i < TICKETS; i++) {
         let userKey = tk.TestKeys.getKey();
@@ -1610,7 +1622,7 @@ unit.test("ubot_local_test: concurrent transactions", async () => {
             await cs.addConstraintToContract(buyContract, lotteryContract, "executable_contract_constraint",
                 Constraint.TYPE_EXISTING_STATE, ["this.state.data.executable_contract_id == ref.id"], true);
 
-            let state = await ubotClient.executeCloudMethod(buyContract, await createPayment(12));
+            let state = await clients[i].executeCloudMethod(buyContract, await createPayment(12));
 
             resolve(state.result);
         }));
@@ -1651,11 +1663,18 @@ unit.test("ubot_local_test: concurrent transactions", async () => {
     assert(prizeContract.getOrigin().equals(origin));
     assert(prizeContract.state.data.amount === "100");
 
+    for (let i = 0; i < TICKETS; i++) {
+        assert(results[i] === i);
+        await clients[i].shutdown();
+    }
+
     // waiting pool finished...
     while (ubotMains.some(main => Array.from(main.ubot.processors.values()).some(proc => proc.state.canContinue)))
         await sleep(100);
 
     await netClient.shutdown();
-    await ubotClient.shutdown();
+
     await shutdownUBots(ubotMains);
-});*/
+});
+*/
+
