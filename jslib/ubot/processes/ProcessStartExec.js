@@ -1106,11 +1106,12 @@ class ProcessStartExec extends ProcessBase {
      * End named transaction.
      *
      * @param {string} name - Transaction name.
+     * @param {number} waitMillis - Waiting transaction time in milliseconds. 0 - indefinitely. By default is 0.
      * @return {Promise<boolean>} true if finished successful.
      */
-    async finishTransaction(name) {
+    async finishTransaction(name, waitMillis = 0) {
         try {
-            return await this.pr.session.finishTransaction(name);
+            return await this.pr.session.finishTransaction(name, waitMillis);
 
         } catch (err) {
             this.pr.logger.log("Error finish transaction: " + err.message);

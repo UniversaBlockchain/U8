@@ -1426,13 +1426,11 @@ unit.test("ubot_local_test: concurrent transactions", async () => {
     let n = 3;
 
     let requestContracts = [];
-    let clientsKeys = [];
     let clients = [];
 
     for (let i = 0; i < n; i++) {
         let key = tk.TestKeys.getKey();
         let ubotClient = await new UBotClient(key, TOPOLOGY_ROOT + TOPOLOGY_FILE).start();
-        clientsKeys.push(key);
         clients.push(ubotClient);
 
         let requestContract = Contract.fromPrivateKey(userPrivKey);

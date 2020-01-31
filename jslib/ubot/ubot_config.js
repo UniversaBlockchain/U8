@@ -21,7 +21,7 @@ class UBotConfig {
     static clientMaxWaitSession = 60000; // ms
 
     static waitPeriod = 100; // ms
-    static waitPaidPeriod = 2000; // ms
+    static waitNodeForTransaction = 5000; // ms
 
     static storageReadTrustLevel = 0.3;
     static checkSessionTrustLevel = 0.3;

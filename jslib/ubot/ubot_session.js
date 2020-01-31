@@ -261,6 +261,8 @@ class UBotSession {
         if (waitMillis !== 0)
             maxTime = Date.now() + waitMillis;
 
+        let maxFullNetworkTime = Date.now() + UBotConfig.waitNodeForTransaction;
+
         do {
             let answers = await this.client.askOnAllNodes("ubotStartTransaction", {
                 requestId: this.requestId,
@@ -285,14 +287,15 @@ class UBotSession {
                 }
             }
 
-            if (accepted >= UBotConfig.getNetworkPositiveConsensus(this.client.nodes.length))
+            if (accepted === this.client.nodes.length || (Date.now() > maxFullNetworkTime &&
+                accepted >= UBotConfig.getNetworkPositiveConsensus(this.client.nodes.length)))
                 return true;
             else if (failed >= UBotConfig.getNetworkNegativeConsensus(this.client.nodes.length))
-                throw new UBotClientException("Error UBotSession.startTransaction, command errors:" +
+                throw new UBotClientException("Error UBotSession.startTransaction, command errors: " +
                     t.secureStringify(Array.from(errors)));
 
             if (maxTime == null)
-                delay = Math.min(tryNumber, 50) * UBotConfig.waitPeriod;
+                delay = Math.min(tryNumber, 20) * UBotConfig.waitPeriod;
 
             if (maxTime != null && Date.now() + delay > maxTime)
                 return false;
@@ -308,15 +311,60 @@ class UBotSession {
      * End named transaction.
      *
      * @param {string} name - Transaction name.
+     * @param {number} waitMillis - Waiting transaction time in milliseconds. 0 - indefinitely.
      * @return {Promise<boolean>} true if finished successful.
      */
-    async finishTransaction(name) {
-        await this.client.askOnAllNodes("ubotFinishTransaction", {
-            requestId: this.requestId,
-            transactionName: name
-        });
+    async finishTransaction(name, waitMillis) {
+        let maxTime = null;
+        let delay = UBotConfig.waitPeriod;
+        let tryNumber = 1;
+        if (waitMillis !== 0)
+            maxTime = Date.now() + waitMillis;
 
-        return true;
+        let maxFullNetworkTime = Date.now() + UBotConfig.waitNodeForTransaction;
+
+        do {
+            let answers = await this.client.askOnAllNodes("ubotFinishTransaction", {
+                requestId: this.requestId,
+                transactionName: name
+            });
+
+            if (answers == null || !answers instanceof Array)
+                throw new UBotClientException("Error UBotSession.finishTransaction: Wrong ubotFinishTransaction results");
+
+            let accepted = 0;
+            let failed = 0;
+            let errors = new Set();
+            for (let answer of answers) {
+                if (answer == null)
+                    throw new UBotClientException("Error UBotSession.finishTransaction: Wrong ubotFinishTransaction result from node");
+
+                if (answer.current == null || !answer.current.equals(this.requestId))
+                    accepted++;
+                else if (answer.errorRecord != null && answer.message != null) {
+                    failed++;
+                    errors.add(answer.message);
+                }
+            }
+
+            if (accepted === this.client.nodes.length || (Date.now() > maxFullNetworkTime &&
+                accepted >= UBotConfig.getNetworkPositiveConsensus(this.client.nodes.length)))
+                return true;
+            else if (failed >= UBotConfig.getNetworkNegativeConsensus(this.client.nodes.length))
+                throw new UBotClientException("Error UBotSession.finishTransaction, command errors: " +
+                    t.secureStringify(Array.from(errors)));
+
+            if (maxTime == null)
+                delay = Math.min(tryNumber, 20) * UBotConfig.waitPeriod;
+
+            if (maxTime != null && Date.now() + delay > maxTime)
+                return false;
+
+            ++tryNumber;
+            await sleep(delay);
+        } while (maxTime == null || Date.now() < maxTime);
+
+        return false;
     }
 
     async close(finished) {

@@ -883,7 +883,7 @@ class UBotClient {
 
         this.checkRequest(requestContract, ubotRegistry);
 
-        let session = await this.createSession(requestContract, payment, false);
+        let session = await this.createSession(requestContract, payment);
 
         await this.connectRandomUbot(session.pool);
 
