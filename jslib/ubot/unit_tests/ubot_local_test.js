@@ -125,7 +125,7 @@ async function generateSimpleExecutableContract(jsFileName, methodName) {
     executableContract.state.data.cloud_methods = {};
     executableContract.state.data.cloud_methods[methodName] = {
         pool: {size: 5},
-        quorum: {size: 4}
+        quorum: {size: (methodName === "transaction") ? 5 : 4}
     };
 
     executableContract.state.data.js = await io.fileGetContentsAsString(TEST_CONTRACTS_PATH + jsFileName);
@@ -243,6 +243,99 @@ unit.test("ubot_local_test: ping", async () => {
     assert(result.UDP > -1 && result.TCP > -1);
 
     await ubotClient.shutdown();
+    await shutdownUBots(ubotMains);
+});
+
+unit.test("ubot_local_test: transactions", async () => {
+    let ubotMains = await createUBots(ubotsCount);
+    for (let step = 0; step < 5; step++) {
+        let netClient = await new UBotClient(tk.getTestKey(), TOPOLOGY_ROOT + TOPOLOGY_FILE).start();
+
+        let executableContract = await generateSimpleExecutableContract("transaction.js", "transaction");
+
+        console.log("Register executable contract...");
+        let ir = await netClient.register(await executableContract.getPackedTransaction(), 10000);
+
+        assert(ir.state === ItemState.APPROVED);
+
+        let n = 3;
+
+        let requestContracts = [];
+        let clients = [];
+
+        for (let i = 0; i < n; i++) {
+            let key = tk.TestKeys.getKey();
+            let ubotClient = await new UBotClient(key, TOPOLOGY_ROOT + TOPOLOGY_FILE).start();
+            clients.push(ubotClient);
+
+            let requestContract = Contract.fromPrivateKey(userPrivKey);
+            requestContract.state.data.method_name = "transaction";
+            requestContract.state.data.method_args = [i];
+            requestContract.state.data.executable_contract_id = executableContract.id;
+
+            await cs.addConstraintToContract(requestContract, executableContract, "executable_contract_constraint",
+                Constraint.TYPE_EXISTING_STATE, ["this.state.data.executable_contract_id == ref.id"], true);
+
+            requestContracts.push(requestContract);
+        }
+
+        let promisesStart = [];
+        for (let i = 0; i < n; i++)
+            promisesStart.push(clients[i].startCloudMethod(requestContracts[i], await createPayment(20)));
+
+        let sessions = await Promise.all(promisesStart);
+
+        let promisesWork = [];
+        for (let i = 0; i < n; i++) {
+            promisesWork.push(new Promise(async (resolve) => {
+
+                let states = await Promise.all(sessions[i].pool.map(async (ubotNumber) => {
+                    let state = await clients[i].getStateCloudMethod(requestContracts[i].id, ubotNumber);
+
+                    if (state.state !== UBotPoolState.FINISHED.val || state.state !== UBotPoolState.FAILED.val)
+                        state = await clients[i].waitCloudMethod(requestContracts[i].id, ubotNumber);
+
+                    return state;
+                }));
+
+                console.log("Session states: " + JSON.stringify(states));
+
+                let res = null;
+                let count = 0;
+                for (let state of states)
+                    if (state.state === UBotPoolState.FINISHED.val && typeof state.result === "number") {
+                        if (res == null) {
+                            res = state.result;
+                            count = 1;
+                        }
+                        else if (res === state.result)
+                            count++;
+                        else {
+                            res = null;
+                            break;
+                        }
+                    }
+
+                if (count < executableContract.state.data.cloud_methods.transaction.quorum.size)
+                    res = null;
+
+                resolve(res);
+            }));
+        }
+
+        let results = await Promise.all(promisesWork);
+
+        for (let i = 0; i < n; i++) {
+            assert(results[i] === i);
+            await clients[i].shutdown();
+        }
+
+        // waiting pool finished...
+        while (ubotMains.some(main => Array.from(main.ubot.processors.values()).some(proc => proc.state.canContinue)))
+            await sleep(100);
+
+        await netClient.shutdown();
+    }
     await shutdownUBots(ubotMains);
 });
 
