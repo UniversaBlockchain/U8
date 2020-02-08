@@ -29,6 +29,8 @@ class UBotSession {
         this.executableContractId = executableContractId;
         this.ubot = ubot;
         this.quantaLimit = session.quantaLimit;
+        this.transactionEntranceCounter = 0;
+        this.transactionFinishCounter = 0;
     }
 
     async updateStorage(hash, multi) {
@@ -266,7 +268,8 @@ class UBotSession {
         do {
             let answers = await this.client.askOnAllNodes("ubotStartTransaction", {
                 requestId: this.requestId,
-                transactionName: name
+                transactionName: name,
+                transactionNumber: this.transactionEntranceCounter
             });
 
             if (answers == null || !answers instanceof Array)
@@ -288,9 +291,10 @@ class UBotSession {
             }
 
             if (accepted === this.client.nodes.length || (Date.now() > maxFullNetworkTime &&
-                accepted >= UBotConfig.getNetworkPositiveConsensus(this.client.nodes.length)))
+                accepted >= UBotConfig.getNetworkPositiveConsensus(this.client.nodes.length))) {
+                this.transactionEntranceCounter++;
                 return true;
-            else if (failed >= UBotConfig.getNetworkNegativeConsensus(this.client.nodes.length))
+            } else if (failed >= UBotConfig.getNetworkNegativeConsensus(this.client.nodes.length))
                 throw new UBotClientException("Error UBotSession.startTransaction, command errors: " +
                     t.secureStringify(Array.from(errors)));
 
@@ -326,7 +330,8 @@ class UBotSession {
         do {
             let answers = await this.client.askOnAllNodes("ubotFinishTransaction", {
                 requestId: this.requestId,
-                transactionName: name
+                transactionName: name,
+                transactionNumber: this.transactionFinishCounter
             });
 
             if (answers == null || !answers instanceof Array)
@@ -348,9 +353,10 @@ class UBotSession {
             }
 
             if (accepted === this.client.nodes.length || (Date.now() > maxFullNetworkTime &&
-                accepted >= UBotConfig.getNetworkPositiveConsensus(this.client.nodes.length)))
+                accepted >= UBotConfig.getNetworkPositiveConsensus(this.client.nodes.length))) {
+                this.transactionFinishCounter++;
                 return true;
-            else if (failed >= UBotConfig.getNetworkNegativeConsensus(this.client.nodes.length))
+            } else if (failed >= UBotConfig.getNetworkNegativeConsensus(this.client.nodes.length))
                 throw new UBotClientException("Error UBotSession.finishTransaction, command errors: " +
                     t.secureStringify(Array.from(errors)));
 

@@ -474,9 +474,9 @@ class UBotClient {
         return lastResult.state === ItemState.APPROVED;
     }
 
-    checkSessionIsNull(session) {
+    static checkSessionIsNull(session) {
         if (session == null || session.state == null) {
-            if (session.errors != null)
+            if (session != null && session.errors != null)
                 throw new UBotClientException("Session is aborted. Errors: " + JSON.stringify(session.errors));
             else
                 throw new UBotClientException("Session is null");
@@ -507,7 +507,7 @@ class UBotClient {
         } else
             session = await this.getSession("ubotCreateSession", params);
 
-        this.checkSessionIsNull(session);
+        UBotClient.checkSessionIsNull(session);
 
         let maxTime = 0;
         if (this.waitSession != null)
@@ -523,7 +523,7 @@ class UBotClient {
                 session = await this.getSession("ubotGetSession", {requestId: requestContract.id});
             }
 
-            this.checkSessionIsNull(session);
+            UBotClient.checkSessionIsNull(session);
 
             if (session.requestId == null || !session.requestId.equals(requestContract.id))
                 throw new UBotClientException("Unable to create session by request contract");
@@ -545,7 +545,7 @@ class UBotClient {
             await sleep(UBotConfig.waitPeriod);
             session = await this.getSession("ubotGetSession", {requestId: requestContract.id});
 
-            this.checkSessionIsNull(session);
+            UBotClient.checkSessionIsNull(session);
         }
 
         if (session.state === UBotSessionState.CLOSING.val)
@@ -1007,7 +1007,7 @@ class UBotClient {
     async checkSession(executableContractId, requestContractId, ubotNumber, ubot) {
         let session = await this.getSessionWithTrust(requestContractId);
 
-        this.checkSessionIsNull(session);
+        UBotClient.checkSessionIsNull(session);
 
         let maxTime = 0;
         if (this.waitSession != null)
@@ -1027,7 +1027,7 @@ class UBotClient {
                 await sleep(UBotConfig.waitPeriod);
                 session = await this.getSessionWithTrust(requestContractId);
 
-                this.checkSessionIsNull(session);
+                UBotClient.checkSessionIsNull(session);
             }
 
             if (session.state === UBotSessionState.CLOSING.val)
