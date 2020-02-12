@@ -298,8 +298,7 @@ class UBotSession {
                 throw new UBotClientException("Error UBotSession.startTransaction, command errors: " +
                     t.secureStringify(Array.from(errors)));
 
-            if (maxTime == null)
-                delay = Math.min(tryNumber, 20) * UBotConfig.waitPeriod;
+            delay = Math.min(tryNumber, 20) * UBotConfig.waitPeriod;
 
             if (maxTime != null && Date.now() + delay > maxTime)
                 return false;
@@ -360,8 +359,7 @@ class UBotSession {
                 throw new UBotClientException("Error UBotSession.finishTransaction, command errors: " +
                     t.secureStringify(Array.from(errors)));
 
-            if (maxTime == null)
-                delay = Math.min(tryNumber, 20) * UBotConfig.waitPeriod;
+            delay = Math.min(tryNumber, 20) * UBotConfig.waitPeriod;
 
             if (maxTime != null && Date.now() + delay > maxTime)
                 return false;

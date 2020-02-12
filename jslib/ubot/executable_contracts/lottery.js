@@ -18,9 +18,10 @@ const RND_LEN = 96;
  *
  * @param {Uint8Array} packedPayment - Packed transaction with token contract for ticket payment
  * @param {PublicKey} userKey - Key to transfer winnings
+ * @param {boolean} parallel - Allow parallel purchase, false by default
  * @return {number} ticket number
  */
-async function buyTicket(packedPayment, userKey) {
+async function buyTicket(packedPayment, userKey, parallel = false) {
     // check payment contract
     let payment = await Contract.fromPackedTransaction(packedPayment);
 
@@ -51,6 +52,9 @@ async function buyTicket(packedPayment, userKey) {
     if (ir.state !== ItemState.APPROVED.val)
         return {error: "Payment contract is not registered, item state: " + ir.state};
 
+    if (parallel)
+        await startTransaction("csSingleStorage");      // enter to the critical section for work with the single storage
+
     // get storage
     let storage = await getSingleStorage();
     let first = false;
@@ -80,6 +84,9 @@ async function buyTicket(packedPayment, userKey) {
     }
 
     await writeSingleStorage(storage);
+
+    if (parallel)
+        await finishTransaction("csSingleStorage");      // leave the critical section
 
     return ticket;
 }

@@ -248,7 +248,9 @@ unit.test("ubot_local_test: ping", async () => {
 
 // unit.test("ubot_local_test: transactions", async () => {
 //     let ubotMains = await createUBots(ubotsCount);
-//     for (let step = 0; step < 5; step++) {
+//     for (let step = 0; step < 20; step++) {
+//         console.error("=== ITERATION = " + step);
+//
 //         let netClient = await new UBotClient(tk.getTestKey(), TOPOLOGY_ROOT + TOPOLOGY_FILE).start();
 //
 //         let executableContract = await generateSimpleExecutableContract("transaction.js", "transaction");
@@ -319,6 +321,9 @@ unit.test("ubot_local_test: ping", async () => {
 //                 if (count < executableContract.state.data.cloud_methods.transaction.quorum.size)
 //                     res = null;
 //
+//                 if (res == null)
+//                     throw new Error("Session error");
+//
 //                 resolve(res);
 //             }));
 //         }
@@ -326,6 +331,7 @@ unit.test("ubot_local_test: ping", async () => {
 //         let results = await Promise.all(promisesWork);
 //
 //         for (let i = 0; i < n; i++) {
+//             console.log("Checking " + i + "...");
 //             assert(results[i] === i);
 //             await clients[i].shutdown();
 //         }
@@ -1596,23 +1602,21 @@ unit.test("ubot_local_test: concurrent transactions", async () => {
     await shutdownUBots(ubotMains);
 });
 
-/*
 unit.test("ubot_local_test: parallel purchase of lottery tickets", async () => {
     let ubotMains = await createUBots(ubotsCount);
 
     const TICKETS = 10;
-
-    //let ubotClient = await new UBotClient(clientKey, TOPOLOGY_ROOT + TOPOLOGY_FILE).start();
-
     let clients = [];
 
+    console.log("Open clients...");
     for (let i = 0; i < TICKETS; i++) {
         let key = tk.TestKeys.getKey();
-        let ubotClient = await new UBotClient(key, TOPOLOGY_ROOT + TOPOLOGY_FILE).start();
-        clients.push(ubotClient);
+        let client = await new UBotClient(key, TOPOLOGY_ROOT + TOPOLOGY_FILE).start();
+        clients.push(client);
     }
 
     let netClient = await new UBotClient(tk.getTestKey(), TOPOLOGY_ROOT + TOPOLOGY_FILE).start();
+    let ubotClient = await new UBotClient(clientKey, TOPOLOGY_ROOT + TOPOLOGY_FILE).start();
 
     // test token for payments
     let tokenIssuerKey = tk.TestKeys.getKey();
@@ -1709,7 +1713,7 @@ unit.test("ubot_local_test: parallel purchase of lottery tickets", async () => {
 
             let buyContract = Contract.fromPrivateKey(userKeys[i]);
             buyContract.state.data.method_name = "buyTicket";
-            buyContract.state.data.method_args = [payment, userKeys[i].publicKey];
+            buyContract.state.data.method_args = [payment, userKeys[i].publicKey, true];
             buyContract.state.data.executable_contract_id = lotteryContract.id;
 
             await cs.addConstraintToContract(buyContract, lotteryContract, "executable_contract_constraint",
@@ -1722,9 +1726,14 @@ unit.test("ubot_local_test: parallel purchase of lottery tickets", async () => {
     }
 
     let results = await Promise.all(promises);
+    let ticketsOrder = [];
     for (let i = 0; i < TICKETS; i++) {
         assert(0 <= results[i] < TICKETS);
+        ticketsOrder.push(-1);
     }
+
+    for (let i = 0; i < TICKETS; i++)
+        ticketsOrder[results[i]] = i;
 
     // raffle
     let raffleContract = Contract.fromPrivateKey(userPrivKey);
@@ -1751,23 +1760,21 @@ unit.test("ubot_local_test: parallel purchase of lottery tickets", async () => {
     assert(prizeContract.roles.owner instanceof roles.SimpleRole);
 
     let keys = roles.RoleExtractor.extractKeys(prizeContract.roles.owner);
-    assert(keys.size === 1 && keys.has(userKeys[state.result.winTicket].publicKey));
+    assert(keys.size === 1 && keys.has(userKeys[ticketsOrder[state.result.winTicket]].publicKey));
 
     assert(prizeContract.getOrigin().equals(origin));
     assert(prizeContract.state.data.amount === "100");
 
-    for (let i = 0; i < TICKETS; i++) {
-        assert(results[i] === i);
+    for (let i = 0; i < TICKETS; i++)
         await clients[i].shutdown();
-    }
 
     // waiting pool finished...
     while (ubotMains.some(main => Array.from(main.ubot.processors.values()).some(proc => proc.state.canContinue)))
         await sleep(100);
 
     await netClient.shutdown();
+    await ubotClient.shutdown();
 
     await shutdownUBots(ubotMains);
 });
-*/
 
