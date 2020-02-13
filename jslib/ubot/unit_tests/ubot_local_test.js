@@ -1778,3 +1778,87 @@ unit.test("ubot_local_test: parallel purchase of lottery tickets", async () => {
     await shutdownUBots(ubotMains);
 });
 
+/*unit.test("ubot_local_test: named storages", async () => {
+    let ubotMains = await createUBots(ubotsCount);
+
+    // ubotMains.forEach(main => main.ubot.network.verboseLevel = VerboseLevel.BASE);
+    // for (let i = 0; i < 10; i++) {
+    // console.error("Iteration = " + i);
+
+    let ubotClient = await new UBotClient(clientKey, TOPOLOGY_ROOT + TOPOLOGY_FILE).start();
+
+    let executableContract = await generateSimpleExecutableContract("storages.js", "writeStorage");
+
+    console.log("Register executable contract...");
+    let ir = await netClient.register(await executableContract.getPackedTransaction(), 10000);
+
+    assert(ir.state === ItemState.APPROVED);
+
+    // requestContracts 1
+
+    let requestContract1 = Contract.fromPrivateKey(userPrivKey);
+    requestContract1.state.data.method_name = "writeStorage";
+    requestContract1.state.data.method_args = [23, "number1"];
+    requestContract1.state.data.executable_contract_id = executableContract.id;
+
+    await cs.addConstraintToContract(requestContract1, executableContract, "executable_contract_constraint",
+        Constraint.TYPE_EXISTING_STATE, ["this.state.data.executable_contract_id == ref.id"], true);
+
+    let state = await ubotClient.executeCloudMethod(requestContract1, await createPayment(20));
+    console.log("State: " + JSON.stringify(state));
+    assert(state.state === UBotPoolState.FINISHED.val);
+
+    // requestContracts 2
+
+    let requestContract2 = Contract.fromPrivateKey(userPrivKey);
+    requestContract2.state.data.method_name = "writeStorage";
+    requestContract2.state.data.method_args = [123, "number2"];
+    requestContract2.state.data.executable_contract_id = executableContract.id;
+
+    await cs.addConstraintToContract(requestContract2, executableContract, "executable_contract_constraint",
+        Constraint.TYPE_EXISTING_STATE, ["this.state.data.executable_contract_id == ref.id"], true);
+
+    state = await ubotClient.executeCloudMethod(requestContract2, await createPayment(20));
+    console.log("State: " + JSON.stringify(state));
+    assert(state.state === UBotPoolState.FINISHED.val);
+
+
+    // requestContracts 3
+
+    let requestContract3 = Contract.fromPrivateKey(userPrivKey);
+    requestContract3.state.data.method_name = "readStorage";
+    requestContract3.state.data.method_args = ["number1"];
+    requestContract3.state.data.executable_contract_id = executableContract.id;
+
+    await cs.addConstraintToContract(requestContract3, executableContract, "executable_contract_constraint",
+        Constraint.TYPE_EXISTING_STATE, ["this.state.data.executable_contract_id == ref.id"], true);
+
+    state = await ubotClient.executeCloudMethod(requestContract3, await createPayment(20));
+    console.log("State: " + JSON.stringify(state));
+    assert(state.state === UBotPoolState.FINISHED.val);
+
+    // requestContracts 4
+
+    let requestContract4 = Contract.fromPrivateKey(userPrivKey);
+    requestContract4.state.data.method_name = "readStorage";
+    requestContract4.state.data.method_args = ["number1"];
+    requestContract4.state.data.executable_contract_id = executableContract.id;
+
+    await cs.addConstraintToContract(requestContract4, executableContract, "executable_contract_constraint",
+        Constraint.TYPE_EXISTING_STATE, ["this.state.data.executable_contract_id == ref.id"], true);
+
+    state = await ubotClient.executeCloudMethod(requestContract3, await createPayment(20));
+    console.log("State: " + JSON.stringify(state));
+    assert(state.state === UBotPoolState.FINISHED.val);
+
+    // checking secure random value
+    //assert(typeof state.result === "number" && state.result >= 0 && state.result < 1000);
+
+    await ubotClient.shutdown();
+
+    // waiting pool finished...
+    while (ubotMains.some(main => Array.from(main.ubot.processors.values()).some(proc => proc.state.canContinue)))
+        await sleep(100);
+
+    await shutdownUBots(ubotMains);//}
+});*/
