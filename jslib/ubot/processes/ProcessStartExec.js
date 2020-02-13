@@ -32,26 +32,26 @@ class ProcessStartExec extends ProcessBase {
     static workerSrc = consoleWrapper + farcallWrapper + `
     const Contract = require("contract").Contract;
     
-    function writeSingleStorage(data) {
-        return new Promise((resolve, reject) => wrkInner.farcall("writeSingleStorage", [data], {},
+    function writeSingleStorage(data, storageName = "default") {
+        return new Promise((resolve, reject) => wrkInner.farcall("writeSingleStorage", [data, storageName], {},
             ans => resolve(ans), err => reject(err)
         ));
     }
     
-    function writeMultiStorage(data) {
-        return new Promise((resolve, reject) => wrkInner.farcall("writeMultiStorage", [data], {},
+    function writeMultiStorage(data, storageName = "default") {
+        return new Promise((resolve, reject) => wrkInner.farcall("writeMultiStorage", [data, storageName], {},
             ans => resolve(ans), err => reject(err)
         ));
     }
     
-    function getSingleStorage() {
-        return new Promise((resolve, reject) => wrkInner.farcall("getSingleStorage", [], {},
+    function getSingleStorage(storageName = "default") {
+        return new Promise((resolve, reject) => wrkInner.farcall("getSingleStorage", [storageName], {},
             ans => resolve(ans), err => reject(err)
         ));
     }
     
-    function getMultiStorage() {
-        return new Promise((resolve, reject) => wrkInner.farcall("getMultiStorage", [], {},
+    function getMultiStorage(storageName = "default") {
+        return new Promise((resolve, reject) => wrkInner.farcall("getMultiStorage", [storageName], {},
             ans => resolve(ans), err => reject(err)
         ));
     }
@@ -131,7 +131,7 @@ class ProcessStartExec extends ProcessBase {
     }
     `;
 
-    constructor(processor, onReady /*, cmdStack = []*/) {
+    constructor(processor, onReady) {
         super(processor, onReady);
         this.output = null;
         this.processes = [];
@@ -192,19 +192,19 @@ class ProcessStartExec extends ProcessBase {
                 this.pr.logger.log("start worker");
 
                 this.pr.worker.export["writeSingleStorage"] = async (args, kwargs) => {
-                    return await this.writeSingleStorage(args[0]);
+                    return await this.writeSingleStorage(args[0], args[1]);
                 };
 
                 this.pr.worker.export["writeMultiStorage"] = async (args, kwargs) => {
-                    return await this.writeMultiStorage(args[0]);
+                    return await this.writeMultiStorage(args[0], args[1]);
                 };
 
                 this.pr.worker.export["getSingleStorage"] = async (args, kwargs) => {
-                    return await this.getSingleStorage();
+                    return await this.getSingleStorage(args[0]);
                 };
 
                 this.pr.worker.export["getMultiStorage"] = async (args, kwargs) => {
-                    return await this.getMultiStorage();
+                    return await this.getMultiStorage(args[0]);
                 };
 
                 this.pr.worker.export["registerContract"] = async (args, kwargs) => {
@@ -378,18 +378,19 @@ class ProcessStartExec extends ProcessBase {
      *
      * @param {*} data - Data to write to single storage. Data can be primitive JS types or
      * special U8 types that are may be packed by the Boss.
+     * @param {string} storageName - Storage name. Optional, if undefined - using default storage.
      * @return {Promise<void>}
      * @throws {UBotProcessException} process exception if can`t write empty data to single-storage.
      */
-    async writeSingleStorage(data) {
+    async writeSingleStorage(data, storageName = "default") {
         if (data != null) {
             try {
                 this.pr.quantiser.addWorkCost(UBotQuantiserProcesses.PRICE_WRITE_SINGLE_STORAGE);
             } catch (err) {
-                this.pr.logger.log("Error write data to single-storage: " + err.message);
+                this.pr.logger.log("Error write data to single-storage \"" + storageName + "\": " + err.message);
                 this.pr.logger.log(err.stack);
                 this.pr.errors.push(new ErrorRecord(Errors.FAILURE, "writeSingleStorage",
-                    "Error write data to single-storage: " + err.message));
+                    "Error write data to single-storage \"" + storageName + "\": " + err.message));
                 this.pr.changeState(UBotPoolState.FAILED);
 
                 throw err;
@@ -403,16 +404,16 @@ class ProcessStartExec extends ProcessBase {
                 this.processes[this.procIndex] = proc;
                 this.procIndex++;
 
-                await proc.init(data, this.pr.getDefaultRecordId(false), {storage_name : "default"});
+                await proc.init(data, this.pr.getDefaultRecordId(storageName, false), {storage_name : storageName});
                 await proc.start();
             });
         } else {
-            this.pr.logger.log("Can`t write empty data to single-storage");
+            this.pr.logger.log("Can`t write empty data to single-storage \"" + storageName + "\"");
             this.pr.errors.push(new ErrorRecord(Errors.FORBIDDEN, "writeSingleStorage",
-                "Can`t write empty data to single-storage"));
+                "Can`t write empty data to single-storage \"" + storageName + "\""));
             this.pr.changeState(UBotPoolState.FAILED);
 
-            throw new UBotProcessException("Error writeSingleStorage: Can`t write empty data to single-storage");
+            throw new UBotProcessException("Error writeSingleStorage: Can`t write empty data to single-storage \"" + storageName + "\"");
         }
     }
 
@@ -421,18 +422,19 @@ class ProcessStartExec extends ProcessBase {
      *
      * @param {*} data - Data to write to multi storage.Data can be primitive JS types or
      * special U8 types that are may be packed by the Boss.
+     * @param {string} storageName - Storage name. Optional, if undefined - using default storage.
      * @return {Promise<void>}
      * @throws {UBotProcessException} process exception if can`t write empty data to multi-storage.
      */
-    async writeMultiStorage(data) {
+    async writeMultiStorage(data, storageName = "default") {
         if (data != null) {
             try {
                 this.pr.quantiser.addWorkCost(UBotQuantiserProcesses.PRICE_WRITE_MULTI_STORAGE);
             } catch (err) {
-                this.pr.logger.log("Error write data to multi-storage: " + err.message);
+                this.pr.logger.log("Error write data to multi-storage \"" + storageName + "\": " + err.message);
                 this.pr.logger.log(err.stack);
                 this.pr.errors.push(new ErrorRecord(Errors.FAILURE, "writeMultiStorage",
-                    "Error write data to multi-storage: " + err.message));
+                    "Error write data to multi-storage \"" + storageName + "\": " + err.message));
                 this.pr.changeState(UBotPoolState.FAILED);
 
                 throw err;
@@ -446,32 +448,34 @@ class ProcessStartExec extends ProcessBase {
                 this.processes[this.procIndex] = proc;
                 this.procIndex++;
 
-                await proc.init(data, this.pr.getDefaultRecordId(true), {storage_name : "default"});
+                await proc.init(data, this.pr.getDefaultRecordId(storageName, true), {storage_name : storageName});
                 await proc.start();
             });
         } else {
-            this.pr.logger.log("Can`t write empty data to multi-storage");
+            this.pr.logger.log("Can`t write empty data to multi-storage \"" + storageName + "\"");
             this.pr.errors.push(new ErrorRecord(Errors.FORBIDDEN, "writeMultiStorage",
-                "Can`t write empty data to multi-storage"));
+                "Can`t write empty data to multi-storage \"" + storageName + "\""));
             this.pr.changeState(UBotPoolState.FAILED);
 
-            throw new UBotProcessException("Error writeMultiStorage: Can`t write empty data to multi-storage");
+            throw new UBotProcessException("Error writeMultiStorage: Can`t write empty data to multi-storage \"" + storageName + "\"");
         }
     }
 
     /**
      * Get data from single storage.
      *
+     * @param {string} storageName - Storage name. Optional, if undefined - using default storage.
+     *
      * @return {Promise<null|*>} data from single storage or null if storage is empty.
      */
-    async getSingleStorage() {
+    async getSingleStorage(storageName = "default") {
         try {
             this.pr.quantiser.addWorkCost(UBotQuantiserProcesses.PRICE_GET_STORAGE);
             
-            let recordId = this.pr.getDefaultRecordId(false);
+            let recordId = this.pr.getDefaultRecordId(storageName, false);
 
             // get actual hash from MainNet by this.executableContract.id (further recordId)
-            let actualHash = await this.pr.session.getStorage(false, this.trustLevel, this.pr.requestContract);
+            let actualHash = await this.pr.session.getStorage(storageName, false, this.trustLevel, this.pr.requestContract);
             if (actualHash == null) {
                 this.pr.logger.log("getSingleStorage: getStorage return null");
                 return null;
@@ -497,17 +501,17 @@ class ProcessStartExec extends ProcessBase {
                 this.pr.ubot.resultCache.put(recordId, result);
 
                 await this.pr.ledger.deleteFromSingleStorage(recordId);
-                await this.pr.ledger.writeToSingleStorage(this.pr.executableContract.id, "default",
+                await this.pr.ledger.writeToSingleStorage(this.pr.executableContract.id, storageName,
                     result, crypto.HashId.of(result), recordId);
             }
 
             return await BossBiMapper.getInstance().deserialize(await Boss.load(result));
 
         } catch (err) {
-            this.pr.logger.log("Error get data from single-storage: " + err.message);
+            this.pr.logger.log("Error get data from single-storage \"" + storageName + "\": " + err.message);
             this.pr.logger.log(err.stack);
             this.pr.errors.push(new ErrorRecord(Errors.FAILURE, "getSingleStorage",
-                "Error get data from single-storage: " + err.message));
+                "Error get data from single-storage \"" + storageName + "\": " + err.message));
             this.pr.changeState(UBotPoolState.FAILED);
 
             throw err;
@@ -517,16 +521,18 @@ class ProcessStartExec extends ProcessBase {
     /**
      * Get data from multi storage.
      *
+     * @param {string} storageName - Storage name. Optional, if undefined - using default storage.
+     *
      * @return {Promise<null|[*]>} data from multi storage or null if storage is empty.
      */
-    async getMultiStorage() {
+    async getMultiStorage(storageName = "default") {
         try {
             this.pr.quantiser.addWorkCost(UBotQuantiserProcesses.PRICE_GET_STORAGE);
             
-            let recordId = this.pr.getDefaultRecordId(true);
+            let recordId = this.pr.getDefaultRecordId(storageName, true);
 
             // get actual hash from MainNet by this.executableContract.id (further recordId)
-            let actualHash = await this.pr.session.getStorage(true, this.trustLevel, this.pr.requestContract);
+            let actualHash = await this.pr.session.getStorage(storageName, true, this.trustLevel, this.pr.requestContract);
             if (actualHash == null) {
                 this.pr.logger.log("getMultiStorage: getStorage return null");
                 return null;
@@ -562,17 +568,17 @@ class ProcessStartExec extends ProcessBase {
             for (let item of result) {
                 records.push(await BossBiMapper.getInstance().deserialize(await Boss.load(item.result)));
 
-                await this.pr.ledger.writeToMultiStorage(this.pr.executableContract.id, "default", item.result,
+                await this.pr.ledger.writeToMultiStorage(this.pr.executableContract.id, storageName, item.result,
                     crypto.HashId.of(item.result), recordId, item.ubot_number);
             }
 
             return records;
 
         } catch (err) {
-            this.pr.logger.log("Error get data from multi-storage: " + err.message);
+            this.pr.logger.log("Error get data from multi-storage \"" + storageName + "\": " + err.message);
             this.pr.logger.log(err.stack);
             this.pr.errors.push(new ErrorRecord(Errors.FAILURE, "getMultiStorage",
-                "Error get data from multi-storage: " + err.message));
+                "Error get data from multi-storage \"" + storageName + "\": " + err.message));
             this.pr.changeState(UBotPoolState.FAILED);
 
             throw err;

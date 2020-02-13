@@ -33,65 +33,49 @@ class UBotSession {
         this.transactionFinishCounter = 0;
     }
 
-    async updateStorage(hash, multi) {
+    async updateStorage(storageName, hash, multi) {
         if (this.ubot != null)
-            this.ubot.logger.log("UBotProcess_write" + (multi ? "Multi" : "Single") + "Storage... UBotSession.updateStorage hash = " + hash);
+            this.ubot.logger.log("UBotProcess_write" + (multi ? "Multi" : "Single") + "Storage " + storageName + "... UBotSession.updateStorage hash = " + hash);
 
-        let storageName = multi ? "default_multi" : "default_single";
-        // let fromValue = null;
-        //
-        // if (this.ubot != null) {
-        //     let storages = this.ubot.sessionStorageCache.get(this.executableContractId);
-        //     if (storages != null)
-        //         fromValue = storages[storageName];
-        // }
+        let fullStorageName = storageName + (multi ? "_multi" : "_single");
 
         let answers = await this.client.askOnAllNodes("ubotUpdateStorage", {
             requestId: this.requestId,
-            storageName: storageName,
+            storageName: fullStorageName,
             //fromValue: fromValue,
             toValue: hash
         });
 
         // check answers
         if (answers == null || !answers instanceof Array || answers.length !== this.client.httpNodeClients.size)
-            throw new UBotClientException("Error UBotSession.updateStorage: askOnAllNodes must return array");
+            throw new UBotClientException("Error UBotSession.updateStorage " + storageName + ": askOnAllNodes must return array");
 
         if (this.client.httpNodeClients.size < UBotConfig.getNetworkPositiveConsensus(this.client.nodes.length))
-            throw new UBotClientException("Error UBotSession.updateStorage: not enough answers for consensus");
+            throw new UBotClientException("Error UBotSession.updateStorage " + storageName + ": not enough answers for consensus");
 
         let failed = 0;
         let errors = [];
 
         for (let i = 0; i < answers.length; i++) {
             if (answers[i] == null)
-                throw new Error("ubotUpdateStorage return null");
+                throw new UBotClientException("Error UBotSession.updateStorage " + storageName + ": ubotUpdateStorage return null");
 
             if (answers[i] instanceof Error) {
                 failed++;
                 errors.push(answers[i].toString());
                 if (failed >= UBotConfig.getNetworkNegativeConsensus(this.client.topology.length))
                     throw new UBotClientException(
-                        "Error UBotSession.updateStorage: error in answers from some nodes - consensus was broken. Errors: " +
+                        "Error UBotSession.updateStorage " + storageName + ": error in answers from some nodes - consensus was broken. Errors: " +
                         JSON.stringify(errors));
             }
         }
-
-        // if (this.ubot != null) {
-        //     let storages = this.ubot.sessionStorageCache.get(this.executableContractId);
-        //     if (storages == null)
-        //         storages = {};
-        //
-        //     storages[storageName] = hash;
-        //     this.ubot.sessionStorageCache.put(this.executableContractId, storages);
-        // }
     }
 
-    async getStorage(multi, trustLevel, requestContract) {
+    async getStorage(storageName, multi, trustLevel, requestContract) {
         if (this.ubot != null)
-            this.ubot.logger.log("UBotSession.getStorage");
+            this.ubot.logger.log("UBotSession.getStorage " + storageName);
 
-        let storageName = multi ? "default_multi" : "default_single";
+        let fullStorageName = storageName + (multi ? "_multi" : "_single");
         let result = undefined;
         let first = true;
         let tryNumber = 0;
@@ -112,7 +96,7 @@ class UBotSession {
             let delay = Math.min(tryNumber, 50) * UBotConfig.waitPeriod;
 
             if (maxTime != null && Date.now() + delay > maxTime)
-                throw new UBotClientException("Error UBotSession.getStorage: Maximum waiting time is exceeded");
+                throw new UBotClientException("Error UBotSession.getStorage " + storageName + ": Maximum waiting time is exceeded");
 
             ++tryNumber;
             if (delay > 0)
@@ -120,11 +104,11 @@ class UBotSession {
 
             let answers = await this.client.askOnSomeNodes("ubotGetStorage", {
                 requestId: this.requestId,
-                storageNames: [storageName]
+                storageNames: [fullStorageName]
             }, selected);
 
             if (answers == null || !answers instanceof Array || answers.length !== selected.length)
-                throw new UBotClientException("Error UBotSession.getStorage: askOnSomeNodes must return array");
+                throw new UBotClientException("Error UBotSession.getStorage " + storageName + ": askOnSomeNodes must return array");
 
             let groups = new Map();
             let asked = 0;
@@ -134,16 +118,16 @@ class UBotSession {
             for (let i = 0; i < answers.length; i++) {
                 let answer = answers[i];
                 if (answer == null)
-                    throw new UBotClientException("Error UBotSession.getStorage: ubotGetStorage return null");
+                    throw new UBotClientException("Error UBotSession.getStorage " + storageName + ": ubotGetStorage return null");
 
                 if (!(answer instanceof Error)) {
                     if (answer.current == null || answer.pending == null)
-                        throw new UBotClientException("Error UBotSession.getStorage: ubotGetStorage wrong result");
+                        throw new UBotClientException("Error UBotSession.getStorage " + storageName + ": ubotGetStorage wrong result");
 
-                    if (answer.pending[storageName] == null || Object.keys(answer.pending[storageName]).length === 0) {
+                    if (answer.pending[fullStorageName] == null || Object.keys(answer.pending[fullStorageName]).length === 0) {
                         asked++;
 
-                        let hash = answer.current[storageName];
+                        let hash = answer.current[fullStorageName];
                         let key = (hash != null) ? hash.base64 : "null";
 
                         let count = groups.get(key);
@@ -159,7 +143,7 @@ class UBotSession {
 
                             // check trust level available
                             if (Array.from(groups.values()).every(c => c + this.client.topology.length - asked < trust))
-                                throw new UBotClientException("Error UBotSession.getStorage: trust level can`t be reached");
+                                throw new UBotClientException("Error UBotSession.getStorage " + storageName + ": trust level can`t be reached");
                         }
                     }
                 } else {
@@ -168,7 +152,7 @@ class UBotSession {
                     errors.push(answers[i].toString());
                     if (failed >= UBotConfig.getNetworkNegativeConsensus(this.client.topology.length))
                         throw new UBotClientException(
-                            "Error UBotSession.getStorage: error in answers from some nodes - consensus was broken. Errors: " +
+                            "Error UBotSession.getStorage " + storageName + ": error in answers from some nodes - consensus was broken. Errors: " +
                             JSON.stringify(errors));
                 }
             }
@@ -179,15 +163,6 @@ class UBotSession {
             }
 
         } while (result === undefined);
-
-        // if (this.ubot != null) {
-        //     let storages = this.ubot.sessionStorageCache.get(this.executableContractId);
-        //     if (storages == null)
-        //         storages = {};
-        //
-        //     storages[storageName] = result;
-        //     this.ubot.sessionStorageCache.put(this.executableContractId, storages);
-        // }
 
         return result;
     }

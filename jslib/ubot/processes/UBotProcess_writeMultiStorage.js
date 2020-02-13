@@ -448,7 +448,7 @@ class UBotProcess_writeMultiStorage extends UBotProcess_writeSingleStorage {
     }
 
     generateSelfRecordID() {
-        if (this.previousRecordId != null && this.previousRecordId.equals(this.pr.getDefaultRecordId(true)))
+        if (this.previousRecordId != null && this.previousRecordId.equals(this.pr.getDefaultRecordId(this.storageName, true)))
             this.recordId = this.previousRecordId;   //executable contract id - default record id
         else {
             let poolId = this.pr.poolId.digest;
@@ -614,7 +614,7 @@ class UBotProcess_writeMultiStorage extends UBotProcess_writeSingleStorage {
                     await this.pr.ledger.writeToMultiStorage(this.pr.executableContract.id, this.storageName, this.results[i],
                         this.hashes[i], this.recordId, this.pr.pool[i].number);
 
-            await this.pr.session.updateStorage(this.cortegeId, true);
+            await this.pr.session.updateStorage(this.storageName, this.cortegeId, true);
         } catch (err) {
             this.fail("error writing to multi-storage: " + err.message);
             return;

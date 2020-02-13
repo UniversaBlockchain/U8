@@ -117,7 +117,7 @@ class UBotProcess_writeSingleStorage extends ProcessBase {
     }
 
     generateSelfRecordID() {
-        if (this.previousRecordId != null && this.previousRecordId.equals(this.pr.getDefaultRecordId(false)))
+        if (this.previousRecordId != null && this.previousRecordId.equals(this.pr.getDefaultRecordId(this.storageName, false)))
             this.recordId = this.previousRecordId;   // executable contract id - default record id
         else {
             let poolId = this.pr.poolId.digest;
@@ -163,7 +163,7 @@ class UBotProcess_writeSingleStorage extends ProcessBase {
                 await this.pr.ledger.writeToSingleStorage(this.pr.executableContract.id, this.storageName,
                     this.binToWrite, this.binHashId, this.recordId);
 
-                await this.pr.session.updateStorage(this.binHashId, false);
+                await this.pr.session.updateStorage(this.storageName, this.binHashId, false);
             } catch (err) {
                 this.pr.logger.log("error: UBotProcess_writeSingleStorage: " + err.message);
                 this.pr.errors.push(new ErrorRecord(Errors.FAILURE, "UBotProcess_writeSingleStorage",

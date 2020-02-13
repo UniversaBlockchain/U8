@@ -228,19 +228,32 @@ class UBot {
         };
     }
 
-    static getDefaultRecordId(executableContractId, multi) {
-        let concat = new Uint8Array(executableContractId.digest.length + 1);
+    static getDefaultRecordId(executableContractId, storageName, multi) {
+        let storageId = crypto.HashId.of(storageName);
+        let concat = new Uint8Array(executableContractId.digest.length + storageId.digest.length + 1);
         concat[0] = multi ? 1 : 0;
         concat.set(executableContractId.digest, 1);
+        concat.set(storageId.digest, executableContractId.digest.length + 1);
 
         return crypto.HashId.of(concat);
     }
 
-    async getStorage(executableContractId, storageNames) {
+    async getStorages(executableContractId, storageNames) {
+        if (storageNames == null || storageNames === "default")
+            return await this.getStorage(executableContractId, "default");
+
+        let storage = {};
+        for (let storageName of storageNames)
+            storage[storageName] = await this.getStorage(executableContractId, storageName);
+
+        return storage;
+    }
+
+    async getStorage(executableContractId, storageName) {
         let storage = {};
 
         // multi storage
-        let recordId = UBot.getDefaultRecordId(executableContractId, true);
+        let recordId = UBot.getDefaultRecordId(executableContractId, storageName, true);
         let result = await this.getRecordsFromMultiStorageByRecordId(recordId);
 
         if (result != null) {
@@ -251,7 +264,7 @@ class UBot {
             storage.multi = null;
 
         // single storage
-        recordId = UBot.getDefaultRecordId(executableContractId, false);
+        recordId = UBot.getDefaultRecordId(executableContractId, storageName, false);
         storage.single = await this.getStorageResultByRecordId(recordId, false);
 
         return storage;

@@ -88,7 +88,7 @@ class UBotHttpServer extends network.HttpServer {
 
     async getStorage(params, clientKey) {
         try {
-            return await this.ubot.getStorage(params.executableContractId, params.storageNames);
+            return await this.ubot.getStorages(params.executableContractId, params.storageNames);
         } catch (err) {
             this.logger.log(err.stack);
             this.logger.log("getStorage ERROR: " + err.message);
