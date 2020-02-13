@@ -15,6 +15,6 @@ require('ubot/unit_tests/ubot_wallet_test');
 require('ubot/unit_tests/ubot_main_test');
 //require('ubot/unit_tests/ubot_commands_test');
 
-async function main() {
-    return await unit.perform();
+async function main(args) {
+    return await unit.perform(args);
 }

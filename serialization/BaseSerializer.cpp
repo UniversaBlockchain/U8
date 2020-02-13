@@ -16,6 +16,7 @@
 #include "../types/complex/UKeyAddress.h"
 #include "../types/complex/UPublicKey.h"
 #include "../types/complex/UPrivateKey.h"
+#include "../types/complex/USerializationError.h"
 
 // Serialization object templates
 template <typename T> UObject BaseSerializer::serializeObject(T o, std::string typeName) {
@@ -86,7 +87,8 @@ UObject BaseSerializer::skipBaseTypes(const UObject& o) {
     functionName(UHashId, "HashId"); \
     functionName(UKeyAddress, "KeyAddress"); \
     functionName(UPublicKey, "RSAPublicKey"); \
-    functionName(UPrivateKey, "RSAPrivateKey");
+    functionName(UPrivateKey, "RSAPrivateKey"); \
+    functionName(USerializationError, "USerializationError");
     // TODO: add other complex types
 
 UObject BaseSerializer::serialize(const UObject& o) {

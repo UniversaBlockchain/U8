@@ -82,21 +82,25 @@ const unit = {
     },
     TestFailed: class extends Error {
     },
-    async perform() {
-        for (let [name, block] of allTests) {
-            try {
-                console.logPut(`[${name}]`);
-                currentTest = name;
-                await block();
-                passedTestsCount++;
-                console.log("ok");
-            } catch (e) {
-                console.log("unit test FAILED!");
-                console.error("unit test FAILED: message = " + e.message);
-                console.error("unit test FAILED: stack = " + e.stack);
-                if (e.message === undefined)
-                    console.error("unit test FAILED: error = " + JSON.stringify(e));
-                failedTestsCount++;
+    async perform(args = []) {
+        if (args.length > 0) {
+            for (let arg of args) {
+                let isTestFound = false;
+                for (let [name, block] of allTests) {
+                    if (name === arg) {
+                        isTestFound = true;
+                        await this.performOne(name, block);
+                        break;
+                    }
+                }
+                if (!isTestFound) {
+                    console.error('test not found: "' + arg + '"');
+                    failedTestsCount++;
+                }
+            }
+        } else {
+            for (let [name, block] of allTests) {
+                await this.performOne(name, block);
             }
         }
         let totalTests = failedTestsCount + passedTestsCount;
@@ -106,6 +110,22 @@ const unit = {
         else
             console.log(`all tests passed: ${totalTests} test(s), ${passedChecksCount} check(s).`);
         return failedTestsCount > 0 ? 1000 : 0;
+    },
+    async performOne(name, block) {
+        try {
+            console.logPut(`[${name}]`);
+            currentTest = name;
+            await block();
+            passedTestsCount++;
+            console.log("ok");
+        } catch (e) {
+            console.log("unit test FAILED!");
+            console.error("unit test FAILED: message = " + e.message);
+            console.error("unit test FAILED: stack = " + e.stack);
+            if (e.message === undefined)
+                console.error("unit test FAILED: error = " + JSON.stringify(e));
+            failedTestsCount++;
+        }
     },
     fail(message) {
         checkFailed(message);

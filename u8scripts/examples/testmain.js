@@ -148,7 +148,7 @@ require('unit_tests/lock_test');
 //require('unit_tests/main_test');
 // require('unit_tests/stress_test')
 
-async function main() {
+async function main(args) {
     //testBoss();
 
     // testBoss();
@@ -165,5 +165,5 @@ async function main() {
 
     // await sleep(100);
     // console.log("hello async");
-    await unit.perform();
+    await unit.perform(args);
 }
