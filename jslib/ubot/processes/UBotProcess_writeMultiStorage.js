@@ -77,7 +77,7 @@ class UBotProcess_writeMultiStorage extends UBotProcess_writeSingleStorage {
     }
 
     async start() {
-        this.pr.logger.log("start UBotProcess_writeMultiStorage");
+        this.pr.logger.log("start UBotProcess_writeMultiStorage, storage name: " + this.storageName);
 
         // check self result
         if (!await this.verifyResult(this.binToWrite, this.previousRecordId, this.pr.ubot.network.myInfo.number)) {
@@ -127,15 +127,15 @@ class UBotProcess_writeMultiStorage extends UBotProcess_writeSingleStorage {
             if (this.votingExclusionSuspiciousTasks[i] != null)
                 this.votingExclusionSuspiciousTasks[i].cancel();
 
-        this.pr.logger.log("Error UBotProcess_writeMultiStorage: " + error);
-        this.pr.errors.push(new ErrorRecord(Errors.FAILURE, "UBotProcess_writeMultiStorage", error));
+        this.pr.logger.log("Error UBotProcess_writeMultiStorage: " + error + ". Storage name: " + this.storageName);
+        this.pr.errors.push(new ErrorRecord(Errors.FAILURE, "UBotProcess_writeMultiStorage", error + ". Storage name: " + this.storageName));
         this.pr.changeState(UBotPoolState.FAILED);
 
-        this.onFailed(new UBotProcessException("Error UBotProcess_writeMultiStorage: " + error));
+        this.onFailed(new UBotProcessException("Error UBotProcess_writeMultiStorage: " + error + ". Storage name: " + this.storageName));
     }
 
     pulseGetHashes() {
-        this.pr.logger.log("UBotProcess_writeMultiStorage... pulseGetHashes. Answers = " + JSON.stringify(Array.from(this.otherAnswers)));
+        this.pr.logger.log("UBotProcess_writeMultiStorage " + this.storageName + "... pulseGetHashes. Answers = " + JSON.stringify(Array.from(this.otherAnswers)));
         for (let i = 0; i < this.pr.pool.length; ++i)
             if (this.pr.pool[i].number !== this.pr.ubot.network.myInfo.number && !this.otherAnswers.has(this.pr.pool[i].number) &&
                 !this.notAnswered.has(this.pr.pool[i].number)) {
@@ -160,7 +160,7 @@ class UBotProcess_writeMultiStorage extends UBotProcess_writeSingleStorage {
     }
 
     pulseGetCortegeId() {
-        this.pr.logger.log("UBotProcess_writeMultiStorage... pulseGetCortegeId. Answers = " + JSON.stringify(Array.from(this.otherAnswers)));
+        this.pr.logger.log("UBotProcess_writeMultiStorage " + this.storageName + "... pulseGetCortegeId. Answers = " + JSON.stringify(Array.from(this.otherAnswers)));
         for (let i = 0; i < this.pr.pool.length; ++i)
             if (this.pr.pool[i].number !== this.pr.ubot.network.myInfo.number && !this.otherAnswers.has(this.pr.pool[i].number) &&
                 !this.notAnswered.has(this.pr.pool[i].number)) {
@@ -189,7 +189,7 @@ class UBotProcess_writeMultiStorage extends UBotProcess_writeSingleStorage {
     }
 
     pulseGetPoolHashes(first = false) {
-        this.pr.logger.log("UBotProcess_writeMultiStorage... pulseGetPoolHashes");
+        this.pr.logger.log("UBotProcess_writeMultiStorage " + this.storageName + "... pulseGetPoolHashes");
 
         Array.from(this.cortege).filter(ubot => ubot !== this.pr.selfPoolIndex).forEach(ubot => {
             if (first)
@@ -235,7 +235,7 @@ class UBotProcess_writeMultiStorage extends UBotProcess_writeSingleStorage {
     pulseDownload() {
         this.downloadAttempts++;
         if (this.downloadAttempts > UBotConfig.maxResultDownloadAttempts) {
-            this.pr.logger.log("UBotProcess_writeMultiStorage... limit of attempts to download result reached");
+            this.pr.logger.log("UBotProcess_writeMultiStorage " + this.storageName + "... limit of attempts to download result reached");
             this.downloadTask.cancel();
 
             if (this.downloadAnswers.size >= this.quorumSize)
@@ -267,7 +267,7 @@ class UBotProcess_writeMultiStorage extends UBotProcess_writeSingleStorage {
 
                         this.downloadAnswers.add(i);
                         if (this.downloadAnswers.size + this.notAnswered.size >= this.pr.pool.length) {
-                            this.pr.logger.log("UBotProcess_writeMultiStorage... results downloaded");
+                            this.pr.logger.log("UBotProcess_writeMultiStorage " + this.storageName + "... results downloaded");
                             this.downloadTask.cancel();
                             this.downloadFire();
                         }
@@ -278,7 +278,7 @@ class UBotProcess_writeMultiStorage extends UBotProcess_writeSingleStorage {
     }
 
     pulseGetCorteges() {
-        this.pr.logger.log("UBotProcess_writeMultiStorage... pulseGetCorteges");
+        this.pr.logger.log("UBotProcess_writeMultiStorage " + this.storageName + "... pulseGetCorteges");
 
         Array.from(this.cortege).filter(
             ubot => ubot !== this.pr.selfPoolIndex && !this.otherAnswers.has(this.pr.pool[ubot].number)
@@ -306,7 +306,7 @@ class UBotProcess_writeMultiStorage extends UBotProcess_writeSingleStorage {
     }
 
     pulseGetCortegeIds() {
-        this.pr.logger.log("UBotProcess_writeMultiStorage... pulseGetCortegeIds");
+        this.pr.logger.log("UBotProcess_writeMultiStorage " + this.storageName + "... pulseGetCortegeIds");
 
         Array.from(this.suspicious).filter(su => !this.approveCounterSet.has(su) && !this.declineCounterSet.has(su)).forEach(su => {
             Array.from(this.cortege).filter(u => u !== this.pr.selfPoolIndex && u !== su &&
@@ -338,7 +338,7 @@ class UBotProcess_writeMultiStorage extends UBotProcess_writeSingleStorage {
     }
 
     pulseGetDecisions(iteration = -1) {
-        this.pr.logger.log("UBotProcess_writeMultiStorage... pulseGetDecisions. Answers = " +
+        this.pr.logger.log("UBotProcess_writeMultiStorage " + this.storageName + "... pulseGetDecisions. Answers = " +
             JSON.stringify(Array.from(this.otherAnswers)) + (iteration !== -1 ? ", iteration: " + iteration : ""));
 
         Array.from(this.cortege).filter(
@@ -367,7 +367,7 @@ class UBotProcess_writeMultiStorage extends UBotProcess_writeSingleStorage {
     }
 
     pulseVotingDecision(iteration = -1) {
-        this.pr.logger.log("UBotProcess_writeMultiStorage... pulseVotingDecision" + (iteration !== -1 ? ", iteration: " + iteration : ""));
+        this.pr.logger.log("UBotProcess_writeMultiStorage " + this.storageName + "... pulseVotingDecision" + (iteration !== -1 ? ", iteration: " + iteration : ""));
 
         Array.from(this.cortege).filter(
             ubot => ubot !== this.pr.selfPoolIndex && !this.otherAnswers.has(this.pr.pool[ubot].number)
@@ -395,7 +395,7 @@ class UBotProcess_writeMultiStorage extends UBotProcess_writeSingleStorage {
     }
 
     pulseVotingExclusionSuspicious(suspect) {
-        this.pr.logger.log("UBotProcess_writeMultiStorage... pulseVotingExclusionSuspicious, iteration: " +
+        this.pr.logger.log("UBotProcess_writeMultiStorage " + this.storageName + "... pulseVotingExclusionSuspicious, iteration: " +
             this.commonCortegeIteration + ", suspect: " + suspect);
 
         Array.from(this.cortege).filter(
@@ -500,7 +500,7 @@ class UBotProcess_writeMultiStorage extends UBotProcess_writeSingleStorage {
     }
 
     checkCortege() {
-        this.pr.logger.log("UBotProcess_writeMultiStorage: check cortege");
+        this.pr.logger.log("UBotProcess_writeMultiStorage " + this.storageName + ": check cortege");
 
         for (let i = 0; i < this.pr.pool.length; i++)
             // check previous ID equals
@@ -521,10 +521,10 @@ class UBotProcess_writeMultiStorage extends UBotProcess_writeSingleStorage {
     }
 
     async waitResults() {
-        this.pr.logger.log("UBotProcess_writeMultiStorage... wait results");
+        this.pr.logger.log("UBotProcess_writeMultiStorage " + this.storageName + "... wait results");
 
         await this.downloadEvent;
-        this.pr.logger.log("UBotProcess_writeMultiStorage... results received");
+        this.pr.logger.log("UBotProcess_writeMultiStorage " + this.storageName + "... results received");
 
         // add downloaded results to cortege
         for (let i = 0; i < this.pr.pool.length; i++)
@@ -551,9 +551,9 @@ class UBotProcess_writeMultiStorage extends UBotProcess_writeSingleStorage {
 
     async getDecision() {
         if (this.state === UBotProcess_writeMultiStorage.states.ANALYSIS)
-            this.pr.logger.log("UBotProcess_writeMultiStorage... get decision after analysis, iteration: " + this.commonCortegeIteration);
+            this.pr.logger.log("UBotProcess_writeMultiStorage " + this.storageName + "... get decision after analysis, iteration: " + this.commonCortegeIteration);
         else
-            this.pr.logger.log("UBotProcess_writeMultiStorage... get decision");
+            this.pr.logger.log("UBotProcess_writeMultiStorage " + this.storageName + "... get decision");
 
         let iteration = -1;
         if (this.state === UBotProcess_writeMultiStorage.states.ANALYSIS) {
@@ -593,7 +593,7 @@ class UBotProcess_writeMultiStorage extends UBotProcess_writeSingleStorage {
     }
 
     async approveCortege() {
-        this.pr.logger.log("UBotProcess_writeMultiStorage... approve cortege");
+        this.pr.logger.log("UBotProcess_writeMultiStorage " + this.storageName + "... approve cortege");
 
         this.state = UBotProcess_writeMultiStorage.states.APPROVED;
 
@@ -620,7 +620,7 @@ class UBotProcess_writeMultiStorage extends UBotProcess_writeSingleStorage {
             return;
         }
 
-        this.pr.logger.log("UBotProcess_writeMultiStorage... cortege approved");
+        this.pr.logger.log("UBotProcess_writeMultiStorage " + this.storageName + "... cortege approved");
 
         this.mainProcess.var0 = this.recordId.digest;
         this.onReady();
@@ -630,7 +630,7 @@ class UBotProcess_writeMultiStorage extends UBotProcess_writeSingleStorage {
         if (!await this.waitResults())
             return;
 
-        this.pr.logger.log("UBotProcess_writeMultiStorage: analyze cortege");
+        this.pr.logger.log("UBotProcess_writeMultiStorage " + this.storageName + ": analyze cortege");
         this.state = UBotProcess_writeMultiStorage.states.ANALYSIS;
 
         this.approveCounterSet.clear();
@@ -650,7 +650,7 @@ class UBotProcess_writeMultiStorage extends UBotProcess_writeSingleStorage {
     }
 
     vote(notification) {
-        let message = "UBotProcess_writeMultiStorage... vote {from: " + notification.from.number +
+        let message = "UBotProcess_writeMultiStorage " + this.storageName + "... vote {from: " + notification.from.number +
             ", ubot: " + this.pr.pool[notification.params.dataUbotInPool].number + ", result: ";
 
         if (this.hashes[notification.params.dataUbotInPool] != null &&
@@ -721,7 +721,7 @@ class UBotProcess_writeMultiStorage extends UBotProcess_writeSingleStorage {
     }
 
     voteSuspiciousCortegeId(notification) {
-        let message = "UBotProcess_writeMultiStorage... voteSuspiciousCortegeId {from: " + notification.from.number +
+        let message = "UBotProcess_writeMultiStorage " + this.storageName + "... voteSuspiciousCortegeId {from: " + notification.from.number +
             ", ubot: " + this.pr.pool[notification.params.dataUbotInPool].number + ", result: ";
 
         if (this.iterationsCortegesIds[this.commonCortegeIteration][notification.params.dataUbotInPool].equals(notification.params.cortegeId)) {
@@ -774,10 +774,10 @@ class UBotProcess_writeMultiStorage extends UBotProcess_writeSingleStorage {
         let res = notification.params.decision ? "approve" : "decline";
 
         if (notification.params.commonCortegeIteration === -1)
-            this.pr.logger.log("UBotProcess_writeMultiStorage... voteDecision {from: " + notification.from.number +
+            this.pr.logger.log("UBotProcess_writeMultiStorage " + this.storageName + "... voteDecision {from: " + notification.from.number +
                 ", result: " + res + "}");
         else
-            this.pr.logger.log("UBotProcess_writeMultiStorage... voteDecision {from: " + notification.from.number +
+            this.pr.logger.log("UBotProcess_writeMultiStorage " + this.storageName + "... voteDecision {from: " + notification.from.number +
                 ", iteration: " + this.commonCortegeIteration + ", result: " + res + "}");
 
         if (notification.params.decision) {
@@ -817,7 +817,7 @@ class UBotProcess_writeMultiStorage extends UBotProcess_writeSingleStorage {
     voteExclusionSuspect(notification) {
         let res = notification.params.decision ? "remove" : "leave";
 
-        this.pr.logger.log("UBotProcess_writeMultiStorage... voteExclusionSuspect {from: " + notification.from.number +
+        this.pr.logger.log("UBotProcess_writeMultiStorage " + this.storageName + "... voteExclusionSuspect {from: " + notification.from.number +
             ", iteration: " + this.commonCortegeIteration + ", suspect: " + notification.params.suspect + ", result: " + res + "}");
 
         if (notification.params.decision) {
@@ -858,8 +858,8 @@ class UBotProcess_writeMultiStorage extends UBotProcess_writeSingleStorage {
     }
 
     async calculateCommonCortege() {
-        this.pr.logger.log("UBotProcess_writeMultiStorage... calculateCommonCortege iteration: " + this.commonCortegeIteration);
-        this.pr.logger.log("UBotProcess_writeMultiStorage... self cortege = " + JSON.stringify(Array.from(this.cortege)));
+        this.pr.logger.log("UBotProcess_writeMultiStorage " + this.storageName + "... calculateCommonCortege iteration: " + this.commonCortegeIteration);
+        this.pr.logger.log("UBotProcess_writeMultiStorage " + this.storageName + "... self cortege = " + JSON.stringify(Array.from(this.cortege)));
 
         this.iterationsCortege[this.commonCortegeIteration] = new Set(this.cortege);
 
@@ -887,9 +887,9 @@ class UBotProcess_writeMultiStorage extends UBotProcess_writeSingleStorage {
         let cortegesHash = this.getCortegesHash();
         if (this.lastCortegesHash != null) {
             if (this.lastCortegesHash.equals(cortegesHash)) {
-                this.pr.logger.log("Error UBotProcess_writeMultiStorage: cortege has not changed during the iteration, consensus not found");
+                this.pr.logger.log("Error UBotProcess_writeMultiStorage: cortege has not changed during the iteration, consensus not found. Storage name: " + this.storageName);
                 this.pr.errors.push(new ErrorRecord(Errors.FAILURE, "UBotProcess_writeMultiStorage",
-                    "cortege has not changed during the iteration, consensus not found"));
+                    "cortege has not changed during the iteration, consensus not found. Storage name: " + this.storageName));
                 return false;
             }
         } else
@@ -897,8 +897,8 @@ class UBotProcess_writeMultiStorage extends UBotProcess_writeSingleStorage {
 
         // analyze corteges
         if (!await this.crossAnalyzeCorteges()) {
-            this.pr.logger.log("Error UBotProcess_writeMultiStorage: consensus not found");
-            this.pr.errors.push(new ErrorRecord(Errors.FAILURE, "UBotProcess_writeMultiStorage", "consensus not found"));
+            this.pr.logger.log("Error UBotProcess_writeMultiStorage: consensus not found. Storage name: " + this.storageName);
+            this.pr.errors.push(new ErrorRecord(Errors.FAILURE, "UBotProcess_writeMultiStorage", "consensus not found. Storage name: " + this.storageName));
             return false;
         }
 
@@ -1113,7 +1113,7 @@ class UBotProcess_writeMultiStorage extends UBotProcess_writeSingleStorage {
                     );
                 } else if (this.getHashesTask != null && !this.getHashesTask.cancelled) {
                     this.otherAnswers.add(notification.from.number);
-                    this.pr.logger.log("UBotProcess_writeMultiStorage... hash received. Answers = " + JSON.stringify(Array.from(this.otherAnswers)));
+                    this.pr.logger.log("UBotProcess_writeMultiStorage " + this.storageName + "... hash received. Answers = " + JSON.stringify(Array.from(this.otherAnswers)));
                     this.hashes[this.pr.poolIndexes.get(notification.from.number)] = notification.params.dataHashId;
                     this.previous[this.pr.poolIndexes.get(notification.from.number)] = notification.params.previousRecordId;
 
@@ -1348,7 +1348,7 @@ class UBotProcess_writeMultiStorage extends UBotProcess_writeSingleStorage {
                 }
             }
         } else {
-            this.pr.logger.log("warning: UBotProcess_writeMultiStorage - wrong notification received");
+            this.pr.logger.log("warning: UBotProcess_writeMultiStorage - wrong notification received. Storage name: " + this.storageName);
         }
     }
 
@@ -1361,7 +1361,7 @@ class UBotProcess_writeMultiStorage extends UBotProcess_writeSingleStorage {
     }
 
     checkGetAllHashes() {
-        this.pr.logger.log("UBotProcess_writeMultiStorage... checkGetAllHashes");
+        this.pr.logger.log("UBotProcess_writeMultiStorage " + this.storageName + "... checkGetAllHashes");
 
         if (this.otherAnswers.size + this.notAnswered.size + 1 >= this.pr.pool.length &&
             this.otherAnswers.size + 1 >= this.quorumSize) {
@@ -1378,7 +1378,7 @@ class UBotProcess_writeMultiStorage extends UBotProcess_writeSingleStorage {
     }
 
     checkCortegesReceived() {
-        this.pr.logger.log("UBotProcess_writeMultiStorage... checkCortegesReceived");
+        this.pr.logger.log("UBotProcess_writeMultiStorage " + this.storageName + "... checkCortegesReceived");
 
         if (Array.from(this.cortege).every(ubot => ubot === this.pr.selfPoolIndex ||
             this.otherAnswers.has(this.pr.pool[ubot].number))) {
@@ -1388,7 +1388,7 @@ class UBotProcess_writeMultiStorage extends UBotProcess_writeSingleStorage {
     }
 
     decisionVoteDeclined(iteration) {
-        this.pr.logger.log("UBotProcess_writeMultiStorage... decisionVoteDeclined");
+        this.pr.logger.log("UBotProcess_writeMultiStorage " + this.storageName + "... decisionVoteDeclined");
 
         this.getDecisionsTask.cancel();
 
