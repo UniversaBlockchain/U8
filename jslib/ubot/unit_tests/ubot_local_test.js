@@ -1778,87 +1778,85 @@ unit.test("ubot_local_test: parallel purchase of lottery tickets", async () => {
     await shutdownUBots(ubotMains);
 });
 
-/*unit.test("ubot_local_test: named storages", async () => {
+unit.test("ubot_local_test: named storages", async () => {
     let ubotMains = await createUBots(ubotsCount);
-
-    // ubotMains.forEach(main => main.ubot.network.verboseLevel = VerboseLevel.BASE);
-    // for (let i = 0; i < 10; i++) {
-    // console.error("Iteration = " + i);
-
     let ubotClient = await new UBotClient(clientKey, TOPOLOGY_ROOT + TOPOLOGY_FILE).start();
+    let netClient = await new UBotClient(tk.getTestKey(), TOPOLOGY_ROOT + TOPOLOGY_FILE).start();
 
-    let executableContract = await generateSimpleExecutableContract("storages.js", "writeStorage");
+    let executableContract = await generateSimpleExecutableContract("storages.js", "writeStorages");
+    executableContract.state.data.cloud_methods.readStorages = {
+        pool: {size: 5},
+        quorum: {size: 4}
+    };
+    await executableContract.seal();
 
     console.log("Register executable contract...");
     let ir = await netClient.register(await executableContract.getPackedTransaction(), 10000);
 
     assert(ir.state === ItemState.APPROVED);
 
-    // requestContracts 1
+    // write storages
+    let requestWriteStorage1 = Contract.fromPrivateKey(userPrivKey);
+    requestWriteStorage1.state.data.method_name = "writeStorages";
+    requestWriteStorage1.state.data.method_args = ["string1", 23, "storage1"];
+    requestWriteStorage1.state.data.executable_contract_id = executableContract.id;
 
-    let requestContract1 = Contract.fromPrivateKey(userPrivKey);
-    requestContract1.state.data.method_name = "writeStorage";
-    requestContract1.state.data.method_args = [23, "number1"];
-    requestContract1.state.data.executable_contract_id = executableContract.id;
-
-    await cs.addConstraintToContract(requestContract1, executableContract, "executable_contract_constraint",
+    await cs.addConstraintToContract(requestWriteStorage1, executableContract, "executable_contract_constraint",
         Constraint.TYPE_EXISTING_STATE, ["this.state.data.executable_contract_id == ref.id"], true);
 
-    let state = await ubotClient.executeCloudMethod(requestContract1, await createPayment(20));
+    let state = await ubotClient.executeCloudMethod(requestWriteStorage1, await createPayment(5));
     console.log("State: " + JSON.stringify(state));
     assert(state.state === UBotPoolState.FINISHED.val);
 
-    // requestContracts 2
+    let requestWriteStorage2 = Contract.fromPrivateKey(userPrivKey);
+    requestWriteStorage2.state.data.method_name = "writeStorages";
+    requestWriteStorage2.state.data.method_args = ["string2", 88, "storage2"];
+    requestWriteStorage2.state.data.executable_contract_id = executableContract.id;
 
-    let requestContract2 = Contract.fromPrivateKey(userPrivKey);
-    requestContract2.state.data.method_name = "writeStorage";
-    requestContract2.state.data.method_args = [123, "number2"];
-    requestContract2.state.data.executable_contract_id = executableContract.id;
-
-    await cs.addConstraintToContract(requestContract2, executableContract, "executable_contract_constraint",
+    await cs.addConstraintToContract(requestWriteStorage2, executableContract, "executable_contract_constraint",
         Constraint.TYPE_EXISTING_STATE, ["this.state.data.executable_contract_id == ref.id"], true);
 
-    state = await ubotClient.executeCloudMethod(requestContract2, await createPayment(20));
+    state = await ubotClient.executeCloudMethod(requestWriteStorage2, await createPayment(5));
     console.log("State: " + JSON.stringify(state));
     assert(state.state === UBotPoolState.FINISHED.val);
 
+    // read storages
+    let requestReadStorage1 = Contract.fromPrivateKey(userPrivKey);
+    requestReadStorage1.state.data.method_name = "readStorages";
+    requestReadStorage1.state.data.method_args = ["storage1"];
+    requestReadStorage1.state.data.executable_contract_id = executableContract.id;
 
-    // requestContracts 3
-
-    let requestContract3 = Contract.fromPrivateKey(userPrivKey);
-    requestContract3.state.data.method_name = "readStorage";
-    requestContract3.state.data.method_args = ["number1"];
-    requestContract3.state.data.executable_contract_id = executableContract.id;
-
-    await cs.addConstraintToContract(requestContract3, executableContract, "executable_contract_constraint",
+    await cs.addConstraintToContract(requestReadStorage1, executableContract, "executable_contract_constraint",
         Constraint.TYPE_EXISTING_STATE, ["this.state.data.executable_contract_id == ref.id"], true);
 
-    state = await ubotClient.executeCloudMethod(requestContract3, await createPayment(20));
+    state = await ubotClient.executeCloudMethod(requestReadStorage1, await createPayment(5));
     console.log("State: " + JSON.stringify(state));
-    assert(state.state === UBotPoolState.FINISHED.val);
 
-    // requestContracts 4
+    // check results
+    assert(state.state === UBotPoolState.FINISHED.val && state.result.single_data === "string1" &&
+        state.result.multi_data instanceof Array && state.result.multi_data.every(md => md === 23));
 
-    let requestContract4 = Contract.fromPrivateKey(userPrivKey);
-    requestContract4.state.data.method_name = "readStorage";
-    requestContract4.state.data.method_args = ["number1"];
-    requestContract4.state.data.executable_contract_id = executableContract.id;
+    let requestReadStorage2 = Contract.fromPrivateKey(userPrivKey);
+    requestReadStorage2.state.data.method_name = "readStorages";
+    requestReadStorage2.state.data.method_args = ["storage2"];
+    requestReadStorage2.state.data.executable_contract_id = executableContract.id;
 
-    await cs.addConstraintToContract(requestContract4, executableContract, "executable_contract_constraint",
+    await cs.addConstraintToContract(requestReadStorage2, executableContract, "executable_contract_constraint",
         Constraint.TYPE_EXISTING_STATE, ["this.state.data.executable_contract_id == ref.id"], true);
 
-    state = await ubotClient.executeCloudMethod(requestContract3, await createPayment(20));
+    state = await ubotClient.executeCloudMethod(requestReadStorage2, await createPayment(5));
     console.log("State: " + JSON.stringify(state));
-    assert(state.state === UBotPoolState.FINISHED.val);
 
-    // checking secure random value
-    //assert(typeof state.result === "number" && state.result >= 0 && state.result < 1000);
+    // check results
+    assert(state.state === UBotPoolState.FINISHED.val && state.result.single_data === "string2" &&
+        state.result.multi_data instanceof Array && state.result.multi_data.every(md => md === 88));
 
+    await netClient.shutdown();
     await ubotClient.shutdown();
 
     // waiting pool finished...
     while (ubotMains.some(main => Array.from(main.ubot.processors.values()).some(proc => proc.state.canContinue)))
         await sleep(100);
 
-    await shutdownUBots(ubotMains);//}
-});*/
+    await shutdownUBots(ubotMains);
+});
