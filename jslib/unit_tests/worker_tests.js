@@ -426,6 +426,80 @@ unit.test("worker_tests: exceptions from main scripter", async () => {
     }
 });
 
+unit.test("worker_tests: serialize custom error", async () => {
+    class CustomErrorB extends Error {
+        constructor(message = undefined) {
+            super();
+            this.message = message;
+        }
+    }
+
+    class Worker {
+        constructor() {
+            this.worker = null;
+        }
+        async release() {await this.worker.release();}
+        static async start() {
+            let res = new Worker();
+            res.worker = await getWorker(1, consoleWrapper + farcallWrapper+`
+            class CustomErrorA extends Error {
+                constructor(message = undefined) {
+                    super();
+                    this.message = message;
+                }
+            }
+            
+            function callMeFromWorker(val) {
+                return new Promise((resolve,reject) => wrkInner.farcall("callMeFromWorker", [val], {}, resolve, reject));
+            }
+
+            wrkInner.export.doSomething = async (args, kwargs) => {
+                let cea = new CustomErrorA("custom error A description");
+                let ans = await callMeFromWorker(cea);
+                return ans;
+            }
+            `);
+            res.worker.startFarcallCallbacks();
+
+            res.worker.export["__worker_bios_print"] = (args, kwargs) => {
+                let out = args[0] === true ? console.error : console.logPut;
+                out(...args[1], args[2]);
+            };
+
+            res.worker.export["callMeFromWorker"] = (args, kwargs) => {
+                if (args[0].__proto__ === USerializationErrorImpl.prototype) {
+                    //console.log("callMeFromWorker hit USerializationError: " + args[0].__getStrValue());
+                    assert(args[0].__getStrValue() === "Boss TypesFactory error: unknown Object prototype 'CustomErrorA'");
+                    return new CustomErrorB("custom error B description");
+                }
+                else {
+                    //console.log("callMeFromWorker hit: " + args[0]);
+                    assert(false);
+                }
+            };
+
+            return res;
+        }
+        doSomething() {
+            return new Promise((resolve,reject) => this.worker.farcall("doSomething", [], {}, resolve, reject));
+        }
+    }
+
+    for (let i = 0; i < 200; ++i) {
+        let worker = await Worker.start();
+        try {
+            let ans = await worker.doSomething();
+            assert(ans.__proto__ === USerializationErrorImpl.prototype);
+            assert(ans.__getStrValue() === "Boss TypesFactory error: unknown Object prototype 'CustomErrorB'");
+            //console.log("ans: " + ans.__getStrValue());
+        } catch (e) {
+            console.error("catch: " + JSON.stringify(e));
+            assert(false);
+        }
+        await worker.release();
+    }
+});
+
 unit.test("worker_tests: access levels order", async () => {
     // Today (2019-10-18) there is not able to create subworker from worker code.
     // However, getWorker function should to check access levels.

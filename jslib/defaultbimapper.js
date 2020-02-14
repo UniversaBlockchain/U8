@@ -133,4 +133,17 @@ DefaultBiMapper.registerAdapter(typeErrorAdapter);
 
 
 
+let uSerializationErrorImplAdapter = new bs.BiAdapter("USerializationErrorImpl", USerializationErrorImpl);
+uSerializationErrorImplAdapter.serialize = async function(o,s) {
+    return {
+        composite3 : await s.serialize(o.__getStrValue())
+    };
+};
+uSerializationErrorImplAdapter.deserialize = async function(data,d) {
+    return new USerializationErrorImpl(await d.deserialize(data.composite3));
+};
+DefaultBiMapper.registerAdapter(uSerializationErrorImplAdapter);
+
+
+
 module.exports = {DefaultBiMapper};

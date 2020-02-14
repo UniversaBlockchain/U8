@@ -8,6 +8,7 @@
 #include "../UObject.h"
 #include "../UBinder.h"
 #include "../UString.h"
+#include "../../js_bindings/boss_bindings.h"
 
 class USerializationError: public UObject {
 private:
@@ -18,8 +19,11 @@ private:
         ~USerializationErrorData() override = default;
 
         Local<Object> serializeToV8(Local<Context> cxt, shared_ptr<Scripter> scripter) override {
-            auto res = Local<Object>::Cast(String::NewFromUtf8(scripter->isolate(), strValue.data()).ToLocalChecked());
-            return res;
+//            auto res = Local<Object>::Cast(String::NewFromUtf8(scripter->isolate(), strValue.data()).ToLocalChecked());
+//            return res;
+            auto res = wrapUSerializationError(scripter, new USerializationErrorImpl(strValue));
+            auto obj = Local<Object>::Cast(res);
+            return obj;
         }
 
         void dbgPrint(std::string prefix) override {

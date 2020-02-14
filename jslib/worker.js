@@ -146,6 +146,7 @@ wrkInner.onReceive = async (obj) => {
                 await DefaultBiMapper.getInstance().deserialize(obj.args),
                 await DefaultBiMapper.getInstance().deserialize(obj.kwargs)
             );
+            res = await DefaultBiMapper.getInstance().serialize(res);
             await wrkInner.send({serial:wrkInner.getNextFarcallSN(), ref:obj.serial, result:res});
         } catch(e) {
             let err = {};

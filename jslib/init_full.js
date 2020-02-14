@@ -170,6 +170,7 @@ function freezeGlobals() {
     Object.freeze(global.WorkerScripter);
     Object.freeze(global.wrkImpl.__getWorker);
     Object.freeze(global.wrkImpl);
+    Object.freeze(global.USerializationErrorImpl);
     Object.freeze(global.gc);
     Object.freeze(global.chomp);
     Object.freeze(global.equalArrays);

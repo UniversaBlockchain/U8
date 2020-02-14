@@ -138,9 +138,55 @@ void JsBossAddPrototype(const v8::FunctionCallbackInfo<v8::Value> &args) {
     });
 }
 
+static void USerializationErrorImpl_getStrValue(const FunctionCallbackInfo<Value> &args) {
+    Scripter::unwrapArgs(args, [](ArgsContext &ac) {
+        if (ac.args.Length() == 0) {
+            auto obj = unwrap<USerializationErrorImpl>(ac.args.This());
+            ac.setReturnValue(ac.v8String(obj->getStrValue()));
+            return;
+        }
+        ac.throwError("invalid arguments");
+    });
+}
+
+Local<FunctionTemplate> initUSerializationError(Scripter& scripter) {
+    Isolate *isolate = scripter.isolate();
+    Local<FunctionTemplate> tpl = bindCppClass<USerializationErrorImpl>(
+            isolate,
+            "USerializationErrorTpl",
+            [=](const FunctionCallbackInfo<Value> &args) -> USerializationErrorImpl* {
+                Isolate *isolate = args.GetIsolate();
+                if (args.Length() == 1) {
+                    try {
+                        v8::String::Utf8Value str(isolate, args[0]->ToString(isolate->GetCurrentContext()).ToLocalChecked());
+                        auto res = new USerializationErrorImpl(*str);
+                        return res;
+                    } catch (const std::exception& e) {
+                        isolate->ThrowException(
+                                Exception::TypeError(String::NewFromUtf8(isolate, e.what()).ToLocalChecked()));
+                        return nullptr;
+                    }
+                }
+                isolate->ThrowException(
+                        Exception::TypeError(String::NewFromUtf8(isolate, "invalid number of arguments").ToLocalChecked()));
+                return nullptr;
+            });
+    auto prototype = tpl->PrototypeTemplate();
+    prototype->Set(isolate, "__getStrValue", FunctionTemplate::New(isolate, USerializationErrorImpl_getStrValue));
+
+    scripter.USerializationErrorTpl.Reset(isolate, tpl);
+    return tpl;
+}
+
+v8::Local<v8::Value> wrapUSerializationError(shared_ptr<Scripter> scripter, USerializationErrorImpl* obj) {
+    return wrap(scripter->USerializationErrorTpl, scripter->isolate(), obj, true);
+}
+
 void JsInitBossBindings(Scripter& scripter, const Local<ObjectTemplate> &global) {
     Isolate *isolate = scripter.isolate();
     global->Set(String::NewFromUtf8(isolate, "__boss_asyncDump").ToLocalChecked(), FunctionTemplate::New(isolate, JsBossAsyncDump));
     global->Set(String::NewFromUtf8(isolate, "__boss_asyncLoad").ToLocalChecked(), FunctionTemplate::New(isolate, JsBossAsyncLoad));
     global->Set(String::NewFromUtf8(isolate, "__boss_addPrototype").ToLocalChecked(), FunctionTemplate::New(isolate, JsBossAddPrototype));
+
+    global->Set(isolate, "USerializationErrorImpl", initUSerializationError(scripter));
 }

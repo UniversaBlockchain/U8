@@ -11,6 +11,7 @@
 #include "UDateTime.h"
 #include "UBytes.h"
 #include "UBool.h"
+#include "complex/USerializationError.h"
 #include "../tools/tools.h"
 #include <unordered_map>
 #include <functional>
@@ -124,8 +125,8 @@ UObject v8ValueToUObject(v8::Isolate* isolate, v8::Local<Value> v8value) {
         if (v8ObjectToUObjectFactory.find(constructorName) != v8ObjectToUObjectFactory.end()) {
             return v8ObjectToUObjectFactory[constructorName](isolate, obj);
         } else {
-            fprintf(stderr, "Boss TypesFactory error: unknown Object prototype '%s'\n", constructorName.data());
-            return UObject();
+            //fprintf(stderr, "Boss TypesFactory error: unknown Object prototype '%s'\n", constructorName.data());
+            return USerializationError("Boss TypesFactory error: unknown Object prototype '" + constructorName + "'");
         }
     } else {
         auto objTypeStr = String::Utf8Value(isolate, v8value->TypeOf(isolate));
@@ -133,7 +134,8 @@ UObject v8ValueToUObject(v8::Isolate* isolate, v8::Local<Value> v8value) {
         if (v8ValueToUObjectFactory.find(objType) != v8ValueToUObjectFactory.end())
             return v8ValueToUObjectFactory[objType](isolate, v8value);
         else {
-            fprintf(stderr, "Boss TypesFactory error: unknown Value type '%s'\n", objType.data());
+            //fprintf(stderr, "Boss TypesFactory error: unknown Value type '%s'\n", objType.data());
+            return USerializationError("Boss TypesFactory error: unknown Value type '" + objType + "'");
             return UObject();
         }
     }

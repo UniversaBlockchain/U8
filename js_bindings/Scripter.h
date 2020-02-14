@@ -274,6 +274,9 @@ public:
     // worker templates
     Persistent<FunctionTemplate> WorkerScripterTpl;
 
+    // boss templates
+    Persistent<FunctionTemplate> USerializationErrorTpl;
+
     static int workerMemLimitMegabytes;
 
 private:
