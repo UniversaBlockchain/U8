@@ -23,6 +23,7 @@ const Boss = require('boss.js');
 const roles = require('roles');
 const Constraint = require('constraint').Constraint;
 const permissions = require('permissions');
+const Lock = require("lock").Lock;
 
 // const UBotProcess_call = require("ubot/processes/UBotProcess_call").UBotProcess_call;
 // const notSupportedCommandsInMultiVerify = ["call", "writeSingleStorage", "writeMultiStorage", "replaceSingleStorage", "replaceMultiStorage"];
@@ -134,10 +135,10 @@ class ProcessStartExec extends ProcessBase {
     constructor(processor, onReady) {
         super(processor, onReady);
         this.output = null;
-        this.processes = [];
-        this.procIndex = 0;
+        this.processes = new Map();
         this.readsFrom = new Map();
         this.writesTo = new Map();
+        this.lock = new Lock();
 
         this.trustLevel = ut.getRequestStorageReadTrustLevel(this.pr.requestContract);
         if (this.trustLevel == null)
@@ -368,9 +369,22 @@ class ProcessStartExec extends ProcessBase {
 
     async onNotify(notification) {
         if (notification instanceof UBotCloudNotification_process) {
-            if (typeof notification.procIndex === "number" && this.processes[notification.procIndex] != null)
-                await this.processes[notification.procIndex].onNotify(notification);
+            if (typeof notification.procIndex === "number" && notification.storageId instanceof crypto.HashId &&
+                this.processes.has(notification.storageId.base64)) {
+                let process = this.processes.get(notification.storageId.base64)[notification.procIndex];
+                if (process != null)
+                    await process.onNotify(notification);
+            }
         }
+    }
+
+    static getStorageId(storageName, multi) {
+        let storageId = crypto.HashId.of(storageName);
+        let concat = new Uint8Array(storageId.digest.length + 1);
+        concat[0] = multi ? 1 : 0;
+        concat.set(storageId.digest, 1);
+
+        return crypto.HashId.of(concat);
     }
 
     /**
@@ -397,14 +411,25 @@ class ProcessStartExec extends ProcessBase {
             }
 
             return new Promise(async (resolve, reject) => {
-                let proc = new UBotProcess_writeSingleStorage(this.pr,
-                    result => resolve(result),
-                    error => reject(error),
-                    this, this.procIndex);
-                this.processes[this.procIndex] = proc;
-                this.procIndex++;
+                let storageId = ProcessStartExec.getStorageId(storageName, false);
+                let proc = await this.lock.synchronize("processes", async () => {
+                    if (!this.processes.has(storageId.base64))
+                        this.processes.set(storageId.base64, []);
 
-                await proc.init(data, this.pr.getDefaultRecordId(storageName, false), {storage_name : storageName});
+                    let storageProcesses = this.processes.get(storageId.base64);
+                    let procIndex = storageProcesses.length;
+
+                    let process = new UBotProcess_writeSingleStorage(this.pr,
+                        result => resolve(result),
+                        error => reject(error),
+                        this, storageId, procIndex);
+
+                    storageProcesses.push(process);
+
+                    return process;
+                });
+
+                await proc.init(data, this.pr.getDefaultRecordId(storageName, false), {storage_name: storageName});
                 await proc.start();
             });
         } else {
@@ -441,14 +466,25 @@ class ProcessStartExec extends ProcessBase {
             }
             
             return new Promise(async (resolve, reject) => {
-                let proc = new UBotProcess_writeMultiStorage(this.pr,
-                    result => resolve(result),
-                    error => reject(error),
-                    this, this.procIndex);
-                this.processes[this.procIndex] = proc;
-                this.procIndex++;
+                let storageId = ProcessStartExec.getStorageId(storageName, true);
+                let proc = await this.lock.synchronize("processes", async () => {
+                    if (!this.processes.has(storageId.base64))
+                        this.processes.set(storageId.base64, []);
 
-                await proc.init(data, this.pr.getDefaultRecordId(storageName, true), {storage_name : storageName});
+                    let storageProcesses = this.processes.get(storageId.base64);
+                    let procIndex = storageProcesses.length;
+
+                    let process = new UBotProcess_writeMultiStorage(this.pr,
+                        result => resolve(result),
+                        error => reject(error),
+                        this, storageId, procIndex);
+
+                    storageProcesses.push(process);
+
+                    return process;
+                });
+
+                await proc.init(data, this.pr.getDefaultRecordId(storageName, true), {storage_name: storageName});
                 await proc.start();
             });
         } else {

@@ -1860,3 +1860,66 @@ unit.test("ubot_local_test: named storages", async () => {
 
     await shutdownUBots(ubotMains);
 });
+
+unit.test("ubot_local_test: parallel storages", async () => {
+    let ubotMains = await createUBots(ubotsCount);
+    let ubotClient = await new UBotClient(clientKey, TOPOLOGY_ROOT + TOPOLOGY_FILE).start();
+    let netClient = await new UBotClient(tk.getTestKey(), TOPOLOGY_ROOT + TOPOLOGY_FILE).start();
+
+    let executableContract = await generateSimpleExecutableContract("storages.js", "parallelWriteStorages");
+    executableContract.state.data.cloud_methods.parallelReadStorages = {
+        pool: {size: 5},
+        quorum: {size: 4}
+    };
+    await executableContract.seal();
+
+    console.log("Register executable contract...");
+    let ir = await netClient.register(await executableContract.getPackedTransaction(), 10000);
+
+    assert(ir.state === ItemState.APPROVED);
+
+    // simple data
+    let singleData = [11, "DATA!", 33];
+    let multiData = ["qwerty", "...", 10984.289];
+
+    // write storages
+    let requestWriteStorages = Contract.fromPrivateKey(userPrivKey);
+    requestWriteStorages.state.data.method_name = "parallelWriteStorages";
+    requestWriteStorages.state.data.method_args = [singleData, multiData];
+    requestWriteStorages.state.data.executable_contract_id = executableContract.id;
+
+    await cs.addConstraintToContract(requestWriteStorages, executableContract, "executable_contract_constraint",
+        Constraint.TYPE_EXISTING_STATE, ["this.state.data.executable_contract_id == ref.id"], true);
+
+    let state = await ubotClient.executeCloudMethod(requestWriteStorages, await createPayment(7));
+    console.log("State: " + JSON.stringify(state));
+    assert(state.state === UBotPoolState.FINISHED.val);
+
+    // read storages
+    let requestReadStorages = Contract.fromPrivateKey(userPrivKey);
+    requestReadStorages.state.data.method_name = "parallelReadStorages";
+    requestReadStorages.state.data.method_args = [3];
+    requestReadStorages.state.data.executable_contract_id = executableContract.id;
+
+    await cs.addConstraintToContract(requestReadStorages, executableContract, "executable_contract_constraint",
+        Constraint.TYPE_EXISTING_STATE, ["this.state.data.executable_contract_id == ref.id"], true);
+
+    state = await ubotClient.executeCloudMethod(requestReadStorages, await createPayment(5));
+    console.log("State: " + JSON.stringify(state));
+
+    // check results
+    assert(state.state === UBotPoolState.FINISHED.val);
+    for (let i = 0; i < 3; i++) {
+        assert(state.result[i * 2] === singleData[i]);
+        assert(state.result[i * 2 + 1] instanceof Array && state.result[i * 2 + 1].every(md => md === multiData[i]));
+    }
+
+    await netClient.shutdown();
+    await ubotClient.shutdown();
+
+    // waiting pool finished...
+    while (ubotMains.some(main => Array.from(main.ubot.processors.values()).some(proc => proc.state.canContinue)))
+        await sleep(100);
+
+    await shutdownUBots(ubotMains);
+});

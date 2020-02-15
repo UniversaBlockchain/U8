@@ -16,9 +16,10 @@ const t = require("tools");
 const ut = require("ubot/ubot_tools");
 
 class UBotProcess_writeSingleStorage extends ProcessBase {
-    constructor(processor, onReady, onFailed, mainProcess, procIndex) {
+    constructor(processor, onReady, onFailed, mainProcess, storageId, procIndex) {
         super(processor, onReady, onFailed);
         this.mainProcess = mainProcess;
+        this.storageId = storageId;
         this.procIndex = procIndex;
         this.binToWrite = null;
         this.binHashId = null;
@@ -103,6 +104,7 @@ class UBotProcess_writeSingleStorage extends ProcessBase {
                             new UBotCloudNotification_process(
                                 this.pr.ubot.network.myInfo,
                                 this.pr.poolId,
+                                this.storageId,
                                 this.procIndex,
                                 UBotCloudNotification_process.types.SINGLE_STORAGE_GET_DATA_HASHID,
                                 {isAnswer: false}
@@ -192,6 +194,7 @@ class UBotProcess_writeSingleStorage extends ProcessBase {
                         new UBotCloudNotification_process(
                             this.pr.ubot.network.myInfo,
                             this.pr.poolId,
+                            this.storageId,
                             this.procIndex,
                             UBotCloudNotification_process.types.SINGLE_STORAGE_GET_DATA_HASHID,
                             {

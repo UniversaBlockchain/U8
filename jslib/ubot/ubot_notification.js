@@ -87,10 +87,10 @@ class UBotCloudNotification extends Notification {
         if(Object.getPrototypeOf(this) !== Object.getPrototypeOf(o))
             return false;
 
-        if (this.type.poolId !== o.type.poolId)
+        if (!t.valuesEqual(this.poolId !== o.poolId))
             return false;
 
-        if (this.type.executableContractId !== o.type.executableContractId)
+        if (!t.valuesEqual(this.executableContractId !== o.executableContractId))
             return false;
 
         if (this.type.ordinal !== o.type.ordinal)
@@ -127,9 +127,10 @@ class UBotCloudNotification_process extends Notification {
         MULTI_STORAGE_VOTE_EXCLUSION_SUSPICIOUS:        {ordinal: 8}
     };
 
-    constructor(from, poolId, procIndex, type, params) {
+    constructor(from, poolId, storageId, procIndex, type, params) {
         super(from);
         this.poolId = poolId;
+        this.storageId = storageId;
         this.procIndex = procIndex;
         this.type = type;
         this.params = params;
@@ -145,6 +146,7 @@ class UBotCloudNotification_process extends Notification {
 
     writeTo(bw) {
         bw.write(this.poolId.digest);
+        bw.write(this.storageId.digest);
 
         if (this.procIndex instanceof Array) {
             bw.write(this.procIndex.length);
@@ -216,6 +218,7 @@ class UBotCloudNotification_process extends Notification {
 
     readFrom(br) {
         this.poolId = crypto.HashId.withDigest(br.read());
+        this.storageId = crypto.HashId.withDigest(br.read());
         this.params = {};
 
         let procIndexLen = br.read();
@@ -287,7 +290,10 @@ class UBotCloudNotification_process extends Notification {
         if(Object.getPrototypeOf(this) !== Object.getPrototypeOf(o))
             return false;
 
-        if (this.type.poolId !== o.type.poolId)
+        if (!t.valuesEqual(this.poolId !== o.poolId))
+            return false;
+
+        if (!t.valuesEqual(this.storageId !== o.storageId))
             return false;
 
         if (!t.valuesEqual(this.procIndex, o.procIndex))
@@ -306,6 +312,7 @@ class UBotCloudNotification_process extends Notification {
     toString() {
         return "[UBotCloudNotification_process from node: " + this.from.number +
             ", poolId: " + this.poolId +
+            ", poolId: " + this.storageId +
             ", procIndex: " + JSON.stringify(this.procIndex) +
             ", type: " + this.type.val +
             ", isAnswer: " + this.params.isAnswer + "]";

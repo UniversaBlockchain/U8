@@ -27,8 +27,8 @@ class UBotProcess_writeMultiStorage extends UBotProcess_writeSingleStorage {
         ANALYSIS:       {ordinal: 5}
     };
 
-    constructor(processor, onReady, onFailed, mainProcess, procIndex) {
-        super(processor, onReady, onFailed, mainProcess, procIndex);
+    constructor(processor, onReady, onFailed, mainProcess, storageId, procIndex) {
+        super(processor, onReady, onFailed, mainProcess, storageId, procIndex);
         this.results = [];
         this.hashes = [];
         this.previous = [];
@@ -151,6 +151,7 @@ class UBotProcess_writeMultiStorage extends UBotProcess_writeSingleStorage {
                         new UBotCloudNotification_process(
                             this.pr.ubot.network.myInfo,
                             this.pr.poolId,
+                            this.storageId,
                             this.procIndex,
                             UBotCloudNotification_process.types.MULTI_STORAGE_GET_DATA_HASHID,
                             { isAnswer: false }
@@ -180,6 +181,7 @@ class UBotProcess_writeMultiStorage extends UBotProcess_writeSingleStorage {
                         new UBotCloudNotification_process(
                             this.pr.ubot.network.myInfo,
                             this.pr.poolId,
+                            this.storageId,
                             this.procIndex,
                             UBotCloudNotification_process.types.MULTI_STORAGE_GET_CORTEGE_HASHID,
                             {isAnswer: false}
@@ -197,6 +199,7 @@ class UBotProcess_writeMultiStorage extends UBotProcess_writeSingleStorage {
                     new UBotCloudNotification_process(
                         this.pr.ubot.network.myInfo,
                         this.pr.poolId,
+                        this.storageId,
                         this.procIndex,
                         UBotCloudNotification_process.types.MULTI_STORAGE_GET_POOL_HASHES,
                         {
@@ -220,6 +223,7 @@ class UBotProcess_writeMultiStorage extends UBotProcess_writeSingleStorage {
                         new UBotCloudNotification_process(
                             this.pr.ubot.network.myInfo,
                             this.pr.poolId,
+                            this.storageId,
                             this.procIndex,
                             UBotCloudNotification_process.types.MULTI_STORAGE_GET_POOL_HASHES,
                             {
@@ -294,6 +298,7 @@ class UBotProcess_writeMultiStorage extends UBotProcess_writeSingleStorage {
                     new UBotCloudNotification_process(
                         this.pr.ubot.network.myInfo,
                         this.pr.poolId,
+                        this.storageId,
                         this.procIndex,
                         UBotCloudNotification_process.types.MULTI_STORAGE_GET_CORTEGES,
                         {
@@ -324,6 +329,7 @@ class UBotProcess_writeMultiStorage extends UBotProcess_writeSingleStorage {
                         new UBotCloudNotification_process(
                             this.pr.ubot.network.myInfo,
                             this.pr.poolId,
+                            this.storageId,
                             this.procIndex,
                             UBotCloudNotification_process.types.MULTI_STORAGE_GET_SUSPICIOUS_CORTEGE_HASHID,
                             {
@@ -355,6 +361,7 @@ class UBotProcess_writeMultiStorage extends UBotProcess_writeSingleStorage {
                     new UBotCloudNotification_process(
                         this.pr.ubot.network.myInfo,
                         this.pr.poolId,
+                        this.storageId,
                         this.procIndex,
                         UBotCloudNotification_process.types.MULTI_STORAGE_GET_DECISIONS,
                         {
@@ -383,6 +390,7 @@ class UBotProcess_writeMultiStorage extends UBotProcess_writeSingleStorage {
                     new UBotCloudNotification_process(
                         this.pr.ubot.network.myInfo,
                         this.pr.poolId,
+                        this.storageId,
                         this.procIndex,
                         UBotCloudNotification_process.types.MULTI_STORAGE_VOTE_DECISION,
                         {
@@ -413,6 +421,7 @@ class UBotProcess_writeMultiStorage extends UBotProcess_writeSingleStorage {
                     new UBotCloudNotification_process(
                         this.pr.ubot.network.myInfo,
                         this.pr.poolId,
+                        this.storageId,
                         this.procIndex,
                         UBotCloudNotification_process.types.MULTI_STORAGE_VOTE_EXCLUSION_SUSPICIOUS,
                         {
@@ -1102,6 +1111,7 @@ class UBotProcess_writeMultiStorage extends UBotProcess_writeSingleStorage {
                         new UBotCloudNotification_process(
                             this.pr.ubot.network.myInfo,
                             this.pr.poolId,
+                            this.storageId,
                             this.procIndex,
                             UBotCloudNotification_process.types.MULTI_STORAGE_GET_DATA_HASHID,
                             {
@@ -1127,6 +1137,7 @@ class UBotProcess_writeMultiStorage extends UBotProcess_writeSingleStorage {
                             new UBotCloudNotification_process(
                                 this.pr.ubot.network.myInfo,
                                 this.pr.poolId,
+                                this.storageId,
                                 this.procIndex,
                                 UBotCloudNotification_process.types.MULTI_STORAGE_GET_CORTEGE_HASHID,
                                 {
@@ -1160,6 +1171,7 @@ class UBotProcess_writeMultiStorage extends UBotProcess_writeSingleStorage {
                                     new UBotCloudNotification_process(
                                         this.pr.ubot.network.myInfo,
                                         this.pr.poolId,
+                                        this.storageId,
                                         this.procIndex,
                                         UBotCloudNotification_process.types.MULTI_STORAGE_GET_POOL_HASHES,
                                         {
@@ -1175,6 +1187,7 @@ class UBotProcess_writeMultiStorage extends UBotProcess_writeSingleStorage {
                             new UBotCloudNotification_process(
                                 this.pr.ubot.network.myInfo,
                                 this.pr.poolId,
+                                this.storageId,
                                 this.procIndex,
                                 UBotCloudNotification_process.types.MULTI_STORAGE_GET_POOL_HASHES,
                                 {
@@ -1197,10 +1210,11 @@ class UBotProcess_writeMultiStorage extends UBotProcess_writeSingleStorage {
                             new UBotCloudNotification_process(
                                 this.pr.ubot.network.myInfo,
                                 this.pr.poolId,
+                                this.storageId,
                                 this.procIndex,
                                 UBotCloudNotification_process.types.MULTI_STORAGE_GET_CORTEGES,
                                 {
-                                    //TODO: for > 200 ubots in pool need HTTP request
+                                    //TODO: for > 70 ubots in pool need HTTP request
                                     cortege: await Boss.dump(Array.from(this.iterationsCortege[notification.params.commonCortegeIteration])),
                                     commonCortegeIteration: notification.params.commonCortegeIteration,
                                     isAnswer: true
@@ -1213,7 +1227,7 @@ class UBotProcess_writeMultiStorage extends UBotProcess_writeSingleStorage {
 
                     let receivedCortege = new Set(await Boss.load(notification.params.cortege));
                     this.corteges[this.pr.poolIndexes.get(notification.from.number)] = receivedCortege;
-                    //TODO: for > 200 ubots in pool need HTTP request (check marker)
+                    //TODO: for > 70 ubots in pool need HTTP request (check marker)
 
                     if (this.iterationsCortegesIds[this.commonCortegeIteration] == null)
                         this.iterationsCortegesIds[this.commonCortegeIteration] = [];
@@ -1232,6 +1246,7 @@ class UBotProcess_writeMultiStorage extends UBotProcess_writeSingleStorage {
                             new UBotCloudNotification_process(
                                 this.pr.ubot.network.myInfo,
                                 this.pr.poolId,
+                                this.storageId,
                                 this.procIndex,
                                 UBotCloudNotification_process.types.MULTI_STORAGE_GET_SUSPICIOUS_CORTEGE_HASHID,
                                 {
@@ -1258,6 +1273,7 @@ class UBotProcess_writeMultiStorage extends UBotProcess_writeSingleStorage {
                             new UBotCloudNotification_process(
                                 this.pr.ubot.network.myInfo,
                                 this.pr.poolId,
+                                this.storageId,
                                 this.procIndex,
                                 UBotCloudNotification_process.types.MULTI_STORAGE_GET_DECISIONS,
                                 {
@@ -1303,6 +1319,7 @@ class UBotProcess_writeMultiStorage extends UBotProcess_writeSingleStorage {
                             new UBotCloudNotification_process(
                                 this.pr.ubot.network.myInfo,
                                 this.pr.poolId,
+                                this.storageId,
                                 this.procIndex,
                                 UBotCloudNotification_process.types.MULTI_STORAGE_VOTE_DECISION,
                                 {
@@ -1328,6 +1345,7 @@ class UBotProcess_writeMultiStorage extends UBotProcess_writeSingleStorage {
                             new UBotCloudNotification_process(
                                 this.pr.ubot.network.myInfo,
                                 this.pr.poolId,
+                                this.storageId,
                                 this.procIndex,
                                 UBotCloudNotification_process.types.MULTI_STORAGE_VOTE_EXCLUSION_SUSPICIOUS,
                                 {
