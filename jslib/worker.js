@@ -46,6 +46,12 @@ wrk.WorkerHandle = class {
                             await DefaultBiMapper.getInstance().deserialize(obj.args),
                             await DefaultBiMapper.getInstance().deserialize(obj.kwargs)
                         );
+                        try {
+                            res = await DefaultBiMapper.getInstance().serializeOrThrow(res);
+                        } catch (e) {
+                            res = new WorkerRuntimeError(e.toString(), JSON.stringify(res));
+                            res = await DefaultBiMapper.getInstance().serializeOrThrow(res);
+                        }
                         await this.send({serial: this.getNextFarcallSN(), ref: obj.serial, result: res});
                     } catch (e) {
                         if (e === undefined)
@@ -146,7 +152,12 @@ wrkInner.onReceive = async (obj) => {
                 await DefaultBiMapper.getInstance().deserialize(obj.args),
                 await DefaultBiMapper.getInstance().deserialize(obj.kwargs)
             );
-            res = await DefaultBiMapper.getInstance().serialize(res);
+            try {
+                res = await DefaultBiMapper.getInstance().serializeOrThrow(res);
+            } catch (e) {
+                res = new WorkerRuntimeError(e.toString(), JSON.stringify(res));
+                res = await DefaultBiMapper.getInstance().serializeOrThrow(res);
+            }
             await wrkInner.send({serial:wrkInner.getNextFarcallSN(), ref:obj.serial, result:res});
         } catch(e) {
             let err = {};

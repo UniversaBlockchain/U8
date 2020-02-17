@@ -431,6 +431,7 @@ unit.test("worker_tests: serialize custom error", async () => {
         constructor(message = undefined) {
             super();
             this.message = message;
+            this.field1 = 123;
         }
     }
 
@@ -469,7 +470,6 @@ unit.test("worker_tests: serialize custom error", async () => {
             };
 
             res.worker.export["callMeFromWorker"] = (args, kwargs) => {
-                console.log("callMeFromWorker hit args[0]: " + args[0]);
                 if (args[0].__proto__ === WorkerRuntimeError.prototype) {
                     // console.log("callMeFromWorker hit WorkerRuntimeError message: " + args[0].message);
                     // console.log("callMeFromWorker hit WorkerRuntimeError jsonData: " + args[0].jsonData);
@@ -492,13 +492,16 @@ unit.test("worker_tests: serialize custom error", async () => {
         }
     }
 
-    for (let i = 0; i < 1; ++i) {
+    for (let i = 0; i < 200; ++i) {
         let worker = await Worker.start();
         try {
             let ans = await worker.doSomething();
-            //assert(ans.__proto__ === USerializationErrorImpl.prototype);
-            //assert(ans.__getStrValue() === "Boss TypesFactory error: unknown Object prototype 'CustomErrorB'");
-            console.log("ans: " + ans.__getStrValue());
+            // console.log("ans message: " + ans.message);
+            // console.log("ans jsonData: " + ans.jsonData);
+            assert(ans.__proto__ === WorkerRuntimeError.prototype);
+            assert(ans.message === "Error: unable to serialize CustomErrorB");
+            let jsonObj = JSON.parse(ans.jsonData);
+            assert(jsonObj.field1 === 123);
         } catch (e) {
             console.error("catch: " + JSON.stringify(e));
             assert(false);

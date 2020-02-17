@@ -129,12 +129,16 @@ class BiMapper {
             return result;
         } else if(object instanceof Array || object instanceof Set || object instanceof t.GenericSet) {
             let result = [];
-            for(let element of object) {
+            for (let element of object) {
                 result.push(await this.serialize(element));
             }
             return result;
+        } else if (object.constructor && object.constructor.name === 'String') {
+            return object;
+        } else if (object.constructor && object.constructor.name === 'Number') {
+            return object;
         } else {
-            throw new Error("unable to serialize");
+            throw new Error("unable to serialize " + object.constructor.name);
         }
     }
 
