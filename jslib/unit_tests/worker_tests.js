@@ -457,6 +457,11 @@ unit.test("worker_tests: serialize custom error", async () => {
             }
 
             wrkInner.export.doSomething = async (args, kwargs) => {
+                // console.log("args[0].message: " + args[0].message);
+                // console.log("args[0].jsonData: " + args[0].jsonData);
+                assert(args[0].message === "Error: unable to serialize CustomErrorB");
+                let jsonObj = JSON.parse(args[0].jsonData);
+                assert(jsonObj.field1 === 123);
                 let cea = new CustomErrorA("custom error A description");
                 let ans = await callMeFromWorker(cea);
                 return ans;
@@ -488,7 +493,7 @@ unit.test("worker_tests: serialize custom error", async () => {
             return res;
         }
         doSomething() {
-            return new Promise((resolve,reject) => this.worker.farcall("doSomething", [], {}, resolve, reject));
+            return new Promise((resolve,reject) => this.worker.farcall("doSomething", [new CustomErrorB("bbb")], {}, resolve, reject));
         }
     }
 

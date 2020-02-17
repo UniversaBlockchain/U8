@@ -78,7 +78,18 @@ wrk.WorkerHandle = class {
         let id = this.getNextFarcallSN();
         if (onComplete != null)
             this.callbacksFarcall.set(id, [onComplete, onError]);
-        await this.send({serial: id, cmd: cmd, args: args, kwargs: kwargs});
+        let serArgs = [];
+        for (let a of args) {
+            let sa;
+            try {
+                sa = await DefaultBiMapper.getInstance().serializeOrThrow(a);
+            } catch (e) {
+                sa = new WorkerRuntimeError(e.toString(), JSON.stringify(a));
+                sa = await DefaultBiMapper.getInstance().serializeOrThrow(sa);
+            }
+            serArgs.push(sa);
+        }
+        await this.send({serial: id, cmd: cmd, args: serArgs, kwargs: kwargs});
     }
 
     async release(terminateRequired = false) {
