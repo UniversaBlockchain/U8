@@ -153,7 +153,7 @@ Local<FunctionTemplate> initUSerializationError(Scripter& scripter) {
     Isolate *isolate = scripter.isolate();
     Local<FunctionTemplate> tpl = bindCppClass<USerializationErrorImpl>(
             isolate,
-            "USerializationErrorTpl",
+            "USerializationErrorImpl",
             [=](const FunctionCallbackInfo<Value> &args) -> USerializationErrorImpl* {
                 Isolate *isolate = args.GetIsolate();
                 if (args.Length() == 1) {

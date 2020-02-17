@@ -185,7 +185,18 @@ wrkInner.farcall = async (cmd, args, kwargs, onComplete = null, onError = (e)=>{
     let id = wrkInner.getNextFarcallSN();
     if (onComplete != null)
         wrkInner.callbacksFarcall.set(id, [onComplete, onError]);
-    await wrkInner.send(await DefaultBiMapper.getInstance().serialize({serial:id, cmd:cmd, args:args, kwargs:kwargs}));
+    let serArgs = [];
+    for (let a of args) {
+        let sa;
+        try {
+            sa = await DefaultBiMapper.getInstance().serializeOrThrow(a);
+        } catch (e) {
+            sa = new WorkerRuntimeError("unable to serialize argument", JSON.stringify(a));
+            sa = await DefaultBiMapper.getInstance().serializeOrThrow(sa);
+        }
+        serArgs.push(sa);
+    }
+    await wrkInner.send({serial:id, cmd:cmd, args:serArgs, kwargs:kwargs});
 }
 `;
 

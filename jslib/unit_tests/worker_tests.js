@@ -446,6 +446,8 @@ unit.test("worker_tests: serialize custom error", async () => {
                 constructor(message = undefined) {
                     super();
                     this.message = message;
+                    this.param1 = 11;
+                    this.param2 = "param param";
                 }
             }
             
@@ -467,9 +469,14 @@ unit.test("worker_tests: serialize custom error", async () => {
             };
 
             res.worker.export["callMeFromWorker"] = (args, kwargs) => {
-                if (args[0].__proto__ === USerializationErrorImpl.prototype) {
-                    //console.log("callMeFromWorker hit USerializationError: " + args[0].__getStrValue());
-                    assert(args[0].__getStrValue() === "Boss TypesFactory error: unknown Object prototype 'CustomErrorA'");
+                console.log("callMeFromWorker hit args[0]: " + args[0]);
+                if (args[0].__proto__ === WorkerRuntimeError.prototype) {
+                    // console.log("callMeFromWorker hit WorkerRuntimeError message: " + args[0].message);
+                    // console.log("callMeFromWorker hit WorkerRuntimeError jsonData: " + args[0].jsonData);
+                    assert(args[0].message === "unable to serialize argument");
+                    let jsonObj = JSON.parse(args[0].jsonData);
+                    assert(jsonObj.param1 === 11);
+                    assert(jsonObj.param2 === "param param");
                     return new CustomErrorB("custom error B description");
                 }
                 else {
@@ -485,13 +492,13 @@ unit.test("worker_tests: serialize custom error", async () => {
         }
     }
 
-    for (let i = 0; i < 200; ++i) {
+    for (let i = 0; i < 1; ++i) {
         let worker = await Worker.start();
         try {
             let ans = await worker.doSomething();
-            assert(ans.__proto__ === USerializationErrorImpl.prototype);
-            assert(ans.__getStrValue() === "Boss TypesFactory error: unknown Object prototype 'CustomErrorB'");
-            //console.log("ans: " + ans.__getStrValue());
+            //assert(ans.__proto__ === USerializationErrorImpl.prototype);
+            //assert(ans.__getStrValue() === "Boss TypesFactory error: unknown Object prototype 'CustomErrorB'");
+            console.log("ans: " + ans.__getStrValue());
         } catch (e) {
             console.error("catch: " + JSON.stringify(e));
             assert(false);

@@ -146,4 +146,18 @@ DefaultBiMapper.registerAdapter(uSerializationErrorImplAdapter);
 
 
 
+let workerRuntimeErrorAdapter = new bs.BiAdapter("WorkerRuntimeError", WorkerRuntimeError);
+workerRuntimeErrorAdapter.serialize = async function(o,s) {
+    return {
+        message : o.message,
+        jsonData: o.jsonData
+    };
+};
+workerRuntimeErrorAdapter.deserialize = async function(data,d) {
+    return new WorkerRuntimeError(data.message, data.jsonData);
+};
+DefaultBiMapper.registerAdapter(workerRuntimeErrorAdapter);
+
+
+
 module.exports = {DefaultBiMapper};

@@ -111,6 +111,33 @@ class BiMapper {
         }
     }
 
+    async serializeOrThrow(object) {
+        if(object == null || typeof object === "undefined")
+            return null;
+        const proto = Object.getPrototypeOf(object);
+
+        if(this.adapters.has(proto)) {
+            const adapter = this.adapters.get(proto);
+            let result = await adapter.serialize(object,this);
+            result.__type = adapter.getTag();
+            return result;
+        } else if(proto === Object.prototype) {
+            let result = {};
+            for(let key of Object.keys(object)) {
+                result[key] = await this.serialize(object[key]);
+            }
+            return result;
+        } else if(object instanceof Array || object instanceof Set || object instanceof t.GenericSet) {
+            let result = [];
+            for(let element of object) {
+                result.push(await this.serialize(element));
+            }
+            return result;
+        } else {
+            throw new Error("unable to serialize");
+        }
+    }
+
     removeAdapter(adapter) {
         this.adapters.delete(adapter.getTag());
         this.adapters.delete(adapter.getType());

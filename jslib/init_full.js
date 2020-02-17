@@ -122,6 +122,14 @@ Object.freeze(platform);
 // crypto is a global module and needs global initialization:
 require('crypto');
 
+class WorkerRuntimeError extends Error {
+    constructor(message = undefined, jsonData = undefined) {
+        super();
+        this.message = message;
+        this.jsonData = jsonData;
+    }
+}
+
 function freezeGlobals() {
     let global = Function('return this')();
     Object.freeze(global.__bios_print);
@@ -168,6 +176,7 @@ function freezeGlobals() {
     Object.freeze(global.__boss_asyncLoad);
     Object.freeze(global.__boss_addPrototype);
     Object.freeze(global.WorkerScripter);
+    Object.freeze(global.WorkerRuntimeError);
     Object.freeze(global.wrkImpl.__getWorker);
     Object.freeze(global.wrkImpl);
     Object.freeze(global.USerializationErrorImpl);
