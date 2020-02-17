@@ -394,7 +394,9 @@ class ProcessStartExec extends ProcessBase {
      * special U8 types that are may be packed by the Boss.
      * @param {string} storageName - Storage name. Optional, if undefined - using default storage.
      * @return {Promise<void>}
+     * @throws {UBotQuantiserException} quantiser limit is reached.
      * @throws {UBotProcessException} process exception if can`t write empty data to single-storage.
+
      */
     async writeSingleStorage(data, storageName = "default") {
         if (data != null) {
@@ -449,6 +451,7 @@ class ProcessStartExec extends ProcessBase {
      * special U8 types that are may be packed by the Boss.
      * @param {string} storageName - Storage name. Optional, if undefined - using default storage.
      * @return {Promise<void>}
+     * @throws {UBotQuantiserException} quantiser limit is reached.
      * @throws {UBotProcessException} process exception if can`t write empty data to multi-storage.
      */
     async writeMultiStorage(data, storageName = "default") {
@@ -501,8 +504,9 @@ class ProcessStartExec extends ProcessBase {
      * Get data from single storage.
      *
      * @param {string} storageName - Storage name. Optional, if undefined - using default storage.
-     *
      * @return {Promise<null|*>} data from single storage or null if storage is empty.
+     * @throws {UBotQuantiserException} quantiser limit is reached.
+     * @throws {UBotClientException} UBot client error.
      */
     async getSingleStorage(storageName = "default") {
         try {
@@ -558,8 +562,9 @@ class ProcessStartExec extends ProcessBase {
      * Get data from multi storage.
      *
      * @param {string} storageName - Storage name. Optional, if undefined - using default storage.
-     *
      * @return {Promise<null|[*]>} data from multi storage or null if storage is empty.
+     * @throws {UBotQuantiserException} quantiser limit is reached.
+     * @throws {UBotClientException} UBot client error.
      */
     async getMultiStorage(storageName = "default") {
         try {
@@ -622,10 +627,11 @@ class ProcessStartExec extends ProcessBase {
     }
 
     /**
-     * Register a contract (with transaction).
+     * Register a contract transferred as part of a packed transaction.
      *
      * @param {Uint8Array} packedTransaction - Packed transaction for registration.
      * @return {Promise<ItemResult>} - Result of registration or current state of registration (if wasn't finished yet).
+     * @throws {UBotQuantiserException} quantiser limit is reached.
      * @throws {UBotClientException} client exception if error register contract.
      */
     async registerContract(packedTransaction) {
@@ -809,6 +815,7 @@ class ProcessStartExec extends ProcessBase {
      *
      * @param {string} url - URL of the external service.
      * @return {Promise<{body: HTTP response body, response_code: HTTP response code}>} HTTP response.
+     * @throws {UBotQuantiserException} quantiser limit is reached.
      */
     async doHTTPRequest(url) {
         try {
@@ -882,6 +889,7 @@ class ProcessStartExec extends ProcessBase {
      * @param {string} name - Transaction name.
      * @param {number} waitMillis - Waiting transaction time in milliseconds. 0 - indefinitely. By default is 0.
      * @return {Promise<boolean>} true if started.
+     * @throws {UBotClientException} UBot client error.
      */
     async startTransaction(name, waitMillis = 0) {
         try {
@@ -903,6 +911,7 @@ class ProcessStartExec extends ProcessBase {
      * @param {string} name - Transaction name.
      * @param {number} waitMillis - Waiting transaction time in milliseconds. 0 - indefinitely. By default is 0.
      * @return {Promise<boolean>} true if finished successful.
+     * @throws {UBotClientException} UBot client error.
      */
     async finishTransaction(name, waitMillis = 0) {
         try {
