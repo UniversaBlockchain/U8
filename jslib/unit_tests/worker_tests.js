@@ -478,7 +478,7 @@ unit.test("worker_tests: serialize custom error", async () => {
                 if (args[0].__proto__ === WorkerRuntimeError.prototype) {
                     // console.log("callMeFromWorker hit WorkerRuntimeError message: " + args[0].message);
                     // console.log("callMeFromWorker hit WorkerRuntimeError jsonData: " + args[0].jsonData);
-                    assert(args[0].message === "unable to serialize argument");
+                    assert(args[0].message === "custom error A description");
                     let jsonObj = JSON.parse(args[0].jsonData);
                     assert(jsonObj.param1 === 11);
                     assert(jsonObj.param2 === "param param");

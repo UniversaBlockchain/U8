@@ -213,7 +213,10 @@ wrkInner.farcall = async (cmd, args, kwargs, onComplete = null, onError = (e)=>{
         try {
             sa = await DefaultBiMapper.getInstance().serializeOrThrow(a);
         } catch (e) {
-            sa = new WorkerRuntimeError("unable to serialize argument", JSON.stringify(a));
+            if (a instanceof Error && a.message != null)
+                sa = new WorkerRuntimeError(a.message, JSON.stringify(a));
+            else
+                sa = new WorkerRuntimeError("unable to serialize argument", JSON.stringify(a));
             sa = await DefaultBiMapper.getInstance().serializeOrThrow(sa);
         }
         serArgs.push(sa);

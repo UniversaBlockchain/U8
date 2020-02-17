@@ -436,6 +436,39 @@ unit.test("ubot_local_test: execute cloud method", async () => {
     await shutdownUBots(ubotMains);//}
 });
 
+unit.test("ubot_local_test: error in cloud method", async () => {
+    let ubotMains = await createUBots(ubotsCount);
+
+    let ubotClient = await new UBotClient(clientKey, TOPOLOGY_ROOT + TOPOLOGY_FILE).start();
+
+    let executableContract = await generateSimpleExecutableContract("error.js", "doError");
+
+    let requestContract = Contract.fromPrivateKey(userPrivKey);
+    requestContract.state.data.method_name = "doError";
+    requestContract.state.data.executable_contract_id = executableContract.id;
+    requestContract.newItems.add(executableContract);
+
+    await cs.addConstraintToContract(requestContract, executableContract, "executable_contract_constraint",
+        Constraint.TYPE_EXISTING_STATE, ["this.state.data.executable_contract_id == ref.id"], true);
+
+    let state = await ubotClient.executeCloudMethod(requestContract, await createPayment(5));
+
+    console.log("State: " + JSON.stringify(state));
+
+    assert(state.state === UBotPoolState.FAILED.val);
+
+    // checking error
+    assert(state.errors[0].message === "Error in cloud method doError: Simple test error message.");
+
+    await ubotClient.shutdown();
+
+    // waiting pool finished...
+    while (ubotMains.some(main => Array.from(main.ubot.processors.values()).some(proc => proc.state.canContinue)))
+        await sleep(100);
+
+    await shutdownUBots(ubotMains);
+});
+
 // unit.test("ubot_local_test: random deviation", async () => {
 //     let ubotMains = await createUBots(ubotsCount);
 //
