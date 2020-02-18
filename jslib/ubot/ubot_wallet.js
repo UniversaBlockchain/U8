@@ -7,8 +7,11 @@ import * as io from "io";
 const ex = require("exceptions");
 const roles = require('roles');
 const Constraint = require('constraint').Constraint;
+const Parcel = require("parcel").Parcel;
 
 const EXECUTABLE_CONTRACTS_PATH = "../jslib/ubot/executable_contracts/";
+const TOPOLOGY_ROOT = "../jslib/ubot/topology/";
+const TOPOLOGY_FILE = "mainnet_topology.json";
 
 /**
  * Create wallet executable contract.
@@ -98,4 +101,60 @@ async function prepareToken(walletContract, token, tokenOwnerKeys) {
     return await walletToken.getPackedTransaction();
 }
 
-module.exports = {createWallet, prepareToken};
+class UBotWallet {
+    constructor(ownerKey, quorum, pool, gettingQuorum = 3, gettingPool = 4) {
+        this.walletKey = ownerKey;
+        this.quorum = quorum;
+        this.pool = pool;
+        this.gettingQuorum = gettingQuorum;
+        this.gettingPool = gettingPool;
+        this.walletContract = null;
+        this.clientKey = null;
+        this.client = null;
+    }
+
+    async init() {
+        this.walletContract = await createWallet(this.walletKey, this.quorum, this.pool, this.gettingQuorum, this.gettingPool);
+
+        if (!(await this.walletContract.check()))
+            throw new Error("Failed check wallet contract: " + JSON.stringify(this.walletContract.errors));
+
+        return this.walletContract.getProcessedCostU();
+    }
+
+    async register(clientKey, payment) {
+        this.clientKey = clientKey;
+        this.client = await new UBotClient(this.clientKey, TOPOLOGY_ROOT + TOPOLOGY_FILE).start();
+
+        if (this.walletContract == null)
+            throw new Error("Wallet isn`t created");
+
+        let parcel = new Parcel(await this.walletContract.getPackedTransaction(), await payment.getPackedTransaction());
+
+        let ir = await this.client.registerParcelWithState(parcel, 10000);
+        if (ir.state !== ItemState.APPROVED)
+            throw new Error("Failed registration of wallet contract. Item result: " + JSON.stringify(ir));
+    }
+
+    async put(token, tokenOwnerKeys, payment) {
+
+    }
+
+    async transfer(amount, recipientAddress, payment) {
+
+    }
+
+    async getLastOperation(payment) {
+
+    }
+
+    async getOperations(payment) {
+
+    }
+
+    async getBalance(payment) {
+
+    }
+}
+
+module.exports = {UBotWallet, createWallet, prepareToken};

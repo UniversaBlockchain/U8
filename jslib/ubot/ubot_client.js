@@ -567,7 +567,7 @@ class UBotClient {
      *
      * @param {HashId} itemId - To get state by itemId.
      * @async
-     * @return known {ItemState} if exist or ItemState.UNDEFINED.
+     * @return known {ItemResult} if exist or ItemResult.UNDEFINED.
      */
     async getState(itemId) {
         let result = await new Promise(async (resolve, reject) =>
@@ -676,8 +676,8 @@ class UBotClient {
      *
      * @param {Uint8Array} packedParcel - Binary parcel.
      * @param {number} millisToWait - Maximum time to wait for final {@link ItemState}.
-     * @return {Promise<ItemState>} either final result of registration or last known status of registration.
-     * Getting {@link ItemState#UNDEFINED} means either.
+     * @return {Promise<ItemResult>} either final result of registration or last known status of registration.
+     * Getting {@link ItemResult#UNDEFINED} means either.
      * payment wasn't processed yet or something is wrong with it (invalid or insufficient U).
      * @throws UBotClientException
      */

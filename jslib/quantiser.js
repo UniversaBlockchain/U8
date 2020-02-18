@@ -38,6 +38,10 @@ class Quantiser {
         this.quantaLimit_ = limit;
     }
 
+    getQuantaSum() {
+        return this.quantaSum_;
+    }
+
     addWorkCost(cost) {
         this.quantaSum_ += cost;
         if (this.quantaLimit_ >= 0)

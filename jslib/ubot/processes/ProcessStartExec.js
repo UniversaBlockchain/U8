@@ -638,7 +638,9 @@ class ProcessStartExec extends ProcessBase {
         try {
             let contract = await Contract.fromPackedTransaction(packedTransaction);
             await contract.check();
-            this.pr.quantiser.addWorkCostFrom(contract.quantiser);
+
+            let cost = Math.ceil(contract.quantiser.getQuantaSum() / this.pr.poolSize);
+            this.pr.quantiser.addWorkCost(cost);
 
             return await this.pr.session.registerContract(packedTransaction, this.pr.requestContract);
 
