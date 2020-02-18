@@ -203,3 +203,79 @@ TEST_CASE("http_secure_endpoints") {
     httpServer.join();
     printf("all done, stop server and client... ok\n");
 }
+
+TEST_CASE("http_secure_concurrency") {
+    crypto::PrivateKey nodePrivateKey(base64_decodeToBytes("JgAcAQABvID6D5ZdM9EKrZSztm/R/RcywM4K8Z4VBtX+NZp2eLCWtfAgGcBCQLtNz4scH7dPBerkkxckW6+9CLlnu/tgOxvzS6Z1Ec51++fVP9gaWbBQe9/dSg7xVPg5p9ibhfTB+iRXyevCkNj0hrlLyXl1BkPjN9+lZfXJsp9OnGIJ/AaAb7yA99E65gvZnbb3/oA3rG0pM45af6ppZKe2HeiAK+fcXm5KTQzfTce45f/mJ0jsDmFf1HFosS4waXSAz0ZfcssjPeoF3PuXfJLtM8czJ55+Nz6NMCbzrSk6zkKssGBieYFOb4eG2AdtfjTrpcSSHBgJpsbcmRx4bZNfBAZPqT+Sd20="));
+    crypto::PublicKey nodePublicKey(nodePrivateKey);
+    HttpServer httpServer("0.0.0.0", 8080, 4);
+    httpServer.initSecureProtocol(nodePrivateKey);
+    auto secureProcessor = [](UBinder& params){
+        std::string command = params.getString("command");
+        if (command == "hello") {
+            return UBinder::of("result", UBinder::of("status", "OK", "message", "welcome to the Universa"));
+        } else if (command == "sping") {
+            return UBinder::of("result", UBinder::of("sping", "spong"));
+        } else if (command == "test_error") {
+            throw std::invalid_argument("sample error");
+        } else {
+            if (command == "unsRate") {
+                return UBinder::of("result", UBinder::of("U", 777));
+            }else
+                throw std::invalid_argument("unknown command: " + command);
+        }
+    };
+    httpServer.addSecureCallback([&secureProcessor](
+            const byte_vector& paramsBin,
+            std::shared_ptr<HttpServerSession> session,
+            std::function<void(const byte_vector& ansBin)>&& sendAnswer){
+        runAsync([paramsBin,&secureProcessor,sendAnswer{std::move(sendAnswer)}](){
+            byte_vector paramsCopy(paramsBin);
+            UObject paramsUnpackedObj = BossSerializer::deserialize(UBytes(std::move(paramsCopy)));
+            UBinder params = UBinder::asInstance(paramsUnpackedObj);
+            UBinder reqAns = secureProcessor(params);
+            sendAnswer(BossSerializer::serialize(reqAns).get());
+        });
+    });
+    httpServer.start();
+
+    HttpClient httpClient("http://localhost:8080", 5);
+    httpClient.start(crypto::PrivateKey(2048), nodePublicKey);
+    int N = 2000;
+    N = 200000;
+    int THREADS = 20;
+
+    atomic<int> reqCounter = 0;
+    atomic<int> ansCounter = 0;
+    atomic<int> curCounter = 0;
+    atomic<long> t0 = getCurrentTimeMillis();
+    mutex mtxPrint;
+    ThreadPool pool(THREADS);
+    for (int i = 0; i < N; ++i) {
+        ++reqCounter;
+        pool.execute([&httpClient,&ansCounter,&reqCounter,&mtxPrint,&t0,&curCounter](){
+            httpClient.command("unsRate", UBinder(), [&mtxPrint,&ansCounter,&reqCounter,&t0,&curCounter](UBinder&& resp, bool isError){
+                if (!isError && (resp.getInt("U") == 777))
+                    ++ansCounter;
+                else
+                    REQUIRE(false);
+                std::lock_guard lock(mtxPrint);
+                long now = getCurrentTimeMillis();
+                long dt = now - t0;
+                if (dt >= 1000) {
+                    t0 = now;
+                    double rate = double(ansCounter - curCounter) * 1000.0 / double(dt);
+                    curCounter = (int)ansCounter;
+                    cout << "reqCounter = " << reqCounter << ", ansCounter = " << ansCounter << ", rate = " << rate << endl;
+                }
+            });
+        });
+        if (reqCounter >= ansCounter + 1000)
+            std::this_thread::sleep_for(10ms);
+    }
+
+    while (ansCounter < reqCounter)
+        std::this_thread::sleep_for(10ms);
+
+    httpServer.stop();
+    httpServer.join();
+}
