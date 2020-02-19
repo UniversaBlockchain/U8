@@ -7,7 +7,11 @@ import * as io from "io";
 const ex = require("exceptions");
 const roles = require('roles');
 const Constraint = require('constraint').Constraint;
+const UBotClient = require('ubot/ubot_client').UBotClient;
+const ItemState = require("itemstate").ItemState;
+const UBotPoolState = require("ubot/ubot_pool_state").UBotPoolState;
 const Parcel = require("parcel").Parcel;
+const cs = require("contractsservice");
 
 const EXECUTABLE_CONTRACTS_PATH = "../jslib/ubot/executable_contracts/";
 const TOPOLOGY_ROOT = "../jslib/ubot/topology/";
@@ -116,6 +120,7 @@ class UBotWallet {
     async init() {
         this.walletContract = await createWallet(this.walletKey, this.quorum, this.pool, this.gettingQuorum, this.gettingPool);
 
+        this.walletContract.getPackedTransaction();
         if (!(await this.walletContract.check()))
             throw new Error("Failed check wallet contract: " + JSON.stringify(this.walletContract.errors));
 
@@ -129,31 +134,107 @@ class UBotWallet {
         if (this.walletContract == null)
             throw new Error("Wallet isn`t created");
 
-        let parcel = new Parcel(await this.walletContract.getPackedTransaction(), await payment.getPackedTransaction());
+        await payment.getPackedTransaction();
+        let parcel = new Parcel(this.walletContract.transactionPack, payment.transactionPack);
 
-        let ir = await this.client.registerParcelWithState(parcel, 10000);
+        let ir = await this.client.registerParcelWithState(await parcel.pack(), 10000);
         if (ir.state !== ItemState.APPROVED)
             throw new Error("Failed registration of wallet contract. Item result: " + JSON.stringify(ir));
     }
 
     async put(token, tokenOwnerKeys, payment) {
+        let packedToken = await prepareToken(this.walletContract, token, tokenOwnerKeys);
 
+        let requestContract = Contract.fromPrivateKey(this.clientKey);
+        requestContract.state.data.method_name = "putTokenIntoWallet";
+        requestContract.state.data.method_args = [packedToken];
+        requestContract.state.data.executable_contract_id = this.walletContract.id;
+
+        await cs.addConstraintToContract(requestContract, this.walletContract, "executable_contract_constraint",
+            Constraint.TYPE_EXISTING_STATE, ["this.state.data.executable_contract_id == ref.id"], true);
+
+        let state = await this.client.executeCloudMethod(requestContract, payment);
+        if (state.state !== UBotPoolState.FINISHED.val)
+            throw new Error("Failed execution cloud method putTokenIntoWallet. State: " + JSON.stringify(state));
+
+        return state.result;
     }
 
     async transfer(amount, recipientAddress, payment) {
+        let requestContract = Contract.fromPrivateKey(this.walletKey);
+        requestContract.state.data.method_name = "makeTranfer";
+        requestContract.state.data.method_args = [amount, recipientAddress];
+        requestContract.state.data.executable_contract_id = this.walletContract.id;
 
+        await cs.addConstraintToContract(requestContract, this.walletContract, "executable_contract_constraint",
+            Constraint.TYPE_EXISTING_STATE, [
+                "this.state.data.executable_contract_id == ref.id",
+                "this can_perform ref.state.roles.walletOwner"
+            ], true);
+
+        let state = await this.client.executeCloudMethod(requestContract, payment);
+        if (state.state !== UBotPoolState.FINISHED.val)
+            throw new Error("Failed execution cloud method makeTranfer. State: " + JSON.stringify(state));
+
+        return await Contract.fromSealedBinary(state.result);
     }
 
     async getLastOperation(payment) {
+        let requestContract = Contract.fromPrivateKey(this.walletKey);
+        requestContract.state.data.method_name = "getLastOperation";
+        requestContract.state.data.executable_contract_id = this.walletContract.id;
 
+        await cs.addConstraintToContract(requestContract, this.walletContract, "executable_contract_constraint",
+            Constraint.TYPE_EXISTING_STATE, [
+                "this.state.data.executable_contract_id == ref.id",
+                "this can_perform ref.state.roles.walletOwner"
+            ], true);
+
+        let state = await this.client.executeCloudMethod(requestContract, payment);
+        if (state.state !== UBotPoolState.FINISHED.val)
+            throw new Error("Failed execution cloud method getLastOperation. State: " + JSON.stringify(state));
+
+        return state.result;
     }
 
     async getOperations(payment) {
+        let requestContract = Contract.fromPrivateKey(this.walletKey);
+        requestContract.state.data.method_name = "getOperations";
+        requestContract.state.data.executable_contract_id = this.walletContract.id;
 
+        await cs.addConstraintToContract(requestContract, this.walletContract, "executable_contract_constraint",
+            Constraint.TYPE_EXISTING_STATE, [
+                "this.state.data.executable_contract_id == ref.id",
+                "this can_perform ref.state.roles.walletOwner"
+            ], true);
+
+        let state = await this.client.executeCloudMethod(requestContract, payment);
+        if (state.state !== UBotPoolState.FINISHED.val)
+            throw new Error("Failed execution cloud method getOperations. State: " + JSON.stringify(state));
+
+        return state.result;
     }
 
     async getBalance(payment) {
+        let requestContract = Contract.fromPrivateKey(this.walletKey);
+        requestContract.state.data.method_name = "getBalance";
+        requestContract.state.data.executable_contract_id = this.walletContract.id;
 
+        await cs.addConstraintToContract(requestContract, this.walletContract, "executable_contract_constraint",
+            Constraint.TYPE_EXISTING_STATE, [
+                "this.state.data.executable_contract_id == ref.id",
+                "this can_perform ref.state.roles.walletOwner"
+            ], true);
+
+        let state = await this.client.executeCloudMethod(requestContract, payment);
+        if (state.state !== UBotPoolState.FINISHED.val)
+            throw new Error("Failed execution cloud method getBalance. State: " + JSON.stringify(state));
+
+        return state.result;
+    }
+
+    async close() {
+        await this.client.shutdown();
     }
 }
 

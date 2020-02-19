@@ -697,7 +697,7 @@ class UBotClient {
             if (millisToWait > 0) {
                 let end = Date.now() + millisToWait;
                 try {
-                    let parcel = Parcel.unpack(packedParcel);
+                    let parcel = await Parcel.unpack(packedParcel);
                     let pState = await this.getParcelProcessingState(parcel.hashId);
                     let interval = 1000;
                     while ((millisToWait === 0 || Date.now() < end) && pState.isProcessing) {

@@ -6,6 +6,7 @@ import * as tk from "unit_tests/test_keys";
 import {expect, assert, unit} from 'test'
 
 const wallet = require("ubot/ubot_wallet");
+const UBotWallet = require("ubot/ubot_wallet").UBotWallet;
 const UBotMain = require("ubot/ubot_main").UBotMain;
 const UBotClient = require('ubot/ubot_client').UBotClient;
 const UBotPoolState = require("ubot/ubot_pool_state").UBotPoolState;
@@ -748,6 +749,146 @@ unit.test("ubot_wallet_test: many operations", async () => {
 
     await netClient.shutdown();
     await ubotClient.shutdown();
+
+    if (LOCAL_UBOTS)
+        await shutdownUBots(ubotMains);
+});
+
+unit.test("ubot_wallet_test: UBotWallet many operations", async () => {
+    let ubotMains = [];
+    if (LOCAL_UBOTS)
+        ubotMains = await createUBots(ubotsCount);
+
+    let netClient = await new UBotClient(tk.getTestKey(), TOPOLOGY_ROOT + TOPOLOGY_FILE).start();
+
+    // test token
+    let tokenIssuerKey = tk.TestKeys.getKey();
+    let tokenContract = await cs.createTokenContract([tokenIssuerKey], [tokenIssuerKey.publicKey], new BigDecimal("1000"));
+
+    console.log("Register base token...");
+    let ir = await netClient.register(await tokenContract.getPackedTransaction(), 10000);
+    assert(ir.state === ItemState.APPROVED);
+
+    let splitKeys = [];
+    let splits = [];
+
+    for (let i = 0; i < 3; i++) {
+        tokenContract = await cs.createSplit(tokenContract, 200 + i * 100, "amount", [tokenIssuerKey], true);
+        let splitToken = Array.from(tokenContract.newItems)[0];
+        let splitKey = tk.TestKeys.getKey();
+
+        splitToken.registerRole(new roles.SimpleRole("owner", splitKey, splitToken));
+        splitToken.registerRole(new roles.RoleLink("creator", "owner", splitToken));
+
+        await splitToken.seal();
+        await splitToken.addSignatureToSeal(splitKey);
+        await tokenContract.seal();
+
+        splitKeys.push(splitKey);
+        splits.push(splitToken);
+
+        console.log("Register split " + (i + 1) + "...");
+        ir = await netClient.register(await tokenContract.getPackedTransaction(), 10000);
+        assert(ir.state === ItemState.APPROVED);
+    }
+
+    // create wallet
+    let wallet = new UBotWallet(tk.TestKeys.getKey(), 10, 12);
+    let cost = await wallet.init();
+    await wallet.register(clientKey, await createPayment(cost));
+
+    // put tokens into wallet
+    let expectedBalance = 0;
+    for (let i = 0; i < 3; i++) {
+        let balance = await wallet.put(splits[i], [splitKeys[i]], await createPayment(10));
+
+        let amount = 200 + i * 100;
+        expectedBalance += amount;
+        assert(balance === expectedBalance.toString());
+
+        // check last operation
+        let lastOperation = await wallet.getLastOperation(await createPayment(2));
+        assert(lastOperation.operation === "put" && lastOperation.amount === amount.toString());
+    }
+
+    // make transfers
+    for (let i = 0; i < 5; i++) {
+        let recipientKey = tk.TestKeys.getKey();
+        let recipientAddress = new crypto.KeyAddress(recipientKey.publicKey, 0, true).toString();
+        let amount = 10 * (i + 10);
+        expectedBalance -= amount;
+
+        let transfer = await wallet.transfer(amount, recipientAddress, await createPayment(10));
+        assert(transfer.state.data.amount === amount.toString());
+
+        // check balance
+        let balance = await wallet.getBalance(await createPayment(2));
+        assert(balance === expectedBalance.toString());
+
+        // check last operation
+        let lastOperation = await wallet.getLastOperation(await createPayment(2));
+        assert(lastOperation.operation === "transfer" && lastOperation.amount === amount.toString() &&
+            lastOperation.recipient === recipientAddress);
+
+        // check transfer token
+        transfer = await transfer.createRevision([recipientKey]);
+        transfer.registerRole(new roles.SimpleRole("owner", userPrivKey, transfer));
+        await transfer.seal(true);
+
+        console.log("Change owner of transfer token...");
+        ir = await netClient.register(await transfer.getPackedTransaction(), 10000);
+        assert(ir.state === ItemState.APPROVED);
+    }
+
+    // put token into wallet
+    let balance = await wallet.put(tokenContract, [tokenIssuerKey], await createPayment(10));
+    let amount = Number(tokenContract.state.data.amount);
+    expectedBalance += amount;
+    assert(balance === expectedBalance.toString());
+
+    // make transfer
+    let recipientKey = tk.TestKeys.getKey();
+    let recipientAddress = new crypto.KeyAddress(recipientKey.publicKey, 0, true).toString();
+
+    let transfer = await wallet.transfer(333, recipientAddress, await createPayment(10));
+    assert(transfer.state.data.amount === "333");
+    expectedBalance -= 333;
+
+    // check balance
+    balance = await wallet.getBalance(await createPayment(2));
+    assert(balance === expectedBalance.toString());
+
+    // check last operation
+    let lastOperation = await wallet.getLastOperation(await createPayment(2));
+    assert(lastOperation.operation === "transfer" && lastOperation.amount === "333" &&
+        lastOperation.recipient === recipientAddress);
+
+    // check transfer token
+    transfer = await transfer.createRevision([recipientKey]);
+    transfer.registerRole(new roles.SimpleRole("owner", userPrivKey, transfer));
+    await transfer.seal(true);
+
+    console.log("Change owner of transfer token...");
+    ir = await netClient.register(await transfer.getPackedTransaction(), 10000);
+    assert(ir.state === ItemState.APPROVED);
+
+    // check all operations
+    let operations = await wallet.getOperations(await createPayment(2));
+
+    assert(operations.length === 10 &&
+        operations[0].operation === "put" && operations[0].amount === "200" &&
+        operations[1].operation === "put" && operations[1].amount === "300" &&
+        operations[2].operation === "put" && operations[2].amount === "400" &&
+        operations[3].operation === "transfer" && operations[3].amount === "100" &&
+        operations[4].operation === "transfer" && operations[4].amount === "110" &&
+        operations[5].operation === "transfer" && operations[5].amount === "120" &&
+        operations[6].operation === "transfer" && operations[6].amount === "130" &&
+        operations[7].operation === "transfer" && operations[7].amount === "140" &&
+        operations[8].operation === "put" && operations[8].amount === "100" &&
+        operations[9].operation === "transfer" && operations[9].amount === "333");
+
+    await netClient.shutdown();
+    await wallet.close();
 
     if (LOCAL_UBOTS)
         await shutdownUBots(ubotMains);
