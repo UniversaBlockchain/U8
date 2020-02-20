@@ -26,6 +26,16 @@ in mg_socket_if_connect_tcp
 //// for IPv6 support, do manually fix in mongoose.c
 //////////////////////////////////////////////////////////
 
+//////////////////////////////////////////////////////////
+//// for DNS support, do manually fix in mongoose.c
+/*
+
+added parameter 'port' to  function mg_resolve_async_opt
+
+*/
+//// for DNS support, do manually fix in mongoose.c
+//////////////////////////////////////////////////////////
+
 struct mg_connection *mg_connect_http_base(
     struct mg_mgr *mgr, MG_CB(mg_event_handler_t ev_handler, void *user_data),
     struct mg_connect_opts opts, const char *scheme1, const char *scheme2,

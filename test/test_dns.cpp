@@ -3,6 +3,7 @@
  */
 
 #include "../network/DnsServer.h"
+#include "../tools/tools.h"
 #include "catch2.h"
 #include <iostream>
 
@@ -14,14 +15,46 @@ TEST_CASE("dns_hello", "[!hide]") {
     DnsServer dnsServer;
 
     dnsServer.setQuestionsCallback([](shared_ptr<DnsServerQuestion> question){
-        cout << "dns question: name = " << question->name << endl;
+        //cout << "dns question: name = " << question->name << endl;
         question->sendAnswerFromMgThread();
     });
 
     dnsServer.start("0.0.0.0", 5353);
 
-    this_thread::sleep_for(9000s);
+    DnsResolver dnsResolver;
+    dnsResolver.setNameServer("127.0.0.1", 5353);
+    dnsResolver.start();
+
+    atomic<int> reqCounter = 0;
+    atomic<int> ansCounter = 0;
+    atomic<long> t0 = getCurrentTimeMillis();
+    int N = 2000;
+    //N = 2000000;
+    for (int i = 0; i < N; ++i) {
+        ++reqCounter;
+        dnsResolver.resolve("ya.ru", MG_DNS_A_RECORD, [&ansCounter,&t0](const std::string &addr) {
+            //cout << "resolved: " << addr << endl;
+            ++ansCounter;
+            long now = getCurrentTimeMillis();
+            long dt = now - t0;
+            if (dt >= 1000) {
+                t0 = now;
+                cout << "ansCounter = " << ansCounter << endl;
+            }
+        });
+        if (reqCounter > ansCounter + 1000)
+            this_thread::sleep_for(10ms);
+    }
+    while (ansCounter < N) {
+        this_thread::sleep_for(10ms);
+    }
+    cout << "total ansCounter = " << ansCounter << endl;
+
+    //this_thread::sleep_for(9000s);
 
     dnsServer.stop();
     dnsServer.join();
+
+    dnsResolver.stop();
+    dnsResolver.join();
 }
