@@ -104,18 +104,37 @@ void DnsResolver::resolve(const std::string& name, int query, std::function<void
         memset(&opts, 0, sizeof(opts));
         opts.nameserver = &nameServerHost_[0];
         mg_resolve_async_opt(mgr_.get(), name.data(), query, [](mg_dns_message *msg, void *user_data, enum mg_resolve_err){
+            if (msg == nullptr)
+                return;
             DnsResolverRequestHolder* ph = (DnsResolverRequestHolder*) user_data;
-            mg_dns_resource_record* rr = mg_dns_next_record(msg, MG_DNS_A_RECORD, nullptr);
-            if (rr != nullptr) {
-                in_addr got_addr;
-                mg_dns_parse_record_data(msg, rr, &got_addr, sizeof(got_addr));
-                char resolvedIp[INET_ADDRSTRLEN];
-                memset(resolvedIp, 0, sizeof(resolvedIp));
-                inet_ntop(AF_INET, &got_addr, resolvedIp, sizeof(resolvedIp));
-                ph->callback(std::string(resolvedIp));
-            } else {
-                printf("resolved: N/A\n");
+            for (int i = 0; i < msg->num_answers; ++i) {
+                mg_dns_resource_record* rr = &msg->answers[i];
+                switch (rr->rtype) {
+                    case DnsRRType::DNS_A: {
+                        in_addr got_addr;
+                        mg_dns_parse_record_data(msg, rr, &got_addr, sizeof(got_addr));
+                        char resolvedIp[INET_ADDRSTRLEN];
+                        memset(resolvedIp, 0, sizeof(resolvedIp));
+                        inet_ntop(AF_INET, &got_addr, resolvedIp, sizeof(resolvedIp));
+                        ph->callback(std::string(resolvedIp));
+                        break;
+                    }
+                    case DnsRRType::DNS_AAAA: {
+                        in6_addr got_addr;
+                        mg_dns_parse_record_data(msg, rr, &got_addr, sizeof(got_addr));
+                        char resolvedIp[INET6_ADDRSTRLEN];
+                        memset(resolvedIp, 0, sizeof(resolvedIp));
+                        inet_ntop(AF_INET6, &got_addr, resolvedIp, sizeof(resolvedIp));
+                        ph->callback(std::string(resolvedIp));
+                        break;
+                    }
+                    default: {
+                        printf("resolved: N/A\n");
+                        break;
+                    }
+                }
             }
+
             DnsResolver* pSelf = getResolver_g(ph->resolverId);
             if (pSelf != nullptr)
                 pSelf->removeReq(ph->reqId);
@@ -184,9 +203,8 @@ void DnsServerQuestion::sendAnswerFromMgThread() {
     if (server == nullptr)
         return;
 
-//    auto ans = inet_addr("127.0.0.1");
-//    mg_dns_reply_record(&reply_, &rr_, NULL, rr_.rtype, 10, &ans, sizeof(ans));
-    mg_dns_reply_record(&reply_, &rr_, NULL, rr_.rtype, 10, &ansBinary_[0], ansBinary_.size());
+    if (ansBinary_.size() > 0)
+        mg_dns_reply_record(&reply_, &rr_, NULL, rr_.rtype, 10, &ansBinary_[0], ansBinary_.size());
     mg_dns_send_reply(con_, &reply_);
 
     mbuf_free(&replyBuf_);

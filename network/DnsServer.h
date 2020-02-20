@@ -17,6 +17,12 @@
 
 namespace network {
 
+enum DnsRRType {
+    DNS_A = MG_DNS_A_RECORD,
+    DNS_AAAA = MG_DNS_AAAA_RECORD,
+    DNS_CNAME = MG_DNS_CNAME_RECORD
+};
+
 struct DnsResolverRequestHolder {
     long resolverId;
     long reqId;

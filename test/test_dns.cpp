@@ -16,7 +16,10 @@ TEST_CASE("dns_hello", "[!hide]") {
 
     dnsServer.setQuestionsCallback([](shared_ptr<DnsServerQuestion> question){
         //cout << "dns question: name = " << question->name << endl;
-        question->setAnswerIpV4("127.0.0.1");
+        if (question->rtype == DnsRRType::DNS_A)
+            question->setAnswerIpV4("127.0.0.1");
+        else if (question->rtype == DnsRRType::DNS_AAAA)
+            question->setAnswerIpV6("2a02:6b8::2:242");
         question->sendAnswerFromMgThread();
     });
 
@@ -33,7 +36,7 @@ TEST_CASE("dns_hello", "[!hide]") {
     //N = 2000000;
     for (int i = 0; i < N; ++i) {
         ++reqCounter;
-        dnsResolver.resolve("ya.ru", MG_DNS_A_RECORD, [&ansCounter,&t0](const std::string &addr) {
+        dnsResolver.resolve("ya.ru", DnsRRType::DNS_A, [&ansCounter,&t0](const std::string &addr) {
             //cout << "resolved: " << addr << endl;
             ++ansCounter;
             long now = getCurrentTimeMillis();
