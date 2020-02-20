@@ -241,7 +241,7 @@ TEST_CASE("http_secure_concurrency") {
     HttpClient httpClient("http://localhost:8080", 5);
     httpClient.start(crypto::PrivateKey(2048), nodePublicKey);
     int N = 2000;
-    N = 200000;
+    //N = 200000;
     int THREADS = 20;
 
     atomic<int> reqCounter = 0;

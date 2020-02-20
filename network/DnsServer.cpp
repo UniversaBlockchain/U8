@@ -150,13 +150,43 @@ DnsServerQuestion::DnsServerQuestion(long srvId, long qId, std::shared_ptr<mg_mg
     reply_ = mg_dns_create_reply(&replyBuf_, msg);
 }
 
+bool DnsServerQuestion::setAnswerIpV4(const std::string& ip) {
+    in_addr ans;
+    if (inet_pton(AF_INET, ip.data(), &ans) > 0) {
+        ansBinary_.resize(sizeof(ans));
+        memcpy(&ansBinary_[0], &ans, sizeof(ans));
+        return true;
+    }
+    return false;
+}
+
+bool DnsServerQuestion::setAnswerIpV6(const std::string& ip6) {
+    in6_addr ans;
+    if (inet_pton(AF_INET6, ip6.data(), &ans) > 0) {
+        ansBinary_.resize(sizeof(ans));
+        memcpy(&ansBinary_[0], &ans, sizeof(ans));
+        return true;
+    }
+    return false;
+}
+
+bool DnsServerQuestion::setAnswerBin(const byte_vector& bin) {
+    if (bin.size() <= 512) {
+        ansBinary_.resize(bin.size());
+        memcpy(&ansBinary_[0], &bin[0], bin.size());
+        return true;
+    }
+    return false;
+}
+
 void DnsServerQuestion::sendAnswerFromMgThread() {
     DnsServer* server = getServer_g(serverId_);
     if (server == nullptr)
         return;
 
-    auto ans = inet_addr("127.0.0.1");
-    mg_dns_reply_record(&reply_, &rr_, NULL, rr_.rtype, 10, &ans, sizeof(ans));
+//    auto ans = inet_addr("127.0.0.1");
+//    mg_dns_reply_record(&reply_, &rr_, NULL, rr_.rtype, 10, &ans, sizeof(ans));
+    mg_dns_reply_record(&reply_, &rr_, NULL, rr_.rtype, 10, &ansBinary_[0], ansBinary_.size());
     mg_dns_send_reply(con_, &reply_);
 
     mbuf_free(&replyBuf_);

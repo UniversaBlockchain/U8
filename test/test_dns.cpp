@@ -16,6 +16,7 @@ TEST_CASE("dns_hello", "[!hide]") {
 
     dnsServer.setQuestionsCallback([](shared_ptr<DnsServerQuestion> question){
         //cout << "dns question: name = " << question->name << endl;
+        question->setAnswerIpV4("127.0.0.1");
         question->sendAnswerFromMgThread();
     });
 

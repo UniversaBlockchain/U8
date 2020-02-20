@@ -13,6 +13,7 @@
 #include <mutex>
 #include <list>
 #include "mongoose/mongooseExt.h"
+#include "../tools/tools.h"
 
 namespace network {
 
@@ -65,6 +66,9 @@ public:
     int rclass;
     int ttl;
 
+    bool setAnswerIpV4(const std::string& ip);
+    bool setAnswerIpV6(const std::string& ip6);
+    bool setAnswerBin(const byte_vector& bin);
     void sendAnswerFromMgThread();
 
 private:
@@ -75,6 +79,7 @@ private:
     mg_dns_reply reply_;
     mbuf replyBuf_;
     mg_dns_resource_record rr_;
+    byte_vector ansBinary_;
 };
 
 class DnsServer {
