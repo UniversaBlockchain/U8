@@ -75,7 +75,8 @@ public:
     bool setAnswerIpV4(const std::string& ip);
     bool setAnswerIpV6(const std::string& ip6);
     bool setAnswerBin(const byte_vector& bin);
-    void sendAnswerFromMgThread();
+    void sendAnswer(int ttl);
+    void sendAnswerFromMgThread(int ttl);
 
 private:
     long serverId_;
@@ -105,13 +106,16 @@ private:
 
 private:
     long ownId_;
+    long nextConId_ = 1;
     std::shared_ptr<mg_mgr> mgr_;
     mg_connection* listener_;
     std::atomic<bool> exitFlag_ = false;
+    std::mutex broadcastMutex_;
     std::shared_ptr<std::thread> serverThread_;
     std::atomic<long> nextQuestionId_ = 1;
     std::unordered_map<long, std::shared_ptr<DnsServerQuestion>> questionsHolder_;
     std::function<void(std::shared_ptr<DnsServerQuestion>)> onQuestionCallback_;
+    std::thread::id mgThreadId_;
 };
 
 }

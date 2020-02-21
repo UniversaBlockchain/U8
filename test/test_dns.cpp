@@ -4,6 +4,7 @@
 
 #include "../network/DnsServer.h"
 #include "../tools/tools.h"
+#include "../tools/ThreadPool.h"
 #include "catch2.h"
 #include <iostream>
 
@@ -14,13 +15,17 @@ TEST_CASE("dns_hello", "[!hide]") {
     //iptables -t nat -A PREROUTING -i enp0s3 -p udp --dport 53 -j REDIRECT --to-port 5353
     DnsServer dnsServer;
 
-    dnsServer.setQuestionsCallback([](shared_ptr<DnsServerQuestion> question){
-        //cout << "dns question: name = " << question->name << endl;
-        if (question->rtype == DnsRRType::DNS_A)
-            question->setAnswerIpV4("127.0.0.1");
-        else if (question->rtype == DnsRRType::DNS_AAAA)
-            question->setAnswerIpV6("2a02:6b8::2:242");
-        question->sendAnswerFromMgThread();
+    ThreadPool pool(8);
+    dnsServer.setQuestionsCallback([&pool](shared_ptr<DnsServerQuestion> question){
+        pool.execute([question](){
+            //cout << "dns question: name = " << question->name << endl;
+            this_thread::sleep_for(20ms);
+            if (question->rtype == DnsRRType::DNS_A)
+                question->setAnswerIpV4("127.0.0.1");
+            else if (question->rtype == DnsRRType::DNS_AAAA)
+                question->setAnswerIpV6("2a02:6b8::2:242");
+            question->sendAnswer(300);
+        });
     });
 
     dnsServer.start("0.0.0.0", 5353);
@@ -32,8 +37,8 @@ TEST_CASE("dns_hello", "[!hide]") {
     atomic<int> reqCounter = 0;
     atomic<int> ansCounter = 0;
     atomic<long> t0 = getCurrentTimeMillis();
-    int N = 2000;
-    //N = 2000000;
+    int N = 1;
+    //N = 200000;
     for (int i = 0; i < N; ++i) {
         ++reqCounter;
         dnsResolver.resolve("ya.ru", DnsRRType::DNS_A, [&ansCounter,&t0](const std::string &addr) {
@@ -46,6 +51,7 @@ TEST_CASE("dns_hello", "[!hide]") {
                 cout << "ansCounter = " << ansCounter << endl;
             }
         });
+        //this_thread::sleep_for(500ms);
         if (reqCounter > ansCounter + 1000)
             this_thread::sleep_for(10ms);
     }

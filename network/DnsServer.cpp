@@ -198,14 +198,57 @@ bool DnsServerQuestion::setAnswerBin(const byte_vector& bin) {
     return false;
 }
 
-void DnsServerQuestion::sendAnswerFromMgThread() {
+struct DnsServerAnswerHolder {
+    long serverId;
+    long qId;
+    mg_connection *nc;
+    int ttl;
+};
+
+void DnsServerQuestion::sendAnswer(int ttl) {
+    DnsServer* server = getServer_g(serverId_);
+    if (server == nullptr)
+        return;
+    if (std::this_thread::get_id() == server->mgThreadId_) {
+        sendAnswerFromMgThread(ttl);
+        return;
+    }
+    DnsServerAnswerHolder ah;
+    ah.serverId = serverId_;
+    ah.qId = questionId_;
+    ah.nc = con_;
+    ah.ttl = ttl;
+    std::lock_guard lock(server->broadcastMutex_);
+    mg_broadcast(server->mgr_.get(), [](mg_connection *nc, int ev, void *ev_data) {
+        DnsServerAnswerHolder* holder = (DnsServerAnswerHolder*)ev_data;
+        long serverId = holder->serverId;
+        DnsServer* server = getServer_g(serverId);
+        if (server == nullptr)
+            return;
+        if ((long)nc->user_data == (long)holder->nc->user_data) {
+            // here we are in mongoose loop thread, so we dont worry about synchronization
+            if (server->questionsHolder_.find(holder->qId) != server->questionsHolder_.end()) {
+                auto pReq = server->questionsHolder_[holder->qId];
+                pReq->sendAnswerFromMgThread(holder->ttl);
+            }
+        }
+    }, (void*)(&ah), sizeof(ah));
+}
+
+void DnsServerQuestion::sendAnswerFromMgThread(int ttl) {
     DnsServer* server = getServer_g(serverId_);
     if (server == nullptr)
         return;
 
     if (ansBinary_.size() > 0)
-        mg_dns_reply_record(&reply_, &rr_, NULL, rr_.rtype, 10, &ansBinary_[0], ansBinary_.size());
+        mg_dns_reply_record(&reply_, &rr_, NULL, rr_.rtype, ttl, &ansBinary_[0], ansBinary_.size());
     mg_dns_send_reply(con_, &reply_);
+
+    con_->flags |= MG_F_SEND_AND_CLOSE;
+
+//    char str[INET_ADDRSTRLEN];
+//    inet_ntop(AF_INET, &(con_->sa.sin.sin_addr), str, INET_ADDRSTRLEN);
+//    printf("reply, sock=%s : %u\n", str, con_->sa.sin.sin_port);
 
     mbuf_free(&replyBuf_);
     server->questionsHolder_.erase(questionId_);
@@ -225,7 +268,26 @@ void DnsServer::start(const std::string& host, int port) {
         if (server == nullptr)
             return;
         switch (ev) {
+            case MG_EV_ACCEPT: {
+//                char str[INET_ADDRSTRLEN];
+//                inet_ntop(AF_INET, &(nc->sa.sin.sin_addr), str, INET_ADDRSTRLEN);
+//                printf("MG_EV_ACCEPT, sock=%s : %u\n", str, nc->sa.sin.sin_port);
+                nc->user_data = (void*) server->nextConId_++;
+                if (server->nextConId_ >= 2000000000)
+                    server->nextConId_ = 1;
+                break;
+            }
+
+            case MG_EV_CLOSE: {
+//                char str[INET_ADDRSTRLEN];
+//                inet_ntop(AF_INET, &(nc->sa.sin.sin_addr), str, INET_ADDRSTRLEN);
+//                printf("MG_EV_CLOSE, sock=%s : %u\n", str, nc->sa.sin.sin_port);
+                nc->user_data = nullptr;
+                break;
+            }
+
             case MG_DNS_MESSAGE: {
+//                printf("MG_DNS_MESSAGE\n");
                 mg_dns_message *msg = (mg_dns_message*) ev_data;
                 for (int i = 0; i < msg->num_questions; ++i) {
                     mg_dns_resource_record* rr = &msg->questions[i];
@@ -246,7 +308,7 @@ void DnsServer::start(const std::string& host, int port) {
                     server->onQuestionCallback_(dnsQuestion);
                 }
 
-                //nc->flags |= MG_F_SEND_AND_CLOSE;
+                nc->flags &= ~MG_F_SEND_AND_CLOSE;
                 break;
             }
         }
@@ -258,6 +320,7 @@ void DnsServer::start(const std::string& host, int port) {
     mg_set_protocol_dns(listener_);
 
     serverThread_ = std::make_shared<std::thread>([this]() {
+        mgThreadId_ = std::this_thread::get_id();
         while (!exitFlag_)
             mg_mgr_poll(mgr_.get(), 100);
         mgr_.reset();
