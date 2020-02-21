@@ -86,6 +86,8 @@ private:
     byte_vector ansBinary_;
     mg_dns_message_mem msgMem_;
     mg_dns_resource_record_mem rrMem_;
+    mbuf replyBuf_;
+    mg_dns_reply reply_;
 };
 
 class DnsServer {

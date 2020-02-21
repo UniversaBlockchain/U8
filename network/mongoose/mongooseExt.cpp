@@ -118,17 +118,20 @@ struct mg_connection *mg_connect_http_opt1(
 
 mg_dns_resource_record_mem::mg_dns_resource_record_mem(mg_dns_resource_record *msg) {
     name = std::make_shared<byte_vector>();
-    name->resize(msg->name.len+1);
+    name->resize(msg->name.len);
     memset(&(*name)[0], 0, name->size());
     memcpy(&(*name)[0], msg->name.p, msg->name.len);
 
     rdata = std::make_shared<byte_vector>();
-    rdata->resize(msg->rdata.len+1);
+    rdata->resize(msg->rdata.len);
     memset(&(*rdata)[0], 0, rdata->size());
     memcpy(&(*rdata)[0], msg->rdata.p, msg->rdata.len);
 
     mdrr.name = mg_mk_str_n((char*)&(*name)[0], name->size());
-    mdrr.rdata = mg_mk_str_n((char*)&(*rdata)[0], rdata->size());
+    if (msg->rdata.p == nullptr)
+        mdrr.rdata = msg->rdata;
+    else
+        mdrr.rdata = mg_mk_str_n((char*)&(*rdata)[0], rdata->size());
     mdrr.kind = msg->kind;
     mdrr.ttl = msg->ttl;
     mdrr.rclass = msg->rclass;
@@ -137,7 +140,7 @@ mg_dns_resource_record_mem::mg_dns_resource_record_mem(mg_dns_resource_record *m
 
 mg_dns_message_mem::mg_dns_message_mem(mg_dns_message *m) {
     pkt = std::make_shared<byte_vector>();
-    pkt->resize(m->pkt.len+1);
+    pkt->resize(m->pkt.len);
     memset(&(*pkt)[0], 0, pkt->size());
     memcpy(&(*pkt)[0], m->pkt.p, m->pkt.len);
     for (int i = 0; i < MG_MAX_DNS_QUESTIONS; ++i) {

@@ -165,6 +165,8 @@ DnsServerQuestion::DnsServerQuestion(long srvId, long qId, std::shared_ptr<mg_mg
     questionId_ = qId;
     mgr_ = mgr;
     con_ = con;
+    mbuf_init(&replyBuf_, 512);
+    reply_ = mg_dns_create_reply(&replyBuf_, msg);
 }
 
 bool DnsServerQuestion::setAnswerIpV4(const std::string& ip) {
@@ -238,13 +240,9 @@ void DnsServerQuestion::sendAnswerFromMgThread(int ans_ttl) {
     if (server == nullptr)
         return;
 
-    mbuf replyBuf_;
-    mbuf_init(&replyBuf_, 512);
-    mg_dns_reply reply = mg_dns_create_reply(&replyBuf_, &msgMem_.msg);
-
     if (ansBinary_.size() > 0)
-        mg_dns_reply_record(&reply, &rrMem_.mdrr, NULL, rrMem_.mdrr.rtype, ans_ttl, &ansBinary_[0], ansBinary_.size());
-    mg_dns_send_reply(con_, &reply);
+        mg_dns_reply_record(&reply_, &rrMem_.mdrr, nullptr, rrMem_.mdrr.rtype, ans_ttl, &ansBinary_[0], ansBinary_.size());
+    mg_dns_send_reply(con_, &reply_);
 
     con_->flags |= MG_F_SEND_AND_CLOSE;
 
