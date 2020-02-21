@@ -322,7 +322,7 @@ class Constraint extends bs.BiSerializable {
         return val;
     }
 
-    evaluateOperand(operand, typeOfOperand, conversion, refContract, contracts, iteration) {
+    async evaluateOperand(operand, typeOfOperand, conversion, refContract, contracts, iteration) {
         let operandContract = null;
         let firstPointPos;
 
@@ -348,7 +348,7 @@ class Constraint extends bs.BiSerializable {
                     throw new ex.IllegalArgumentError("Not found reference: " + operand.substring(0, firstPointPos));
 
                 for (let checkedContract of contracts)
-                    if (ref.isMatchingWithIteration(checkedContract, contracts, iteration + 1))
+                    if (await ref.isMatchingWithIteration(checkedContract, contracts, iteration + 1))
                         operandContract = checkedContract;
 
                 if (operandContract == null)
@@ -369,7 +369,7 @@ class Constraint extends bs.BiSerializable {
         }
     }
 
-    evaluateExpression(expression, refContract, contracts, iteration) {
+    async evaluateExpression(expression, refContract, contracts, iteration) {
         let left;
         let right;
         let result;
@@ -377,15 +377,15 @@ class Constraint extends bs.BiSerializable {
         try {
             // evaluate operands
             if (expression.typeOfLeftOperand === compareOperandType.EXPRESSION)
-                left = this.evaluateExpression(expression.leftOperand, refContract, contracts, iteration);
+                left = await this.evaluateExpression(expression.leftOperand, refContract, contracts, iteration);
             else
-                left = this.evaluateOperand(expression.leftOperand, expression.typeOfLeftOperand,
+                left = await this.evaluateOperand(expression.leftOperand, expression.typeOfLeftOperand,
                     expression.leftConversion, refContract, contracts, iteration);
 
             if (expression.typeOfRightOperand === compareOperandType.EXPRESSION)
-                right = this.evaluateExpression(expression.rightOperand, refContract, contracts, iteration);
+                right = await this.evaluateExpression(expression.rightOperand, refContract, contracts, iteration);
             else
-                right = this.evaluateOperand(expression.rightOperand, expression.typeOfRightOperand,
+                right = await this.evaluateOperand(expression.rightOperand, expression.typeOfRightOperand,
                     expression.rightConversion, refContract, contracts, iteration);
 
             if (left == null || right == null)
@@ -483,7 +483,7 @@ class Constraint extends bs.BiSerializable {
      * @return {boolean} True if match or false.
      * @throws If error compare.
      */
-    compareOperands(refContract,
+    async compareOperands(refContract,
                     leftOperand,
                     rightOperand,
                     typeOfLeftOperand,
@@ -531,7 +531,7 @@ class Constraint extends bs.BiSerializable {
                     if (ref == null)
                         throw new ex.IllegalArgumentError("Not found constraint: " + leftOperand.substring(0, firstPointPos));
                     for (let checkedContract of contracts)
-                        if (ref.isMatchingWithIteration(checkedContract, contracts, iteration + 1))
+                        if (await ref.isMatchingWithIteration(checkedContract, contracts, iteration + 1))
                             leftOperandContract = checkedContract;
 
                     if (leftOperandContract == null)
@@ -560,7 +560,7 @@ class Constraint extends bs.BiSerializable {
                             throw new ex.IllegalArgumentError("Not found constraint: " + leftOperand);
 
                         for (let checkedContract of contracts)
-                            if (ref.isMatchingWithIteration(checkedContract, contracts, iteration + 1))
+                            if (await ref.isMatchingWithIteration(checkedContract, contracts, iteration + 1))
                                 leftOperandContract = checkedContract;
 
                         if (leftOperandContract == null)
@@ -592,7 +592,7 @@ class Constraint extends bs.BiSerializable {
                         throw new ex.IllegalArgumentError("Not found constraint: " + rightOperand.substring(0, firstPointPos));
 
                     for (let checkedContract of contracts)
-                        if (ref.isMatchingWithIteration(checkedContract, contracts, iteration + 1))
+                        if (await ref.isMatchingWithIteration(checkedContract, contracts, iteration + 1))
                             rightOperandContract = checkedContract;
 
                     if (rightOperandContract == null)
@@ -616,7 +616,7 @@ class Constraint extends bs.BiSerializable {
 
             if (leftExpression != null) {
                 try {
-                    left = this.evaluateExpression(leftExpression, refContract, contracts, iteration);
+                    left = await this.evaluateExpression(leftExpression, refContract, contracts, iteration);
                 } catch (e) {
                     if (e instanceof ex.IllegalArgumentError && ~e.toString().indexOf("Not found referenced contract for constraint"))
                         return false;
@@ -631,7 +631,7 @@ class Constraint extends bs.BiSerializable {
 
             if (rightExpression != null) {
                 try {
-                    right = this.evaluateExpression(rightExpression, refContract, contracts, iteration);
+                    right = await this.evaluateExpression(rightExpression, refContract, contracts, iteration);
                 } catch (e) {
                     if (e instanceof ex.IllegalArgumentError && ~e.toString().indexOf("Not found referenced contract for constraint"))
                         return false;
@@ -895,7 +895,7 @@ class Constraint extends bs.BiSerializable {
                         if (right == null || !(right instanceof Constraint))
                             throw new ex.IllegalArgumentError("Expected constraint in condition in right operand: " + rightOperand);
 
-                        ret = left.isInherited(right, refContract, contracts, iteration + 1);
+                        ret = await left.isInherited(right, refContract, contracts, iteration + 1);
 
                         break;
                     case INHERIT:
@@ -904,7 +904,7 @@ class Constraint extends bs.BiSerializable {
                     case INHERITS:
                         if (right == null || !(right instanceof Constraint))
                             throw new ex.IllegalArgumentError("Expected constraint in condition in right operand: " + rightOperand);
-                        ret = right.isMatchingWithIteration(refContract, contracts, iteration + 1);
+                        ret = await right.isMatchingWithIteration(refContract, contracts, iteration + 1);
 
                         break;
                     case CAN_PLAY:
@@ -920,9 +920,11 @@ class Constraint extends bs.BiSerializable {
                         else
                             keys = leftOperandContract.sealedByKeys.keys();
 
-                        //TODO
-                        ret = right.requiredAllConstraints.size === 0 && right.requiredAnyConstraints.size === 0 &&
-                            right.isAllowedForKeys(keys);
+                        let roleToBePlayed = right instanceof roles.RoleLink ? right.resolve(false) : right;
+
+                        ret = roleToBePlayed.requiredAllConstraints.size === 0 &&
+                              roleToBePlayed.requiredAnyConstraints.size === 0 &&
+                              roleToBePlayed.isAllowedForKeys(keys);
 
                         break;
                     case CAN_PERFORM:
@@ -932,15 +934,48 @@ class Constraint extends bs.BiSerializable {
                         if (!(right instanceof roles.Role))
                             throw new ex.IllegalArgumentError("Expected role in condition in right operand: " + rightOperand);
 
+                        let savedContext = null;
+
                         let keys1;
                         if (leftOperand === "this")
-                            keys1 = leftOperandContract.effectiveKeys.keys();
-                        else
-                            keys1 = leftOperandContract.sealedByKeys.keys();
+                            keys1 = leftOperandContract.constraintContextKeys;
+                        else {
+                            //otherwise context should be updated with effective keys of currently checked contract
+                            //those are:
 
-                        //TODO
-                        ret = right.requiredAllConstraints.size === 0 && right.requiredAnyConstraints.size === 0 &&
-                            right.isAllowedForKeys(keys1);
+                            if (leftOperandContract.transactionPack.referencedItems.has(leftOperandContract.id)) {
+                                //contract signatures for referenced items of transaction
+
+                                //these signatures aren't verified by default so we do it here if necessary
+                                //no signatures verified means one of two situations happening:
+                                // - signatures weren't verified yet -> verify!
+                                // - signatures were verified but just non existent ->
+                                //      -> verify! (it will cost no additional quanta because there is nothing to quantize
+                                if (leftOperandContract.sealedByKeys.size === 0)
+                                    await leftOperandContract.verifySealedKeys(true);
+
+                                keys1 = leftOperandContract.sealedByKeys.keys();
+                            } else {
+                                //contract effective keys for subitems of transaction
+
+                                keys1 = leftOperandContract.effectiveKeys.keys();
+                            }
+
+                            //so we save existing context
+                            savedContext = leftOperandContract.constraintContextKeys;
+
+                            if (this.baseContract == null)
+                                throw new ex.IllegalArgumentError("Need base contract for setting context keys. But this contract not initialized.");
+
+                            //and set new one for checking the role
+                            this.baseContract.transactionPack.setConstraintContextKeys(keys1);
+                        }
+
+                        ret = right.isAllowedForKeysQuantized(keys1);
+
+                        //after check is performed we bring back saved context
+                        if (savedContext != null)
+                            this.baseContract.transactionPack.setConstraintContextKeys(savedContext);
 
                         break;
                     case IN:
@@ -1485,12 +1520,12 @@ class Constraint extends bs.BiSerializable {
      * @param {number} iteration - Check inside constraints iteration number.
      * @return {boolean} true if match or false.
      */
-    checkCondition(condition, ref, contracts, iteration) {
+    async checkCondition(condition, ref, contracts, iteration) {
 
         if (typeof condition === "string")
             condition = this.parseCondition(condition);
 
-        return this.compareOperands(ref, condition.leftOperand, condition.rightOperand,
+        return await this.compareOperands(ref, condition.leftOperand, condition.rightOperand,
             condition.typeOfLeftOperand, condition.typeOfRightOperand,
             (condition.leftConversion === CONVERSION_BIG_DECIMAL) ||
             (condition.rightConversion === CONVERSION_BIG_DECIMAL),
@@ -1506,7 +1541,7 @@ class Constraint extends bs.BiSerializable {
      * @param {number} iteration - Check inside constraints iteration number.
      * @return {boolean} true if match or false.
      */
-    checkConditions(conditions, ref, contracts, iteration) {
+    async checkConditions(conditions, ref, contracts, iteration) {
 
         let result;
         if (conditions == null || Object.entries(conditions).length === 0)
@@ -1521,9 +1556,9 @@ class Constraint extends bs.BiSerializable {
             result = true;
             for (let item of condList)
                 if (typeof item === "string")
-                    result = result && this.checkCondition(item, ref, contracts, iteration);
+                    result = result && await this.checkCondition(item, ref, contracts, iteration);
                 else
-                    result = result && this.checkConditions(item, ref, contracts, iteration);
+                    result = result && await this.checkConditions(item, ref, contracts, iteration);
 
         } else if (conditions.hasOwnProperty(Constraint.conditionsModeType.any_of)) {
             let condList = conditions[Constraint.conditionsModeType.any_of];
@@ -1534,12 +1569,12 @@ class Constraint extends bs.BiSerializable {
             result = false;
             for (let item of condList)
                 if (typeof item === "string")
-                    result = result || this.checkCondition(item, ref, contracts, iteration);
+                    result = result || await this.checkCondition(item, ref, contracts, iteration);
                 else
-                    result = result || this.checkConditions(item, ref, contracts, iteration);
+                    result = result || await this.checkConditions(item, ref, contracts, iteration);
 
         } else if (conditions.hasOwnProperty("operator"))
-            result = this.checkCondition(conditions, ref, contracts, iteration);
+            result = await this.checkCondition(conditions, ref, contracts, iteration);
         else
             throw new ex.IllegalArgumentError("Expected all_of or any_of");
 
@@ -1572,8 +1607,8 @@ class Constraint extends bs.BiSerializable {
      * @param {Set<Contract>} contracts - Contract list to check for matching.
      * @return {boolean} true if match or false.
      */
-    isMatchingWith(contract, contracts) {
-        return this.isMatchingWithIteration(contract, contracts, 0);
+    async isMatchingWith(contract, contracts) {
+        return await this.isMatchingWithIteration(contract, contracts, 0);
     }
 
     /**
@@ -1586,7 +1621,7 @@ class Constraint extends bs.BiSerializable {
      * @return {boolean} true if match or false.
      * @throws Recursive checking constraint have more 16 iterations.
      */
-    isMatchingWithIteration(contract, contracts, iteration) {
+    async isMatchingWithIteration(contract, contracts, iteration) {
         //todo: add this checking for matching with given item
 
         if (iteration > 16)
@@ -1624,7 +1659,7 @@ class Constraint extends bs.BiSerializable {
 
         //check conditions
         if (result)
-            result = this.checkConditions(this.conditions, contract, contracts, iteration);
+            result = await this.checkConditions(this.conditions, contract, contracts, iteration);
 
         return result;
     }
@@ -1638,8 +1673,8 @@ class Constraint extends bs.BiSerializable {
      * @param {number} iteration - Iteration check inside constraints iteration number.
      * @return {boolean} true if inherited or false.
      */
-    isInherited(constr, constrContract, contracts, iteration) {
-        return this.isInheritedConditions(this.conditions, constr, constrContract, contracts, iteration);
+    async isInherited(constr, constrContract, contracts, iteration) {
+        return await this.isInheritedConditions(this.conditions, constr, constrContract, contracts, iteration);
     }
 
     /**
@@ -1652,7 +1687,7 @@ class Constraint extends bs.BiSerializable {
      * @param {number} iteration - Iteration check inside constraints iteration number.
      * @return {boolean} true if inherited or false.
      */
-    isInheritedConditions(conditions, constr, constrContract, contracts, iteration) {
+    async isInheritedConditions(conditions, constr, constrContract, contracts, iteration) {
 
         if (conditions == null || Object.entries(conditions).length === 0)
             return false;
@@ -1669,16 +1704,16 @@ class Constraint extends bs.BiSerializable {
                 throw new ex.IllegalArgumentError("Expected any_of conditions");
 
         } else if (conditions.hasOwnProperty("operator"))
-            return this.isInheritedParsed(conditions, constr, constrContract, contracts, iteration);
+            return await this.isInheritedParsed(conditions, constr, constrContract, contracts, iteration);
         else
             throw new ex.IllegalArgumentError("Expected all_of or any_of");
 
         if (condList != null)
             for (let item of condList)
                 if (typeof item === "string") {
-                    if (this.isInheritedCondition(item, constr, constrContract, contracts, iteration))
+                    if (await this.isInheritedCondition(item, constr, constrContract, contracts, iteration))
                         return true;
-                } else if (this.isInheritedConditions(item, constr, constrContract, contracts, iteration))
+                } else if (await this.isInheritedConditions(item, constr, constrContract, contracts, iteration))
                     return true;
 
         return false;
@@ -1694,10 +1729,10 @@ class Constraint extends bs.BiSerializable {
      * @param {number} iteration - Iteration check inside constraints iteration number.
      * @return {boolean} true if inherited or false.
      */
-    isInheritedParsed(condition, constr, constrContract, contracts, iteration) {
+    async isInheritedParsed(condition, constr, constrContract, contracts, iteration) {
 
         if (((condition.operator === INHERITS) || (condition.operator === INHERIT)) && (condition.rightOperand != null))
-            return this.isInheritedOperand(condition.rightOperand, constr, constrContract, contracts, iteration);
+            return await this.isInheritedOperand(condition.rightOperand, constr, constrContract, contracts, iteration);
 
         return false;
     }
@@ -1713,7 +1748,7 @@ class Constraint extends bs.BiSerializable {
      * @return {boolean} true if inherited or false.
      * @throws Invalid format of condition
      */
-    isInheritedCondition(condition, constr, constrContract, contracts, iteration) {
+    async isInheritedCondition(condition, constr, constrContract, contracts, iteration) {
 
         for (let i = INHERITS; i <= INHERIT; i++) {
             let operPos = condition.indexOf(operators[i]);
@@ -1725,7 +1760,7 @@ class Constraint extends bs.BiSerializable {
 
                 let rightOperand = subStrR.replace(/\s/g, "");
 
-                return this.isInheritedOperand(rightOperand, constr, constrContract, contracts, iteration);
+                return await this.isInheritedOperand(rightOperand, constr, constrContract, contracts, iteration);
             }
         }
 
@@ -1743,7 +1778,7 @@ class Constraint extends bs.BiSerializable {
      * @return {boolean} true if inherited or false.
      * @throws Invalid format of condition.
      */
-    isInheritedOperand(rightOperand, constr, constrContract, contracts, iteration) {
+    async isInheritedOperand(rightOperand, constr, constrContract, contracts, iteration) {
 
         let rightOperandContract = null;
         let right = null;
@@ -1767,7 +1802,7 @@ class Constraint extends bs.BiSerializable {
                 throw new ex.IllegalArgumentError("Not found constraint: " + rightOperand.substring(0, firstPointPos));
 
             for (let checkedContract of contracts)
-                if (constr.isMatchingWithIteration(checkedContract, contracts, iteration + 1))
+                if (await constr.isMatchingWithIteration(checkedContract, contracts, iteration + 1))
                     rightOperandContract = checkedContract;
 
             if (rightOperandContract == null)

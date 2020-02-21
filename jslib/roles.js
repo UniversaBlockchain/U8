@@ -103,6 +103,11 @@ class Role extends bs.BiSerializable {
         return this.isAllowedForConstraints(this.contract == null ? new Set() : this.contract.validRoleConstraints)
     }
 
+    isAllowedForKeysQuantized(keys) {
+        // TODO: add quantisation
+        return this.isAllowedForKeys(keys);
+    }
+
     isAllowedForConstraints(constraints) {
 
         for(let constr of this.requiredAllConstraints) {
@@ -327,12 +332,16 @@ class RoleLink extends Role {
 
     /**
      * Follows the links until real (not link) role is found. It is then returned.
+     * @param {boolean} ignoreConstrs - Ignore constraints for resolving process. True by default.
      * @returns {Role} first non-link role in chain if found. Otherwise {null}
      */
-    resolve() {
+    resolve(ignoreConstrs = true) {
         let maxDepth = 40;
         for (let r = this; maxDepth > 0; maxDepth--) {
-            if (r instanceof RoleLink) {
+            if (r instanceof RoleLink && (ignoreConstrs || (
+                r.requiredAllConstraints.size === 0 &&
+                r.requiredAnyConstraints.size === 0))) {
+
                 r = r.getRole();
                 if (r == null)
                     return null;

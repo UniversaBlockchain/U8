@@ -126,6 +126,7 @@ require('unit_tests/listrole_test');
 require('unit_tests/linkrole_test');
 require('unit_tests/changenumberpermission_test');
 require('unit_tests/changeownerpermission_test');
+require('unit_tests/changerolepermission_test');
 require('unit_tests/modifydatapermission_test');
 require('unit_tests/revokepermission_test');
 require('unit_tests/splitjoinpermission_test');

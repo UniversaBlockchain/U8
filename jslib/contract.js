@@ -577,6 +577,7 @@ class Contract extends bs.BiSerializable {
         this.transactionPack = null;
         this.validRoleConstraints = new Set();
         this.quantiser = new Quantiser();
+        this.constraintContextKeys = new Set();
     }
 
     async setOwnBinary(result) {
@@ -1104,15 +1105,13 @@ class Contract extends bs.BiSerializable {
         this.quantiser.addWorkCost(QuantiserProcesses.PRICE_REVOKE_VERSION*this.revokingItems.size);
         this.quantiser.addWorkCost(QuantiserProcesses.PRICE_CHECK_CONSTRAINT*this.constraints.size);
 
-        this.checkConstraints(contractsTree);
+        await this.checkConstraints(contractsTree);
 
-        this.revokingItems.forEach(ri => {
+        for (let ri of this.revokingItems) {
             ri.errors = [];
-            ri.checkConstraints(contractsTree,true);
-            ri.errors.forEach(e => {
-                this.errors.push(e);
-            });
-        });
+            await ri.checkConstraints(contractsTree,true);
+            ri.errors.forEach(e => this.errors.push(e));
+        }
 
         try {
             this.basicCheck(prefix);
@@ -1676,7 +1675,7 @@ class Contract extends bs.BiSerializable {
         this.revokingItems.delete(removed);
     }
 
-    checkConstraints(contractsTree, roleConstraintsOnly) {
+    async checkConstraints(contractsTree, roleConstraintsOnly) {
 
         if (typeof roleConstraintsOnly === "undefined")
             roleConstraintsOnly = false;
@@ -1730,7 +1729,7 @@ class Contract extends bs.BiSerializable {
                         c.transactional_id.equals(neighbour.transactional.id)) ||
                         (c.contract_id != null && c.contract_id.equals(neighbour.id))) && this.checkOneConstraint(c, neighbour)) ||
                         (c.conditions.length > 0))    // new format of constraint with conditions, transactional_id - optional
-                        if (c.isMatchingWith(neighbour, neighbours)) {
+                        if (await c.isMatchingWith(neighbour, neighbours)) {
                             c.addMatchingItem(neighbour);
                             c_check = true;
                             break;
@@ -1738,7 +1737,7 @@ class Contract extends bs.BiSerializable {
 
             } else if ((c.type === Constraint.TYPE_EXISTING_DEFINITION) || (c.type === Constraint.TYPE_EXISTING_STATE)) {
                 for (let neighbour of neighbours)
-                    if (c.isMatchingWith(neighbour, neighbours))
+                    if (await c.isMatchingWith(neighbour, neighbours))
                         c.addMatchingItem(neighbour);
 
                 c_check = c.isValid();
@@ -2391,6 +2390,12 @@ class Contract extends bs.BiSerializable {
         }
 
         return true;
+    }
+
+    setConstraintContextKeys(effectiveKeys) {
+        this.validRoleConstraints.clear();
+        this.constraints.values().forEach(r => r.matchingItems.clear());
+        this.constraintContextKeys = effectiveKeys;
     }
 }
 

@@ -98,6 +98,8 @@ class Permission extends bs.BiSerializable {
                 return new RevokePermission(role);
             case "change_owner":
                 return new ChangeOwnerPermission(role);
+            case "change_role":
+                return new ChangeRolePermission(role, params);
             case "modify_data":
                 return new ModifyDataPermission(role, params);
             case "decrement_permission":
@@ -221,6 +223,49 @@ class ChangeOwnerPermission extends Permission {
         if(!stateChanges.hasOwnProperty("owner"))
             return;
         delete stateChanges.owner;
+    }
+}
+
+
+///////////////////////////
+//ChangeRolePermission
+///////////////////////////
+
+class ChangeRolePermission extends Permission {
+    /**
+     * Permission allows to change a custom role.
+     *
+     * @apiNote This permission does not apply to predefined contract roles: issuer, owner, creator.
+     * Issuer is immutable. Change of an owner can be allowed by {@link ChangeOwnerPermission}. Creator
+     * can be changed without any permission.
+     *
+     * @param {Role} role allows to permission.
+     * @param {object} params with name of a role that is allowed to be changed.
+     * @constructor
+     */
+    constructor(role, params) {
+        super("change_role", role, params);
+        if (params)
+            this.initFromParams();
+    }
+
+    initFromParams() {
+        this.roleName = this.params.role_name;
+    }
+
+    async serialize(serializer) {
+        return await Object.getPrototypeOf(ChangeRolePermission.prototype).serialize.call(this, serializer);
+    }
+
+    async deserialize(data, deserializer) {
+        await Object.getPrototypeOf(ChangeRolePermission.prototype).deserialize.call(this, data, deserializer);
+        this.initFromParams();
+    }
+
+    checkChanges(contract, changed, stateChanges, revokingItems, keys) {
+        if (!stateChanges.hasOwnProperty("roles"))
+            return;
+        delete stateChanges.roles.changes[this.roleName];
     }
 }
 
@@ -557,10 +602,10 @@ dbm.DefaultBiMapper.registerAdapter(new bs.BiAdapter("ChangeOwnerPermission",Cha
 dbm.DefaultBiMapper.registerAdapter(new bs.BiAdapter("ModifyDataPermission",ModifyDataPermission));
 dbm.DefaultBiMapper.registerAdapter(new bs.BiAdapter("RevokePermission",RevokePermission));
 dbm.DefaultBiMapper.registerAdapter(new bs.BiAdapter("SplitJoinPermission",SplitJoinPermission));
-
+dbm.DefaultBiMapper.registerAdapter(new bs.BiAdapter("ChangeRolePermission",ChangeRolePermission));
 
 
 ///////////////////////////
 //EXPORTS
 ///////////////////////////
-module.exports = {Permission,ChangeNumberPermission,ChangeOwnerPermission,ModifyDataPermission,RevokePermission,SplitJoinPermission};
+module.exports = {Permission,ChangeNumberPermission,ChangeOwnerPermission,ModifyDataPermission,RevokePermission,SplitJoinPermission,ChangeRolePermission};

@@ -54,6 +54,12 @@ class TransactionPack {
             this.referencedItems.set(ref.id, ref);
     }
 
+    setConstraintContextKeys(constraintEffectiveKeys) {
+        this.contract.setConstraintContextKeys(constraintEffectiveKeys);
+        this.subItems.values().forEach(si => si.setConstraintContextKeys(constraintEffectiveKeys));
+        this.referencedItems.values().forEach(ri => ri.setConstraintContextKeys(constraintEffectiveKeys));
+    }
+
     /**
      * Add tag to an item of transaction pack by its id
      *
