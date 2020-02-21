@@ -129,7 +129,7 @@ void DnsResolver::resolve(const std::string& name, int query, std::function<void
                         break;
                     }
                     default: {
-                        printf("resolved: N/A\n");
+                        printf("resolved: N/A, rtype=%i\n", rr->rtype);
                         break;
                     }
                 }
@@ -159,14 +159,12 @@ void DnsResolver::removeReq(long reqId) {
     reqs_.erase(reqId);
 }
 
-DnsServerQuestion::DnsServerQuestion(long srvId, long qId, std::shared_ptr<mg_mgr> mgr, mg_connection* con, mg_dns_message *msg, mg_dns_resource_record rr) {
+DnsServerQuestion::DnsServerQuestion(long srvId, long qId, std::shared_ptr<mg_mgr> mgr, mg_connection* con, mg_dns_message *msg, mg_dns_resource_record* rr)
+: msgMem_(msg), rrMem_(rr) {
     serverId_ = srvId;
     questionId_ = qId;
     mgr_ = mgr;
     con_ = con;
-    rr_ = rr;
-    mbuf_init(&replyBuf_, 512);
-    reply_ = mg_dns_create_reply(&replyBuf_, msg);
 }
 
 bool DnsServerQuestion::setAnswerIpV4(const std::string& ip) {
@@ -235,20 +233,24 @@ void DnsServerQuestion::sendAnswer(int ttl) {
     }, (void*)(&ah), sizeof(ah));
 }
 
-void DnsServerQuestion::sendAnswerFromMgThread(int ttl) {
+void DnsServerQuestion::sendAnswerFromMgThread(int ans_ttl) {
     DnsServer* server = getServer_g(serverId_);
     if (server == nullptr)
         return;
 
+    mbuf replyBuf_;
+    mbuf_init(&replyBuf_, 512);
+    mg_dns_reply reply = mg_dns_create_reply(&replyBuf_, &msgMem_.msg);
+
     if (ansBinary_.size() > 0)
-        mg_dns_reply_record(&reply_, &rr_, NULL, rr_.rtype, ttl, &ansBinary_[0], ansBinary_.size());
-    mg_dns_send_reply(con_, &reply_);
+        mg_dns_reply_record(&reply, &rrMem_.mdrr, NULL, rrMem_.mdrr.rtype, ans_ttl, &ansBinary_[0], ansBinary_.size());
+    mg_dns_send_reply(con_, &reply);
 
     con_->flags |= MG_F_SEND_AND_CLOSE;
 
 //    char str[INET_ADDRSTRLEN];
 //    inet_ntop(AF_INET, &(con_->sa.sin.sin_addr), str, INET_ADDRSTRLEN);
-//    printf("reply, sock=%s : %u\n", str, con_->sa.sin.sin_port);
+//    printf("sendAnswerFromMgThread, sock=%s : %u\n", str, con_->sa.sin.sin_port);
 
     mbuf_free(&replyBuf_);
     server->questionsHolder_.erase(questionId_);
@@ -293,7 +295,7 @@ void DnsServer::start(const std::string& host, int port) {
                     mg_dns_resource_record* rr = &msg->questions[i];
 
                     long qId = server->genQuestionId();
-                    auto dnsQuestion = std::make_shared<DnsServerQuestion>(server->ownId_, qId, server->mgr_, nc, msg, *rr);
+                    auto dnsQuestion = std::make_shared<DnsServerQuestion>(server->ownId_, qId, server->mgr_, nc, msg, rr);
                     server->questionsHolder_[qId] = dnsQuestion;
 
                     char rname[256];

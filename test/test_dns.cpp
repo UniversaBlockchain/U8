@@ -18,7 +18,7 @@ TEST_CASE("dns_hello", "[!hide]") {
     ThreadPool pool(8);
     dnsServer.setQuestionsCallback([&pool](shared_ptr<DnsServerQuestion> question){
         pool.execute([question](){
-            //cout << "dns question: name = " << question->name << endl;
+            cout << "dns question: name = " << question->name << endl;
             this_thread::sleep_for(20ms);
             if (question->rtype == DnsRRType::DNS_A)
                 question->setAnswerIpV4("127.0.0.1");
@@ -42,7 +42,7 @@ TEST_CASE("dns_hello", "[!hide]") {
     for (int i = 0; i < N; ++i) {
         ++reqCounter;
         dnsResolver.resolve("ya.ru", DnsRRType::DNS_A, [&ansCounter,&t0](const std::string &addr) {
-            //cout << "resolved: " << addr << endl;
+            cout << "resolved: " << addr << endl;
             ++ansCounter;
             long now = getCurrentTimeMillis();
             long dt = now - t0;

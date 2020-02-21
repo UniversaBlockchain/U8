@@ -64,7 +64,7 @@ private:
 
 class DnsServerQuestion {
 public:
-    DnsServerQuestion(long srvId, long qId, std::shared_ptr<mg_mgr> mgr, mg_connection* con, mg_dns_message *msg, mg_dns_resource_record rr);
+    DnsServerQuestion(long srvId, long qId, std::shared_ptr<mg_mgr> mgr, mg_connection* con, mg_dns_message* msg, mg_dns_resource_record* rr);
 
 public:
     std::string name;
@@ -76,17 +76,16 @@ public:
     bool setAnswerIpV6(const std::string& ip6);
     bool setAnswerBin(const byte_vector& bin);
     void sendAnswer(int ttl);
-    void sendAnswerFromMgThread(int ttl);
+    void sendAnswerFromMgThread(int ans_ttl);
 
 private:
     long serverId_;
     long questionId_;
     std::shared_ptr<mg_mgr> mgr_;
     mg_connection* con_;
-    mg_dns_reply reply_;
-    mbuf replyBuf_;
-    mg_dns_resource_record rr_;
     byte_vector ansBinary_;
+    mg_dns_message_mem msgMem_;
+    mg_dns_resource_record_mem rrMem_;
 };
 
 class DnsServer {

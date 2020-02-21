@@ -115,3 +115,46 @@ struct mg_connection *mg_connect_http_opt1(
     mbuf_free(&auth);
     return nc;
 }
+
+mg_dns_resource_record_mem::mg_dns_resource_record_mem(mg_dns_resource_record *msg) {
+    name = std::make_shared<byte_vector>();
+    name->resize(msg->name.len+1);
+    memset(&(*name)[0], 0, name->size());
+    memcpy(&(*name)[0], msg->name.p, msg->name.len);
+
+    rdata = std::make_shared<byte_vector>();
+    rdata->resize(msg->rdata.len+1);
+    memset(&(*rdata)[0], 0, rdata->size());
+    memcpy(&(*rdata)[0], msg->rdata.p, msg->rdata.len);
+
+    mdrr.name = mg_mk_str_n((char*)&(*name)[0], name->size());
+    mdrr.rdata = mg_mk_str_n((char*)&(*rdata)[0], rdata->size());
+    mdrr.kind = msg->kind;
+    mdrr.ttl = msg->ttl;
+    mdrr.rclass = msg->rclass;
+    mdrr.rtype = msg->rtype;
+}
+
+mg_dns_message_mem::mg_dns_message_mem(mg_dns_message *m) {
+    pkt = std::make_shared<byte_vector>();
+    pkt->resize(m->pkt.len+1);
+    memset(&(*pkt)[0], 0, pkt->size());
+    memcpy(&(*pkt)[0], m->pkt.p, m->pkt.len);
+    for (int i = 0; i < MG_MAX_DNS_QUESTIONS; ++i) {
+        questions.emplace_back(mg_dns_resource_record_mem(&m->questions[i]));
+    }
+    for (int i = 0; i < MG_MAX_DNS_ANSWERS; ++i) {
+        answers.emplace_back(mg_dns_resource_record_mem(&m->answers[i]));
+    }
+    msg.flags = m->flags;
+    msg.num_answers = m->num_answers;
+    msg.num_questions = m->num_questions;
+    msg.transaction_id = m->transaction_id;
+    msg.pkt = mg_mk_str_n((char*)&(*pkt)[0], pkt->size());
+    for (int i = 0; i < MG_MAX_DNS_QUESTIONS; ++i) {
+        msg.questions[i] = questions[i].mdrr;
+    }
+    for (int i = 0; i < MG_MAX_DNS_ANSWERS; ++i) {
+        msg.answers[i] = answers[i].mdrr;
+    }
+}
