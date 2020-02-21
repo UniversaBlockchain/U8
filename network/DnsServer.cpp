@@ -203,6 +203,7 @@ struct DnsServerAnswerHolder {
     long qId;
     mg_connection *nc;
     int ttl;
+    bool done = false;
 };
 
 void DnsServerQuestion::sendAnswer(int ttl) {
@@ -221,6 +222,8 @@ void DnsServerQuestion::sendAnswer(int ttl) {
     std::lock_guard lock(server->broadcastMutex_);
     mg_broadcast(server->mgr_.get(), [](mg_connection *nc, int ev, void *ev_data) {
         DnsServerAnswerHolder* holder = (DnsServerAnswerHolder*)ev_data;
+        if (holder->done)
+            return;
         long serverId = holder->serverId;
         DnsServer* server = getServer_g(serverId);
         if (server == nullptr)
@@ -230,6 +233,7 @@ void DnsServerQuestion::sendAnswer(int ttl) {
             if (server->questionsHolder_.find(holder->qId) != server->questionsHolder_.end()) {
                 auto pReq = server->questionsHolder_[holder->qId];
                 pReq->sendAnswerFromMgThread(holder->ttl);
+                holder->done = true;
             }
         }
     }, (void*)(&ah), sizeof(ah));
