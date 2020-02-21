@@ -49,21 +49,4 @@ struct mg_connection *mg_connect_http_opt1(
     struct mg_connect_opts opts, const char *url, const char *extra_headers,
     const char *post_data, int post_data_len, const char *method);
 
-class mg_dns_resource_record_mem {
-public:
-    mg_dns_resource_record mdrr;
-    std::shared_ptr<byte_vector> name;
-    std::shared_ptr<byte_vector> rdata;
-    mg_dns_resource_record_mem(mg_dns_resource_record *msg);
-};
-
-class mg_dns_message_mem {
-public:
-    mg_dns_message msg;
-    std::shared_ptr<byte_vector> pkt;
-    std::vector<mg_dns_resource_record_mem> questions;
-    std::vector<mg_dns_resource_record_mem> answers;
-    mg_dns_message_mem(mg_dns_message *m);
-};
-
 #endif //U8_MONGOOSEEXT_H

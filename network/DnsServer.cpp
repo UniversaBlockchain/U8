@@ -159,14 +159,14 @@ void DnsResolver::removeReq(long reqId) {
     reqs_.erase(reqId);
 }
 
-DnsServerQuestion::DnsServerQuestion(long srvId, long qId, std::shared_ptr<mg_mgr> mgr, mg_connection* con, mg_dns_message *msg, mg_dns_resource_record* rr)
-: msgMem_(msg), rrMem_(rr) {
+DnsServerQuestion::DnsServerQuestion(long srvId, long qId, std::shared_ptr<mg_mgr> mgr, mg_connection* con, mg_dns_message *msg, int qIndx) {
     serverId_ = srvId;
     questionId_ = qId;
     mgr_ = mgr;
     con_ = con;
-    mbuf_init(&replyBuf_, 512);
-    reply_ = mg_dns_create_reply(&replyBuf_, msg);
+    msgBody_.resize(msg->pkt.len);
+    memcpy(&msgBody_[0], msg->pkt.p, msg->pkt.len);
+    questionIndex_ = qIndx;
 }
 
 bool DnsServerQuestion::setAnswerIpV4(const std::string& ip) {
@@ -240,17 +240,23 @@ void DnsServerQuestion::sendAnswerFromMgThread(int ans_ttl) {
     if (server == nullptr)
         return;
 
+    mg_dns_message msg;
+    // this body has been already successfully parsed, so we can to ignore error code here
+    mg_parse_dns((char*)&msgBody_[0], msgBody_.size(), &msg);
+
+    mg_dns_resource_record* rr = &msg.questions[questionIndex_];
+
+    mbuf replyBuf;
+    mbuf_init(&replyBuf, 512);
+    mg_dns_reply reply = mg_dns_create_reply(&replyBuf, &msg);
+
     if (ansBinary_.size() > 0)
-        mg_dns_reply_record(&reply_, &rrMem_.mdrr, nullptr, rrMem_.mdrr.rtype, ans_ttl, &ansBinary_[0], ansBinary_.size());
-    mg_dns_send_reply(con_, &reply_);
+        mg_dns_reply_record(&reply, rr, nullptr, rr->rtype, ans_ttl, &ansBinary_[0], ansBinary_.size());
+    mg_dns_send_reply(con_, &reply);
 
     con_->flags |= MG_F_SEND_AND_CLOSE;
 
-//    char str[INET_ADDRSTRLEN];
-//    inet_ntop(AF_INET, &(con_->sa.sin.sin_addr), str, INET_ADDRSTRLEN);
-//    printf("sendAnswerFromMgThread, sock=%s : %u\n", str, con_->sa.sin.sin_port);
-
-    mbuf_free(&replyBuf_);
+    mbuf_free(&replyBuf);
     server->questionsHolder_.erase(questionId_);
 }
 
@@ -269,9 +275,6 @@ void DnsServer::start(const std::string& host, int port) {
             return;
         switch (ev) {
             case MG_EV_ACCEPT: {
-//                char str[INET_ADDRSTRLEN];
-//                inet_ntop(AF_INET, &(nc->sa.sin.sin_addr), str, INET_ADDRSTRLEN);
-//                printf("MG_EV_ACCEPT, sock=%s : %u\n", str, nc->sa.sin.sin_port);
                 nc->user_data = (void*) server->nextConId_++;
                 if (server->nextConId_ >= 2000000000)
                     server->nextConId_ = 1;
@@ -279,21 +282,17 @@ void DnsServer::start(const std::string& host, int port) {
             }
 
             case MG_EV_CLOSE: {
-//                char str[INET_ADDRSTRLEN];
-//                inet_ntop(AF_INET, &(nc->sa.sin.sin_addr), str, INET_ADDRSTRLEN);
-//                printf("MG_EV_CLOSE, sock=%s : %u\n", str, nc->sa.sin.sin_port);
                 nc->user_data = nullptr;
                 break;
             }
 
             case MG_DNS_MESSAGE: {
-//                printf("MG_DNS_MESSAGE\n");
                 mg_dns_message *msg = (mg_dns_message*) ev_data;
                 for (int i = 0; i < msg->num_questions; ++i) {
                     mg_dns_resource_record* rr = &msg->questions[i];
 
                     long qId = server->genQuestionId();
-                    auto dnsQuestion = std::make_shared<DnsServerQuestion>(server->ownId_, qId, server->mgr_, nc, msg, rr);
+                    auto dnsQuestion = std::make_shared<DnsServerQuestion>(server->ownId_, qId, server->mgr_, nc, msg, i);
                     server->questionsHolder_[qId] = dnsQuestion;
 
                     char rname[256];
