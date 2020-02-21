@@ -596,7 +596,7 @@ unit.test("ubot_local_test: execute high memory cloud method", async () => {
     await cs.addConstraintToContract(requestContract, executableContract, "executable_contract_constraint",
         Constraint.TYPE_EXISTING_STATE, ["this.state.data.executable_contract_id == ref.id"], true);
 
-    let state = await ubotClient.executeCloudMethod(requestContract, await createPayment(2), true);
+    let state = await ubotClient.executeCloudMethod(requestContract, await createPayment(2));
 
     console.log("State: " + JSON.stringify(state));
 
@@ -954,12 +954,6 @@ unit.test("ubot_local_test: 2 cloud method", async () => {
     assert(session.pool.filter(
         ubot => ubotMains[ubot].ubot.processors.get(requestContract.id.base64).state === UBotPoolState.FINISHED).length >=
         executableContract.state.data.cloud_methods.getRandom.quorum.size);
-
-    //await sleep(5000);
-    // let sess = null;
-    // do {
-    //     sess = await ubotClient.getSession("ubotGetSession", {requestId: requestContract.id});
-    // } while (Object.keys(sess).length > 0);
 
     // SECOND METHOD (READ RANDOM)
     requestContract = Contract.fromPrivateKey(userPrivKey);

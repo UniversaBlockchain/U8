@@ -187,6 +187,31 @@ unit.test("ubot_main_test: secure random", async () => {
     await ubotClient.shutdown();
 });
 
+unit.test("ubot_main_test: error in cloud method", async () => {
+    let ubotClient = await new UBotClient(clientKey, TOPOLOGY_ROOT + TOPOLOGY_FILE).start();
+
+    let executableContract = await generateSimpleExecutableContract("error.js", "doError");
+
+    let requestContract = Contract.fromPrivateKey(userPrivKey);
+    requestContract.state.data.method_name = "doError";
+    requestContract.state.data.executable_contract_id = executableContract.id;
+    requestContract.newItems.add(executableContract);
+
+    await cs.addConstraintToContract(requestContract, executableContract, "executable_contract_constraint",
+        Constraint.TYPE_EXISTING_STATE, ["this.state.data.executable_contract_id == ref.id"], true);
+
+    let state = await ubotClient.executeCloudMethod(requestContract, await createPayment(5));
+
+    console.log("State: " + JSON.stringify(state));
+
+    assert(state.state === UBotPoolState.FAILED.val);
+
+    // checking error
+    assert(state.errors[0].message === "Error in cloud method doError: Simple test error message.");
+
+    await ubotClient.shutdown();
+});
+
 unit.test("ubot_main_test: execute looped cloud method", async () => {
     let ubotClient = await new UBotClient(clientKey, TOPOLOGY_ROOT + TOPOLOGY_FILE).start();
 
@@ -219,6 +244,46 @@ unit.test("ubot_main_test: execute looped cloud method", async () => {
 
     assert(state.errors[0].error === "FAILURE" && state.errors[0].objectName === "loop" &&
         state.errors[0].message === "Cloud method return error: Quantiser limit is reached");
+
+    await ubotClient.shutdown();
+});
+
+unit.test("ubot_main_test: execute high memory cloud method", async () => {
+    let ubotClient = await new UBotClient(clientKey, TOPOLOGY_ROOT + TOPOLOGY_FILE).start();
+
+    let executableContract = Contract.fromPrivateKey(userPrivKey);
+    executableContract.state.data.cloud_methods = {
+        loop: {
+            pool: {size: 2},
+            quorum: {size: 2}
+        }
+    };
+
+    executableContract.state.data.js = `function loop() {
+        let arr = [];
+        while(true) {
+            arr.push(0);
+        }
+    }`;
+
+    await executableContract.seal();
+
+    let requestContract = Contract.fromPrivateKey(userPrivKey);
+    requestContract.state.data.method_name = "loop";
+    requestContract.state.data.executable_contract_id = executableContract.id;
+    requestContract.newItems.add(executableContract);
+
+    await cs.addConstraintToContract(requestContract, executableContract, "executable_contract_constraint",
+        Constraint.TYPE_EXISTING_STATE, ["this.state.data.executable_contract_id == ref.id"], true);
+
+    let state = await ubotClient.executeCloudMethod(requestContract, await createPayment(2));
+
+    console.log("State: " + JSON.stringify(state));
+
+    assert(state.state === UBotPoolState.FAILED.val);
+
+    assert(state.errors[0].error === "FAILURE" && state.errors[0].objectName === "loop" &&
+        state.errors[0].message === "Cloud method return error: Executable contract uses too more memory");
 
     await ubotClient.shutdown();
 });
@@ -510,12 +575,6 @@ unit.test("ubot_main_test: 2 cloud method", async () => {
 
     await ubotClient.disconnectUbot();
 
-    //await sleep(5000);
-    let sess = null;
-    do {
-        sess = await ubotClient.getSession("ubotGetSession", {executableContractId: executableContract.id});
-    } while (Object.keys(sess).length > 0);
-
     // SECOND METHOD (READ RANDOM)
     requestContract = Contract.fromPrivateKey(userPrivKey);
     requestContract.state.data.method_name = "readRandom";
@@ -554,6 +613,49 @@ unit.test("ubot_main_test: 2 cloud method", async () => {
         state.result.random === first &&                                    // checking read random value
         checkRandomMultiData(state.result.multi_data, state.result.random)  // checking multi-storage
     ).length >= executableContract.state.data.cloud_methods.getRandom.quorum.size);
+
+    await ubotClient.shutdown();
+});
+
+unit.test("ubot_main_test: many cloud method with executeCloudMethod", async () => {
+    let ubotClient = await new UBotClient(clientKey, TOPOLOGY_ROOT + TOPOLOGY_FILE).start();
+
+    let executableContract = await generateSecureRandomExecutableContract();
+
+    let ITERATIONS = 3;
+    for (let i = 0; i < ITERATIONS; i++) {
+        // GET RANDOM
+        let requestContract = Contract.fromPrivateKey(userPrivKey);
+        requestContract.state.data.method_name = "getRandom";
+        requestContract.state.data.method_args = [1000];
+        requestContract.state.data.executable_contract_id = executableContract.id;
+        if (i === 0)
+            requestContract.newItems.add(executableContract);
+
+        await cs.addConstraintToContract(requestContract, executableContract, "executable_contract_constraint",
+            Constraint.TYPE_EXISTING_STATE, ["this.state.data.executable_contract_id == ref.id"], true);
+
+        console.log("GET RANDOM");
+        await ubotClient.executeCloudMethod(requestContract, await createPayment(20));
+
+        // READ RANDOM
+        requestContract = Contract.fromPrivateKey(userPrivKey);
+        requestContract.state.data.method_name = "readRandom";
+        requestContract.state.data.executable_contract_id = executableContract.id;
+
+        await cs.addConstraintToContract(requestContract, executableContract, "executable_contract_constraint",
+            Constraint.TYPE_EXISTING_STATE, ["this.state.data.executable_contract_id == ref.id"], true);
+
+        console.log("READ RANDOM");
+        let state = await ubotClient.executeCloudMethod(requestContract, await createPayment(20));
+
+        console.log("State: " + JSON.stringify(state));
+
+        assert(state.state === UBotPoolState.FINISHED.val);
+
+        // checking secure random value
+        assert(typeof state.result.random === "number" && state.result.random >= 0 && state.result.random < 1000);
+    }
 
     await ubotClient.shutdown();
 });
@@ -818,6 +920,41 @@ unit.test("ubot_main_test: execute cloud method with ubot delay", async () => {
     await ubotClient.shutdown();
 });
 
+unit.test("ubot_main_test: sequential launch", async () => {
+    let ubotClient = await new UBotClient(clientKey, TOPOLOGY_ROOT + TOPOLOGY_FILE).start();
+
+    let executableContract = Contract.fromPrivateKey(userPrivKey);
+
+    executableContract.state.data.cloud_methods = {
+        method_for_launcher1: {
+            pool: {size: 8},
+            quorum: {size: 3}
+        }
+    };
+
+    executableContract.state.data.js = await io.fileGetContentsAsString(TEST_CONTRACTS_PATH + "launcherRole.js");
+
+    await executableContract.seal();
+
+    for (let i = 0; i < 10; i++) {
+        let requestContract = Contract.fromPrivateKey(userPrivKey);
+        requestContract.state.data.method_name = "method_for_launcher1";
+        requestContract.state.data.executable_contract_id = executableContract.id;
+        if (i === 0)
+            requestContract.newItems.add(executableContract);
+
+        await cs.addConstraintToContract(requestContract, executableContract, "executable_contract_constraint",
+            Constraint.TYPE_EXISTING_STATE, ["this.state.data.executable_contract_id == ref.id"], true);
+
+        let state = await ubotClient.executeCloudMethod(requestContract, await createPayment(20));
+
+        assert(state.state === UBotPoolState.FINISHED.val);
+        assert(state.result === 1);
+    }
+
+    await ubotClient.shutdown();
+});
+
 unit.test("ubot_main_test: launcher role", async () => {
     let ubotClient = await new UBotClient(clientKey, TOPOLOGY_ROOT + TOPOLOGY_FILE).start();
 
@@ -872,7 +1009,7 @@ unit.test("ubot_main_test: launcher role", async () => {
     assert(state.result === 1);
 
     // method_for_launcher1 failure
- /*   launcher1Contract = Contract.fromPrivateKey(userPrivKey);
+    launcher1Contract = Contract.fromPrivateKey(userPrivKey);
     launcher1Contract.state.data.method_name = "method_for_launcher1";
     launcher1Contract.state.data.executable_contract_id = executableContract.id;
 
@@ -894,9 +1031,9 @@ unit.test("ubot_main_test: launcher role", async () => {
     console.log("Error: " + errMessage);
 
     // checking error
-    assert(errMessage === "Session is aborted. Errors: [{\"error\":\"FAILED_CHECK\",\"objectName\":\"checkReferencedItems for contract (hashId=" +
-        launcher1Contract.id + "): false\",\"message\":\"\"},{\"error\":\"FAILURE\",\"objectName\":\"requestContract\",\"message\":\"Request contract state is not APPROVED\"}]");
-*/
+    assert(errMessage.startsWith("Session is aborted. Errors:") &&
+        errMessage.includes("{\"error\":\"FAILURE\",\"objectName\":\"requestContract\",\"message\":\"Request contract state is not APPROVED\"}"));
+
     // method_for_launcher2
     let launcher2Contract = Contract.fromPrivateKey(userKey2);
     launcher2Contract.state.data.method_name = "method_for_launcher2";
@@ -918,7 +1055,7 @@ unit.test("ubot_main_test: launcher role", async () => {
     assert(state.result === 2);
 
     // method_for_launcher2 failure
-  /*  launcher2Contract = Contract.fromPrivateKey(userKey1);
+    launcher2Contract = Contract.fromPrivateKey(userKey1);
     launcher2Contract.state.data.method_name = "method_for_launcher2";
     launcher2Contract.state.data.executable_contract_id = executableContract.id;
 
@@ -930,7 +1067,7 @@ unit.test("ubot_main_test: launcher role", async () => {
 
     console.log("method_for_launcher2 failure...");
 
-    let errMessage = null;
+    errMessage = null;
     try {
         await ubotClient.executeCloudMethod(launcher2Contract, await createPayment(5));
     } catch (err) {
@@ -940,9 +1077,9 @@ unit.test("ubot_main_test: launcher role", async () => {
     console.log("Error: " + errMessage);
 
     // checking error
-    assert(errMessage === "Session is aborted. Errors: [{\"error\":\"FAILED_CHECK\",\"objectName\":\"checkReferencedItems for contract (hashId=" +
-        launcher2Contract.id + "): false\",\"message\":\"\"},{\"error\":\"FAILURE\",\"objectName\":\"requestContract\",\"message\":\"Request contract state is not APPROVED\"}]");
-*/
+    assert(errMessage.startsWith("Session is aborted. Errors:") &&
+        errMessage.includes("{\"error\":\"FAILURE\",\"objectName\":\"requestContract\",\"message\":\"Request contract state is not APPROVED\"}"));
+
     // method_for_any
     let anyContract = Contract.fromPrivateKey(userKey1);
     anyContract.state.data.method_name = "method_for_any";
@@ -963,38 +1100,387 @@ unit.test("ubot_main_test: launcher role", async () => {
     await ubotClient.shutdown();
 });
 
-// unit.test("ubot_main_test: sequential launch", async () => {
-//
-//     let ubotClient = await new UBotClient(clientKey, TOPOLOGY_ROOT + TOPOLOGY_FILE).start();
-//
-//     let executableContract = Contract.fromPrivateKey(userPrivKey);
-//
-//     executableContract.state.data.cloud_methods = {
-//         method_for_launcher1: {
-//             pool: {size: 8},
-//             quorum: {size: 3}
-//         }
-//     };
-//
-//     executableContract.state.data.js = await io.fileGetContentsAsString(TEST_CONTRACTS_PATH + "launcherRole.js");
-//
-//     await executableContract.seal();
-//
-//     for (let i = 0; i < 10; i++) {
-//         let requestContract = Contract.fromPrivateKey(userPrivKey);
-//         requestContract.state.data.method_name = "method_for_launcher1";
-//         requestContract.state.data.executable_contract_id = executableContract.id;
-//         if (i === 0)
-//             requestContract.newItems.add(executableContract);
-//
-//         await cs.addConstraintToContract(requestContract, executableContract, "executable_contract_constraint",
-//             Constraint.TYPE_EXISTING_STATE, ["this.state.data.executable_contract_id == ref.id"], true);
-//
-//         let state = await ubotClient.executeCloudMethod(requestContract, await createPayment(20));
-//
-//         assert(state.state === UBotPoolState.FINISHED.val);
-//         assert(state.result === 1);
-//     }
-//
-//     await ubotClient.shutdown();
-// });
+unit.test("ubot_main_test: concurrent transactions", async () => {
+    let netClient = await new UBotClient(tk.getTestKey(), TOPOLOGY_ROOT + TOPOLOGY_FILE).start();
+
+    let executableContract = await generateSimpleExecutableContract("transaction.js", "transaction");
+
+    console.log("Register executable contract...");
+    let ir = await netClient.register(await executableContract.getPackedTransaction(), 10000);
+
+    assert(ir.state === ItemState.APPROVED);
+
+    let n = 3;
+
+    let requestContracts = [];
+    let clients = [];
+
+    for (let i = 0; i < n; i++) {
+        let key = tk.TestKeys.getKey();
+        let ubotClient = await new UBotClient(key, TOPOLOGY_ROOT + TOPOLOGY_FILE).start();
+        clients.push(ubotClient);
+
+        let requestContract = Contract.fromPrivateKey(userPrivKey);
+        requestContract.state.data.method_name = "transaction";
+        requestContract.state.data.method_args = [i];
+        requestContract.state.data.executable_contract_id = executableContract.id;
+
+        await cs.addConstraintToContract(requestContract, executableContract, "executable_contract_constraint",
+            Constraint.TYPE_EXISTING_STATE, ["this.state.data.executable_contract_id == ref.id"], true);
+
+        requestContracts.push(requestContract);
+    }
+
+    let promisesStart = [];
+    for (let i = 0; i < n; i++)
+        promisesStart.push(clients[i].startCloudMethod(requestContracts[i], await createPayment(20)));
+
+    let sessions = await Promise.all(promisesStart);
+
+    let promisesWork = [];
+    for (let i = 0; i < n; i++) {
+        promisesWork.push(new Promise(async (resolve) => {
+
+            let states = await Promise.all(sessions[i].pool.map(async (ubotNumber) => {
+                let state = await clients[i].getStateCloudMethod(requestContracts[i].id, ubotNumber);
+
+                if (state.state !== UBotPoolState.FINISHED.val || state.state !== UBotPoolState.FAILED.val)
+                    state = await clients[i].waitCloudMethod(requestContracts[i].id, ubotNumber);
+
+                return state;
+            }));
+
+            console.log("Session states: " + JSON.stringify(states));
+
+            let res = null;
+            let count = 0;
+            for (let state of states)
+                if (state.state === UBotPoolState.FINISHED.val && typeof state.result === "number") {
+                    if (res == null) {
+                        res = state.result;
+                        count = 1;
+                    }
+                    else if (res === state.result)
+                        count++;
+                    else {
+                        res = null;
+                        break;
+                    }
+                }
+
+            if (count < executableContract.state.data.cloud_methods.transaction.quorum.size)
+                res = null;
+
+            resolve(res);
+        }));
+    }
+
+    let results = await Promise.all(promisesWork);
+
+    for (let i = 0; i < n; i++) {
+        assert(results[i] === i);
+        await clients[i].shutdown();
+    }
+
+    await netClient.shutdown();
+});
+
+unit.test("ubot_main_test: parallel purchase of lottery tickets", async () => {
+    const TICKETS = 10;
+    let clients = [];
+
+    console.log("Open clients...");
+    for (let i = 0; i < TICKETS; i++) {
+        let key = tk.TestKeys.getKey();
+        let client = await new UBotClient(key, TOPOLOGY_ROOT + TOPOLOGY_FILE).start();
+        clients.push(client);
+    }
+
+    let netClient = await new UBotClient(tk.getTestKey(), TOPOLOGY_ROOT + TOPOLOGY_FILE).start();
+    let ubotClient = await new UBotClient(clientKey, TOPOLOGY_ROOT + TOPOLOGY_FILE).start();
+
+    // test token for payments
+    let tokenIssuerKey = tk.TestKeys.getKey();
+    let tokenContract = await cs.createTokenContract([tokenIssuerKey], [tokenIssuerKey.publicKey], new BigDecimal("1000"));
+    let origin = tokenContract.getOrigin();
+
+    console.log("Register base token...");
+    let ir = await netClient.register(await tokenContract.getPackedTransaction(), 10000);
+
+    assert(ir.state === ItemState.APPROVED);
+
+    let userKeys = [];
+    let payments = [];
+
+    console.log("Register initial payments...");
+    for (let i = 0; i < TICKETS; i++) {
+        let userKey = tk.TestKeys.getKey();
+
+        tokenContract = await cs.createSplit(tokenContract, 10, "amount", [tokenIssuerKey], true);
+        let payment = Array.from(tokenContract.newItems)[0];
+
+        payment.registerRole(new roles.SimpleRole("owner", userKey, payment));
+        payment.registerRole(new roles.RoleLink("creator", "owner", payment));
+
+        await payment.seal();
+        await payment.addSignatureToSeal(userKey);
+        await tokenContract.seal();
+
+        userKeys.push(userKey);
+        payments.push(payment);
+
+        console.log("Register payment " + i + "...");
+        ir = await netClient.register(await tokenContract.getPackedTransaction(), 10000);
+
+        assert(ir.state === ItemState.APPROVED);
+    }
+
+    let lotteryKey = tk.TestKeys.getKey();
+    let lotteryContract = Contract.fromPrivateKey(lotteryKey);
+
+    lotteryContract.state.data.cloud_methods = {
+        buyTicket: {
+            pool: {size: 3},
+            quorum: {size: 3},
+            storage_read_trust_level: 0.51,
+            max_wait_ubot: 60
+        },
+        raffle: {
+            pool: {size: 12},
+            quorum: {size: 10},
+            storage_read_trust_level: 0.75,
+            max_wait_ubot: 60
+        }
+    };
+
+    lotteryContract.state.data.js = await io.fileGetContentsAsString(TEST_CONTRACTS_PATH + "lottery.js");
+    lotteryContract.state.data.tokenOrigin = origin;
+    lotteryContract.state.data.ticketPrice = "10";
+
+    await lotteryContract.seal();
+
+    console.log("Register lottery сontract...");
+    ir = await netClient.register(await lotteryContract.getPackedTransaction(), 10000);
+
+    assert(ir.state === ItemState.APPROVED);
+
+    // buy tickets
+    console.log("Buy tickets...");
+
+    let promises = [];
+
+    for (let i = 0; i < TICKETS; i++) {
+        promises.push(new Promise(async (resolve) => {
+
+            let payment = await payments[i].createRevision([userKeys[i]]);
+
+            // quorum vote role
+            payment.registerRole(new roles.QuorumVoteRole("owner", "refUbotRegistry.state.roles.ubots", "10", payment));
+            payment.registerRole(new roles.QuorumVoteRole("creator", "refUbotRegistry.state.roles.ubots", "3", payment));
+
+            // constraint for UBotNet registry contract
+            payment.createTransactionalSection();
+            let constr = new Constraint(payment);
+            constr.name = "refUbotRegistry";
+            constr.type = Constraint.TYPE_TRANSACTIONAL;
+            let conditions = {};
+            conditions[Constraint.conditionsModeType.all_of] = ["ref.tag == \"universa:ubot_registry_contract\""];
+            constr.setConditions(conditions);
+            payment.addConstraint(constr);
+
+            await payment.seal();
+
+            payment = await payment.getPackedTransaction();
+
+            let buyContract = Contract.fromPrivateKey(userKeys[i]);
+            buyContract.state.data.method_name = "buyTicket";
+            buyContract.state.data.method_args = [payment, userKeys[i].publicKey, true];
+            buyContract.state.data.executable_contract_id = lotteryContract.id;
+
+            await cs.addConstraintToContract(buyContract, lotteryContract, "executable_contract_constraint",
+                Constraint.TYPE_EXISTING_STATE, ["this.state.data.executable_contract_id == ref.id"], true);
+
+            let state = await clients[i].executeCloudMethod(buyContract, await createPayment(12));
+
+            resolve(state.result);
+        }));
+    }
+
+    let results = await Promise.all(promises);
+    let ticketsOrder = [];
+    for (let i = 0; i < TICKETS; i++) {
+        assert(0 <= results[i] < TICKETS);
+        ticketsOrder.push(-1);
+    }
+
+    for (let i = 0; i < TICKETS; i++)
+        ticketsOrder[results[i]] = i;
+
+    // raffle
+    let raffleContract = Contract.fromPrivateKey(userPrivKey);
+    raffleContract.state.data.method_name = "raffle";
+    raffleContract.state.data.executable_contract_id = lotteryContract.id;
+
+    await cs.addConstraintToContract(raffleContract, lotteryContract, "executable_contract_constraint",
+        Constraint.TYPE_EXISTING_STATE, ["this.state.data.executable_contract_id == ref.id"], true);
+
+    console.log("Raffle lottery...");
+    let state = await ubotClient.executeCloudMethod(raffleContract, await createPayment(50));
+
+    assert(state.state === UBotPoolState.FINISHED.val);
+
+    // check raffle result
+    assert(state.result.hasOwnProperty("winTicket") && state.result.prizeContract instanceof Uint8Array);
+    assert(state.result.hasOwnProperty("prizeContract") && typeof state.result.winTicket === "number" &&
+        state.result.winTicket >= 0 && state.result.winTicket < TICKETS);
+
+    console.log("Win ticket: " + state.result.winTicket);
+
+    // check prize contract
+    let prizeContract = await Contract.fromPackedTransaction(state.result.prizeContract);
+    assert(prizeContract.roles.owner instanceof roles.SimpleRole);
+
+    let keys = roles.RoleExtractor.extractKeys(prizeContract.roles.owner);
+    assert(keys.size === 1 && keys.has(userKeys[ticketsOrder[state.result.winTicket]].publicKey));
+
+    assert(prizeContract.getOrigin().equals(origin));
+    assert(prizeContract.state.data.amount === "100");
+
+    for (let i = 0; i < TICKETS; i++)
+        await clients[i].shutdown();
+
+    await netClient.shutdown();
+    await ubotClient.shutdown();
+});
+
+unit.test("ubot_main_test: named storages", async () => {
+    let ubotClient = await new UBotClient(clientKey, TOPOLOGY_ROOT + TOPOLOGY_FILE).start();
+    let netClient = await new UBotClient(tk.getTestKey(), TOPOLOGY_ROOT + TOPOLOGY_FILE).start();
+
+    let executableContract = await generateSimpleExecutableContract("storages.js", "writeStorages");
+    executableContract.state.data.cloud_methods.readStorages = {
+        pool: {size: 5},
+        quorum: {size: 4}
+    };
+    await executableContract.seal();
+
+    console.log("Register executable contract...");
+    let ir = await netClient.register(await executableContract.getPackedTransaction(), 10000);
+
+    assert(ir.state === ItemState.APPROVED);
+
+    // write storages
+    let requestWriteStorage1 = Contract.fromPrivateKey(userPrivKey);
+    requestWriteStorage1.state.data.method_name = "writeStorages";
+    requestWriteStorage1.state.data.method_args = ["string1", 23, "storage1"];
+    requestWriteStorage1.state.data.executable_contract_id = executableContract.id;
+
+    await cs.addConstraintToContract(requestWriteStorage1, executableContract, "executable_contract_constraint",
+        Constraint.TYPE_EXISTING_STATE, ["this.state.data.executable_contract_id == ref.id"], true);
+
+    let state = await ubotClient.executeCloudMethod(requestWriteStorage1, await createPayment(5));
+    console.log("State: " + JSON.stringify(state));
+    assert(state.state === UBotPoolState.FINISHED.val);
+
+    let requestWriteStorage2 = Contract.fromPrivateKey(userPrivKey);
+    requestWriteStorage2.state.data.method_name = "writeStorages";
+    requestWriteStorage2.state.data.method_args = ["string2", 88, "storage2"];
+    requestWriteStorage2.state.data.executable_contract_id = executableContract.id;
+
+    await cs.addConstraintToContract(requestWriteStorage2, executableContract, "executable_contract_constraint",
+        Constraint.TYPE_EXISTING_STATE, ["this.state.data.executable_contract_id == ref.id"], true);
+
+    state = await ubotClient.executeCloudMethod(requestWriteStorage2, await createPayment(5));
+    console.log("State: " + JSON.stringify(state));
+    assert(state.state === UBotPoolState.FINISHED.val);
+
+    // read storages
+    let requestReadStorage1 = Contract.fromPrivateKey(userPrivKey);
+    requestReadStorage1.state.data.method_name = "readStorages";
+    requestReadStorage1.state.data.method_args = ["storage1"];
+    requestReadStorage1.state.data.executable_contract_id = executableContract.id;
+
+    await cs.addConstraintToContract(requestReadStorage1, executableContract, "executable_contract_constraint",
+        Constraint.TYPE_EXISTING_STATE, ["this.state.data.executable_contract_id == ref.id"], true);
+
+    state = await ubotClient.executeCloudMethod(requestReadStorage1, await createPayment(5));
+    console.log("State: " + JSON.stringify(state));
+
+    // check results
+    assert(state.state === UBotPoolState.FINISHED.val && state.result.single_data === "string1" &&
+        state.result.multi_data instanceof Array && state.result.multi_data.every(md => md === 23));
+
+    let requestReadStorage2 = Contract.fromPrivateKey(userPrivKey);
+    requestReadStorage2.state.data.method_name = "readStorages";
+    requestReadStorage2.state.data.method_args = ["storage2"];
+    requestReadStorage2.state.data.executable_contract_id = executableContract.id;
+
+    await cs.addConstraintToContract(requestReadStorage2, executableContract, "executable_contract_constraint",
+        Constraint.TYPE_EXISTING_STATE, ["this.state.data.executable_contract_id == ref.id"], true);
+
+    state = await ubotClient.executeCloudMethod(requestReadStorage2, await createPayment(5));
+    console.log("State: " + JSON.stringify(state));
+
+    // check results
+    assert(state.state === UBotPoolState.FINISHED.val && state.result.single_data === "string2" &&
+        state.result.multi_data instanceof Array && state.result.multi_data.every(md => md === 88));
+
+    await netClient.shutdown();
+    await ubotClient.shutdown();
+});
+
+unit.test("ubot_main_test: parallel storages", async () => {
+    let ubotClient = await new UBotClient(clientKey, TOPOLOGY_ROOT + TOPOLOGY_FILE).start();
+    let netClient = await new UBotClient(tk.getTestKey(), TOPOLOGY_ROOT + TOPOLOGY_FILE).start();
+
+    let executableContract = await generateSimpleExecutableContract("storages.js", "parallelWriteStorages");
+    executableContract.state.data.cloud_methods.parallelReadStorages = {
+        pool: {size: 5},
+        quorum: {size: 4}
+    };
+    await executableContract.seal();
+
+    console.log("Register executable contract...");
+    let ir = await netClient.register(await executableContract.getPackedTransaction(), 10000);
+
+    assert(ir.state === ItemState.APPROVED);
+
+    // simple data
+    let singleData = [11, "DATA!", 33];
+    let multiData = ["qwerty", "...", 10984.289];
+
+    // write storages
+    let requestWriteStorages = Contract.fromPrivateKey(userPrivKey);
+    requestWriteStorages.state.data.method_name = "parallelWriteStorages";
+    requestWriteStorages.state.data.method_args = [singleData, multiData];
+    requestWriteStorages.state.data.executable_contract_id = executableContract.id;
+
+    await cs.addConstraintToContract(requestWriteStorages, executableContract, "executable_contract_constraint",
+        Constraint.TYPE_EXISTING_STATE, ["this.state.data.executable_contract_id == ref.id"], true);
+
+    let state = await ubotClient.executeCloudMethod(requestWriteStorages, await createPayment(7));
+    console.log("State: " + JSON.stringify(state));
+    assert(state.state === UBotPoolState.FINISHED.val);
+
+    // read storages
+    let requestReadStorages = Contract.fromPrivateKey(userPrivKey);
+    requestReadStorages.state.data.method_name = "parallelReadStorages";
+    requestReadStorages.state.data.method_args = [3];
+    requestReadStorages.state.data.executable_contract_id = executableContract.id;
+
+    await cs.addConstraintToContract(requestReadStorages, executableContract, "executable_contract_constraint",
+        Constraint.TYPE_EXISTING_STATE, ["this.state.data.executable_contract_id == ref.id"], true);
+
+    state = await ubotClient.executeCloudMethod(requestReadStorages, await createPayment(5));
+    console.log("State: " + JSON.stringify(state));
+
+    // check results
+    assert(state.state === UBotPoolState.FINISHED.val);
+    for (let i = 0; i < 3; i++) {
+        assert(state.result[i * 2] === singleData[i]);
+        assert(state.result[i * 2 + 1] instanceof Array && state.result[i * 2 + 1].every(md => md === multiData[i]));
+    }
+
+    await netClient.shutdown();
+    await ubotClient.shutdown();
+});

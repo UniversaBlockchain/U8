@@ -24,7 +24,7 @@ const CONFIG_ROOT = "../test/config/ubot_config";
 const clientKey = tk.TestKeys.getKey();
 const userPrivKey = tk.TestKeys.getKey();
 
-const LOCAL_UBOTS = true;
+const LOCAL_UBOTS = false;
 const ubotsCount = 30;
 
 async function createPayment(cost) {
