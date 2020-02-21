@@ -162,6 +162,7 @@ void DnsResolver::removeReq(long reqId) {
 DnsServerQuestion::DnsServerQuestion(long srvId, long qId, std::shared_ptr<mg_mgr> mgr, mg_connection* con, mg_dns_message *msg, int qIndx) {
     serverId_ = srvId;
     questionId_ = qId;
+    connId_ = (long)con->user_data;
     mgr_ = mgr;
     con_ = con;
     msgBody_.resize(msg->pkt.len);
@@ -203,7 +204,8 @@ struct DnsServerAnswerHolder {
     long qId;
     mg_connection *nc;
     int ttl;
-    bool done = false;
+    long connId;
+    bool done;
 };
 
 void DnsServerQuestion::sendAnswer(int ttl) {
@@ -219,6 +221,8 @@ void DnsServerQuestion::sendAnswer(int ttl) {
     ah.qId = questionId_;
     ah.nc = con_;
     ah.ttl = ttl;
+    ah.connId = connId_;
+    ah.done = false;
     std::lock_guard lock(server->broadcastMutex_);
     mg_broadcast(server->mgr_.get(), [](mg_connection *nc, int ev, void *ev_data) {
         DnsServerAnswerHolder* holder = (DnsServerAnswerHolder*)ev_data;
@@ -228,7 +232,7 @@ void DnsServerQuestion::sendAnswer(int ttl) {
         DnsServer* server = getServer_g(serverId);
         if (server == nullptr)
             return;
-        if ((long)nc->user_data == (long)holder->nc->user_data) {
+        if ((long)nc->user_data == holder->connId) {
             // here we are in mongoose loop thread, so we dont worry about synchronization
             if (server->questionsHolder_.find(holder->qId) != server->questionsHolder_.end()) {
                 auto pReq = server->questionsHolder_[holder->qId];

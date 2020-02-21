@@ -81,6 +81,7 @@ public:
 private:
     long serverId_;
     long questionId_;
+    long connId_;
     std::shared_ptr<mg_mgr> mgr_;
     mg_connection* con_;
     byte_vector ansBinary_;
