@@ -20,10 +20,11 @@ TEST_CASE("dns_hello", "[!hide]") {
         pool.execute([question](){
             //cout << "dns question: name = " << question->name << endl;
             this_thread::sleep_for(20ms);
-            if (question->rtype == DnsRRType::DNS_A)
-                question->setAnswerIpV4("127.0.0.1");
-            else if (question->rtype == DnsRRType::DNS_AAAA)
-                question->setAnswerIpV6("2a02:6b8::2:242");
+            if (question->rtype == DnsRRType::DNS_A) {
+                question->addAnswerIpV4("127.0.0.1");
+            } else if (question->rtype == DnsRRType::DNS_AAAA) {
+                question->addAnswerIpV6("2a02:6b8::2:242");
+            }
             question->sendAnswer(300);
         });
     });

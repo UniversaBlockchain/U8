@@ -72,9 +72,9 @@ public:
     int rclass;
     int ttl;
 
-    bool setAnswerIpV4(const std::string& ip);
-    bool setAnswerIpV6(const std::string& ip6);
-    bool setAnswerBin(const byte_vector& bin);
+    bool addAnswerIpV4(const std::string& ip);
+    bool addAnswerIpV6(const std::string& ip6);
+    bool addAnswerBin(const byte_vector& bin);
     void sendAnswer(int ttl);
     void sendAnswerFromMgThread(int ans_ttl);
 
@@ -84,7 +84,7 @@ private:
     long connId_;
     std::shared_ptr<mg_mgr> mgr_;
     mg_connection* con_;
-    byte_vector ansBinary_;
+    std::vector<byte_vector> ansBinary_;
     byte_vector msgBody_;
     int questionIndex_;
 };

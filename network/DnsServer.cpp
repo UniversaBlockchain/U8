@@ -170,30 +170,33 @@ DnsServerQuestion::DnsServerQuestion(long srvId, long qId, std::shared_ptr<mg_mg
     questionIndex_ = qIndx;
 }
 
-bool DnsServerQuestion::setAnswerIpV4(const std::string& ip) {
+bool DnsServerQuestion::addAnswerIpV4(const std::string& ip) {
     in_addr ans;
     if (inet_pton(AF_INET, ip.data(), &ans) > 0) {
-        ansBinary_.resize(sizeof(ans));
-        memcpy(&ansBinary_[0], &ans, sizeof(ans));
+        byte_vector bin;
+        bin.resize(sizeof(ans));
+        memcpy(&bin[0], &ans, sizeof(ans));
+        ansBinary_.emplace_back(std::move(bin));
         return true;
     }
     return false;
 }
 
-bool DnsServerQuestion::setAnswerIpV6(const std::string& ip6) {
+bool DnsServerQuestion::addAnswerIpV6(const std::string& ip6) {
     in6_addr ans;
     if (inet_pton(AF_INET6, ip6.data(), &ans) > 0) {
-        ansBinary_.resize(sizeof(ans));
-        memcpy(&ansBinary_[0], &ans, sizeof(ans));
+        byte_vector bin;
+        bin.resize(sizeof(ans));
+        memcpy(&bin[0], &ans, sizeof(ans));
+        ansBinary_.emplace_back(std::move(bin));
         return true;
     }
     return false;
 }
 
-bool DnsServerQuestion::setAnswerBin(const byte_vector& bin) {
+bool DnsServerQuestion::addAnswerBin(const byte_vector& bin) {
     if (bin.size() <= 512) {
-        ansBinary_.resize(bin.size());
-        memcpy(&ansBinary_[0], &bin[0], bin.size());
+        ansBinary_.emplace_back(bin);
         return true;
     }
     return false;
@@ -258,8 +261,8 @@ void DnsServerQuestion::sendAnswerFromMgThread(int ans_ttl) {
     mbuf_init(&replyBuf, 512);
     mg_dns_reply reply = mg_dns_create_reply(&replyBuf, &msg);
 
-    if (ansBinary_.size() > 0)
-        mg_dns_reply_record(&reply, rr, nullptr, rr->rtype, ans_ttl, &ansBinary_[0], ansBinary_.size());
+    for (byte_vector& bv : ansBinary_)
+        mg_dns_reply_record(&reply, rr, nullptr, rr->rtype, ans_ttl, &bv[0], bv.size());
     mg_dns_send_reply(con_, &reply);
 
     con_->flags |= MG_F_SEND_AND_CLOSE;
