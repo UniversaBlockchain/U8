@@ -39,11 +39,12 @@ TEST_CASE("dns_hello", "[!hide]") {
     atomic<int> ansCounter = 0;
     atomic<long> t0 = getCurrentTimeMillis();
     int N = 200;
-    //N = 20000;
+    //N = 200000;
     for (int i = 0; i < N; ++i) {
         ++reqCounter;
-        dnsResolver.resolve("ya.ru", DnsRRType::DNS_A, [&ansCounter,&t0](const std::string &addr) {
-            cout << "resolved: " << addr << endl;
+        dnsResolver.resolve("ya.ru", DnsRRType::DNS_A, [&ansCounter,&t0](const std::vector<DnsResolverAnswer>& ansArr) {
+//            for (const DnsResolverAnswer& ans : ansArr)
+//                cout << "resolved: " << ans.parseIpV4asString() << endl;
             ++ansCounter;
             long now = getCurrentTimeMillis();
             long dt = now - t0;

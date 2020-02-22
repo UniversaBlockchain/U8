@@ -23,10 +23,20 @@ enum DnsRRType {
     DNS_CNAME = MG_DNS_CNAME_RECORD
 };
 
+class DnsResolverAnswer {
+public:
+    DnsResolverAnswer(byte_vector&& bin);
+    const byte_vector& getBinary() const;
+    std::string parseIpV4asString() const;
+    std::string parseIpV6asString() const;
+private:
+    byte_vector bin_;
+};
+
 struct DnsResolverRequestHolder {
     long resolverId;
     long reqId;
-    std::function<void(const std::string& ip)> callback;
+    std::function<void(const std::vector<DnsResolverAnswer>& ansArr)> callback;
 };
 
 class DnsResolver {
@@ -38,7 +48,7 @@ public:
     void stop();
     void join();
 
-    void resolve(const std::string& name, int query, std::function<void(const std::string& ip)>&& onComplete);
+    void resolve(const std::string& name, int query, std::function<void(const std::vector<DnsResolverAnswer>& ansArr)>&& onComplete);
 
 private:
     DnsResolverRequestHolder* saveReq(DnsResolverRequestHolder&& req);

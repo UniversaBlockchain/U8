@@ -56,6 +56,38 @@ void removeResolver_g(long resolverId) {
     resolversHolder_g.erase(resolverId);
 }
 
+DnsResolverAnswer::DnsResolverAnswer(byte_vector&& bin) {
+    bin_ = std::move(bin);
+}
+
+const byte_vector& DnsResolverAnswer::getBinary() const {
+    return bin_;
+}
+
+std::string DnsResolverAnswer::parseIpV4asString() const {
+    in_addr got_addr;
+    if (bin_.size() >= sizeof(got_addr))
+        memcpy(&got_addr, &bin_[0], sizeof(got_addr));
+    else
+        throw std::runtime_error("DnsResolverAnswer::parseIpV4asString: data too small");
+    char resolvedIp[INET_ADDRSTRLEN];
+    memset(resolvedIp, 0, sizeof(resolvedIp));
+    inet_ntop(AF_INET, &got_addr, resolvedIp, sizeof(resolvedIp));
+    return std::string(resolvedIp);
+}
+
+std::string DnsResolverAnswer::parseIpV6asString() const {
+    in6_addr got_addr;
+    if (bin_.size() >= sizeof(got_addr))
+        memcpy(&got_addr, &bin_[0], sizeof(got_addr));
+    else
+        throw std::runtime_error("DnsResolverAnswer::parseIpV6asString: data too small");
+    char resolvedIp[INET6_ADDRSTRLEN];
+    memset(resolvedIp, 0, sizeof(resolvedIp));
+    inet_ntop(AF_INET6, &got_addr, resolvedIp, sizeof(resolvedIp));
+    return std::string(resolvedIp);
+}
+
 DnsResolver::DnsResolver(): mgr_(new mg_mgr(), [](auto p){mg_mgr_free(p);delete p;}) {
     mg_mgr_init(mgr_.get(), this);
     ownId_ = genNextServerId_g();
@@ -93,7 +125,7 @@ void DnsResolver::join() {
     removeResolver_g(ownId_);
 }
 
-void DnsResolver::resolve(const std::string& name, int query, std::function<void(const std::string& ip)>&& onComplete) {
+void DnsResolver::resolve(const std::string& name, int query, std::function<void(const std::vector<DnsResolverAnswer>& ansArr)>&& onComplete) {
     DnsResolverRequestHolder holder;
     holder.resolverId = ownId_;
     holder.callback = std::move(onComplete);
@@ -107,33 +139,16 @@ void DnsResolver::resolve(const std::string& name, int query, std::function<void
             if (msg == nullptr)
                 return;
             DnsResolverRequestHolder* ph = (DnsResolverRequestHolder*) user_data;
+            std::vector<DnsResolverAnswer> ansArr;
             for (int i = 0; i < msg->num_answers; ++i) {
                 mg_dns_resource_record* rr = &msg->answers[i];
-                switch (rr->rtype) {
-                    case DnsRRType::DNS_A: {
-                        in_addr got_addr;
-                        mg_dns_parse_record_data(msg, rr, &got_addr, sizeof(got_addr));
-                        char resolvedIp[INET_ADDRSTRLEN];
-                        memset(resolvedIp, 0, sizeof(resolvedIp));
-                        inet_ntop(AF_INET, &got_addr, resolvedIp, sizeof(resolvedIp));
-                        ph->callback(std::string(resolvedIp));
-                        break;
-                    }
-                    case DnsRRType::DNS_AAAA: {
-                        in6_addr got_addr;
-                        mg_dns_parse_record_data(msg, rr, &got_addr, sizeof(got_addr));
-                        char resolvedIp[INET6_ADDRSTRLEN];
-                        memset(resolvedIp, 0, sizeof(resolvedIp));
-                        inet_ntop(AF_INET6, &got_addr, resolvedIp, sizeof(resolvedIp));
-                        ph->callback(std::string(resolvedIp));
-                        break;
-                    }
-                    default: {
-                        printf("resolved: N/A, rtype=%i\n", rr->rtype);
-                        break;
-                    }
-                }
+                byte_vector bin;
+                bin.resize(rr->rdata.len);
+                memcpy(&bin[0], rr->rdata.p, rr->rdata.len);
+                DnsResolverAnswer ans(std::move(bin));
+                ansArr.emplace_back(std::move(ans));
             }
+            ph->callback(ansArr);
 
             DnsResolver* pSelf = getResolver_g(ph->resolverId);
             if (pSelf != nullptr)
