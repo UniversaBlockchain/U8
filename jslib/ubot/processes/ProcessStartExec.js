@@ -57,6 +57,30 @@ class ProcessStartExec extends ProcessBase {
         ));
     }
     
+    function writePoolBoundStorage(data, storageName = "default") {
+        return new Promise((resolve, reject) => wrkInner.farcall("writeSingleStorage", [data, storageName], {},
+            ans => resolve(ans), err => reject(err)
+        ));
+    }
+    
+    function writeWorkerBoundStorage(data, storageName = "default") {
+        return new Promise((resolve, reject) => wrkInner.farcall("writeMultiStorage", [data, storageName], {},
+            ans => resolve(ans), err => reject(err)
+        ));
+    }
+    
+    function getPoolBoundStorage(storageName = "default") {
+        return new Promise((resolve, reject) => wrkInner.farcall("getSingleStorage", [storageName], {},
+            ans => resolve(ans), err => reject(err)
+        ));
+    }
+    
+    function getWorkerBoundStorage(storageName = "default") {
+        return new Promise((resolve, reject) => wrkInner.farcall("getMultiStorage", [storageName], {},
+            ans => resolve(ans), err => reject(err)
+        ));
+    }
+    
     function registerContract(contract) {
         return new Promise((resolve, reject) => wrkInner.farcall("registerContract", [contract], {},
             ans => resolve(ans), err => reject(err)
