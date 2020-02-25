@@ -101,10 +101,17 @@ std::string DnsResolverAnswer::parseCNAME() const {
     // this body has been already successfully parsed, so we can to ignore error code here
     mg_parse_dns((char*)&msgBody_[0], msgBody_.size(), &msg);
 
-    char res[512];
+    char res[256];
     memset(res, 0, sizeof(res));
     mg_dns_uncompress_name(&msg, &msg.answers[ansIndex_].rdata, res, sizeof(res)-1);
+    std::string rs(res);
+    if (rs.empty())
+        rs = "";
     return std::string(res);
+}
+
+std::string DnsResolverAnswer::parseTXT() const {
+    return std::string(bin_.begin()+1, bin_.end());
 }
 
 DnsResolver::DnsResolver(): mgr_(new mg_mgr(), [](auto p){mg_mgr_free(p);delete p;}) {

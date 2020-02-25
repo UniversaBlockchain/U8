@@ -20,7 +20,10 @@ namespace network {
 enum DnsRRType {
     DNS_A = MG_DNS_A_RECORD,
     DNS_AAAA = MG_DNS_AAAA_RECORD,
-    DNS_CNAME = MG_DNS_CNAME_RECORD
+    DNS_CNAME = MG_DNS_CNAME_RECORD,
+    DNS_TXT = 16,
+    DNS_NS = 2,
+    DNS_SOA = 6,
 };
 
 class DnsResolverAnswer {
@@ -31,6 +34,7 @@ public:
     std::string parseIpV4asString() const;
     std::string parseIpV6asString() const;
     std::string parseCNAME() const;
+    std::string parseTXT() const;
 private:
     byte_vector bin_;
     byte_vector msgBody_;

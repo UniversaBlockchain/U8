@@ -85,8 +85,16 @@ TEST_CASE("dns_get_cname", "[!hide]") {
                 cout << "  ans rtype=" << ans.getType() << ", value: " << ans.parseIpV4asString() << endl;
             else if (ans.getType() == DnsRRType::DNS_AAAA)
                 cout << "  ans rtype=" << ans.getType() << ", value: " << ans.parseIpV6asString() << endl;
-            else
+            else if (ans.getType() == DnsRRType::DNS_TXT)
+                cout << "  ans rtype=" << ans.getType() << ", value: " << ans.parseTXT() << endl;
+            else if (ans.getType() == DnsRRType::DNS_CNAME)
                 cout << "  ans rtype=" << ans.getType() << ", value: " << ans.parseCNAME() << endl;
+            else if (ans.getType() == DnsRRType::DNS_NS)
+                cout << "  ans rtype=" << ans.getType() << ", value: " << ans.parseCNAME() << endl;
+            else if (ans.getType() == DnsRRType::DNS_SOA)
+                cout << "  ans rtype=" << ans.getType() << ", value: " << ans.parseCNAME() << endl;
+            else
+                cout << "  ans rtype=" << ans.getType() << ", value: " << ans.parseTXT() << endl;
         }
 
         sem.notify();
