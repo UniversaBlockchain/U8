@@ -25,12 +25,17 @@ enum DnsRRType {
 
 class DnsResolverAnswer {
 public:
-    DnsResolverAnswer(byte_vector&& bin);
+    DnsResolverAnswer(byte_vector&& bin, mg_dns_message* msg, int ansIndex, int rtype);
+    int getType() const;
     const byte_vector& getBinary() const;
     std::string parseIpV4asString() const;
     std::string parseIpV6asString() const;
+    std::string parseCNAME() const;
 private:
     byte_vector bin_;
+    byte_vector msgBody_;
+    int ansIndex_;
+    int rtype_;
 };
 
 struct DnsResolverRequestHolder {

@@ -5,6 +5,7 @@
 #include "../network/DnsServer.h"
 #include "../tools/tools.h"
 #include "../tools/ThreadPool.h"
+#include "../tools/Semaphore.h"
 #include "catch2.h"
 #include <iostream>
 
@@ -66,6 +67,31 @@ TEST_CASE("dns_hello", "[!hide]") {
 
     dnsServer.stop();
     dnsServer.join();
+
+    dnsResolver.stop();
+    dnsResolver.join();
+}
+
+TEST_CASE("dns_get_cname", "[!hide]") {
+    DnsResolver dnsResolver;
+    dnsResolver.setNameServer("8.8.4.4", 53);
+    dnsResolver.start();
+
+    Semaphore sem;
+    dnsResolver.resolve("www.arubacloud.com", DnsRRType::DNS_CNAME, [&sem](const std::vector<DnsResolverAnswer>& ansArr){
+        cout << "ansArr count = " << ansArr.size() << endl;
+        for (auto& ans : ansArr) {
+            if (ans.getType() == DnsRRType::DNS_A)
+                cout << "  ans rtype=" << ans.getType() << ", value: " << ans.parseIpV4asString() << endl;
+            else if (ans.getType() == DnsRRType::DNS_AAAA)
+                cout << "  ans rtype=" << ans.getType() << ", value: " << ans.parseIpV6asString() << endl;
+            else
+                cout << "  ans rtype=" << ans.getType() << ", value: " << ans.parseCNAME() << endl;
+        }
+
+        sem.notify();
+    });
+    sem.wait();
 
     dnsResolver.stop();
     dnsResolver.join();

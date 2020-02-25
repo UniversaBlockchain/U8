@@ -56,8 +56,16 @@ void removeResolver_g(long resolverId) {
     resolversHolder_g.erase(resolverId);
 }
 
-DnsResolverAnswer::DnsResolverAnswer(byte_vector&& bin) {
+DnsResolverAnswer::DnsResolverAnswer(byte_vector&& bin, mg_dns_message* msg, int ansIndex, int rtype) {
     bin_ = std::move(bin);
+    msgBody_.resize(msg->pkt.len);
+    memcpy(&msgBody_[0], msg->pkt.p, msg->pkt.len);
+    ansIndex_ = ansIndex;
+    rtype_ = rtype;
+}
+
+int DnsResolverAnswer::getType() const {
+    return rtype_;
 }
 
 const byte_vector& DnsResolverAnswer::getBinary() const {
@@ -86,6 +94,17 @@ std::string DnsResolverAnswer::parseIpV6asString() const {
     memset(resolvedIp, 0, sizeof(resolvedIp));
     inet_ntop(AF_INET6, &got_addr, resolvedIp, sizeof(resolvedIp));
     return std::string(resolvedIp);
+}
+
+std::string DnsResolverAnswer::parseCNAME() const {
+    mg_dns_message msg;
+    // this body has been already successfully parsed, so we can to ignore error code here
+    mg_parse_dns((char*)&msgBody_[0], msgBody_.size(), &msg);
+
+    char res[512];
+    memset(res, 0, sizeof(res));
+    mg_dns_uncompress_name(&msg, &msg.answers[ansIndex_].rdata, res, sizeof(res)-1);
+    return std::string(res);
 }
 
 DnsResolver::DnsResolver(): mgr_(new mg_mgr(), [](auto p){mg_mgr_free(p);delete p;}) {
@@ -136,17 +155,17 @@ void DnsResolver::resolve(const std::string& name, int query, std::function<void
         memset(&opts, 0, sizeof(opts));
         opts.nameserver = &nameServerHost_[0];
         mg_resolve_async_opt(mgr_.get(), name.data(), query, [](mg_dns_message *msg, void *user_data, enum mg_resolve_err){
-            if (msg == nullptr)
-                return;
             DnsResolverRequestHolder* ph = (DnsResolverRequestHolder*) user_data;
             std::vector<DnsResolverAnswer> ansArr;
-            for (int i = 0; i < msg->num_answers; ++i) {
-                mg_dns_resource_record* rr = &msg->answers[i];
-                byte_vector bin;
-                bin.resize(rr->rdata.len);
-                memcpy(&bin[0], rr->rdata.p, rr->rdata.len);
-                DnsResolverAnswer ans(std::move(bin));
-                ansArr.emplace_back(std::move(ans));
+            if (msg != nullptr) {
+                for (int i = 0; i < msg->num_answers; ++i) {
+                    mg_dns_resource_record *rr = &msg->answers[i];
+                    byte_vector bin;
+                    bin.resize(rr->rdata.len);
+                    memcpy(&bin[0], rr->rdata.p, rr->rdata.len);
+                    DnsResolverAnswer ans(std::move(bin), msg, i, rr->rtype);
+                    ansArr.emplace_back(std::move(ans));
+                }
             }
             ph->callback(ansArr);
 
