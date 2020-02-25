@@ -497,10 +497,15 @@ class UBotClient {
         let session = null;
         if (payment != null) {
             params.packedU = await payment.getPackedTransaction();
-            //let paidAttempts = 3;
 
-            if (!await this.processPaidOperation(params, payment.id))
-                throw new UBotClientException("Paid operation is not processed");
+            if (!await this.processPaidOperation(params, payment.id)) {
+                let errors = "";
+                session = await this.getSession("ubotGetSession", {requestId: requestContract.id});
+                if (session != null && session.errors != null)
+                    errors = ": " + JSON.stringify(session.errors);
+
+                throw new UBotClientException("Paid operation is not processed" + errors);
+            }
 
             while (session == null || (session.state == null && session.errors == null))
                 session = await this.getSession("ubotGetSession", {requestId: requestContract.id});

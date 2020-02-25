@@ -1463,8 +1463,8 @@ unit.test("ubot_local_test: launcher role", async () => {
     console.log("Error: " + errMessage);
 
     // checking error
-    assert(errMessage === "Session is aborted. Errors: [{\"error\":\"FAILED_CHECK\",\"objectName\":\"checkReferencedItems for contract (hashId=" +
-        launcher1Contract.id + "): false\",\"message\":\"\"},{\"error\":\"FAILURE\",\"objectName\":\"requestContract\",\"message\":\"Request contract state is not APPROVED\"}]");
+    assert(errMessage.startsWith("Session is aborted. Errors:") &&
+        errMessage.includes("{\"error\":\"FAILURE\",\"objectName\":\"requestContract\",\"message\":\"Request contract state is not APPROVED\"}"));
 
     // method_for_launcher2
     let launcher2Contract = Contract.fromPrivateKey(userKey2);
@@ -1509,8 +1509,8 @@ unit.test("ubot_local_test: launcher role", async () => {
     console.log("Error: " + errMessage);
 
     // checking error
-    assert(errMessage === "Session is aborted. Errors: [{\"error\":\"FAILED_CHECK\",\"objectName\":\"checkReferencedItems for contract (hashId=" +
-        launcher2Contract.id + "): false\",\"message\":\"\"},{\"error\":\"FAILURE\",\"objectName\":\"requestContract\",\"message\":\"Request contract state is not APPROVED\"}]");
+    assert(errMessage.startsWith("Session is aborted. Errors:") &&
+        errMessage.includes("{\"error\":\"FAILURE\",\"objectName\":\"requestContract\",\"message\":\"Request contract state is not APPROVED\"}"));
 
     // method_for_any
     let anyContract = Contract.fromPrivateKey(userKey1);
