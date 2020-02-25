@@ -23,7 +23,6 @@ enum DnsRRType {
     DNS_CNAME = MG_DNS_CNAME_RECORD,
     DNS_TXT = 16,
     DNS_NS = 2,
-    DNS_SOA = 6,
 };
 
 class DnsResolverAnswer {
@@ -31,6 +30,7 @@ public:
     DnsResolverAnswer(byte_vector&& bin, mg_dns_message* msg, int ansIndex, int rtype);
     int getType() const;
     const byte_vector& getBinary() const;
+    const byte_vector& getWholeMsgBinary() const;
     std::string parseIpV4asString() const;
     std::string parseIpV6asString() const;
     std::string parseCNAME() const;
@@ -91,10 +91,13 @@ public:
     int rclass;
     int ttl;
 
-    bool addAnswerIpV4(const std::string& ip);
-    bool addAnswerIpV6(const std::string& ip6);
-    bool addAnswerBin(const byte_vector& bin);
+    bool addAnswerIpV4(int rtype, const std::string& ip);
+    bool addAnswerIpV6(int rtype, const std::string& ip6);
+    bool addAnswerBin(int rtype, const byte_vector& bin);
+    void setWholeBinaryResponse(const byte_vector& bin);
     void sendAnswer(int ttl);
+
+private:
     void sendAnswerFromMgThread(int ans_ttl);
 
 private:
@@ -103,9 +106,10 @@ private:
     long connId_;
     std::shared_ptr<mg_mgr> mgr_;
     mg_connection* con_;
-    std::vector<byte_vector> ansBinary_;
+    std::vector<std::pair<int,byte_vector>> ansBinary_;
     byte_vector msgBody_;
     int questionIndex_;
+    byte_vector wholeResponse_;
 };
 
 class DnsServer {

@@ -22,9 +22,9 @@ TEST_CASE("dns_hello", "[!hide]") {
             //cout << "dns question: name = " << question->name << endl;
             this_thread::sleep_for(20ms);
             if (question->rtype == DnsRRType::DNS_A) {
-                question->addAnswerIpV4("127.0.0.1");
+                question->addAnswerIpV4(question->rtype, "127.0.0.1");
             } else if (question->rtype == DnsRRType::DNS_AAAA) {
-                question->addAnswerIpV6("2a02:6b8::2:242");
+                question->addAnswerIpV6(question->rtype, "2a02:6b8::2:242");
             }
             question->sendAnswer(300);
         });
@@ -91,8 +91,6 @@ TEST_CASE("dns_get_cname", "[!hide]") {
                 cout << "  ans rtype=" << ans.getType() << ", value: " << ans.parseCNAME() << endl;
             else if (ans.getType() == DnsRRType::DNS_NS)
                 cout << "  ans rtype=" << ans.getType() << ", value: " << ans.parseCNAME() << endl;
-            else if (ans.getType() == DnsRRType::DNS_SOA)
-                cout << "  ans rtype=" << ans.getType() << ", value: " << ans.parseCNAME() << endl;
             else
                 cout << "  ans rtype=" << ans.getType() << ", value: " << ans.parseTXT() << endl;
         }
@@ -103,4 +101,35 @@ TEST_CASE("dns_get_cname", "[!hide]") {
 
     dnsResolver.stop();
     dnsResolver.join();
+}
+
+TEST_CASE("dns_uplink_proxy", "[!hide]") {
+    DnsResolver dnsUplink;
+    dnsUplink.setNameServer("8.8.4.4", 53);
+    dnsUplink.start();
+
+    DnsServer dnsServer;
+
+    dnsServer.setQuestionsCallback([&dnsUplink](shared_ptr<DnsServerQuestion> question){
+        //cout << "dns question: name = " << question->name << endl;
+        if (question->name == "www.ya.ru") {
+            question->addAnswerIpV4(DnsRRType::DNS_A, "87.250.250.242");
+            question->sendAnswer(300);
+        } else {
+            dnsUplink.resolve(question->name, question->rtype, [question](const std::vector<DnsResolverAnswer>& ansArr){
+                question->setWholeBinaryResponse(ansArr[0].getWholeMsgBinary());
+                question->sendAnswer(300);
+            });
+        }
+    });
+
+    dnsServer.start("0.0.0.0", 5353);
+
+    this_thread::sleep_for(9000s);
+
+    dnsServer.stop();
+    dnsServer.join();
+
+    dnsUplink.stop();
+    dnsUplink.join();
 }

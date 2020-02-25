@@ -72,6 +72,10 @@ const byte_vector& DnsResolverAnswer::getBinary() const {
     return bin_;
 }
 
+const byte_vector& DnsResolverAnswer::getWholeMsgBinary() const {
+    return msgBody_;
+}
+
 std::string DnsResolverAnswer::parseIpV4asString() const {
     in_addr got_addr;
     if (bin_.size() >= sizeof(got_addr))
@@ -104,9 +108,6 @@ std::string DnsResolverAnswer::parseCNAME() const {
     char res[256];
     memset(res, 0, sizeof(res));
     mg_dns_uncompress_name(&msg, &msg.answers[ansIndex_].rdata, res, sizeof(res)-1);
-    std::string rs(res);
-    if (rs.empty())
-        rs = "";
     return std::string(res);
 }
 
@@ -211,36 +212,40 @@ DnsServerQuestion::DnsServerQuestion(long srvId, long qId, std::shared_ptr<mg_mg
     questionIndex_ = qIndx;
 }
 
-bool DnsServerQuestion::addAnswerIpV4(const std::string& ip) {
+bool DnsServerQuestion::addAnswerIpV4(int rtype, const std::string& ip) {
     in_addr ans;
     if (inet_pton(AF_INET, ip.data(), &ans) > 0) {
         byte_vector bin;
         bin.resize(sizeof(ans));
         memcpy(&bin[0], &ans, sizeof(ans));
-        ansBinary_.emplace_back(std::move(bin));
+        ansBinary_.emplace_back(std::make_pair(rtype,std::move(bin)));
         return true;
     }
     return false;
 }
 
-bool DnsServerQuestion::addAnswerIpV6(const std::string& ip6) {
+bool DnsServerQuestion::addAnswerIpV6(int rtype, const std::string& ip6) {
     in6_addr ans;
     if (inet_pton(AF_INET6, ip6.data(), &ans) > 0) {
         byte_vector bin;
         bin.resize(sizeof(ans));
         memcpy(&bin[0], &ans, sizeof(ans));
-        ansBinary_.emplace_back(std::move(bin));
+        ansBinary_.emplace_back(std::make_pair(rtype,std::move(bin)));
         return true;
     }
     return false;
 }
 
-bool DnsServerQuestion::addAnswerBin(const byte_vector& bin) {
+bool DnsServerQuestion::addAnswerBin(int rtype, const byte_vector& bin) {
     if (bin.size() <= 512) {
-        ansBinary_.emplace_back(bin);
+        ansBinary_.emplace_back(std::make_pair(rtype,bin));
         return true;
     }
     return false;
+}
+
+void DnsServerQuestion::setWholeBinaryResponse(const byte_vector& bin) {
+    wholeResponse_ = bin;
 }
 
 struct DnsServerAnswerHolder {
@@ -300,11 +305,16 @@ void DnsServerQuestion::sendAnswerFromMgThread(int ans_ttl) {
 
     mbuf replyBuf;
     mbuf_init(&replyBuf, 512);
-    mg_dns_reply reply = mg_dns_create_reply(&replyBuf, &msg);
 
-    for (byte_vector& bv : ansBinary_)
-        mg_dns_reply_record(&reply, rr, nullptr, rr->rtype, ans_ttl, &bv[0], bv.size());
-    mg_dns_send_reply(con_, &reply);
+    if (wholeResponse_.empty()) {
+        mg_dns_reply reply = mg_dns_create_reply(&replyBuf, &msg);
+        for (auto &ans : ansBinary_)
+            mg_dns_reply_record(&reply, rr, nullptr, ans.first, ans_ttl, &ans.second[0], ans.second.size());
+        mg_dns_send_reply(con_, &reply);
+    } else {
+        memcpy(&wholeResponse_[0], &msgBody_[0], 2);
+        mg_send(con_, &wholeResponse_[0], wholeResponse_.size());
+    }
 
     con_->flags |= MG_F_SEND_AND_CLOSE;
 
