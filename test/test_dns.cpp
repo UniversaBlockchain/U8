@@ -111,13 +111,15 @@ TEST_CASE("dns_uplink_proxy", "[!hide]") {
     DnsServer dnsServer;
 
     dnsServer.setQuestionsCallback([&dnsUplink](shared_ptr<DnsServerQuestion> question){
-        //cout << "dns question: name = " << question->name << endl;
+        cout << "dns question: type=" << question->rtype << ", name = " << question->name << endl;
         if (question->name == "www.ya.ru") {
             question->addAnswerIpV4(DnsRRType::DNS_A, "87.250.250.242");
             question->sendAnswer(300);
         } else {
             dnsUplink.resolve(question->name, question->rtype, [question](const std::vector<DnsResolverAnswer>& ansArr){
-                question->setWholeBinaryResponse(ansArr[0].getWholeMsgBinary());
+                if (ansArr.size() > 0) {
+                    question->setWholeBinaryResponse(ansArr[0].getWholeMsgBinary());
+                }
                 question->sendAnswer(300);
             });
         }
