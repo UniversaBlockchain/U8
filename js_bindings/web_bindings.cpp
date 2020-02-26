@@ -1147,21 +1147,36 @@ Local<FunctionTemplate> initHttpClient(Scripter& scripter) {
 
 class DnsServerQuestionWrapper {
 public:
-    void init(shared_ptr<DnsServerQuestion> question) {
+    void init(shared_ptr<DnsServerQuestion> question, DnsResolver* resolver) {
         question_ = question;
+        resolver_ = resolver;
     }
     string getName() {
         return question_->name;
     }
+    int getRType() {
+        return question_->rtype;
+    }
     void addAnswer_typeA(int ttl, const string& ipV4) {
         question_->addAnswerIpV4(DnsRRType::DNS_A, ttl, ipV4);
+    }
+    void addAnswer_typeAAAA(int ttl, const string& ipV6) {
+        question_->addAnswerIpV6(DnsRRType::DNS_AAAA, ttl, ipV6);
     }
     void sendAnswer() {
         question_->sendAnswer();
         delete this;
     }
+    void resolveThroughUplink() {
+        resolver_->resolve(question_->name, question_->rtype, [this](const std::vector<DnsResolverAnswer>& ansArr){
+            if (ansArr.size() > 0)
+                question_->setWholeBinaryResponse(ansArr[0].getWholeMsgBinary());
+            sendAnswer();
+        });
+    }
 private:
     shared_ptr<DnsServerQuestion> question_;
+    DnsResolver* resolver_;
 };
 
 class DnsServerWrapper {
@@ -1171,35 +1186,42 @@ public:
             if (questionsCallback_ != nullptr) {
                 questionsCallback_->lockedContext([this,q](Local<Context> &cxt){
                     DnsServerQuestionWrapper* qw = new DnsServerQuestionWrapper();
-                    qw->init(q);
+                    qw->init(q, &this->dnsResolver);
                     Local<Value> res = wrap(questionsCallback_->scripter()->DnsServerQuestionWrapperTpl, cxt->GetIsolate(), qw);
                     questionsCallback_->invoke(move(res));
                 });
             }
         });
     }
-    void start(const string& host, int port) {
+    void start(const string& host, int port, const string& uplinkNameServer, int uplinkPort) {
         dnsServer.start(host, port);
+        dnsResolver.setNameServer(uplinkNameServer, uplinkPort);
+        dnsResolver.start();
     }
     void stop() {
         dnsServer.stop();
         dnsServer.join();
+        dnsResolver.stop();
+        dnsResolver.join();
     }
     void setQuestionsCallback(shared_ptr<FunctionHandler> questionsCallback) {
         questionsCallback_ = questionsCallback;
     }
 private:
     DnsServer dnsServer;
+    DnsResolver dnsResolver;
     shared_ptr<FunctionHandler> questionsCallback_;
 };
 
 void dnsServer_start(const FunctionCallbackInfo<Value> &args) {
     Scripter::unwrapArgs(args, [](ArgsContext &ac) {
-        if (ac.args.Length() == 2) {
+        if (ac.args.Length() == 4) {
             auto dnsServer = unwrap<DnsServerWrapper>(ac.args.This());
             string host = ac.asString(0);
             int port = ac.asInt(1);
-            dnsServer->start(host, port);
+            string uplinkHost = ac.asString(2);
+            int uplinkPort = ac.asInt(3);
+            dnsServer->start(host, port, uplinkHost, uplinkPort);
             return;
         }
         ac.throwError("invalid arguments");
@@ -1507,6 +1529,17 @@ void DnsServerQuestionWrapper_getName(const FunctionCallbackInfo<Value> &args) {
     });
 }
 
+void DnsServerQuestionWrapper_getRType(const FunctionCallbackInfo<Value> &args) {
+    Scripter::unwrapArgs(args, [](ArgsContext &ac) {
+        if (ac.args.Length() == 0) {
+            auto qw = unwrap<DnsServerQuestionWrapper>(ac.args.This());
+            ac.setReturnValue(qw->getRType());
+            return;
+        }
+        ac.throwError("invalid arguments");
+    });
+}
+
 void DnsServerQuestionWrapper_addAnswer_typeA(const FunctionCallbackInfo<Value> &args) {
     Scripter::unwrapArgs(args, [](ArgsContext &ac) {
         if (ac.args.Length() == 2) {
@@ -1514,6 +1547,19 @@ void DnsServerQuestionWrapper_addAnswer_typeA(const FunctionCallbackInfo<Value> 
             auto ttl = ac.asInt(0);
             auto ipV4 = ac.asString(1);
             qw->addAnswer_typeA(ttl, ipV4);
+            return;
+        }
+        ac.throwError("invalid arguments");
+    });
+}
+
+void DnsServerQuestionWrapper_addAnswer_typeAAAA(const FunctionCallbackInfo<Value> &args) {
+    Scripter::unwrapArgs(args, [](ArgsContext &ac) {
+        if (ac.args.Length() == 2) {
+            auto qw = unwrap<DnsServerQuestionWrapper>(ac.args.This());
+            auto ttl = ac.asInt(0);
+            auto ipV6 = ac.asString(1);
+            qw->addAnswer_typeAAAA(ttl, ipV6);
             return;
         }
         ac.throwError("invalid arguments");
@@ -1531,6 +1577,17 @@ void DnsServerQuestionWrapper_sendAnswer(const FunctionCallbackInfo<Value> &args
     });
 }
 
+void DnsServerQuestionWrapper_resolveThroughUplink(const FunctionCallbackInfo<Value> &args) {
+    Scripter::unwrapArgs(args, [](ArgsContext &ac) {
+        if (ac.args.Length() == 0) {
+            auto qw = unwrap<DnsServerQuestionWrapper>(ac.args.This());
+            qw->resolveThroughUplink();
+            return;
+        }
+        ac.throwError("invalid arguments");
+    });
+}
+
 void JsInitDnsServerQuestion(Scripter& scripter, const Local<ObjectTemplate> &global) {
     Isolate *isolate = scripter.isolate();
 
@@ -1541,8 +1598,11 @@ void JsInitDnsServerQuestion(Scripter& scripter, const Local<ObjectTemplate> &gl
     auto prototype = tpl->PrototypeTemplate();
     prototype->Set(isolate, "version", String::NewFromUtf8(isolate, "0.0.1").ToLocalChecked());
     prototype->Set(isolate, "__getName", FunctionTemplate::New(isolate, DnsServerQuestionWrapper_getName));
+    prototype->Set(isolate, "__getRType", FunctionTemplate::New(isolate, DnsServerQuestionWrapper_getRType));
     prototype->Set(isolate, "__addAnswer_typeA", FunctionTemplate::New(isolate, DnsServerQuestionWrapper_addAnswer_typeA));
+    prototype->Set(isolate, "__addAnswer_typeAAAA", FunctionTemplate::New(isolate, DnsServerQuestionWrapper_addAnswer_typeAAAA));
     prototype->Set(isolate, "__sendAnswer", FunctionTemplate::New(isolate, DnsServerQuestionWrapper_sendAnswer));
+    prototype->Set(isolate, "__resolveThroughUplink", FunctionTemplate::New(isolate, DnsServerQuestionWrapper_resolveThroughUplink));
 
     // register it into global namespace
     scripter.DnsServerQuestionWrapperTpl.Reset(isolate, tpl);
