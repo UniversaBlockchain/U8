@@ -160,8 +160,8 @@ class ProcessStartExec extends ProcessBase {
         super(processor, onReady);
         this.output = null;
         this.processes = new Map();
-        this.readsFrom = new Map();
-        this.writesTo = new Map();
+        this.readsFrom = null;
+        this.writesTo = null;
         this.lock = new Lock();
 
         this.trustLevel = ut.getRequestStorageReadTrustLevel(this.pr.requestContract);
@@ -384,11 +384,15 @@ class ProcessStartExec extends ProcessBase {
     }
 
     initStorages(methodData) {
-        if (methodData.readsFrom != null && methodData.readsFrom instanceof Array)
+        if (methodData.readsFrom != null && methodData.readsFrom instanceof Array) {
+            this.readsFrom = new Map();
             methodData.readsFrom.forEach(rf => this.readsFrom.set(rf.storage_name, rf));
+        }
 
-        if (methodData.writesTo != null && methodData.writesTo instanceof Array)
+        if (methodData.writesTo != null && methodData.writesTo instanceof Array) {
+            this.writesTo = new Map();
             methodData.writesTo.forEach(wt => this.writesTo.set(wt.storage_name, wt));
+        }
     }
 
     async onNotify(notification) {
@@ -411,128 +415,149 @@ class ProcessStartExec extends ProcessBase {
         return crypto.HashId.of(concat);
     }
 
+    checkStorageAccessibly(storageName, write, multi) {
+        if ((write && this.writesTo != null && !this.writesTo.has(storageName)) ||
+            (!write && this.readsFrom != null && !this.readsFrom.has(storageName))) {
+
+            let message = "Can`t " + (write ? "write data to " : "read data from ") +
+                (multi ? "worker-bound storage \"" : "pool-bound storage \"") + storageName + "\"";
+
+            this.pr.logger.log(message);
+            this.pr.errors.push(new ErrorRecord(Errors.FORBIDDEN, "checkStorageAccessibly", message));
+            this.pr.changeState(UBotPoolState.FAILED);
+
+            throw new UBotProcessException("Error checkStorageAccessibly: " + message);
+        }
+    }
+
     /**
-     * Write data to single storage.
+     * Write data to pool-bound storage.
      *
-     * @param {*} data - Data to write to single storage. Data can be primitive JS types or
+     * @param {*} data - Data to write to pool-bound storage. Data can be primitive JS types or
      * special U8 types that are may be packed by the Boss.
      * @param {string} storageName - Storage name. Optional, if undefined - using default storage.
      * @return {Promise<void>}
      * @throws {UBotQuantiserException} quantiser limit is reached.
-     * @throws {UBotProcessException} process exception if can`t write empty data to single-storage.
+     * @throws {UBotProcessException} process exception if can`t write empty data to pool-bound storage.
 
      */
     async writeSingleStorage(data, storageName = "default") {
-        if (data != null) {
-            try {
-                this.pr.quantiser.addWorkCost(UBotQuantiserProcesses.PRICE_WRITE_SINGLE_STORAGE);
-            } catch (err) {
-                this.pr.logger.log("Error write data to single-storage \"" + storageName + "\": " + err.message);
-                this.pr.logger.log(err.stack);
-                this.pr.errors.push(new ErrorRecord(Errors.FAILURE, "writeSingleStorage",
-                    "Error write data to single-storage \"" + storageName + "\": " + err.message));
-                this.pr.changeState(UBotPoolState.FAILED);
-
-                throw err;
-            }
-
-            return new Promise(async (resolve, reject) => {
-                let storageId = ProcessStartExec.getStorageId(storageName, false);
-                let proc = await this.lock.synchronize("processes", async () => {
-                    if (!this.processes.has(storageId.base64))
-                        this.processes.set(storageId.base64, []);
-
-                    let storageProcesses = this.processes.get(storageId.base64);
-                    let procIndex = storageProcesses.length;
-
-                    let process = new UBotProcess_writeSingleStorage(this.pr,
-                        result => resolve(result),
-                        error => reject(error),
-                        this, storageId, procIndex);
-
-                    storageProcesses.push(process);
-
-                    return process;
-                });
-
-                await proc.init(data, this.pr.getDefaultRecordId(storageName, false), {storage_name: storageName});
-                await proc.start();
-            });
-        } else {
-            this.pr.logger.log("Can`t write empty data to single-storage \"" + storageName + "\"");
-            this.pr.errors.push(new ErrorRecord(Errors.FORBIDDEN, "writeSingleStorage",
-                "Can`t write empty data to single-storage \"" + storageName + "\""));
+        if (data == null) {
+            this.pr.logger.log("Can`t write empty data to pool-bound storage \"" + storageName + "\"");
+            this.pr.errors.push(new ErrorRecord(Errors.FORBIDDEN, "writePoolBoundStorage",
+                "Can`t write empty data to pool-bound storage \"" + storageName + "\""));
             this.pr.changeState(UBotPoolState.FAILED);
 
-            throw new UBotProcessException("Error writeSingleStorage: Can`t write empty data to single-storage \"" + storageName + "\"");
+            throw new UBotProcessException("Error writePoolBoundStorage: Can`t write empty data to pool-bound storage \"" + storageName + "\"");
         }
+
+        this.checkStorageAccessibly(storageName, true, false);
+
+        try {
+            this.pr.quantiser.addWorkCost(UBotQuantiserProcesses.PRICE_WRITE_SINGLE_STORAGE);
+        } catch (err) {
+            this.pr.logger.log("Error write data to pool-bound storage \"" + storageName + "\": " + err.message);
+            this.pr.logger.log(err.stack);
+            this.pr.errors.push(new ErrorRecord(Errors.FAILURE, "writePoolBoundStorage",
+                "Error write data to pool-bound storage \"" + storageName + "\": " + err.message));
+            this.pr.changeState(UBotPoolState.FAILED);
+
+            throw err;
+        }
+
+        return new Promise(async (resolve, reject) => {
+            let storageId = ProcessStartExec.getStorageId(storageName, false);
+            let proc = await this.lock.synchronize("processes", async () => {
+                if (!this.processes.has(storageId.base64))
+                    this.processes.set(storageId.base64, []);
+
+                let storageProcesses = this.processes.get(storageId.base64);
+                let procIndex = storageProcesses.length;
+
+                let process = new UBotProcess_writeSingleStorage(this.pr,
+                    result => resolve(result),
+                    error => reject(error),
+                    this, storageId, procIndex);
+
+                storageProcesses.push(process);
+
+                return process;
+            });
+
+            await proc.init(data, this.pr.getDefaultRecordId(storageName, false), {storage_name: storageName});
+            await proc.start();
+        });
     }
 
     /**
-     * Write data to multi storage.
+     * Write data to worker-bound storage.
      *
-     * @param {*} data - Data to write to multi storage.Data can be primitive JS types or
+     * @param {*} data - Data to write to worker-bound storage.Data can be primitive JS types or
      * special U8 types that are may be packed by the Boss.
      * @param {string} storageName - Storage name. Optional, if undefined - using default storage.
      * @return {Promise<void>}
      * @throws {UBotQuantiserException} quantiser limit is reached.
-     * @throws {UBotProcessException} process exception if can`t write empty data to multi-storage.
+     * @throws {UBotProcessException} process exception if can`t write empty data to worker-bound storage.
      */
     async writeMultiStorage(data, storageName = "default") {
-        if (data != null) {
-            try {
-                this.pr.quantiser.addWorkCost(UBotQuantiserProcesses.PRICE_WRITE_MULTI_STORAGE);
-            } catch (err) {
-                this.pr.logger.log("Error write data to multi-storage \"" + storageName + "\": " + err.message);
-                this.pr.logger.log(err.stack);
-                this.pr.errors.push(new ErrorRecord(Errors.FAILURE, "writeMultiStorage",
-                    "Error write data to multi-storage \"" + storageName + "\": " + err.message));
-                this.pr.changeState(UBotPoolState.FAILED);
-
-                throw err;
-            }
-            
-            return new Promise(async (resolve, reject) => {
-                let storageId = ProcessStartExec.getStorageId(storageName, true);
-                let proc = await this.lock.synchronize("processes", async () => {
-                    if (!this.processes.has(storageId.base64))
-                        this.processes.set(storageId.base64, []);
-
-                    let storageProcesses = this.processes.get(storageId.base64);
-                    let procIndex = storageProcesses.length;
-
-                    let process = new UBotProcess_writeMultiStorage(this.pr,
-                        result => resolve(result),
-                        error => reject(error),
-                        this, storageId, procIndex);
-
-                    storageProcesses.push(process);
-
-                    return process;
-                });
-
-                await proc.init(data, this.pr.getDefaultRecordId(storageName, true), {storage_name: storageName});
-                await proc.start();
-            });
-        } else {
-            this.pr.logger.log("Can`t write empty data to multi-storage \"" + storageName + "\"");
-            this.pr.errors.push(new ErrorRecord(Errors.FORBIDDEN, "writeMultiStorage",
-                "Can`t write empty data to multi-storage \"" + storageName + "\""));
+        if (data == null) {
+            this.pr.logger.log("Can`t write empty data to worker-bound storage \"" + storageName + "\"");
+            this.pr.errors.push(new ErrorRecord(Errors.FORBIDDEN, "writeWorkerBoundStorage",
+                "Can`t write empty data to worker-bound storage \"" + storageName + "\""));
             this.pr.changeState(UBotPoolState.FAILED);
 
-            throw new UBotProcessException("Error writeMultiStorage: Can`t write empty data to multi-storage \"" + storageName + "\"");
+            throw new UBotProcessException("Error writeWorkerBoundStorage: Can`t write empty data to worker-bound storage \"" + storageName + "\"");
         }
+
+        this.checkStorageAccessibly(storageName, true, true);
+
+        try {
+            this.pr.quantiser.addWorkCost(UBotQuantiserProcesses.PRICE_WRITE_MULTI_STORAGE);
+        } catch (err) {
+            this.pr.logger.log("Error write data to worker-bound storage \"" + storageName + "\": " + err.message);
+            this.pr.logger.log(err.stack);
+            this.pr.errors.push(new ErrorRecord(Errors.FAILURE, "writeWorkerBoundStorage",
+                "Error write data to worker-bound storage \"" + storageName + "\": " + err.message));
+            this.pr.changeState(UBotPoolState.FAILED);
+
+            throw err;
+        }
+
+        return new Promise(async (resolve, reject) => {
+            let storageId = ProcessStartExec.getStorageId(storageName, true);
+            let proc = await this.lock.synchronize("processes", async () => {
+                if (!this.processes.has(storageId.base64))
+                    this.processes.set(storageId.base64, []);
+
+                let storageProcesses = this.processes.get(storageId.base64);
+                let procIndex = storageProcesses.length;
+
+                let process = new UBotProcess_writeMultiStorage(this.pr,
+                    result => resolve(result),
+                    error => reject(error),
+                    this, storageId, procIndex);
+
+                storageProcesses.push(process);
+
+                return process;
+            });
+
+            await proc.init(data, this.pr.getDefaultRecordId(storageName, true), {storage_name: storageName});
+            await proc.start();
+        });
     }
 
     /**
-     * Get data from single storage.
+     * Get data from pool-bound storage.
      *
      * @param {string} storageName - Storage name. Optional, if undefined - using default storage.
-     * @return {Promise<null|*>} data from single storage or null if storage is empty.
+     * @return {Promise<null|*>} data from pool-bound storage or null if storage is empty.
      * @throws {UBotQuantiserException} quantiser limit is reached.
      * @throws {UBotClientException} UBot client error.
      */
     async getSingleStorage(storageName = "default") {
+        this.checkStorageAccessibly(storageName, false, false);
+
         try {
             this.pr.quantiser.addWorkCost(UBotQuantiserProcesses.PRICE_GET_STORAGE);
             
@@ -541,24 +566,24 @@ class ProcessStartExec extends ProcessBase {
             // get actual hash from MainNet by this.executableContract.id (further recordId)
             let actualHash = await this.pr.session.getStorage(storageName, false, this.trustLevel, this.pr.requestContract);
             if (actualHash == null) {
-                this.pr.logger.log("getSingleStorage: getStorage return null");
+                this.pr.logger.log("getPoolBoundStorage: getStorage return null");
                 return null;
             } else
-                this.pr.logger.log("getSingleStorage: actual hash = " + actualHash);
+                this.pr.logger.log("getPoolBoundStorage: actual hash = " + actualHash);
 
             let result = await this.pr.ubot.getStoragePackedResultByRecordId(recordId, false);
 
             if (result != null)
-                this.pr.logger.log("getSingleStorage: current result hash = " + crypto.HashId.of(result));
+                this.pr.logger.log("getPoolBoundStorage: current result hash = " + crypto.HashId.of(result));
             else
-                this.pr.logger.log("getSingleStorage: current result is null");
+                this.pr.logger.log("getPoolBoundStorage: current result is null");
 
             if (result == null || !actualHash.equals(crypto.HashId.of(result))) {
-                this.pr.logger.log("getSingleStorage: searchActualStorageResult...");
+                this.pr.logger.log("getPoolBoundStorage: searchActualStorageResult...");
                 result = await this.pr.ubot.network.searchActualStorageResult(recordId, actualHash, false);
 
                 if (result == null) {
-                    this.pr.logger.log("getSingleStorage: searchActualStorageResult return null");
+                    this.pr.logger.log("getPoolBoundStorage: searchActualStorageResult return null");
                     return null;
                 }
 
@@ -572,10 +597,10 @@ class ProcessStartExec extends ProcessBase {
             return await BossBiMapper.getInstance().deserialize(await Boss.load(result));
 
         } catch (err) {
-            this.pr.logger.log("Error get data from single-storage \"" + storageName + "\": " + err.message);
+            this.pr.logger.log("Error get data from pool-bound storage \"" + storageName + "\": " + err.message);
             this.pr.logger.log(err.stack);
-            this.pr.errors.push(new ErrorRecord(Errors.FAILURE, "getSingleStorage",
-                "Error get data from single-storage \"" + storageName + "\": " + err.message));
+            this.pr.errors.push(new ErrorRecord(Errors.FAILURE, "getPoolBoundStorage",
+                "Error get data from pool-bound storage \"" + storageName + "\": " + err.message));
             this.pr.changeState(UBotPoolState.FAILED);
 
             throw err;
@@ -583,14 +608,16 @@ class ProcessStartExec extends ProcessBase {
     }
 
     /**
-     * Get data from multi storage.
+     * Get data from worker-bound storage.
      *
      * @param {string} storageName - Storage name. Optional, if undefined - using default storage.
-     * @return {Promise<null|[*]>} data from multi storage or null if storage is empty.
+     * @return {Promise<null|[*]>} data from worker-bound storage or null if storage is empty.
      * @throws {UBotQuantiserException} quantiser limit is reached.
      * @throws {UBotClientException} UBot client error.
      */
     async getMultiStorage(storageName = "default") {
+        this.checkStorageAccessibly(storageName, false, true);
+
         try {
             this.pr.quantiser.addWorkCost(UBotQuantiserProcesses.PRICE_GET_STORAGE);
             
@@ -599,25 +626,25 @@ class ProcessStartExec extends ProcessBase {
             // get actual hash from MainNet by this.executableContract.id (further recordId)
             let actualHash = await this.pr.session.getStorage(storageName, true, this.trustLevel, this.pr.requestContract);
             if (actualHash == null) {
-                this.pr.logger.log("getMultiStorage: getStorage return null");
+                this.pr.logger.log("getWorkerBoundStorage: getStorage return null");
                 return null;
             } else
-                this.pr.logger.log("getMultiStorage: actual hash = " + actualHash);
+                this.pr.logger.log("getWorkerBoundStorage: actual hash = " + actualHash);
 
             let result = await this.pr.ubot.getRecordsFromMultiStorageByRecordId(recordId);
 
             if (result != null) {
-                this.pr.logger.log("getMultiStorage: current result hash = " + result.cortegeId);
+                this.pr.logger.log("getWorkerBoundStorage: current result hash = " + result.cortegeId);
                 if (result.cortegeId.equals(actualHash))
                     return result.records;
             } else
-                this.pr.logger.log("getMultiStorage: current result is null");
+                this.pr.logger.log("getWorkerBoundStorage: current result is null");
 
-            this.pr.logger.log("getMultiStorage: searchActualStorageResult...");
+            this.pr.logger.log("getWorkerBoundStorage: searchActualStorageResult...");
             result = await this.pr.ubot.network.searchActualStorageResult(recordId, actualHash, true);
 
             if (result == null) {
-                this.pr.logger.log("getMultiStorage: searchActualStorageResult return null");
+                this.pr.logger.log("getWorkerBoundStorage: searchActualStorageResult return null");
                 return null;
             }
 
@@ -640,10 +667,10 @@ class ProcessStartExec extends ProcessBase {
             return records;
 
         } catch (err) {
-            this.pr.logger.log("Error get data from multi-storage \"" + storageName + "\": " + err.message);
+            this.pr.logger.log("Error get data from worker-bound storage \"" + storageName + "\": " + err.message);
             this.pr.logger.log(err.stack);
-            this.pr.errors.push(new ErrorRecord(Errors.FAILURE, "getMultiStorage",
-                "Error get data from multi-storage \"" + storageName + "\": " + err.message));
+            this.pr.errors.push(new ErrorRecord(Errors.FAILURE, "getWorkerBoundStorage",
+                "Error get data from worker-bound storage \"" + storageName + "\": " + err.message));
             this.pr.changeState(UBotPoolState.FAILED);
 
             throw err;

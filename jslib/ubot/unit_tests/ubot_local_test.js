@@ -469,6 +469,69 @@ unit.test("ubot_local_test: error in cloud method", async () => {
     await shutdownUBots(ubotMains);
 });
 
+unit.test("ubot_local_test: error writing to storage", async () => {
+    let ubotMains = await createUBots(ubotsCount);
+
+    let ubotClient = await new UBotClient(clientKey, TOPOLOGY_ROOT + TOPOLOGY_FILE).start();
+
+    let executableContract = await generateSecureRandomExecutableContract();
+
+    executableContract.state.data.cloud_methods.getRandom.writesTo = [{storage_name: "no"}];
+    await executableContract.seal();
+
+    let requestContract = await generateSecureRandomRequestContract(executableContract);
+
+    let state = await ubotClient.executeCloudMethod(requestContract, await createPayment(20));
+
+    console.log("State: " + JSON.stringify(state));
+
+    assert(state.state === UBotPoolState.FAILED.val);
+
+    // checking error
+    assert(state.errors[0].objectName === "checkStorageAccessibly" &&
+           state.errors[0].message === "Can`t write data to worker-bound storage \"default\"");
+
+    await ubotClient.shutdown();
+
+    // waiting pool finished...
+    while (ubotMains.some(main => Array.from(main.ubot.processors.values()).some(proc => proc.state.canContinue)))
+        await sleep(100);
+
+    await shutdownUBots(ubotMains);
+});
+
+unit.test("ubot_local_test: error reading to storage", async () => {
+    let ubotMains = await createUBots(ubotsCount);
+
+    let ubotClient = await new UBotClient(clientKey, TOPOLOGY_ROOT + TOPOLOGY_FILE).start();
+
+    let executableContract = await generateSecureRandomExecutableContract();
+
+    executableContract.state.data.cloud_methods.getRandom.writesTo = [{storage_name: "default"}];
+    executableContract.state.data.cloud_methods.getRandom.readsFrom = [];
+    await executableContract.seal();
+
+    let requestContract = await generateSecureRandomRequestContract(executableContract);
+
+    let state = await ubotClient.executeCloudMethod(requestContract, await createPayment(20));
+
+    console.log("State: " + JSON.stringify(state));
+
+    assert(state.state === UBotPoolState.FAILED.val);
+
+    // checking error
+    assert(state.errors[0].objectName === "checkStorageAccessibly" &&
+           state.errors[0].message === "Can`t read data from worker-bound storage \"default\"");
+
+    await ubotClient.shutdown();
+
+    // waiting pool finished...
+    while (ubotMains.some(main => Array.from(main.ubot.processors.values()).some(proc => proc.state.canContinue)))
+        await sleep(100);
+
+    await shutdownUBots(ubotMains);
+});
+
 // unit.test("ubot_local_test: random deviation", async () => {
 //     let ubotMains = await createUBots(ubotsCount);
 //
