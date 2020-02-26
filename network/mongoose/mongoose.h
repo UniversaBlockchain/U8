@@ -6374,7 +6374,7 @@ void mg_set_nameserver(struct mg_mgr *mgr, const char *nameserver);
  */
 int mg_resolve_async_opt(struct mg_mgr *mgr, const char *name, int query,
                          mg_resolve_callback_t cb, void *data,
-                         struct mg_resolve_async_opts opts);
+                         struct mg_resolve_async_opts opts, int port);
 
 /*
  * Resolve a name from `/etc/hosts`.

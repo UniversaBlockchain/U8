@@ -5,6 +5,7 @@ add_definitions(-DGMP_DESC)
 add_definitions(-DMG_HIDE_SERVER_INFO)
 add_definitions(-DMG_ENABLE_IPV6)
 add_definitions(-DMG_ENABLE_SSL)
+add_definitions(-DMG_ENABLE_DNS_SERVER)
 add_definitions(-DV8_COMPRESS_POINTERS)
 
 # v8 lib

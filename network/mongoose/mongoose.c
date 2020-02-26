@@ -3324,7 +3324,7 @@ struct mg_connection *mg_connect_opt(struct mg_mgr *mgr, const char *address,
     o.dns_conn = &dns_conn;
     o.nameserver = opts.nameserver;
     if (mg_resolve_async_opt(nc->mgr, host, MG_DNS_A_RECORD, resolve_cb, nc,
-                             o) != 0) {
+                             o, 53) != 0) {
       MG_SET_PTRPTR(opts.error_string, "cannot schedule DNS lookup");
       mg_destroy_conn(nc, 1 /* destroy_if */);
       return NULL;
@@ -12189,12 +12189,12 @@ int mg_resolve_async(struct mg_mgr *mgr, const char *name, int query,
                      mg_resolve_callback_t cb, void *data) {
   struct mg_resolve_async_opts opts;
   memset(&opts, 0, sizeof(opts));
-  return mg_resolve_async_opt(mgr, name, query, cb, data, opts);
+  return mg_resolve_async_opt(mgr, name, query, cb, data, opts, 53);
 }
 
 int mg_resolve_async_opt(struct mg_mgr *mgr, const char *name, int query,
                          mg_resolve_callback_t cb, void *data,
-                         struct mg_resolve_async_opts opts) {
+                         struct mg_resolve_async_opts opts, int port) {
   struct mg_resolve_async_request *req;
   struct mg_connection *dns_nc;
   const char *nameserver = opts.nameserver;
@@ -12232,7 +12232,7 @@ int mg_resolve_async_opt(struct mg_mgr *mgr, const char *name, int query,
     }
   }
 
-  snprintf(nameserver_url, sizeof(nameserver_url), "udp://%s:53", nameserver);
+  snprintf(nameserver_url, sizeof(nameserver_url), "udp://%s:%i", nameserver, port);
 
   dns_nc = mg_connect(mgr, nameserver_url, MG_CB(mg_resolve_async_eh, NULL));
   if (dns_nc == NULL) {

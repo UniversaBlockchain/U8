@@ -638,4 +638,67 @@ network.HttpClient = class {
     }
 };
 
+network.DnsServerQuestion = class {
+    constructor(questionWrapper, hasUplink) {
+        this.hasUplink = hasUplink;
+        this.questionWrapper = questionWrapper;
+    }
+
+    get name() {
+        return this.memoise('__getName', () => this.questionWrapper.__getName());
+    }
+
+    get rType() {
+        return this.memoise('__getRType', () => this.questionWrapper.__getRType());
+    }
+
+    addAnswer_typeA(ttl, ipV4string) {
+        this.questionWrapper.__addAnswer_typeA(ttl, ipV4string);
+    }
+
+    addAnswer_typeAAAA(ttl, ipV6string) {
+        this.questionWrapper.__addAnswer_typeAAAA(ttl, ipV6string);
+    }
+
+    sendAnswer() {
+        this.questionWrapper.__sendAnswer();
+    }
+
+    resolveThroughUplink() {
+        if (this.hasUplink)
+            this.questionWrapper.__resolveThroughUplink();
+        else
+            throw Error("network.DnsServer: please set uplink name server to use 'resolveThroughUplink' function");
+    }
+};
+Object.assign(network.DnsServerQuestion.prototype, MemoiseMixin);
+
+network.DnsRRType = {
+    DNS_ANY: 255,
+    DNS_A: 1,
+    DNS_AAAA: 28,
+};
+
+network.DnsServer = class {
+    constructor() {
+        this.uplinkNameServer = "";
+        this.dnsServer_ = new network.DnsServerImpl();
+    }
+
+    setQuestionCallback(block) {
+        this.dnsServer_.__setQuestionsCallback(questionWrapper => {
+            block(new network.DnsServerQuestion(questionWrapper, this.uplinkNameServer!==""));
+        });
+    }
+
+    start(host, port, uplinkNameServer = "", uplinkPort = 53) {
+        this.uplinkNameServer = uplinkNameServer;
+        this.dnsServer_.__start(host, port, uplinkNameServer, uplinkPort);
+    }
+
+    stop() {
+        return new Promise(resolve => this.dnsServer_.__stop(resolve));
+    }
+};
+
 module.exports = network;

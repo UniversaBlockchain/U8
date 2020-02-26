@@ -6,6 +6,8 @@
 #define U8_MONGOOSEEXT_H
 
 #include "mongoose.h"
+#include "../../tools/tools.h"
+#include <memory>
 
 //////////////////////////////////////////////////////////
 //// for IPv6 support, do manually fix in mongoose.c
@@ -24,6 +26,16 @@ in mg_socket_if_connect_tcp
 
 */
 //// for IPv6 support, do manually fix in mongoose.c
+//////////////////////////////////////////////////////////
+
+//////////////////////////////////////////////////////////
+//// for DNS support, do manually fix in mongoose.c
+/*
+
+added parameter 'port' to  function mg_resolve_async_opt
+
+*/
+//// for DNS support, do manually fix in mongoose.c
 //////////////////////////////////////////////////////////
 
 struct mg_connection *mg_connect_http_base(

@@ -3,7 +3,7 @@
  */
 
 import {expect, unit, assert, assertSilent} from 'test'
-import {HttpServer} from 'web'
+import {HttpServer, DnsServer, DnsRRType} from 'web'
 import * as tk from 'unit_tests/test_keys'
 const Boss = require('boss.js');
 const t = require('tools.js');
@@ -553,4 +553,26 @@ unit.test("web_test: http server start exception", async () => {
     }
 
     await httpServer1.stopServer();
+});
+
+unit.test("web_test: dns server hello world", async () => {
+    console.log();
+    let dnsServer = new DnsServer();
+    dnsServer.setQuestionCallback(question => {
+        console.log("question name = " + question.name + ", rType = " + question.rType);
+        if (question.name === "test.ya.ru") {
+            if (question.rType === DnsRRType.DNS_A || question.rType === DnsRRType.DNS_ANY)
+                question.addAnswer_typeA(300, "127.0.0.1");
+            if (question.rType === DnsRRType.DNS_AAAA || question.rType === DnsRRType.DNS_ANY)
+                question.addAnswer_typeAAAA(600, "2a02:6b8::2:242");
+            question.sendAnswer();
+        } else {
+            question.resolveThroughUplink();
+        }
+    });
+    dnsServer.start("0.0.0.0", 5353, "8.8.4.4");
+
+    await sleep(9000);
+
+    await dnsServer.stop();
 });
