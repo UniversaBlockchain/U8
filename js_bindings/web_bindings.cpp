@@ -1182,11 +1182,11 @@ private:
 class DnsServerWrapper {
 public:
     DnsServerWrapper() {
-        dnsServer.setQuestionsCallback([this](std::shared_ptr<DnsServerQuestion> q){
+        dnsServer_.setQuestionsCallback([this](std::shared_ptr<DnsServerQuestion> q){
             if (questionsCallback_ != nullptr) {
                 questionsCallback_->lockedContext([this,q](Local<Context> &cxt){
                     DnsServerQuestionWrapper* qw = new DnsServerQuestionWrapper();
-                    qw->init(q, &this->dnsResolver);
+                    qw->init(q, &this->dnsResolver_);
                     Local<Value> res = wrap(questionsCallback_->scripter()->DnsServerQuestionWrapperTpl, cxt->GetIsolate(), qw);
                     questionsCallback_->invoke(move(res));
                 });
@@ -1194,35 +1194,46 @@ public:
         });
     }
     void start(const string& host, int port, const string& uplinkNameServer, int uplinkPort) {
-        dnsServer.start(host, port);
-        dnsResolver.setNameServer(uplinkNameServer, uplinkPort);
-        dnsResolver.start();
+        uplinkNameServer_ = uplinkNameServer;
+        dnsServer_.start(host, port);
+        if (!uplinkNameServer_.empty()) {
+            dnsResolver_.setNameServer(uplinkNameServer, uplinkPort);
+            dnsResolver_.start();
+        }
     }
     void stop() {
-        dnsServer.stop();
-        dnsServer.join();
-        dnsResolver.stop();
-        dnsResolver.join();
+        dnsServer_.stop();
+        dnsServer_.join();
+        if (!uplinkNameServer_.empty()) {
+            dnsResolver_.stop();
+            dnsResolver_.join();
+        }
     }
     void setQuestionsCallback(shared_ptr<FunctionHandler> questionsCallback) {
         questionsCallback_ = questionsCallback;
     }
 private:
-    DnsServer dnsServer;
-    DnsResolver dnsResolver;
+    string uplinkNameServer_;
+    DnsServer dnsServer_;
+    DnsResolver dnsResolver_;
     shared_ptr<FunctionHandler> questionsCallback_;
 };
 
 void dnsServer_start(const FunctionCallbackInfo<Value> &args) {
     Scripter::unwrapArgs(args, [](ArgsContext &ac) {
         if (ac.args.Length() == 4) {
-            auto dnsServer = unwrap<DnsServerWrapper>(ac.args.This());
-            string host = ac.asString(0);
-            int port = ac.asInt(1);
-            string uplinkHost = ac.asString(2);
-            int uplinkPort = ac.asInt(3);
-            dnsServer->start(host, port, uplinkHost, uplinkPort);
-            return;
+            try {
+                auto dnsServer = unwrap<DnsServerWrapper>(ac.args.This());
+                string host = ac.asString(0);
+                int port = ac.asInt(1);
+                string uplinkHost = ac.asString(2);
+                int uplinkPort = ac.asInt(3);
+                dnsServer->start(host, port, uplinkHost, uplinkPort);
+                return;
+            } catch (const std::exception& e) {
+                ac.throwError(e.what());
+                return;
+            }
         }
         ac.throwError("invalid arguments");
     });
