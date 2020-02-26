@@ -81,6 +81,12 @@ private:
     int requestTimeoutMillis_ = 4000;
 };
 
+struct DnsServerAnswerParams {
+    int rtype;
+    int ttl;
+    byte_vector bin;
+};
+
 class DnsServerQuestion {
 public:
     DnsServerQuestion(long srvId, long qId, std::shared_ptr<mg_mgr> mgr, mg_connection* con, mg_dns_message* msg, int qIndx);
@@ -91,14 +97,14 @@ public:
     int rclass;
     int ttl;
 
-    bool addAnswerIpV4(int rtype, const std::string& ip);
-    bool addAnswerIpV6(int rtype, const std::string& ip6);
-    bool addAnswerBin(int rtype, const byte_vector& bin);
+    bool addAnswerIpV4(int rtype, int ttl, const std::string& ip);
+    bool addAnswerIpV6(int rtype, int ttl, const std::string& ip6);
+    bool addAnswerBin(int rtype, int ttl, const byte_vector& bin);
     void setWholeBinaryResponse(const byte_vector& bin);
-    void sendAnswer(int ttl);
+    void sendAnswer();
 
 private:
-    void sendAnswerFromMgThread(int ans_ttl);
+    void sendAnswerFromMgThread();
 
 private:
     long serverId_;
@@ -106,7 +112,7 @@ private:
     long connId_;
     std::shared_ptr<mg_mgr> mgr_;
     mg_connection* con_;
-    std::vector<std::pair<int,byte_vector>> ansBinary_;
+    std::vector<DnsServerAnswerParams> ansBinary_;
     byte_vector msgBody_;
     int questionIndex_;
     byte_vector wholeResponse_;

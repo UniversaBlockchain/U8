@@ -212,33 +212,41 @@ DnsServerQuestion::DnsServerQuestion(long srvId, long qId, std::shared_ptr<mg_mg
     questionIndex_ = qIndx;
 }
 
-bool DnsServerQuestion::addAnswerIpV4(int rtype, const std::string& ip) {
+bool DnsServerQuestion::addAnswerIpV4(int rtype, int ttl, const std::string& ip) {
     in_addr ans;
     if (inet_pton(AF_INET, ip.data(), &ans) > 0) {
-        byte_vector bin;
-        bin.resize(sizeof(ans));
-        memcpy(&bin[0], &ans, sizeof(ans));
-        ansBinary_.emplace_back(std::make_pair(rtype,std::move(bin)));
+        DnsServerAnswerParams ap;
+        ap.bin.resize(sizeof(ans));
+        memcpy(&ap.bin[0], &ans, sizeof(ans));
+        ap.rtype = rtype;
+        ap.ttl = ttl;
+        ansBinary_.emplace_back(std::move(ap));
         return true;
     }
     return false;
 }
 
-bool DnsServerQuestion::addAnswerIpV6(int rtype, const std::string& ip6) {
+bool DnsServerQuestion::addAnswerIpV6(int rtype, int ttl, const std::string& ip6) {
     in6_addr ans;
     if (inet_pton(AF_INET6, ip6.data(), &ans) > 0) {
-        byte_vector bin;
-        bin.resize(sizeof(ans));
-        memcpy(&bin[0], &ans, sizeof(ans));
-        ansBinary_.emplace_back(std::make_pair(rtype,std::move(bin)));
+        DnsServerAnswerParams ap;
+        ap.bin.resize(sizeof(ans));
+        memcpy(&ap.bin[0], &ans, sizeof(ans));
+        ap.rtype = rtype;
+        ap.ttl = ttl;
+        ansBinary_.emplace_back(std::move(ap));
         return true;
     }
     return false;
 }
 
-bool DnsServerQuestion::addAnswerBin(int rtype, const byte_vector& bin) {
+bool DnsServerQuestion::addAnswerBin(int rtype, int ttl, const byte_vector& bin) {
     if (bin.size() <= 512) {
-        ansBinary_.emplace_back(std::make_pair(rtype,bin));
+        DnsServerAnswerParams ap;
+        ap.bin = bin;
+        ap.rtype = rtype;
+        ap.ttl = ttl;
+        ansBinary_.emplace_back(std::move(ap));
         return true;
     }
     return false;
@@ -252,24 +260,22 @@ struct DnsServerAnswerHolder {
     long serverId;
     long qId;
     mg_connection *nc;
-    int ttl;
     long connId;
     bool done;
 };
 
-void DnsServerQuestion::sendAnswer(int ttl) {
+void DnsServerQuestion::sendAnswer() {
     DnsServer* server = getServer_g(serverId_);
     if (server == nullptr)
         return;
     if (std::this_thread::get_id() == server->mgThreadId_) {
-        sendAnswerFromMgThread(ttl);
+        sendAnswerFromMgThread();
         return;
     }
     DnsServerAnswerHolder ah;
     ah.serverId = serverId_;
     ah.qId = questionId_;
     ah.nc = con_;
-    ah.ttl = ttl;
     ah.connId = connId_;
     ah.done = false;
     std::lock_guard lock(server->broadcastMutex_);
@@ -285,14 +291,14 @@ void DnsServerQuestion::sendAnswer(int ttl) {
             // here we are in mongoose loop thread, so we dont worry about synchronization
             if (server->questionsHolder_.find(holder->qId) != server->questionsHolder_.end()) {
                 auto pReq = server->questionsHolder_[holder->qId];
-                pReq->sendAnswerFromMgThread(holder->ttl);
+                pReq->sendAnswerFromMgThread();
                 holder->done = true;
             }
         }
     }, (void*)(&ah), sizeof(ah));
 }
 
-void DnsServerQuestion::sendAnswerFromMgThread(int ans_ttl) {
+void DnsServerQuestion::sendAnswerFromMgThread() {
     DnsServer* server = getServer_g(serverId_);
     if (server == nullptr)
         return;
@@ -309,7 +315,7 @@ void DnsServerQuestion::sendAnswerFromMgThread(int ans_ttl) {
     if (wholeResponse_.empty()) {
         mg_dns_reply reply = mg_dns_create_reply(&replyBuf, &msg);
         for (auto &ans : ansBinary_)
-            mg_dns_reply_record(&reply, rr, nullptr, ans.first, ans_ttl, &ans.second[0], ans.second.size());
+            mg_dns_reply_record(&reply, rr, nullptr, ans.rtype, ans.ttl, &ans.bin[0], ans.bin.size());
         mg_dns_send_reply(con_, &reply);
     } else {
         memcpy(&wholeResponse_[0], &msgBody_[0], 2);

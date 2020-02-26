@@ -559,7 +559,8 @@ unit.test("web_test: dns server hello world", async () => {
     console.log();
     let dnsServer = new DnsServer();
     dnsServer.setQuestionCallback(question => {
-        question.addAnswer_typeA("127.0.0.1");
+        question.addAnswer_typeA(300, "127.0.0.1");
+        question.addAnswer_typeA(600, "127.0.0.2");
         question.sendAnswer();
     });
     dnsServer.start("0.0.0.0", 5353);

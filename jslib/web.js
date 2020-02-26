@@ -647,8 +647,8 @@ network.DnsServerQuestion = class {
         return this.memoise('__getName', () => this.questionWrapper.__getName());
     }
 
-    addAnswer_typeA(ipV4string) {
-        this.questionWrapper.__addAnswer_typeA(ipV4string);
+    addAnswer_typeA(ttl, ipV4string) {
+        this.questionWrapper.__addAnswer_typeA(ttl, ipV4string);
     }
 
     sendAnswer() {

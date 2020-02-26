@@ -1153,11 +1153,11 @@ public:
     string getName() {
         return question_->name;
     }
-    void addAnswer_typeA(const string& ipV4) {
-        question_->addAnswerIpV4(DnsRRType::DNS_A, ipV4);
+    void addAnswer_typeA(int ttl, const string& ipV4) {
+        question_->addAnswerIpV4(DnsRRType::DNS_A, ttl, ipV4);
     }
     void sendAnswer() {
-        question_->sendAnswer(300);
+        question_->sendAnswer();
         delete this;
     }
 private:
@@ -1509,10 +1509,11 @@ void DnsServerQuestionWrapper_getName(const FunctionCallbackInfo<Value> &args) {
 
 void DnsServerQuestionWrapper_addAnswer_typeA(const FunctionCallbackInfo<Value> &args) {
     Scripter::unwrapArgs(args, [](ArgsContext &ac) {
-        if (ac.args.Length() == 1) {
+        if (ac.args.Length() == 2) {
             auto qw = unwrap<DnsServerQuestionWrapper>(ac.args.This());
-            auto ipV4 = ac.asString(0);
-            qw->addAnswer_typeA(ipV4);
+            auto ttl = ac.asInt(0);
+            auto ipV4 = ac.asString(1);
+            qw->addAnswer_typeA(ttl, ipV4);
             return;
         }
         ac.throwError("invalid arguments");

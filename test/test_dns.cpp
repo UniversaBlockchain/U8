@@ -22,11 +22,11 @@ TEST_CASE("dns_hello", "[!hide]") {
             //cout << "dns question: name = " << question->name << endl;
             this_thread::sleep_for(20ms);
             if (question->rtype == DnsRRType::DNS_A) {
-                question->addAnswerIpV4(question->rtype, "127.0.0.1");
+                question->addAnswerIpV4(question->rtype, 300, "127.0.0.1");
             } else if (question->rtype == DnsRRType::DNS_AAAA) {
-                question->addAnswerIpV6(question->rtype, "2a02:6b8::2:242");
+                question->addAnswerIpV6(question->rtype, 300, "2a02:6b8::2:242");
             }
-            question->sendAnswer(300);
+            question->sendAnswer();
         });
     });
 
@@ -115,14 +115,14 @@ TEST_CASE("dns_uplink_proxy", "[!hide]") {
     dnsServer.setQuestionsCallback([&dnsUplink](shared_ptr<DnsServerQuestion> question){
         cout << "dns question: type=" << question->rtype << ", name = " << question->name << endl;
         if (question->name == "www.ya.ru") {
-            question->addAnswerIpV4(DnsRRType::DNS_A, "87.250.250.242");
-            question->sendAnswer(300);
+            question->addAnswerIpV4(DnsRRType::DNS_A, 300, "87.250.250.242");
+            question->sendAnswer();
         } else {
             dnsUplink.resolve(question->name, question->rtype, [question](const std::vector<DnsResolverAnswer>& ansArr){
                 if (ansArr.size() > 0) {
                     question->setWholeBinaryResponse(ansArr[0].getWholeMsgBinary());
                 }
-                question->sendAnswer(300);
+                question->sendAnswer();
             });
         }
     });
