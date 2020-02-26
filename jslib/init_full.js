@@ -167,6 +167,10 @@ function freezeGlobals() {
     Object.freeze(global.network.HttpServerRequest);
     Object.freeze(global.network.HttpServer);
     Object.freeze(global.network.HttpClient);
+    Object.freeze(global.DnsServerQuestionWrapper);
+    Object.freeze(global.network.DnsServerImpl);
+    Object.freeze(global.network.DnsServerQuestion);
+    Object.freeze(global.network.DnsServer);
     Object.freeze(global.network);
     Object.freeze(global.research.MemoryUser1Impl);
     Object.freeze(global.research.MemoryUser2Impl);

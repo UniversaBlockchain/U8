@@ -3,7 +3,7 @@
  */
 
 import {expect, unit, assert, assertSilent} from 'test'
-import {HttpServer} from 'web'
+import {HttpServer, DnsServer} from 'web'
 import * as tk from 'unit_tests/test_keys'
 const Boss = require('boss.js');
 const t = require('tools.js');
@@ -553,4 +553,18 @@ unit.test("web_test: http server start exception", async () => {
     }
 
     await httpServer1.stopServer();
+});
+
+unit.test("web_test: dns server hello world", async () => {
+    console.log();
+    let dnsServer = new DnsServer();
+    dnsServer.setQuestionCallback(question => {
+        question.addAnswer_typeA("127.0.0.1");
+        question.sendAnswer();
+    });
+    dnsServer.start("0.0.0.0", 5353);
+
+    await sleep(9000);
+
+    await dnsServer.stop();
 });

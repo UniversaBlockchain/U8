@@ -44,8 +44,10 @@ TEST_CASE("dns_hello", "[!hide]") {
     for (int i = 0; i < N; ++i) {
         ++reqCounter;
         dnsResolver.resolve("ya.ru", DnsRRType::DNS_A, [&ansCounter,&t0](const std::vector<DnsResolverAnswer>& ansArr) {
-//            for (const DnsResolverAnswer& ans : ansArr)
-//                cout << "resolved: " << ans.parseIpV4asString() << endl;
+            for (const DnsResolverAnswer& ans : ansArr) {
+                //cout << "resolved: " << ans.parseIpV4asString() << endl;
+                REQUIRE(ans.parseIpV4asString() == "127.0.0.1");
+            }
             ++ansCounter;
             long now = getCurrentTimeMillis();
             long dt = now - t0;

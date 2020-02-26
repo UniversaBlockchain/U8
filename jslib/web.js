@@ -638,4 +638,43 @@ network.HttpClient = class {
     }
 };
 
+network.DnsServerQuestion = class {
+    constructor(questionWrapper) {
+        this.questionWrapper = questionWrapper;
+    }
+
+    getName() {
+        return this.memoise('__getName', () => this.questionWrapper.__getName());
+    }
+
+    addAnswer_typeA(ipV4string) {
+        this.questionWrapper.__addAnswer_typeA(ipV4string);
+    }
+
+    sendAnswer() {
+        this.questionWrapper.__sendAnswer();
+    }
+};
+Object.assign(network.DnsServerQuestion.prototype, MemoiseMixin);
+
+network.DnsServer = class {
+    constructor() {
+        this.dnsServer_ = new network.DnsServerImpl();
+    }
+
+    setQuestionCallback(block) {
+        this.dnsServer_.__setQuestionsCallback(questionWrapper => {
+            block(new network.DnsServerQuestion(questionWrapper));
+        });
+    }
+
+    start(host, port) {
+        this.dnsServer_.__start(host, port);
+    }
+
+    stop() {
+        return new Promise(resolve => this.dnsServer_.__stop(resolve));
+    }
+};
+
 module.exports = network;

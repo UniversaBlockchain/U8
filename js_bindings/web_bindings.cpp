@@ -7,6 +7,7 @@
 #include "../network/HttpServer.h"
 #include "../network/HttpClient.h"
 #include "../network/UDPAdapter.h"
+#include "../network/DnsServer.h"
 
 using namespace network;
 using namespace crypto;
@@ -735,7 +736,7 @@ Local<FunctionTemplate> initHttpServer(Scripter& scripter) {
     Isolate *isolate = scripter.isolate();
     Local<FunctionTemplate> tpl = bindCppClass<HttpServerBuffered>(
             isolate,
-            "HttpServerTpl",
+            "HttpServerBuffered",
             [=](const FunctionCallbackInfo<Value> &args) -> HttpServerBuffered* {
                 Isolate *isolate = args.GetIsolate();
                 if (args.Length() == 4) {
@@ -1109,7 +1110,7 @@ Local<FunctionTemplate> initHttpClient(Scripter& scripter) {
     Isolate *isolate = scripter.isolate();
     Local<FunctionTemplate> tpl = bindCppClass<HttpClientBuffered>(
             isolate,
-            "HttpClientTpl",
+            "HttpClientBuffered",
             [=](const FunctionCallbackInfo<Value> &args) -> HttpClientBuffered* {
                 Isolate *isolate = args.GetIsolate();
                 if (args.Length() == 1) {
@@ -1144,11 +1145,116 @@ Local<FunctionTemplate> initHttpClient(Scripter& scripter) {
     return tpl;
 }
 
+class DnsServerQuestionWrapper {
+public:
+    void init(shared_ptr<DnsServerQuestion> question) {
+        question_ = question;
+    }
+    string getName() {
+        return question_->name;
+    }
+    void addAnswer_typeA(const string& ipV4) {
+        question_->addAnswerIpV4(DnsRRType::DNS_A, ipV4);
+    }
+    void sendAnswer() {
+        question_->sendAnswer(300);
+        delete this;
+    }
+private:
+    shared_ptr<DnsServerQuestion> question_;
+};
+
+class DnsServerWrapper {
+public:
+    DnsServerWrapper() {
+        dnsServer.setQuestionsCallback([this](std::shared_ptr<DnsServerQuestion> q){
+            if (questionsCallback_ != nullptr) {
+                questionsCallback_->lockedContext([this,q](Local<Context> &cxt){
+                    DnsServerQuestionWrapper* qw = new DnsServerQuestionWrapper();
+                    qw->init(q);
+                    Local<Value> res = wrap(questionsCallback_->scripter()->DnsServerQuestionWrapperTpl, cxt->GetIsolate(), qw);
+                    questionsCallback_->invoke(move(res));
+                });
+            }
+        });
+    }
+    void start(const string& host, int port) {
+        dnsServer.start(host, port);
+    }
+    void stop() {
+        dnsServer.stop();
+        dnsServer.join();
+    }
+    void setQuestionsCallback(shared_ptr<FunctionHandler> questionsCallback) {
+        questionsCallback_ = questionsCallback;
+    }
+private:
+    DnsServer dnsServer;
+    shared_ptr<FunctionHandler> questionsCallback_;
+};
+
+void dnsServer_start(const FunctionCallbackInfo<Value> &args) {
+    Scripter::unwrapArgs(args, [](ArgsContext &ac) {
+        if (ac.args.Length() == 2) {
+            auto dnsServer = unwrap<DnsServerWrapper>(ac.args.This());
+            string host = ac.asString(0);
+            int port = ac.asInt(1);
+            dnsServer->start(host, port);
+            return;
+        }
+        ac.throwError("invalid arguments");
+    });
+}
+
+void dnsServer_stop(const FunctionCallbackInfo<Value> &args) {
+    Scripter::unwrapArgs(args, [](ArgsContext &ac) {
+        if (ac.args.Length() == 1) {
+            auto dnsServer = unwrap<DnsServerWrapper>(ac.args.This());
+            auto onReady = ac.asFunction(0);
+            runAsync([dnsServer,onReady](){
+                Blocking;
+                dnsServer->stop();
+                onReady->lockedContext([onReady](Local<Context> &cxt) {
+                    onReady->invoke();
+                });
+            });
+            return;
+        }
+        ac.throwError("invalid arguments");
+    });
+}
+
+void dnsServer_setQuestionsCallback(const FunctionCallbackInfo<Value> &args) {
+    Scripter::unwrapArgs(args, [](ArgsContext &ac) {
+        if (ac.args.Length() == 1) {
+            auto dnsServer = unwrap<DnsServerWrapper>(ac.args.This());
+            auto callback = ac.asFunction(0);
+            dnsServer->setQuestionsCallback(callback);
+            return;
+        }
+        ac.throwError("invalid arguments");
+    });
+}
+
+Local<FunctionTemplate> initDnsServer(Scripter& scripter) {
+    Isolate *isolate = scripter.isolate();
+    Local<FunctionTemplate> tpl = bindCppClass<DnsServerWrapper>(isolate, "DnsServerImpl");
+    auto prototype = tpl->PrototypeTemplate();
+
+    prototype->Set(isolate, "__start", FunctionTemplate::New(isolate, dnsServer_start));
+    prototype->Set(isolate, "__stop", FunctionTemplate::New(isolate, dnsServer_stop));
+    prototype->Set(isolate, "__setQuestionsCallback", FunctionTemplate::New(isolate, dnsServer_setQuestionsCallback));
+
+    scripter.DnsServerTpl.Reset(isolate, tpl);
+    return tpl;
+}
+
 void JsInitNetwork(Scripter& scripter, const Local<ObjectTemplate> &global) {
     Isolate *isolate = scripter.isolate();
 
     JsInitHttpServerRequest(scripter, global);
     JsInitHttpServerSecureRequest(scripter, global);
+    JsInitDnsServerQuestion(scripter, global);
 
     auto network = ObjectTemplate::New(isolate);
 
@@ -1158,6 +1264,7 @@ void JsInitNetwork(Scripter& scripter, const Local<ObjectTemplate> &global) {
     network->Set(isolate, "UDPAdapterImpl", initUDPAdapter(scripter));
     network->Set(isolate, "HttpServerImpl", initHttpServer(scripter));
     network->Set(isolate, "HttpClientImpl", initHttpClient(scripter));
+    network->Set(isolate, "DnsServerImpl", initDnsServer(scripter));
 
     global->Set(isolate, "network", network);
 }
@@ -1387,4 +1494,56 @@ void JsInitHttpServerSecureRequest(Scripter& scripter, const Local<ObjectTemplat
     // register it into global namespace
     scripter.HttpServerRequestSecureBufTpl.Reset(isolate, tpl);
     global->Set(isolate, "HttpServerSecureRequestBuf", tpl);
+}
+
+void DnsServerQuestionWrapper_getName(const FunctionCallbackInfo<Value> &args) {
+    Scripter::unwrapArgs(args, [](ArgsContext &ac) {
+        if (ac.args.Length() == 0) {
+            auto qw = unwrap<DnsServerQuestionWrapper>(ac.args.This());
+            ac.setReturnValue(ac.v8String(qw->getName()));
+            return;
+        }
+        ac.throwError("invalid arguments");
+    });
+}
+
+void DnsServerQuestionWrapper_addAnswer_typeA(const FunctionCallbackInfo<Value> &args) {
+    Scripter::unwrapArgs(args, [](ArgsContext &ac) {
+        if (ac.args.Length() == 1) {
+            auto qw = unwrap<DnsServerQuestionWrapper>(ac.args.This());
+            auto ipV4 = ac.asString(0);
+            qw->addAnswer_typeA(ipV4);
+            return;
+        }
+        ac.throwError("invalid arguments");
+    });
+}
+
+void DnsServerQuestionWrapper_sendAnswer(const FunctionCallbackInfo<Value> &args) {
+    Scripter::unwrapArgs(args, [](ArgsContext &ac) {
+        if (ac.args.Length() == 0) {
+            auto qw = unwrap<DnsServerQuestionWrapper>(ac.args.This());
+            qw->sendAnswer();
+            return;
+        }
+        ac.throwError("invalid arguments");
+    });
+}
+
+void JsInitDnsServerQuestion(Scripter& scripter, const Local<ObjectTemplate> &global) {
+    Isolate *isolate = scripter.isolate();
+
+    // Bind object with default constructor
+    Local<FunctionTemplate> tpl = bindCppClass<DnsServerQuestionWrapper>(isolate, "DnsServerQuestionWrapper");
+
+    // instance methods
+    auto prototype = tpl->PrototypeTemplate();
+    prototype->Set(isolate, "version", String::NewFromUtf8(isolate, "0.0.1").ToLocalChecked());
+    prototype->Set(isolate, "__getName", FunctionTemplate::New(isolate, DnsServerQuestionWrapper_getName));
+    prototype->Set(isolate, "__addAnswer_typeA", FunctionTemplate::New(isolate, DnsServerQuestionWrapper_addAnswer_typeA));
+    prototype->Set(isolate, "__sendAnswer", FunctionTemplate::New(isolate, DnsServerQuestionWrapper_sendAnswer));
+
+    // register it into global namespace
+    scripter.DnsServerQuestionWrapperTpl.Reset(isolate, tpl);
+    global->Set(isolate, "DnsServerQuestionWrapper", tpl);
 }

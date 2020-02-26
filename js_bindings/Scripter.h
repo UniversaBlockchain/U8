@@ -270,6 +270,8 @@ public:
     Persistent<FunctionTemplate> HttpServerRequestBufTpl;
     Persistent<FunctionTemplate> HttpServerRequestSecureBufTpl;
     Persistent<FunctionTemplate> HttpClientTpl;
+    Persistent<FunctionTemplate> DnsServerTpl;
+    Persistent<FunctionTemplate> DnsServerQuestionWrapperTpl;
 
     // worker templates
     Persistent<FunctionTemplate> WorkerScripterTpl;

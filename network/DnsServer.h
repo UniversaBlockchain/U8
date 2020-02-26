@@ -122,6 +122,7 @@ public:
 
     void setQuestionsCallback(std::function<void(std::shared_ptr<DnsServerQuestion>)>&& onQuestion);
 
+private:
     long genQuestionId();
 
 private:

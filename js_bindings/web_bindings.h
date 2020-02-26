@@ -13,5 +13,6 @@ using namespace std;
 void JsInitNetwork(Scripter& scripter, const Local<ObjectTemplate> &global);
 void JsInitHttpServerRequest(Scripter& scripter, const Local<ObjectTemplate> &global);
 void JsInitHttpServerSecureRequest(Scripter& scripter, const Local<ObjectTemplate> &global);
+void JsInitDnsServerQuestion(Scripter& scripter, const Local<ObjectTemplate> &global);
 
 #endif //U8_WEB_BINDINGS_H
