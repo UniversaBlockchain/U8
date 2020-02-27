@@ -742,12 +742,51 @@ class SimpleRole extends Role {
 //QuorumVoteRole
 ///////////////////////////
 
+const QuorumOperators = {
+    OPERATOR_ADD : "OPERATOR_ADD",
+    OPERATOR_SUBTRACT : "OPERATOR_SUBTRACT"
+};
+
+let operatorSymbols = {
+    "+" : QuorumOperators.OPERATOR_ADD,
+    "-" : QuorumOperators.OPERATOR_SUBTRACT
+};
+
 class QuorumVoteRole extends Role {
 
-    constructor(name, source, quorum, contract = null) {
+    constructor (name, source, quorum, contract = null) {
         super(name, contract);
         this.source = source;
         this.quorum = quorum;
+        this.quorumValues = [];
+        this.quorumOperators = [];
+        this.votesCount = null;
+
+        this.extractValuesAndOperators();
+    }
+
+    extractValuesAndOperators() {
+        let pos = 0;
+
+        for (let i = 0; i < this.quorum.length; i++) {
+            if (operatorSymbols.hasOwnProperty(this.quorum.charAt(i))) {
+                let value = this.quorum.substring(pos,i);
+                if (value.length === 0) {
+                    throw new ex.IllegalArgumentError("Invalid quorum format");
+                }
+
+                this.quorumValues.push(value);
+                this.quorumOperators.push(operatorSymbols[this.quorum.charAt(i)]);
+                pos = i+1;
+            }
+        }
+
+        let value = this.quorum.substring(pos);
+        if (value.length === 0) {
+            throw new ex.IllegalArgumentError("Invalid quorum format");
+        }
+
+        this.quorumValues.push(value);
     }
 
     isValid() {
@@ -771,20 +810,20 @@ class QuorumVoteRole extends Role {
         return t.valuesEqual(this.quorum, to.quorum);
     }
 
-    equalsForConstraint(to) {
-        if (this === to)
-            return true;
-
-        if (Object.getPrototypeOf(this) !== Object.getPrototypeOf(to))
+    equalsIgnoreNameAndRefs(otherRole) {
+        if (!(otherRole instanceof QuorumVoteRole))
             return false;
 
-        if (!Object.getPrototypeOf(QuorumVoteRole.prototype).equals.call(this, to))
+        if (!this.isValid() || !otherRole.isValid())
             return false;
 
-        if (!t.valuesEqual(this.source, to.source))
+        if (!this.source.equals(otherRole.source))
             return false;
 
-        return t.valuesEqual(this.quorum, to.quorum);
+        if (!this.quorum.equals(otherRole.quorum))
+            return false;
+
+        return true;
     }
 
     initWithDsl(serializedRole) {
@@ -792,11 +831,33 @@ class QuorumVoteRole extends Role {
         this.quorum = serializedRole.quorum;
     }
 
+    getKeys() {
+        return null;
+    }
+
+    getAnonymousIds() {
+        return null;
+    }
+
+    getKeyAddresses() {
+        return null;
+    }
+
+    getKeyRecords() {
+        return null;
+    }
+
+    anonymize() {
+
+    }
+
     async deserialize(data, deserializer) {
         await Object.getPrototypeOf(QuorumVoteRole.prototype).deserialize.call(this, data, deserializer);
 
         this.source = data.source;
         this.quorum = data.quorum;
+
+        this.extractValuesAndOperators();
     }
 
     async serialize(serializer) {
@@ -808,13 +869,54 @@ class QuorumVoteRole extends Role {
         return data;
     }
 
+
+    /**
+     * Check role is allowed to keys.
+     *
+     * @param {Iterable<crypto.PrivateKey> | Iterable<crypto.PublicKey>} keys - Keys to check allowance for.
+     * @return {boolean} if role is allowed for a set of keys
+     */
+    isAllowedForKeysQuantized(keys) {
+        if (!Object.getPrototypeOf(QuorumVoteRole.prototype).isAllowedForKeysQuantized.call(this, keys))
+            return false;
+
+        let votingAddresses;
+
+        try {
+            votingAddresses = this.getVotingAddresses();
+        } catch (e) {
+            return false;
+        }
+
+        let minValidCount = this.calculateMinValidCount(votingAddresses.size);
+
+        if (this.votesCount != null) {
+            return minValidCount <= this.votesCount;
+
+        } else {
+            for (let va of votingAddresses) {
+                for (let k of keys) {
+                    if (k.isMatchingKeyAddress(va)) { //TODO
+                        minValidCount--;
+                    }
+                }
+
+                if (minValidCount === 0) {
+                    break;
+                }
+            }
+
+            return minValidCount === 0;
+        }
+    }
+
     /**
      * Check role is allowed to keys
      *
      * @param {Iterable<crypto.PrivateKey> | Iterable<crypto.PublicKey>} keys - Keys to check allowance for
      * @returns {boolean} if role is allowed for a set of keys
      */
-    isAllowedForKeys(keys) {
+    isAllowedForKeys(keys) {  //TODO
         if (!Object.getPrototypeOf(QuorumVoteRole.prototype).isAllowedForKeys.call(this, keys))
             return false;
 
@@ -881,6 +983,182 @@ class QuorumVoteRole extends Role {
         return minValidCount === 0;
     }
 
+    calculateMinValidCount(totalVotesCount) {
+        let value = 0;
+
+        for (let i = 0; i < this.quorumValues.length; i++) {
+
+            let curValue;
+            let valueString = this.quorumValues[i];
+            let isPercentageBased = valueString.endsWith("%");
+
+            if (isPercentageBased) {
+                if (totalVotesCount === 0)
+                    throw new ex.IllegalArgumentError("Percentage based quorum requires vote list to be provided at registration");
+
+                valueString = valueString.substring(0,valueString.length-1);
+
+            } else if (valueString === "N") {
+                curValue = totalVotesCount;
+            }
+
+            try {
+                //curValue = isPercentageBased ? Math.floor(totalVotesCount * Double.parseDouble(valueString) / 100) : Long.parseLong(valueString);
+            } catch (ignored) {
+                let idx = valueString.indexOf(".");
+                let from;
+                let what;
+
+                if (idx === -1) {
+                    from = "this";
+                    what = "state.data." + valueString;
+                } else {
+                    from = valueString.substring(0, idx);
+                    what = valueString.substring(idx+1);
+                }
+
+                if (from.equals("this")) {
+                    valueString = this.contract.get(what);
+                } else {
+                    let constr = this.contract.constraints.get(from);
+
+                    if (constr == null) {
+                        throw new ex.IllegalArgumentError("Reference with name '" + from + "' wasn't found for role " + this.name);
+                    }
+
+                    if(constr.matchingItems.size() !== 1) {
+                        throw new ex.IllegalArgumentError("Reference with name '" + from + "' should be matching exactly one contract within transaction to be used in QuorumVoteRole");
+                    }
+
+                    valueString = (constr.matchingItems.get(0)).get(what).toString();
+                }
+
+                try {
+                    //curValue = isPercentageBased ? (long) Math.floor(totalVotesCount * Double.parseDouble(valueString) / 100) : Long.parseLong(valueString);
+                } catch (e) {
+                    throw new ex.IllegalArgumentError(e);
+                }
+            }
+
+            if (i === 0) {
+                value = curValue;
+            } else {
+                switch (this.quorumOperators.get(i-1)) {
+                    case QuorumOperators.OPERATOR_SUBTRACT:
+                        value -= curValue;
+                        break;
+                    case QuorumOperators.OPERATOR_ADD:
+                        value += curValue;
+                        break;
+                }
+            }
+        }
+
+        return value;
+    }
+
+    getVotesForKeys(keys) {
+        let votingAddresses = null;
+        try {
+            votingAddresses = this.getVotingAddresses();
+        } catch (e) {
+            console.log(e);
+            //TODO: not gonna happen
+        }
+
+        let result = [];
+
+        for(let va of votingAddresses) {
+            for (let k of keys) {
+                if (k.isMatchingKeyAddress(va)) { //TODO
+                    result.push(va);
+                }
+            }
+        }
+
+        return result;
+    }
+
+    getVotingAddresses() {
+        let idx = this.source.indexOf(".");
+        let from = this.source.substring(0, idx);
+        let what = this.source.substring(idx + 1);
+
+        let fromContracts = null;
+
+  /*      if (from === "this") {
+            fromContracts = this.contract;
+        } else {
+            let constr = this.contract.constraints.get(from);
+
+            if(constr == null) {
+                throw new ex.IllegalArgumentError("Reference with name '" + from + "' wasn't found for role " + this.name);
+            }
+
+            this.contract.checkReferencedItems(new HashSet<>(Do.listOf(constr.name)));
+
+            constr.matchingItems.forEach(a => fromContracts.add(a));
+        }
+
+        let addresses = [];
+
+        for (let fromContract of fromContracts) {
+            let o = fromContract.get(what);
+            if (o instanceof Role) {
+
+                if (o instanceof RoleLink)
+                    o = o.resolve(false);
+
+                if (!(o instanceof ListRole)) {
+                    throw new ex.IllegalArgumentError("Path '" + what + "' is pointing to a role '" + o.name + "' that is not ListRole");
+                } else {
+                    for (let r of o.roles) {
+                        let ka = r.getSimpleAddress();
+                        if(ka == null)
+                            throw new ex.IllegalArgumentError("Unable to extract simple address from " + r.name+ ". Check if role is a simple role with single address and no references");
+                        this.checkAddress(ka);
+                        addresses.push(ka);
+                    }
+                }
+            } else if (o instanceof List) {
+                for (let item of o) {
+                    if (item instanceof Role) {
+                        let ka = (item).getSimpleAddress();
+
+                        if(ka == null)
+                            throw new ex.IllegalArgumentError("Unable to extract simple address from " + item.name + ". Check if role is a simple role with single address and no references");
+                        this.checkAddress(ka);
+                        addresses.push(ka);
+                    } else if (item instanceof crypto.KeyAddress) {
+                        this.checkAddress(item);
+                        addresses.push(item);
+                    } else if (item instanceof crypto.PublicKey) {
+                        throw new ex.IllegalArgumentError("Public keys are not allowed in QourumVoteRole source");
+                    } else if (item instanceof String) {
+                        try {
+                            let ka = new crypto.KeyAddress(item);
+                            this.checkAddress(ka);
+                            addresses.push(ka);
+                        } catch (e) {
+                            throw new ex.IllegalArgumentError("Unable to parse '" + item + "' into an address");
+                        }
+                    }
+                }
+            } else {
+                throw new ex.IllegalArgumentError("Path '" + what + "' is pointing to neither Role nor List<?>.");
+            }
+        }
+        return addresses;*/
+
+    }
+
+    checkAddress(ka) {
+        if(!ka.isLong() || ka.getTypeMark() != 0) { //TODO
+            throw new ex.IllegalArgumentError("Only the long addresses with type mark 0 are supported by QuorumVoteRole as a source");
+        }
+
+    }
+
     /**
      * Get names of {@link Constraint} that are not required but are used in voting.
      */
@@ -889,15 +1167,20 @@ class QuorumVoteRole extends Role {
 
         let sourceConstraint = this.source.substring(0, this.source.indexOf("."));
 
-        if (!sourceConstraint.equals("this")) {
+        if (sourceConstraint !== "this") {
             constrs.add(sourceConstraint);
             // add internal constraints
             let constr = this.contract.constraints.get(sourceConstraint);
+
             if (constr != null)
                 constr.getInternalConstraints().forEach(c => constrs.add(c));
         }
 
         return constrs;
+    }
+
+    isQuorumPercentageBased() {
+        return quorumValues.stream().anyMatch(v->v.endsWith("%") || v.equals("N"));
     }
 }
 
