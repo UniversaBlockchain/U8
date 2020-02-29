@@ -18,6 +18,7 @@
 namespace network {
 
 enum DnsRRType {
+    DNS_ANY = 255,
     DNS_A = MG_DNS_A_RECORD,
     DNS_AAAA = MG_DNS_AAAA_RECORD,
     DNS_CNAME = MG_DNS_CNAME_RECORD,
@@ -97,8 +98,9 @@ public:
     int rclass;
     int ttl;
 
-    bool addAnswerIpV4(int rtype, int ttl, const std::string& ip);
-    bool addAnswerIpV6(int rtype, int ttl, const std::string& ip6);
+    bool addAnswer_typeA(int ttl, const std::string& ip);
+    bool addAnswer_typeAAAA(int ttl, const std::string& ip6);
+    bool addAnswer_typeCNAME(int ttl, const std::string& domainName);
     bool addAnswerBin(int rtype, int ttl, const byte_vector& bin);
     void setWholeBinaryResponse(const byte_vector& bin);
     void sendAnswer();

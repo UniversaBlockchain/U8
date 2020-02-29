@@ -660,6 +660,11 @@ network.DnsServerQuestion = class {
         this.questionWrapper.__addAnswer_typeAAAA(ttl, ipV6string);
     }
 
+    /** domainName without ending dot */
+    addAnswer_typeCNAME(ttl, domainName) {
+        this.questionWrapper.__addAnswer_typeCNAME(ttl, domainName);
+    }
+
     sendAnswer() {
         this.questionWrapper.__sendAnswer();
     }
@@ -677,6 +682,7 @@ network.DnsRRType = {
     DNS_ANY: 255,
     DNS_A: 1,
     DNS_AAAA: 28,
+    DNS_CNAME: 5,
 };
 
 network.DnsServer = class {

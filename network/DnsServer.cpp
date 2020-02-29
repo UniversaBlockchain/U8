@@ -212,13 +212,13 @@ DnsServerQuestion::DnsServerQuestion(long srvId, long qId, std::shared_ptr<mg_mg
     questionIndex_ = qIndx;
 }
 
-bool DnsServerQuestion::addAnswerIpV4(int rtype, int ttl, const std::string& ip) {
+bool DnsServerQuestion::addAnswer_typeA(int ttl, const std::string& ip) {
     in_addr ans;
     if (inet_pton(AF_INET, ip.data(), &ans) > 0) {
         DnsServerAnswerParams ap;
         ap.bin.resize(sizeof(ans));
         memcpy(&ap.bin[0], &ans, sizeof(ans));
-        ap.rtype = rtype;
+        ap.rtype = DnsRRType::DNS_A;
         ap.ttl = ttl;
         ansBinary_.emplace_back(std::move(ap));
         return true;
@@ -226,18 +226,29 @@ bool DnsServerQuestion::addAnswerIpV4(int rtype, int ttl, const std::string& ip)
     return false;
 }
 
-bool DnsServerQuestion::addAnswerIpV6(int rtype, int ttl, const std::string& ip6) {
+bool DnsServerQuestion::addAnswer_typeAAAA(int ttl, const std::string& ip6) {
     in6_addr ans;
     if (inet_pton(AF_INET6, ip6.data(), &ans) > 0) {
         DnsServerAnswerParams ap;
         ap.bin.resize(sizeof(ans));
         memcpy(&ap.bin[0], &ans, sizeof(ans));
-        ap.rtype = rtype;
+        ap.rtype = DnsRRType::DNS_AAAA;
         ap.ttl = ttl;
         ansBinary_.emplace_back(std::move(ap));
         return true;
     }
     return false;
+}
+
+bool DnsServerQuestion::addAnswer_typeCNAME(int ttl, const std::string& domainName) {
+    DnsServerAnswerParams ap;
+    ap.rtype = DnsRRType::DNS_CNAME;
+    ap.ttl = ttl;
+    ap.bin = stringToBytes(domainName);
+    ap.bin.reserve(ap.bin.size()+1); // important reserve, not resize
+    ap.bin[ap.bin.size()] = 0;
+    ansBinary_.emplace_back(std::move(ap));
+    return true;
 }
 
 bool DnsServerQuestion::addAnswerBin(int rtype, int ttl, const byte_vector& bin) {

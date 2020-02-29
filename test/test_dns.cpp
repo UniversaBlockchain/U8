@@ -12,7 +12,7 @@
 using namespace std;
 using namespace network;
 
-TEST_CASE("dns_hello", "[!hide]") {
+TEST_CASE("dns_hello") {
     //iptables -t nat -A PREROUTING -i enp0s3 -p udp --dport 53 -j REDIRECT --to-port 5353
     DnsServer dnsServer;
 
@@ -21,10 +21,12 @@ TEST_CASE("dns_hello", "[!hide]") {
         pool.execute([question](){
             //cout << "dns question: name = " << question->name << endl;
             this_thread::sleep_for(20ms);
-            if (question->rtype == DnsRRType::DNS_A) {
-                question->addAnswerIpV4(question->rtype, 300, "127.0.0.1");
-            } else if (question->rtype == DnsRRType::DNS_AAAA) {
-                question->addAnswerIpV6(question->rtype, 300, "2a02:6b8::2:242");
+            if (question->rtype == DnsRRType::DNS_A || question->rtype == DnsRRType::DNS_ANY) {
+                question->addAnswer_typeA(300, "127.0.0.1");
+            } else if (question->rtype == DnsRRType::DNS_AAAA || question->rtype == DnsRRType::DNS_ANY) {
+                question->addAnswer_typeAAAA(300, "2a02:6b8::2:242");
+            } else if (question->rtype == DnsRRType::DNS_CNAME || question->rtype == DnsRRType::DNS_ANY) {
+                question->addAnswer_typeCNAME(400, "www.ya.ru");
             }
             question->sendAnswer();
         });
@@ -115,7 +117,7 @@ TEST_CASE("dns_uplink_proxy", "[!hide]") {
     dnsServer.setQuestionsCallback([&dnsUplink](shared_ptr<DnsServerQuestion> question){
         cout << "dns question: type=" << question->rtype << ", name = " << question->name << endl;
         if (question->name == "www.ya.ru") {
-            question->addAnswerIpV4(DnsRRType::DNS_A, 300, "87.250.250.242");
+            question->addAnswer_typeA(300, "87.250.250.242");
             question->sendAnswer();
         } else {
             dnsUplink.resolve(question->name, question->rtype, [question](const std::vector<DnsResolverAnswer>& ansArr){
