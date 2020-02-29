@@ -665,6 +665,10 @@ network.DnsServerQuestion = class {
         this.questionWrapper.__addAnswer_typeCNAME(ttl, domainName);
     }
 
+    addAnswer_typeMX(ttl, preference, exchange) {
+        this.questionWrapper.__addAnswer_typeMX(ttl, preference, exchange);
+    }
+
     sendAnswer() {
         this.questionWrapper.__sendAnswer();
     }
@@ -683,6 +687,7 @@ network.DnsRRType = {
     DNS_A: 1,
     DNS_AAAA: 28,
     DNS_CNAME: 5,
+    DNS_MX: 15,
 };
 
 network.DnsServer = class {

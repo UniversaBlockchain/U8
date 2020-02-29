@@ -22,6 +22,7 @@ enum DnsRRType {
     DNS_A = MG_DNS_A_RECORD,
     DNS_AAAA = MG_DNS_AAAA_RECORD,
     DNS_CNAME = MG_DNS_CNAME_RECORD,
+    DNS_MX = 15,
     DNS_TXT = 16,
     DNS_NS = 2,
 };
@@ -86,6 +87,7 @@ struct DnsServerAnswerParams {
     int rtype;
     int ttl;
     byte_vector bin;
+    uint16_t uint16val0;
 };
 
 class DnsServerQuestion {
@@ -101,6 +103,7 @@ public:
     bool addAnswer_typeA(int ttl, const std::string& ip);
     bool addAnswer_typeAAAA(int ttl, const std::string& ip6);
     bool addAnswer_typeCNAME(int ttl, const std::string& domainName);
+    bool addAnswer_typeMX(int ttl, int preference, const std::string& exchange);
     bool addAnswerBin(int rtype, int ttl, const byte_vector& bin);
     void setWholeBinaryResponse(const byte_vector& bin);
     void sendAnswer();

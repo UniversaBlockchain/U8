@@ -567,6 +567,8 @@ unit.test("web_test: dns server hello world", async () => {
                 question.addAnswer_typeAAAA(600, "2a02:6b8::2:242");
             if (question.rType === DnsRRType.DNS_CNAME || question.rType === DnsRRType.DNS_ANY)
                 question.addAnswer_typeCNAME(500, "ya.ru");
+            if (question.rType === DnsRRType.DNS_MX || question.rType === DnsRRType.DNS_ANY)
+                question.addAnswer_typeMX(550, 20, "alt-mx.ya.ru");
             question.sendAnswer();
         } else {
             question.resolveThroughUplink();

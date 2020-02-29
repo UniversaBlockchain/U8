@@ -115,3 +115,81 @@ struct mg_connection *mg_connect_http_opt1(
     mbuf_free(&auth);
     return nc;
 }
+
+int mg_dns_reply_record_mx(struct mg_dns_reply *reply,
+                           struct mg_dns_resource_record *question,
+                           const char *name, int rtype, int ttl, const void *rdata,
+                           size_t rdata_len, uint16_t preference) {
+  struct mg_dns_message *msg = (struct mg_dns_message *) reply->msg;
+  char rname[512];
+  struct mg_dns_resource_record *ans = &msg->answers[msg->num_answers];
+  if (msg->num_answers >= MG_MAX_DNS_ANSWERS) {
+    return -1; /* LCOV_EXCL_LINE */
+  }
+
+  if (name == NULL) {
+    name = rname;
+    rname[511] = 0;
+    mg_dns_uncompress_name(msg, &question->name, rname, sizeof(rname) - 1);
+  }
+
+  *ans = *question;
+  ans->kind = MG_DNS_ANSWER;
+  ans->rtype = rtype;
+  ans->ttl = ttl;
+
+  if (mg_dns_encode_record_mx(reply->io, ans, name, strlen(name), rdata,
+                           rdata_len, preference) == -1) {
+    return -1; /* LCOV_EXCL_LINE */
+  };
+
+  msg->num_answers++;
+  return 0;
+}
+
+int mg_dns_encode_record_mx(struct mbuf *io, struct mg_dns_resource_record *rr,
+                            const char *name, size_t nlen, const void *rdata,
+                            size_t rlen, uint16_t preference) {
+  size_t pos = io->len;
+  uint16_t u16;
+  uint32_t u32;
+
+  if (rr->kind == MG_DNS_INVALID_RECORD) {
+    return -1; /* LCOV_EXCL_LINE */
+  }
+
+  if (mg_dns_encode_name(io, name, nlen) == -1) {
+    return -1;
+  }
+
+  u16 = htons(rr->rtype);
+  mbuf_append(io, &u16, 2);
+  u16 = htons(rr->rclass);
+  mbuf_append(io, &u16, 2);
+
+  if (rr->kind == MG_DNS_ANSWER) {
+    u32 = htonl(rr->ttl);
+    mbuf_append(io, &u32, 4);
+
+    if (rr->rtype == MG_DNS_MX_RECORD) {
+      int clen;
+      /* fill size after encoding */
+      size_t off = io->len;
+      mbuf_append(io, &u16, 2);
+      u16 = htons(preference);
+      mbuf_append(io, &u16, 2);
+      if ((clen = mg_dns_encode_name(io, (const char *) rdata, rlen)) == -1) {
+        return -1;
+      }
+      u16 = clen+2;
+      io->buf[off] = u16 >> 8;
+      io->buf[off + 1] = u16 & 0xff;
+    } else {
+      u16 = htons((uint16_t) rlen);
+      mbuf_append(io, &u16, 2);
+      mbuf_append(io, rdata, rlen);
+    }
+  }
+
+  return io->len - pos;
+}

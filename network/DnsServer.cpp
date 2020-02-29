@@ -251,6 +251,18 @@ bool DnsServerQuestion::addAnswer_typeCNAME(int ttl, const std::string& domainNa
     return true;
 }
 
+bool DnsServerQuestion::addAnswer_typeMX(int ttl, int preference, const std::string& exchange) {
+    DnsServerAnswerParams ap;
+    ap.rtype = DnsRRType::DNS_MX;
+    ap.ttl = ttl;
+    ap.uint16val0 = preference;
+    ap.bin = stringToBytes(exchange);
+    ap.bin.reserve(ap.bin.size()+1); // important reserve, not resize
+    ap.bin[ap.bin.size()] = 0;
+    ansBinary_.emplace_back(std::move(ap));
+    return true;
+}
+
 bool DnsServerQuestion::addAnswerBin(int rtype, int ttl, const byte_vector& bin) {
     if (bin.size() <= 512) {
         DnsServerAnswerParams ap;
@@ -325,8 +337,18 @@ void DnsServerQuestion::sendAnswerFromMgThread() {
 
     if (wholeResponse_.empty()) {
         mg_dns_reply reply = mg_dns_create_reply(&replyBuf, &msg);
-        for (auto &ans : ansBinary_)
-            mg_dns_reply_record(&reply, rr, nullptr, ans.rtype, ans.ttl, &ans.bin[0], ans.bin.size());
+        for (auto &ans : ansBinary_) {
+            switch (ans.rtype) {
+                case DnsRRType::DNS_MX: {
+                    mg_dns_reply_record_mx(&reply, rr, nullptr, ans.rtype, ans.ttl, &ans.bin[0], ans.bin.size(), ans.uint16val0);
+                    break;
+                }
+                default: {
+                    mg_dns_reply_record(&reply, rr, nullptr, ans.rtype, ans.ttl, &ans.bin[0], ans.bin.size());
+                    break;
+                }
+            }
+        }
         mg_dns_send_reply(con_, &reply);
     } else {
         memcpy(&wholeResponse_[0], &msgBody_[0], 2);

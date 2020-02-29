@@ -49,4 +49,13 @@ struct mg_connection *mg_connect_http_opt1(
     struct mg_connect_opts opts, const char *url, const char *extra_headers,
     const char *post_data, int post_data_len, const char *method);
 
+int mg_dns_reply_record_mx(struct mg_dns_reply *reply,
+                        struct mg_dns_resource_record *question,
+                        const char *name, int rtype, int ttl, const void *rdata,
+                        size_t rdata_len, uint16_t preference);
+
+int mg_dns_encode_record_mx(struct mbuf *io, struct mg_dns_resource_record *rr,
+                         const char *name, size_t nlen, const void *rdata,
+                         size_t rlen, uint16_t preference);
+
 #endif //U8_MONGOOSEEXT_H

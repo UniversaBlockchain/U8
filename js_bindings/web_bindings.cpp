@@ -1166,6 +1166,9 @@ public:
     void addAnswer_typeCNAME(int ttl, const string& domainName) {
         question_->addAnswer_typeCNAME(ttl, domainName);
     }
+    void addAnswer_typeMX(int ttl, int preference, const string& exchange) {
+        question_->addAnswer_typeMX(ttl, preference, exchange);
+    }
     void sendAnswer() {
         question_->sendAnswer();
         delete this;
@@ -1593,6 +1596,20 @@ void DnsServerQuestionWrapper_addAnswer_typeCNAME(const FunctionCallbackInfo<Val
     });
 }
 
+void DnsServerQuestionWrapper_addAnswer_typeMX(const FunctionCallbackInfo<Value> &args) {
+    Scripter::unwrapArgs(args, [](ArgsContext &ac) {
+        if (ac.args.Length() == 3) {
+            auto qw = unwrap<DnsServerQuestionWrapper>(ac.args.This());
+            auto ttl = ac.asInt(0);
+            auto preference = ac.asInt(1);
+            auto exchange = ac.asString(2);
+            qw->addAnswer_typeMX(ttl, preference, exchange);
+            return;
+        }
+        ac.throwError("invalid arguments");
+    });
+}
+
 void DnsServerQuestionWrapper_sendAnswer(const FunctionCallbackInfo<Value> &args) {
     Scripter::unwrapArgs(args, [](ArgsContext &ac) {
         if (ac.args.Length() == 0) {
@@ -1629,6 +1646,7 @@ void JsInitDnsServerQuestion(Scripter& scripter, const Local<ObjectTemplate> &gl
     prototype->Set(isolate, "__addAnswer_typeA", FunctionTemplate::New(isolate, DnsServerQuestionWrapper_addAnswer_typeA));
     prototype->Set(isolate, "__addAnswer_typeAAAA", FunctionTemplate::New(isolate, DnsServerQuestionWrapper_addAnswer_typeAAAA));
     prototype->Set(isolate, "__addAnswer_typeCNAME", FunctionTemplate::New(isolate, DnsServerQuestionWrapper_addAnswer_typeCNAME));
+    prototype->Set(isolate, "__addAnswer_typeMX", FunctionTemplate::New(isolate, DnsServerQuestionWrapper_addAnswer_typeMX));
     prototype->Set(isolate, "__sendAnswer", FunctionTemplate::New(isolate, DnsServerQuestionWrapper_sendAnswer));
     prototype->Set(isolate, "__resolveThroughUplink", FunctionTemplate::New(isolate, DnsServerQuestionWrapper_resolveThroughUplink));
 
