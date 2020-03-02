@@ -424,7 +424,7 @@ class ProcessStartExec extends ProcessBase {
 
             this.pr.logger.log(message);
             this.pr.errors.push(new ErrorRecord(Errors.FORBIDDEN, "checkStorageAccessibly", message));
-            this.pr.changeState(UBotPoolState.FAILED);
+            //this.pr.changeState(UBotPoolState.FAILED);
 
             throw new UBotProcessException("Error checkStorageAccessibly: " + message);
         }
@@ -446,7 +446,7 @@ class ProcessStartExec extends ProcessBase {
             this.pr.logger.log("Can`t write empty data to pool-bound storage \"" + storageName + "\"");
             this.pr.errors.push(new ErrorRecord(Errors.FORBIDDEN, "writePoolBoundStorage",
                 "Can`t write empty data to pool-bound storage \"" + storageName + "\""));
-            this.pr.changeState(UBotPoolState.FAILED);
+            //this.pr.changeState(UBotPoolState.FAILED);
 
             throw new UBotProcessException("Error writePoolBoundStorage: Can`t write empty data to pool-bound storage \"" + storageName + "\"");
         }
@@ -460,7 +460,7 @@ class ProcessStartExec extends ProcessBase {
             this.pr.logger.log(err.stack);
             this.pr.errors.push(new ErrorRecord(Errors.FAILURE, "writePoolBoundStorage",
                 "Error write data to pool-bound storage \"" + storageName + "\": " + err.message));
-            this.pr.changeState(UBotPoolState.FAILED);
+            //this.pr.changeState(UBotPoolState.FAILED);
 
             throw err;
         }
@@ -504,7 +504,7 @@ class ProcessStartExec extends ProcessBase {
             this.pr.logger.log("Can`t write empty data to worker-bound storage \"" + storageName + "\"");
             this.pr.errors.push(new ErrorRecord(Errors.FORBIDDEN, "writeWorkerBoundStorage",
                 "Can`t write empty data to worker-bound storage \"" + storageName + "\""));
-            this.pr.changeState(UBotPoolState.FAILED);
+            //this.pr.changeState(UBotPoolState.FAILED);
 
             throw new UBotProcessException("Error writeWorkerBoundStorage: Can`t write empty data to worker-bound storage \"" + storageName + "\"");
         }
@@ -518,7 +518,7 @@ class ProcessStartExec extends ProcessBase {
             this.pr.logger.log(err.stack);
             this.pr.errors.push(new ErrorRecord(Errors.FAILURE, "writeWorkerBoundStorage",
                 "Error write data to worker-bound storage \"" + storageName + "\": " + err.message));
-            this.pr.changeState(UBotPoolState.FAILED);
+            //this.pr.changeState(UBotPoolState.FAILED);
 
             throw err;
         }
@@ -601,7 +601,7 @@ class ProcessStartExec extends ProcessBase {
             this.pr.logger.log(err.stack);
             this.pr.errors.push(new ErrorRecord(Errors.FAILURE, "getPoolBoundStorage",
                 "Error get data from pool-bound storage \"" + storageName + "\": " + err.message));
-            this.pr.changeState(UBotPoolState.FAILED);
+            //this.pr.changeState(UBotPoolState.FAILED);
 
             throw err;
         }
@@ -671,7 +671,7 @@ class ProcessStartExec extends ProcessBase {
             this.pr.logger.log(err.stack);
             this.pr.errors.push(new ErrorRecord(Errors.FAILURE, "getWorkerBoundStorage",
                 "Error get data from worker-bound storage \"" + storageName + "\": " + err.message));
-            this.pr.changeState(UBotPoolState.FAILED);
+            //this.pr.changeState(UBotPoolState.FAILED);
 
             throw err;
         }
@@ -700,7 +700,7 @@ class ProcessStartExec extends ProcessBase {
             this.pr.logger.log(err.stack);
             this.pr.errors.push(new ErrorRecord(Errors.FAILURE, "registerContract",
                 "Error register contract: " + err.message));
-            this.pr.changeState(UBotPoolState.FAILED);
+            //this.pr.changeState(UBotPoolState.FAILED);
 
             throw err;
         }
@@ -762,7 +762,7 @@ class ProcessStartExec extends ProcessBase {
             this.pr.logger.log(err.stack);
             this.pr.errors.push(new ErrorRecord(Errors.FAILURE, "createPoolContract",
                 "Error create pool contract: " + err.message));
-            this.pr.changeState(UBotPoolState.FAILED);
+            //this.pr.changeState(UBotPoolState.FAILED);
 
             throw err;
         }
@@ -835,7 +835,7 @@ class ProcessStartExec extends ProcessBase {
             this.pr.logger.log(err.stack);
             this.pr.errors.push(new ErrorRecord(Errors.FAILURE, "preparePoolRevision",
                 "Error prepare contract revision to pool registration: " + err.message));
-            this.pr.changeState(UBotPoolState.FAILED);
+            //this.pr.changeState(UBotPoolState.FAILED);
 
             throw err;
         }
@@ -857,7 +857,7 @@ class ProcessStartExec extends ProcessBase {
             this.pr.logger.log(err.stack);
             this.pr.errors.push(new ErrorRecord(Errors.FAILURE, "sealByPool",
                 "Error seal contract by pool: " + err.message));
-            this.pr.changeState(UBotPoolState.FAILED);
+            //this.pr.changeState(UBotPoolState.FAILED);
 
             throw err;
         }
@@ -894,7 +894,7 @@ class ProcessStartExec extends ProcessBase {
             this.pr.logger.log("Error HTTP request: " + err.message);
             this.pr.logger.log(err.stack);
             this.pr.errors.push(new ErrorRecord(Errors.FAILURE, "doHTTPRequest", "Error HTTP request: " + err.message));
-            this.pr.changeState(UBotPoolState.FAILED);
+            //this.pr.changeState(UBotPoolState.FAILED);
 
             throw err;
         }
@@ -952,7 +952,7 @@ class ProcessStartExec extends ProcessBase {
             this.pr.logger.log("Error start transaction: " + err.message);
             this.pr.logger.log(err.stack);
             this.pr.errors.push(new ErrorRecord(Errors.FAILURE, "startTransaction", "Error start transaction: " + err.message));
-            this.pr.changeState(UBotPoolState.FAILED);
+            //this.pr.changeState(UBotPoolState.FAILED);
 
             throw err;
         }
@@ -974,7 +974,7 @@ class ProcessStartExec extends ProcessBase {
             this.pr.logger.log("Error finish transaction: " + err.message);
             this.pr.logger.log(err.stack);
             this.pr.errors.push(new ErrorRecord(Errors.FAILURE, "finishTransaction", "Error finish transaction: " + err.message));
-            this.pr.changeState(UBotPoolState.FAILED);
+            //this.pr.changeState(UBotPoolState.FAILED);
 
             throw err;
         }
