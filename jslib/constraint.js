@@ -444,9 +444,9 @@ class Constraint extends bs.BiSerializable {
         return result;
     }
 
-    static prepareRoleToComparison(item) {
-        if (item instanceof roles.RoleLink && item.requiredAllConstraints.size === 0 && item.requiredAnyConstraints.size === 0)
-            return item.resolve();
+    static prepareRoleToComparison(item, doResolve) {
+        if (item instanceof roles.RoleLink && doResolve && item.requiredAllConstraints.size === 0 && item.requiredAnyConstraints.size === 0)
+            return item.resolve(false);
         else if (typeof item === "string") {
             try {
                 let roleString = item.replace(/\s/g, "");       // for key in quotes
@@ -751,12 +751,20 @@ class Constraint extends bs.BiSerializable {
                         } else if (((left != null) && left instanceof roles.Role) || ((right != null) && right instanceof roles.Role)) { // if role - compare with role, key or address
                             if (((left != null) && left instanceof roles.Role) && ((right != null) && right instanceof roles.Role)) {
 
-                                let leftRole = Constraint.prepareRoleToComparison(left);
-                                let rightRole = Constraint.prepareRoleToComparison(right);
+                                let leftRole = Constraint.prepareRoleToComparison(left, false);
+                                let rightRole = Constraint.prepareRoleToComparison(right, false);
 
-                                if (((indxOperator === NOT_EQUAL) && !leftRole.equalsForConstraint(rightRole)) ||
-                                    ((indxOperator === EQUAL) && leftRole.equalsForConstraint(rightRole)))
-                                    ret = true;
+                                ret = leftRole.equalsForConstraint(rightRole);
+
+                                if (!ret && (leftRole instanceof roles.RoleLink || rightRole instanceof roles.RoleLink)) {
+                                    if (leftRole instanceof roles.RoleLink)
+                                        leftRole = Constraint.prepareRoleToComparison(left, true);
+
+                                    if (rightRole instanceof  roles.RoleLink)
+                                        rightRole = Constraint.prepareRoleToComparison(right, true);
+
+                                    ret = leftRole.equalsForConstraint(rightRole);
+                                }
 
                             } else {
                                 let role;
@@ -775,14 +783,25 @@ class Constraint extends bs.BiSerializable {
                                         compareOperand = leftOperand;
                                 }
 
-                                role = Constraint.prepareRoleToComparison(role);
-                                let compareRole = Constraint.prepareRoleToComparison(compareOperand);
+                                role = Constraint.prepareRoleToComparison(role, false);
+                                let compareRole = Constraint.prepareRoleToComparison(compareOperand, false);
 
-                                ret = role.equalsForConstraint(compareRole);
+                                if (role != null) {
+                                    ret = role.equalsForConstraint(compareRole);
 
-                                if (indxOperator === NOT_EQUAL)
-                                    ret = !ret;
+                                    if (!ret && role instanceof roles.RoleLink) {
+                                        role = Constraint.prepareRoleToComparison(role, true);
+                                        if (role != null)
+                                            ret = role.equalsForConstraint(compareRole);
+                                        else
+                                            ret = false;
+                                    }
+                                } else
+                                    ret = false;
                             }
+
+                            if (indxOperator === NOT_EQUAL)
+                                ret = !ret;
 
                         } else if (((left != null) && left instanceof Date) ||
                             ((right != null) && right instanceof Date)) {
@@ -1040,17 +1059,25 @@ class Constraint extends bs.BiSerializable {
                             let rightRoleSet = new t.GenericSet();
 
                             for (let item of leftSet) {
-                                if (item instanceof roles.Role || typeof item === "string")
-                                    leftRoleSet.add(Constraint.prepareRoleToComparison(item));
-                                else
+                                if (item instanceof roles.Role || typeof item === "string") {
+                                    let role = Constraint.prepareRoleToComparison(item, false);
+                                    leftRoleSet.add(role);
+
+                                    if (role instanceof roles.RoleLink)
+                                        leftRoleSet.add(Constraint.prepareRoleToComparison(item, true));
+                                } else
                                     throw new ex.IllegalArgumentError(
                                         "Unexpected type (expect Role or String) of collection item in left operand in condition: " + leftOperand);
                             }
 
                             for (let item of rightSet) {
-                                if (item instanceof roles.Role || typeof item === "string")
-                                    rightRoleSet.add(Constraint.prepareRoleToComparison(item));
-                                else
+                                if (item instanceof roles.Role || typeof item === "string") {
+                                    let role = Constraint.prepareRoleToComparison(item, false);
+                                    rightRoleSet.add(role);
+
+                                    if (role instanceof roles.RoleLink)
+                                        rightRoleSet.add(Constraint.prepareRoleToComparison(item, true));
+                                } else
                                     throw new ex.IllegalArgumentError(
                                         "Unexpected type (expect Role or String) of collection item in right operand in condition: " + rightOperand);
                             }
