@@ -1171,18 +1171,49 @@ public:
     }
     void sendAnswer() {
         question_->sendAnswer();
-        delete this;
+        lock_guard lock(deleteMutex_);
+        --useCounter_;
+        if (useCounter_ <= 0)
+            delete this;
     }
-    void resolveThroughUplink() {
+    void resolveThroughUplink_start() {
+        lock_guard lock(deleteMutex_);
+        ++useCounter_;
         resolver_->resolve(question_->name, question_->rtype, [this](const std::vector<DnsResolverAnswer>& ansArr){
+            //this_thread::sleep_for(200ms);
+            lock_guard lock(answerFromUplinkMutex_);
             if (ansArr.size() > 0)
-                question_->setWholeBinaryResponse(ansArr[0].getWholeMsgBinary());
-            sendAnswer();
+                answerFromUplink_ = ansArr[0].getWholeMsgBinary();
+            if (answerFromUplinkSendImmediately_) {
+                question_->setWholeBinaryResponse(answerFromUplink_);
+                sendAnswer();
+            } else {
+                answerFromUplinkReceived_ = true;
+            }
+            lock_guard lock1(deleteMutex_);
+            --useCounter_;
+            if (useCounter_ <= 0)
+                delete this;
         });
+    }
+    void resolveThroughUplink_finish() {
+        lock_guard lock(answerFromUplinkMutex_);
+        if (answerFromUplinkReceived_) {
+            question_->setWholeBinaryResponse(answerFromUplink_);
+            sendAnswer();
+        } else {
+            answerFromUplinkSendImmediately_ = true;
+        }
     }
 private:
     shared_ptr<DnsServerQuestion> question_;
     DnsResolver* resolver_;
+    mutex answerFromUplinkMutex_;
+    bool answerFromUplinkReceived_ = false;
+    bool answerFromUplinkSendImmediately_ = false;
+    byte_vector answerFromUplink_;
+    mutex deleteMutex_;
+    int useCounter_ = 1;
 };
 
 class DnsServerWrapper {
@@ -1621,11 +1652,22 @@ void DnsServerQuestionWrapper_sendAnswer(const FunctionCallbackInfo<Value> &args
     });
 }
 
-void DnsServerQuestionWrapper_resolveThroughUplink(const FunctionCallbackInfo<Value> &args) {
+void DnsServerQuestionWrapper_resolveThroughUplink_start(const FunctionCallbackInfo<Value> &args) {
     Scripter::unwrapArgs(args, [](ArgsContext &ac) {
         if (ac.args.Length() == 0) {
             auto qw = unwrap<DnsServerQuestionWrapper>(ac.args.This());
-            qw->resolveThroughUplink();
+            qw->resolveThroughUplink_start();
+            return;
+        }
+        ac.throwError("invalid arguments");
+    });
+}
+
+void DnsServerQuestionWrapper_resolveThroughUplink_finish(const FunctionCallbackInfo<Value> &args) {
+    Scripter::unwrapArgs(args, [](ArgsContext &ac) {
+        if (ac.args.Length() == 0) {
+            auto qw = unwrap<DnsServerQuestionWrapper>(ac.args.This());
+            qw->resolveThroughUplink_finish();
             return;
         }
         ac.throwError("invalid arguments");
@@ -1648,7 +1690,8 @@ void JsInitDnsServerQuestion(Scripter& scripter, const Local<ObjectTemplate> &gl
     prototype->Set(isolate, "__addAnswer_typeCNAME", FunctionTemplate::New(isolate, DnsServerQuestionWrapper_addAnswer_typeCNAME));
     prototype->Set(isolate, "__addAnswer_typeMX", FunctionTemplate::New(isolate, DnsServerQuestionWrapper_addAnswer_typeMX));
     prototype->Set(isolate, "__sendAnswer", FunctionTemplate::New(isolate, DnsServerQuestionWrapper_sendAnswer));
-    prototype->Set(isolate, "__resolveThroughUplink", FunctionTemplate::New(isolate, DnsServerQuestionWrapper_resolveThroughUplink));
+    prototype->Set(isolate, "__resolveThroughUplink_start", FunctionTemplate::New(isolate, DnsServerQuestionWrapper_resolveThroughUplink_start));
+    prototype->Set(isolate, "__resolveThroughUplink_finish", FunctionTemplate::New(isolate, DnsServerQuestionWrapper_resolveThroughUplink_finish));
 
     // register it into global namespace
     scripter.DnsServerQuestionWrapperTpl.Reset(isolate, tpl);

@@ -558,8 +558,10 @@ unit.test("web_test: http server start exception", async () => {
 unit.test("web_test: dns server hello world", async () => {
     console.log();
     let dnsServer = new DnsServer();
-    dnsServer.setQuestionCallback(question => {
+    dnsServer.setQuestionCallback(async question => {
         console.log("question name = " + question.name + ", rType = " + question.rType);
+        question.resolveThroughUplink_start();
+        //await sleep(500); // imitate long processing
         if (question.name === "test.ya.ru") {
             if (question.rType === DnsRRType.DNS_A || question.rType === DnsRRType.DNS_ANY)
                 question.addAnswer_typeA(300, "127.0.0.1");
@@ -571,7 +573,7 @@ unit.test("web_test: dns server hello world", async () => {
                 question.addAnswer_typeMX(550, 20, "alt-mx.ya.ru");
             question.sendAnswer();
         } else {
-            question.resolveThroughUplink();
+            question.resolveThroughUplink_finish();
         }
     });
     dnsServer.start("0.0.0.0", 5353, "8.8.4.4");

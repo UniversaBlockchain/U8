@@ -673,11 +673,25 @@ network.DnsServerQuestion = class {
         this.questionWrapper.__sendAnswer();
     }
 
-    resolveThroughUplink() {
+    /**
+     * Initiates uplink request in background. After a while (or immediately) you can confirm answer from uplink
+     * by calling resolveThroughUplink_finish(), or do sendAnswer() manually.
+     */
+    resolveThroughUplink_start() {
         if (this.hasUplink)
-            this.questionWrapper.__resolveThroughUplink();
+            this.questionWrapper.__resolveThroughUplink_start();
         else
-            throw Error("network.DnsServer: please set uplink name server to use 'resolveThroughUplink' function");
+            throw Error("network.DnsServer: please set uplink name server to use 'resolveThroughUplink_start' function");
+    }
+
+    /**
+     * Call resolveThroughUplink_start() first.
+     */
+    resolveThroughUplink_finish() {
+        if (this.hasUplink)
+            this.questionWrapper.__resolveThroughUplink_finish();
+        else
+            throw Error("network.DnsServer: please set uplink name server to use 'resolveThroughUplink_finish' function");
     }
 };
 Object.assign(network.DnsServerQuestion.prototype, MemoiseMixin);
