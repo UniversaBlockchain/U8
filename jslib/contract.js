@@ -1808,7 +1808,7 @@ class Contract extends bs.BiSerializable {
             return false;
 
         if (role instanceof roles.RoleLink)
-            role  = role.resolve();
+            role  = role.resolve(false);
 
         if (role == null)
             return false;

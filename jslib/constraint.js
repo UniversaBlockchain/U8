@@ -446,7 +446,7 @@ class Constraint extends bs.BiSerializable {
 
     static prepareRoleToComparison(item, doResolve) {
         if (item instanceof roles.RoleLink && doResolve && item.requiredAllConstraints.size === 0 && item.requiredAnyConstraints.size === 0)
-            return item.resolve();
+            return item.resolve(false);
         else if (typeof item === "string") {
             try {
                 let roleString = item.replace(/\s/g, "");       // for key in quotes
@@ -754,7 +754,7 @@ class Constraint extends bs.BiSerializable {
                                 let leftRole = Constraint.prepareRoleToComparison(left, false);
                                 let rightRole = Constraint.prepareRoleToComparison(right, false);
 
-                                ret = leftRole.equalsIgnoreName(rightRole); //TODO equalsIgnoreName
+                                ret = leftRole.equalsForConstraint(rightRole);
 
                                 if (!ret && (leftRole instanceof roles.RoleLink || rightRole instanceof roles.RoleLink)) {
                                     if (leftRole instanceof roles.RoleLink)
@@ -763,7 +763,7 @@ class Constraint extends bs.BiSerializable {
                                     if (rightRole instanceof  roles.RoleLink)
                                         rightRole = Constraint.prepareRoleToComparison(right, true);
 
-                                    ret = leftRole.equalsIgnoreName(rightRole); //TODO equalsIgnoreName
+                                    ret = leftRole.equalsForConstraint(rightRole);
                                 }
 
                             } else {
@@ -786,12 +786,18 @@ class Constraint extends bs.BiSerializable {
                                 role = Constraint.prepareRoleToComparison(role, false);
                                 let compareRole = Constraint.prepareRoleToComparison(compareOperand, false);
 
-                                ret = role.equalsIgnoreName(compareRole); //TODO equalsIgnoreName
+                                if (role != null) {
+                                    ret = role.equalsForConstraint(compareRole);
 
-                                if (!ret && role instanceof roles.RoleLink) {
-                                    role = prepareRoleToComparison(role, true);
-                                    ret = role.equalsIgnoreName(compareRole); //TODO equalsIgnoreName
-                                }
+                                    if (!ret && role instanceof roles.RoleLink) {
+                                        role = Constraint.prepareRoleToComparison(role, true);
+                                        if (role != null)
+                                            ret = role.equalsForConstraint(compareRole);
+                                        else
+                                            ret = false;
+                                    }
+                                } else
+                                    ret = false;
                             }
 
                             if (indxOperator === NOT_EQUAL)
@@ -1078,7 +1084,7 @@ class Constraint extends bs.BiSerializable {
 
                             ret = Array.from(leftRoleSet).every(leftRole =>
                                   Array.from(rightRoleSet).some(rightRole =>
-                                      leftRole.equalsForConstraint(rightRole)));  //TODO equalsIgnoreName
+                                      leftRole.equalsForConstraint(rightRole)));
 
                         } else if (Array.from(leftSet).every(item => item instanceof Constraint) &&
                                    Array.from(rightSet).every(item => item instanceof Constraint)) {
