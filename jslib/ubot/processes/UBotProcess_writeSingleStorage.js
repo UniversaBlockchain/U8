@@ -31,6 +31,10 @@ class UBotProcess_writeSingleStorage extends ProcessBase {
         this.recordId = null;
     }
 
+    log(message) {
+        this.pr.logger.log("WritePoolBoundStorage. Storage name: " + this.storageName + ". Pool Id: " + this.pr.poolId + message);
+    }
+
     async init(binToWrite, previousRecordId, storageData) {
         this.binToWrite = await Boss.dump(await BossBiMapper.getInstance().serialize(binToWrite));
         this.binHashId = crypto.HashId.of(this.binToWrite);
@@ -51,22 +55,24 @@ class UBotProcess_writeSingleStorage extends ProcessBase {
                     this.poolSize = result.pool;
                     this.quorumSize = result.quorum;
                 } catch (err) {
-                    let message = "Failed get pool and quorum of method \"" + this.methodName + "\": " + err.message + ". Storage name: " + this.storageName;
-                    this.pr.logger.log("Error UBotProcess_writeSingleStorage: " + message);
-                    this.pr.errors.push(new ErrorRecord(Errors.BAD_VALUE, "UBotProcess_writeSingleStorage", message));
+                    let message = "failed get pool and quorum of method" + this.methodName + ": " + err.message;
+                    this.log("Error: " + message);
+                    message += ". Storage name: " + this.storageName;
+                    this.pr.errors.push(new ErrorRecord(Errors.BAD_VALUE, "WritePoolBoundStorage", message));
                     this.pr.changeState(UBotPoolState.FAILED);
 
-                    this.onFailed(new UBotProcessException("Error UBotProcess_writeSingleStorage: " + message));
+                    this.onFailed(new UBotProcessException("Error WritePoolBoundStorage: " + message));
                     return;
                 }
 
                 if (this.poolSize > this.pr.poolSize || this.quorumSize > this.pr.quorumSize) {
-                    let message = "Insufficient pool or quorum to use storage '" + this.storageName + "'";
-                    this.pr.logger.log("Error UBotProcess_writeSingleStorage: " + message);
-                    this.pr.errors.push(new ErrorRecord(Errors.FAILURE, "UBotProcess_writeSingleStorage", message));
+                    let message = "Insufficient pool or quorum to use storage";
+                    this.log("Error: " + message);
+                    message += ". Storage name: " + this.storageName;
+                    this.pr.errors.push(new ErrorRecord(Errors.FAILURE, "WritePoolBoundStorage", message));
                     this.pr.changeState(UBotPoolState.FAILED);
 
-                    this.onFailed(new UBotProcessException("Error UBotProcess_writeSingleStorage: " + message));
+                    this.onFailed(new UBotProcessException("Error WritePoolBoundStorage: " + message));
                 }
                 return;
             }
@@ -77,7 +83,7 @@ class UBotProcess_writeSingleStorage extends ProcessBase {
     }
 
     async start() {
-        this.pr.logger.log("start UBotProcess_writeSingleStorage, storage name: "  + this.storageName);
+        this.log("Start");
         this.approveCounterSet.add(this.pr.ubot.network.myInfo.number); // vote for itself
 
         // save first request times
@@ -89,7 +95,7 @@ class UBotProcess_writeSingleStorage extends ProcessBase {
     }
 
     pulse() {
-        this.pr.logger.log("UBotProcess_writeSingleStorage " + this.storageName + "... pulse. Not answered = " + JSON.stringify(Array.from(this.notAnswered)));
+        this.log("Pulse. Not answered = " + JSON.stringify(Array.from(this.notAnswered)));
 
         try {
             for (let i = 0; i < this.pr.pool.length; ++i)
@@ -99,7 +105,7 @@ class UBotProcess_writeSingleStorage extends ProcessBase {
                     if (this.checkMaxWaitPeriod(i))
                         this.checkDecline();        // check consensus available
                     else {
-                        this.pr.logger.log("UBotProcess_writeSingleStorage " + this.storageName + "... deliver notification to " + this.pr.pool[i].number);
+                        this.log("Deliver notification to " + this.pr.pool[i].number);
                         this.pr.ubot.network.deliver(this.pr.pool[i],
                             new UBotCloudNotification_process(
                                 this.pr.ubot.network.myInfo,
@@ -113,7 +119,7 @@ class UBotProcess_writeSingleStorage extends ProcessBase {
                     }
                 }   
         } catch (err) {
-            console.error("UBotProcess_writeSingleStorage. pulse error: " + err.message);
+            console.error("WritePoolBoundStorage. Pulse error: " + err.message);
             console.error(err.stack);
         }
     }
@@ -136,7 +142,7 @@ class UBotProcess_writeSingleStorage extends ProcessBase {
     }
 
     async vote(notification) {
-        let message = "UBotProcess_writeSingleStorage " + this.storageName + "... vote {from: " + notification.from.number + ", result: ";
+        let message = "Vote {from: " + notification.from.number + ", result: ";
 
         if (this.binHashId.equals(notification.params.dataHashId) &&
             t.valuesEqual(this.previousRecordId, notification.params.previousRecordId)) {
@@ -148,7 +154,7 @@ class UBotProcess_writeSingleStorage extends ProcessBase {
         }
 
         message += "}";
-        this.pr.logger.log(message);
+        this.log(message);
 
         if (this.approveCounterSet.size >= this.quorumSize) {
             // ok
@@ -167,16 +173,16 @@ class UBotProcess_writeSingleStorage extends ProcessBase {
 
                 await this.pr.session.updateStorage(this.storageName, this.binHashId, false);
             } catch (err) {
-                this.pr.logger.log("error: UBotProcess_writeSingleStorage: " + err.message);
-                this.pr.errors.push(new ErrorRecord(Errors.FAILURE, "UBotProcess_writeSingleStorage",
+                this.log("Error: " + err.message);
+                this.pr.errors.push(new ErrorRecord(Errors.FAILURE, "WritePoolBoundStorage",
                     "error writing to single storage: " + err.message));
                 this.pr.changeState(UBotPoolState.FAILED);
 
-                this.onFailed(new UBotProcessException("Error UBotProcess_writeSingleStorage: " + err.message));
+                this.onFailed(new UBotProcessException("Error WritePoolBoundStorage: " + err.message));
                 return;
             }
 
-            this.pr.logger.log("UBotProcess_writeSingleStorage " + this.storageName + "... ready, approved");
+            this.log("Ready, approved");
 
             //this.mainProcess.var0 = this.recordId.digest;
             this.onReady();
@@ -189,7 +195,7 @@ class UBotProcess_writeSingleStorage extends ProcessBase {
         if (notification instanceof UBotCloudNotification_process) {
             if (notification.type === UBotCloudNotification_process.types.SINGLE_STORAGE_GET_DATA_HASHID) {
                 if (!notification.params.isAnswer) {
-                    // this.pr.logger.log("SINGLE_STORAGE_GET_DATA_HASHID req... " + notification);
+                    // this.log("SINGLE_STORAGE_GET_DATA_HASHID req... " + notification);
                     this.pr.ubot.network.deliver(notification.from,
                         new UBotCloudNotification_process(
                             this.pr.ubot.network.myInfo,
@@ -208,7 +214,7 @@ class UBotProcess_writeSingleStorage extends ProcessBase {
                     await this.vote(notification);
             }
         } else {
-            this.pr.logger.log("warning: UBotProcess_writeSingleStorage " + this.storageName + " - wrong notification received");
+            this.log("Warning: wrong notification received");
         }
     }
 
@@ -223,7 +229,7 @@ class UBotProcess_writeSingleStorage extends ProcessBase {
         if (this.mainProcess.maxWaitUbot != null &&
             Date.now() - this.mainProcess.requestTimes[ubotInPool] > this.mainProcess.maxWaitUbot) {
             this.notAnswered.add(this.pr.pool[ubotInPool].number);
-            this.pr.logger.log(this.constructor.name + "... ubot " + this.pr.pool[ubotInPool].number +
+            this.log(this.constructor.name + "... ubot " + this.pr.pool[ubotInPool].number +
                 " did not respond to the request during the wait period");
 
             return true;
@@ -238,11 +244,11 @@ class UBotProcess_writeSingleStorage extends ProcessBase {
             if (this.getHashesTask != null)
                 this.getHashesTask.cancel();
 
-            this.pr.logger.log("UBotProcess_writeSingleStorage " + this.storageName + "... ready, declined");
-            this.pr.errors.push(new ErrorRecord(Errors.FAILURE, "UBotProcess_writeSingleStorage", "writing to single storage declined. Storage name: " + this.storageName));
+            this.log("Ready, declined");
+            this.pr.errors.push(new ErrorRecord(Errors.FAILURE, "WritePoolBoundStorage", "writing to single storage declined. Storage name: " + this.storageName));
             this.pr.changeState(UBotPoolState.FAILED);
 
-            this.onFailed(new UBotProcessException("Error UBotProcess_writeSingleStorage: writing to single storage declined. Storage name: " + this.storageName));
+            this.onFailed(new UBotProcessException("Error WritePoolBoundStorage: writing to single storage declined. Storage name: " + this.storageName));
         }
     }
 }
