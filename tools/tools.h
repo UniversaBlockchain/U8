@@ -22,16 +22,14 @@ inline byte_vector stringToBytes(const std::string& s) {
     return byte_vector(s.begin(), s.end());
 }
 
-inline bool file_exists(const std::string &name) {
-    struct stat buffer;
-    return (stat(name.c_str(), &buffer) == 0);
-}
+bool file_exists(const std::string &name);
 
 std::string replace_all(const std::string &src,
                                const std::string &what,
                                const std::string &to,
                                size_t from_pos = 0);
 
+std::string loadFromZip(const std::string &zipName, const std::string &fileName);
 
 std::string loadAsString(const std::string &fileName);
 

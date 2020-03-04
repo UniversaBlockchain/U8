@@ -18,6 +18,7 @@
 #include "worker_bindings.h"
 
 static const char *ARGV0 = nullptr;
+static const char *JSLIB_PATH = "/no";  //jslib.zip
 int Scripter::workerMemLimitMegabytes = 200; // actual default value is set in main.cpp
 
 std::unique_ptr<v8::Platform> Scripter::initV8(const char *argv0) {
@@ -82,35 +83,62 @@ Scripter::Scripter() : Logging("SCR") {
     auto root = s.substr(0, s.rfind('/'));
     auto path = root;
     bool root_found = false;
-    // Looking for library in the current tree
+    // Looking for library in the archive
     do {
-        auto x = path + "/jslib";
+        auto x = path + JSLIB_PATH + "/jslib";
         if (file_exists(x)) {
             require_roots.push_back(x);
             root_found = true;
             break;
         }
         auto index = path.rfind('/');
-        if (index == std::string::npos) break;
+        if (index == std::string::npos)
+            break;
         path = path.substr(0, index);
     } while (path != "/");
+
+    // Looking for library in the current tree
+    if (!root_found) {
+        path = root;
+        do {
+            auto x = path + "/jslib";
+            if (file_exists(x)) {
+                require_roots.push_back(x);
+                root_found = true;
+                break;
+            }
+            auto index = path.rfind('/');
+            if (index == std::string::npos)
+                break;
+            path = path.substr(0, index);
+        } while (path != "/");
+    }
 
     // if not found, get from ENV
     if (!root_found) {
         // get U8 root from env
         auto u8root = std::getenv("U8_ROOT");
         if (u8root) {
+            std::string sroot = u8root;
+            require_roots.emplace_back(sroot + JSLIB_PATH);
             require_roots.emplace_back(u8root);
         } else {
             // last chance ;)
+            std::string sroot = "..";
+            require_roots.emplace_back(sroot + JSLIB_PATH + "/jslib");
+            sroot = ".";
+            require_roots.emplace_back(sroot + JSLIB_PATH + "/jslib");
             require_roots.emplace_back("../jslib");
             require_roots.emplace_back("./jslib");
         }
-
     }
     // then look in the application executable file root
+    std::string sroot = root;
+    require_roots.emplace_back(sroot + JSLIB_PATH);
     require_roots.push_back(root);
     // and in the current directory
+    sroot = ".";
+    require_roots.emplace_back(sroot + JSLIB_PATH);
     require_roots.emplace_back(".");
 }
 
