@@ -32,7 +32,7 @@ class UBotProcess_writeSingleStorage extends ProcessBase {
     }
 
     log(message) {
-        this.pr.logger.log("WritePoolBoundStorage. Storage name: " + this.storageName + ". Pool Id: " + this.pr.poolId + message);
+        this.pr.logger.log("WritePoolBoundStorage " + this.storageName + ", poolID: " + this.pr.poolId + " " + message);
     }
 
     async init(binToWrite, previousRecordId, storageData) {

@@ -72,7 +72,7 @@ class UBotProcess_writeMultiStorage extends UBotProcess_writeSingleStorage {
     }
 
     log(message) {
-        this.pr.logger.log("WriteWorkerBoundStorage. Storage name: " + this.storageName + ". Pool Id: " + this.pr.poolId + message);
+        this.pr.logger.log("WriteWorkerBoundStorage " + this.storageName + ", poolID: " + this.pr.poolId + " " + message);
     }
 
     async init(binToWrite, previousRecordId, storageData) {
