@@ -71,8 +71,8 @@ class UBotProcess_writeMultiStorage extends UBotProcess_writeSingleStorage {
         this.state = UBotProcess_writeMultiStorage.states.CHECKING;
     }
 
-    log(message) {
-        this.pr.logger.log("WriteWorkerBoundStorage " + this.storageName + ", poolID: " + this.pr.poolId + " " + message);
+    log(message, error = false) {
+        this.pr.logger.log((error ? "Error: " : "") + "WriteWorkerBoundStorage " + this.storageName + ", poolID: " + this.pr.poolId + " " + message);
     }
 
     async init(binToWrite, previousRecordId, storageData) {

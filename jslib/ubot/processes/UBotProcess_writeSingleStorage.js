@@ -31,8 +31,8 @@ class UBotProcess_writeSingleStorage extends ProcessBase {
         this.recordId = null;
     }
 
-    log(message) {
-        this.pr.logger.log("WritePoolBoundStorage " + this.storageName + ", poolID: " + this.pr.poolId + " " + message);
+    log(message, error = false) {
+        this.pr.logger.log((error ? "Error: " : "") + "WritePoolBoundStorage " + this.storageName + ", poolID: " + this.pr.poolId + " " + message);
     }
 
     async init(binToWrite, previousRecordId, storageData) {
@@ -56,7 +56,7 @@ class UBotProcess_writeSingleStorage extends ProcessBase {
                     this.quorumSize = result.quorum;
                 } catch (err) {
                     let message = "failed get pool and quorum of method" + this.methodName + ": " + err.message;
-                    this.log("Error: " + message);
+                    this.log(message, true);
                     message += ". Storage name: " + this.storageName;
                     this.pr.errors.push(new ErrorRecord(Errors.BAD_VALUE, "WritePoolBoundStorage", message));
                     this.pr.changeState(UBotPoolState.FAILED);
@@ -67,7 +67,7 @@ class UBotProcess_writeSingleStorage extends ProcessBase {
 
                 if (this.poolSize > this.pr.poolSize || this.quorumSize > this.pr.quorumSize) {
                     let message = "Insufficient pool or quorum to use storage";
-                    this.log("Error: " + message);
+                    this.log(message, true);
                     message += ". Storage name: " + this.storageName;
                     this.pr.errors.push(new ErrorRecord(Errors.FAILURE, "WritePoolBoundStorage", message));
                     this.pr.changeState(UBotPoolState.FAILED);
@@ -173,7 +173,7 @@ class UBotProcess_writeSingleStorage extends ProcessBase {
 
                 await this.pr.session.updateStorage(this.storageName, this.binHashId, false);
             } catch (err) {
-                this.log("Error: " + err.message);
+                this.log(err.message, true);
                 this.pr.errors.push(new ErrorRecord(Errors.FAILURE, "WritePoolBoundStorage",
                     "error writing to single storage: " + err.message));
                 this.pr.changeState(UBotPoolState.FAILED);
