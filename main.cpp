@@ -52,7 +52,7 @@ int main(int argc, const char **argv) {
         usage();
         return 1;
     } else {
-        return Scripter::Application(argv[0], [=](shared_ptr<Scripter> se) {
+        return Scripter::Application(argv[0], argv[1], [=](shared_ptr<Scripter> se) {
             vector<string> args(argv + 1, argv + argc);
 
             auto u8param_workersPoolSize = std::getenv("U8_PARAM_WORKERS_POOL_SIZE");

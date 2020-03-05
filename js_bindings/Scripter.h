@@ -48,11 +48,12 @@ public:
      * Create V8 environment, construct scripter, executes block with it, close V8 environment and return
      * whatever block return unless it throw an exception.
      * @param argv0 argv[0] of the executing program, needed to properly initialize V8.
+     * @param argv1 argv[1] of the executing program, needed to properly initialize JS-module (or simple script).
      * @param block to execute with Scripter environment
      * @return block returned value or 1000 if std::exception was thrown, or 2000 if any other exception was thrown
      *         by the block.
      */
-    static int Application(const char *argv0, function<int(shared_ptr<Scripter>)> &&block);
+    static int Application(const char *argv0, const char *argv1, function<int(shared_ptr<Scripter>)> &&block);
 
     /**
      * Sets up V8 environment for the process. Must be called once before any V8 and/or Scripter operation.

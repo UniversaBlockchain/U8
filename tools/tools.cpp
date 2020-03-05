@@ -9,7 +9,7 @@
 
 using namespace std;
 
-bool file_exists(const std::string &name) {
+bool file_exists(const std::string &name, bool dirInZip) {
     size_t pos = name.find(".zip/");
     struct stat buffer;
     if (pos == std::string::npos)
@@ -26,6 +26,9 @@ bool file_exists(const std::string &name) {
         zip* z = zip_open(zipPath.c_str(), 0, &err);
         if (z == nullptr)
             return false;
+
+        if (dirInZip)
+            path += "/";
 
         struct zip_stat zbuffer;
         zip_stat_init(&zbuffer);

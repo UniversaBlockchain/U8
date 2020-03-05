@@ -18,7 +18,7 @@
 #include "worker_bindings.h"
 
 static const char *ARGV0 = nullptr;
-static const char *JSLIB_PATH = "/no";  //jslib.zip
+static const char *ARGV1 = nullptr;
 int Scripter::workerMemLimitMegabytes = 200; // actual default value is set in main.cpp
 
 std::unique_ptr<v8::Platform> Scripter::initV8(const char *argv0) {
@@ -48,8 +48,9 @@ void Scripter::closeV8(std::unique_ptr<v8::Platform> &platform) {
     platform.release();
 }
 
-int Scripter::Application(const char *argv0, function<int(shared_ptr<Scripter>)> &&block) {
+int Scripter::Application(const char *argv0, const char *argv1, function<int(shared_ptr<Scripter>)> &&block) {
     try {
+        ARGV1 = argv1;
         auto platform = initV8(argv0);
         auto se = New(0, false);
         return block(se);
@@ -79,67 +80,56 @@ shared_ptr<Scripter> Scripter::New(int accessLevel, bool forWorker) {
 }
 
 Scripter::Scripter() : Logging("SCR") {
-    std::string s = ARGV0;
+    std::string s = ARGV1;
+
+    size_t zipPos = s.rfind(".zip/");
+    bool inZip = zipPos != std::string::npos;
+    if (inZip && !checkModuleSignature(s.substr(0, zipPos + 4)))
+        throw runtime_error("Failed checking module signature");
+
+    if (!inZip)
+        s = ARGV0;
+
     auto root = s.substr(0, s.rfind('/'));
     auto path = root;
     bool root_found = false;
-    // Looking for library in the archive
+
+    // Looking for library in the current tree
     do {
-        auto x = path + JSLIB_PATH + "/jslib";
-        if (file_exists(x)) {
+        auto x = path + "/jslib";
+        if (file_exists(x, true)) {
             require_roots.push_back(x);
             root_found = true;
             break;
         }
         auto index = path.rfind('/');
-        if (index == std::string::npos)
+        if (index == std::string::npos || (inZip && index < zipPos))
             break;
         path = path.substr(0, index);
     } while (path != "/");
 
-    // Looking for library in the current tree
-    if (!root_found) {
-        path = root;
-        do {
-            auto x = path + "/jslib";
-            if (file_exists(x)) {
-                require_roots.push_back(x);
-                root_found = true;
-                break;
-            }
-            auto index = path.rfind('/');
-            if (index == std::string::npos)
-                break;
-            path = path.substr(0, index);
-        } while (path != "/");
-    }
-
     // if not found, get from ENV
     if (!root_found) {
+        if (inZip)
+            throw runtime_error("jslib in module not found");
+
         // get U8 root from env
         auto u8root = std::getenv("U8_ROOT");
         if (u8root) {
-            std::string sroot = u8root;
-            require_roots.emplace_back(sroot + JSLIB_PATH);
             require_roots.emplace_back(u8root);
         } else {
             // last chance ;)
-            std::string sroot = "..";
-            require_roots.emplace_back(sroot + JSLIB_PATH + "/jslib");
-            sroot = ".";
-            require_roots.emplace_back(sroot + JSLIB_PATH + "/jslib");
             require_roots.emplace_back("../jslib");
             require_roots.emplace_back("./jslib");
         }
     }
-    // then look in the application executable file root
-    std::string sroot = root;
-    require_roots.emplace_back(sroot + JSLIB_PATH);
-    require_roots.push_back(root);
-    // and in the current directory
-    sroot = ".";
-    require_roots.emplace_back(sroot + JSLIB_PATH);
-    require_roots.emplace_back(".");
+
+    if (!inZip) {
+        // then look in the application executable file root
+        require_roots.push_back(root);
+        // and in the current directory
+        require_roots.emplace_back(".");
+    }
 }
 
 static void JsThrowScripterException(const FunctionCallbackInfo<Value> &args) {

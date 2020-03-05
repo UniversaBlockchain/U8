@@ -22,7 +22,7 @@ inline byte_vector stringToBytes(const std::string& s) {
     return byte_vector(s.begin(), s.end());
 }
 
-bool file_exists(const std::string &name);
+bool file_exists(const std::string &name, bool dirInZip = false);
 
 std::string replace_all(const std::string &src,
                                const std::string &what,
@@ -34,6 +34,10 @@ std::string loadFromZip(const std::string &zipName, const std::string &fileName)
 std::string loadAsString(const std::string &fileName);
 
 std::string loadAsStringOrThrow(const std::string &fileName);
+
+inline bool checkModuleSignature(const std::string &moduleName) {
+    return true;
+}
 
 class io_error : public std::runtime_error {
 public:
