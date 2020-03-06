@@ -131,7 +131,7 @@ class UBotProcess_writeMultiStorage extends UBotProcess_writeSingleStorage {
             if (this.votingExclusionSuspiciousTasks[i] != null)
                 this.votingExclusionSuspiciousTasks[i].cancel();
 
-        this.log("Error: " + error);
+        this.log(error, true);
         this.pr.errors.push(new ErrorRecord(Errors.FAILURE, "WriteWorkerBoundStorage", error + ". Storage name: " + this.storageName));
         this.pr.changeState(UBotPoolState.FAILED);
 
@@ -898,7 +898,7 @@ class UBotProcess_writeMultiStorage extends UBotProcess_writeSingleStorage {
         let cortegesHash = this.getCortegesHash();
         if (this.lastCortegesHash != null) {
             if (this.lastCortegesHash.equals(cortegesHash)) {
-                this.log("Error: cortege has not changed during the iteration, consensus not found");
+                this.log("cortege has not changed during the iteration, consensus not found", true);
                 this.pr.errors.push(new ErrorRecord(Errors.FAILURE, "WriteWorkerBoundStorage",
                     "cortege has not changed during the iteration, consensus not found. Storage name: " + this.storageName));
                 return false;
@@ -908,7 +908,7 @@ class UBotProcess_writeMultiStorage extends UBotProcess_writeSingleStorage {
 
         // analyze corteges
         if (!await this.crossAnalyzeCorteges()) {
-            this.log("Error: consensus not found");
+            this.log("consensus not found", true);
             this.pr.errors.push(new ErrorRecord(Errors.FAILURE, "WriteWorkerBoundStorage", "consensus not found. Storage name: " + this.storageName));
             return false;
         }
