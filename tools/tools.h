@@ -35,9 +35,9 @@ std::string loadAsString(const std::string &fileName);
 
 std::string loadAsStringOrThrow(const std::string &fileName);
 
-inline bool checkModuleSignature(const std::string &moduleName) {
-    return true;
-}
+int singModule(const std::string &moduleName, const std::string &keyFileName);
+
+bool checkModuleSignature(const std::string &moduleName);
 
 class io_error : public std::runtime_error {
 public:

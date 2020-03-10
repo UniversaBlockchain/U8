@@ -48,6 +48,15 @@ int main(int argc, const char **argv) {
         return 0;
     }
 
+    if (argc > 1 && strcmp(argv[1], "--signmodule") == 0) {
+        if (argc != 4) {
+            usage();
+            return 1;
+        }
+
+        return singModule(argv[2], argv[3]);
+    }
+
     if (argc == 1) {
         usage();
         return 1;
@@ -89,7 +98,7 @@ void usage() {
 
 Usage:
 
-    u8 [-e "`js code to evaluate`"] | <javascript_file_name> | [--selftest]
+    u8 [-e "`js code to evaluate`"] | <javascript_file_name> | [--selftest] | [--signmodule <module_name> <key_name>]
 
 if -e switch present, evaluates the second command line parameter as Javascript code and
 prints out result ou stdout.
@@ -99,6 +108,8 @@ All other parameters are passed to the main(argv) function if present in the scr
 if it is imported from it.
 
 --selftest run some internal tests.
+
+--signmodule sign zip-module with define key.
 
 )End";
 }

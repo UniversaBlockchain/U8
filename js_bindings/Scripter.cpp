@@ -19,7 +19,8 @@
 
 static const char *ARGV0 = nullptr;
 static const char *ARGV1 = nullptr;
-int Scripter::workerMemLimitMegabytes = 200; // actual default value is set in main.cpp
+std::string BASE_PATH;                          // path to ZIP-module or directory where jslib found
+int Scripter::workerMemLimitMegabytes = 200;    // actual default value is set in main.cpp
 
 std::unique_ptr<v8::Platform> Scripter::initV8(const char *argv0) {
 
@@ -84,10 +85,13 @@ Scripter::Scripter() : Logging("SCR") {
 
     size_t zipPos = s.rfind(".zip/");
     bool inZip = zipPos != std::string::npos;
-    if (inZip && !checkModuleSignature(s.substr(0, zipPos + 4)))
-        throw runtime_error("Failed checking module signature");
 
-    if (!inZip)
+    if (inZip) {
+        std:string zip = s.substr(0, zipPos + 4);
+        BASE_PATH = zip + "/";
+        if (!checkModuleSignature(zip))
+            throw runtime_error("Failed checking module signature");
+    } else
         s = ARGV0;
 
     auto root = s.substr(0, s.rfind('/'));
@@ -99,6 +103,9 @@ Scripter::Scripter() : Logging("SCR") {
         auto x = path + "/jslib";
         if (file_exists(x, true)) {
             require_roots.push_back(x);
+            if (!inZip)
+                BASE_PATH = path + "/";
+
             root_found = true;
             break;
         }
