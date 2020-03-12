@@ -20,7 +20,7 @@ const Constraint = require('constraint').Constraint;
 const BigDecimal  = require("big").Big;
 const tt = require("test_tools");
 
-const TOPOLOGY_ROOT = "../jslib/ubot/topology/";
+const TOPOLOGY_ROOT = "../test/ubot/topology/";
 const TOPOLOGY_FILE = "mainnet_topology.json";
 const TEST_CONTRACTS_PATH = "../test/ubot/executable_contracts/";
 

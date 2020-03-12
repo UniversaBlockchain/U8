@@ -14,7 +14,7 @@ const Parcel = require("parcel").Parcel;
 const cs = require("contractsservice");
 
 const EXECUTABLE_CONTRACTS_PATH = "../test/ubot/executable_contracts/";
-const TOPOLOGY_ROOT = "../jslib/ubot/topology/";
+const TOPOLOGY_ROOT = "../test/ubot/topology/";
 const TOPOLOGY_FILE = "mainnet_topology.json";
 
 /**
