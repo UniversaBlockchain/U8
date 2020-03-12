@@ -19,7 +19,7 @@ const CONFIG_ROOT = "../test/config/ubot_config"; //io.getTmpDirPath() + "/ubot_
 const clientKey = tk.TestKeys.getKey();
 const userPrivKey = tk.TestKeys.getKey();
 
-const TOPOLOGY_ROOT = "../jslib/ubot/topology/";
+const TOPOLOGY_ROOT = "../test/ubot/topology/";
 const TOPOLOGY_FILE = "mainnet_topology.json";
 const ubotsCount = 30;
 

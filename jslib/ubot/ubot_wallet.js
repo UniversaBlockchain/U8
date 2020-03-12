@@ -13,7 +13,7 @@ const UBotPoolState = require("ubot/ubot_pool_state").UBotPoolState;
 const Parcel = require("parcel").Parcel;
 const cs = require("contractsservice");
 
-const EXECUTABLE_CONTRACTS_PATH = "../jslib/ubot/executable_contracts/";
+const EXECUTABLE_CONTRACTS_PATH = "../test/ubot/executable_contracts/";
 const TOPOLOGY_ROOT = "../jslib/ubot/topology/";
 const TOPOLOGY_FILE = "mainnet_topology.json";
 

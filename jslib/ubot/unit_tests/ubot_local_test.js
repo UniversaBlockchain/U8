@@ -24,10 +24,10 @@ const t = require("tools");
 const ut = require("ubot/ubot_tools");
 const tt = require("test_tools");
 
-const TOPOLOGY_ROOT = "../jslib/ubot/topology/";
+const TOPOLOGY_ROOT = "../test/ubot/topology/";
 const TOPOLOGY_FILE = "mainnet_topology.json";
 const CONFIG_ROOT = "../test/config/ubot_config";
-const TEST_CONTRACTS_PATH = "../jslib/ubot/executable_contracts/";
+const TEST_CONTRACTS_PATH = "../test/ubot/executable_contracts/";
 const ubotsCount = 30;
 
 const clientKey = tk.TestKeys.getKey();
