@@ -15,5 +15,6 @@ void JsInitIOTCP(Scripter& scripter, const Local<ObjectTemplate> &global);
 void JsInitIOTLS(Scripter& scripter, const Local<ObjectTemplate> &global);
 void JsInitIOUDP(Scripter& scripter, const Local<ObjectTemplate> &global);
 void JsInitIODir(Scripter& scripter, const Local<ObjectTemplate> &global);
+void JsInitZipBindings(Scripter& scripter, const Local<ObjectTemplate> &global);
 
 #endif //U8_ASYNC_IO_BINDINGS_H

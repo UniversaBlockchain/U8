@@ -218,6 +218,7 @@ void Scripter::initialize(int accessLevel, bool forWorker) {
         JsInitResearchBindings(*this, global);
         JsInitBossBindings(*this, global);
         JsInitWorkerBindings(*this, global);
+        JsInitZipBindings(*this, global);
     } else if (accessLevel == 1) {
         global->Set(v8String("__bios_loadRequired"), functionTemplate(JsLoadRequiredRestricted));
         global->Set(v8String("__bios_initTimers"), functionTemplate(JsInitTimers));

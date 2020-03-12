@@ -447,20 +447,39 @@ async function filePutContents(path, contents) {
     await h.close();
 }
 
-async function fileGetContentsAsString(path, contents) {
+async function fileGetContentsAsString(path) {
     let h = await openRead(path);
     let res = await h.allAsString();
     await h.close();
     return res;
 }
 
-async function fileGetContentsAsBytes(path, contents) {
+async function fileGetContentsAsBytes(path) {
     let h = await openRead(path);
     let res = await h.allBytes();
     await h.close();
     return res;
 }
 
+// For module resources (files in ZIP-module)
+async function getResourcesFromPath(path) {
+    let basePath = getBasePath();
+    let fullPath = basePath + path;
+    if (~basePath.indexOf(".zip/"))
+        return await getModuleResourcesFromPath(fullPath);
+    else
+        return await getFilesFromDir(fullPath);
+}
+
+async function resourceGetContentsAsString(path) {
+    let basePath = getBasePath();
+    let fullPath = basePath + path;
+    if (~basePath.indexOf(".zip/"))
+        return await readResourceContentsAsString(fullPath);
+    else
+        return await fileGetContentsAsString(fullPath);
+}
+
 module.exports = {openRead, openWrite, InputStream, OutputStream, AsyncProcessor, IoError, isAccessible, isFile, isDir,
     EntryType, getEntriesFromDir, getFilesFromDir, getTmpDirPath, createDir, removeDir, filePutContents,
-    fileGetContentsAsString, fileGetContentsAsBytes};
+    fileGetContentsAsString, fileGetContentsAsBytes, getResourcesFromPath, resourceGetContentsAsString};

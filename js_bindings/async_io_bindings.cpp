@@ -4,6 +4,7 @@
 
 #include <iostream>
 #include <cstring>
+#include "zip.h"
 
 #include "async_io_bindings.h"
 #include "binding_tools.h"
@@ -13,6 +14,8 @@
 #include "../AsyncIO/IODir.h"
 #include "../AsyncIO/IOTCP.h"
 #include "../AsyncIO/IOTLS.h"
+
+extern std::string BASE_PATH;                          // path to ZIP-module or directory where jslib found
 
 void JsAsyncGetErrorText(const FunctionCallbackInfo<Value> &args) {
     Scripter::unwrapArgs(args, [](ArgsContext &ac) {
@@ -586,4 +589,96 @@ void JsInitIODir(Scripter& scripter, const Local<ObjectTemplate> &global) {
     // register it into global namespace
     scripter.DirTemplate.Reset(isolate, tpl);
     global->Set(isolate, "IODir", tpl);
+}
+
+void JsZip_getBasePath(const FunctionCallbackInfo<Value> &args) {
+    Scripter::unwrapArgs(args, [](ArgsContext &ac) {
+        if (ac.args.Length() == 0) {
+            ac.setReturnValue(ac.v8String(BASE_PATH));
+            return;
+        }
+        ac.throwError("invalid number of arguments");
+    });
+}
+
+void JsZip_getModuleResourcesFromPath(const FunctionCallbackInfo<Value> &args) {
+    Scripter::unwrapArgs(args, [](ArgsContext &ac) {
+        if (ac.args.Length() == 1) {
+            auto path = ac.asString(0);
+
+            size_t pos = path.find(".zip/");
+            if (pos == std::string::npos) {
+                ac.throwError("path without zip-module");
+                return;
+            }
+
+            string zipPath = path.substr(0, pos + 4);
+            string dir = path.substr(pos + 5);
+
+            int err = 0;
+            zip* z = zip_open(zipPath.c_str(), 0, &err);
+            if (z == nullptr) {
+                ac.throwError("failed opening zip-module");
+                return;
+            }
+
+            auto expected = dir.length();
+            if (dir.rfind("/") == expected - 1)
+                expected--;
+
+            v8::Local<v8::Array> result = v8::Array::New(ac.isolate);
+            auto count = zip_get_num_entries(z, 0);
+
+            for (zip_uint64_t i = 0; i < count; i++) {
+                string name = zip_get_name(z, i, 0);
+                pos = name.rfind("/");
+                if (name.find(dir) == 0 && pos == expected) {
+                    string fileName = name.substr(pos + 1);
+                    if (!fileName.empty())
+                        auto unused = result->Set(ac.context, result->Length(), ac.v8String(fileName));
+                }
+            }
+
+            zip_close(z);
+
+            ac.setReturnValue(result);
+            return;
+        }
+        ac.throwError("invalid number of arguments");
+    });
+}
+
+void JsZip_readResourceContentsAsString(const FunctionCallbackInfo<Value> &args) {
+    Scripter::unwrapArgs(args, [](ArgsContext &ac) {
+        if (ac.args.Length() == 1) {
+            auto path = ac.asString(0);
+
+            size_t pos = path.find(".zip/");
+            if (pos == std::string::npos) {
+                ac.throwError("path without zip-module");
+                return;
+            }
+
+            string zipPath = path.substr(0, pos + 4);
+            string fileName = path.substr(pos + 5);
+
+            auto data = loadFromZip(zipPath, fileName);
+            if (data.empty()) {
+                ac.throwError("error loading file from zip-module");
+                return;
+            }
+
+            ac.setReturnValue(ac.v8String(data));
+
+            return;
+        }
+        ac.throwError("invalid number of arguments");
+    });
+}
+
+void JsInitZipBindings(Scripter& scripter, const Local<ObjectTemplate> &global) {
+    Isolate *isolate = scripter.isolate();
+    global->Set(String::NewFromUtf8(isolate, "getBasePath").ToLocalChecked(), FunctionTemplate::New(isolate, JsZip_getBasePath));
+    global->Set(String::NewFromUtf8(isolate, "getModuleResourcesFromPath").ToLocalChecked(), FunctionTemplate::New(isolate, JsZip_getModuleResourcesFromPath));
+    global->Set(String::NewFromUtf8(isolate, "readResourceContentsAsString").ToLocalChecked(), FunctionTemplate::New(isolate, JsZip_readResourceContentsAsString));
 }

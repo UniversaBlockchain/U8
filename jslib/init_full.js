@@ -202,6 +202,9 @@ function freezeGlobals() {
     Object.freeze(global._);
     Object.freeze(global.__args);
     Object.freeze(global.freezeGlobals);
+    Object.freeze(global.getBasePath);
+    Object.freeze(global.getModuleResourcesFromPath);
+    Object.freeze(global.readResourceContentsAsString);
     Object.freeze(global);
 }
 

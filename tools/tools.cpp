@@ -8,6 +8,8 @@
 #include "zip.h"
 #include "../crypto/PrivateKey.h"
 #include "../crypto/PublicKey.h"
+#include "../types/UBinder.h"
+#include "../serialization/BossSerializer.h"
 
 using namespace std;
 using namespace crypto;
@@ -116,72 +118,84 @@ string loadAsStringOrThrow(const string &fileName) {
 }
 
 int singModule(const std::string &moduleName, const std::string &keyFileName) {
-    int err = 0;
-    zip* z = zip_open(moduleName.c_str(), 0, &err);
-    if (z == nullptr) {
-        printf("File %s not found\n", moduleName.c_str());
+    try {
+        int err = 0;
+        zip *z = zip_open(moduleName.c_str(), 0, &err);
+        if (z == nullptr) {
+            printf("File %s not found\n", moduleName.c_str());
+            return 1;
+        }
+
+        // delete exist comment
+        if (zip_set_archive_comment(z, nullptr, 0) != 0) {
+            printf("Failed deleting archive comment\n");
+            return 1;
+        }
+
+        zip_close(z);
+
+        // read key
+        FILE *f = fopen(keyFileName.c_str(), "rb");
+        if (f == nullptr) {
+            printf("Failed opening key file %s\n", moduleName.c_str());
+            return 1;
+        }
+        fseek(f, 0, SEEK_END);
+        auto keyLen = (size_t) ftell(f);
+        fseek(f, 0, SEEK_SET);
+
+        void *keyData = malloc(keyLen);
+        fread(keyData, 1, keyLen, f);
+        fclose(f);
+
+        // read data for signing
+        f = fopen(moduleName.c_str(), "r+b");
+        if (f == nullptr) {
+            printf("Failed opening module file %s\n", moduleName.c_str());
+            return 1;
+        }
+        fseek(f, 0, SEEK_END);
+        auto dataLen = (size_t) ftell(f) - 2;
+        fseek(f, 0, SEEK_SET);
+
+        void *data = malloc(dataLen);
+        fread(data, 1, dataLen, f);
+
+        auto key = new PrivateKey(keyData, keyLen);
+
+        // sign module
+        auto sign = key->sign(data, dataLen, HashType::SHA3_512);
+
+        auto publicKey = new PublicKey(*key);
+        auto packedKey = publicKey->pack();
+
+        // form signature
+        UBytes keyBytes(packedKey.data(), (unsigned short) packedKey.size());
+        UBytes signBytes(sign.data(), (unsigned short) sign.size());
+
+        UBinder signature = UBinder::of("pub_key", keyBytes, "sha3_512", signBytes);
+
+        UBytes packed = BossSerializer::serialize(signature);
+
+        if (packed.get().size() > 65536) {
+            printf("Packed signature size exceed 65536 bytes\n");
+            return 1;
+        }
+
+        // write public key and signature to archive
+        auto size = (unsigned short) packed.get().size();
+        fwrite(&size, 1, sizeof(unsigned short), f);
+        fwrite(packed.get().data(), 1, size, f);
+
+        fclose(f);
+
+        free(data);
+        free(keyData);
+
+    } catch (const std::exception& e) {
+        printf("Error singing module: %s\n", e.what());
         return 1;
     }
-
-    // delete exist comment
-    if (zip_set_archive_comment(z, nullptr, 0) != 0) {
-        printf("Failed deleting archive comment\n");
-        return 1;
-    }
-
-    zip_close(z);
-
-    // read key
-    FILE* f = fopen(keyFileName.c_str(), "rb");
-    if (f == nullptr) {
-        printf("Failed opening key file %s\n", moduleName.c_str());
-        return false;
-    }
-    fseek(f, 0, SEEK_END);
-    auto keyLen = (size_t) ftell(f);
-    fseek(f, 0, SEEK_SET);
-
-    void* keyData = malloc(keyLen);
-    fread(keyData, 1, keyLen, f);
-    fclose(f);
-
-    // read data for signing
-    f = fopen(moduleName.c_str(), "r+b");
-    if (f == nullptr) {
-        printf("Failed opening module file %s\n", moduleName.c_str());
-        return false;
-    }
-    fseek(f, 0, SEEK_END);
-    auto dataLen = (size_t) ftell(f) - 2;
-    fseek(f, 0, SEEK_SET);
-
-    void* data = malloc(dataLen);
-    fread(data, 1, dataLen, f);
-
-    auto key = new PrivateKey(keyData, keyLen);
-
-    // sign module
-    auto sign = key->sign(data, dataLen, HashType::SHA512);
-
-    auto publicKey = new PublicKey(*key);
-    auto packedKey = publicKey->pack();
-
-    // write public key and signature to archive
-    auto fullSize = sizeof(unsigned short) * 2 + packedKey.size() + sign.size();
-    fwrite(&fullSize, 1, sizeof(unsigned short), f);
-
-    auto size = (unsigned short) packedKey.size();
-    fwrite(&size, 1, sizeof(unsigned short), f);
-    fwrite(packedKey.data(), 1, packedKey.size(), f);
-
-    size = (unsigned short) sign.size();
-    fwrite(&size, 1, sizeof(unsigned short), f);
-    fwrite(sign.data(), 1, sign.size(), f);
-
-    fclose(f);
-
-    free(data);
-    free(keyData);
 
     printf("Module '%s' successfully signed with key '%s'\n", moduleName.c_str(), keyFileName.c_str());
 
@@ -189,82 +203,76 @@ int singModule(const std::string &moduleName, const std::string &keyFileName) {
 }
 
 bool checkModuleSignature(const std::string &moduleName) {
-    int err = 0;
-    zip* z = zip_open(moduleName.c_str(), 0, &err);
-    if (z == nullptr) {
-        printf("File %s not found\n", moduleName.c_str());
+    try {
+        int err = 0;
+        zip* z = zip_open(moduleName.c_str(), 0, &err);
+        if (z == nullptr) {
+            printf("File %s not found\n", moduleName.c_str());
+            return false;
+        }
+
+        int lenSignData = 0;
+        zip_get_archive_comment(z, &lenSignData, ZIP_FL_ENC_RAW);
+        zip_close(z);
+
+        if (lenSignData == 0) {
+            printf("Signature of module %s not found\n", moduleName.c_str());
+            return false;
+        }
+        if (lenSignData > 65536) {
+            printf("Signature of module %s has wrong format\n", moduleName.c_str());
+            return false;
+        }
+
+        // read module
+        FILE* f = fopen(moduleName.c_str(), "rb");
+        if (f == nullptr) {
+            printf("Failed opening file %s\n", moduleName.c_str());
+            return false;
+        }
+        fseek(f, 0, SEEK_END);
+        auto moduleLen = (size_t) ftell(f);
+        fseek(f, 0, SEEK_SET);
+
+        auto dataLen = moduleLen - lenSignData - sizeof(unsigned short);
+        void* data = malloc(dataLen);
+        auto readed = fread(data, 1, dataLen, f);
+        if (readed != dataLen) {
+            printf("Failed reading module data\n");
+            return false;
+        }
+
+        fseek(f, dataLen + sizeof(unsigned short), SEEK_SET);
+
+        // read signature
+        void* signData = malloc((unsigned short) lenSignData);
+        readed = fread(signData, 1, (unsigned short) lenSignData, f);
+        if (readed != lenSignData) {
+            printf("Failed reading signature\n");
+            return false;
+        }
+
+        // unpack signature
+        UBytes packed((const unsigned char*) signData, (unsigned short) lenSignData);
+        UObject signature = BossSerializer::deserialize(packed);
+
+        auto key = UBytes::asInstance(UBinder::asInstance(signature).get("pub_key")).get();
+        auto sign = UBytes::asInstance(UBinder::asInstance(signature).get("sha3_512")).get();
+
+        auto publicKey = new PublicKey(key.data(), key.size());
+
+        // verify signature
+        bool res = publicKey->verify(sign.data(), sign.size(), data, dataLen, HashType::SHA3_512);
+
+        fclose(f);
+
+        free(data);
+        free(signData);
+
+        return res;
+
+    } catch (const std::exception& e) {
+        printf("Error checking module signature: %s\n", e.what());
         return false;
     }
-
-    int lenSignData = 0;
-    zip_get_archive_comment(z, &lenSignData, ZIP_FL_ENC_RAW);
-    zip_close(z);
-
-    if (lenSignData == 0) {
-        printf("Signature of module %s not found\n", moduleName.c_str());
-        return false;
-    }
-
-    // read module
-    FILE* f = fopen(moduleName.c_str(), "rb");
-    if (f == nullptr) {
-        printf("Failed opening file %s\n", moduleName.c_str());
-        return false;
-    }
-    fseek(f, 0, SEEK_END);
-    auto moduleLen = (size_t) ftell(f);
-    fseek(f, 0, SEEK_SET);
-
-    auto dataLen = moduleLen - lenSignData - sizeof(unsigned short);
-    void* data = malloc(dataLen);
-    auto readed = fread(data, 1, dataLen, f);
-    if (readed != dataLen) {
-        printf("Failed reading module data\n");
-        return false;
-    }
-
-    fseek(f, dataLen + sizeof(unsigned short), SEEK_SET);
-
-    // read key
-    unsigned short keySize = 0;
-    readed = fread(&keySize, 1, sizeof(unsigned short), f);
-    if (readed != sizeof(unsigned short)) {
-        printf("Failed reading key data size\n");
-        return false;
-    }
-
-    void* packedKey = malloc(keySize);
-    readed = fread(packedKey, 1, keySize, f);
-    if (readed != keySize) {
-        printf("Failed reading key data \n");
-        return false;
-    }
-
-    // read sign
-    unsigned short signSize = 0;
-    readed = fread(&signSize, 1, sizeof(unsigned short), f);
-    if (readed != sizeof(unsigned short)) {
-        printf("Failed reading sign size\n");
-        return false;
-    }
-
-    void* sign = malloc(signSize);
-    readed = fread(sign, 1, signSize, f);
-    if (readed != signSize) {
-        printf("Failed reading sign\n");
-        return false;
-    }
-
-    auto publicKey = new PublicKey(packedKey, keySize);
-
-    // verify signature
-    bool res = publicKey->verify(sign, signSize, data, dataLen, HashType::SHA512);
-
-    fclose(f);
-
-    free(data);
-    free(packedKey);
-    free(sign);
-
-    return res;
 }

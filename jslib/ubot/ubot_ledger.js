@@ -31,7 +31,7 @@ class UBotLedger {
     }
 
     async init() {
-        await db.MigrationDriver.createDB(this.dbPool_, "../jslib/ubot/migrations/postgres");
+        await db.MigrationDriver.createDB(this.dbPool_, "jslib/ubot/migrations/postgres");
     }
 
     async close() {

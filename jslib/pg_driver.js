@@ -235,7 +235,7 @@ class MigrationDriver {
                 let resolver;
                 let promise = new Promise(resolve => resolver = resolve);
                 pool.transaction(async (con) => {
-                    let sql = await io.fileGetContentsAsString(migrationFilesPath + "migrate_" + myVersion + ".sql");
+                    let sql = await io.resourceGetContentsAsString(migrationFilesPath + "migrate_" + myVersion + ".sql");
                     //this.preMigrate(myVersion);
                     let res = await MigrationDriver.execSqlSync(con, sql);
                     if (!res[0])
@@ -283,7 +283,7 @@ class MigrationDriver {
     }
 
     static async detectMaxMigrationVersion(path) {
-        let files = await io.getFilesFromDir(path);
+        let files = await io.getResourcesFromPath(path);
         let res = 0;
         for (let file of files) {
             if (file.endsWith(".sql")) {
