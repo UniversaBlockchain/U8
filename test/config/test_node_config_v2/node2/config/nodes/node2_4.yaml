@@ -1,6 +1,6 @@
 ---
 http_client_port: 6006
-http_public_port: 2082
+http_public_port: 6006
 udp_server_port: 6007
 database: host=localhost port=5432 dbname=universa_node_t4
 node_number: 4

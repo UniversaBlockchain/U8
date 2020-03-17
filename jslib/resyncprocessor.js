@@ -252,6 +252,8 @@ class ResyncingItem {
 
     //there should be no consensus checks here as it was already done in resyncVote
     resyncAndCommit(committingState) {
+        this.node.report("ResyncProcessor.resyncAndCommit(hashId = " + this.hashId + ") committingState = " + committingState.val, VerboseLevel.DETAILED);
+
         this.resyncingState = ResyncingItemProcessingState.IS_COMMITTING;
 
         new ScheduleExecutor(async () => {
