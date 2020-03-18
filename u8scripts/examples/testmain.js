@@ -146,7 +146,7 @@ require('unit_tests/asyncevent_test');
 require('unit_tests/contractsservice_test');
 require('unit_tests/notification_test');
 require('unit_tests/lock_test');
-//require('unit_tests/main_test');
+require('unit_tests/main_test');
 // require('unit_tests/stress_test')
 
 async function main(args) {
