@@ -101,7 +101,7 @@ class UBotMain {
 
         parser
             .option(["?", "h", "help"], 'show help')
-            .option(["nolog"], "do not buffer log messages (good for testing)")
+            .option(["nolog"], "do not output log messages")
             .option(["version"], "show version")
             .option(["c", "config"], "configuration file for the network", true, "config_file")
         ;

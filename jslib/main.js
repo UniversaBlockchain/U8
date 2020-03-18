@@ -98,7 +98,7 @@ class Main {
             .option(["c", "config"], "configuration file for the network", true, "config_file")
             //.option(["d", "database"], "database connection url", true, "db_url")
             .option(["test"], "intended to be used in integration tests")
-            .option(["nolog"], "do not buffer log messages (good for testing)")
+            .option(["nolog"], "do not output log messages")
             .option(["verbose"], "sets verbose level to nothing, base or detail", true, "level")
             .option(["udp-verbose"], "sets udp-verbose level to nothing, base or detail", true, "level")
             .option(["restart-socket"], "restarts UDPAdapter: shutdown it and create new")
