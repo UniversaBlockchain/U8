@@ -571,19 +571,22 @@ class SimpleRole extends Role {
         this.keyAddresses = new t.GenericSet();
         this.keyRecords = new t.GenericMap();
 
-        if(param instanceof crypto.KeyAddress) {
+        if (param == null)
+            return;
+
+        if (param instanceof crypto.KeyAddress) {
             this.keyAddresses.add(param);
-        } else if(param instanceof crypto.PublicKey) {
+        } else if (param instanceof crypto.PublicKey) {
             this.keyRecords.set(param,new KeyRecord(param));
-        } else if(param instanceof crypto.PrivateKey) {
+        } else if (param instanceof crypto.PrivateKey) {
             this.keyRecords.set(param.publicKey,new KeyRecord(param.publicKey));
-        } else if(param instanceof Array || param instanceof Set || param instanceof t.GenericSet) {
-            for(let p of param) {
-                if(p instanceof crypto.KeyAddress) {
+        } else if (param instanceof Array || param instanceof Set || param instanceof t.GenericSet) {
+            for (let p of param) {
+                if (p instanceof crypto.KeyAddress) {
                     this.keyAddresses.add(p);
-                } else if(p instanceof crypto.PublicKey) {
+                } else if (p instanceof crypto.PublicKey) {
                     this.keyRecords.set(p,new KeyRecord(p));
-                } else if(p instanceof crypto.PrivateKey) {
+                } else if (p instanceof crypto.PrivateKey) {
                     this.keyRecords.set(p.publicKey,new KeyRecord(p.publicKey));
                 } else {
                     throw new ex.IllegalArgumentError("invalid param type")

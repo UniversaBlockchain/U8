@@ -11,32 +11,46 @@ const t = require("tools");
 const e = require("errors");
 const Errors = e.Errors;
 const ErrorRecord = e.ErrorRecord;
+const TransactionPack = require("transactionpack").TransactionPack;
 const ex = require("exceptions");
 
 const NSmartContract = require("services/NSmartContract").NSmartContract;
 const UnsName = require("services/unsName").UnsName;
+const UnsRecord = require("services/unsRecord").UnsRecord;
 
 const CONSTRAINT_CONDITION_PREFIX = "ref.state.origin==";
 const CONSTRAINT_CONDITION_LEFT = "ref.state.origin";
 const CONSTRAINT_CONDITION_OPERATOR = 7;       // EQUAL
 
+class PayingAmountMissingException extends Error {
+    constructor(message = undefined) {
+        super();
+        this.message = message;
+    }
+}
+
 class UnsContract extends NSmartContract {
 
-    static NAMES_FIELD_NAME = "names";
+    static NAMES_LIST_FIELD_NAME = "names_list";
+    static REDUCED_NAMES_LIST_FIELD_NAME = "reduce_names_list";
+    static DESCRIPTIONS_LIST_FIELD_NAME = "descriptions_list";
+
     static PREPAID_ND_FIELD_NAME = "prepaid_ND";
-    static PREPAID_ND_FROM_TIME_FIELD_NAME = "prepaid_ND_from";
-    static STORED_ENTRIES_FIELD_NAME = "stored_entries";
-    static SPENT_ND_FIELD_NAME = "spent_ND";
-    static SPENT_ND_TIME_FIELD_NAME = "spent_ND_time";
+
+    static ENTRIES_FIELD_NAME = "entries";
+    static SUSPENDED_FIELD_NAME = "suspended";
+    static NAMES_FIELD_NAME = "names";
 
     constructor() {
         super();
         // Stored UNS names
         this.storedNames = [];
+        // Stored UNS names
+        this.storedRecords = [];
         // Calculate U paid with las revision of UNS
         this.paidU = 0;
         // All ND (names*days) prepaid from first revision (sum of all paidU, converted to ND)
-        this.prepaidNamesForDays = 0;
+        this.prepaidNameDays = 0;
         // Spent NDs for current revision
         this.spentNDs = 0;
         // Time of spent ND's calculation for current revision
@@ -58,6 +72,12 @@ class UnsContract extends NSmartContract {
      */
     static fromPrivateKey(key) {
         let c = Contract.fromPrivateKey(key, new UnsContract());
+
+        let revokePerm1 = new permissions.RevokePermission(new roles.RoleLink("@owner", "owner", c));
+        c.definition.addPermission(revokePerm1);
+
+        let revokePerm2 = new permissions.RevokePermission(new roles.RoleLink("@issuer", "issuer", c));
+        c.definition.addPermission(revokePerm2);
 
         c.addUnsSpecific();
         return c;
@@ -109,6 +129,12 @@ class UnsContract extends NSmartContract {
             this.storedNames.push(unsName.initializeWithDsl(name));
         });
 
+        let arrayRecords = root.state.data[UnsContract.ENTRIES_FIELD_NAME];
+        arrayRecords.forEach(record => {
+            let unsRecord = new UnsRecord();
+            this.storedRecords.push(unsRecord.initializeWithDsl(record));
+        });
+
         return this;
     }
 
@@ -122,10 +148,21 @@ class UnsContract extends NSmartContract {
      * Extract values from deserialized object for UNS fields.
      */
     async deserializeForUns(deserializer) {
-        this.storedNames = await deserializer.deserialize(t.getOrDefault(this.state.data, UnsContract.NAMES_FIELD_NAME, null));
+        let names = t.getOrDefault(this.state.data, UnsContract.NAMES_LIST_FIELD_NAME, null);
+        let reduced_names = t.getOrDefault(this.state.data, UnsContract.REDUCED_NAMES_LIST_FIELD_NAME, null);
+        let descriptions = t.getOrDefault(this.state.data, UnsContract.DESCRIPTIONS_LIST_FIELD_NAME, null);
+
+        this.storedNames = [];
+        for (let i = 0; i < names.length; i++) {
+            let unsName = new UnsName(names[i], descriptions[i]);
+            unsName.unsReducedName = reduced_names[i];
+            this.storedNames.push(unsName);
+        }
+
+        this.storedRecords = await deserializer.deserialize(t.getOrDefault(this.state.data, UnsContract.ENTRIES_FIELD_NAME, null));
 
         this.paidU = t.getOrDefault(this.state.data, UnsContract.PAID_U_FIELD_NAME, 0);
-        this.prepaidNamesForDays = t.getOrDefault(this.state.data, UnsContract.PREPAID_ND_FIELD_NAME, 0);
+        this.prepaidNameDays = t.getOrDefault(this.state.data, UnsContract.PREPAID_ND_FIELD_NAME, 0);
     }
 
     /**
@@ -134,7 +171,7 @@ class UnsContract extends NSmartContract {
     addUnsSpecific() {
         this.definition.extendedType = NSmartContract.SmartContractType.UNS1;
 
-        let ownerLink = new roles.RoleLink("owner_link", "owner");
+        let ownerLink = new roles.RoleLink("owner_link", "owner", this);
         this.registerRole(ownerLink);
 
         let fieldsMap = {};
@@ -144,24 +181,82 @@ class UnsContract extends NSmartContract {
         fieldsMap[UnsContract.NAMES_FIELD_NAME] = null;
         fieldsMap[UnsContract.PAID_U_FIELD_NAME] = null;
         fieldsMap[UnsContract.PREPAID_ND_FIELD_NAME] = null;
-        fieldsMap[UnsContract.PREPAID_ND_FROM_TIME_FIELD_NAME] = null;
-        fieldsMap[UnsContract.STORED_ENTRIES_FIELD_NAME] = null;
-        fieldsMap[UnsContract.SPENT_ND_FIELD_NAME] = null;
-        fieldsMap[UnsContract.SPENT_ND_TIME_FIELD_NAME] = null;
+        fieldsMap[UnsContract.NAMES_LIST_FIELD_NAME] = null;
+        fieldsMap[UnsContract.REDUCED_NAMES_LIST_FIELD_NAME] = null;
+        fieldsMap[UnsContract.DESCRIPTIONS_LIST_FIELD_NAME] = null;
 
         let modifyDataPermission = new permissions.ModifyDataPermission(ownerLink, {fields : fieldsMap});
+        modifyDataPermission.id = "modify_all";
+        this.definition.addPermission(modifyDataPermission);
+
+        let refNodeConfigNameService = new Constraint(this);
+        refNodeConfigNameService.name = "ref_node_config_name_service";
+        refNodeConfigNameService.setConditions({any_of: [
+                "ref.tag==\"" + TransactionPack.TAG_PREFIX_RESERVED + "node_config_contract\"",
+                "this can_play ref.state.roles.name_service"
+            ]
+        });
+
+        this.addConstraint(refNodeConfigNameService);
+
+        let nameService = new roles.SimpleRole("name_service", null, this);
+        nameService.requiredAllConstraints.add("ref_node_config_name_service");
+        this.registerRole(nameService);
+
+        fieldsMap = {};
+        fieldsMap[UnsContract.REDUCED_NAMES_LIST_FIELD_NAME] = null;
+        fieldsMap[UnsContract.PREPAID_ND_FIELD_NAME] = null;
+        fieldsMap[UnsContract.SUSPENDED_FIELD_NAME] = null;
+
+        modifyDataPermission = new permissions.ModifyDataPermission(new roles.RoleLink("@ns", "name_service", this), {fields : fieldsMap});
+        modifyDataPermission.id = "modify_reduced";
         this.definition.addPermission(modifyDataPermission);
 
         let revokePermission = new permissions.RevokePermission(ownerLink);
         this.definition.addPermission(revokePermission);
+
+        let revokePermissionNS = new permissions.RevokePermission(new roles.RoleLink("@ns", "name_service", this));
+        this.definition.addPermission(revokePermissionNS);
     }
 
-    seal(isTransactionRoot = false) {
-        this.saveNamesToState();
-        this.saveOriginConstraintsToState();
-        this.calculatePrepaidNamesForDays(true);
+    async seal(isTransactionRoot = false) {
+        if (this.paidU == null)
+            throw new PayingAmountMissingException("Use setPayingAmount to manually provide the amount to be payed for this NSmartContract");
 
-        return super.seal(isTransactionRoot);
+        this.saveNamesAndRecordsToState();
+        this.saveOriginConstraintsToState();
+        this.calculatePrepaidNameDays(true);
+
+        //TODO: add hold duration to info provider and get it from there
+        let nameExpires = new Date(this.getCurrentUnsExpiration().getTime() + 30*24*3600000);
+        nameExpires.setMilliseconds(0);
+        if (this.getExpiresAt().getTime() < nameExpires.getTime())
+            this.setExpiresAt(new Date(nameExpires.getTime() + 10*24*3600000));
+
+        let res = await super.seal(isTransactionRoot);
+
+        if (this.transactionPack == null)
+            this.transactionPack = new TransactionPack(this);
+        this.originContracts.values().forEach(oc => this.transactionPack.addReferencedItem(oc));
+        return res;
+    }
+
+    /**
+     * Get expiration date of names associated with UNS1 contract.
+     *
+     * @return {Date} expiration date
+     */
+    getCurrentUnsExpiration() {
+        // get number of entries
+        let entries = this.getStoredUnitsCount();
+        if (entries === 0)
+            return this.getCreatedAt();
+
+        return new Date(this.getCreatedAt().getTime() + (this.prepaidNameDays / entries) * 24 * 3600000);
+    }
+
+    getStoredUnitsCount() {
+        return this.storedNames.length;
     }
 
     /**
@@ -175,45 +270,26 @@ class UnsContract extends NSmartContract {
      * It is also useful for UNS contract checking.
      * @param {boolean} withSaveToState if true, calculated values is saving to state.data
      */
-    calculatePrepaidNamesForDays(withSaveToState) {
+    calculatePrepaidNameDays(withSaveToState) {
 
         this.paidU = this.getPaidU();
 
-        this.spentNDsTime = new Date();
-        let now = Math.floor(Date.now() / 1000);
-        let wasPrepaidNamesForDays = 0;
-        let storedEarlyEntries = 0;
-        let spentEarlyNDs = 0;
-        let spentEarlyNDsTimeSecs = now;
         let parentContract = this.getRevokingItem(this.state.parent);
+        let prepaidNameDaysLeft = 0;
         if (parentContract != null) {
-            wasPrepaidNamesForDays = t.getOrDefault(parentContract.state.data, UnsContract.PREPAID_ND_FIELD_NAME, 0);
-            spentEarlyNDsTimeSecs = t.getOrDefault(parentContract.state.data, UnsContract.SPENT_ND_TIME_FIELD_NAME, now);
-            storedEarlyEntries = t.getOrDefault(parentContract.state.data, UnsContract.STORED_ENTRIES_FIELD_NAME, 0);
-            spentEarlyNDs = t.getOrDefault(parentContract.state.data, UnsContract.SPENT_ND_FIELD_NAME, 0);
+            prepaidNameDaysLeft = t.getOrDefault(parentContract.state.data, UnsContract.PREPAID_ND_FIELD_NAME, 0);
+            prepaidNameDaysLeft -= parentContract.getStoredUnitsCount() *
+                Math.floor((this.getCreatedAt().getTime() - parentContract.getCreatedAt().getTime()) / 1000) / (3600*24);
         }
 
-        this.prepaidNamesForDays = wasPrepaidNamesForDays + this.paidU * Number(this.getRate());
-
-        let spentSeconds = Math.floor(this.spentNDsTime.getTime() / 1000) - spentEarlyNDsTimeSecs;
-        let spentDays = spentSeconds / (3600 * 24);
-        this.spentNDs = spentEarlyNDs + spentDays * storedEarlyEntries;
+        this.prepaidNameDays = prepaidNameDaysLeft + this.paidU * Number(this.getRate());
 
         if (withSaveToState) {
             this.state.data[UnsContract.PAID_U_FIELD_NAME] = this.paidU;
-
-            this.state.data[UnsContract.PREPAID_ND_FIELD_NAME] = this.prepaidNamesForDays;
-            if (this.state.revision === 1)
-                this.state.data[UnsContract.PREPAID_ND_FROM_TIME_FIELD_NAME] = now;
-
-            // calculate num of entries
-            let storingEntries = 0;
-            this.storedNames.forEach(name => storingEntries += name.getRecordsCount());
-            this.state.data[UnsContract.STORED_ENTRIES_FIELD_NAME] = storingEntries;
-
-            this.state.data[UnsContract.SPENT_ND_FIELD_NAME] = this.spentNDs;
-            this.state.data[UnsContract.SPENT_ND_TIME_FIELD_NAME] = now;
+            this.state.data[UnsContract.PREPAID_ND_FIELD_NAME] = this.prepaidNameDays;
         }
+
+        return this.prepaidNameDays;
     }
 
     /**
@@ -233,13 +309,12 @@ class UnsContract extends NSmartContract {
      * Save constraints with origin conditions to state.
      */
     saveOriginConstraintsToState() {
-        let origins = new t.GenericSet();
+        let origins = this.getOrigins();
         let constraintsToRemove = new t.GenericSet();
 
-        this.storedNames.forEach(sn => sn.unsRecords.forEach(unsRecord => {
-            if (unsRecord.unsOrigin != null)
-                origins.add(unsRecord.unsOrigin);
-        }));
+        let parentContract = this.getRevokingItem(this.state.parent);
+        if (parentContract != null)
+            parentContract.getOrigins().forEach(oldOrigin => origins.delete(oldOrigin));
 
         Array.from(this.constraints.values()).forEach(constr => {
             if (constr.conditions.hasOwnProperty(Constraint.conditionsModeType.all_of))
@@ -258,26 +333,17 @@ class UnsContract extends NSmartContract {
         origins.forEach( origin => {
             if (!this.isOriginConstraintExists(origin))
                 this.addOriginConstraint(origin);
-            else {
-                let originConstr = null;
-                for (let c of this.constraints.values())
-                    if (c.conditions.hasOwnProperty(Constraint.conditionsModeType.all_of) &&
-                        c.conditions[Constraint.conditionsModeType.all_of].some(cond => UnsContract.isOriginCondition(cond, origin))) {
-                        originConstr = c;
-                        break;
-                    }
-
-                if (originConstr != null && originConstr.matchingItems.size === 0 && this.originContracts.has(origin))
-                    originConstr.addMatchingItem(this.originContracts.get(origin));
-            }
         });
     }
 
     /**
      * Save UNS names to state.
      */
-    saveNamesToState() {
-        this.state.data[UnsContract.NAMES_FIELD_NAME] = this.storedNames;
+    saveNamesAndRecordsToState() {
+        this.state.data[UnsContract.NAMES_LIST_FIELD_NAME] = this.storedNames.map(n => n.unsName);
+        this.state.data[UnsContract.REDUCED_NAMES_LIST_FIELD_NAME] = this.storedNames.map(n => n.unsReducedName);
+        this.state.data[UnsContract.DESCRIPTIONS_LIST_FIELD_NAME] = this.storedNames.map(n => n.unsDescription);
+        this.state.data[UnsContract.ENTRIES_FIELD_NAME] = this.storedRecords;
     }
 
     /**
@@ -655,6 +721,16 @@ class UnsContract extends NSmartContract {
                 this.storedNames.splice(i, 1);
                 return;
             }
+    }
+
+    /**
+     * Get all origins registered by UNS1 contract
+     *
+     * @return {Set} origins
+     */
+
+    getOrigins() {
+        return new t.GenericSet(this.storedRecords.map(unsRecord => unsRecord.unsOrigin).filter(unsRecord => unsRecord != null));
     }
 }
 

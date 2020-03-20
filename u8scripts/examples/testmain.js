@@ -139,7 +139,7 @@ require('unit_tests/collection_test');
 require('unit_tests/services/environment_test');
 require('unit_tests/services/slot_test');
 require('unit_tests/services/follower_test');
-require('unit_tests/services/uns_test');
+//require('unit_tests/services/uns_test');
 require('unit_tests/web_test');
 require('unit_tests/parcel_test');
 require('unit_tests/asyncevent_test');

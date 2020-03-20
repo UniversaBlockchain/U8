@@ -3,17 +3,20 @@
  */
 
 const bs = require("biserializable");
+const DefaultBiMapper = require("defaultbimapper").DefaultBiMapper;
 const ex = require("exceptions");
 
 class UnsRecord extends bs.BiSerializable {
 
     static ADDRESSES_FIELD_NAME = "addresses";
     static ORIGIN_FIELD_NAME = "origin";
+    static DATA_FIELD_NAME = "data";
 
     constructor() {
         super();
         this.unsAddresses = [];
         this.unsOrigin = null;
+        this.unsData = {};
     }
 
     /**
@@ -73,6 +76,19 @@ class UnsRecord extends bs.BiSerializable {
     }
 
     /**
+     * Initialize {@link UnsRecord} from data.
+     *
+     * @param {Object} data for generate UNS record.
+     *
+     * @return {UnsRecord} initialized UNS record.
+     */
+    static fromData(data) {
+        let record = new UnsRecord();
+        record.unsData = data;
+        return record;
+    }
+
+    /**
      * Method calls from {@link UnsContract#fromDslFile(String)} and initialize UNS record from given root object.
      *
      * @param {Object} root object with initialized data.
@@ -82,6 +98,8 @@ class UnsRecord extends bs.BiSerializable {
     initializeWithDsl(root) {
         if (root[UnsRecord.ORIGIN_FIELD_NAME] != null)
             this.unsOrigin = crypto.HashId.withDigest(root[UnsRecord.ORIGIN_FIELD_NAME]);
+        else if (root[UnsRecord.DATA_FIELD_NAME] != null)
+            this.unsData = root[UnsRecord.DATA_FIELD_NAME];
         else {
             root[UnsRecord.ADDRESSES_FIELD_NAME].forEach(addr => {
                 try {
@@ -149,6 +167,7 @@ class UnsRecord extends bs.BiSerializable {
                 shortAddress = addr.toString();
         });
 
+        // TODO: add comparison unsData
         return (((this.unsOrigin != null && entry.getOrigin() != null && this.unsOrigin.equals(entry.getOrigin())) ||
                  (this.unsOrigin == null && entry.getOrigin() == null)) &&
                 ((longAddress != null && entry.getLongAddress() != null && longAddress.equals(entry.getLongAddress())) ||
@@ -165,6 +184,9 @@ class UnsRecord extends bs.BiSerializable {
         if (this.unsOrigin != null)
             data.origin = await serializer.serialize(this.unsOrigin);
 
+        if (this.unsData != null)
+            data.data = await serializer.serialize(this.unsData);
+
         return data;
     }
 
@@ -174,6 +196,9 @@ class UnsRecord extends bs.BiSerializable {
 
         if (data.hasOwnProperty("origin"))
             this.unsOrigin = await deserializer.deserialize(data.origin);
+
+        if (data.hasOwnProperty("data"))
+            this.unsData = await deserializer.deserialize(data.data);
     }
 
     equals(to) {
@@ -189,7 +214,7 @@ class UnsRecord extends bs.BiSerializable {
         if(!t.valuesEqual(this.unsOrigin, to.unsOrigin))
             return false;
 
-        return true;
+        return t.valuesEqual(this.unsData, to.unsData);
     }
 }
 
