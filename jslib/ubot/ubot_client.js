@@ -1164,9 +1164,9 @@ class UBotClient {
         );
     }
 
-    async queryNameContract(name) {
+    async queryNameContract(name, type) {
         let result = await new Promise(async (resolve, reject) =>
-            await this.httpNodeClient.command("queryNameContract", {name: name},
+            await this.httpNodeClient.command("queryNameContract", {name: name, type: type},
                 result => resolve(result),
                 error => reject(error)
             )

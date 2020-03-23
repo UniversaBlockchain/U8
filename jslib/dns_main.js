@@ -8,10 +8,7 @@ import * as tk from 'unit_tests/test_keys'
 const Logger = require("logger").Logger;
 const OptionParser = require("optionparser").OptionParser;
 const UBotClient = require('ubot/ubot_client').UBotClient;
-const Contract = require("contract").Contract;
 const UnsContract = require("services/unsContract").UnsContract;
-
-const tt = require("test_tools");
 
 class DnsMain {
 
@@ -98,7 +95,7 @@ class DnsMain {
 
     async resolveName(name, rType) {
         try {
-            let packedContract = await this.client.queryNameContract(name);
+            let packedContract = await this.client.queryNameContract(name, "UNS2");
             if (packedContract != null) {
                 let uns = await UnsContract.fromSealedBinary(packedContract, null);
                 let data = uns.getAllData();
