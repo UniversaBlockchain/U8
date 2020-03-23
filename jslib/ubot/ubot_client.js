@@ -142,7 +142,6 @@ class UBotClient {
     /**
      * Connects to all nodes of the Universa network.
      *
-     * @private
      * @async
      * @return {Promise<void>}.
      */
@@ -269,7 +268,7 @@ class UBotClient {
         if (sessionData == null || !sessionData.hasOwnProperty("session"))
             throw new UBotClientException("Wrong session data");
 
-        let message = "UBotClient.getSession: " + JSON.stringify(sessionData.session, (key, value) => {
+        let message = "Client.getSession: " + JSON.stringify(sessionData.session, (key, value) => {
             if ((key === "requestId" || key === "sessionId") && value != null && value instanceof crypto.HashId)
                 return value.toString();
             else
@@ -300,7 +299,7 @@ class UBotClient {
             )
         );
 
-        let message = "UBotClient.askSession: cmd=" + command + " " + JSON.stringify(data, (key, value) => {
+        let message = "Client.askSession: cmd=" + command + " " + JSON.stringify(data, (key, value) => {
             if ((key === "requestId" || key === "sessionId") && value != null && value instanceof crypto.HashId)
                 return value.toString();
             else
@@ -338,7 +337,7 @@ class UBotClient {
             )
         ));
 
-        let message = "UBotClient.askOnAllNodes: cmd=" + command + " " + JSON.stringify(data, (key, value) => {
+        let message = "Client.askOnAllNodes: cmd=" + command + " " + JSON.stringify(data, (key, value) => {
             if (value != null && value instanceof crypto.HashId)
                 return value.toString();
             else
@@ -381,7 +380,7 @@ class UBotClient {
             })
         ));
 
-        let message = "UBotClient.askOnSomeNodes: cmd=" + command + " nodes=" + JSON.stringify(nodes) + " " +
+        let message = "Client.askOnSomeNodes: cmd=" + command + " nodes=" + JSON.stringify(nodes) + " " +
             JSON.stringify(data, (key, value) => {
             if (value != null && value instanceof crypto.HashId)
                 return value.toString();
@@ -412,7 +411,7 @@ class UBotClient {
             )
         );
 
-        let message = "UBotClient.getPaidOperationProcessingState state: " + result.processingState.state;
+        let message = "Client.getPaidOperationProcessingState state: " + result.processingState.state;
         if (this.logger != null)
             this.logger.log(message);
         else
@@ -439,7 +438,7 @@ class UBotClient {
             )
         );
 
-        let message = "UBotClient.processPaidOperation ubotCreateSessionPaid result: " + JSON.stringify(paidOperationResult, (key, value) => {
+        let message = "Client.processPaidOperation ubotCreateSessionPaid result: " + JSON.stringify(paidOperationResult, (key, value) => {
             if ((key === "paidOperationId") && value != null && value instanceof crypto.HashId)
                 return value.toString();
             else
@@ -462,7 +461,7 @@ class UBotClient {
             lastResult = await this.getState(paymentId);
         }
 
-        message = "UBotClient.processPaidOperation item state: " + lastResult.state.val;
+        message = "Client.processPaidOperation item state: " + lastResult.state.val;
         if (this.logger != null)
             this.logger.log(message);
         else
@@ -590,6 +589,40 @@ class UBotClient {
             console.error("Register error, getState failed: " + ir);
 
         return ItemResult.UNDEFINED;
+    }
+
+    async checkStateWithTrust(itemId, trustLevel, breakLevel) {
+        let nodes = this.topology.map(node => node.number);
+        let trust = Math.ceil(nodes.length * (trustLevel + breakLevel));
+        let stop = Math.ceil(nodes.length * (trustLevel + breakLevel));
+        let full = Math.ceil(nodes.length * (trustLevel + breakLevel));
+        if (full > nodes.length)
+            full = nodes.length;
+
+        let selected = t.randomChoice(nodes, full);
+
+        let states = await this.askOnSomeNodes("getState", {itemId: itemId}, selected);
+
+        if (states == null || !states instanceof Array || states.length !== selected.length)
+            throw new Error("checkStateWithTrust failed: askSessionOnSomeNodes must return array");
+
+        let approved = 0;
+        let declined = 0;
+        for (let i = 0; i < states.length; i++) {
+            if (typeof states[i] === "object" && states[i].itemResult != null && states[i].itemResult.state != null &&
+                states[i].itemResult.state === ItemState.APPROVED)
+                approved++;
+            else
+                declined++;
+
+            if (approved >= trust)
+                return true;
+
+            if (declined >= stop)
+                break;
+        }
+
+        return false;
     }
 
     /**

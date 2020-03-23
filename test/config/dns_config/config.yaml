@@ -1,0 +1,8 @@
+---
+host: "0.0.0.0"
+port: 5353
+uplinkNameServer: "8.8.4.4"
+uplinkPort: 53
+topologyPath: "../test/ubot/topology/universa.pro.json"
+trustLevel: 0.3
+breakLevel: 0.1

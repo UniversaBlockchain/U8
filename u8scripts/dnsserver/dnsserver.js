@@ -7,7 +7,7 @@ const DnsMain = require("dns_main").DnsMain;
 async function main(args) {
 
     let dnsMain = new DnsMain(...args);
-    await dnsMain.start("0.0.0.0", 5353, "8.8.4.4", 53);
+    await dnsMain.start();
 
     await sleep(100000000000);
 

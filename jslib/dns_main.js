@@ -3,12 +3,14 @@
  */
 
 import {DnsServer, DnsRRType} from 'web'
-import * as tk from 'unit_tests/test_keys'
+import * as io from 'io'
+import * as t from 'tools'
 
 const Logger = require("logger").Logger;
 const OptionParser = require("optionparser").OptionParser;
 const UBotClient = require('ubot/ubot_client').UBotClient;
 const UnsContract = require("services/unsContract").UnsContract;
+const yaml = require('yaml');
 
 class DnsMain {
 
@@ -19,14 +21,20 @@ class DnsMain {
         this.parser.parse(args);
     }
 
-    async start(host, port, uplinkNameServer, uplinkPort) {
+    async start() {
         if (this.processOptions())
             return;
 
-        this.logger.log("Start client with topology: " + this.topologyRoot);
+        if (!await this.loadConfig())
+            return;
+
+        this.logger.log("Start client with topology: " + this.topologyPath);
 
         // start client
-        this.client = await new UBotClient(await crypto.PrivateKey.generate(2048), this.topologyRoot).start();
+        this.client = await new UBotClient(await crypto.PrivateKey.generate(2048), this.topologyPath, null, null, this.logger).start();
+
+        this.logger.log("Connect to Universa nodes...");
+        await this.client.connectAllNodes();
 
         // start DNS server
         this.dnsServer = new DnsServer();
@@ -47,7 +55,7 @@ class DnsMain {
                 question.resolveThroughUplink_finish();
             }
         });
-        this.dnsServer.start(host, port, uplinkNameServer, uplinkPort);
+        this.dnsServer.start(this.host, this.port, this.uplinkNameServer, this.uplinkPort);
 
         this.logger.log("DNS server started");
     }
@@ -71,14 +79,37 @@ class DnsMain {
             return true;
         }
 
-        if (this.parser.values.has("topology"))
-            this.topologyRoot = this.parser.values.get("topology");
+        if (this.parser.values.has("config"))
+            this.configPath = this.parser.values.get("config");
         else {
-            console.error("Topology not defined");
+            console.error("Config not defined");
             return true;
         }
 
         return false;
+    }
+
+    async loadConfig() {
+        try {
+            let settings = yaml.load(await io.fileGetContentsAsString(this.configPath));
+
+            this.logger.log("DNS server settings: " + JSON.stringify(settings, null, 2));
+
+            this.topologyPath = t.getOrThrow(settings, "topologyPath");
+            this.host = t.getOrThrow(settings, "host");
+            this.port = t.getOrThrow(settings, "port");
+            this.uplinkNameServer = t.getOrThrow(settings, "uplinkNameServer");
+            this.uplinkPort = t.getOrThrow(settings, "uplinkPort");
+            this.trustLevel = t.getOrThrow(settings, "trustLevel");
+            this.breakLevel = t.getOrThrow(settings, "breakLevel");
+
+        } catch (err) {
+            console.error("Failed loading config: " + err.message);
+            console.error(err.stack);
+            return false;
+        }
+
+        return true;
     }
 
     static initOptionParser() {
@@ -87,10 +118,19 @@ class DnsMain {
         parser
             .option(["?", "h", "help"], 'show help')
             .option(["nolog"], "do not output log messages")
-            .option(["t", "topology"], "network topology file", true, "topology_file")
+            .option(["c", "config"], "DNS configuration file", true, "config_file")
         ;
 
         return parser;
+    }
+
+    async checkContractTrust(id) {
+        let result = await this.client.checkStateWithTrust(id, this.trustLevel, this.breakLevel);
+
+        if (!result)
+            this.logger.log("UNS contract " + id.toString() + " isn`t APPROVED by Universa network");
+
+        return result;
     }
 
     async resolveName(name, rType) {
@@ -98,21 +138,24 @@ class DnsMain {
             let packedContract = await this.client.queryNameContract(name, "UNS2");
             if (packedContract != null) {
                 let uns = await UnsContract.fromSealedBinary(packedContract, null);
-                let data = uns.getAllData();
 
-                let answer = {A: [], AAAA: [], CNAME: [], MX: []};
-                data.forEach(dnsRecord => {
-                    if (dnsRecord.dns_type === "A" && (rType === DnsRRType.DNS_A || rType === DnsRRType.DNS_ANY))
-                        answer.A.push(dnsRecord.value);
-                    if (dnsRecord.dns_type === "AAAA" && (rType === DnsRRType.DNS_AAAA || rType === DnsRRType.DNS_ANY))
-                        answer.AAAA.push(dnsRecord.value);
-                    if (dnsRecord.dns_type === "CNAME" && (rType === DnsRRType.DNS_CNAME || rType === DnsRRType.DNS_ANY))
-                        answer.CNAME.push(dnsRecord.value);
-                    if (dnsRecord.dns_type === "MX" && (rType === DnsRRType.DNS_MX || rType === DnsRRType.DNS_ANY))
-                        answer.MX.push(dnsRecord.value);
-                });
+                if (await this.checkContractTrust(uns.id)) {
+                    let data = uns.getAllData();
 
-                return answer;
+                    let answer = {A: [], AAAA: [], CNAME: [], MX: []};
+                    data.forEach(dnsRecord => {
+                        if (dnsRecord.dns_type === "A" && (rType === DnsRRType.DNS_A || rType === DnsRRType.DNS_ANY))
+                            answer.A.push(dnsRecord.value);
+                        if (dnsRecord.dns_type === "AAAA" && (rType === DnsRRType.DNS_AAAA || rType === DnsRRType.DNS_ANY))
+                            answer.AAAA.push(dnsRecord.value);
+                        if (dnsRecord.dns_type === "CNAME" && (rType === DnsRRType.DNS_CNAME || rType === DnsRRType.DNS_ANY))
+                            answer.CNAME.push(dnsRecord.value);
+                        if (dnsRecord.dns_type === "MX" && (rType === DnsRRType.DNS_MX || rType === DnsRRType.DNS_ANY))
+                            answer.MX.push(dnsRecord.value);
+                    });
+
+                    return answer;
+                }
             }
 
         } catch (e) {
