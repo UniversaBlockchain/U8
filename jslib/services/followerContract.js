@@ -3,6 +3,7 @@
  */
 
 const bs = require("biserializable");
+const Contract = require("contract").Contract;
 const DefaultBiMapper = require("defaultbimapper").DefaultBiMapper;
 const roles = require('roles');
 const permissions = require('permissions');

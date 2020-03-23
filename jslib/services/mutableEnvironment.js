@@ -69,11 +69,21 @@ class MutableEnvironment extends ImmutableEnvironment {
     }
 
     /**
+     * Create UNS name record.
      *
      * @param {UnsName} unsName - UNS name.
-     * @param {Date} expiresAt -
+     * @param {Date} expiresAt - expiration name time.
      */
     createNameRecord(unsName, expiresAt) {
+        throw new Error("not implemented");
+    }
+
+    /**
+     * Create UNS record entry.
+     *
+     * @param {UnsName} unsRecord - UNS record.
+     */
+    createNameRecordEntry(unsRecord) {
         throw new Error("not implemented");
     }
 
@@ -131,6 +141,15 @@ class MutableEnvironment extends ImmutableEnvironment {
      * @param {NameRecord} nameRecord - UNS name record.
      */
     destroyNameRecord(nameRecord) {
+        throw new Error("not implemented");
+    }
+
+    /**
+     * Remove UNS name record entry from the ledger.
+     *
+     * @param {nameRecordEntry} nameRecord - UNS name record entry.
+     */
+    destroyNameRecordEntry(nameRecordEntry) {
         throw new Error("not implemented");
     }
 }

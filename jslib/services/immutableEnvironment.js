@@ -53,6 +53,15 @@ class ImmutableEnvironment {
     }
 
     /**
+     * Get array of UNS records.
+     *
+     * @return {Array<NameRecordEntry>} array of UNS records.
+     */
+    nameRecordEntries() {
+        throw new Error("not implemented");
+    }
+
+    /**
      * Get follower contract service.
      *
      * @param {boolean} init - Initialize follower service if not initialized. Optional. Default - false.

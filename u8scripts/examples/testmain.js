@@ -112,6 +112,7 @@ async function testES() {
     assert(es != null);
 }
 
+require('unit_tests/dns_test');
 require('unit_tests/worker_tests');
 require('unit_tests/boss_test');
 require('unit_tests/crypto_test');

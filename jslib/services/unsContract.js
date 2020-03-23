@@ -4,6 +4,7 @@
 
 const bs = require("biserializable");
 const DefaultBiMapper = require("defaultbimapper").DefaultBiMapper;
+const Contract = require("contract").Contract;
 const permissions = require('permissions');
 const Constraint = require('constraint').Constraint;
 const roles = require('roles');
@@ -51,10 +52,6 @@ class UnsContract extends NSmartContract {
         this.paidU = 0;
         // All ND (names*days) prepaid from first revision (sum of all paidU, converted to ND)
         this.prepaidNameDays = 0;
-        // Spent NDs for current revision
-        this.spentNDs = 0;
-        // Time of spent ND's calculation for current revision
-        this.spentNDsTime = null;
         // Need origins of referenced contracts
         this.originContracts = new t.GenericMap();
     }
@@ -141,13 +138,13 @@ class UnsContract extends NSmartContract {
     async deserialize(data, deserializer) {
         await super.deserialize(data, deserializer);
 
-        await this.deserializeForUns(deserializer);
+        await this.deserializeForUns();
     }
 
     /**
      * Extract values from deserialized object for UNS fields.
      */
-    async deserializeForUns(deserializer) {
+    async deserializeForUns() {
         let names = t.getOrDefault(this.state.data, UnsContract.NAMES_LIST_FIELD_NAME, null);
         let reduced_names = t.getOrDefault(this.state.data, UnsContract.REDUCED_NAMES_LIST_FIELD_NAME, null);
         let descriptions = t.getOrDefault(this.state.data, UnsContract.DESCRIPTIONS_LIST_FIELD_NAME, null);
@@ -159,7 +156,7 @@ class UnsContract extends NSmartContract {
             this.storedNames.push(unsName);
         }
 
-        this.storedRecords = await deserializer.deserialize(t.getOrDefault(this.state.data, UnsContract.ENTRIES_FIELD_NAME, null));
+        this.storedRecords = t.getOrDefault(this.state.data, UnsContract.ENTRIES_FIELD_NAME, null);
 
         this.paidU = t.getOrDefault(this.state.data, UnsContract.PAID_U_FIELD_NAME, 0);
         this.prepaidNameDays = t.getOrDefault(this.state.data, UnsContract.PREPAID_ND_FIELD_NAME, 0);
@@ -237,7 +234,7 @@ class UnsContract extends NSmartContract {
 
         if (this.transactionPack == null)
             this.transactionPack = new TransactionPack(this);
-        this.originContracts.values().forEach(oc => this.transactionPack.addReferencedItem(oc));
+        Array.from(this.originContracts.values()).forEach(oc => this.transactionPack.addReferencedItem(oc));
         return res;
     }
 
@@ -262,7 +259,7 @@ class UnsContract extends NSmartContract {
     /**
      * It is private method that looking for U contract in the new items of this UNS contract. Then calculates
      * new payment, looking for already paid, summarize it and calculate new prepaid period for UNS names registration,
-     * that sets to {@link UnsContract#prepaidNamesForDays}. This field is measured in the names*days, means how many
+     * that sets to {@link UnsContract#prepaidNameDays}. This field is measured in the names*days, means how many
      * names registered for how many days.
      * But if withSaveToState param is false, calculated value do not saving to state.
      * It is useful for checking set state.data values.
@@ -383,35 +380,7 @@ class UnsContract extends NSmartContract {
      * @return {boolean} check result.
      */
     beforeCreate(c) {
-
-        let checkResult = true;
-
-        this.calculatePrepaidNamesForDays(false);
-
-        if (this.paidU === 0) {
-            if (this.getPaidU(true) > 0)
-                this.errors.push(new ErrorRecord(Errors.FAILED_CHECK, "",
-                    "Test payment is not allowed for storing names"));
-            checkResult = false;
-        } else if (this.paidU < this.getMinPayment()) {
-            this.errors.push(new ErrorRecord(Errors.FAILED_CHECK, "",
-                "Payment for UNS contract is below minimum level of " + this.getMinPayment() + "U"));
-            checkResult = false;
-        }
-
-        if (!checkResult) {
-            this.errors.push(new ErrorRecord(Errors.FAILED_CHECK, "", "UNS contract hasn't valid payment"));
-            return false;
-        }
-
-        // check that payment was not hacked
-        if (this.prepaidNamesForDays !== t.getOrDefault(this.state.data, UnsContract.PREPAID_ND_FIELD_NAME, 0)) {
-            this.errors.push(new ErrorRecord(Errors.FAILED_CHECK, "state.data." + UnsContract.PREPAID_ND_FIELD_NAME,
-                "Should be sum of early paid U and paid U by current revision."));
-            return false;
-        }
-
-        return this.additionallyUnsCheck(c);
+        return this.checkPaymentAndRelatedFields(false) && this.additionallyUnsCheck(c);
     }
 
     /**
@@ -421,25 +390,58 @@ class UnsContract extends NSmartContract {
      * @return {boolean} check result.
      */
     beforeUpdate(c) {
-        this.calculatePrepaidNamesForDays(false);
-
-        // check that payment was not hacked
-        if (this.prepaidNamesForDays !== t.getOrDefault(this.state.data, UnsContract.PREPAID_ND_FIELD_NAME, 0)) {
-            this.errors.push(new ErrorRecord(Errors.FAILED_CHECK, "state.data." + UnsContract.PREPAID_ND_FIELD_NAME,
-                "Should be sum of early paid U and paid U by current revision."));
-            return false;
-        }
-
-        return this.additionallyUnsCheck(c);
+        return this.checkPaymentAndRelatedFields(true) && this.additionallyUnsCheck(c);
     }
 
     /**
      * Callback called by the node before revocation the UNS-contract for his check.
      *
-     * @param {ImmutableEnvironment} c is {@link ImmutableEnvironment} object with some data.     *
+     * @param {ImmutableEnvironment} c is {@link ImmutableEnvironment} object with some data.
      * @return {boolean} check result.
      */
     beforeRevoke(c) {
+        return true;
+    }
+
+    checkPaymentAndRelatedFields(allowNoPayment) {
+        let paymentCheck = true;
+
+        this.paidU = this.getPaidU();
+
+        if (this.paidU === 0) {
+            if (!allowNoPayment) {
+                if (this.getPaidU(true) > 0)
+                    this.errors.push(new ErrorRecord(Errors.FAILED_CHECK, "",
+                        "Test payment is not allowed for storing names"));
+                paymentCheck = false;
+            }
+        } else if (this.paidU < this.getMinPayment()) {
+            this.errors.push(new ErrorRecord(Errors.FAILED_CHECK, "",
+                "Payment for UNS contract is below minimum level of " + this.getMinPayment() + "U"));
+            paymentCheck = false;
+        }
+
+        if (!paymentCheck) {
+            this.errors.push(new ErrorRecord(Errors.FAILED_CHECK, "", "UNS contract hasn't valid payment"));
+            return false;
+        }
+
+        if (this.paidU !== t.getOrDefault(this.state.data, UnsContract.PAID_U_FIELD_NAME, 0)) {
+            this.errors.push(new ErrorRecord(Errors.FAILED_CHECK, "Wrong [state.data." + UnsContractPAID_U_FIELD_NAME + "] value",
+                "Should be amount of U paid by current paying parcel."));
+            return false;
+        }
+
+        this.calculatePrepaidNameDays(false);
+
+        // check that payment was not hacked
+        if (this.prepaidNameDays !== t.getOrDefault(this.state.data, UnsContract.PREPAID_ND_FIELD_NAME, 0)) {
+            this.errors.push(new ErrorRecord(Errors.FAILED_CHECK, "Wrong [state.data." + UnsContract.PREPAID_ND_FIELD_NAME + "] value",
+                "Should be sum of early prepaid name days left and prepaid name days of current revision. " +
+                "Make sure contract was prepared using correct UNS1 rate."));
+            return false;
+        }
+
         return true;
     }
 
@@ -455,6 +457,27 @@ class UnsContract extends NSmartContract {
             return false;
         }
 
+        let newNames = new Map();
+        this.storedNames.forEach(un => newNames.set(un.unsName, un));
+
+        try {
+            ime.nameRecords().forEach(nameRecord => {
+                let unsName = newNames.get(nameRecord.getName());
+                if (unsName != null && unsName.equalsTo(nameRecord))
+                    newNames.remove(nameRecord.getName());
+            });
+        } catch (err) {
+            console.error(err.message);
+            console.error(err.stack);
+        }
+
+        let newRecords = new t.GenericSet(this.storedRecords);
+        ime.nameRecordEntries().forEach(nre => {
+            let ur = Array.from(newRecords).filter(unsRecord => unsRecord.equalsTo(nre));
+            if (ur.length > 0)
+                newRecords.delete(ur[0]);
+        });
+
         if (this.definition.extendedType !== NSmartContract.SmartContractType.UNS1) {
             this.errors.push(new ErrorRecord(Errors.FAILED_CHECK, "definition.extended_type",
                 "illegal value, should be " + NSmartContract.SmartContractType.UNS1 + " instead " + this.definition.extendedType));
@@ -466,18 +489,24 @@ class UnsContract extends NSmartContract {
             return false;
         }
 
-        if (!this.storedNames.every(n => n.unsRecords.every(unsRecord => {
+        if (!newRecords.every(unsRecord => {
             if (unsRecord.unsOrigin != null) {
                 if (unsRecord.unsAddresses.length > 0) {
                     this.errors.push(new ErrorRecord(Errors.FAILED_CHECK, UnsContract.NAMES_FIELD_NAME,
-                        "name " + n.unsName + " referencing to origin AND addresses. Should be either origin or addresses"));
+                        "record referencing to origin AND addresses. Should be either origin or addresses"));
+                    return false;
+                }
+
+                if (unsRecord.unsData != null) {
+                    this.errors.push(new ErrorRecord(Errors.FAILED_CHECK, UnsContract.NAMES_FIELD_NAME,
+                        "record referencing to origin AND data found. Should be either origin or addresses or data"));
                     return false;
                 }
 
                 //check reference exists in contract (ensures that matching contract was checked by system for being approved)
                 if (!this.isOriginConstraintExists(unsRecord.unsOrigin)) {
                     this.errors.push(new ErrorRecord(Errors.FAILED_CHECK, UnsContract.NAMES_FIELD_NAME,
-                        "name " + n.unsName + " referencing to origin " + unsRecord.unsOrigin.toString() +
+                        "record referencing to origin " + unsRecord.unsOrigin.toString() +
                         " but no corresponding reference is found"));
                     return false;
                 }
@@ -489,14 +518,14 @@ class UnsContract extends NSmartContract {
 
                 if (matchingContracts.length === 0) {
                     this.errors.push(new ErrorRecord(Errors.FAILED_CHECK, UnsContract.NAMES_FIELD_NAME,
-                        "name " + n.unsName + " referencing to origin " + unsRecord.unsOrigin.toString() +
+                        "record referencing to origin " + unsRecord.unsOrigin.toString() +
                         " but no corresponding referenced contract is found"));
                     return false;
                 }
 
                 if (!matchingContracts[0].roles.issuer.isAllowedForKeys(this.effectiveKeys.keys())) {
                     this.errors.push(new ErrorRecord(Errors.FAILED_CHECK, UnsContract.NAMES_FIELD_NAME,
-                        "name " + n.unsName + " referencing to origin " + unsRecord.unsOrigin.toString() +
+                        "record referencing to origin " + unsRecord.unsOrigin.toString() +
                         ". UNS1 contract should be also signed by this contract issuer key."));
                     return false;
                 }
@@ -504,32 +533,41 @@ class UnsContract extends NSmartContract {
                 return true;
             }
 
-            if (unsRecord.unsAddresses.length === 0) {
-                this.errors.push(new ErrorRecord(Errors.FAILED_CHECK, UnsContract.NAMES_FIELD_NAME,
-                    "name " + n.unsName + " is missing both addresses and origin."));
-                return false;
+            if (unsRecord.unsAddresses.length > 0) {
+                if (unsRecord.unsData != null) {
+                    this.errors.push(new ErrorRecord(Errors.FAILED_CHECK, UnsContract.NAMES_FIELD_NAME,
+                        "record referencing to addresses AND data found. Should be either origin or addresses or data"));
+                    return false;
+                }
+
+                if (unsRecord.unsAddresses.length > 2)
+                    this.errors.push(new ErrorRecord(Errors.FAILED_CHECK, UnsContract.NAMES_FIELD_NAME,
+                        "Addresses list should not be contains more 2 addresses"));
+
+                if (unsRecord.unsAddresses.length === 2 && unsRecord.unsAddresses[0].base64.length === unsRecord.unsAddresses[1].base64.length)
+                    this.errors.push(new ErrorRecord(Errors.FAILED_CHECK, UnsContract.NAMES_FIELD_NAME,
+                        "Addresses list may only contain one short and one long addresses"));
+
+                if (!unsRecord.unsAddresses.every(keyAddress =>
+                    Array.from(this.effectiveKeys.keys()).some(key => keyAddress.match(key)))) {
+                    this.errors.push(new ErrorRecord(Errors.FAILED_CHECK, UnsContract.NAMES_FIELD_NAME,
+                        "Address used is missing corresponding key UNS contract signed with."));
+                    return false;
+                }
             }
 
-            if (unsRecord.unsAddresses.length > 2)
+            if (unsRecord.unsData == null) {
                 this.errors.push(new ErrorRecord(Errors.FAILED_CHECK, UnsContract.NAMES_FIELD_NAME,
-                    "name " + n.unsName + ": Addresses list should not be contains more 2 addresses"));
-
-            if (unsRecord.unsAddresses.length === 2 && unsRecord.unsAddresses[0].base64.length === unsRecord.unsAddresses[1].base64.length)
-                this.errors.push(new ErrorRecord(Errors.FAILED_CHECK, UnsContract.NAMES_FIELD_NAME,
-                    "name " + n.unsName + ": Addresses list may only contain one short and one long addresses"));
-
-            if (!unsRecord.unsAddresses.every(keyAddress =>
-                Array.from(this.effectiveKeys.keys()).some(key => keyAddress.match(key)))) {
-                this.errors.push(new ErrorRecord(Errors.FAILED_CHECK, UnsContract.NAMES_FIELD_NAME,
-                    "name " + n.unsName + " using address that missing corresponding key UNS contract signed with."));
+                    "Record is empty. Should reference to either origin or addresses or data"));
                 return false;
             }
 
             return true;
-        })))
+        }))
             return false;
 
-        if (!this.getAdditionalKeysToSignWith().every(ak =>
+        //only check name service signature is there are new/changed name->reduced
+        if (newNames.size > 0 && !this.getAdditionalKeysToSignWith().every(ak =>
              Array.from(this.effectiveKeys.keys()).some(ek => ek.equals(ak)))) {
             this.errors.push(new ErrorRecord(Errors.FAILED_CHECK, UnsContract.NAMES_FIELD_NAME,
                 "Authorized name service signature is missing"));
@@ -566,10 +604,10 @@ class UnsContract extends NSmartContract {
 
     getOriginsToCheck() {
         let origins = new t.GenericSet();
-        this.storedNames.forEach(sn => sn.unsRecords.forEach(rec => {
-            if (rec.unsOrigin != null)
-                origins.add(rec.unsOrigin);
-        }));
+        this.storedRecords.forEach(sr => {
+            if (sr.unsOrigin != null)
+                origins.add(sr.unsOrigin);
+        });
 
         this.revokingItems.forEach(revoked => this.removeRevokedOrigins(revoked, origins));
 
@@ -578,18 +616,18 @@ class UnsContract extends NSmartContract {
 
     removeRevokedOrigins(contract, set) {
         if (contract instanceof UnsContract)
-            contract.storedNames.forEach(sn => sn.unsRecords.forEach(rec => {
-                if (rec.unsOrigin != null)
-                    set.delete(rec.unsOrigin);
-            }));
+            contract.storedRecords.forEach(sr => {
+                if (sr.unsOrigin != null)
+                    set.delete(sr.unsOrigin);
+            });
 
         contract.revokingItems.forEach(revoked => this.removeRevokedOrigins(revoked, set));
     }
 
     getAddressesToCheck() {
         let addresses = new Set();
-        this.storedNames.forEach(sn => sn.unsRecords.forEach(rec =>
-            rec.unsAddresses.forEach(ka => addresses.add(ka.toString()))));
+        this.storedRecords.forEach(sr =>
+            sr.unsAddresses.forEach(ka => addresses.add(ka.toString())));
 
         this.revokingItems.forEach(revoked => this.removeRevokedAddresses(revoked, addresses));
 
@@ -598,24 +636,10 @@ class UnsContract extends NSmartContract {
 
     removeRevokedAddresses(contract, set) {
         if (contract instanceof UnsContract)
-            contract.forEach(sn => sn.unsRecords.forEach(rec =>
-                rec.unsAddresses.forEach(ka => set.remove(ka.toString()))));
+            contract.storedRecords.forEach(sr =>
+                sr.unsAddresses.forEach(ka => set.remove(ka.toString())));
 
         contract.revokingItems.forEach(revoked => this.removeRevokedAddresses(revoked, set));
-    }
-
-    calcExpiresAt() {
-        // get number of entries
-        let entries = 0;
-        this.storedNames.forEach(sn => entries += sn.getRecordsCount());
-        if (entries === 0)
-            entries = 1;
-
-        // calculate time that will be added to now as new expiring time
-        // it is difference of all prepaid ND (names*days) and already spent divided to new number of entries.
-        let seconds = Math.floor((this.prepaidNamesForDays - this.spentNDs) * 24 * 3600 / entries);
-
-        return this.spentNDsTime.setSeconds(this.spentNDsTime.getSeconds() + seconds);
     }
 
     /**
@@ -625,9 +649,10 @@ class UnsContract extends NSmartContract {
      * @return {Object} object contains operation status.
      */
     onCreated(me) {
-        this.calculatePrepaidNamesForDays(false);
-        let expiresAt = this.calcExpiresAt();
+        this.calculatePrepaidNameDays(false);
+        let expiresAt = this.getCurrentUnsExpiration();
         this.storedNames.forEach(sn => me.createNameRecord(sn, expiresAt));
+        this.storedRecords.forEach(sr => me.createNameRecordEntry(sr));
         return {status : "ok"};
     }
 
@@ -638,18 +663,16 @@ class UnsContract extends NSmartContract {
      * @return {Object} object contains operation status.
      */
     onUpdated(me) {
-        this.calculatePrepaidNamesForDays(false);
+        this.calculatePrepaidNameDays(false);
 
-        let expiresAt = this.calcExpiresAt();
+        let expiresAt = this.getCurrentUnsExpiration();
 
         let newNames = new Map();
         this.storedNames.forEach(sn => newNames.set(sn.unsName, sn));
 
         me.nameRecords().forEach(nameRecord => {
             let unsName = newNames.get(nameRecord.getName());
-            if (unsName != null && unsName.getRecordsCount() === nameRecord.getEntries().length &&
-                unsName.unsRecords.every(unsRecord => nameRecord.getEntries().some(entry => unsRecord.equalsTo(entry)))) {
-
+            if (unsName != null && unsName.equalsTo(nameRecord)) {
                 me.setNameRecordExpiresAt(nameRecord, expiresAt);
                 newNames.delete(nameRecord.getName());
             } else
@@ -657,6 +680,17 @@ class UnsContract extends NSmartContract {
         });
 
         Array.from(newNames.values()).forEach(sn => me.createNameRecord(sn, expiresAt));
+
+        let newRecords = new t.GenericSet(this.storedRecords);
+        me.nameRecordEntries().forEach(nre => {
+            let ur = Array.from(newRecords).filter(unsRecord => unsRecord.equalsTo(nre));
+            if (ur.length > 0)
+                newRecords.delete(ur[0]);
+            else
+                me.destroyNameRecordEntry(nre);
+        });
+
+        newRecords.forEach(sr => me.createNameRecordEntry(sr));
 
         return {status : "ok"};
     }
@@ -675,7 +709,7 @@ class UnsContract extends NSmartContract {
      * @return {Object}
      */
     getExtraResultForApprove() {
-        return {expires_at : Math.floor(this.calcExpiresAt().getTime() / 1000)};
+        return {expires_at : Math.floor(this.getCurrentUnsExpiration().getTime() / 1000)};
     }
 
     /**
@@ -688,26 +722,20 @@ class UnsContract extends NSmartContract {
     }
 
     /**
-     * Add {@link UnsName} record that describes name that will be stored by this UnsContract.
+     * Add name to be register by UNS1 contract
      *
-     * @param {UnsName} unsName record.
+     * @param {string} name - name to register
+     * @param {string} reducedName - reduced version of registered name (verified by name service)
+     * @param {string} description - description of name
      */
-    addUnsName(unsName) {
-        this.storedNames.push(unsName);
-    }
+    addName(name, reducedName, description) {
+        let exists = this.storedNames.filter(unsName => unsName.unsReducedName.equals(reducedName));
+        if (exists.length > 0)
+            throw new ex.IllegalArgumentError("Name '" + name + "'/'" + reducedName +"' already exists");
 
-    /**
-     * Returns {@link UnsName} record by it's name.
-     *
-     * @param {string} name of unsName record.
-     * @return {UnsName | null} unsName record or null if not found.
-     */
-    getUnsName(name) {
-        for (let unsName of this.storedNames)
-            if (unsName.unsName === name)
-                return unsName;
-
-        return null;
+        let un = new UnsName(name, description);
+        un.unsReducedName = reducedName;
+        this.storedNames.push(un);
     }
 
     /**
@@ -724,6 +752,28 @@ class UnsContract extends NSmartContract {
     }
 
     /**
+     * Returns {@link UnsName} record by it's name.
+     *
+     * @param {string} name of unsName record.
+     * @return {UnsName | null} unsName record or null if not found.
+     */
+    getName(name) {
+        for (let unsName of this.storedNames)
+            if (unsName.unsName === name)
+                return unsName;
+
+        return null;
+    }
+
+    /**
+     * Get all names registered by UNS1 contract
+     * @return {Set<string>} names
+     */
+    getNames() {
+        return new Set(this.storedNames.map(unsName => unsName.unsName));
+    }
+
+    /**
      * Get all origins registered by UNS1 contract
      *
      * @return {Set} origins
@@ -732,6 +782,113 @@ class UnsContract extends NSmartContract {
     getOrigins() {
         return new t.GenericSet(this.storedRecords.map(unsRecord => unsRecord.unsOrigin).filter(unsRecord => unsRecord != null));
     }
+
+    /**
+     * Add origin to be registered by UNS1 contract
+     *
+     * @param {Contract} contract - contract whose origin is registered. Contract is added to UNS1 referenced items.
+     */
+
+    addOriginFromContract(contract) {
+        this.addOrigin(contract.getOrigin());
+        this.originContracts.put(contract.getOrigin(), contract);
+    }
+
+    /**
+     * Add origin to be registered by UNS1 contract
+     *
+     * @param {HashId} origin to be registered. Corresponding contract must be added to referenced items of transaction manually
+     */
+    addOrigin(origin) {
+        let exists = this.storedRecords.filter(unsRecord => unsRecord.unsOrigin != null && unsRecord.unsOrigin.equals(origin));
+        if (exists.length > 0)
+            throw new ex.IllegalArgumentError("Origin '" + origin + "' already exists");
+
+        this.storedRecords.push(UnsRecord.fromOrigin(origin));
+    }
+
+    /**
+     * Remove origin from the list of origins registered by UNS1 contract
+     * @param {HashId} origin to be removed
+     */
+    removeOrigin(origin) {
+        for (let i = 0; i < this.storedRecords.length; i++)
+            if (this.storedRecords[i].unsOrigin != null && this.storedRecords[i].unsOrigin.equals(origin)) {
+                this.storedRecords.splice(i, 1);
+                return;
+            }
+    }
+
+    addKey(publicKey) {
+        let addresses = this.getAddresses();
+        if (addresses.has(publicKey.shortAddress) && addresses.has(publicKey.longAddress))
+            throw new ex.IllegalArgumentError("Key addresses '" + publicKey.longAddress + "'/'" + publicKey.shortAddress + "' already exist");
+
+        let records = this.storedRecords.filter(unsRecord => unsRecord.unsAddresses.includes(publicKey.shortAddress) ||
+            unsRecord.unsAddresses.includes(publicKey.longAddress));
+        if (records.length > 0)
+            for (let i = 0; i < this.storedRecords.length; i++)
+                if (this.storedRecords[i].equal(records[0]))
+                    this.storedRecords.splice(i, 1);
+
+        this.storedRecords.push(UnsRecord.fromKey(publicKey));
+    }
+
+    addAddress(keyAddress) {
+        let addresses = this.getAddresses();
+        if (addresses.has(keyAddress))
+            throw new ex.IllegalArgumentError("Key address '" + keyAddress +  "' already exist");
+
+        this.storedRecords.push(UnsRecord.fromAddress(keyAddress));
+    }
+
+    getAddresses() {
+        let result = new t.GenericSet();
+        this.storedRecords.forEach(unsRecord => unsRecord.unsAddresses.forEach(unsAddress => result.add(unsAddress)));
+        return result;
+    }
+
+    removeAddress(keyAddress) {
+        for (let i = 0; i < this.storedRecords.length; i++)
+            if (this.storedRecords[i].unsAddresses.some(unsAddress => unsAddress.equals(keyAddress))) {
+                this.storedRecords.splice(i, 1);
+                return;
+            }
+    }
+
+    removeKey(publicKey) {
+        for (let i = 0; i < this.storedRecords.length; i++)
+            if (this.storedRecords[i].unsAddresses.some(unsAddress => unsAddress.equals(publicKey.shortAddress) ||
+                unsAddress.equals(publicKey.longAddress))) {
+                this.storedRecords.splice(i, 1);
+                return;
+            }
+    }
+
+    copy() {
+        //create revision should drop paidU value
+        let c = super.copy();
+        c.paidU = null;
+        return c;
+    }
+
+    addData(data) {
+        this.storedRecords.push(UnsRecord.fromData(data));
+    }
+
+    getAllData() {
+        return this.storedRecords.map(unsRecord => unsRecord.unsData).filter(unsData => unsData != null);
+    }
+
+    removeData(data) {
+        for (let i = 0; i < this.storedRecords.length; i++)
+            if (this.storedRecords[i].unsData != null && this.storedRecords[i].unsData.equals(data)) {
+                this.storedRecords.splice(i, 1);
+                return;
+            }
+    }
+
+    //TODO: payments
 }
 
 DefaultBiMapper.registerAdapter(new bs.BiAdapter("UnsContract", UnsContract));

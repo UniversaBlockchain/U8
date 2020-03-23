@@ -158,6 +158,12 @@ class UnsName extends bs.BiSerializable {
 
         return true;
     }
+
+    equalsTo(nr) {
+        return this.unsName.equals(nr.getName())
+            && this.unsReducedName.equals(nr.getNameReduced())
+            && this.unsDescription.equals(nr.getDescription());
+    }
 }
 
 DefaultBiMapper.registerAdapter(new bs.BiAdapter("UnsName", UnsName));

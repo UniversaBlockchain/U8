@@ -159,14 +159,17 @@ class TransactionPack {
                         break;
 
                     case this.NSmartContract.SmartContractType.SLOT1:
+                        let SlotContract = require("services/slotContract").SlotContract;
                         this.contract = await SlotContract.fromSealedBinary(data.contract, this);
                         break;
 
                     case this.NSmartContract.SmartContractType.UNS1:
+                        let UnsContract = require("services/unsContract").UnsContract;
                         this.contract = await UnsContract.fromSealedBinary(data.contract, this);
                         break;
 
                     case this.NSmartContract.SmartContractType.FOLLOWER1:
+                        let FollowerContract = require("services/followerContract").FollowerContract;
                         this.contract = await FollowerContract.fromSealedBinary(data.contract, this);
                         break;
                 }

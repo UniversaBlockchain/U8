@@ -7,11 +7,10 @@ import * as tk from 'unit_tests/test_keys'
 
 const Logger = require("logger").Logger;
 const OptionParser = require("optionparser").OptionParser;
-
-//const Contract = require("contract");
+const Contract = require("contract").Contract;
 const UnsContract = require("services/unsContract").UnsContract;
-const UnsName = require("services/unsName").UnsName;
-const UnsRecord = require("services/unsRecord").UnsRecord;
+
+const tt = require("test_tools");
 
 class DnsMain {
 
@@ -35,14 +34,10 @@ class DnsMain {
 
             let result = await this.resolveName(question.name, question.rType);
             if (result != null) {
-                if (result.A != null)
-                    question.addAnswer_typeA(result.A.ttl, result.A.IPv4);
-                if (result.AAAA != null)
-                    question.addAnswer_typeAAAA(result.AAAA.ttl, result.AAAA.IPv6);
-                if (result.CNAME != null)
-                    question.addAnswer_typeCNAME(result.CNAME.ttl, result.CNAME.domain_name);
-                if (result.MX != null)
-                    result.MX.forEach(MXrecord => question.addAnswer_typeMX(MXrecord.ttl, MXrecord.preference, MXrecord.exchange));
+                result.A.forEach(Arecord => question.addAnswer_typeA(Arecord.ttl, Arecord.IPv4));
+                result.AAAA.forEach(AAAArecord => question.addAnswer_typeAAAA(AAAArecord.ttl, AAAArecord.IPv6));
+                result.CNAME.forEach(CNAMErecord => question.addAnswer_typeCNAME(CNAMErecord.ttl, CNAMErecord.domain_name));
+                result.MX.forEach(MXrecord => question.addAnswer_typeMX(MXrecord.ttl, MXrecord.preference, MXrecord.exchange));
 
                 question.sendAnswer();
             } else {
@@ -88,60 +83,58 @@ class DnsMain {
 
     async resolveName(name, rType) {
         if (name === "test.ya.ru") {
-            // let key = tk.TestKeys.getKey();
-            // let unsContract = UnsContract.fromPrivateKey(key);
-            // let reducedName = name;
-            //
-            // let unsName = new UnsName(reducedName);
-            // unsName.unsReducedName = reducedName;
-            //
-            // unsName.addUnsRecord(UnsRecord.fromData({type: "dns", dns_type: "A", value: {ttl: 300, IPv4: "127.0.0.1"}}));
-            // unsName.addUnsRecord(UnsRecord.fromData({type: "dns", dns_type: "AAAA", value: {ttl: 600, IPv6: "2a02:6b8::2:242"}}));
-            // unsName.addUnsRecord(UnsRecord.fromData({type: "dns", dns_type: "CNAME", value: {ttl: 500, domain_name: "ya.ru"}}));
-            // unsName.addUnsRecord(UnsRecord.fromData({type: "dns", dns_type: "MX", value: {ttl: 550, preference: 20, exchange: "alt-mx.ya.ru"}}));
-            // unsName.addUnsRecord(UnsRecord.fromData({type: "dns", dns_type: "MX", value: {ttl: 550, preference: 5, exchange: "add-mx.ya.ru"}}));
-            //
-            // unsContract.addUnsName(unsName);
-            //
-            // await unsContract.seal(true);
-            //
-            // let uns = await Contract.fromPackedTransaction(await unsContract.getPackedTransaction());
-            // let data = uns.getAllData();
+            try {
+                let key = tk.TestKeys.getKey();
+                let unsContract = UnsContract.fromPrivateKey(key);
 
-            let answer = {};
-            if (rType === DnsRRType.DNS_A || rType === DnsRRType.DNS_ANY)
-                answer.A = {ttl: 300, IPv4: "127.0.0.1"};
-            if (rType === DnsRRType.DNS_AAAA || rType === DnsRRType.DNS_ANY)
-                answer.AAAA = {ttl: 600, IPv6: "2a02:6b8::2:242"};
-            if (rType === DnsRRType.DNS_CNAME || rType === DnsRRType.DNS_ANY)
-                answer.CNAME = {ttl: 500, domain_name: "ya.ru"};
-            if (rType === DnsRRType.DNS_MX || rType === DnsRRType.DNS_ANY) {
-                answer.MX = [
-                    {ttl: 550, preference: 20, exchange: "alt-mx.ya.ru"},
-                    {ttl: 550, preference: 5, exchange: "add-mx.ya.ru"}
-                ];
+                unsContract.addName(name, name, "");
+
+                unsContract.addData({type: "dns", dns_type: "A", value: {ttl: 300, IPv4: "127.0.0.1"}});
+                unsContract.addData({type: "dns", dns_type: "AAAA", value: {ttl: 600, IPv6: "2a02:6b8::2:242"}});
+                unsContract.addData({type: "dns", dns_type: "CNAME", value: {ttl: 500, domain_name: "ya.ru"}});
+                unsContract.addData({type: "dns", dns_type: "MX", value: {ttl: 550, preference: 20, exchange: "alt-mx.ya.ru"}});
+                unsContract.addData({type: "dns", dns_type: "MX", value: {ttl: 550, preference: 5, exchange: "add-mx.ya.ru"}});
+
+                unsContract.nodeInfoProvider = tt.createNodeInfoProvider();
+                await unsContract.seal(true);
+
+                let uns = await Contract.fromPackedTransaction(await unsContract.getPackedTransaction());
+                let data = uns.getAllData();
+
+                let answer = {A: [], AAAA: [], CNAME: [], MX: []};
+                data.forEach(dnsRecord => {
+                    if (dnsRecord.dns_type === "A" && (rType === DnsRRType.DNS_A || rType === DnsRRType.DNS_ANY))
+                        answer.A.push(dnsRecord.value);
+                    if (dnsRecord.dns_type === "AAAA" && (rType === DnsRRType.DNS_AAAA || rType === DnsRRType.DNS_ANY))
+                        answer.AAAA.push(dnsRecord.value);
+                    if (dnsRecord.dns_type === "CNAME" && (rType === DnsRRType.DNS_CNAME || rType === DnsRRType.DNS_ANY))
+                        answer.CNAME.push(dnsRecord.value);
+                    if (dnsRecord.dns_type === "MX" && (rType === DnsRRType.DNS_MX || rType === DnsRRType.DNS_ANY))
+                        answer.MX.push(dnsRecord.value);
+                });
+
+                return answer;
             }
-            return answer;
+            catch (e) {
+                console.error(e.message);
+                console.error(e.stack);
+            }
 
-            // try {
-            //     let k = tk.TestKeys.getKey();
-            //     let c = Contract.fromPrivateKey(k);
-            //
-            //     c.state.data.DNS_records = answer;
-            //
-            //     console.log(JSON.stringify(c.state.data.DNS_records));
-            //
-            //     await c.seal(true);
-            //     let pack = await c.getPackedTransaction();
-            //     let cc = await Contract.fromPackedTransaction(pack);
-            //
-            //     console.error(JSON.stringify(cc.state.data.DNS_records));
-            //
-            //     return cc.state.data.DNS_records;
+            // let answer = {};
+            // if (rType === DnsRRType.DNS_A || rType === DnsRRType.DNS_ANY)
+            //     answer.A = {ttl: 300, IPv4: "127.0.0.1"};
+            // if (rType === DnsRRType.DNS_AAAA || rType === DnsRRType.DNS_ANY)
+            //     answer.AAAA = {ttl: 600, IPv6: "2a02:6b8::2:242"};
+            // if (rType === DnsRRType.DNS_CNAME || rType === DnsRRType.DNS_ANY)
+            //     answer.CNAME = {ttl: 500, domain_name: "ya.ru"};
+            // if (rType === DnsRRType.DNS_MX || rType === DnsRRType.DNS_ANY) {
+            //     answer.MX = [
+            //         {ttl: 550, preference: 20, exchange: "alt-mx.ya.ru"},
+            //         {ttl: 550, preference: 5, exchange: "add-mx.ya.ru"}
+            //     ];
             // }
-            // catch (e) {
-            //     console.error(e.message);
-            // }
+            // return answer;
+
         } else
             return null;
     }
