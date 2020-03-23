@@ -30,6 +30,7 @@ FROM debian:buster-slim
 
 COPY --from=build_clang /code/cmake-build-release /code/cmake-build-release
 COPY --from=build_clang /code/ext/linux/libpq /code/ext/linux/libpq
+COPY --from=build_clang /code/ext/linux/libzip /code/ext/linux/libzip
 COPY --from=build_clang /code/ext/linux/libssl /code/ext/linux/libssl
 COPY --from=build_clang /code/ext/linux/libtomcrypt /code/ext/linux/libtomcrypt
 COPY --from=build_clang /code/ext/linux/libuv /code/ext/linux/libuv
