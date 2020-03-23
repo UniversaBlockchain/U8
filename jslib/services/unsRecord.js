@@ -218,6 +218,6 @@ class UnsRecord extends bs.BiSerializable {
     }
 }
 
-DefaultBiMapper.registerAdapter(new bs.BiAdapter("UnsRecord", UnsRecord));
+DefaultBiMapper.registerAdapter(new bs.BiAdapter("com.icodici.universa.contract.services.UnsRecord", UnsRecord));   //TODO: crutch
 
 module.exports = {UnsRecord};

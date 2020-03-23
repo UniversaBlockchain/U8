@@ -1163,6 +1163,20 @@ class UBotClient {
             )
         );
     }
+
+    async queryNameContract(name) {
+        let result = await new Promise(async (resolve, reject) =>
+            await this.httpNodeClient.command("queryNameContract", {name: name},
+                result => resolve(result),
+                error => reject(error)
+            )
+        );
+
+        if (result == null)
+            return null;
+
+        return result.packedContract;
+    }
 }
 
 class UBotTestClient extends UBotClient {

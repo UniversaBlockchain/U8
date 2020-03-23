@@ -641,98 +641,98 @@ unit.test("contractsservice_test: createSlotContract", async () => {
     assert(mdp[0].fields.hasOwnProperty(SlotContract.TRACKING_CONTRACT_FIELD_NAME));
 });
 
-unit.test("contractsservice_test: createUnsContract", async () => {
-    let key1 = tk.TestKeys.getKey();
-    let key2 = tk.TestKeys.getKey();
-
-    let unsContract = await cs.createUnsContract([key1], [key2.publicKey], tt.createNodeInfoProvider());
-
-    await simpleCheckContract(unsContract, key1, key2);
-
-    assert(unsContract.definition.extendedType === NSmartContract.SmartContractType.UNS1);
-
-    let mdp = unsContract.definition.permissions.get("modify_data");
-    assert(mdp !== null);
-    assert(mdp instanceof Array);
-    assert(mdp[0].fields.hasOwnProperty("action"));
-    assert(mdp[0].fields.hasOwnProperty("/expires_at"));
-    assert(mdp[0].fields.hasOwnProperty("/references"));
-    assert(mdp[0].fields.hasOwnProperty(UnsContract.NAMES_FIELD_NAME));
-    assert(mdp[0].fields.hasOwnProperty(UnsContract.PAID_U_FIELD_NAME));
-    assert(mdp[0].fields.hasOwnProperty(UnsContract.PREPAID_ND_FIELD_NAME));
-    assert(mdp[0].fields.hasOwnProperty(UnsContract.PREPAID_ND_FROM_TIME_FIELD_NAME));
-    assert(mdp[0].fields.hasOwnProperty(UnsContract.STORED_ENTRIES_FIELD_NAME));
-    assert(mdp[0].fields.hasOwnProperty(UnsContract.SPENT_ND_FIELD_NAME));
-    assert(mdp[0].fields.hasOwnProperty(UnsContract.SPENT_ND_TIME_FIELD_NAME));
-});
-
-unit.test("contractsservice_test: createUnsContractForRegisterContractName", async () => {
-    let namedContract = Contract.fromPrivateKey(tk.TestKeys.getKey());
-    await namedContract.seal(true);
-    assert(await namedContract.check());
-
-    let key1 = tk.TestKeys.getKey();
-    let key2 = tk.TestKeys.getKey();
-
-    let unsContract = await cs.createUnsContractForRegisterContractName([key1], [key2.publicKey],
-        tt.createNodeInfoProvider(), "testUnsContract", "test description", "http://test.com", namedContract);
-
-    await simpleCheckContract(unsContract, key1, key2);
-
-    assert(unsContract.definition.extendedType === NSmartContract.SmartContractType.UNS1);
-
-    let mdp = unsContract.definition.permissions.get("modify_data");
-    assert(mdp !== null);
-    assert(mdp instanceof Array);
-    assert(mdp[0].fields.hasOwnProperty("action"));
-    assert(mdp[0].fields.hasOwnProperty("/expires_at"));
-    assert(mdp[0].fields.hasOwnProperty("/references"));
-    assert(mdp[0].fields.hasOwnProperty(UnsContract.NAMES_FIELD_NAME));
-    assert(mdp[0].fields.hasOwnProperty(UnsContract.PAID_U_FIELD_NAME));
-    assert(mdp[0].fields.hasOwnProperty(UnsContract.PREPAID_ND_FIELD_NAME));
-    assert(mdp[0].fields.hasOwnProperty(UnsContract.PREPAID_ND_FROM_TIME_FIELD_NAME));
-    assert(mdp[0].fields.hasOwnProperty(UnsContract.STORED_ENTRIES_FIELD_NAME));
-    assert(mdp[0].fields.hasOwnProperty(UnsContract.SPENT_ND_FIELD_NAME));
-    assert(mdp[0].fields.hasOwnProperty(UnsContract.SPENT_ND_TIME_FIELD_NAME));
-
-    assert(unsContract.getUnsName("testUnsContract").unsName === "testUnsContract");
-    assert(unsContract.getUnsName("testUnsContract").unsDescription === "test description");
-    assert(unsContract.getUnsName("testUnsContract").unsURL === "http://test.com");
-
-    assert(unsContract.getUnsName("testUnsContract").findUnsRecordByOrigin(namedContract.getOrigin()) !== -1);
-});
-
-unit.test("contractsservice_test: createUnsContractForRegisterKeyName", async () => {
-    let namedKey = tk.TestKeys.getKey();
-
-    let key1 = tk.TestKeys.getKey();
-    let key2 = tk.TestKeys.getKey();
-
-    let unsContract = await cs.createUnsContractForRegisterKeyName([key1], [key2.publicKey],
-        tt.createNodeInfoProvider(), "testUnsContract", "test description", "http://test.com", namedKey);
-
-    await simpleCheckContract(unsContract, key1, key2);
-
-    assert(unsContract.definition.extendedType === NSmartContract.SmartContractType.UNS1);
-
-    let mdp = unsContract.definition.permissions.get("modify_data");
-    assert(mdp !== null);
-    assert(mdp instanceof Array);
-    assert(mdp[0].fields.hasOwnProperty("action"));
-    assert(mdp[0].fields.hasOwnProperty("/expires_at"));
-    assert(mdp[0].fields.hasOwnProperty("/references"));
-    assert(mdp[0].fields.hasOwnProperty(UnsContract.NAMES_FIELD_NAME));
-    assert(mdp[0].fields.hasOwnProperty(UnsContract.PAID_U_FIELD_NAME));
-    assert(mdp[0].fields.hasOwnProperty(UnsContract.PREPAID_ND_FIELD_NAME));
-    assert(mdp[0].fields.hasOwnProperty(UnsContract.PREPAID_ND_FROM_TIME_FIELD_NAME));
-    assert(mdp[0].fields.hasOwnProperty(UnsContract.STORED_ENTRIES_FIELD_NAME));
-    assert(mdp[0].fields.hasOwnProperty(UnsContract.SPENT_ND_FIELD_NAME));
-    assert(mdp[0].fields.hasOwnProperty(UnsContract.SPENT_ND_TIME_FIELD_NAME));
-
-    assert(unsContract.getUnsName("testUnsContract").findUnsRecordByKey(namedKey.publicKey) !== -1);
-    assert(unsContract.getUnsName("testUnsContract").findUnsRecordByAddress(new crypto.KeyAddress(namedKey.publicKey, 0, true)) !== -1);
-    assert(unsContract.getUnsName("testUnsContract").findUnsRecordByAddress(new crypto.KeyAddress(namedKey.publicKey, 0, false)) !== -1);
-});
+// unit.test("contractsservice_test: createUnsContract", async () => {
+//     let key1 = tk.TestKeys.getKey();
+//     let key2 = tk.TestKeys.getKey();
+//
+//     let unsContract = await cs.createUnsContract([key1], [key2.publicKey], tt.createNodeInfoProvider());
+//
+//     await simpleCheckContract(unsContract, key1, key2);
+//
+//     assert(unsContract.definition.extendedType === NSmartContract.SmartContractType.UNS1);
+//
+//     let mdp = unsContract.definition.permissions.get("modify_data");
+//     assert(mdp !== null);
+//     assert(mdp instanceof Array);
+//     assert(mdp[0].fields.hasOwnProperty("action"));
+//     assert(mdp[0].fields.hasOwnProperty("/expires_at"));
+//     assert(mdp[0].fields.hasOwnProperty("/references"));
+//     assert(mdp[0].fields.hasOwnProperty(UnsContract.NAMES_FIELD_NAME));
+//     assert(mdp[0].fields.hasOwnProperty(UnsContract.PAID_U_FIELD_NAME));
+//     assert(mdp[0].fields.hasOwnProperty(UnsContract.PREPAID_ND_FIELD_NAME));
+//     assert(mdp[0].fields.hasOwnProperty(UnsContract.PREPAID_ND_FROM_TIME_FIELD_NAME));
+//     assert(mdp[0].fields.hasOwnProperty(UnsContract.STORED_ENTRIES_FIELD_NAME));
+//     assert(mdp[0].fields.hasOwnProperty(UnsContract.SPENT_ND_FIELD_NAME));
+//     assert(mdp[0].fields.hasOwnProperty(UnsContract.SPENT_ND_TIME_FIELD_NAME));
+// });
+//
+// unit.test("contractsservice_test: createUnsContractForRegisterContractName", async () => {
+//     let namedContract = Contract.fromPrivateKey(tk.TestKeys.getKey());
+//     await namedContract.seal(true);
+//     assert(await namedContract.check());
+//
+//     let key1 = tk.TestKeys.getKey();
+//     let key2 = tk.TestKeys.getKey();
+//
+//     let unsContract = await cs.createUnsContractForRegisterContractName([key1], [key2.publicKey],
+//         tt.createNodeInfoProvider(), "testUnsContract", "test description", "http://test.com", namedContract);
+//
+//     await simpleCheckContract(unsContract, key1, key2);
+//
+//     assert(unsContract.definition.extendedType === NSmartContract.SmartContractType.UNS1);
+//
+//     let mdp = unsContract.definition.permissions.get("modify_data");
+//     assert(mdp !== null);
+//     assert(mdp instanceof Array);
+//     assert(mdp[0].fields.hasOwnProperty("action"));
+//     assert(mdp[0].fields.hasOwnProperty("/expires_at"));
+//     assert(mdp[0].fields.hasOwnProperty("/references"));
+//     assert(mdp[0].fields.hasOwnProperty(UnsContract.NAMES_FIELD_NAME));
+//     assert(mdp[0].fields.hasOwnProperty(UnsContract.PAID_U_FIELD_NAME));
+//     assert(mdp[0].fields.hasOwnProperty(UnsContract.PREPAID_ND_FIELD_NAME));
+//     assert(mdp[0].fields.hasOwnProperty(UnsContract.PREPAID_ND_FROM_TIME_FIELD_NAME));
+//     assert(mdp[0].fields.hasOwnProperty(UnsContract.STORED_ENTRIES_FIELD_NAME));
+//     assert(mdp[0].fields.hasOwnProperty(UnsContract.SPENT_ND_FIELD_NAME));
+//     assert(mdp[0].fields.hasOwnProperty(UnsContract.SPENT_ND_TIME_FIELD_NAME));
+//
+//     assert(unsContract.getUnsName("testUnsContract").unsName === "testUnsContract");
+//     assert(unsContract.getUnsName("testUnsContract").unsDescription === "test description");
+//     assert(unsContract.getUnsName("testUnsContract").unsURL === "http://test.com");
+//
+//     assert(unsContract.getUnsName("testUnsContract").findUnsRecordByOrigin(namedContract.getOrigin()) !== -1);
+// });
+//
+// unit.test("contractsservice_test: createUnsContractForRegisterKeyName", async () => {
+//     let namedKey = tk.TestKeys.getKey();
+//
+//     let key1 = tk.TestKeys.getKey();
+//     let key2 = tk.TestKeys.getKey();
+//
+//     let unsContract = await cs.createUnsContractForRegisterKeyName([key1], [key2.publicKey],
+//         tt.createNodeInfoProvider(), "testUnsContract", "test description", "http://test.com", namedKey);
+//
+//     await simpleCheckContract(unsContract, key1, key2);
+//
+//     assert(unsContract.definition.extendedType === NSmartContract.SmartContractType.UNS1);
+//
+//     let mdp = unsContract.definition.permissions.get("modify_data");
+//     assert(mdp !== null);
+//     assert(mdp instanceof Array);
+//     assert(mdp[0].fields.hasOwnProperty("action"));
+//     assert(mdp[0].fields.hasOwnProperty("/expires_at"));
+//     assert(mdp[0].fields.hasOwnProperty("/references"));
+//     assert(mdp[0].fields.hasOwnProperty(UnsContract.NAMES_FIELD_NAME));
+//     assert(mdp[0].fields.hasOwnProperty(UnsContract.PAID_U_FIELD_NAME));
+//     assert(mdp[0].fields.hasOwnProperty(UnsContract.PREPAID_ND_FIELD_NAME));
+//     assert(mdp[0].fields.hasOwnProperty(UnsContract.PREPAID_ND_FROM_TIME_FIELD_NAME));
+//     assert(mdp[0].fields.hasOwnProperty(UnsContract.STORED_ENTRIES_FIELD_NAME));
+//     assert(mdp[0].fields.hasOwnProperty(UnsContract.SPENT_ND_FIELD_NAME));
+//     assert(mdp[0].fields.hasOwnProperty(UnsContract.SPENT_ND_TIME_FIELD_NAME));
+//
+//     assert(unsContract.getUnsName("testUnsContract").findUnsRecordByKey(namedKey.publicKey) !== -1);
+//     assert(unsContract.getUnsName("testUnsContract").findUnsRecordByAddress(new crypto.KeyAddress(namedKey.publicKey, 0, true)) !== -1);
+//     assert(unsContract.getUnsName("testUnsContract").findUnsRecordByAddress(new crypto.KeyAddress(namedKey.publicKey, 0, false)) !== -1);
+// });
 
 unit.test("contractsservice_test: createFollowerContract", async () => {
     let key1 = tk.TestKeys.getKey();

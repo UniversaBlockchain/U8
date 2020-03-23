@@ -27,12 +27,15 @@ unit.test("dns_test: PRO DNS", async () => {
     unsContract.nodeInfoProvider = tt.createNodeInfoProvider();
     await unsContract.seal(true);
 
-    // let netClient = await new UBotClient(tk.getTestKey(), TOPOLOGY_ROOT + TOPOLOGY_FILE).start();
-    //
-    // console.log("Register UNS contract...");
-    // let ir = await netClient.register(await unsContract.getPackedTransaction(), 10000);
-    //
-    // assert(ir.state === ItemState.APPROVED);
-    //
-    // await netClient.shutdown();
+    let netClient = await new UBotClient(tk.getTestKey(), TOPOLOGY_ROOT + TOPOLOGY_FILE).start();
+
+    console.log("Register UNS contract...");
+
+    await unsContract.getPackedTransaction()
+
+    let ir = await netClient.register(await unsContract.getPackedTransaction(), 10000);
+
+    assert(ir.state === ItemState.APPROVED);
+
+    await netClient.shutdown();
 });
