@@ -22,7 +22,7 @@ class DnsMain {
         this.parser.parse(args);
     }
 
-    async start() {
+    async start(host, port, uplinkNameServer, uplinkPort) {
         if (this.processOptions())
             return;
 
@@ -50,7 +50,7 @@ class DnsMain {
                 question.resolveThroughUplink_finish();
             }
         });
-        this.dnsServer.start("0.0.0.0", 5353, "8.8.4.4");
+        this.dnsServer.start(host, port, uplinkNameServer, uplinkPort);
 
         this.logger.log("DNS server started");
     }
