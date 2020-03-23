@@ -889,6 +889,172 @@ class UnsContract extends NSmartContract {
     }
 
     //TODO: payments
+
+    /**
+     * Get amount of U to be payed additionally to achieve desired UNS1 expiration date.
+     *
+     * Note: UNS1 expiration date is related to names services expiration
+     * only and has nothing with {@link Contract} expiration. {@link Contract} expiration
+     * can be set by its owner freely. It is only automatically adjusted if it's less
+     * than: names services expiration date + HOLD period (one month) + 10 days
+     *
+     * @param {Date} unsExpirationDate - Desired expiration data.
+     * @return {number} amount of U to be payed. Can be zero if no additional payment is required.
+     */
+    getPayingAmount(unsExpirationDate) {
+        let nameDaysShouldBeValidFor = this.getStoredUnitsCount() *
+            Math.floor((unsExpirationDate.getTime() - this.getCreatedAt().getTime()) / 1000) / (3600*24);
+
+        let parentContract = this.getRevokingItem(this.state.parent);
+
+        let prepaidNameDaysLeft = 0;
+
+        if(parentContract != null) {
+            prepaidNameDaysLeft = t.getOrDefault(parentContract.state.data, UnsContract.PREPAID_ND_FIELD_NAME, 0);
+            prepaidNameDaysLeft -= parentContract.getStoredUnitsCount() *
+                Math.floor((this.getCreatedAt().getTime() - parentContract.getCreatedAt().getTime()) / 1000) / (3600*24);
+        }
+
+        nameDaysShouldBeValidFor -= prepaidNameDaysLeft;
+
+        let amount = Math.ceil(nameDaysShouldBeValidFor / Number(this.getRate()));
+
+        if(amount <= 0) {
+            return 0;
+        }
+
+        if(amount < this.getMinPayment()) {
+            return this.getMinPayment();
+        }
+
+        return amount;
+    }
+
+    /**
+     * Get expiration date of current UNS1 if being payed additionally by specified amount.
+     * If parent contract exists its paid time remaining will be taken into account.
+     *
+     * Note: UNS1 expiration date is related to names services expiration
+     * only and has nothing with {@link Contract} expiration. {@link Contract} expiration
+     * can be set by its owner freely. It is only automatically adjusted if it's less
+     * than: names services expiration date + HOLD period (one month) + 10 days.
+     *
+     * @param {number} payingAmount - Paying amount.
+     * @return {Date} calculated UNS1 expiration date or {@code null} if amount passed is less than {@link #getMinPayment()}.
+     */
+    getUnsExpiration(payingAmount) {
+        if(payingAmount === 0 && this.state.revision === 1 || payingAmount > 0 && payingAmount < this.getMinPayment()) {
+            return null;
+        }
+
+        let parentContract = this.getRevokingItem(this.state.parent);
+
+        let prepaidNameDaysLeft = 0;
+
+        if(parentContract != null) {
+            prepaidNameDaysLeft = t.getOrDefault(parentContract.state.data, UnsContract.PREPAID_ND_FIELD_NAME, 0);
+            prepaidNameDaysLeft -= parentContract.getStoredUnitsCount() *
+                Math.floor((this.getCreatedAt().getTime() - parentContract.getCreatedAt().getTime()) / 1000) / (3600*24);
+        }
+
+        let days = (payingAmount * Number(this.getRate()) + prepaidNameDaysLeft) / this.getStoredUnitsCount();
+
+        return new Date(this.getCreatedAt().getTime() + (days) * 24 * 3600000);
+    }
+
+    /**
+     * Get expiration date of current UNS1 if being payed additionally by minimum amount possible.
+     * If parent contract exists its paid time remaining will be taken into account.
+     *
+     * Note: UNS1 expiration date is related to names services expiration
+     * only and has nothing with {@link Contract} expiration. {@link Contract} expiration
+     * can be set by its owner freely. It is only automatically adjusted if it's less
+     * than: names services expiration date + HOLD period (one month) + 10 days.
+     *
+     * @return {Date} calculated UNS1 expiration date.
+     */
+    getMinUnsExpiration() {
+        return this.getUnsExpiration(this.getMinPayment());
+    }
+
+    /**
+     * Create {@link Parcel} to be registered that ensures expiration date of current UNS1 is not less than desired one.
+     *
+     * @param {Date} unsExpirationDate - Desired expiration date.
+     * @param {Contract} uContract - Contract to used as payment.
+     * @param {} uKeys - Keys that resolve owner of
+     * payment contract.
+     * @param {Array<crypto.PrivateKey>|Set<crypto.PrivateKey>|crypto.PrivateKey}keysToSignUnsWith keys to sign UNS1 contract
+     * with (existing signatures are dropped when adding payment).
+     * @return {Parcel} parcel to be registered.
+     */
+    createRegistrationParcelFromExpirationDate(unsExpirationDate, uContract, uKeys, keysToSignUnsWith) {
+        let amount = this.getPayingAmount(unsExpirationDate);
+
+        return this.createRegistrationParcelFromPaymentAmount(amount, uContract, uKeys, keysToSignUnsWith);
+    }
+
+    /**
+     * Create {@link Parcel} to be registered that includes given amount paid.
+     *
+     * @param {number} payingAmount - Paying amount to pay.
+     * @param {Contract} uContract - Contract to used as payment.
+     * @param {} uKeys - Keys that resolve owner of
+     * payment contract.
+     * @param {Array<crypto.PrivateKey>|Set<crypto.PrivateKey>|crypto.PrivateKey} keysToSignUnsWith - Keys to sign UNS1
+     * contract with (existing signatures are dropped when adding payment).
+     * @return {Parcel} parcel to be registered.
+     */
+    async createRegistrationParcelFromPaymentAmount(payingAmount, uContract, uKeys, keysToSignUnsWith) {
+        if(this.paidU == null || payingAmount !== this.paidU) {
+
+            if(this.setPayingAmount(payingAmount) == null) {
+                return null;
+            }
+
+            await this.seal();
+
+            await this.addSignatureToSeal(keysToSignUnsWith);
+        }
+
+        return Parcel.of(this, uContract, uKeys,payingAmount);
+    }
+
+    /**
+     * Create {@link Parcel} to be registered that includes additional payment of size expected by UNS1 contract: {@link #getPayingAmount()}.
+     *
+     * Using this method allows to create paying parcel for UNS1 contract without dropping its signatures.
+     *
+     * @param {Contract} uContract - Contract to used as payment.
+     * @param {} uKeys - Keys that resolve owner of payment contract.
+     * @return {Parcel} parcel to be registered.
+     */
+    createRegistrationParcel(uContract, uKeys) {
+        return Parcel.of(this, uContract, uKeys, this.paidU);
+    }
+
+    /**
+     * Sets an amount that is going to be paid for this UNS1.
+     *
+     * Note: UNS1 expiration date is related to names services expiration
+     * only and has nothing with {@link Contract} expiration. {@link Contract} expiration
+     * can be set by its owner freely. It is only automatically adjusted if it's less
+     * than: names services expiration date + HOLD period (one month) + 10 days.
+     *
+     * @param {number} payingAmount - Paying amount that is going to be paid.
+     * @return {Date} calculated UNS1 expiration date.
+     */
+    setPayingAmount(payingAmount) {
+        if(payingAmount === 0 && this.state.revision === 1 || payingAmount > 0 && payingAmount < this.getMinPayment()) {
+            return null;
+        }
+
+        this.paidU = payingAmount;
+        this.calculatePrepaidNameDays(false);
+
+        return this.getCurrentUnsExpiration();
+    }
+
 }
 
 DefaultBiMapper.registerAdapter(new bs.BiAdapter("UnsContract", UnsContract));
