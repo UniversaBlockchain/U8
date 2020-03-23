@@ -164,6 +164,7 @@ class TransactionPack {
                         break;
 
                     case this.NSmartContract.SmartContractType.UNS1:
+                    case this.NSmartContract.SmartContractType.UNS2:
                         let UnsContract = require("services/unsContract").UnsContract;
                         this.contract = await UnsContract.fromSealedBinary(data.contract, this);
                         break;

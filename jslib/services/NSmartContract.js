@@ -20,6 +20,7 @@ class NSmartContract extends Contract {
         N_SMART_CONTRACT : "N_SMART_CONTRACT",
         SLOT1 : "SLOT1",
         UNS1 : "UNS1",
+        UNS2 : "UNS2",
         FOLLOWER1 : "FOLLOWER1"
     };
 
