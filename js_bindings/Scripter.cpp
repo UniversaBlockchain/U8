@@ -21,6 +21,7 @@ static const char *ARGV0 = nullptr;
 static const char *ARGV1 = nullptr;
 std::string BASE_PATH;                          // path to ZIP-module or directory where jslib found
 int Scripter::workerMemLimitMegabytes = 200;    // actual default value is set in main.cpp
+const char *U8MODULE_EXTENSION = ".u8m/";
 
 std::unique_ptr<v8::Platform> Scripter::initV8(const char *argv0) {
 
@@ -83,7 +84,7 @@ shared_ptr<Scripter> Scripter::New(int accessLevel, bool forWorker) {
 Scripter::Scripter() : Logging("SCR") {
     std::string s = ARGV1;
 
-    size_t zipPos = s.rfind(".zip/");
+    size_t zipPos = s.rfind(U8MODULE_EXTENSION);
     bool inZip = zipPos != std::string::npos;
 
     if (inZip) {

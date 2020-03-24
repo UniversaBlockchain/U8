@@ -10,12 +10,16 @@
 #include "../crypto/PublicKey.h"
 #include "../types/UBinder.h"
 #include "../serialization/BossSerializer.h"
+#include "../crypto/base64.h"
 
 using namespace std;
 using namespace crypto;
 
+extern const char *U8MODULE_EXTENSION;
+const char *U8_PUBLIC_KEY = "HggcAQABxAABuc8tZdvfwUY550JXjg6GkVszQsy5lrao6LX5BpmVCPRq8xBlhqNnZmPz+sv+bFlGHPhydqV1xkSzBxGi+JqPYE+q0NQ9MJ3YVOzd/MRVW+dn7oZ8uUcWp81j/Wmn4mGVHP9bFhaqiu1JpnkJS6We5923IMrGrhxHDdstFFbs0KVHfgX1ekKKZSkXqNOHFb1VcvIyHrWyL4ZBqVlhqoQB7uMz68MlVznCzdF1HVWtwfuTLzVKXLlMNXGRYLaMqsBKH2U9esN6wXbvSfiMRRKKyiHMfYO4Ohg8ZAnnOfUwCqR48LbxY/W6w0aJ+uy4ohA9jKbT+JEp+vv3bM3KV8jt1w==";
+
 bool file_exists(const std::string &name, bool dirInZip) {
-    size_t pos = name.find(".zip/");
+    size_t pos = name.find(U8MODULE_EXTENSION);
     struct stat buffer;
     if (pos == std::string::npos)
         return (stat(name.c_str(), &buffer) == 0);
@@ -87,7 +91,7 @@ string loadFromZip(const string &zipName, const string &fileName) {
 }
 
 string loadAsString(const string &fileName) {
-    size_t pos = fileName.find(".zip/");
+    size_t pos = fileName.find(U8MODULE_EXTENSION);
     if (pos == std::string::npos) {
         ifstream ifs(fileName);
         return string((istreambuf_iterator<char>(ifs)), (istreambuf_iterator<char>()));
@@ -100,7 +104,7 @@ string loadAsString(const string &fileName) {
 }
 
 string loadAsStringOrThrow(const string &fileName) {
-    size_t pos = fileName.find(".zip/");
+    size_t pos = fileName.find(U8MODULE_EXTENSION);
     if (pos == std::string::npos) {
         ifstream ifs(fileName, ios::in);
         if (!ifs)
@@ -137,7 +141,7 @@ int singModule(const std::string &moduleName, const std::string &keyFileName) {
         // read key
         FILE *f = fopen(keyFileName.c_str(), "rb");
         if (f == nullptr) {
-            printf("Failed opening key file %s\n", moduleName.c_str());
+            printf("Failed opening key file %s\n", keyFileName.c_str());
             return 1;
         }
         fseek(f, 0, SEEK_END);
@@ -239,6 +243,9 @@ bool checkModuleSignature(const std::string &moduleName) {
         auto readed = fread(data, 1, dataLen, f);
         if (readed != dataLen) {
             printf("Failed reading module data\n");
+
+            fclose(f);
+            free(data);
             return false;
         }
 
@@ -249,6 +256,10 @@ bool checkModuleSignature(const std::string &moduleName) {
         readed = fread(signData, 1, (unsigned short) lenSignData, f);
         if (readed != lenSignData) {
             printf("Failed reading signature\n");
+
+            fclose(f);
+            free(data);
+            free(signData);
             return false;
         }
 
@@ -263,6 +274,13 @@ bool checkModuleSignature(const std::string &moduleName) {
 
         // verify signature
         bool res = publicKey->verify(sign.data(), sign.size(), data, dataLen, HashType::SHA3_512);
+
+        // check public key
+        auto U8Key = base64_decodeToBytes(U8_PUBLIC_KEY);
+        if (key.size() != U8Key.size() || memcmp(key.data(), U8Key.data(), U8Key.size()) != 0) {
+            printf("Wrong signature key\n");
+            res = false;
+        }
 
         fclose(f);
 

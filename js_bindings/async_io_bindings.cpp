@@ -16,6 +16,7 @@
 #include "../AsyncIO/IOTLS.h"
 
 extern std::string BASE_PATH;                          // path to ZIP-module or directory where jslib found
+extern const char *U8MODULE_EXTENSION;
 
 void JsAsyncGetErrorText(const FunctionCallbackInfo<Value> &args) {
     Scripter::unwrapArgs(args, [](ArgsContext &ac) {
@@ -606,7 +607,7 @@ void JsZip_getModuleResourcesFromPath(const FunctionCallbackInfo<Value> &args) {
         if (ac.args.Length() == 1) {
             auto path = ac.asString(0);
 
-            size_t pos = path.find(".zip/");
+            size_t pos = path.find(U8MODULE_EXTENSION);
             if (pos == std::string::npos) {
                 ac.throwError("path without zip-module");
                 return;
@@ -653,7 +654,7 @@ void JsZip_readResourceContentsAsString(const FunctionCallbackInfo<Value> &args)
         if (ac.args.Length() == 1) {
             auto path = ac.asString(0);
 
-            size_t pos = path.find(".zip/");
+            size_t pos = path.find(U8MODULE_EXTENSION);
             if (pos == std::string::npos) {
                 ac.throwError("path without zip-module");
                 return;

@@ -98,7 +98,7 @@ void usage() {
 
 Usage:
 
-    u8 [-e "`js code to evaluate`"] | <javascript_file_name> | [--selftest] | [--signmodule <module_name> <key_name>]
+    u8 [-e "`js code to evaluate`"] | <javascript_file_name> | [--selftest] | [--signmodule <module_path> <key_path>]
 
 if -e switch present, evaluates the second command line parameter as Javascript code and
 prints out result ou stdout.
@@ -109,7 +109,7 @@ if it is imported from it.
 
 --selftest run some internal tests.
 
---signmodule sign zip-module with define key.
+--signmodule sign u8m-module with define key.
 
 )End";
 }

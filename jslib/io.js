@@ -461,11 +461,13 @@ async function fileGetContentsAsBytes(path) {
     return res;
 }
 
-// For module resources (files in ZIP-module)
+// For module resources (files in module)
+const U8MODULE_EXTENSION = ".u8m/";
+
 async function getResourcesFromPath(path) {
     let basePath = getBasePath();
     let fullPath = basePath + path;
-    if (~basePath.indexOf(".zip/"))
+    if (~basePath.indexOf(U8MODULE_EXTENSION))
         return await getModuleResourcesFromPath(fullPath);
     else
         return await getFilesFromDir(fullPath);
@@ -474,7 +476,7 @@ async function getResourcesFromPath(path) {
 async function resourceGetContentsAsString(path) {
     let basePath = getBasePath();
     let fullPath = basePath + path;
-    if (~basePath.indexOf(".zip/"))
+    if (~basePath.indexOf(U8MODULE_EXTENSION))
         return await readResourceContentsAsString(fullPath);
     else
         return await fileGetContentsAsString(fullPath);
