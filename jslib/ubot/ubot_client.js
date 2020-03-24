@@ -591,6 +591,16 @@ class UBotClient {
         return ItemResult.UNDEFINED;
     }
 
+    /**
+     * Check contract state (for APPROVED) with defined trust level.
+     *
+     * @param itemId - ID of checking contract.
+     * @param trustLevel - Trust level (between 0 and 1).
+     * @param breakLevel - Level determining that contract has not been approved (between 0 and 1).
+     *
+     * @async
+     * @return {Promise<boolean>} true - if contract has been approved.
+     */
     async checkStateWithTrust(itemId, trustLevel, breakLevel) {
         let nodes = this.topology.map(node => node.number);
         let trust = Math.ceil(nodes.length * (trustLevel + breakLevel));
@@ -1197,6 +1207,15 @@ class UBotClient {
         );
     }
 
+    /**
+     * Request UNS contract by name.
+     *
+     * @param name - Name registered in UNS contract.
+     * @param type - Contract type (UNS1 or UNS2).
+     *
+     * @async
+     * @return {Promise<Uint8Array>} UNS contract body.
+     */
     async queryNameContract(name, type) {
         let result = await new Promise(async (resolve, reject) =>
             await this.httpNodeClient.command("queryNameContract", {name: name, type: type},
