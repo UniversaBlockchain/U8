@@ -263,6 +263,20 @@ bool DnsServerQuestion::addAnswer_typeMX(int ttl, int preference, const std::str
     return true;
 }
 
+bool DnsServerQuestion::addAnswer_typeTXT(int ttl, const std::string& text) {
+    DnsServerAnswerParams ap;
+    ap.rtype = DnsRRType::DNS_TXT;
+    ap.ttl = ttl;
+    auto textBin = stringToBytes(text);
+    if (textBin.size() > 255)
+        textBin.resize(255);
+    ap.bin.resize(textBin.size()+1);
+    ap.bin[0] = (unsigned char) textBin.size();
+    memcpy(&ap.bin[1], &textBin[0], textBin.size());
+    ansBinary_.emplace_back(std::move(ap));
+    return true;
+}
+
 bool DnsServerQuestion::addAnswerBin(int rtype, int ttl, const byte_vector& bin) {
     if (bin.size() <= 512) {
         DnsServerAnswerParams ap;

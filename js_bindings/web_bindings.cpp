@@ -1169,6 +1169,9 @@ public:
     void addAnswer_typeMX(int ttl, int preference, const string& exchange) {
         question_->addAnswer_typeMX(ttl, preference, exchange);
     }
+    void addAnswer_typeTXT(int ttl, const string& text) {
+        question_->addAnswer_typeTXT(ttl, text);
+    }
     void sendAnswer() {
         question_->sendAnswer();
         lock_guard lock(deleteMutex_);
@@ -1641,6 +1644,19 @@ void DnsServerQuestionWrapper_addAnswer_typeMX(const FunctionCallbackInfo<Value>
     });
 }
 
+void DnsServerQuestionWrapper_addAnswer_typeTXT(const FunctionCallbackInfo<Value> &args) {
+    Scripter::unwrapArgs(args, [](ArgsContext &ac) {
+        if (ac.args.Length() == 2) {
+            auto qw = unwrap<DnsServerQuestionWrapper>(ac.args.This());
+            auto ttl = ac.asInt(0);
+            auto text = ac.asString(1);
+            qw->addAnswer_typeTXT(ttl, text);
+            return;
+        }
+        ac.throwError("invalid arguments");
+    });
+}
+
 void DnsServerQuestionWrapper_sendAnswer(const FunctionCallbackInfo<Value> &args) {
     Scripter::unwrapArgs(args, [](ArgsContext &ac) {
         if (ac.args.Length() == 0) {
@@ -1689,6 +1705,7 @@ void JsInitDnsServerQuestion(Scripter& scripter, const Local<ObjectTemplate> &gl
     prototype->Set(isolate, "__addAnswer_typeAAAA", FunctionTemplate::New(isolate, DnsServerQuestionWrapper_addAnswer_typeAAAA));
     prototype->Set(isolate, "__addAnswer_typeCNAME", FunctionTemplate::New(isolate, DnsServerQuestionWrapper_addAnswer_typeCNAME));
     prototype->Set(isolate, "__addAnswer_typeMX", FunctionTemplate::New(isolate, DnsServerQuestionWrapper_addAnswer_typeMX));
+    prototype->Set(isolate, "__addAnswer_typeTXT", FunctionTemplate::New(isolate, DnsServerQuestionWrapper_addAnswer_typeTXT));
     prototype->Set(isolate, "__sendAnswer", FunctionTemplate::New(isolate, DnsServerQuestionWrapper_sendAnswer));
     prototype->Set(isolate, "__resolveThroughUplink_start", FunctionTemplate::New(isolate, DnsServerQuestionWrapper_resolveThroughUplink_start));
     prototype->Set(isolate, "__resolveThroughUplink_finish", FunctionTemplate::New(isolate, DnsServerQuestionWrapper_resolveThroughUplink_finish));

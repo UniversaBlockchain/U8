@@ -27,6 +27,8 @@ TEST_CASE("dns_hello") {
                 question->addAnswer_typeAAAA(300, "2a02:6b8::2:242");
             } else if (question->rtype == DnsRRType::DNS_CNAME || question->rtype == DnsRRType::DNS_ANY) {
                 question->addAnswer_typeCNAME(400, "www.ya.ru");
+            } else if (question->rtype == DnsRRType::DNS_TXT || question->rtype == DnsRRType::DNS_ANY) {
+                question->addAnswer_typeTXT(400, "aaa aaa aaa bbbbbbbb cccc d 24");
             }
             question->sendAnswer();
         });
@@ -45,10 +47,12 @@ TEST_CASE("dns_hello") {
     //N = 200000;
     for (int i = 0; i < N; ++i) {
         ++reqCounter;
-        dnsResolver.resolve("ya.ru", DnsRRType::DNS_A, [&ansCounter,&t0](const std::vector<DnsResolverAnswer>& ansArr) {
+        dnsResolver.resolve("ya.ru", DnsRRType::DNS_TXT, [&ansCounter,&t0](const std::vector<DnsResolverAnswer>& ansArr) {
             for (const DnsResolverAnswer& ans : ansArr) {
-                //cout << "resolved: " << ans.parseIpV4asString() << endl;
-                REQUIRE(ans.parseIpV4asString() == "127.0.0.1");
+//                cout << "resolved: " << ans.parseIpV4asString() << endl;
+//                REQUIRE(ans.parseIpV4asString() == "127.0.0.1");
+                //cout << "resolved: " << ans.parseTXT() << endl;
+                REQUIRE(ans.parseTXT() == "aaa aaa aaa bbbbbbbb cccc d 24");
             }
             ++ansCounter;
             long now = getCurrentTimeMillis();

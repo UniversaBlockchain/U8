@@ -104,6 +104,7 @@ public:
     bool addAnswer_typeAAAA(int ttl, const std::string& ip6);
     bool addAnswer_typeCNAME(int ttl, const std::string& domainName);
     bool addAnswer_typeMX(int ttl, int preference, const std::string& exchange);
+    bool addAnswer_typeTXT(int ttl, const std::string& text);
     bool addAnswerBin(int rtype, int ttl, const byte_vector& bin);
     void setWholeBinaryResponse(const byte_vector& bin);
     void sendAnswer();

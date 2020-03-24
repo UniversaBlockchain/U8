@@ -571,6 +571,12 @@ unit.test("web_test: dns server hello world", async () => {
                 question.addAnswer_typeCNAME(500, "ya.ru");
             if (question.rType === DnsRRType.DNS_MX || question.rType === DnsRRType.DNS_ANY)
                 question.addAnswer_typeMX(550, 20, "alt-mx.ya.ru");
+            if (question.rType === DnsRRType.DNS_TXT || question.rType === DnsRRType.DNS_ANY) {
+                question.addAnswer_typeTXT(500, "aaa bbb ccc dddd dddd eeee d 24");
+                question.addAnswer_typeTXT(600, "aaa bbb ccc dddd dddd eeee d 600");
+                question.addAnswer_typeTXT(700, "aaa bbb ccc dddd dddd eeee d 700");
+                question.addAnswer_typeTXT(800, "longtext01longtext02longtext03longtext04longtext05longtext06longtext07longtext08longtext09longtext10longtext11longtext12longtext13longtext14longtext15longtext16longtext17longtext18longtext19longtext20longtext21longtext22longtext23longtext24longtext2512345");
+            }
             question.sendAnswer();
         } else {
             question.resolveThroughUplink_finish();
