@@ -56,6 +56,17 @@ void JsLoadRequired(const v8::FunctionCallbackInfo<v8::Value> &args) {
     });
 }
 
+void JsLoadModule(const v8::FunctionCallbackInfo<v8::Value> &args) {
+    Scripter::unwrap(args, [&](auto se, auto isolate, auto context) {
+        v8::String::Utf8Value v8str(isolate, args[0]);
+
+        string sourceName = *v8::String::Utf8Value(isolate, args[0]);
+        auto res = checkModuleSignature(sourceName);
+
+        args.GetReturnValue().Set(res);
+    });
+}
+
 static unordered_set<string> validSourcesForRestrictedWorker = {
     "crypto.js",
     "FastPriorityQueue.js",

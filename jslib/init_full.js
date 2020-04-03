@@ -103,6 +103,26 @@ const require = (function () {
     }
 })();
 
+const load = (function () {
+    const trusts = new Map();
+
+    return function (moduleName) {
+        if (!/\.[mc]?u8m$/.test(moduleName))
+            moduleName += ".u8m";
+
+        if (trusts.has(moduleName)) {
+            if (!trusts.get(moduleName))
+                throw "Module \"" + moduleName + "\" isn`t loaded";
+        } else {
+            let trust = __bios_loadModule(moduleName);
+            trusts.set(moduleName, trust);
+
+            if (!trust)
+                throw "Module \"" + moduleName + "\" isn`t loaded";
+        }
+    }
+})();
+
 function assert(condition, text = "assertion failed") {
     if (!condition) throw Error(text);
 }
@@ -134,7 +154,10 @@ function freezeGlobals() {
     let global = Function('return this')();
     Object.freeze(global.__bios_print);
     Object.freeze(global.__debug_throw);
+    Object.freeze(global.require);
+    Object.freeze(global.load);
     Object.freeze(global.__bios_loadRequired);
+    Object.freeze(global.__bios_loadModule);
     Object.freeze(global.__bios_initTimers);
     Object.freeze(global.exit);
     Object.freeze(global.utf8Decode);

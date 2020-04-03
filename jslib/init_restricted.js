@@ -92,6 +92,10 @@ const require = (function () {
     }
 })();
 
+function load() {
+    throw "Loading modules is not available in restricted mode";
+}
+
 function assert(condition, text = "assertion failed") {
     if (!condition) throw Error(text);
 }
@@ -121,6 +125,8 @@ class WorkerRuntimeError extends Error {
 
 function freezeGlobals() {
     let global = Function('return this')();
+    Object.freeze(global.require);
+    Object.freeze(global.load);
     Object.freeze(global.__bios_loadRequired);
     Object.freeze(global.__bios_initTimers);
     Object.freeze(global.utf8Decode);

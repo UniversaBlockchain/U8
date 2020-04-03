@@ -195,6 +195,7 @@ void Scripter::initialize(int accessLevel, bool forWorker) {
         global->Set(v8String("__bios_print"), functionTemplate(JsPrint));
         global->Set(v8String("__debug_throw"), functionTemplate(JsThrowScripterException));
         global->Set(v8String("__bios_loadRequired"), functionTemplate(JsLoadRequired));
+        global->Set(v8String("__bios_loadModule"), functionTemplate(JsLoadModule));
         global->Set(v8String("__bios_initTimers"), functionTemplate(JsInitTimers));
         global->Set(v8String("exit"), functionTemplate(JsExit));
         global->Set(v8String("utf8Decode"), functionTemplate(JsTypedArrayToString));

@@ -11,6 +11,8 @@ void JsPrint(const v8::FunctionCallbackInfo<v8::Value> &args);
 
 void JsLoadRequired(const v8::FunctionCallbackInfo<v8::Value> &args);
 
+void JsLoadModule(const v8::FunctionCallbackInfo<v8::Value> &args);
+
 void JsLoadRequiredRestricted(const v8::FunctionCallbackInfo<v8::Value> &args);
 
 void JsInitTimers(const v8::FunctionCallbackInfo<v8::Value> &args);

@@ -276,9 +276,8 @@ bool checkModuleSignature(const std::string &moduleName) {
         bool res = publicKey->verify(sign.data(), sign.size(), data, dataLen, HashType::SHA3_512);
 
         // check public key
-        auto U8Key = base64_decodeToBytes(U8_PUBLIC_KEY);
-        if (key.size() != U8Key.size() || memcmp(key.data(), U8Key.data(), U8Key.size()) != 0) {
-            printf("Wrong signature key\n");
+        if (!checkKeyTrust(key)) {
+            printf("Untrusted signature key\n");
             res = false;
         }
 
@@ -293,4 +292,15 @@ bool checkModuleSignature(const std::string &moduleName) {
         printf("Error checking module signature: %s\n", e.what());
         return false;
     }
+}
+
+bool checkKeyTrust(std::vector<unsigned char> &key) {
+    auto U8Key = base64_decodeToBytes(U8_PUBLIC_KEY);
+    if (key.size() == U8Key.size() && memcmp(key.data(), U8Key.data(), U8Key.size()) == 0)
+        return true;
+
+    // search u8trust file
+    //if (file_exists)
+
+    return false;
 }

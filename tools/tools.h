@@ -39,6 +39,8 @@ int singModule(const std::string &moduleName, const std::string &keyFileName);
 
 bool checkModuleSignature(const std::string &moduleName);
 
+bool checkKeyTrust(std::vector<unsigned char> &key);
+
 class io_error : public std::runtime_error {
 public:
     using runtime_error::runtime_error;
