@@ -142,8 +142,8 @@ TEST_CASE("Semaphore") {
 
 TEST_CASE("Check_V8_version") {
     printf("V8_VERSION: %i.%i\n", V8_MAJOR_VERSION, V8_MINOR_VERSION);
-    REQUIRE(V8_MAJOR_VERSION == 7);
-    REQUIRE(V8_MINOR_VERSION == 4);
+    REQUIRE(V8_MAJOR_VERSION == 8);
+    REQUIRE(V8_MINOR_VERSION == 0);
 }
 
 TEST_CASE("TimerThread_FixedRate") {
