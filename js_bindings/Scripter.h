@@ -282,6 +282,8 @@ public:
 
     static int workerMemLimitMegabytes;
 
+    std::string getHome();
+
 private:
 
     std::string expandPath(const std::string &path);

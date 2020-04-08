@@ -37,9 +37,9 @@ std::string loadAsStringOrThrow(const std::string &fileName);
 
 int singModule(const std::string &moduleName, const std::string &keyFileName);
 
-bool checkModuleSignature(const std::string &moduleName);
+bool checkModuleSignature(const std::string &moduleName, const std::string &homeDir);
 
-bool checkKeyTrust(std::vector<unsigned char> &key);
+bool checkKeyTrust(std::vector<unsigned char> &keyData, const std::string &moduleName, const std::string &homeDir);
 
 class io_error : public std::runtime_error {
 public:

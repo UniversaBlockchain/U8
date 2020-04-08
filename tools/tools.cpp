@@ -4,6 +4,8 @@
 
 #include <fstream>
 #include <iostream>
+#include <algorithm>
+#include "yaml-cpp/yaml.h"
 #include "tools.h"
 #include "zip.h"
 #include "../crypto/PrivateKey.h"
@@ -206,7 +208,7 @@ int singModule(const std::string &moduleName, const std::string &keyFileName) {
     return 0;
 }
 
-bool checkModuleSignature(const std::string &moduleName) {
+bool checkModuleSignature(const std::string &moduleName, const std::string &homeDir) {
     try {
         int err = 0;
         zip* z = zip_open(moduleName.c_str(), 0, &err);
@@ -276,10 +278,12 @@ bool checkModuleSignature(const std::string &moduleName) {
         bool res = publicKey->verify(sign.data(), sign.size(), data, dataLen, HashType::SHA3_512);
 
         // check public key
-        if (!checkKeyTrust(key)) {
+        if (!checkKeyTrust(key, moduleName, homeDir)) {
             printf("Untrusted signature key\n");
             res = false;
         }
+
+        delete publicKey;
 
         fclose(f);
 
@@ -294,13 +298,80 @@ bool checkModuleSignature(const std::string &moduleName) {
     }
 }
 
-bool checkKeyTrust(std::vector<unsigned char> &key) {
+bool checkKeyTrust(std::vector<unsigned char> &keyData, const std::string &moduleName, const std::string &homeDir) {
+
     auto U8Key = base64_decodeToBytes(U8_PUBLIC_KEY);
-    if (key.size() == U8Key.size() && memcmp(key.data(), U8Key.data(), U8Key.size()) == 0)
+    if (keyData.size() == U8Key.size() && memcmp(keyData.data(), U8Key.data(), U8Key.size()) == 0)
         return true;
 
-    // search u8trust file
-    //if (file_exists)
+    YAML::Node trust;
+    std::string path = "u8trust.yaml";
+    bool checkU8trust = true;
+    bool trustChanged = false;
 
-    return false;
+    // search u8trust file
+    if (file_exists(path))
+        trust = YAML::LoadFile(path);
+    else if (file_exists(path = homeDir + "/.universa/u8trust.yaml"))
+        trust = YAML::LoadFile(path);
+    else
+        checkU8trust = false;
+
+    auto publicKey = new PublicKey(keyData.data(), keyData.size());
+
+    if (checkU8trust) {
+        // check trusted keys
+        if (trust["trust_all"].IsMap() && trust["trust_all"]["keys"].IsSequence())
+            for (auto it = trust["trust_all"]["keys"].begin(); it != trust["trust_all"]["keys"].end(); it++) {
+                auto str = (*it).as<std::string>();
+                str.erase(std::remove(str.begin(), str.end(), ' '), str.end());
+                auto trustedKey = base64_decodeToBytes(str);
+                if (keyData.size() == trustedKey.size() && memcmp(keyData.data(), trustedKey.data(), trustedKey.size()) == 0)
+                    return true;
+            }
+
+        // check trusted addresses
+        if (trust["trust_all"].IsMap() && trust["trust_all"]["addresses"].IsSequence()) {
+            for (auto it = trust["trust_all"]["addresses"].begin(); it != trust["trust_all"]["addresses"].end(); it++) {
+                auto str = (*it).as<std::string>();
+                str.erase(std::remove(str.begin(), str.end(), ' '), str.end());
+                auto ka = new KeyAddress(str);
+                bool res = ka->isMatchingKey(*publicKey);
+                delete ka;
+
+                if (res) {
+                    delete publicKey;
+                    return true;
+                }
+            }
+        }
+
+        // TODO: check trusted UNS (and keys/addresses for modules)
+    }
+
+    auto ka = new KeyAddress(*publicKey, 0, true);
+
+    // ask for trust for module key
+    printf("Module \"%s\" is untrusted.\nModule has signed by key with address: %s.\nTrust this key? (y/n)",
+        moduleName.data(), ka->toString().data());
+    char ans = (char) getchar();
+
+    if (ans == 'y' || ans == 'Y') {
+        // add address to u8trust
+        trust["trust_all"]["addresses"].push_back(ka->toString());
+        trustChanged = true;
+
+        printf("Address %s has added to u8trust for all modules.\n", ka->toString().data());
+    }
+
+    delete ka;
+    delete publicKey;
+
+    if (trustChanged) {
+        std::ofstream fout(path);
+        fout << trust;
+        fout.close();
+    }
+
+    return trustChanged;
 }

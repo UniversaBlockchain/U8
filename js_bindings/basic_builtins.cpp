@@ -61,7 +61,7 @@ void JsLoadModule(const v8::FunctionCallbackInfo<v8::Value> &args) {
         v8::String::Utf8Value v8str(isolate, args[0]);
 
         string sourceName = *v8::String::Utf8Value(isolate, args[0]);
-        auto res = checkModuleSignature(sourceName);
+        auto res = checkModuleSignature(sourceName, se->getHome());
 
         args.GetReturnValue().Set(res);
     });
