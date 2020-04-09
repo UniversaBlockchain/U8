@@ -9,8 +9,10 @@
 #include <sys/stat.h>
 #include <iterator>
 #include <vector>
+#include <map>
 #include <iostream>
 #include <chrono>
+#include "zip.h"
 
 typedef std::vector<unsigned char> byte_vector;
 
@@ -40,6 +42,8 @@ int singModule(const std::string &moduleName, const std::string &keyFileName);
 bool checkModuleSignature(const std::string &moduleName, const std::string &homeDir);
 
 bool checkKeyTrust(std::vector<unsigned char> &keyData, const std::string &moduleName, const std::string &homeDir);
+
+std::map<std::string, std::string> getModuleManifest(zip* module);
 
 class io_error : public std::runtime_error {
 public:

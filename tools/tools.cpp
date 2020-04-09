@@ -219,6 +219,19 @@ bool checkModuleSignature(const std::string &moduleName, const std::string &home
 
         int lenSignData = 0;
         zip_get_archive_comment(z, &lenSignData, ZIP_FL_ENC_RAW);
+
+//        std::map<std::string, std::string> manifest = getModuleManifest(z);
+//
+//        if (manifest.find("name") != manifest.end())
+//            printf("MANIFEST: name = %s\n", manifest.find("name")->second.data());
+//        else
+//            printf("MANIFEST: name = UNDEFINED\n");
+//
+//        if (manifest.find("UNS_name") != manifest.end())
+//            printf("MANIFEST: UNS_name = %s\n", manifest.find("UNS_name")->second.data());
+//        else
+//            printf("MANIFEST: UNS_name = UNDEFINED\n");
+
         zip_close(z);
 
         if (lenSignData == 0) {
@@ -374,4 +387,35 @@ bool checkKeyTrust(std::vector<unsigned char> &keyData, const std::string &modul
     }
 
     return trustChanged;
+}
+
+std::map<std::string, std::string> getModuleManifest(zip* module) {
+    std::map<std::string, std::string> manifest;
+
+    struct zip_stat zbuffer;
+    zip_stat_init(&zbuffer);
+    int exist = zip_stat(module, "manifest.yaml", 0, &zbuffer);
+    if (exist == -1)
+        return manifest;
+
+    char* contents = new char[zbuffer.size + 1];
+
+    // read file from zip-archive
+    zip_file* f = zip_fopen(module, "manifest.yaml", 0);
+    zip_fread(f, contents, zbuffer.size);
+    zip_fclose(f);
+
+    contents[zbuffer.size] = '\0';
+
+    YAML::Node manifestYaml = YAML::Load(contents);
+
+    if (manifestYaml["name"])
+        manifest.insert(std::pair<std::string, std::string>("name", manifestYaml["name"].as<std::string>()));
+
+    if (manifestYaml["UNS_name"])
+        manifest.insert(std::pair<std::string, std::string>("UNS_name", manifestYaml["UNS_name"].as<std::string>()));
+
+    delete[] contents;
+
+    return manifest;
 }
