@@ -52,11 +52,13 @@ if [ "$platform" = "linux" ]; then
     download_archive libzip-v1.6.1.7z
     download_archive libyaml.7z
 elif [ "$platform" = "macos" ]; then
-    download_archive libv8-v7.4.288.28.7z
+    download_archive libv8-v8.0.426.16.7z
     download_archive libtomcrypt.7z
     download_archive libuv.7z
     download_archive libpq.7z
     download_archive libssl.7z
+    download_archive libzip.7z
+    download_archive libyaml.7z
 else
     echo "FATAL_ERROR: unknown platform '$platform'"
     exit 1
