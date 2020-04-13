@@ -97,7 +97,7 @@ Scripter::Scripter() : Logging("SCR") {
     bool inZip = zipPos != std::string::npos;
 
     if (inZip) {
-        std:string zip = s.substr(0, zipPos + 4);
+        std::string zip = s.substr(0, zipPos + 4);
         BASE_PATH = zip + "/";
         if (!checkModuleSignature(zip, home))     // TODO: cache
             throw runtime_error("Failed checking module signature");

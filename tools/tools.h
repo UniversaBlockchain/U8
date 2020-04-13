@@ -13,6 +13,7 @@
 #include <iostream>
 #include <chrono>
 #include "zip.h"
+#include "yaml-cpp/yaml.h"
 
 typedef std::vector<unsigned char> byte_vector;
 
@@ -39,9 +40,11 @@ std::string loadAsStringOrThrow(const std::string &fileName);
 
 int singModule(const std::string &moduleName, const std::string &keyFileName);
 
-bool checkModuleSignature(const std::string &moduleName, const std::string &homeDir);
+bool checkModuleSignature(const std::string &modulePath, const std::string &homeDir);
 
 bool checkKeyTrust(std::vector<unsigned char> &keyData, const std::string &moduleName, const std::string &homeDir);
+
+void sortYAML(YAML::Node &trust);
 
 std::map<std::string, std::string> getModuleManifest(zip* module);
 
