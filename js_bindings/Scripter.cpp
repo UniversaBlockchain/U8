@@ -9,7 +9,10 @@
 #include <unistd.h>
 #include <sys/types.h>
 #include <pwd.h>
-#include <filesystem>
+
+#ifndef __APPLE__
+    #include <filesystem>
+#endif
 
 #include "Scripter.h"
 #include "../tools/tools.h"
@@ -88,7 +91,21 @@ shared_ptr<Scripter> Scripter::New(int accessLevel, bool forWorker) {
 Scripter::Scripter() : Logging("SCR") {
     std::string s = ARGV1;
 
+
+    //make path absolute
+#ifndef __APPLE__
     s = std::filesystem::absolute(std::filesystem::path(s));
+#else
+    const std::string relative_sym("./");
+    const std::string root_sym("/");
+
+    if(s.rfind(root_sym,0) != 0) {
+        char buf[PATH_MAX];
+        std::string cwd = getcwd(buf,PATH_MAX);
+        s = cwd + (s.rfind(relative_sym,0) == 0 ? s.substr (relative_sym.length()) : s);
+    }
+#endif
+
 
     struct passwd *pw = getpwuid(getuid());
     home = pw->pw_dir;
