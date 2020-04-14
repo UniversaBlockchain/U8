@@ -942,6 +942,7 @@ unit.test("pg_test: performance: withConnection", async () => {
     await heartbeat;
     while (readyCounter < sendCounter)
         await sleep(10);
+    pool.close();
 });
 
 unit.test("pg_test: performance: withConnection-executeQuery", async () => {
@@ -984,6 +985,38 @@ unit.test("pg_test: performance: withConnection-executeQuery", async () => {
     await heartbeat;
     while (readyCounter < sendCounter)
         await sleep(10);
+    pool.close();
+});
+
+unit.test("pg_test: spawn connections dynamically", async () => {
+    let N = 200;
+    N *= 2; // N must be even
+
+    let pool = createPool(N/2);
+    let cons = [];
+    for (let i = 0; i < N; ++i) {
+        pool.withConnection(con => {
+            cons.push(con);
+        });
+    }
+
+    while (cons.length < N/2)
+        await sleep(10);
+
+    let cons2 = [];
+    let i = 0;
+    for (let con of cons) {
+        if (i < N/2)
+            con.release();
+        else
+            cons2.push(con);
+    }
+    cons = cons2;
+
+    while (cons.length < N/2)
+        await sleep(10);
+
+    pool.close();
 });
 
 /*unit.test("pg_test: check pg connections restore, needs to run it manually", async () => {

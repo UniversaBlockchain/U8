@@ -283,6 +283,10 @@ namespace db {
         std::string loadOids();
 
     private:
+        std::atomic<int> nextConId_ = 1;
+        int maxPoolSize_ = 1;
+        int stopSpawnConnectionsOnSize_ = 4;
+        std::function<std::shared_ptr<BusyConnection>()> conSpawner_;
         std::queue<std::shared_ptr<BusyConnection>> connPool_;
         std::mutex poolMutex_;
         std::condition_variable poolCV_;

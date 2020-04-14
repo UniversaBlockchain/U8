@@ -5,7 +5,6 @@
 #include <fstream>
 #include <iostream>
 #include <algorithm>
-#include "yaml-cpp/yaml.h"
 #include "tools.h"
 #include "zip.h"
 #include "../crypto/PrivateKey.h"
@@ -208,45 +207,37 @@ int singModule(const std::string &moduleName, const std::string &keyFileName) {
     return 0;
 }
 
-bool checkModuleSignature(const std::string &moduleName, const std::string &homeDir) {
+bool checkModuleSignature(const std::string &modulePath, const std::string &homeDir) {
     try {
         int err = 0;
-        zip* z = zip_open(moduleName.c_str(), 0, &err);
+        zip* z = zip_open(modulePath.c_str(), 0, &err);
         if (z == nullptr) {
-            printf("File %s not found\n", moduleName.c_str());
+            printf("File %s not found\n", modulePath.c_str());
             return false;
         }
 
         int lenSignData = 0;
         zip_get_archive_comment(z, &lenSignData, ZIP_FL_ENC_RAW);
 
-//        std::map<std::string, std::string> manifest = getModuleManifest(z);
-//
-//        if (manifest.find("name") != manifest.end())
-//            printf("MANIFEST: name = %s\n", manifest.find("name")->second.data());
-//        else
-//            printf("MANIFEST: name = UNDEFINED\n");
-//
-//        if (manifest.find("UNS_name") != manifest.end())
-//            printf("MANIFEST: UNS_name = %s\n", manifest.find("UNS_name")->second.data());
-//        else
-//            printf("MANIFEST: UNS_name = UNDEFINED\n");
+        std::map<std::string, std::string> manifest = getModuleManifest(z);
+
+        std::string moduleName = (manifest.find("name") != manifest.end()) ? manifest.find("name")->second : modulePath;
 
         zip_close(z);
 
         if (lenSignData == 0) {
-            printf("Signature of module %s not found\n", moduleName.c_str());
+            printf("Signature of module %s not found\n", modulePath.c_str());
             return false;
         }
         if (lenSignData > 65536) {
-            printf("Signature of module %s has wrong format\n", moduleName.c_str());
+            printf("Signature of module %s has wrong format\n", modulePath.c_str());
             return false;
         }
 
         // read module
-        FILE* f = fopen(moduleName.c_str(), "rb");
+        FILE* f = fopen(modulePath.c_str(), "rb");
         if (f == nullptr) {
-            printf("Failed opening file %s\n", moduleName.c_str());
+            printf("Failed opening file %s\n", modulePath.c_str());
             return false;
         }
         fseek(f, 0, SEEK_END);
@@ -318,9 +309,11 @@ bool checkKeyTrust(std::vector<unsigned char> &keyData, const std::string &modul
         return true;
 
     YAML::Node trust;
+    YAML::iterator moduleTrust;
     std::string path = "u8trust.yaml";
     bool checkU8trust = true;
     bool trustChanged = false;
+    bool foundedModuleTrust = false;
 
     // search u8trust file
     if (file_exists(path))
@@ -344,7 +337,7 @@ bool checkKeyTrust(std::vector<unsigned char> &keyData, const std::string &modul
             }
 
         // check trusted addresses
-        if (trust["trust_all"].IsMap() && trust["trust_all"]["addresses"].IsSequence()) {
+        if (trust["trust_all"].IsMap() && trust["trust_all"]["addresses"].IsSequence())
             for (auto it = trust["trust_all"]["addresses"].begin(); it != trust["trust_all"]["addresses"].end(); it++) {
                 auto str = (*it).as<std::string>();
                 str.erase(std::remove(str.begin(), str.end(), ' '), str.end());
@@ -357,9 +350,52 @@ bool checkKeyTrust(std::vector<unsigned char> &keyData, const std::string &modul
                     return true;
                 }
             }
-        }
 
-        // TODO: check trusted UNS (and keys/addresses for modules)
+        // check for module
+        if (trust["trust_modules"].IsSequence())
+            for (auto it = trust["trust_modules"].begin(); it != trust["trust_modules"].end(); it++)
+                if (it->IsMap() && (*it)["module_names"].IsSequence()) {
+                    bool bModuleFound = false;
+                    for (auto itn = (*it)["module_names"].begin(); itn != (*it)["module_names"].end(); itn++)
+                        if (moduleName == (*itn).as<std::string>()) {
+                            bModuleFound = true;
+                            break;
+                        }
+
+                    if (bModuleFound) {
+                        if (!foundedModuleTrust && (*it)["module_names"].size() == 1) {
+                            moduleTrust = it;
+                            foundedModuleTrust = true;
+                        }
+
+                        // check trusted keys
+                        if ((*it)["keys"].IsSequence())
+                            for (auto itk = (*it)["keys"].begin(); itk != (*it)["keys"].end(); itk++) {
+                                auto str = (*itk).as<std::string>();
+                                str.erase(std::remove(str.begin(), str.end(), ' '), str.end());
+                                auto trustedKey = base64_decodeToBytes(str);
+                                if (keyData.size() == trustedKey.size() && memcmp(keyData.data(), trustedKey.data(), trustedKey.size()) == 0)
+                                    return true;
+                            }
+
+                        // check trusted addresses
+                        if ((*it)["addresses"].IsSequence())
+                            for (auto ita = (*it)["addresses"].begin(); ita != (*it)["addresses"].end(); ita++) {
+                                auto str = (*ita).as<std::string>();
+                                str.erase(std::remove(str.begin(), str.end(), ' '), str.end());
+                                auto ka = new KeyAddress(str);
+                                bool res = ka->isMatchingKey(*publicKey);
+                                delete ka;
+
+                                if (res) {
+                                    delete publicKey;
+                                    return true;
+                                }
+                            }
+                    }
+                }
+
+        // TODO: check trusted UNS
     }
 
     auto ka = new KeyAddress(*publicKey, 0, true);
@@ -367,26 +403,88 @@ bool checkKeyTrust(std::vector<unsigned char> &keyData, const std::string &modul
     // ask for trust for module key
     printf("Module \"%s\" is untrusted.\nModule has signed by key with address: %s.\nTrust this key? (y/n)",
         moduleName.data(), ka->toString().data());
-    char ans = (char) getchar();
+    std::string ans;
+    getline(cin, ans);
 
-    if (ans == 'y' || ans == 'Y') {
-        // add address to u8trust
-        trust["trust_all"]["addresses"].push_back(ka->toString());
+    if (ans[0] == 'y' || ans[0] == 'Y') {
+        printf("Trust this key for ALL modules? (y/n)");
+        std::string ansAll;
+        getline(cin, ansAll);
+
+        if (ansAll[0] == 'y' || ansAll[0] == 'Y') {
+            // add address to u8trust for all modules
+            trust["trust_all"]["addresses"].push_back(ka->toString());
+
+            printf("Address %s has added to u8trust for all modules.\n", ka->toString().data());
+        } else {
+            // add address to u8trust for module
+            if (!foundedModuleTrust) {
+                auto newModuleTrust = new YAML::Node();
+                (*newModuleTrust)["module_names"].push_back(moduleName);
+                (*newModuleTrust)["addresses"].push_back(ka->toString());
+
+                trust["trust_modules"].push_back(*newModuleTrust);
+            }
+
+            (*moduleTrust)["addresses"].push_back(ka->toString());
+
+            printf("Address %s has added to u8trust for module \"%s\".\n", ka->toString().data(), moduleName.data());
+        }
+
         trustChanged = true;
-
-        printf("Address %s has added to u8trust for all modules.\n", ka->toString().data());
     }
 
     delete ka;
     delete publicKey;
 
     if (trustChanged) {
+        sortYAML(trust);
         std::ofstream fout(path);
         fout << trust;
         fout.close();
     }
 
     return trustChanged;
+}
+
+void sortYAML(YAML::Node &trust) {
+    auto trust_all = trust["trust_all"];
+    auto trust_modules = trust["trust_modules"];
+
+    trust.remove("trust_all");
+    trust.remove("trust_modules");
+
+    trust["trust_all"] = trust_all;
+    trust["trust_modules"] = trust_modules;
+
+    auto keys = trust["trust_all"]["keys"];
+    auto addresses = trust["trust_all"]["addresses"];
+    auto UNS_names = trust["trust_all"]["UNS_names"];
+
+    trust["trust_all"].remove("keys");
+    trust["trust_all"].remove("addresses");
+    trust["trust_all"].remove("UNS_names");
+
+    trust["trust_all"]["keys"] = keys;
+    trust["trust_all"]["addresses"] = addresses;
+    trust["trust_all"]["UNS_names"] = UNS_names;
+
+    for (auto it = trust["trust_modules"].begin(); it != trust["trust_modules"].end(); it++) {
+        auto it_modules = (*it)["module_names"];
+        auto it_keys = (*it)["keys"];
+        auto it_addresses = (*it)["addresses"];
+        auto it_UNS_names = (*it)["UNS_names"];
+
+        (*it).remove("module_names");
+        (*it).remove("keys");
+        (*it).remove("addresses");
+        (*it).remove("UNS_names");
+
+        (*it)["module_names"] = it_modules;
+        (*it)["keys"] = it_keys;
+        (*it)["addresses"] = it_addresses;
+        (*it)["UNS_names"] = it_UNS_names;
+    }
 }
 
 std::map<std::string, std::string> getModuleManifest(zip* module) {
@@ -400,7 +498,7 @@ std::map<std::string, std::string> getModuleManifest(zip* module) {
 
     char* contents = new char[zbuffer.size + 1];
 
-    // read file from zip-archive
+    // read manifest from zip-module
     zip_file* f = zip_fopen(module, "manifest.yaml", 0);
     zip_fread(f, contents, zbuffer.size);
     zip_fclose(f);

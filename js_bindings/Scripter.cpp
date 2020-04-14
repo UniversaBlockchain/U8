@@ -9,6 +9,7 @@
 #include <unistd.h>
 #include <sys/types.h>
 #include <pwd.h>
+#include <filesystem>
 
 #include "Scripter.h"
 #include "../tools/tools.h"
@@ -87,6 +88,8 @@ shared_ptr<Scripter> Scripter::New(int accessLevel, bool forWorker) {
 Scripter::Scripter() : Logging("SCR") {
     std::string s = ARGV1;
 
+    s = std::filesystem::absolute(std::filesystem::path(s));
+
     struct passwd *pw = getpwuid(getuid());
     home = pw->pw_dir;
 
@@ -94,7 +97,7 @@ Scripter::Scripter() : Logging("SCR") {
     bool inZip = zipPos != std::string::npos;
 
     if (inZip) {
-        std:string zip = s.substr(0, zipPos + 4);
+        std::string zip = s.substr(0, zipPos + 4);
         BASE_PATH = zip + "/";
         if (!checkModuleSignature(zip, home))     // TODO: cache
             throw runtime_error("Failed checking module signature");

@@ -405,23 +405,31 @@ namespace db {
     }
 
     PGPool::PGPool(int poolSize, const std::string& connectString) : poolControlThread_(1) {
-        for (int i = 0; i < poolSize; ++i) {
+        maxPoolSize_ = poolSize;
+        int curPoolSize = std::min(poolSize, stopSpawnConnectionsOnSize_);
+        conSpawner_ = [this,connectString](){
             std::shared_ptr<PGconn> con;
             con.reset(PQconnectdb(connectString.c_str()), &PQfinish);
-            auto bcon = make_shared<BusyConnection>(this, con, i);
-            connPool_.push(bcon);
+            return make_shared<BusyConnection>(this, con, nextConId_++);
+        };
+        for (int i = 0; i < curPoolSize; ++i) {
+            connPool_.push(conSpawner_());
         }
         loadOids();
     }
 
     PGPool::PGPool(int poolSize, const std::string &host, int port, const std::string &dbname, const std::string &user,
                    const std::string &pswd) : poolControlThread_(1) {
-        for (int i = 0; i < poolSize; ++i) {
+        maxPoolSize_ = poolSize;
+        int curPoolSize = std::min(poolSize, stopSpawnConnectionsOnSize_);
+        conSpawner_ = [this,host,port,dbname,user,pswd](){
             std::shared_ptr<PGconn> con;
             con.reset(PQsetdbLogin(host.c_str(), std::to_string(port).c_str(), nullptr, nullptr, dbname.c_str(),
                                    user.c_str(), pswd.c_str()), &PQfinish);
-            auto bcon = make_shared<BusyConnection>(this, con, i);
-            connPool_.push(bcon);
+            return make_shared<BusyConnection>(this, con, nextConId_++);
+        };
+        for (int i = 0; i < curPoolSize; ++i) {
+            connPool_.push(conSpawner_());
         }
         loadOids();
     }
@@ -431,15 +439,23 @@ namespace db {
             return make_pair(false, "poolSize must be at least 1");
         if (connPool_.size() > 0)
             return make_pair(false, "pgPool is already connected");
-        for (int i = 0; i < poolSize; ++i) {
+        maxPoolSize_ = poolSize;
+        int curPoolSize = std::min(poolSize, stopSpawnConnectionsOnSize_);
+        conSpawner_ = [connectString,this](){
             std::shared_ptr<PGconn> con;
             pg_conn* pCon = PQconnectdb(connectString.c_str());
             if (PQstatus(pCon) == CONNECTION_OK) {
                 con.reset(pCon, &PQfinish);
-                auto bcon = make_shared<BusyConnection>(this, con, i);
-                connPool_.push(bcon);
-            } else {
-                return make_pair(false, std::string("unable to connect db: ")+std::string(PQerrorMessage(pCon)));
+                auto bcon = make_shared<BusyConnection>(this, con, nextConId_++);
+                return bcon;
+            }
+            throw std::runtime_error(std::string(PQerrorMessage(pCon)));
+        };
+        for (int i = 0; i < curPoolSize; ++i) {
+            try {
+                connPool_.push(conSpawner_());
+            } catch (const std::exception& e) {
+                return make_pair(false, std::string("unable to connect db: ")+e.what());
             }
         }
         std::string err = loadOids();
@@ -486,6 +502,10 @@ namespace db {
             return nullptr;
         connPool_.pop();
         usedConnections_[con->getId()] = con;
+        size_t totalConnsCount = connPool_.size() + usedConnections_.size();
+        if (connPool_.empty())
+            if (totalConnsCount < maxPoolSize_)
+                connPool_.push(conSpawner_());
         return con;
     }
 
