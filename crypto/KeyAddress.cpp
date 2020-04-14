@@ -84,10 +84,14 @@ namespace crypto {
     int KeyAddress::mask(const PublicKey &key) {
         if (key.getPublicExponent() == 0x10001) {
             int l = key.getBitStrength() / 8;
-            if (l == 2048 / 8)
-                return 0x01;
-            if (l == 4096 / 8)
-                return 0x02;
+            switch (l) {
+                case 2048 / 8:
+                    return 0x01;
+                case 4096 / 8:
+                    return 0x02;
+                case 8192 / 8:
+                    return 0x03;
+            }
         }
         throw std::invalid_argument(std::string("key can't be masked for address"));
     }

@@ -287,6 +287,42 @@ void testKeyAddress() {
     cout << "testKeyAddress()... done!" << endl << endl;
 }
 
+void test2048and4096keysCompatibility() {
+    crypto::PrivateKey pk2048(base64_decodeToBytes("JgAcAQABvID9CDGXtrLxsi45pqDPNUJ2TDXzRJrYcwTxjLF+9ddQvQ7ZoMFh8G43Oro2LHg2ZKiztIgi2Ygc15OmTXpEIUhvI9O3DkvnMLNvQ5NUYL7P5ktYxsd+DsBbAqlmgYrgpIVC5aer1L1LcS+5M+6ikWq+UX6aFE9eS0WoaQTSfxWSv7yA1C9VcVEi48pDFBqlJJ5lE200mP+essyKb5EwamD6L/N6Odt1rnfqJsDOzDtQKXl8wgu/aY/CmBY75yUE4ywQRw2mUCCqY1LhUQ41xwINj1dD2xzWJ7qYZ/0CFmFIkTmv4Hcr8IZQhFnvdZaW0Zk0Bx9tAiliorxy2aFuUMT+JG0="));
+    crypto::PublicKey pub2048(pk2048);
+    checkResult("2048 short key address", true, KeyAddress("ZHYYuENFT9e1UTktZ1b9KPrVrqdRCoXAxRLrfKBuLarEUUzESF").isMatchingKeyAddress(pub2048.getShortAddress()));
+    checkResult("2048 long key address", true, KeyAddress("JnKv298KvPgmiKfPRx8h5vVGYjPTfKs8iuwJbhwatQNgsSd4NAsuwn9kVUJ1YgvJvgWKgmBw").isMatchingKeyAddress(pub2048.getLongAddress()));
+    crypto::PrivateKey pk4096(base64_decodeToBytes("JgAcAQABxAAB3kozmthDEUUZ9YoZDQh+D/EPRS7z6AWjeNNLBCtcN/SLABaWgNhb800miZIMJpY2BNz3+SNblc3POc+Wrk5ZkPg47scxtFUkU0x6Pg9JvasoJSXQMqpO6k0kpbQtfIr32wm5XStErDCWkHzS0OAwHCeG4llqEnCM7nVXIxSEXpa3fOZHhbAd9IWM4E+HbkyPhWN1EAUp6a0a2IU09TaAgTZcUYQOhMPK6cM4CrJJ3ubs/rgxgHzh45E5BlBclRBcmNJYxDQ4AcTbnVx7xRYW9eLd609LTk3c6Ufttnrd9+koeclXolsLI/7lKWRJnpWWBgzvZBZ4WNHc3w50buAaO8QAAdRiqVxJ1cOr3+CAxxr2D3Pmf1Yt1uNE22Jq+lzWX3KohMvaEjTRH5DcuGQpjvg5rBkFQObWadhbYdPPWZQVaYmbRWKAPaX8xlQJhPf/zG3O1WjgWLutnC8F7XfcdpiaoWlmgdbbx5iMQ4+VlwixTrXbGZwTFZ94UHB6tkUt/0OBKrptkvfv3qBkE0d99M3CpTvMIpSDOUoiYvkjHyqfzodHzYqbj+i9r4TUBaUElGrv2mgifHTqbUMfFQNP/85jVgosFD28InfcwwfAl9d7DfLxqSYgELYrsEmDZxkhMvTIwZw6C59GY2gcU80RZmfndeZBPWAsvp/5IWt57dUU3dU="));
+    crypto::PublicKey pub4096(pk4096);
+    checkResult("4096 short key address", true, KeyAddress("26X6QPQxJvz7rWarU1KonQ5JkAU4BKKCJoUyNpnwKBn4JgAH5Sw").isMatchingKeyAddress(pub4096.getShortAddress()));
+    checkResult("4096 long key address", true, KeyAddress("bkmb2isfMoXFFs5wFzY3TsfJAkdrRCmNAaFU2EBAxMwoDtSAwST8eqHtesh9NW8qwLdNhVoa").isMatchingKeyAddress(pub4096.getLongAddress()));
+}
+
+void test8192keys() {
+    long t0 = getCurrentTimeMillis();
+    crypto::PrivateKey pk8192(8192);
+    crypto::PublicKey pub8192(pk8192);
+    cout << "generate 8192 key: ..." << endl;
+    cout << "  pk8192 packed b64: " << base64_encode(pk8192.pack()) << endl;
+    cout << "  pk8192 fingerprint b64: " << base64_encode(pub8192.fingerprint()) << endl;
+    cout << "  pk8192 short address b64: " << pub8192.getShortAddress().toString() << endl;
+    cout << "  pk8192  long address b64: " << pub8192.getLongAddress().toString() << endl;
+    long dt = getCurrentTimeMillis() - t0;
+    cout << "dt = " << dt << " ms" << endl;
+    cout << "check 8192 key from java: " << endl;
+    crypto::PrivateKey pk8192java(base64_decodeToBytes("JgAcAQABxAAC+b9BLJKfUM+09ZNeu8Ie0pEglBBbIxK496MMq3F3M+sEGyYMR374rLj/cmX9VjxdTRetfJleXca2JQL4TZ4xj8b1ZL904PMIWwUx5uKmZ1BWmVxyvQBrpQGtIY1lql75pFk4ZAn4ciayMoKuudcjsFZ37miN+WlF9ihaKbECGudd+Aw+peExV/sOemMZ1TRUiPBZ4MJgtgTJH/NWbRptXdnPznT7TEOFyESSUYMM210RbWmR84QI9PQ5FDpICkj6D5yEQqBoQbEJXbrsKRohB04WpGVbiEBs1PAjc9I/J53+k4moUwsGrlZ7HHbs0nl0UnhXUw4CnKRoR/t2+wO82y2GJqzxsbwHO3kmVGESD14zLxvX7fXCG2cAlzOdWq66L2sIHmFFZGf6AJ4Bf+RAy3iEyPuUgSUvxaG6ZxeTfcJR4OttRB17OXfD/EKJgvvo53rc21O2xC1JaGt212c5cW0z6kzU/yOT8RrjOt11FWQbX6S0DIizQjv7gpBqQ5njIuO9aP53vyJKH+7DF0E5ykXJSVKkzEzhzoynzjQz0oz8S/Ze/cZYw1OTZCNxLmYelYbgbjNinLWkoT4go98eO2mxQSncvW5a+t8jAF+uK9tTCjJNqcpgGYw6/+JlrG5A5djdx8s5PIUPsAZ5xPPJWSy3XnlFkKc+PiNu6ER4LzfEAALaY/v9hiHOexy3OU4agoKn2ByTStfec9R0Zs7IPRqw7cVdPL2TlrWgGKKkZrX31xi6CXxz6e1SmKvsE3xEtnbw+nvcBjNOXBI6U1oGk4G9iNELIypclcmgD7pPyzhenNoRI71LRxihyuNhQt0IILhKwR65iRBmhqtNXU8lvraoxnfM3NZgrVoNOSCzTXC4eq9u7BzcQl8K00tmaDEeZLlJGIFRHFaYbp+PMAeMXr3zw+dwDBUiuOiHkh6edu1rWEVPHGTvkvssF8JohM+sSbNc8l043tgUIEK/sWGyJzCPl3yTnTAlVz6K8dAn70oxLaPzimGIoc0fVNEvo/InezG40OBzaxcFd2L7aCRYV+NnoEnZSWL7KcN/fObj6BF1n9JrQ/MJGyUWCUtIq7kKcCEA6iJq1mge5DX2O1SHELHvSKe3VdQPEDlCA4KgHl3C7cUrD2W1ujJtnLghcKqO9uA1U4gVsWrYtSq40Kb9k64oyMh5b9nmIAhD/DIitqrEkQIheAVBRWbgAikoMRQ7GST0FD2CYNMm9rF96pRunMW1sima3FXfrI4cNX2oppaKSQO7wtWa2CRYqul5hNijPveh9+cGZ1hDWogv5pYYrIV1LKekHo8vkSMyH9WysMb6MlUODrLK+1sbfF10Pns/+XACXLXKxMpkKtWKUPp+VSVlTQ=="));
+    crypto::PublicKey pub8192java(pk8192java);
+    cout << "  pk8192java packed b64: " << base64_encode(pk8192java.pack()) << endl;
+    cout << "  pk8192java fingerprint b64: " << base64_encode(pub8192java.fingerprint()) << endl;
+    cout << "  pk8192java short address b64: " << pub8192java.getShortAddress().toString() << endl;
+    cout << "  pk8192java  long address b64: " << pub8192java.getLongAddress().toString() << endl;
+    checkResult("pk8192java fingerprint", string("B2bvZnsfTqydPUHXA06EfE6T7jp/teLFpdkWaKGDmzD0"), base64_encode(pub8192java.fingerprint()));
+    checkResult("pk8192java short address", true, KeyAddress("2dk6jojaU5WaD9TBSSxrRhaHxCUdUSTMchWrjbBdKstxXgzGpP1").isMatchingKeyAddress(pub8192java.getShortAddress()));
+    checkResult("pk8192java short address", false, KeyAddress("2dk6jojaU5WaD9TBSSxrRhaHxCUdUSTMchWrjbBdKstxXgzGpP1").isMatchingKeyAddress(pub8192.getShortAddress()));
+    checkResult("pk8192java long address", true, KeyAddress("t7fSS9cZWHYxgn1Jjj4kVLVwv8Jvjqgb7ZXLwx2HyFkn9UDufeo8TgjNzVFYCrtuACfN9cDg").isMatchingKeyAddress(pub8192java.getLongAddress()));
+    checkResult("pk8192java long address", false, KeyAddress("t7fSS9cZWHYxgn1Jjj4kVLVwv8Jvjqgb7ZXLwx2HyFkn9UDufeo8TgjNzVFYCrtuACfN9cDg").isMatchingKeyAddress(pub8192.getLongAddress()));
+}
+
 std::vector<unsigned char> generateRandomBytes(int len) {
     std::vector<unsigned char> res(len);
     for (int i = 0; i < len; ++i)
@@ -647,6 +683,8 @@ void testCryptoAll() {
     testKeysConcurrency();
     testGenerateNewKeys();
     testSymmetricKeys();
+    test2048and4096keysCompatibility();
+    test8192keys();
     for (int i = 0; i < 10; ++i)
         udpAdapterHelloWorld();
 }

@@ -13,6 +13,8 @@ void testCrypto();
 void testHashId();
 void testHashIdComparison();
 void testKeyAddress();
+void test2048and4096keysCompatibility();
+void test8192keys();
 
 class CryptoTestResults {
 public:
