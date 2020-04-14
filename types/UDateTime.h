@@ -25,7 +25,7 @@ private:
         }
 
         void dbgPrint(std::string prefix) override {
-            printf("DateTime=%lld\n", value.time_since_epoch().count());
+            cout << "DateTime=" << value.time_since_epoch().count() << endl;
         }
 
         TimePoint value;
