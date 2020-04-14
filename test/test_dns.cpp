@@ -34,10 +34,10 @@ TEST_CASE("dns_hello") {
         });
     });
 
-    dnsServer.start("0.0.0.0", 5353);
+    dnsServer.start("0.0.0.0", 15353);
 
     DnsResolver dnsResolver;
-    dnsResolver.setNameServer("127.0.0.1", 5353);
+    dnsResolver.setNameServer("127.0.0.1", 15353);
     dnsResolver.start();
 
     atomic<int> reqCounter = 0;

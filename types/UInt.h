@@ -21,7 +21,7 @@ private:
         }
 
         void dbgPrint(std::string prefix) override {
-            printf("%li\n", value);
+            printf("%lld\n", value);
         }
 
         int64_t value;

@@ -29,7 +29,11 @@ namespace network {
         nextPacketId_ = minstdRand_();
 
         receiveCallback_ = receiveCallback;
+#ifdef __APPLE__
+        socket_.open("0.0.0.0", ownNodeInfo_.getNodeAddress().port, UDP_BUFFER_SIZE);
+#else
         socket_.open("::", ownNodeInfo_.getNodeAddress().port, UDP_BUFFER_SIZE);
+#endif
         socket_.recv([=](ssize_t result, const asyncio::byte_vector& data, const char* IP, unsigned int port) {
             if (result > 0)
                 receiverPool_.execute([&,data](){

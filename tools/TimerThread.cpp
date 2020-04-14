@@ -10,7 +10,7 @@ TimerThread::TimerThread() {
         while (!shutdown) {
             long curDelayMillis = isStarted_ ? ( initialTick_ ? initialDelayMillis_ : periodMillis_ ) : 9000;
             if (isStarted_ && !initialTick_ && type_ == TimerType::RATE)
-                curDelayMillis = std::max(1l, periodMillis_ - (getCurrentTimeMillis() - timeBeforePrevTick));
+                curDelayMillis = std::max((int64_t) 1l, periodMillis_ - (getCurrentTimeMillis() - timeBeforePrevTick));
             if (!sem_.wait(std::chrono::milliseconds(curDelayMillis))) {
                 std::lock_guard guard(callbackMutex_);
                 if (isStarted_) {

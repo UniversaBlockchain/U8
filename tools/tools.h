@@ -81,8 +81,8 @@ private:
 };
 
 inline
-long getCurrentTimeMillis() {
-    return std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now().time_since_epoch()).count();
+int64_t getCurrentTimeMillis() {
+    return std::chrono::time_point_cast<std::chrono::milliseconds>(std::chrono::system_clock::now()).time_since_epoch().count();
 }
 
 #endif //U8_TOOLS_H

@@ -14,8 +14,8 @@ unit.test("hello network", async () => {
     let nc = new network.NetConfig();
     let pk1 = tk.TestKeys.getKey();
     let pk2 = tk.TestKeys.getKey();
-    let n1 = network.NodeInfo.withParameters(pk1.publicKey, 1, "node-1", "127.0.0.1", "0:0:0:0:0:0:0:1", "192.168.1.101", 7001, 8001, 9001);
-    let n2 = network.NodeInfo.withParameters(pk2.publicKey, 2, "node-2", "127.0.0.1", "0:0:0:0:0:0:0:1", "192.168.1.101", 7002, 8002, 9002);
+    let n1 = network.NodeInfo.withParameters(pk1.publicKey, 1, "node-1", "127.0.0.1", null, "192.168.1.101", 7001, 8001, 9001);
+    let n2 = network.NodeInfo.withParameters(pk2.publicKey, 2, "node-2", "127.0.0.1", null, "192.168.1.101", 7002, 8002, 9002);
     nc.addNode(n1);
     nc.addNode(n2);
     let udp1 = new network.UDPAdapter(pk1, 1, nc);
@@ -116,8 +116,8 @@ unit.test("network.UDPAdapter", async () => {
     let nc = new network.NetConfig();
     let pk1 = tk.TestKeys.getKey();
     let pk2 = tk.TestKeys.getKey();
-    let n1 = network.NodeInfo.withParameters(pk1.publicKey, 1, "node-1", "127.0.0.1", "0:0:0:0:0:0:0:1", "192.168.1.101", 7001, 8001, 9001);
-    let n2 = network.NodeInfo.withParameters(pk2.publicKey, 2, "node-2", "127.0.0.1", "0:0:0:0:0:0:0:1", "192.168.1.101", 7002, 8002, 9002);
+    let n1 = network.NodeInfo.withParameters(pk1.publicKey, 1, "node-1", "127.0.0.1", null, "192.168.1.101", 7001, 8001, 9001);
+    let n2 = network.NodeInfo.withParameters(pk2.publicKey, 2, "node-2", "127.0.0.1", null, "192.168.1.101", 7002, 8002, 9002);
     nc.addNode(n1);
     nc.addNode(n2);
     let udp1 = new network.UDPAdapter(pk1, 1, nc);

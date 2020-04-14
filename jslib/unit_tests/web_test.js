@@ -582,7 +582,7 @@ unit.test("web_test: dns server hello world", async () => {
             question.resolveThroughUplink_finish();
         }
     });
-    dnsServer.start("0.0.0.0", 5353, "8.8.4.4");
+    dnsServer.start("0.0.0.0", 15353, "8.8.4.4");
 
     await sleep(9000);
 
