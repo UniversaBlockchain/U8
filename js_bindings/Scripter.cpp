@@ -91,6 +91,19 @@ shared_ptr<Scripter> Scripter::New(int accessLevel, bool forWorker) {
 Scripter::Scripter() : Logging("SCR") {
     std::string s = ARGV1;
 
+    struct passwd *pw = getpwuid(getuid());
+    home = pw->pw_dir;
+
+    size_t zipPos = s.rfind(U8MODULE_EXTENSION);
+    bool inZip = zipPos != std::string::npos;
+
+    if (inZip) {
+        std::string zip = s.substr(0, zipPos + 4);
+        BASE_PATH = zip + "/";
+        if (!checkModuleSignature(zip, home))     // TODO: cache
+            throw runtime_error("Failed checking module signature");
+    } else
+        s = ARGV0;
 
     //make path absolute
 #ifndef __APPLE__
@@ -105,21 +118,6 @@ Scripter::Scripter() : Logging("SCR") {
         s = cwd + (s.rfind(relative_sym,0) == 0 ? s.substr (relative_sym.length()) : s);
     }
 #endif
-
-
-    struct passwd *pw = getpwuid(getuid());
-    home = pw->pw_dir;
-
-    size_t zipPos = s.rfind(U8MODULE_EXTENSION);
-    bool inZip = zipPos != std::string::npos;
-
-    if (inZip) {
-        std::string zip = s.substr(0, zipPos + 4);
-        BASE_PATH = zip + "/";
-        if (!checkModuleSignature(zip, home))     // TODO: cache
-            throw runtime_error("Failed checking module signature");
-    } else
-        s = ARGV0;
 
     auto root = s.substr(0, s.rfind('/'));
     auto path = root;
