@@ -32,7 +32,11 @@ public:
         for (int i = 0; i < count; ++i) {
             PrivateKey pk(2048);
             privKeys.push_back(pk);
+#ifndef __APPLE__
             NodeInfo nodeInfo(PublicKey(pk), i, string("node-")+to_string(i), "127.0.0.1", "0:0:0:0:0:0:0:1", "127.0.0.1", 14000+i, 16000+i, 18000+i);
+#else
+            NodeInfo nodeInfo(PublicKey(pk), i, string("node-")+to_string(i), "127.0.0.1", "null", "127.0.0.1", 14000+i, 16000+i, 18000+i);
+#endif
             nc.addNode(nodeInfo);
         }
         for (int i = 0; i < count; ++i) {
@@ -54,9 +58,15 @@ TEST_CASE("HelloUdp") {
     PrivateKey node0key(2048);
     PrivateKey node1key(2048);
     PrivateKey node2key(2048);
+#ifndef __APPLE__
     network::NodeInfo nodeInfo0(PublicKey(node0key), 0, "node-0", "127.0.0.1", "0:0:0:0:0:0:0:1", "127.0.0.1", 14000, 16000, 18000);
     network::NodeInfo nodeInfo1(PublicKey(node1key), 1, "node-1", "127.0.0.1", "0:0:0:0:0:0:0:1", "127.0.0.1", 14001, 16001, 18001);
     network::NodeInfo nodeInfo2(PublicKey(node2key), 2, "node-2", "127.0.0.1", "0:0:0:0:0:0:0:1", "127.0.0.1", 14002, 16002, 18002);
+#else
+    network::NodeInfo nodeInfo0(PublicKey(node0key), 0, "node-0", "127.0.0.1", "null", "127.0.0.1", 14000, 16000, 18000);
+    network::NodeInfo nodeInfo1(PublicKey(node1key), 1, "node-1", "127.0.0.1", "null", "127.0.0.1", 14001, 16001, 18001);
+    network::NodeInfo nodeInfo2(PublicKey(node2key), 2, "node-2", "127.0.0.1", "null", "127.0.0.1", 14002, 16002, 18002);
+#endif
     network::NetConfig netConfig;
     netConfig.addNode(nodeInfo0);
     netConfig.addNode(nodeInfo1);
@@ -317,9 +327,14 @@ TEST_CASE("Reconnect") {
     NetConfig nc;
     PrivateKey pk0(2048);
     PrivateKey pk1(2048);
+#ifndef __APPLE__
     NodeInfo nodeInfo0(PublicKey(pk0), 0, "node-0", "127.0.0.1", "0:0:0:0:0:0:0:1", "127.0.0.1", 14000, 16000, 18000);
-    nc.addNode(nodeInfo0);
     NodeInfo nodeInfo1(PublicKey(pk1), 1, "node-1", "127.0.0.1", "0:0:0:0:0:0:0:1", "127.0.0.1", 14001, 16001, 18001);
+#else
+    NodeInfo nodeInfo0(PublicKey(pk0), 0, "node-0", "127.0.0.1", "null", "127.0.0.1", 14000, 16000, 18000);
+    NodeInfo nodeInfo1(PublicKey(pk1), 1, "node-1", "127.0.0.1", "null", "127.0.0.1", 14001, 16001, 18001);
+#endif
+    nc.addNode(nodeInfo0);
     nc.addNode(nodeInfo1);
     string received0("");
     string received1("");
@@ -426,13 +441,23 @@ TEST_CASE("SendBadNetConfig") {
     PrivateKey pk2(2048);
     PrivateKey pk3(2048);
     PrivateKey pk3bad(2048);
+
+#ifndef __APPLE__
     NodeInfo nodeInfo0(PublicKey(pk0), 0, "node-0", "127.0.0.1", "0:0:0:0:0:0:0:1", "127.0.0.1", 14000, 16000, 18000);
-    nc.addNode(nodeInfo0);
     NodeInfo nodeInfo1(PublicKey(pk1), 1, "node-1", "127.0.0.1", "0:0:0:0:0:0:0:1", "127.0.0.1", 14001, 16001, 18001);
-    nc.addNode(nodeInfo1);
     NodeInfo nodeInfo2(PublicKey(pk2), 2, "node-2", "127.0.0.1", "0:0:0:0:0:0:0:1", "127.0.0.1", 14002, 16002, 18002);
-    nc.addNode(nodeInfo2);
     NodeInfo nodeInfo3(PublicKey(pk3), 3, "node-3", "127.0.0.1", "0:0:0:0:0:0:0:1", "127.0.0.1", 14003, 16003, 18003);
+#else
+    NodeInfo nodeInfo0(PublicKey(pk0), 0, "node-0", "127.0.0.1", "null", "127.0.0.1", 14000, 16000, 18000);
+    NodeInfo nodeInfo1(PublicKey(pk1), 1, "node-1", "127.0.0.1", "null", "127.0.0.1", 14001, 16001, 18001);
+    NodeInfo nodeInfo2(PublicKey(pk2), 2, "node-2", "127.0.0.1", "null", "127.0.0.1", 14002, 16002, 18002);
+    NodeInfo nodeInfo3(PublicKey(pk3), 3, "node-3", "127.0.0.1", "null", "127.0.0.1", 14003, 16003, 18003);
+#endif
+
+
+    nc.addNode(nodeInfo0);
+    nc.addNode(nodeInfo1);
+    nc.addNode(nodeInfo2);
     nc.addNode(nodeInfo3);
 
     const long countToSend = 3;
