@@ -228,7 +228,7 @@ namespace crypto {
 
 		int saltLen = rsa_sign_saltlen_get_max_ex(LTC_PKCS_1_PSS, hash_idx, &key.key);
 
-		unsigned long tomSigLen = 512;
+		unsigned long tomSigLen = 1024;
 		unsigned char tomSig[tomSigLen];
 		int res = rsa_sign_hash_ex(
 				hashResult, desc.hashsize, hash_idx,
@@ -255,7 +255,7 @@ namespace crypto {
 	std::vector<unsigned char> PrivateKey::decrypt(void *data, size_t size) {
 		int hash_idx = find_hash("sha1");
 
-		size_t bufLen = 512;
+		size_t bufLen = 1024;
 		unsigned char buf[bufLen];
 
 		int stat = -1;

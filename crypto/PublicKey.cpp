@@ -166,7 +166,7 @@ namespace crypto {
 		int hash_idx = find_hash("sha1");
 		int prng_indx = find_prng("sprng");
 
-		size_t bufLen = 512;
+		size_t bufLen = 1024;
 		unsigned char buf[bufLen];
 
 		int err = rsa_encrypt_key_ex(
