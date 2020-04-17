@@ -56,10 +56,16 @@ function __fix_imports(source) {
         .replace(/^import\s+\*\s+as\s+(.*)\s+from\s+(.*['"]);?$/mg, "let $1 = require($2);");
 }
 
+function __fix_require(source, moduleName) {
+    return source
+        .replace(/^(\s*)require\s*\(\s*(['"][^'"]+['"])\s*\)/mg, "$1require($2, \"" + moduleName + "\")")
+        .replace(/(\W)require\s*\(\s*(['"][^'"]+['"])\s*\)/g, "$1require($2, \"" + moduleName + "\")");
+}
+
 const require = (function () {
     const modules = {};
 
-    return function (moduleName) {
+    return function (moduleName, u8mName = "u8core") {
         if (!/\.[mc]?js$/.test(moduleName))
             moduleName += ".js";
         let m = modules[moduleName];
@@ -68,19 +74,22 @@ const require = (function () {
             return m;
         } else {
             let customLib = false;
-            let [name, src] = __bios_loadRequired(moduleName);
-            if (src == "" || !src) {
+            let [name, src] = __bios_loadRequired(moduleName, u8mName);
+            if (src === "" || !src) {
                 customLib = true;
                 src = __require_from_worker(moduleName);
                 name = moduleName;
             }
-            if (src == "" || !src)
+            if (src === "" || !src)
                 throw "import failed: not found " + moduleName;
 
             // limited support for import keyword
             src = __fix_imports(src);
 
-            let module = {exports: {}}
+            // fix default require for current module
+            src = __fix_require(src, u8mName);
+
+            let module = {exports: {}};
             // we should not catch any exception to let u8 code interpret the error in
             // a right way. rethrowing an error kills trycatch.Message() info which carries
             // line number of the syntax error!
@@ -149,6 +158,7 @@ function freezeGlobals() {
     Object.freeze(global.equalArrays);
     Object.freeze(global.safeEval);
     Object.freeze(global.__fix_imports);
+    Object.freeze(global.__fix_require);
     Object.freeze(global.assert);
     Object.freeze(global.__call_main);
     Object.freeze(global.testReadLines);

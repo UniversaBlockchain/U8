@@ -9,6 +9,8 @@
 #include "../tools/tools.h"
 #include "../tools/StreamPump.h"
 
+extern const char *U8COREMODULE_NAME;
+
 using namespace std;
 
 // We want to avoid destructing of these pump with application shutdown as it causes
@@ -45,7 +47,8 @@ void JsLoadRequired(const v8::FunctionCallbackInfo<v8::Value> &args) {
         v8::String::Utf8Value v8str(isolate, args[0]);
 
         string sourceName = *v8::String::Utf8Value(isolate, args[0]);
-        string name = se->resolveRequiredFile(sourceName);
+        string moduleName = (args.Length() > 1) ? *v8::String::Utf8Value(isolate, args[1]) : U8COREMODULE_NAME;
+        string name = se->resolveRequiredFile(sourceName, moduleName);
 
         // If it is empty we just return empty array
         if (!name.empty()) {
@@ -61,7 +64,7 @@ void JsLoadModule(const v8::FunctionCallbackInfo<v8::Value> &args) {
         v8::String::Utf8Value v8str(isolate, args[0]);
 
         string sourceName = *v8::String::Utf8Value(isolate, args[0]);
-        auto res = checkModuleSignature(sourceName, se->getHome());
+        auto res = se->loadModule(sourceName);
 
         args.GetReturnValue().Set(res);
     });
@@ -107,8 +110,9 @@ void JsLoadRequiredRestricted(const v8::FunctionCallbackInfo<v8::Value> &args) {
         v8::String::Utf8Value v8str(isolate, args[0]);
 
         string sourceName = *v8::String::Utf8Value(isolate, args[0]);
+        string moduleName = (args.Length() > 1) ? *v8::String::Utf8Value(isolate, args[1]) : U8COREMODULE_NAME;
         if (validSourcesForRestrictedWorker.find(sourceName) != validSourcesForRestrictedWorker.end()) {
-            string name = se->resolveRequiredFile(sourceName);
+            string name = se->resolveRequiredFile(sourceName, moduleName);
 
             // If it is empty we just return empty array
             if (!name.empty()) {

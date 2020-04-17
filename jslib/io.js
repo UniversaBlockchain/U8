@@ -461,7 +461,7 @@ async function fileGetContentsAsBytes(path) {
     return res;
 }
 
-// For module resources (files in module)
+// For u8 core module resources (files in module)
 const U8MODULE_EXTENSION = ".u8m/";
 
 async function getResourcesFromPath(path) {

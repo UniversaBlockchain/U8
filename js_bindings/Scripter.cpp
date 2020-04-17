@@ -10,10 +10,6 @@
 #include <sys/types.h>
 #include <pwd.h>
 
-#ifndef __APPLE__
-    #include <filesystem>
-#endif
-
 #include "Scripter.h"
 #include "../tools/tools.h"
 #include "basic_builtins.h"
@@ -29,6 +25,9 @@ static const char *ARGV1 = nullptr;
 std::string BASE_PATH;                          // path to ZIP-module or directory where jslib found
 int Scripter::workerMemLimitMegabytes = 200;    // actual default value is set in main.cpp
 const char *U8MODULE_EXTENSION = ".u8m/";
+const char *U8COREMODULE_NAME = "u8core";
+const char *U8COREMODULE_FULLNAME = "u8core.u8m";
+static char path_separator = '/';
 
 std::unique_ptr<v8::Platform> Scripter::initV8(const char *argv0) {
 
@@ -95,68 +94,83 @@ Scripter::Scripter() : Logging("SCR") {
     home = pw->pw_dir;
 
     size_t zipPos = s.rfind(U8MODULE_EXTENSION);
-    bool inZip = zipPos != std::string::npos;
+    inZip = zipPos != std::string::npos;
 
     if (inZip) {
-        std::string zip = s.substr(0, zipPos + 4);
-        BASE_PATH = zip + "/";
-        if (!checkModuleSignature(zip, home))     // TODO: cache
-            throw runtime_error("Failed checking module signature");
+        s = s.substr(0, zipPos + 4);
+        BASE_PATH = makeAbsolutePath(s + path_separator);
+
+        if (!loadModule(s, true))
+            throw runtime_error("Failed loading module");
     } else
         s = ARGV0;
 
     //make path absolute
-#ifndef __APPLE__
-    s = std::filesystem::absolute(std::filesystem::path(s));
-#else
-    const std::string relative_sym("./");
-    const std::string root_sym("/");
+    s = makeAbsolutePath(s);
 
-    if(s.rfind(root_sym,0) != 0) {
-        char buf[PATH_MAX];
-        std::string cwd = getcwd(buf,PATH_MAX);
-        s = cwd + (s.rfind(relative_sym,0) == 0 ? s.substr (relative_sym.length()) : s);
-    }
-#endif
+    if (inZip) {
+        if (!u8coreLoaded) {
+            // load u8 core module from starting module path
+            auto path = s.substr(0, s.rfind(path_separator)) + path_separator + U8COREMODULE_FULLNAME;
 
-    auto root = s.substr(0, s.rfind('/'));
-    auto path = root;
-    bool root_found = false;
+            if (file_exists(path)) {
+                if (!loadModule(path))
+                    throw runtime_error("Failed loading U8 core module");
+            } else {
+                // load u8 core module from U8 path
+                path = makeAbsolutePath(ARGV0).substr(0, s.rfind(path_separator));
 
-    // Looking for library in the current tree
-    do {
-        auto x = path + "/jslib";
-        if (file_exists(x, true)) {
-            require_roots.push_back(x);
-            if (!inZip)
-                BASE_PATH = path + "/";
+                do {
+                    auto x = path + path_separator + U8COREMODULE_FULLNAME;
+                    if (file_exists(x)) {
+                        if (!loadModule(x))
+                            throw runtime_error("Failed loading U8 core module");
+                        else
+                            break;
+                    }
+                    auto index = path.rfind(path_separator);
+                    if (index == std::string::npos)
+                        break;
+                    path = path.substr(0, index);
+                } while (path != "/");
+            }
 
-            root_found = true;
-            break;
+            if (!u8coreLoaded)
+                throw runtime_error("U8 core module was not loaded");
         }
-        auto index = path.rfind('/');
-        if (index == std::string::npos || (inZip && index < zipPos))
-            break;
-        path = path.substr(0, index);
-    } while (path != "/");
+    } else {
+        auto root = s.substr(0, s.rfind(path_separator));
+        auto path = root;
+        bool root_found = false;
 
-    // if not found, get from ENV
-    if (!root_found) {
-        if (inZip)
-            throw runtime_error("jslib in module not found");
+        // Looking for library in the current tree
+        do {
+            auto x = path + "/jslib";
+            if (file_exists(x, true)) {
+                require_roots.push_back(x);
+                BASE_PATH = makeAbsolutePath(path + path_separator);
+                root_found = true;
+                break;
+            }
+            auto index = path.rfind(path_separator);
+            if (index == std::string::npos || (inZip && index < zipPos))
+                break;
+            path = path.substr(0, index);
+        } while (path != "/");
 
-        // get U8 root from env
-        auto u8root = std::getenv("U8_ROOT");
-        if (u8root) {
-            require_roots.emplace_back(u8root);
-        } else {
-            // last chance ;)
-            require_roots.emplace_back("../jslib");
-            require_roots.emplace_back("./jslib");
+        // if not found, get from ENV
+        if (!root_found) {
+            // get U8 root from env
+            auto u8root = std::getenv("U8_ROOT");
+            if (u8root) {
+                require_roots.emplace_back(u8root);
+            } else {
+                // last chance ;)
+                require_roots.emplace_back("../jslib");
+                require_roots.emplace_back("./jslib");
+            }
         }
-    }
 
-    if (!inZip) {
         // then look in the application executable file root
         require_roots.push_back(root);
         // and in the current directory
@@ -269,7 +283,7 @@ void Scripter::initialize(int accessLevel, bool forWorker) {
     // now run initialization library script
     inContext([&](auto context) {
         std::string initScriptFileName = accessLevel==0 ? "init_full.js" : "init_restricted.js";
-        auto src = loadFileAsString(initScriptFileName);
+        auto src = loadCoreFileAsString(initScriptFileName);
         if (src.empty())
             throw runtime_error("failed to find U8 jslib");
         src = src + "\n//# sourceURL=" + "jslib/"+initScriptFileName+"\n";
@@ -362,11 +376,15 @@ int Scripter::runAsMain(string sourceScript, const vector<string> &&args, string
     inContext([&](Local<Context> &context) {
         ScriptOrigin origin(v8String(fileName));
         auto global = context->Global();
-        // fix imports
+        // fix imports and requires
         auto unused = global->Set(context, v8String("__source"), v8String(sourceScript));
+        if (inZip)
+            auto unused1 = global->Set(context, v8String("__startingModuleName"), v8String(startingModuleName));
         string script = evaluate(
+                inZip ? "let r = __fix_require(__fix_imports(__source), __startingModuleName); __source = undefined; __startingModuleName = undefined; r" :
                 "let r = __fix_imports(__source); __source = undefined; r",
                 true);
+        //printf("====== script = %s\n", script.data());
         // run fixed script
         evaluate(script, false, &origin);
         // run main if any
@@ -456,10 +474,17 @@ std::string Scripter::expandPath(const std::string &path) {
     return replace_all(path, "~", home);
 }
 
+std::string Scripter::resolveRequiredFile(const std::string &fileName, const std::string &moduleName) {
+    auto module = modules.find(moduleName);
+    if (module != modules.end()) {
+        auto path = module->second->resolveRequiredFile(fileName);
+        if (!path.empty())
+            return path;
+    }
 
-static char path_separator = '/';
+    if (inZip)
+        return "";
 
-std::string Scripter::resolveRequiredFile(const std::string &fileName) {
     if (fileName[0] == '.' || fileName[0] == path_separator) {
         // no, direct path
         return fileName;
@@ -476,8 +501,8 @@ std::string Scripter::resolveRequiredFile(const std::string &fileName) {
 }
 
 
-std::string Scripter::loadFileAsString(const std::string &fileName) {
-    auto fn = resolveRequiredFile(fileName);
+std::string Scripter::loadCoreFileAsString(const std::string &fileName) {
+    auto fn = resolveRequiredFile(fileName, U8COREMODULE_NAME);
     if (fn.empty())
         return "";
     else
@@ -517,4 +542,31 @@ std::shared_ptr<Persistent<Object>> Scripter::getPrototype(const std::string& pr
 
 void Scripter::setPrototype(const std::string& protoName, std::shared_ptr<Persistent<Object>> proto) {
     prototypesHolder[protoName] = proto;
+}
+
+bool Scripter::loadModule(const std::string& sourceName, bool isStarting) {
+    std::shared_ptr<U8Module> module = std::shared_ptr<U8Module>(new U8Module(sourceName, getHome()));
+
+    // loading module
+    if (!module->load())
+        return false;
+
+    if (modules.find(module->getName()) != modules.end())   // if already checked
+        return true;
+
+    // check signature
+    bool res = module->checkModuleSignature();
+    if (res) {
+        modules.insert(std::pair<std::string, std::shared_ptr<U8Module>>(module->getName(), module));
+
+        if (module->getName() == U8COREMODULE_NAME)
+            u8coreLoaded = true;
+
+        if (isStarting)
+            startingModuleName = module->getName();
+
+        //printf("Module %s successfully loaded\n", module->getName().data());
+    }
+
+    return res;
 }

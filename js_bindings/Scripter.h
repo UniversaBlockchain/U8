@@ -7,6 +7,7 @@
 
 #include <string>
 #include <vector>
+#include <map>
 #include <v8.h>
 #include <libplatform/libplatform.h>
 #include <cstring>
@@ -18,6 +19,7 @@
 #include "../tools/AsyncSleep.h"
 #include "../tools/ConditionVar.h"
 #include "binding_tools.h"
+#include "U8Module.h"
 
 using namespace std;
 using namespace v8;
@@ -173,7 +175,7 @@ public:
      * @param filName to look for.
      * @return found full path with filename or empty string if not found.
      */
-    std::string resolveRequiredFile(const std::string &filName);
+    std::string resolveRequiredFile(const std::string &fileName, const std::string &moduleName);
 
     /**
      * Checks that timers are initialized.
@@ -284,11 +286,13 @@ public:
 
     std::string getHome();
 
+    bool loadModule(const std::string& sourceName, bool isStarting = false);
+
 private:
 
     std::string expandPath(const std::string &path);
 
-    std::string loadFileAsString(const std::string &fileName);
+    std::string loadCoreFileAsString(const std::string &fileName);
 
 
     // is set by initialize(), not by the constructor. We need this copy to wrap into v8 context data field.
@@ -329,6 +333,12 @@ private:
     bool _workersReady = false;
 
     int selfAccessLevel_;
+
+    std::map<std::string, std::shared_ptr<U8Module>> modules;
+
+    bool inZip = false;
+    bool u8coreLoaded = false;
+    std::string startingModuleName;
 
     // do not construct it manually
     explicit Scripter();
