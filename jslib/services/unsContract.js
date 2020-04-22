@@ -13,6 +13,7 @@ const e = require("errors");
 const Errors = e.Errors;
 const ErrorRecord = e.ErrorRecord;
 const TransactionPack = require("transactionpack").TransactionPack;
+const Parcel = require("parcel").Parcel;
 const ex = require("exceptions");
 
 const NSmartContract = require("services/NSmartContract").NSmartContract;
@@ -988,10 +989,10 @@ class UnsContract extends NSmartContract {
      * with (existing signatures are dropped when adding payment).
      * @return {Parcel} parcel to be registered.
      */
-    createRegistrationParcelFromExpirationDate(unsExpirationDate, uContract, uKeys, keysToSignUnsWith) {
+    async createRegistrationParcelFromExpirationDate(unsExpirationDate, uContract, uKeys, keysToSignUnsWith) {
         let amount = this.getPayingAmount(unsExpirationDate);
 
-        return this.createRegistrationParcelFromPaymentAmount(amount, uContract, uKeys, keysToSignUnsWith);
+        return await this.createRegistrationParcelFromPaymentAmount(amount, uContract, uKeys, keysToSignUnsWith);
     }
 
     /**

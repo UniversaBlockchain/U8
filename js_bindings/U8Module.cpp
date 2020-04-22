@@ -245,6 +245,8 @@ bool U8Module::checkKeyTrust(std::vector<unsigned char> &keyData) {
         // TODO: check trusted UNS
     }
 
+    // TODO: scan trust addresses in module`s UNS conract
+
     auto ka = new KeyAddress(*publicKey, 0, true);
 
     // ask for trust for module key

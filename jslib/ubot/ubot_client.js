@@ -21,6 +21,7 @@ const t = require("tools");
 const ut = require("ubot/ubot_tools");
 const Parcel = require("parcel").Parcel;
 const ParcelProcessingState = require("parcelprocessor").ParcelProcessingState;
+const NodeConfigProvider = require("services/NodeConfigProvider").NodeConfigProvider;
 
 class NodeRecord {
     constructor(data) {
@@ -1228,6 +1229,43 @@ class UBotClient {
             return null;
 
         return result.packedContract;
+    }
+
+    /**
+     * Get the current network config provider.
+     *
+     * Config provider is used by NSmartContract
+     *
+     * @return name-days per U rate
+     */
+    async getConfigProvider() {
+        let result = await new Promise(async (resolve, reject) =>
+            await this.httpNodeClient.command("getConfigProvider", {},
+                result => resolve(result),
+                error => reject(error)
+            )
+        );
+
+        if (result == null)
+            return null;
+
+        return result.provider;
+    }
+
+    /**
+     * Look for the name associated with some address (passed as an argument).
+     *
+     * @param address to look for
+     * @return {Object} containing names - an array of objects containing name and description associated with given origin
+     * or empty object if not found
+     */
+    async queryNameRecord(address) {
+        return await new Promise(async (resolve, reject) =>
+            await this.httpNodeClient.command("queryNameRecord", {address: address},
+                result => resolve(result),
+                error => reject(error)
+            )
+        );
     }
 }
 
