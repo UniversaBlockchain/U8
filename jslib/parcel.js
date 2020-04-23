@@ -10,6 +10,35 @@ const BossBiMapper = require("bossbimapper").BossBiMapper;
 const TransactionPack = require("transactionpack").TransactionPack;
 const Quantiser = require("quantiser").Quantiser;
 const DefaultBiMapper = require("defaultbimapper").DefaultBiMapper;
+const QuantiserException = require("quantiser").QuantiserException;
+
+class BadPayloadException extends ex.IllegalArgumentError {
+    constructor(message = undefined) {
+        super();
+        this.message = message;
+    }
+}
+
+class BadPaymentException extends ex.IllegalArgumentError {
+    constructor(message = undefined) {
+        super();
+        this.message = message;
+    }
+}
+
+class OwnerNotResolvedException extends BadPaymentException {
+    constructor(message = undefined) {
+        super();
+        this.message = message;
+    }
+}
+
+class InsufficientFundsException extends BadPaymentException {
+    constructor(message = undefined) {
+        super();
+        this.message = message;
+    }
+}
 
 class Parcel extends bs.BiSerializable {
 
@@ -152,6 +181,133 @@ class Parcel extends bs.BiSerializable {
 
         return null;
     }
+
+    /**
+     * Create parcel used for paid contract registration on the network.
+     * An additional payment of specified amount is added to the payload contract.
+     * This payment is used by various types of {@see NSmartContract}.
+     *
+     * Note: this method uses new way of providing additional payments to {@see NSmartContract}
+     * currently it is only supported by {@see UnsContract}.
+     *
+     * @param {Contract | UnsContract} payload - Contract to be registered on the network.
+     * @param {Contract} uContract - Contract containing units used for payment.
+     * @param {Iterable<crypto.PrivateKey>} uKeys - Keys to resolve owner of payment contract.
+     * @param {number} payingAmount - paying amount for payload contract.
+     * @return {Parcel} parcel to be registered.
+     */
+
+    static async of(payload, uContract, uKeys, payingAmount) {
+        let p = await Parcel.createParcel(payload, uContract, uKeys, false);
+        if (payingAmount > 0)
+            await p.addPayingAmountV2(payingAmount, uKeys);
+        return p;
+    }
+
+    /**
+     * Create parcel used for paid contract registration on the network.
+     *
+     * @param {Contract} payload - Contract to be registered on the network.
+     * @param {Contract} uContract - Contract containing units used for payment.
+     * @param {Iterable<crypto.PrivateKey>} uKeys - Keys to resolve owner of payment contract.
+     * @param {boolean} withTestPayment - Flag indicates if test units should be used and contract should be registered
+     * on the TestNet rather than MainNet.
+     * @return {Parcel} parcel to be registered
+     */
+    static async createParcel(payload, uContract, uKeys, withTestPayment) {
+        let checkResult = true;
+        try {
+            payload.quantiser.resetNoLimit();
+            checkResult = await payload.check();
+
+        } catch (quantiserIgnored) {
+            if (!(quantiserIgnored instanceof QuantiserException))
+                throw quantiserIgnored;
+        }
+
+        if (!checkResult)
+            throw new BadPayloadException("payload contains errors: " + JSON.stringify(payload.errors));
+
+        let costU = payload.getProcessedCostU();
+        let payment = Parcel.createPayment(uContract, uKeys, costU, withTestPayment);
+
+        return new Parcel(payload.transactionPack, payment.transactionPack);
+    }
+
+    static async createPayment(uContract, uKeys, amount, withTestPayment) {
+        let payment = await uContract.createRevision(uKeys);
+        let fieldName = withTestPayment ? "test_transaction_units" : "transaction_units";
+        payment.state.data[fieldName] = uContract.state.data[fieldName] - amount;
+        await payment.seal();
+        try {
+            payment.quantiser.resetNoLimit();
+            if (! (await payment.check())) {
+                if (!payment.roles.owner.isAllowedForKeys(new Set(uKeys)))
+                    throw new OwnerNotResolvedException("Unable to create payment: Check that provided keys are enough to resolve U-contract owner.");
+                else if (payment.state.data[fieldName] < 0)
+                    throw new InsufficientFundsException("Unable to create payment: Check provided U-contract to have at least " +
+                        amount + (withTestPayment ? " test":"") + " units available.");
+                else
+                    throw new BadPaymentException("Unable to create payment: " + JSON.stringify(payment.errors));
+            }
+        } catch (quantiserIgnored) {
+            if (!(quantiserIgnored instanceof QuantiserException))
+                throw quantiserIgnored;
+        }
+
+        return payment;
+    }
+
+    /**
+     * Adds an additional paying amount to the main contract of the parcel.
+     *
+     * Main payment contract of a parcel is used for an additional payment so it must contain required amount of units.
+     * An additional payment is used by various types of {@see NSmartContract}.
+     *
+     * Note: this method uses new way of providing additional payments to {@see NSmartContract}
+     * currently it is only supported by {@see UnsContract}.
+     *
+     * @param {number} payingAmount - Amount paid additionally.
+     * @param {Iterable<crypto.PrivateKey>}uKeys - Keys to resolve owner of parcel main payment contract.
+     */
+
+    async addPayingAmountV2(payingAmount, uKeys) {
+        let transactionPayment = this.payment.contract;
+        if (!transactionPayment.equals(this.getRemainingU()))
+            throw new ex.IllegalArgumentError("The paying amount has been added already");
+
+        let payment = await Parcel.createPayment(transactionPayment, uKeys, payingAmount, false);
+        // we add new item to the contract, so we need to recreate transaction pack
+        let mainContract = this.payload.contract;
+        // Compound compound = new Compound();
+        // compound.addContract(COMPOUND_MAIN_TAG,mainContract,null);
+        // compound.addContract(COMPOUND_PAYMENT_TAG,payment,null);
+        // TransactionPack tp = compound.getCompoundContract().getTransactionPack();
+        // tp.addTag(TP_PAYING_FOR_TAG_PREFIX + mainContract.getId().toBase64String(),payment.getId());
+        // this.payload = tp;
+    }
+
+    /**
+     * Gets the latest revision of payment contract used by this Parcel.
+     * This revision will have {@code APPROVED} status
+     * and must be kept and used for future transactions
+     *
+     * @param {boolean} payloadApproved - Is payload APPROVED
+     * @return {Contract} contract containing remaining U
+     */
+    getRemainingU(payloadApproved = true) {
+        // AtomicReference<Contract> u = new AtomicReference<>(getPaymentContract());
+        // while (payloadApproved) {
+        //     Optional<Contract> result = getPayload().getSubItems().values().stream().filter(si -> si.getParent() != null && si.getParent().equals(u.get().getId())).findAny();
+        //     if (result.isPresent()) {
+        //         u.set(result.get());
+        //     } else {
+        //         break;
+        //     }
+        // }
+        //
+        // return u.get();
+    }
 }
 
 DefaultBiMapper.registerAdapter(new BiAdapter("Parcel", Parcel));
@@ -159,4 +315,4 @@ DefaultBiMapper.registerAdapter(new BiAdapter("Parcel", Parcel));
 ///////////////////////////
 //EXPORTS
 ///////////////////////////
-module.exports = {Parcel};
+module.exports = {Parcel, BadPayloadException, BadPaymentException, OwnerNotResolvedException, InsufficientFundsException};

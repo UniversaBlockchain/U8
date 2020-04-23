@@ -30,12 +30,15 @@ class Quantiser {
     constructor() {
         this.quantaSum_ = 0;
         this.quantaLimit_ = -1;
-
     }
 
     reset(limit) {
         this.quantaSum_ = 0;
         this.quantaLimit_ = limit;
+    }
+
+    resetNoLimit() {
+        this.reset(-1);
     }
 
     getQuantaSum() {

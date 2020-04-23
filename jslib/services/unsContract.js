@@ -983,8 +983,7 @@ class UnsContract extends NSmartContract {
      *
      * @param {Date} unsExpirationDate - Desired expiration date.
      * @param {Contract} uContract - Contract to used as payment.
-     * @param {} uKeys - Keys that resolve owner of
-     * payment contract.
+     * @param {Iterable<crypto.PrivateKey>} uKeys - Keys that resolve owner of payment contract.
      * @param {Array<crypto.PrivateKey>|Set<crypto.PrivateKey>|crypto.PrivateKey}keysToSignUnsWith keys to sign UNS1 contract
      * with (existing signatures are dropped when adding payment).
      * @return {Parcel} parcel to be registered.
@@ -1000,25 +999,24 @@ class UnsContract extends NSmartContract {
      *
      * @param {number} payingAmount - Paying amount to pay.
      * @param {Contract} uContract - Contract to used as payment.
-     * @param {} uKeys - Keys that resolve owner of
+     * @param {Iterable<crypto.PrivateKey>} uKeys - Keys that resolve owner of
      * payment contract.
      * @param {Array<crypto.PrivateKey>|Set<crypto.PrivateKey>|crypto.PrivateKey} keysToSignUnsWith - Keys to sign UNS1
      * contract with (existing signatures are dropped when adding payment).
      * @return {Parcel} parcel to be registered.
      */
     async createRegistrationParcelFromPaymentAmount(payingAmount, uContract, uKeys, keysToSignUnsWith) {
-        if(this.paidU == null || payingAmount !== this.paidU) {
+        if (this.paidU == null || payingAmount !== this.paidU) {
 
-            if(this.setPayingAmount(payingAmount) == null) {
+            if (this.setPayingAmount(payingAmount) == null) {
                 return null;
             }
 
             await this.seal();
-
             await this.addSignatureToSeal(keysToSignUnsWith);
         }
 
-        return Parcel.of(this, uContract, uKeys,payingAmount);
+        return await Parcel.of(this, uContract, uKeys, payingAmount);
     }
 
     /**
@@ -1027,11 +1025,11 @@ class UnsContract extends NSmartContract {
      * Using this method allows to create paying parcel for UNS1 contract without dropping its signatures.
      *
      * @param {Contract} uContract - Contract to used as payment.
-     * @param {} uKeys - Keys that resolve owner of payment contract.
+     * @param {Iterable<crypto.PrivateKey>} uKeys - Keys that resolve owner of payment contract.
      * @return {Parcel} parcel to be registered.
      */
-    createRegistrationParcel(uContract, uKeys) {
-        return Parcel.of(this, uContract, uKeys, this.paidU);
+    async createRegistrationParcel(uContract, uKeys) {
+        return await Parcel.of(this, uContract, uKeys, this.paidU);
     }
 
     /**
@@ -1046,7 +1044,7 @@ class UnsContract extends NSmartContract {
      * @return {Date} calculated UNS1 expiration date.
      */
     setPayingAmount(payingAmount) {
-        if(payingAmount === 0 && this.state.revision === 1 || payingAmount > 0 && payingAmount < this.getMinPayment()) {
+        if (payingAmount === 0 && this.state.revision === 1 || payingAmount > 0 && payingAmount < this.getMinPayment()) {
             return null;
         }
 
