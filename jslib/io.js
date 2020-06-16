@@ -243,7 +243,7 @@ function InputStream(handle, buferLength = chunkSize) {
             }
         }
         // console.log(`read outcome: chunk: ${chunk.length}: ${utf8Decode(chunk)}, pos: ${pos}, result: ${utf8Decode(result)}`);
-        return result;
+        return result.slice(0, actualSize);
     };
 
     /**
