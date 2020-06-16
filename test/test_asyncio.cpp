@@ -61,9 +61,7 @@ TEST_CASE("asyncio_tcp_bench") {
                         });
                     }
                     if (pos != sz) {
-                        //srvClient->readBuf = stringToBytes(s.substr((size_t)pos));
-                        byte_vector tail = stringToBytes(s.substr((size_t)pos));
-                        srvClient->readBuf.insert(srvClient->readBuf.end(), tail.begin(), tail.end());
+                        srvClient->readBuf = stringToBytes(s.substr((size_t)pos));
                     } else {
                         srvClient->readBuf.clear();
                     }
@@ -80,7 +78,10 @@ TEST_CASE("asyncio_tcp_bench") {
     struct TestClient {
         std::mutex mtx;
         std::shared_ptr<asyncio::IOTCP> conn;
+        std::function<void()> doRead;
         byte_vector readBuf;
+        std::mutex pendingPacketsMtx;
+        std::set<std::string> pendingPackets;
     };
 
     Semaphore semConnect;
@@ -113,49 +114,77 @@ TEST_CASE("asyncio_tcp_bench") {
     for (int i = 0; i < NUM_CLIENTS; ++i) {
         auto tc = testClients[i];
         auto th = std::make_shared<thread>([tc,&sendCounter,&answersCounter,&t0mtx,&t0,&count0,&semAnswers,startTime,TEST_DURATION_SECONDS]() {
+
+            tc->doRead = [tc,&answersCounter,&t0mtx,&t0,&count0,&semAnswers](){
+                lock_guard guard(tc->mtx);
+                tc->conn->read(4096, [tc,&answersCounter,&t0mtx,&t0,&count0,&semAnswers](const asyncio::byte_vector& data, ssize_t result) {
+                    byte_vector bv((size_t)result);
+                    memcpy(&bv[0], &data[0], (size_t)result);
+
+                    std::string s = bytesToString(tc->readBuf) + bytesToString(bv);
+                    int sz = (int)s.size();
+                    int pos = 0;
+                    while (sz - pos >= 24) {
+                        std::string ans = s.substr((size_t)pos, (size_t)24);
+                        pos += 24;
+                        {
+                            lock_guard lock(tc->pendingPacketsMtx);
+                            if (tc->pendingPackets.find(ans) != tc->pendingPackets.end()) {
+                                tc->pendingPackets.erase(ans);
+                            } else {
+                                printf("recv: wrong answer: %s\n", ans.data());
+                            }
+                        }
+
+                        ++answersCounter;
+                        {
+                            lock_guard t0lock(t0mtx);
+                            long now = getCurrentTimeMillis();
+                            long dt = now - t0;
+                            if (dt >= 1000) {
+                                t0 = now;
+                                long count = answersCounter - count0;
+                                float rps = float(count) * 1000.0f / float(dt);
+                                count0 = (long) answersCounter;
+                                printf("answersCounter: %li, rps = %.1f\n", (long) answersCounter, rps);
+                            }
+                        }
+                        semAnswers.notify();
+
+                    }
+                    if (pos != sz) {
+                        tc->readBuf = stringToBytes(s.substr((size_t)pos));
+                    } else {
+                        tc->readBuf.clear();
+                    }
+                    tc->doRead();
+                });
+            };
+            tc->doRead();
+
             for (long i = 0; i < LONG_MAX; ++i) {
                 std::string packet = std::to_string(i);
                 packet = "ping" + std::string(20-packet.size(), '0') + packet;
                 std::string awaitAnswer = packet;
                 awaitAnswer[1] = 'o';
+                {
+                    lock_guard lock(tc->pendingPacketsMtx);
+                    tc->pendingPackets.insert(awaitAnswer);
+                }
 
                 if (getCurrentTimeMillis() - startTime > TEST_DURATION_SECONDS*1000)
                     break;
 
                 ++sendCounter;
-                Semaphore semSend;
-                tc->conn->write(stringToBytes(packet), [tc,awaitAnswer,&semAnswers,&answersCounter,&t0mtx,&t0,&count0,&semSend](ssize_t result) {
-                    REQUIRE(!asyncio::isError(result));
-                    tc->conn->read(24, [tc,awaitAnswer,&semAnswers,&answersCounter,&t0mtx,&t0,&count0,&semSend](const asyncio::byte_vector& data, ssize_t result) {
-                        byte_vector bv((size_t)result);
-                        memcpy(&bv[0], &data[0], (size_t)result);
-                        if ((result > 0) && (result < 24)) {
-                            tc->readBuf.insert(tc->readBuf.end(), bv.begin(), bv.end());
-                        } else {
-                            std::string s = bytesToString(tc->readBuf) + bytesToString(bv);
-
-                            REQUIRE(s == awaitAnswer);
-                            ++answersCounter;
-                            {
-                                lock_guard t0lock(t0mtx);
-                                long now = getCurrentTimeMillis();
-                                long dt = now - t0;
-                                if (dt >= 1000) {
-                                    t0 = now;
-                                    long count = answersCounter - count0;
-                                    float rps = float(count) * 1000.0f / float(dt);
-                                    count0 = (long) answersCounter;
-                                    printf("answersCounter: %li, rps = %.1f\n", (long) answersCounter, rps);
-                                }
-                            }
-                            semAnswers.notify();
-                            tc->readBuf.clear();
-
-                            semSend.notify();
-                        }
+                {
+                    lock_guard guard(tc->mtx);
+                    tc->conn->write(stringToBytes(packet), [tc,awaitAnswer,&semAnswers,&answersCounter,&t0mtx,&t0,&count0](ssize_t result) {
+                        REQUIRE(!asyncio::isError(result));
                     });
-                });
-                semSend.wait();
+                }
+
+                if (sendCounter > answersCounter + 50000)
+                    std::this_thread::sleep_for(10ms);
             }
         });
         clientThreads.emplace_back(th);
@@ -236,9 +265,7 @@ TEST_CASE("asyncio_tcp_bench_server", "[!hide]") {
                         });
                     }
                     if (pos != sz) {
-//                        srvClient->readBuf = stringToBytes(s.substr((size_t) pos));
-                        byte_vector tail = stringToBytes(s.substr((size_t)pos));
-                        srvClient->readBuf.insert(srvClient->readBuf.end(), tail.begin(), tail.end());
+                        srvClient->readBuf = stringToBytes(s.substr((size_t) pos));
                     } else {
                         srvClient->readBuf.clear();
                     }
@@ -281,7 +308,10 @@ TEST_CASE("asyncio_tcp_bench_client", "[!hide]") {
     struct TestClient {
         std::mutex mtx;
         std::shared_ptr<asyncio::IOTCP> conn;
+        std::function<void()> doRead;
         byte_vector readBuf;
+        std::mutex pendingPacketsMtx;
+        std::set<std::string> pendingPackets;
     };
 
     Semaphore semConnect;
@@ -314,49 +344,77 @@ TEST_CASE("asyncio_tcp_bench_client", "[!hide]") {
     for (int i = 0; i < NUM_CLIENTS; ++i) {
         auto tc = testClients[i];
         auto th = std::make_shared<thread>([tc,&sendCounter,&answersCounter,&t0mtx,&t0,&count0,&semAnswers,startTime,TEST_DURATION_SECONDS]() {
+
+            tc->doRead = [tc,&answersCounter,&t0mtx,&t0,&count0,&semAnswers](){
+                lock_guard guard(tc->mtx);
+                tc->conn->read(4096, [tc,&answersCounter,&t0mtx,&t0,&count0,&semAnswers](const asyncio::byte_vector& data, ssize_t result) {
+                    byte_vector bv((size_t)result);
+                    memcpy(&bv[0], &data[0], (size_t)result);
+
+                    std::string s = bytesToString(tc->readBuf) + bytesToString(bv);
+                    int sz = (int)s.size();
+                    int pos = 0;
+                    while (sz - pos >= 24) {
+                        std::string ans = s.substr((size_t)pos, (size_t)24);
+                        pos += 24;
+                        {
+                            lock_guard lock(tc->pendingPacketsMtx);
+                            if (tc->pendingPackets.find(ans) != tc->pendingPackets.end()) {
+                                tc->pendingPackets.erase(ans);
+                            } else {
+                                printf("recv: wrong answer: %s\n", ans.data());
+                            }
+                        }
+
+                        ++answersCounter;
+                        {
+                            lock_guard t0lock(t0mtx);
+                            long now = getCurrentTimeMillis();
+                            long dt = now - t0;
+                            if (dt >= 1000) {
+                                t0 = now;
+                                long count = answersCounter - count0;
+                                float rps = float(count) * 1000.0f / float(dt);
+                                count0 = (long) answersCounter;
+                                printf("answersCounter: %li, rps = %.1f\n", (long) answersCounter, rps);
+                            }
+                        }
+                        semAnswers.notify();
+
+                    }
+                    if (pos != sz) {
+                        tc->readBuf = stringToBytes(s.substr((size_t)pos));
+                    } else {
+                        tc->readBuf.clear();
+                    }
+                    tc->doRead();
+                });
+            };
+            tc->doRead();
+
             for (long i = 0; i < LONG_MAX; ++i) {
                 std::string packet = std::to_string(i);
                 packet = "ping" + std::string(20-packet.size(), '0') + packet;
                 std::string awaitAnswer = packet;
                 awaitAnswer[1] = 'o';
+                {
+                    lock_guard lock(tc->pendingPacketsMtx);
+                    tc->pendingPackets.insert(awaitAnswer);
+                }
 
                 if (getCurrentTimeMillis() - startTime > TEST_DURATION_SECONDS*1000)
                     break;
 
                 ++sendCounter;
-                Semaphore semSend;
-                tc->conn->write(stringToBytes(packet), [tc,awaitAnswer,&semAnswers,&answersCounter,&t0mtx,&t0,&count0,&semSend](ssize_t result) {
-                    REQUIRE(!asyncio::isError(result));
-                    tc->conn->read(24, [tc,awaitAnswer,&semAnswers,&answersCounter,&t0mtx,&t0,&count0,&semSend](const asyncio::byte_vector& data, ssize_t result) {
-                        byte_vector bv((size_t)result);
-                        memcpy(&bv[0], &data[0], (size_t)result);
-                        if ((result > 0) && (result < 24)) {
-                            tc->readBuf.insert(tc->readBuf.end(), bv.begin(), bv.end());
-                        } else {
-                            std::string s = bytesToString(tc->readBuf) + bytesToString(bv);
-
-                            REQUIRE(s == awaitAnswer);
-                            ++answersCounter;
-                            {
-                                lock_guard t0lock(t0mtx);
-                                long now = getCurrentTimeMillis();
-                                long dt = now - t0;
-                                if (dt >= 1000) {
-                                    t0 = now;
-                                    long count = answersCounter - count0;
-                                    float rps = float(count) * 1000.0f / float(dt);
-                                    count0 = (long) answersCounter;
-                                    printf("answersCounter: %li, rps = %.1f\n", (long) answersCounter, rps);
-                                }
-                            }
-                            semAnswers.notify();
-                            tc->readBuf.clear();
-
-                            semSend.notify();
-                        }
+                {
+                    lock_guard guard(tc->mtx);
+                    tc->conn->write(stringToBytes(packet), [tc,awaitAnswer,&semAnswers,&answersCounter,&t0mtx,&t0,&count0](ssize_t result) {
+                        REQUIRE(!asyncio::isError(result));
                     });
-                });
-                semSend.wait();
+                }
+
+                if (sendCounter > answersCounter + 50000)
+                    std::this_thread::sleep_for(10ms);
             }
         });
         clientThreads.emplace_back(th);
