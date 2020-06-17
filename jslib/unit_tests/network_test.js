@@ -222,7 +222,7 @@ unit.test("tcp bench server", async () => {
     let connectionProcessor = async (connection) => {
         let readBuf = new Uint8Array(0);
         while (true) {
-            let r = await connection.input.read(4096);
+            let r = await connection.input.read(256);
             if (r.byteLength === 0) {
                 await connection.close();
                 break;
@@ -232,13 +232,15 @@ unit.test("tcp bench server", async () => {
             bv.set(r, readBuf.byteLength);
             let sz = bv.byteLength;
             let pos = 0;
+            let promises = [];
             while (sz - pos >= 24) {
                 let packet = bv.slice(pos, pos+24);
                 pos += 24;
                 // console.log("rcv: " + utf8Decode(packet));
                 packet[1] = 'o'.charCodeAt(0);
-                await connection.output.write(packet);
+                promises.push(connection.output.write(packet));
             }
+            await Promise.all(promises);
             if (pos !== sz) {
                 readBuf = bv.slice(pos);
             } else {
@@ -272,7 +274,7 @@ unit.test("tcp workers bench server", async () => {
                 let connectionProcessor = async (connection) => {
                     let readBuf = new Uint8Array(0);
                     while (true) {
-                        let r = await connection.input.read(4096);
+                        let r = await connection.input.read(256);
                         if (r.byteLength === 0) {
                             await connection.close();
                             break;
@@ -282,13 +284,15 @@ unit.test("tcp workers bench server", async () => {
                         bv.set(r, readBuf.byteLength);
                         let sz = bv.byteLength;
                         let pos = 0;
+                        let promises = [];
                         while (sz - pos >= 24) {
                             let packet = bv.slice(pos, pos+24);
                             pos += 24;
                             // console.log("rcv: " + utf8Decode(packet));
                             packet[1] = 'o'.charCodeAt(0);
-                            await connection.output.write(packet);
+                            promises.push(connection.output.write(packet));
                         }
+                        await Promise.all(promises);
                         if (pos !== sz) {
                             readBuf = bv.slice(pos);
                         } else {
@@ -326,7 +330,7 @@ unit.test("tcp workers bench server", async () => {
     let server = tcp.listen({port: 9990});
 
     let workers = [];
-    for (let i = 0; i < 10; ++i)
+    for (let i = 0; i < 8; ++i)
         workers.push(await SocketWorker.start());
     server.acceptWithWorker(workers, (error) => {
         unit.fail("accept failed: " + error);
