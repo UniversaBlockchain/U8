@@ -223,6 +223,36 @@ void JsAsyncTCPAccept(const FunctionCallbackInfo<Value> &args) {
     });
 }
 
+void JsAsyncTCPAcceptFromGlobalId(const FunctionCallbackInfo<Value> &args) {
+    Scripter::unwrapArgs(args, [](ArgsContext &ac) {
+        if (ac.args.Length() == 1) {
+            auto globalId = ac.asString(0);
+            auto tpl = ac.scripter->TCPTemplate.Get(ac.isolate);
+            auto connectionHandle = asyncio::getIOTCPbyGlobalId(std::stol(globalId));
+            if (connectionHandle == nullptr) {
+                ac.throwError("invalid globalId");
+            } else {
+                auto serverHandle = unwrap<asyncio::IOTCP>(ac.args.This());
+                int code = serverHandle->acceptFromListeningSocket(connectionHandle);
+                ac.setReturnValue(code);
+            }
+        } else {
+            ac.throwError("invalid number of arguments");
+        }
+    });
+}
+
+void JsAsyncTCPGetGlobalId(const FunctionCallbackInfo<Value> &args) {
+    Scripter::unwrapArgs(args, [](ArgsContext &ac) {
+        if (ac.args.Length() == 0) {
+            auto serverHandle = unwrap<asyncio::IOTCP>(ac.args.This());
+            ac.setReturnValue(ac.v8String(std::to_string(serverHandle->getGlobalId())));
+        } else {
+            ac.throwError("invalid number of arguments");
+        }
+    });
+}
+
 //void open(const char* IP, unsigned int port, const char* certFilePath, const char* keyFilePath,
 //          openTCP_cb callback, int maxConnections = SOMAXCONN);
 void JsAsyncTLSListen(const FunctionCallbackInfo<Value> &args) {
@@ -444,6 +474,8 @@ void JsInitIOTCP(Scripter& scripter, const Local<ObjectTemplate> &global) {
     prototype->Set(isolate, "_listen", FunctionTemplate::New(isolate, JsAsyncTCPListen));
     prototype->Set(isolate, "_connect", FunctionTemplate::New(isolate, JsAsyncTCPConnect));
     prototype->Set(isolate, "_accept", FunctionTemplate::New(isolate, JsAsyncTCPAccept));
+    prototype->Set(isolate, "_accept_from_global_id", FunctionTemplate::New(isolate, JsAsyncTCPAcceptFromGlobalId));
+    prototype->Set(isolate, "_get_global_id", FunctionTemplate::New(isolate, JsAsyncTCPGetGlobalId));
 
     // class methods
     tpl->Set(isolate, "getErrorText", FunctionTemplate::New(isolate, JsAsyncGetErrorText));

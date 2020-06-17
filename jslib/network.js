@@ -89,6 +89,23 @@ class TcpServer {
         }, this.maxConnections);
     }
 
+    acceptWithWorker(workersList, reject) {
+        let pos = 0;
+        this.handle = new IOTCP();
+        this.handle._listen(this.bindIp, this.port, async (code) => {
+            if (code < 0) {
+                reject(new IoError(code));
+            } else {
+                let worker = workersList[pos];
+                let workerId = pos;
+                pos += 1;
+                if (pos >= workersList.length)
+                    pos = 0;
+                await worker.accept(this.handle._get_global_id(), workerId);
+            }
+        }, this.maxConnections);
+    }
+
     /**
      * Stop listening for incoming connections.
      * @async
@@ -380,4 +397,4 @@ let udp = {
     }
 };
 
-module.exports = {tcp, TcpServer, tls, TLSServer, udp, UdpSocket};
+module.exports = {tcp, TcpServer, tls, TLSServer, udp, UdpSocket, TcpConnection};

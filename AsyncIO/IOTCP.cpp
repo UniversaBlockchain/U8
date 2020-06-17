@@ -6,6 +6,17 @@
 
 namespace asyncio {
 
+    std::mutex globalStorageOfIOTCPMtx;
+    std::unordered_map<long, IOTCP*> globalStorageOfIOTCP;
+    std::atomic<long> globalStorageOfIOTCPNextId = 1;
+
+    IOTCP* getIOTCPbyGlobalId(long globalId) {
+        lock_guard lock(globalStorageOfIOTCPMtx);
+        if (globalStorageOfIOTCP.find(globalId) != globalStorageOfIOTCP.end())
+            return globalStorageOfIOTCP[globalId];
+        return nullptr;
+    }
+
     IOTCP::IOTCP(AsyncLoop* loop) {
         if (!loop) {
             aloop = new AsyncLoop();
@@ -17,6 +28,11 @@ namespace asyncio {
 
         this->loop = aloop->getLoop();
         ioTCPSoc = nullptr;
+        {
+            lock_guard lock(globalStorageOfIOTCPMtx);
+            idInGlobalStorageOfIOTCP = globalStorageOfIOTCPNextId++;
+            globalStorageOfIOTCP[idInGlobalStorageOfIOTCP] = this;
+        }
     }
 
     IOTCP::~IOTCP() {
@@ -39,6 +55,10 @@ namespace asyncio {
 
             if (ownLoop)
                 delete aloop;
+        }
+        {
+            lock_guard lock(globalStorageOfIOTCPMtx);
+            globalStorageOfIOTCP.erase(idInGlobalStorageOfIOTCP);
         }
     }
 

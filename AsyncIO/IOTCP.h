@@ -208,7 +208,14 @@ namespace asyncio {
          */
         void stopOwnLoop();
 
+        /**
+         * Each tcp socket has unique global id.
+         * You can get your instance of IOTCP from anywhere, using this global id.
+         */
+        long getGlobalId() {return idInGlobalStorageOfIOTCP;}
+
     private:
+        long idInGlobalStorageOfIOTCP;
         ioLoop* loop;
         uv_tcp_t* ioTCPSoc;
         uv_connect_t ioConnection;
@@ -246,6 +253,8 @@ namespace asyncio {
         static void _write_tcp_cb(uv_write_t* req, int status);
         static void _close_handle_cb(uv_handle_t* handle);
     };
+
+    IOTCP* getIOTCPbyGlobalId(long globalId);
 }
 
 #endif //U8_IOTCP_H

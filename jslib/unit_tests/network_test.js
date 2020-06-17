@@ -5,6 +5,7 @@
 import {expect, assert, assertSilent, unit} from 'test'
 import {tcp, tls, udp} from 'network'
 import {now} from 'timers'
+import {getWorker, consoleWrapper, farcallWrapper} from 'worker'
 
 async function reportErrors(block) {
     try {
@@ -247,6 +248,87 @@ unit.test("tcp bench server", async () => {
     };
 
     server.accept(connectionProcessor, (error) => {
+        unit.fail("accept failed: " + error);
+    });
+
+    await sleep(200);
+
+    await server.close();
+});
+
+unit.test("tcp workers bench server", async () => {
+
+    class SocketWorker {
+        constructor() {this.worker = null;}
+        async release() {await this.worker.release();}
+        static async start() {
+            let res = new SocketWorker();
+            res.worker = await getWorker(0, consoleWrapper+farcallWrapper+`
+                
+            const TcpConnection = require("network").TcpConnection;
+                
+            wrkInner.export.accept = async (args, kwargs) => {
+            
+                let connectionProcessor = async (connection) => {
+                    let readBuf = new Uint8Array(0);
+                    while (true) {
+                        let r = await connection.input.read(4096);
+                        if (r.byteLength === 0) {
+                            await connection.close();
+                            break;
+                        }
+                        let bv = new Uint8Array(readBuf.byteLength + r.byteLength);
+                        bv.set(readBuf);
+                        bv.set(r, readBuf.byteLength);
+                        let sz = bv.byteLength;
+                        let pos = 0;
+                        while (sz - pos >= 24) {
+                            let packet = bv.slice(pos, pos+24);
+                            pos += 24;
+                            // console.log("rcv: " + utf8Decode(packet));
+                            packet[1] = 'o'.charCodeAt(0);
+                            await connection.output.write(packet);
+                        }
+                        if (pos !== sz) {
+                            readBuf = bv.slice(pos);
+                        } else {
+                            readBuf = new Uint8Array(0);
+                        }
+                    }
+                };
+            
+                try {
+                    let connectionHandle = new IOTCP();
+                    let result = connectionHandle._accept_from_global_id(args[0]);
+                    const chunkSize = 1024;
+                    let conn = new TcpConnection(connectionHandle, chunkSize);
+                    connectionProcessor(conn);
+                    console.log("accept in worker... ok (workerId=" + args[1] + ")");
+                } catch (e) {
+                    console.log("error in worker: " + e);
+                }
+            }
+            `);
+            res.worker.startFarcallCallbacks();
+            res.worker.export["__worker_bios_print"] = (args, kwargs) => {
+                let out = args[0] === true ? console.error : console.logPut;
+                out(...args[1], args[2]);
+            };
+            return res;
+        }
+        accept(serverSocketGlobalId, workerId) {
+            return new Promise(resolve => this.worker.farcall("accept", [serverSocketGlobalId, workerId], {}, ans => {
+                resolve(ans);
+            }));
+        }
+    }
+
+    let server = tcp.listen({port: 9990});
+
+    let workers = [];
+    for (let i = 0; i < 10; ++i)
+        workers.push(await SocketWorker.start());
+    server.acceptWithWorker(workers, (error) => {
         unit.fail("accept failed: " + error);
     });
 
