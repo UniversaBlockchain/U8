@@ -43,13 +43,14 @@ namespace asyncio {
                 //printf("---AUTO_CLOSING_TCP---\n");
                 freeRequest();
 
-                if (ownLoop)
-                    delete aloop;
-
                 uv_sem_post(&sem);
             });
             uv_sem_wait(&sem);
             uv_sem_destroy(&sem);
+
+            if (ownLoop)
+                delete aloop;
+
         } else {
             freeRequest();
 
