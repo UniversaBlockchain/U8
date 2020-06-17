@@ -109,15 +109,16 @@ TEST_CASE("asyncio_tcp_bench") {
     atomic<long> t0 = getCurrentTimeMillis();
     atomic<long> count0 = 0;
     long startTime = getCurrentTimeMillis();
+    atomic<long> pendingCounter = 0;
 
     vector<std::shared_ptr<thread>> clientThreads;
     for (int i = 0; i < NUM_CLIENTS; ++i) {
         auto tc = testClients[i];
-        auto th = std::make_shared<thread>([tc,&sendCounter,&answersCounter,&t0mtx,&t0,&count0,&semAnswers,startTime,TEST_DURATION_SECONDS]() {
+        auto th = std::make_shared<thread>([tc,&pendingCounter,&sendCounter,&answersCounter,&t0mtx,&t0,&count0,&semAnswers,startTime,TEST_DURATION_SECONDS]() {
 
-            tc->doRead = [tc,&answersCounter,&t0mtx,&t0,&count0,&semAnswers](){
+            tc->doRead = [tc,&answersCounter,&t0mtx,&t0,&count0,&semAnswers,&pendingCounter](){
                 lock_guard guard(tc->mtx);
-                tc->conn->read(4096, [tc,&answersCounter,&t0mtx,&t0,&count0,&semAnswers](const asyncio::byte_vector& data, ssize_t result) {
+                tc->conn->read(4096, [tc,&answersCounter,&t0mtx,&t0,&count0,&semAnswers,&pendingCounter](const asyncio::byte_vector& data, ssize_t result) {
                     byte_vector bv((size_t)result);
                     memcpy(&bv[0], &data[0], (size_t)result);
 
@@ -131,6 +132,7 @@ TEST_CASE("asyncio_tcp_bench") {
                             lock_guard lock(tc->pendingPacketsMtx);
                             if (tc->pendingPackets.find(ans) != tc->pendingPackets.end()) {
                                 tc->pendingPackets.erase(ans);
+                                --pendingCounter;
                             } else {
                                 printf("recv: wrong answer: %s\n", ans.data());
                             }
@@ -146,7 +148,7 @@ TEST_CASE("asyncio_tcp_bench") {
                                 long count = answersCounter - count0;
                                 float rps = float(count) * 1000.0f / float(dt);
                                 count0 = (long) answersCounter;
-                                printf("answersCounter: %li, rps = %.1f\n", (long) answersCounter, rps);
+                                printf("answersCounter: %li, rps = %.1f, pendingCounter = %li\n", (long)answersCounter, rps, (long)pendingCounter);
                             }
                         }
                         semAnswers.notify();
@@ -170,6 +172,7 @@ TEST_CASE("asyncio_tcp_bench") {
                 {
                     lock_guard lock(tc->pendingPacketsMtx);
                     tc->pendingPackets.insert(awaitAnswer);
+                    ++pendingCounter;
                 }
 
                 if (getCurrentTimeMillis() - startTime > TEST_DURATION_SECONDS*1000)
@@ -339,15 +342,16 @@ TEST_CASE("asyncio_tcp_bench_client", "[!hide]") {
     atomic<long> t0 = getCurrentTimeMillis();
     atomic<long> count0 = 0;
     long startTime = getCurrentTimeMillis();
+    atomic<long> pendingCounter = 0;
 
     vector<std::shared_ptr<thread>> clientThreads;
     for (int i = 0; i < NUM_CLIENTS; ++i) {
         auto tc = testClients[i];
-        auto th = std::make_shared<thread>([tc,&sendCounter,&answersCounter,&t0mtx,&t0,&count0,&semAnswers,startTime,TEST_DURATION_SECONDS]() {
+        auto th = std::make_shared<thread>([tc,&pendingCounter,&sendCounter,&answersCounter,&t0mtx,&t0,&count0,&semAnswers,startTime,TEST_DURATION_SECONDS]() {
 
-            tc->doRead = [tc,&answersCounter,&t0mtx,&t0,&count0,&semAnswers](){
+            tc->doRead = [tc,&answersCounter,&t0mtx,&t0,&count0,&semAnswers,&pendingCounter](){
                 lock_guard guard(tc->mtx);
-                tc->conn->read(4096, [tc,&answersCounter,&t0mtx,&t0,&count0,&semAnswers](const asyncio::byte_vector& data, ssize_t result) {
+                tc->conn->read(4096, [tc,&answersCounter,&t0mtx,&t0,&count0,&semAnswers,&pendingCounter](const asyncio::byte_vector& data, ssize_t result) {
                     byte_vector bv((size_t)result);
                     memcpy(&bv[0], &data[0], (size_t)result);
 
@@ -361,6 +365,7 @@ TEST_CASE("asyncio_tcp_bench_client", "[!hide]") {
                             lock_guard lock(tc->pendingPacketsMtx);
                             if (tc->pendingPackets.find(ans) != tc->pendingPackets.end()) {
                                 tc->pendingPackets.erase(ans);
+                                --pendingCounter;
                             } else {
                                 printf("recv: wrong answer: %s\n", ans.data());
                             }
@@ -376,7 +381,7 @@ TEST_CASE("asyncio_tcp_bench_client", "[!hide]") {
                                 long count = answersCounter - count0;
                                 float rps = float(count) * 1000.0f / float(dt);
                                 count0 = (long) answersCounter;
-                                printf("answersCounter: %li, rps = %.1f\n", (long) answersCounter, rps);
+                                printf("answersCounter: %li, rps = %.1f, pendingCounter = %li\n", (long)answersCounter, rps, (long)pendingCounter);
                             }
                         }
                         semAnswers.notify();
@@ -400,6 +405,7 @@ TEST_CASE("asyncio_tcp_bench_client", "[!hide]") {
                 {
                     lock_guard lock(tc->pendingPacketsMtx);
                     tc->pendingPackets.insert(awaitAnswer);
+                    ++pendingCounter;
                 }
 
                 if (getCurrentTimeMillis() - startTime > TEST_DURATION_SECONDS*1000)
