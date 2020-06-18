@@ -611,7 +611,7 @@ class ProcessStartExec extends ProcessBase {
      * Get data from worker-bound storage.
      *
      * @param {string} storageName - Storage name. Optional, if undefined - using default storage.
-     * @return {Promise<null|[*]>} data from worker-bound storage or null if storage is empty.
+     * @return {Promise<null|*>} data from worker-bound storage or null if storage is empty.
      * @throws {UBotQuantiserException} quantiser limit is reached.
      * @throws {UBotClientException} UBot client error.
      */
@@ -867,7 +867,7 @@ class ProcessStartExec extends ProcessBase {
      * Executes an HTTP request to an external service by URL.
      *
      * @param {string} url - URL of the external service.
-     * @return {Promise<{body: HTTP response body, response_code: HTTP response code}>} HTTP response.
+     * @return {Promise<Object>} body: HTTP response body, response_code: HTTP response code.
      * @throws {UBotQuantiserException} quantiser limit is reached.
      */
     async doHTTPRequest(url) {
