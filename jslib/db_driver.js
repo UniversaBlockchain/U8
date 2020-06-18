@@ -2,8 +2,9 @@
  * Copyright (c) 2019-present Sergey Chernov, iCodici S.n.C, All Rights Reserved.
  */
 
-/*
+/**
  * This is a low-level interface that any database driver should implement.
+ * @module db_driver
  */
 
 /**
@@ -46,6 +47,7 @@ function connect(connectionString, onConnected, onError, maxConnection = 100) {
 
 /**
  * Pool of sql connections: any database driver should implent it.
+ * @interface
  */
 class SqlDriverPool {
     /**
@@ -108,7 +110,7 @@ class SqlDriverPool {
  * _binary_: required conversion between {Uint8Array} and BYTEA. BLOB support will be added later.
  *
  * Exotics like arrays, jsons and more will wait until this interface will be implemented.
- *
+ * @interface
  */
 class SqlDriverConnection {
     /**
@@ -148,6 +150,7 @@ class SqlDriverConnection {
 
 /**
  * Results of the query.
+ * @interface
  */
 class SqlDriverResultSet {
     /**
