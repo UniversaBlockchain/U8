@@ -20,32 +20,36 @@ let tcpWorkerSrc = () => {
          */
 
         let connectionProcessor = async (connection) => {
-            let readBuf = new Uint8Array(0);
-            while (true) {
-                let r = await connection.input.read(256);
-                if (r.byteLength === 0) {
-                    await connection.close();
-                    break;
+            try {
+                let readBuf = new Uint8Array(0);
+                while (true) {
+                    let r = await connection.input.read(256);
+                    if (r.byteLength === 0) {
+                        await connection.close();
+                        break;
+                    }
+                    let bv = new Uint8Array(readBuf.byteLength + r.byteLength);
+                    bv.set(readBuf);
+                    bv.set(r, readBuf.byteLength);
+                    let sz = bv.byteLength;
+                    let pos = 0;
+                    let promises = [];
+                    while (sz - pos >= 24) {
+                        let packet = bv.slice(pos, pos + 24);
+                        pos += 24;
+                        // console.log("rcv: " + utf8Decode(packet));
+                        packet[1] = 'o'.charCodeAt(0);
+                        promises.push(connection.output.write(packet));
+                    }
+                    await Promise.all(promises);
+                    if (pos !== sz) {
+                        readBuf = bv.slice(pos);
+                    } else {
+                        readBuf = new Uint8Array(0);
+                    }
                 }
-                let bv = new Uint8Array(readBuf.byteLength + r.byteLength);
-                bv.set(readBuf);
-                bv.set(r, readBuf.byteLength);
-                let sz = bv.byteLength;
-                let pos = 0;
-                let promises = [];
-                while (sz - pos >= 24) {
-                    let packet = bv.slice(pos, pos+24);
-                    pos += 24;
-                    // console.log("rcv: " + utf8Decode(packet));
-                    packet[1] = 'o'.charCodeAt(0);
-                    promises.push(connection.output.write(packet));
-                }
-                await Promise.all(promises);
-                if (pos !== sz) {
-                    readBuf = bv.slice(pos);
-                } else {
-                    readBuf = new Uint8Array(0);
-                }
+            } catch (e) {
+                console.log("error in worker connectionProcessor: " + e);
             }
         };
 
