@@ -13,6 +13,7 @@
 #include "IOTLS.h"
 #include "AsyncIOTests.h"
 #include "../tools/AutoThreadPool.h"
+#include "../tools/tools.h"
 
 using namespace std;
 
@@ -53,7 +54,7 @@ void allAsyncIOTests() {
     testUnifyFileAndTCPread();
     testClientWriteWithouthRead();
     testAsyncTLS();
-    stressTestTCP();
+    //stressTestTCP(); // deprecated, use "asyncio_tcp_bench" from catch2 tests set
 
     asyncio::deinitLoop();
 }
@@ -1674,7 +1675,64 @@ void testAsyncTLS() {
     asyncio::IOTLS srv;
     vector<asyncio::IOTLS*> clients;
 
-    srv.open("127.0.0.1", PORT, "../test/server-cert.pem", "../test/server-key.pem", [&](ssize_t result){
+    std::string serverSertStr = R"End(
+-----BEGIN CERTIFICATE-----
+MIIDWDCCAkACCQD7vY+jRzVUnjANBgkqhkiG9w0BAQsFADBuMQswCQYDVQQGEwJJ
+TjELMAkGA1UECAwCS1QxCzAJBgNVBAcMAkJMMQwwCgYDVQQKDANldnQxDDAKBgNV
+BAsMA2V2dDEpMCcGA1UEAwwgRE9OVCBVU0UgLSB0ZXN0IGNlcnQgZm9yIGV2dC10
+bHMwHhcNMTkwMjAzMTg1NDM4WhcNMTkwMzA1MTg1NDM4WjBuMQswCQYDVQQGEwJJ
+TjELMAkGA1UECAwCS1QxCzAJBgNVBAcMAkJMMQwwCgYDVQQKDANldnQxDDAKBgNV
+BAsMA2V2dDEpMCcGA1UEAwwgRE9OVCBVU0UgLSB0ZXN0IGNlcnQgZm9yIGV2dC10
+bHMwggEiMA0GCSqGSIb3DQEBAQUAA4IBDwAwggEKAoIBAQCvECunq9PogQHF6LUY
+EALhxZB3eGTeXTufKIyTH2NyySJPEf3Ou7KRV7zVPG/FCsujy7cEVa9NybBQ7F+a
+91noVcJeY2quAHtuKdpn6+0vy8JEJ5lKHDSYJufvtmCLEg9W/1c4IDWBLkD0CHej
+7/SBwNcElirvq/gyHmffdbop3QXVkRfIwiZ3fX7opsN54YMxToAapTUC9m5VTQKo
+Bvu2QnBhv+VksA9Zi1yQJzTmBMM8VqnmpnXiwnwROprmb9ob2LEX9maLYodf6S04
+k4ATDW4ybwfg1+NC0EA30w4Pt09hfEtyT1i1r142ZAFgzX13F76kBdYKV0bZ8zqg
+z4wdAgMBAAEwDQYJKoZIhvcNAQELBQADggEBAFbe6lLA6n5igLyjqa1oDMRIqtiu
+ejX/MxSXHFB8kxWUPLMFUNBkICFlVavk18lQlL3ghh1qFaEdBYA8GUjQ9mLXHJDZ
+yu+ULPFUq4RQdQc5HN1ROohn9QkG+pd2wZfgOae7Ik54PmS/P44LbLBVwVhCSBOU
+yE1VVcKYXDwKfE5ok0XKsHPU+ZLIRYAjhnC2x4qZrY6Swy0S/cU4THB/vxc5UP5B
+EQNa+YAYGGVBGnjHLDoN6ear3KPSeT2XbPuhOmV6xiPu5oA+4I9rmq3aoT6A7Ubn
+c9Okxr8f1Lz8+ar3JPX9Ew/26vuCgcfBqyCvxRQot7pJVn7to1l9gmfVFr0=
+-----END CERTIFICATE-----
+    )End";
+
+    std::string serverKeyStr = R"End(
+-----BEGIN PRIVATE KEY-----
+MIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQCvECunq9PogQHF
+6LUYEALhxZB3eGTeXTufKIyTH2NyySJPEf3Ou7KRV7zVPG/FCsujy7cEVa9NybBQ
+7F+a91noVcJeY2quAHtuKdpn6+0vy8JEJ5lKHDSYJufvtmCLEg9W/1c4IDWBLkD0
+CHej7/SBwNcElirvq/gyHmffdbop3QXVkRfIwiZ3fX7opsN54YMxToAapTUC9m5V
+TQKoBvu2QnBhv+VksA9Zi1yQJzTmBMM8VqnmpnXiwnwROprmb9ob2LEX9maLYodf
+6S04k4ATDW4ybwfg1+NC0EA30w4Pt09hfEtyT1i1r142ZAFgzX13F76kBdYKV0bZ
+8zqgz4wdAgMBAAECggEAbrHq6Lrd48avOFVNLUnyiJBEKUcXgQOzD5C0UtMmLw6/
+gv/9XRuSbhTscmkkw5Nv8MJ/l14W2zkNJB5S1cpSL3cK0GRMsHndkmskj1G/SNmu
+nSns48+x8gOn5QuNQGLLEFek7vhu3KBCsgwomqDAGsu1KlFKFQLIjehsBgCLFqx/
+qTUrX6T9EmsZBo4Ep9ctUVx5wg/v2FsnV/1JhpjCxRZlmJNoLNU+fctUbSPaasir
+fIl8aYU0X75GPeE4ERxB21ijLSBIu8gLssdo4nZHXF91VSPNps9Fs9ySKeSLkz2e
+5fqiWrMhj93PqkYqzjkG91ZjIAPfHHJvLXa4vQdUgQKBgQDVDKyVl7JMQC32utVJ
+zXLr4VklBTnmNnL+3sHCdV1VigzoWkdQJlPASd3LHbm62PTE0YFaly/g9SWiFFbn
+T3ZdXxBg/PtIOcdIFEXqko3JhNzHanmA0bXL4Hod8T8kSGXRUunQBvsTM2ihEQ5x
+xcPHfYpUSIX+Iwfftz1PLpZqKwKBgQDSWwy1dfPNONd3qYZJTcRz38+6LayhYRp3
+pcL89ihOaiBQMKHk6JT5WMKbk0pwq2NHVJAqB0x8+ljPu2kAkrKZdBGpntB7QRhV
+qmhgoqq30vEV8xiyrnwoXZP4uOVsf4Cgbn0UsJVVG3wdw1iX+uQFJQ8hRhs6WRFC
+K19Lyy4m1wKBgQDDRHmOJlpp3s0B/d3tZdt17LYK405c/PzLMxm+BFoGQ6Bu+gew
+o2BRtqINP3JymdVF64u2nyln8uiKNEAug7tF+xKFAnnBigtnugUW6ToBQMAmGiXA
+9vS8J0Nl3C52L9D6WRcp7qwCvjSgo4RsrMkzN5Ioi8wb0Lmvxz/vKhD8vwKBgEKN
+uhyjgAp7JHjgsvL4XuKGelOeZdL9RQF7+ZBNVX1RyH12lZI2IAQwGApe9JtnLlcA
+I0iY3JNiJb07v0IGJ+mzNm9jJvUIKGnaK4H/lWHppItcSYEnAXNIACweW8ATKyAX
+NQ3ZvLWbp45HIv2azI/wJLRTWQQB8BruXA0/8I8rAoGBAIAaj8orJKCDQ1xWTA3Y
+BXLaIMNEuqIY8DzUHxWv8uwEdJv9mNwvKs7VOqubi9gumEMeFLVpatSxYWYeSxjR
+P2Dj1Og21nXvc5Q8inwUCyO2uQGncHcB9wgqrlDVObj2xaX3La0P1DxfpuVJCujQ
+FyLjJmNwBykjMeWgpBsnHy1t
+-----END PRIVATE KEY-----
+    )End";
+
+    putFileContents("/tmp/server-cert.pem", serverSertStr);
+    putFileContents("/tmp/server-key.pem", serverKeyStr);
+
+    srv.open("127.0.0.1", PORT, "/tmp/server-cert.pem", "/tmp/server-key.pem", [&](ssize_t result){
         ASSERT(!asyncio::isError(result));
 
         printf("New connection\n");
@@ -1718,7 +1776,7 @@ void testAsyncTLS() {
                 printf("Connecting to server\n");
 
                 cli.connect("127.0.0.1", PORT + (unsigned int) t * NUM_ITERATIONS + i + 1, "127.0.0.1", PORT,
-                        "../test/server-cert.pem", "../test/server-key.pem", [&](ssize_t result){
+                        "/tmp/server-cert.pem", "/tmp/server-key.pem", [&](ssize_t result){
 
                     ASSERT(!asyncio::isError(result));
 
@@ -1788,7 +1846,7 @@ void testAsyncTLS() {
     //init TLS server
     asyncio::IOTLS srv_buff;
 
-    srv_buff.open("127.0.0.1", PORT, "../test/server-cert.pem", "../test/server-key.pem", [&](ssize_t result){
+    srv_buff.open("127.0.0.1", PORT, "/tmp/server-cert.pem", "/tmp/server-key.pem", [&](ssize_t result){
         ASSERT(!asyncio::isError(result));
 
         printf("New connection\n");
@@ -1830,7 +1888,7 @@ void testAsyncTLS() {
                 char buff_cli[5];
 
                 cli.connect("127.0.0.1", PORT + (unsigned int) t * NUM_ITERATIONS + i + 1, "127.0.0.1", PORT,
-                        "../test/server-cert.pem", "../test/server-key.pem", [&](ssize_t result){
+                        "/tmp/server-cert.pem", "/tmp/server-key.pem", [&](ssize_t result){
                     ASSERT(!asyncio::isError(result));
 
                     printf("Connected to server\n");
@@ -1894,7 +1952,7 @@ void testAsyncTLS() {
 
     uv_sem_init(&sem_tls_srv, 0);
 
-    srv_part.open("127.0.0.1", PORT, "../test/server-cert.pem", "../test/server-key.pem", [&](ssize_t result){
+    srv_part.open("127.0.0.1", PORT, "/tmp/server-cert.pem", "/tmp/server-key.pem", [&](ssize_t result){
         ASSERT(!asyncio::isError(result));
 
         printf("New connection\n");
@@ -1941,7 +1999,7 @@ void testAsyncTLS() {
     //init TLS client
     asyncio::IOTLS cli;
 
-    cli.connect("127.0.0.1", PORT + 1, "127.0.0.1", PORT, "../test/server-cert.pem", "../test/server-key.pem", [&](ssize_t result){
+    cli.connect("127.0.0.1", PORT + 1, "127.0.0.1", PORT, "/tmp/server-cert.pem", "/tmp/server-key.pem", [&](ssize_t result){
         ASSERT(!asyncio::isError(result));
 
         printf("Connected to server\n");
@@ -1984,7 +2042,7 @@ void testAsyncTLS() {
     //init TLS server
     asyncio::IOTLS srv_tls;
 
-    srv_tls.open("127.0.0.1", PORT, "../test/server-cert.pem", "../test/server-key.pem", [&](ssize_t result){
+    srv_tls.open("127.0.0.1", PORT, "/tmp/server-cert.pem", "/tmp/server-key.pem", [&](ssize_t result){
         ASSERT(!asyncio::isError(result));
 
         printf("New connection\n");
@@ -2113,7 +2171,7 @@ void testAsyncTLS() {
                 asyncio::IOTLS cli;
 
                 cli.connect("127.0.0.1", PORT + (unsigned int) t * NUM_ITERATIONS + i + 1, "127.0.0.1", PORT,
-                            "../test/server-cert.pem", "../test/server-key.pem", [&](ssize_t result){
+                            "/tmp/server-cert.pem", "/tmp/server-key.pem", [&](ssize_t result){
                     ASSERT(result == ERR_TLS_CONNECT_TIMEOUT);
 
                     uv_sem_post(&stop[t]);
@@ -2161,6 +2219,11 @@ void testAsyncTLS() {
 }
 
 void stressTestTCP() {
+    /**
+     * deprecated
+     * please, use "asyncio_tcp_bench" from catch2 tests set
+     */
+
     printf("\nstressTestTCP...\n");
 
     int blocks = 100;
@@ -2201,6 +2264,7 @@ void stressTestTCP() {
                     free(send_buf);
                 });
             }
+            std::this_thread::sleep_for(50ms);
         }
         //printf("Completed sending %i packets, repeats %i \n", count_package, repeats_package);
     });
@@ -2218,7 +2282,8 @@ void stressTestTCP() {
             for (int j = 0; j < packages; j++) {
                 cli.read(recv_buf, length_package, [&, i, j](ssize_t result) {
                     ++counter;
-                    //printf("Recv package : %i length_package %i \n", counter, length_package);
+                    if (result != length_package)
+                        printf("Recv package : %i; length_package %i; result: %li \n", counter, length_package, result);
                     ASSERT(result == length_package);
 
                     for (int x = 0; x < length_package; x++) {

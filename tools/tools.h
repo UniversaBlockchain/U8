@@ -83,4 +83,8 @@ int64_t getCurrentTimeMillis() {
     return std::chrono::time_point_cast<std::chrono::milliseconds>(std::chrono::system_clock::now()).time_since_epoch().count();
 }
 
+bool isFileExists(const std::string& fileName);
+std::string getFileContents(const std::string& fileName);
+bool putFileContents(const std::string& fileName, const std::string& text);
+
 #endif //U8_TOOLS_H
