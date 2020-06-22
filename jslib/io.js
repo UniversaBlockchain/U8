@@ -99,6 +99,12 @@ function InputStream(handle, buferLength = chunkSize) {
     }
 
     /**
+     * read_some() function reads from 0 to chunkSize bytes.
+     * Consider using read() function if you need to ensure that the requested amount of data is read.
+     */
+    this.read_some = loadChunk;
+
+    /**
      * Get next byte, ir undefined if end of stream is reached.
      *
      * @returns {Promise<number | undefined>}

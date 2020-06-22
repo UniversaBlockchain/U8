@@ -23,7 +23,7 @@ let tcpWorkerSrc = () => {
             try {
                 let readBuf = new Uint8Array(0);
                 while (true) {
-                    let r = await connection.input.read(256);
+                    let r = await connection.input.read_some();
                     if (r.byteLength === 0) {
                         await connection.close();
                         break;
