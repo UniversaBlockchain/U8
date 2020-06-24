@@ -85,6 +85,8 @@ int64_t getCurrentTimeMillis() {
 
 bool isFileExists(const std::string& fileName);
 std::string getFileContents(const std::string& fileName);
+byte_vector getFileContentsBin(const std::string& fileName);
 bool putFileContents(const std::string& fileName, const std::string& text);
+bool putFileContentsBin(const std::string& fileName, const byte_vector& bin);
 
 #endif //U8_TOOLS_H

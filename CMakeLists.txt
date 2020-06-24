@@ -7,6 +7,9 @@ add_definitions(-DMG_ENABLE_IPV6)
 add_definitions(-DMG_ENABLE_SSL)
 add_definitions(-DMG_ENABLE_DNS_SERVER)
 add_definitions(-DV8_COMPRESS_POINTERS)
+if (U8_BUILD_MONOLITH)
+    add_definitions(-DU8_BUILD_MONOLITH)
+endif()
 
 # v8 lib
 # g++ -I/usr/local/Cellar/v8/7.1.302.28 -I/usr/local/Cellar/v8/7.1.302.28/include -Gs tests/hello-world.cc -o hello_world -L/usr/local/Cellar/v8/7.1.302.28 -lv8 -lv8_libplatform -lv8_libbase -Lout.gn/x64.release.sample/obj/ -pthread -std=c++0x -O2
@@ -29,8 +32,11 @@ endif ()
 if (MACOSX)
     set(platform "macos")
 elseif (UNIX)
-    set(platform "linux")
-    #set(platform "linux_monolith")
+    if (U8_BUILD_MONOLITH)
+        set(platform "linux_monolith")
+    else ()
+        set(platform "linux")
+    endif ()
 elseif (WIN32)
     set(platform "win_v8")
 endif ()
@@ -68,8 +74,14 @@ file(GLOB TESTS_SRC
     test/*.h test/*.cpp
 )
 
+if (U8_BUILD_MONOLITH)
+    file(GLOB MAIN_SRC main.cpp u8core.u8m.c)
+else()
+    file(GLOB MAIN_SRC main.cpp)
+endif()
+
 add_executable(u8_tests ${TESTS_SRC})
-add_executable(u8 main.cpp)
+add_executable(u8 ${MAIN_SRC})
 
 target_link_libraries(u8 PRIVATE u8_lib)
 target_link_libraries(u8_tests PRIVATE u8_lib)

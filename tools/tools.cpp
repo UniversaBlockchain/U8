@@ -286,10 +286,37 @@ std::string getFileContents(const std::string& fileName) {
     return "";
 }
 
+byte_vector getFileContentsBin(const std::string& fileName)
+{
+    std::ifstream in(fileName, std::ios::in | std::ios::binary);
+    if (in)
+    {
+        byte_vector contents;
+        in.seekg(0, std::ios::end);
+        contents.resize((size_t)in.tellg());
+        in.seekg(0, std::ios::beg);
+        in.read((char*)&contents[0], contents.size());
+        in.close();
+        return(contents);
+    }
+    return byte_vector();
+}
+
 bool putFileContents(const std::string& fileName, const std::string& text) {
     std::ofstream out(fileName, std::ios::trunc);
     if (out) {
         out << text;
+        out.close();
+        return true;
+    }
+    return false;
+}
+
+bool putFileContentsBin(const std::string& fileName, const byte_vector& bin) {
+    std::ofstream out(fileName, std::ios::trunc | std::ofstream::binary);
+    if (out) {
+        //out << bin;
+        out.write((const char*)bin.data(), bin.size());
         out.close();
         return true;
     }
