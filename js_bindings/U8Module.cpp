@@ -15,6 +15,7 @@ using namespace crypto;
 
 const char *U8_PUBLIC_KEY = "HggcAQABxAABuc8tZdvfwUY550JXjg6GkVszQsy5lrao6LX5BpmVCPRq8xBlhqNnZmPz+sv+bFlGHPhydqV1xkSzBxGi+JqPYE+q0NQ9MJ3YVOzd/MRVW+dn7oZ8uUcWp81j/Wmn4mGVHP9bFhaqiu1JpnkJS6We5923IMrGrhxHDdstFFbs0KVHfgX1ekKKZSkXqNOHFb1VcvIyHrWyL4ZBqVlhqoQB7uMz68MlVznCzdF1HVWtwfuTLzVKXLlMNXGRYLaMqsBKH2U9esN6wXbvSfiMRRKKyiHMfYO4Ohg8ZAnnOfUwCqR48LbxY/W6w0aJ+uy4ohA9jKbT+JEp+vv3bM3KV8jt1w==";
 extern const char *U8COREMODULE_NAME;
+extern const char *U8COREMODULE_FULLNAME;
 
 U8Module::U8Module(const std::string& modulePath, const std::string &homeDir) {
     this->modulePath = modulePath;
@@ -27,7 +28,7 @@ bool U8Module::load() {
 
         byte_vector u8coreBin;
         zip* z = nullptr;
-        if (modulePath.find(U8COREMODULE_NAME) != std::string::npos) {
+        if (modulePath.find(U8COREMODULE_FULLNAME) != std::string::npos) {
             u8coreBin = getU8CoreU8M_binary();
             struct zip_error error = {0};
             zip_source_t *zsrc = zip_source_buffer_create(u8coreBin.data(), u8coreBin.size(), 0, &error);
@@ -77,7 +78,7 @@ bool U8Module::checkModuleSignature() {
         // read module
         byte_vector u8coreBin;
         FILE* f = nullptr;
-        if (modulePath.find(U8COREMODULE_NAME) != std::string::npos) {
+        if (modulePath.find(U8COREMODULE_FULLNAME) != std::string::npos) {
             u8coreBin = getU8CoreU8M_binary();
             f = fmemopen(u8coreBin.data(), u8coreBin.size(), "r+b");
         } else {
