@@ -83,14 +83,38 @@ message("platform: ${platform}")
 
 # Macos brew configuration
 if (${platform} STREQUAL macos)
-    add_custom_command(OUTPUT ../download_libs.stamp WORKING_DIRECTORY .. COMMAND sh download_libs.sh ${platform} > download_libs.stamp)
     set(libtype .dylib)
-    foreach (l libv8 libtomcrypt libuv libpq libssl libzip libyaml)
+
+    if(${BREW_FORMULAE})
+        message(skip download_libs.sh)
+    else ()
+        add_custom_command(OUTPUT ../download_libs.stamp WORKING_DIRECTORY .. COMMAND sh download_libs.sh ${platform} > download_libs.stamp)
+    endif()
+
+    foreach (l libtomcrypt libuv libpq libssl libyaml)
         message( ext/${platform}/${l}/include)
         message( ext/${platform}/${l}/include)
         target_include_directories(u8_lib PUBLIC ext/${platform}/${l}/include)
         target_link_directories(u8_lib PUBLIC ext/${platform}/${l}/lib)
     endforeach (l)
+
+    if(${BREW_FORMULAE})
+#        execute_process(COMMAND brew --prefix libzip OUTPUT_VARIABLE BREW_PREFIX1 OUTPUT_STRIP_TRAILING_WHITESPACE)
+        target_include_directories(u8_lib PUBLIC /usr/local/opt/libzip/include)
+        target_link_directories(u8_lib PUBLIC /usr/local/opt/libzip/lib)
+
+#        execute_process(COMMAND brew --prefix v8 OUTPUT_VARIABLE BREW_PREFIX2 OUTPUT_STRIP_TRAILING_WHITESPACE)
+        target_include_directories(u8_lib PUBLIC /usr/local/opt/v8/libexec/include)
+        target_link_directories(u8_lib PUBLIC /usr/local/opt/v8/libexec)
+    else ()
+        foreach (l libv8 libzip)
+            message( ext/${platform}/${l}/include)
+            message( ext/${platform}/${l}/include)
+            target_include_directories(u8_lib PUBLIC ext/${platform}/${l}/include)
+            target_link_directories(u8_lib PUBLIC ext/${platform}/${l}/lib)
+        endforeach (l)
+    endif()
+
     target_link_libraries(u8 PUBLIC v8 v8_libplatform v8_libbase tomcrypt gmp uv pq ssl crypto zip yaml-cpp)
     target_link_libraries(u8_tests PUBLIC v8 v8_libplatform v8_libbase tomcrypt gmp uv pq ssl crypto zip yaml-cpp)
 elseif (${platform} STREQUAL macos_v8_monolith)
@@ -119,4 +143,5 @@ else ()
     message(FATAL_ERROR "unknown platform ${platform}")
 endif ()
 
-
+install(TARGETS u8
+        RUNTIME DESTINATION bin)
