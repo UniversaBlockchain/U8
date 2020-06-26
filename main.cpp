@@ -9,6 +9,7 @@
 #include "crypto/base64.h"
 #include "js_bindings/Scripter.h"
 #include "tools/tools.h"
+#include "tools/resources.h"
 #include "js_bindings/worker_bindings.h"
 
 #include "AsyncIO/AsyncIO.h"
@@ -62,8 +63,6 @@ int main(int argc, const char **argv) {
         usage();
         return 1;
     } else {
-
-        unpackJsLib();
 
         return Scripter::Application(argv[0], argv[1], [=](shared_ptr<Scripter> se) {
             vector<string> args(argv + 1, argv + argc);
@@ -137,27 +136,3 @@ int manual_main(int argc, char **argv) {
     return 0;
 }
 */
-
-void unpackJsLib() {
-#ifdef U8_BUILD_MONOLITH
-
-#include "u8core.u8m.c"
-
-    struct passwd *pw = getpwuid(getuid());
-    std::string homedir(pw->pw_dir);
-    std::string moduleFullName = homedir + "/.universa/u8core.u8m";
-    bool needToCreateModule = false;
-    if (isFileExists(moduleFullName)) {
-        crypto::Digest resDigest(crypto::HashType::SHA256, __cmake_build_monolith_release_u8core_u8m, __cmake_build_monolith_release_u8core_u8m_len);
-        crypto::Digest fileDigest(crypto::HashType::SHA256, getFileContentsBin(moduleFullName));
-        if (resDigest.getDigest() != fileDigest.getDigest())
-            needToCreateModule = true;
-    } else {
-        needToCreateModule = true;
-    }
-    if (needToCreateModule) {
-        byte_vector bin(std::begin(__cmake_build_monolith_release_u8core_u8m), std::end(__cmake_build_monolith_release_u8core_u8m));
-        putFileContentsBin(moduleFullName, bin);
-    }
-#endif
-}
