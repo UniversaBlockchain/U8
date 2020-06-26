@@ -43,6 +43,8 @@ void sortYAML(YAML::Node &trust);
 
 std::string makeAbsolutePath(const std::string& path);
 
+bool createDirectory(const std::string& path);
+
 class io_error : public std::runtime_error {
 public:
     using runtime_error::runtime_error;

@@ -308,6 +308,14 @@ std::string makeAbsolutePath(const std::string& path) {
 #endif
 }
 
+bool createDirectory(const std::string& path) {
+#ifndef __APPLE__
+    return std::filesystem::create_directory(path);
+#else
+    return true;
+#endif
+}
+
 bool isFileExists(const std::string& fileName) {
     std::ifstream in(fileName);
     return in.good();

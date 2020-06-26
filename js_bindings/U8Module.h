@@ -22,6 +22,8 @@ class U8Module {
     bool checkKeyTrust(std::vector<unsigned char> &keyData);
     std::map<std::string, std::string> loadManifest(zip* module);
     bool initRequireRoots();
+    std::string searchU8Module(std::string basePath);
+    std::string searchU8TrustFile();
 
 public:
     U8Module(const std::string& modulePath, const std::string &homeDir);

@@ -22,13 +22,42 @@ U8Module::U8Module(const std::string& modulePath, const std::string &homeDir) {
     this->homeDir = homeDir;
 }
 
+std::string U8Module::searchU8Module(std::string basePath) {
+    if (file_exists(basePath))
+        return basePath;
+
+    std::string path = "./.u8/modules/" + basePath;
+    if (file_exists(path))
+        return path;
+
+    path = homeDir + "/.u8/modules/" + basePath;
+    if (file_exists(path))
+        return path;
+
+    return "";
+}
+
+std::string U8Module::searchU8TrustFile() {
+    if (file_exists("u8trust.yaml"))
+        return "u8trust.yaml";
+
+    if (file_exists("./.u8/u8trust.yaml"))
+        return "./.u8/u8trust.yaml";
+
+    std::string path = homeDir + "/.u8/u8trust.yaml";
+    if (file_exists(path))
+        return path;
+
+    return "";
+}
+
 bool U8Module::load() {
     try {
         int err = 0;
 
         byte_vector u8coreBin;
         zip* z = nullptr;
-        if (modulePath.find(U8COREMODULE_FULLNAME) != std::string::npos) {
+        if (modulePath == U8COREMODULE_FULLNAME) {
             struct zip_error error = {0};
             zip_source_t *zsrc = zip_source_buffer_create(u8core_u8m, u8core_u8m_len, 0, &error);
             if (zsrc == nullptr) {
@@ -41,7 +70,11 @@ bool U8Module::load() {
                 return false;
             }
         } else {
-            z = zip_open(modulePath.c_str(), 0, &err);
+            std::string path = searchU8Module(modulePath);
+            if (!path.empty()) {
+                z = zip_open(path.c_str(), 0, &err);
+                modulePath = path;
+            }
         }
 
         if (z == nullptr) {
@@ -75,7 +108,7 @@ bool U8Module::checkModuleSignature() {
         }
 
         FILE* f = nullptr;
-        if (modulePath.find(U8COREMODULE_FULLNAME) != std::string::npos) {
+        if (modulePath == U8COREMODULE_FULLNAME) {
             f = fmemopen(u8core_u8m, u8core_u8m_len, "r+b");
         } else {
             f = fopen(modulePath.c_str(), "rb");
@@ -181,18 +214,18 @@ bool U8Module::checkKeyTrust(std::vector<unsigned char> &keyData) {
 
     YAML::Node trust;
     YAML::iterator moduleTrust;
-    std::string path = "u8trust.yaml";
     bool checkU8trust = true;
     bool trustChanged = false;
     bool foundedModuleTrust = false;
 
     // search u8trust file
-    if (file_exists(path))
+    std::string path = searchU8TrustFile();
+    if (!path.empty())
         trust = YAML::LoadFile(path);
-    else if (file_exists(path = homeDir + "/.universa/u8trust.yaml"))
-        trust = YAML::LoadFile(path);
-    else
+    else {
         checkU8trust = false;
+        path = homeDir + "/.u8/u8trust.yaml";
+    }
 
     auto publicKey = new PublicKey(keyData.data(), keyData.size());
 
@@ -311,6 +344,9 @@ bool U8Module::checkKeyTrust(std::vector<unsigned char> &keyData) {
     delete publicKey;
 
     if (trustChanged) {
+        if (!checkU8trust)
+            createDirectory(homeDir + "/.u8");
+
         sortYAML(trust);
         std::ofstream fout(path);
         fout << trust;
