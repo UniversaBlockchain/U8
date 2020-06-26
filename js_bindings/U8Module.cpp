@@ -4,7 +4,7 @@
 
 #include "U8Module.h"
 #include "../tools/tools.h"
-#include "../tools/resources.h"
+#include "../u8core.u8m.h"
 #include "../crypto/PrivateKey.h"
 #include "../crypto/PublicKey.h"
 #include "../types/UBinder.h"
@@ -29,9 +29,8 @@ bool U8Module::load() {
         byte_vector u8coreBin;
         zip* z = nullptr;
         if (modulePath.find(U8COREMODULE_FULLNAME) != std::string::npos) {
-            u8coreBin = getU8CoreU8M_binary();
             struct zip_error error = {0};
-            zip_source_t *zsrc = zip_source_buffer_create(u8coreBin.data(), u8coreBin.size(), 0, &error);
+            zip_source_t *zsrc = zip_source_buffer_create(u8core_u8m, u8core_u8m_len, 0, &error);
             if (zsrc == nullptr) {
                 printf("error: zip_source_filep_create\n");
                 return false;
@@ -75,12 +74,9 @@ bool U8Module::checkModuleSignature() {
             return false;
         }
 
-        // read module
-        byte_vector u8coreBin;
         FILE* f = nullptr;
         if (modulePath.find(U8COREMODULE_FULLNAME) != std::string::npos) {
-            u8coreBin = getU8CoreU8M_binary();
-            f = fmemopen(u8coreBin.data(), u8coreBin.size(), "r+b");
+            f = fmemopen(u8core_u8m, u8core_u8m_len, "r+b");
         } else {
             f = fopen(modulePath.c_str(), "rb");
         }

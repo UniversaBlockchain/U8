@@ -12,7 +12,7 @@
 #include "../crypto/PublicKey.h"
 #include "../types/UBinder.h"
 #include "../serialization/BossSerializer.h"
-#include "resources.h"
+#include "../u8core.u8m.h"
 
 #ifndef __APPLE__
 #include <filesystem>
@@ -44,9 +44,8 @@ bool file_exists(const std::string &name, bool dirInZip) {
         byte_vector u8coreBin;
         zip* z = nullptr;
         if (zipPath.find(U8COREMODULE_FULLNAME) != std::string::npos) {
-            u8coreBin = getU8CoreU8M_binary();
             struct zip_error error = {0};
-            zip_source_t *zsrc = zip_source_buffer_create(u8coreBin.data(), u8coreBin.size(), 0, &error);
+            zip_source_t *zsrc = zip_source_buffer_create(u8core_u8m, u8core_u8m_len, 0, &error);
             if (zsrc == nullptr) {
                 printf("error: zip_source_filep_create\n");
                 return false;
@@ -96,9 +95,8 @@ string loadFromZip(const string &zipName, const string &fileName) {
     byte_vector u8coreBin;
     zip* z = nullptr;
     if (zipName.find(U8COREMODULE_FULLNAME) != std::string::npos) {
-        u8coreBin = getU8CoreU8M_binary();
         struct zip_error error = {0};
-        zip_source_t *zsrc = zip_source_buffer_create(u8coreBin.data(), u8coreBin.size(), 0, &error);
+        zip_source_t *zsrc = zip_source_buffer_create(u8core_u8m, u8core_u8m_len, 0, &error);
         if (zsrc == nullptr) {
             printf("error: zip_source_filep_create\n");
             return string();

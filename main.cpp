@@ -9,7 +9,6 @@
 #include "crypto/base64.h"
 #include "js_bindings/Scripter.h"
 #include "tools/tools.h"
-#include "tools/resources.h"
 #include "js_bindings/worker_bindings.h"
 
 #include "AsyncIO/AsyncIO.h"
