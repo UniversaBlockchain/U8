@@ -107,76 +107,98 @@ bool U8Module::checkModuleSignature() {
             return false;
         }
 
-        FILE* f = nullptr;
         if (modulePath == U8COREMODULE_FULLNAME) {
-            f = fmemopen(u8core_u8m, u8core_u8m_len, "r+b");
+            auto moduleLen = (size_t) u8core_u8m_len;
+            auto dataLen = moduleLen - lenSignData - sizeof(unsigned short);
+            void *data = u8core_u8m;
+            void *signData = &u8core_u8m[dataLen + sizeof(unsigned short)];
+
+            UBytes packed((const unsigned char *) signData, (unsigned short) lenSignData);
+            UObject signature = BossSerializer::deserialize(packed);
+            auto key = UBytes::asInstance(UBinder::asInstance(signature).get("pub_key")).get();
+            auto sign = UBytes::asInstance(UBinder::asInstance(signature).get("sha3_512")).get();
+            PublicKey publicKey(key.data(), key.size());
+            bool res = publicKey.verify(sign.data(), sign.size(), data, dataLen, HashType::SHA3_512);
+
+            if (!checkKeyTrust(key)) {
+                printf("Untrusted signature key\n");
+                res = false;
+            }
+
+            if (!initRequireRoots()) {
+                printf("jslib in u8 core module not found\n");
+                res = false;
+            }
+
+            return res;
         } else {
-            f = fopen(modulePath.c_str(), "rb");
-        }
-        if (f == nullptr) {
-            printf("Failed opening file %s\n", modulePath.c_str());
-            return false;
-        }
-        fseek(f, 0, SEEK_END);
-        auto moduleLen = (size_t) ftell(f);
-        fseek(f, 0, SEEK_SET);
 
-        auto dataLen = moduleLen - lenSignData - sizeof(unsigned short);
-        void* data = malloc(dataLen);
-        auto readed = fread(data, 1, dataLen, f);
-        if (readed != dataLen) {
-            printf("Failed reading module data\n");
+            FILE *f = fopen(modulePath.c_str(), "rb");
+            if (f == nullptr) {
+                printf("Failed opening file %s\n", modulePath.c_str());
+                return false;
+            }
+            fseek(f, 0, SEEK_END);
+            auto moduleLen = (size_t) ftell(f);
+            fseek(f, 0, SEEK_SET);
+
+            auto dataLen = moduleLen - lenSignData - sizeof(unsigned short);
+            void *data = malloc(dataLen);
+            auto readed = fread(data, 1, dataLen, f);
+            if (readed != dataLen) {
+                printf("Failed reading module data\n");
+
+                fclose(f);
+                free(data);
+                return false;
+            }
+
+            fseek(f, dataLen + sizeof(unsigned short), SEEK_SET);
+
+            // read signature
+            void *signData = malloc((unsigned short) lenSignData);
+            readed = fread(signData, 1, (unsigned short) lenSignData, f);
+            if (readed != lenSignData) {
+                printf("Failed reading signature\n");
+
+                fclose(f);
+                free(data);
+                free(signData);
+                return false;
+            }
+
+            // unpack signature
+            UBytes packed((const unsigned char *) signData, (unsigned short) lenSignData);
+            UObject signature = BossSerializer::deserialize(packed);
+
+            auto key = UBytes::asInstance(UBinder::asInstance(signature).get("pub_key")).get();
+            auto sign = UBytes::asInstance(UBinder::asInstance(signature).get("sha3_512")).get();
+
+            auto publicKey = new PublicKey(key.data(), key.size());
+
+            // verify signature
+            bool res = publicKey->verify(sign.data(), sign.size(), data, dataLen, HashType::SHA3_512);
+
+            // check public key
+            if (!checkKeyTrust(key)) {
+                printf("Untrusted signature key\n");
+                res = false;
+            }
+
+            delete publicKey;
 
             fclose(f);
-            free(data);
-            return false;
-        }
 
-        fseek(f, dataLen + sizeof(unsigned short), SEEK_SET);
-
-        // read signature
-        void* signData = malloc((unsigned short) lenSignData);
-        readed = fread(signData, 1, (unsigned short) lenSignData, f);
-        if (readed != lenSignData) {
-            printf("Failed reading signature\n");
-
-            fclose(f);
             free(data);
             free(signData);
-            return false;
+
+            if (!initRequireRoots()) {
+                printf("jslib in u8 core module not found\n");
+                res = false;
+            }
+
+            return res;
         }
-
-        // unpack signature
-        UBytes packed((const unsigned char*) signData, (unsigned short) lenSignData);
-        UObject signature = BossSerializer::deserialize(packed);
-
-        auto key = UBytes::asInstance(UBinder::asInstance(signature).get("pub_key")).get();
-        auto sign = UBytes::asInstance(UBinder::asInstance(signature).get("sha3_512")).get();
-
-        auto publicKey = new PublicKey(key.data(), key.size());
-
-        // verify signature
-        bool res = publicKey->verify(sign.data(), sign.size(), data, dataLen, HashType::SHA3_512);
-
-        // check public key
-        if (!checkKeyTrust(key)) {
-            printf("Untrusted signature key\n");
-            res = false;
-        }
-
-        delete publicKey;
-
-        fclose(f);
-
-        free(data);
-        free(signData);
-
-        if (!initRequireRoots()) {
-            printf("jslib in u8 core module not found\n");
-            res = false;
-        }
-
-        return res;
 
     } catch (const std::exception& e) {
         printf("Error checking module signature: %s\n", e.what());
