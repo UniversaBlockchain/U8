@@ -5,6 +5,7 @@
 #include <fstream>
 #include <iostream>
 #include <algorithm>
+#include <unistd.h>
 #include "tools.h"
 #include "zip.h"
 #include "../crypto/PrivateKey.h"
