@@ -69,6 +69,7 @@ add_dependencies(u8_lib cxxlibs)
 
 file(GLOB TESTS_SRC
     test/*.h test/*.cpp
+    u8core.u8m.h u8core.u8m.c
 )
 
 file(GLOB MAIN_SRC main.cpp u8core.u8m.h u8core.u8m.c)
