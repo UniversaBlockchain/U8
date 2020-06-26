@@ -13,6 +13,8 @@
 #include "../types/UBinder.h"
 #include "../serialization/BossSerializer.h"
 #include "../u8core.u8m.h"
+#include "../tools/Semaphore.h"
+#include "../AsyncIO/IODir.h"
 
 #ifndef __APPLE__
 #include <filesystem>
@@ -309,11 +311,15 @@ std::string makeAbsolutePath(const std::string& path) {
 }
 
 bool createDirectory(const std::string& path) {
-#ifndef __APPLE__
-    return std::filesystem::create_directory(path);
-#else
-    return true;
-#endif
+    Semaphore sem;
+    bool result = false;
+    asyncio::IODir::createDir(path.data(), S_IRWXU | S_IRGRP | S_IXGRP | S_IROTH | S_IXOTH, [&result, &sem](auto res) {
+        result = !asyncio::isError(res);
+        sem.notify();
+    });
+
+    sem.wait();
+    return result;
 }
 
 bool isFileExists(const std::string& fileName) {
