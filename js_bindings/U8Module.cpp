@@ -4,6 +4,7 @@
 
 #include "U8Module.h"
 #include "../tools/tools.h"
+#include "../tools/resources.h"
 #include "../crypto/PrivateKey.h"
 #include "../crypto/PublicKey.h"
 #include "../types/UBinder.h"
@@ -14,6 +15,7 @@ using namespace crypto;
 
 const char *U8_PUBLIC_KEY = "HggcAQABxAABuc8tZdvfwUY550JXjg6GkVszQsy5lrao6LX5BpmVCPRq8xBlhqNnZmPz+sv+bFlGHPhydqV1xkSzBxGi+JqPYE+q0NQ9MJ3YVOzd/MRVW+dn7oZ8uUcWp81j/Wmn4mGVHP9bFhaqiu1JpnkJS6We5923IMrGrhxHDdstFFbs0KVHfgX1ekKKZSkXqNOHFb1VcvIyHrWyL4ZBqVlhqoQB7uMz68MlVznCzdF1HVWtwfuTLzVKXLlMNXGRYLaMqsBKH2U9esN6wXbvSfiMRRKKyiHMfYO4Ohg8ZAnnOfUwCqR48LbxY/W6w0aJ+uy4ohA9jKbT+JEp+vv3bM3KV8jt1w==";
 extern const char *U8COREMODULE_NAME;
+extern const char *U8COREMODULE_FULLNAME;
 
 U8Module::U8Module(const std::string& modulePath, const std::string &homeDir) {
     this->modulePath = modulePath;
@@ -23,7 +25,26 @@ U8Module::U8Module(const std::string& modulePath, const std::string &homeDir) {
 bool U8Module::load() {
     try {
         int err = 0;
-        zip* z = zip_open(modulePath.c_str(), 0, &err);
+
+        byte_vector u8coreBin;
+        zip* z = nullptr;
+        if (modulePath.find(U8COREMODULE_FULLNAME) != std::string::npos) {
+            u8coreBin = getU8CoreU8M_binary();
+            struct zip_error error = {0};
+            zip_source_t *zsrc = zip_source_buffer_create(u8coreBin.data(), u8coreBin.size(), 0, &error);
+            if (zsrc == nullptr) {
+                printf("error: zip_source_filep_create\n");
+                return false;
+            }
+            z = zip_open_from_source(zsrc, 0, &error);
+            if (error.zip_err != 0) {
+                printf("zip_open_from_source error code: %i\n", error.zip_err);
+                return false;
+            }
+        } else {
+            z = zip_open(modulePath.c_str(), 0, &err);
+        }
+
         if (z == nullptr) {
             printf("File %s not found\n", modulePath.c_str());
             return false;
@@ -55,7 +76,14 @@ bool U8Module::checkModuleSignature() {
         }
 
         // read module
-        FILE* f = fopen(modulePath.c_str(), "rb");
+        byte_vector u8coreBin;
+        FILE* f = nullptr;
+        if (modulePath.find(U8COREMODULE_FULLNAME) != std::string::npos) {
+            u8coreBin = getU8CoreU8M_binary();
+            f = fmemopen(u8coreBin.data(), u8coreBin.size(), "r+b");
+        } else {
+            f = fopen(modulePath.c_str(), "rb");
+        }
         if (f == nullptr) {
             printf("Failed opening file %s\n", modulePath.c_str());
             return false;

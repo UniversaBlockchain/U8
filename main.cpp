@@ -9,6 +9,7 @@
 #include "crypto/base64.h"
 #include "js_bindings/Scripter.h"
 #include "tools/tools.h"
+#include "tools/resources.h"
 #include "js_bindings/worker_bindings.h"
 
 #include "AsyncIO/AsyncIO.h"
@@ -21,6 +22,7 @@
 using namespace std;
 
 void usage();
+void unpackJsLib();
 
 void handler(int sig) {
     void *array[100];
@@ -61,6 +63,7 @@ int main(int argc, const char **argv) {
         usage();
         return 1;
     } else {
+
         return Scripter::Application(argv[0], argv[1], [=](shared_ptr<Scripter> se) {
             vector<string> args(argv + 1, argv + argc);
 

@@ -29,8 +29,11 @@ endif ()
 if (MACOSX)
     set(platform "macos")
 elseif (UNIX)
-    set(platform "linux")
-    #set(platform "linux_monolith")
+    if (U8_BUILD_MONOLITH)
+        set(platform "linux_monolith")
+    else ()
+        set(platform "linux")
+    endif ()
 elseif (WIN32)
     set(platform "win_v8")
 endif ()
@@ -68,8 +71,10 @@ file(GLOB TESTS_SRC
     test/*.h test/*.cpp
 )
 
+file(GLOB MAIN_SRC main.cpp u8core.u8m.h u8core.u8m.c)
+
 add_executable(u8_tests ${TESTS_SRC})
-add_executable(u8 main.cpp)
+add_executable(u8 ${MAIN_SRC})
 
 target_link_libraries(u8 PRIVATE u8_lib)
 target_link_libraries(u8_tests PRIVATE u8_lib)

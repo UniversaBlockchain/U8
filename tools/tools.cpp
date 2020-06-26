@@ -12,6 +12,7 @@
 #include "../crypto/PublicKey.h"
 #include "../types/UBinder.h"
 #include "../serialization/BossSerializer.h"
+#include "resources.h"
 
 #ifndef __APPLE__
 #include <filesystem>
@@ -21,6 +22,8 @@ using namespace std;
 using namespace crypto;
 
 extern const char *U8MODULE_EXTENSION;
+extern const char *U8COREMODULE_NAME;
+extern const char *U8COREMODULE_FULLNAME;
 
 bool file_exists(const std::string &name, bool dirInZip) {
     size_t pos = name.find(U8MODULE_EXTENSION);
@@ -31,12 +34,32 @@ bool file_exists(const std::string &name, bool dirInZip) {
         string zipPath = name.substr(0, pos + 4);
         string path = name.substr(pos + 5);
 
-        if (stat(zipPath.c_str(), &buffer) != 0)
-            return false;
+        if (zipPath.find(U8COREMODULE_FULLNAME) == std::string::npos)
+            if (stat(zipPath.c_str(), &buffer) != 0)
+                return false;
 
         // find in zip-archive
         int err = 0;
-        zip* z = zip_open(zipPath.c_str(), 0, &err);
+
+        byte_vector u8coreBin;
+        zip* z = nullptr;
+        if (zipPath.find(U8COREMODULE_FULLNAME) != std::string::npos) {
+            u8coreBin = getU8CoreU8M_binary();
+            struct zip_error error = {0};
+            zip_source_t *zsrc = zip_source_buffer_create(u8coreBin.data(), u8coreBin.size(), 0, &error);
+            if (zsrc == nullptr) {
+                printf("error: zip_source_filep_create\n");
+                return false;
+            }
+            z = zip_open_from_source(zsrc, 0, &error);
+            if (error.zip_err != 0) {
+                printf("zip_open_from_source error code: %i\n", error.zip_err);
+                return false;
+            }
+        } else {
+            z = zip_open(zipPath.c_str(), 0, &err);
+        }
+
         if (z == nullptr)
             return false;
 
@@ -63,12 +86,32 @@ string replace_all(const string &src, const string &what, const string &to, size
 
 string loadFromZip(const string &zipName, const string &fileName) {
     struct stat buffer;
-    if (stat(zipName.c_str(), &buffer) != 0)
-        return string();
+    if (zipName.find(U8COREMODULE_FULLNAME) == std::string::npos)
+        if (stat(zipName.c_str(), &buffer) != 0)
+            return string();
 
     // find in zip-archive
     int err = 0;
-    zip* z = zip_open(zipName.c_str(), 0, &err);
+
+    byte_vector u8coreBin;
+    zip* z = nullptr;
+    if (zipName.find(U8COREMODULE_FULLNAME) != std::string::npos) {
+        u8coreBin = getU8CoreU8M_binary();
+        struct zip_error error = {0};
+        zip_source_t *zsrc = zip_source_buffer_create(u8coreBin.data(), u8coreBin.size(), 0, &error);
+        if (zsrc == nullptr) {
+            printf("error: zip_source_filep_create\n");
+            return string();
+        }
+        z = zip_open_from_source(zsrc, 0, &error);
+        if (error.zip_err != 0) {
+            printf("zip_open_from_source error code: %i\n", error.zip_err);
+            return string();
+        }
+    } else {
+        z = zip_open(zipName.c_str(), 0, &err);
+    }
+
     if (z == nullptr)
         return string();
 
@@ -287,10 +330,37 @@ std::string getFileContents(const std::string& fileName) {
     return "";
 }
 
+byte_vector getFileContentsBin(const std::string& fileName)
+{
+    std::ifstream in(fileName, std::ios::in | std::ios::binary);
+    if (in)
+    {
+        byte_vector contents;
+        in.seekg(0, std::ios::end);
+        contents.resize((size_t)in.tellg());
+        in.seekg(0, std::ios::beg);
+        in.read((char*)&contents[0], contents.size());
+        in.close();
+        return(contents);
+    }
+    return byte_vector();
+}
+
 bool putFileContents(const std::string& fileName, const std::string& text) {
     std::ofstream out(fileName, std::ios::trunc);
     if (out) {
         out << text;
+        out.close();
+        return true;
+    }
+    return false;
+}
+
+bool putFileContentsBin(const std::string& fileName, const byte_vector& bin) {
+    std::ofstream out(fileName, std::ios::trunc | std::ofstream::binary);
+    if (out) {
+        //out << bin;
+        out.write((const char*)bin.data(), bin.size());
         out.close();
         return true;
     }

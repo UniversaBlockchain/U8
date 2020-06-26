@@ -1,5 +1,6 @@
 cmake-build-debug/
 cmake-build-release/
+cmake-build-monolith-release/
 .idea/
 ext/
 download_libs.stamp
