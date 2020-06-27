@@ -1,0 +1,11 @@
+Package: u8
+Version: 0.9-1
+Section: utils
+Priority: optional
+Architecture: amd64
+Depends: libpq5
+Maintainer: iCodici
+Description: runtime environment
+ U8 is the JavaScript + C++ Universa-specific
+ runtime environment implementation
+ using V8 JavaScript engine.
