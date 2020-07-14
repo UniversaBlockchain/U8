@@ -7,6 +7,9 @@ add_definitions(-DMG_ENABLE_IPV6)
 add_definitions(-DMG_ENABLE_SSL)
 add_definitions(-DMG_ENABLE_DNS_SERVER)
 add_definitions(-DV8_COMPRESS_POINTERS)
+if (NOT U8_BUILD_MONOLITH)
+    add_definitions(-DU8_BUILD_DEVELOPMENT)
+endif()
 
 # v8 lib
 # g++ -I/usr/local/Cellar/v8/7.1.302.28 -I/usr/local/Cellar/v8/7.1.302.28/include -Gs tests/hello-world.cc -o hello_world -L/usr/local/Cellar/v8/7.1.302.28 -lv8 -lv8_libplatform -lv8_libbase -Lout.gn/x64.release.sample/obj/ -pthread -std=c++0x -O2

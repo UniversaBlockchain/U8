@@ -90,8 +90,10 @@ shared_ptr<Scripter> Scripter::New(int accessLevel, bool forWorker) {
 Scripter::Scripter() : Logging("SCR") {
     std::string s = ARGV1;
 
+#ifndef U8_BUILD_DEVELOPMENT
     if (!u8coreLoaded)
         loadModule(U8COREMODULE_FULLNAME);
+#endif
 
     struct passwd *pw = getpwuid(getuid());
     home = pw->pw_dir;

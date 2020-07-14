@@ -42,6 +42,12 @@ int main(int argc, const char **argv) {
     crypto::initCrypto();
     asyncio::initAndRunLoop(5ms);
 
+#ifdef U8_BUILD_DEVELOPMENT
+    cout << "==============================" << endl;
+    cout << "=== u8 development version ===" << endl;
+    cout << "==============================" << endl;
+#endif
+
     if (argc == 2 && strcmp(argv[1], "--selftest") == 0) {
         testCryptoAll();
         allAsyncIOTests();
