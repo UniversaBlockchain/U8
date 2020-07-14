@@ -11,6 +11,7 @@ const TransactionPack = require("transactionpack").TransactionPack;
 const Quantiser = require("quantiser").Quantiser;
 const DefaultBiMapper = require("defaultbimapper").DefaultBiMapper;
 const QuantiserException = require("quantiser").QuantiserException;
+const Compound = require("compound").Compound;
 
 class BadPayloadException extends ex.IllegalArgumentError {
     constructor(message = undefined) {
@@ -41,6 +42,10 @@ class InsufficientFundsException extends BadPaymentException {
 }
 
 class Parcel extends bs.BiSerializable {
+
+    static TP_PAYING_FOR_TAG_PREFIX = "paying_for_";
+    static COMPOUND_MAIN_TAG = "paying_parcel_main";
+    static COMPOUND_PAYMENT_TAG = "paying_parcel_payment";
 
     /**
      * This class implements Parcel.
@@ -229,7 +234,7 @@ class Parcel extends bs.BiSerializable {
             throw new BadPayloadException("payload contains errors: " + JSON.stringify(payload.errors));
 
         let costU = payload.getProcessedCostU();
-        let payment = Parcel.createPayment(uContract, uKeys, costU, withTestPayment);
+        let payment = await Parcel.createPayment(uContract, uKeys, costU, withTestPayment);
 
         return new Parcel(payload.transactionPack, payment.transactionPack);
     }
@@ -238,7 +243,7 @@ class Parcel extends bs.BiSerializable {
         let payment = await uContract.createRevision(uKeys);
         let fieldName = withTestPayment ? "test_transaction_units" : "transaction_units";
         payment.state.data[fieldName] = uContract.state.data[fieldName] - amount;
-        await payment.seal();
+        await payment.seal(true);
         try {
             payment.quantiser.resetNoLimit();
             if (! (await payment.check())) {
@@ -279,12 +284,12 @@ class Parcel extends bs.BiSerializable {
         let payment = await Parcel.createPayment(transactionPayment, uKeys, payingAmount, false);
         // we add new item to the contract, so we need to recreate transaction pack
         let mainContract = this.payload.contract;
-        // Compound compound = new Compound();
-        // compound.addContract(COMPOUND_MAIN_TAG,mainContract,null);
-        // compound.addContract(COMPOUND_PAYMENT_TAG,payment,null);
-        // TransactionPack tp = compound.getCompoundContract().getTransactionPack();
-        // tp.addTag(TP_PAYING_FOR_TAG_PREFIX + mainContract.getId().toBase64String(),payment.getId());
-        // this.payload = tp;
+        let compound = new Compound();
+        compound.addContract(Parcel.COMPOUND_MAIN_TAG, mainContract,null);
+        compound.addContract(Parcel.COMPOUND_PAYMENT_TAG, payment,null);
+        let tp = compound.compoundContract.transactionPack;
+        tp.addTag(Parcel.TP_PAYING_FOR_TAG_PREFIX + mainContract.id.base64, payment.id);
+        this.payload = tp;
     }
 
     /**
@@ -296,17 +301,18 @@ class Parcel extends bs.BiSerializable {
      * @return {Contract} contract containing remaining U
      */
     getRemainingU(payloadApproved = true) {
-        // AtomicReference<Contract> u = new AtomicReference<>(getPaymentContract());
-        // while (payloadApproved) {
-        //     Optional<Contract> result = getPayload().getSubItems().values().stream().filter(si -> si.getParent() != null && si.getParent().equals(u.get().getId())).findAny();
-        //     if (result.isPresent()) {
-        //         u.set(result.get());
-        //     } else {
-        //         break;
-        //     }
-        // }
-        //
-        // return u.get();
+        let u = this.payment.contract;
+        while (payloadApproved) {
+            payloadApproved = false;
+            for (let si of this.payload.subItems)
+                if (si.state.parent != null && si.state.parent.equals(u.id)) {
+                    u = si;
+                    payloadApproved = true;
+                    break;
+                }
+        }
+
+        return u;
     }
 }
 

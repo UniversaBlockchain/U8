@@ -12,12 +12,13 @@ const BigDecimal  = require("big").Big;
 const tt = require("test_tools");
 const Contract = require('contract').Contract;
 const UnsContract = require('services/unsContract').UnsContract;
+const io = require("io");
 
 const TOPOLOGY_ROOT = "../test/ubot/topology/";
 const TOPOLOGY_FILE = "universa.pro.json";      //"mainnet_topology.json";
 const userPrivKey = tk.TestKeys.getKey();
 
-async function createPayment(cost) {
+async function createPayment() {
     let netClient = await new UBotClient(tk.getTestKey(), TOPOLOGY_ROOT + TOPOLOGY_FILE).start();
 
     let U = await tt.createFreshU(100000000, [userPrivKey.publicKey]);
@@ -25,14 +26,14 @@ async function createPayment(cost) {
     await U.seal(true);
 
     await U.addSignatureToSeal(tk.getTestKey());
-    let ir = await netClient.register(await U.getPackedTransaction(), 10000);
+
+    let pack = await U.getPackedTransaction();
+    //await io.filePutContents("/home/dmitriy/U_07.unicon", pack);
+
+    let ir = await netClient.register(pack, 10000);
 
     if (ir.state !== ItemState.APPROVED)
         throw new Error("Error createPayment: item state = " + ir.state.val);
-
-    U = await U.createRevision([userPrivKey]);
-    U.state.data.transaction_units = U.state.data.transaction_units - cost;
-    await U.seal();
 
     await netClient.shutdown();
 
@@ -63,7 +64,15 @@ unit.test("uns_test: registerUNS", async () => {
     let parcel = await uns.createRegistrationParcelFromExpirationDate(plannedExpirationDate, await createPayment(100),
         [userPrivKey], [userPrivKey, authorizedNameServiceKey, keyToRegister]);
 
-    let ir = await netClient.registerParcelWithState(await parcel.pack(), 8000);
+    let pack = await parcel.pack();
+    //await io.filePutContents("/home/dmitriy/Parcel_07.uniparcel", pack);
+
+    let ir = await netClient.registerParcelWithState(pack, 8000);
+    let irx = await netClient.getState(parcel.getPaymentContract().id);
+
+    console.log("!!!" + JSON.stringify(ir));
+    console.log("!!!" + JSON.stringify(irx));
+    console.log("!!!" + JSON.stringify(irx.errors.length));
 
     // let tokenIssuerKey = tk.TestKeys.getKey();
     // let tokenContract = await cs.createTokenContract([tokenIssuerKey], [tokenIssuerKey.publicKey], new BigDecimal("1000"));

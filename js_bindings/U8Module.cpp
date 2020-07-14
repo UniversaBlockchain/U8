@@ -252,6 +252,9 @@ bool U8Module::checkKeyTrust(std::vector<unsigned char> &keyData) {
     auto publicKey = new PublicKey(keyData.data(), keyData.size());
 
     if (checkU8trust) {
+        std::string UNS_name = (manifest.find("UNS_name") != manifest.end()) ? manifest.find("UNS_name")->second : "";
+        bool trustUNS = false;
+
         // check trusted keys
         if (trust["trust_all"].IsMap() && trust["trust_all"]["keys"].IsSequence())
             for (auto it = trust["trust_all"]["keys"].begin(); it != trust["trust_all"]["keys"].end(); it++) {
@@ -276,6 +279,14 @@ bool U8Module::checkKeyTrust(std::vector<unsigned char> &keyData) {
                     return true;
                 }
             }
+
+        // check trusted UNS
+        if (!UNS_name.empty() && trust["trust_all"].IsMap() && trust["trust_all"]["UNS_names"].IsSequence())
+            for (auto it = trust["trust_all"]["UNS_names"].begin(); it != trust["trust_all"]["UNS_names"].end(); it++)
+                if (UNS_name == (*it).as<std::string>()) {
+                    trustUNS = true;
+                    break;
+                }
 
         // check for module
         if (trust["trust_modules"].IsSequence())
@@ -318,13 +329,24 @@ bool U8Module::checkKeyTrust(std::vector<unsigned char> &keyData) {
                                     return true;
                                 }
                             }
+
+                        // check trusted UNS
+                        if (!UNS_name.empty() && (*it)["UNS_names"].IsSequence())
+                            for (auto itu = (*it)["UNS_names"].begin(); itu != (*it)["UNS_names"].end(); itu++)
+                                if (UNS_name == (*itu).as<std::string>()) {
+                                    trustUNS = true;
+                                    break;
+                                }
                     }
                 }
 
-        // TODO: check trusted UNS
-    }
+        if (!UNS_name.empty()) {
+            // scan trust addresses in module`s UNS contract
 
-    // TODO: scan trust addresses in module`s UNS conract
+
+            //trustUNS
+        }
+    }
 
     auto ka = new KeyAddress(*publicKey, 0, true);
 

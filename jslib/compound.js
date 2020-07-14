@@ -25,14 +25,12 @@ class Compound {
         this.compoundContract = compoundContract;
 
         let type = compoundContract.definition.data.type;
-        if (type !== Compound.TYPE) {
-            throw new ex.IllegalArgumentError("Invalid 'definition.data.type':'"+type+"', expected:'"+Compound.TYPE+"'");
-        }
+        if (type !== Compound.TYPE)
+            throw new ex.IllegalArgumentError("Invalid 'definition.data.type':'" + type + "', expected:'" + Compound.TYPE + "'");
 
-        let version = compoundContract.definition.data.getInt("version",999999);
-        if (version > Compound.VERSION) {
-            throw new ex.IllegalArgumentError("'definition.data.version':'"+version+"' is not supported. Maximum supported version is " + Compound.VERSION);
-        }
+        let version = compoundContract.definition.data.getInt("version", 999999);
+        if (version > Compound.VERSION)
+            throw new ex.IllegalArgumentError("'definition.data.version':'" + version + "' is not supported. Maximum supported version is " + Compound.VERSION);
     }
 
     /**
@@ -221,6 +219,9 @@ class Compound {
     getTags() {
         return this.compoundContract.definition.data.contracts; //TODO
     }
-
 }
 
+///////////////////////////
+//EXPORTS
+///////////////////////////
+module.exports = {Compound};
