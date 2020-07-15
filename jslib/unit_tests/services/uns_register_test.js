@@ -7,10 +7,7 @@ import * as tk from "unit_tests/test_keys";
 
 const UBotClient = require('ubot/ubot_client').UBotClient;
 const ItemState = require("itemstate").ItemState;
-const cs = require("contractsservice");
-const BigDecimal  = require("big").Big;
 const tt = require("test_tools");
-const Contract = require('contract').Contract;
 const UnsContract = require('services/unsContract').UnsContract;
 const io = require("io");
 
@@ -18,7 +15,7 @@ const TOPOLOGY_ROOT = "../test/ubot/topology/";
 const TOPOLOGY_FILE = "universa.pro.json";      //"mainnet_topology.json";
 const userPrivKey = tk.TestKeys.getKey();
 
-async function createPayment() {
+async function createU() {
     let netClient = await new UBotClient(tk.getTestKey(), TOPOLOGY_ROOT + TOPOLOGY_FILE).start();
 
     let U = await tt.createFreshU(100000000, [userPrivKey.publicKey]);
@@ -47,8 +44,6 @@ unit.test("uns_test: registerUNS", async () => {
 
     uns.nodeInfoProvider = await netClient.getConfigProvider();
 
-    // console.log("uns.nodeInfoProvider = " + JSON.stringify(uns.nodeInfoProvider));
-
     let keyToRegister = tk.TestKeys.getKey();
     let authorizedNameServiceKey = tk.TestKeys.getKey();        // TODO
     let name = "Trust" + Date.now();
@@ -59,9 +54,9 @@ unit.test("uns_test: registerUNS", async () => {
     uns.keysToSignWith.add(keyToRegister);
 
     let plannedExpirationDate = new Date();
-    plannedExpirationDate.setMonth(plannedExpirationDate.getMonth() + 12);
+    plannedExpirationDate.setFullYear(plannedExpirationDate.getFullYear() + 1);
 
-    let parcel = await uns.createRegistrationParcelFromExpirationDate(plannedExpirationDate, await createPayment(100),
+    let parcel = await uns.createRegistrationParcelFromExpirationDate(plannedExpirationDate, await createU(),
         [userPrivKey], [userPrivKey, authorizedNameServiceKey, keyToRegister]);
 
     let pack = await parcel.pack();

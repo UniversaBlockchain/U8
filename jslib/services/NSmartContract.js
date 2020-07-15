@@ -4,6 +4,8 @@
 
 const bs = require("biserializable");
 const Contract = require("contract").Contract;
+const TransactionPack = require("transactionpack").TransactionPack;
+const Parcel = require("parcel").Parcel;
 const e = require("errors");
 const Errors = e.Errors;
 const ErrorRecord = e.ErrorRecord;
@@ -139,38 +141,45 @@ class NSmartContract extends Contract {
     getPaidU(allowTestPayments = false) {
         this.checkProvider();
 
-        // first of all looking for U contract and calculate paid U amount.
-        this.newItems.forEach(nc => {
-            if (nc.isU(this.nodeInfoProvider.getUIssuerKeys(), this.nodeInfoProvider.getUIssuerName())) {
-                let calculatedPayment = 0;
-                let isTestPayment = false;
+        if (this.transactionPack == null)
+            this.transactionPack = new TransactionPack(this);
 
-                let parent = null;
-                for (let nrc of nc.revokingItems)
-                    if (nrc.id.equals(nc.state.parent)) {
-                        parent = nrc;
-                        break;
-                    }
+        let payment = Parcel.findPaymentContract(this, this.transactionPack, this.nodeInfoProvider.getUIssuerKeys(), this.nodeInfoProvider.getUIssuerName());
 
-                if (parent != null) {
-                    if (nc.state.data.test_transaction_units != null) {
-                        isTestPayment = true;
-                        calculatedPayment = parent.state.data.test_transaction_units - nc.state.data.test_transaction_units;
+        if (payment != null)
+            return NSmartContract.getUPaidByContract(payment, allowTestPayments);
 
-                        if (calculatedPayment <= 0) {
-                            isTestPayment = false;
-                            calculatedPayment = parent.state.data.transaction_units - nc.state.data.transaction_units;
-                        }
-                    } else {
-                        isTestPayment = false;
-                        calculatedPayment = parent.state.data.transaction_units - nc.state.data.transaction_units;
-                    }
-                }
+        return 0;
+    }
 
-                if (!isTestPayment || allowTestPayments)
-                    return calculatedPayment;
+    static getUPaidByContract(contract, allowTestPayments) {
+        let calculatedPayment = 0;
+        let isTestPayment = false;
+
+        let parent = null;
+        for (let nrc of contract.revokingItems)
+            if (nrc.id.equals(contract.state.parent)) {
+                parent = nrc;
+                break;
             }
-        });
+
+        if (parent != null) {
+            if (contract.state.data.test_transaction_units != null) {
+                isTestPayment = true;
+                calculatedPayment = parent.state.data.test_transaction_units - contract.state.data.test_transaction_units;
+
+                if (calculatedPayment <= 0) {
+                    isTestPayment = false;
+                    calculatedPayment = parent.state.data.transaction_units - contract.state.data.transaction_units;
+                }
+            } else {
+                isTestPayment = false;
+                calculatedPayment = parent.state.data.transaction_units - contract.state.data.transaction_units;
+            }
+        }
+
+        if (!isTestPayment || allowTestPayments)
+            return calculatedPayment;
 
         return 0;
     }

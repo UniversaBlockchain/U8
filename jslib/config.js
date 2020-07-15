@@ -55,6 +55,7 @@ class Config {
 
     static uIssuerName = "Universa Reserve System";
     static authorizedNameServiceCenterKey = new crypto.PublicKey(atob("HggcAQABxAABg9ideX6A3Wk9CuwnZrakXdvhYDiIiO0HA+YWmLArcZvhhaGMrw1i1mA6S9L6NPAuhYcZzm8Mxtwr1RESyJqm+HFwU+49s0yXHhCJsXcvK23Yx7NEpIrpGkKt9OCCdBGhQkls0Yc1lBBmGYCrShMntPC9xY9DJZ4sbMuBPIUQzpnWLYgRAbZb+KuZFXAIr7hRO0rNTZ6hE5zp6oPwlQLh9hBy6CsvZD/73Cf2WtKDunHD1qKuQU/KqruqVMMv2fd6ZKo692esWsqqIAiQztg1+sArAhf0Cr8lhRf53G5rndiiQx7RDs1P9Pp1wWK9e93UL1KF4PpVx7e7SznrCHTEdw"));
+    static authorizedNameServiceCenterAddress = new crypto.KeyAddress("bfj7QxZRtaKVnQe245MDCrnVcxrvWb5tAAhaWTcgDgHCaEjHZkHQioCSRJp2x5s3pYSH2rum");
     static networkAdminKeyAddress = new crypto.KeyAddress("bVmSQXWM7WvUtgcitUtjRd42WRbLycvsfPaRimpSNY3yZMUrVvEHV6mwb8A2DrKnzi795kJB");
 
     constructor() {

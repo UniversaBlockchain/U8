@@ -284,9 +284,9 @@ class Parcel extends bs.BiSerializable {
         let payment = await Parcel.createPayment(transactionPayment, uKeys, payingAmount, false);
         // we add new item to the contract, so we need to recreate transaction pack
         let mainContract = this.payload.contract;
-        let compound = new Compound();
-        compound.addContract(Parcel.COMPOUND_MAIN_TAG, mainContract,null);
-        compound.addContract(Parcel.COMPOUND_PAYMENT_TAG, payment,null);
+        let compound = await Compound.init();
+        await compound.addContract(Parcel.COMPOUND_MAIN_TAG, mainContract,null);
+        await compound.addContract(Parcel.COMPOUND_PAYMENT_TAG, payment,null);
         let tp = compound.compoundContract.transactionPack;
         tp.addTag(Parcel.TP_PAYING_FOR_TAG_PREFIX + mainContract.id.base64, payment.id);
         this.payload = tp;
@@ -304,7 +304,7 @@ class Parcel extends bs.BiSerializable {
         let u = this.payment.contract;
         while (payloadApproved) {
             payloadApproved = false;
-            for (let si of this.payload.subItems)
+            for (let si of this.payload.subItems.values())
                 if (si.state.parent != null && si.state.parent.equals(u.id)) {
                     u = si;
                     payloadApproved = true;
@@ -313,6 +313,31 @@ class Parcel extends bs.BiSerializable {
         }
 
         return u;
+    }
+
+    static findPaymentContract(contract, transactionPack, uIssuerKeys, uIssuerName) {
+        // for (Contract nc : contract.getNew()) {
+        //     String currentTag = null;
+        //     for(String tag : transactionPack.getTags().keySet()) {
+        //         if(transactionPack.getTags().get(tag) == contract) {
+        //             currentTag = tag;
+        //             break;
+        //         }
+        //     }
+        //
+        //     if (nc.isU(uIssuerKeys, uIssuerName) && (currentTag == null || !currentTag.startsWith(Parcel.TP_PAYING_FOR_TAG_PREFIX))) {
+        //         return nc;
+        //     }
+        // }
+        //
+        // //backward compatibility. SLOT1 and FOLLOWER may not have an ID at this point
+        // if(contract.getLastSealedBinary() != null) {
+        //     Contract payment = transactionPack.getTags().getOrDefault(Parcel.TP_PAYING_FOR_TAG_PREFIX + contract.getId().toBase64String(), null);
+        //     if (payment != null && payment.isU(uIssuerKeys, uIssuerName))
+        //         return payment;
+        // }
+
+        return null;
     }
 }
 

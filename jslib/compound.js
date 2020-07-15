@@ -7,40 +7,15 @@ import {HashId} from 'crypto'
 const roles = require('roles');
 const ex = require("exceptions");
 const Contract = require("contract").Contract;
+const Constraint = require('constraint').Constraint;
+const TransactionPack = require("transactionpack").TransactionPack;
+const t = require("tools");
 
 class Compound {
     static TYPE = "universa_compound";
     static VERSION = 1;
 
-    constructor(compoundContract) {
-        this.compoundContract = compoundContract;
-    }
-
-    /**
-     * Create Compound from compound contract.
-     *
-     * @param {Contract} compoundContract - Unpacked compound contract.
-     */
-    fromCompoundContract(compoundContract) {
-        this.compoundContract = compoundContract;
-
-        let type = compoundContract.definition.data.type;
-        if (type !== Compound.TYPE)
-            throw new ex.IllegalArgumentError("Invalid 'definition.data.type':'" + type + "', expected:'" + Compound.TYPE + "'");
-
-        let version = compoundContract.definition.data.getInt("version", 999999);
-        if (version > Compound.VERSION)
-            throw new ex.IllegalArgumentError("'definition.data.version':'" + version + "' is not supported. Maximum supported version is " + Compound.VERSION);
-    }
-
-    /**
-     * Create Compound from packed transaction of compound contract.
-     *
-     * @param packedTransaction
-     */
-    fromPackedTransaction(packedTransaction) {
-        (Contract.fromPackedTransaction(packedTransaction));
-    }
+    constructor() {}
 
     /**
      * Create a compound contract, nested contracts can be added to.
@@ -48,33 +23,70 @@ class Compound {
      * There are two possible usages of compound contract technique.
      * First is registering multiple contracts in single transaction, saving time and reducing U cost.
      * Second is adding signatures to compound contract that will affect nested contracts without changing their binaries/IDs.
+     *
+     * @return {Compound} created Compound.
      */
-    Compound() {
-        this.compoundContract = new Contract();
+    static async init() {
+        let compound = new Compound();
+        compound.compoundContract = new Contract();
 
         let expires = new Date();
         expires.setDate(expires.getDate() + 14); // 14 days
-        this.compoundContract.setExpiresAt(expires);
+        compound.compoundContract.setExpiresAt(expires);
 
         //in order ot create roles without keys we create dummy reference and add it as required for the roles
-        let dummyConstraint = new Constraint(this.compoundContract);
+        let dummyConstraint = new Constraint(compound.compoundContract);
         dummyConstraint.name = "dummy";
-        dummyConstraint.setConditions(Binder.of("any_of", Do.listOf("this.state.parent undefined")));
-        this.compoundContract.addConstraint(dummyConstraint);
+        let conditions = {};
+        conditions[Constraint.conditionsModeType.any_of] = ["this.state.parent undefined"];
+        dummyConstraint.setConditions(conditions);
+        compound.compoundContract.addConstraint(dummyConstraint);
 
-        let issuer = new roles.SimpleRole("issuer", this.compoundContract);
-        issuer.addRequiredReference("dummy", roles.Role.RequiredMode.ALL_OF); //TODO
-        this.compoundContract.addRole(issuer);
+        let issuer = new roles.SimpleRole("issuer", null, compound.compoundContract);
+        issuer.requiredAllConstraints.add("dummy");
+        compound.compoundContract.registerRole(issuer);
 
-        this.compoundContract.addRole(new roles.RoleLink("creator", this.compoundContract, "issuer"));
-        this.compoundContract.addRole(new roles.RoleLink("owner", this.compoundContract, "issuer"));
+        compound.compoundContract.registerRole(new roles.RoleLink("creator", "issuer", compound.compoundContract));
+        compound.compoundContract.registerRole(new roles.RoleLink("owner", "issuer", compound.compoundContract));
 
-        this.compoundContract.definition.data.type = Compound.TYPE;
-        this.compoundContract.definition.data.version = Compound.VERSION;
+        compound.compoundContract.definition.data.type = Compound.TYPE;
+        compound.compoundContract.definition.data.version = Compound.VERSION;
+        compound.compoundContract.definition.data.contracts = {};
 
-        this.compoundContract.definition.data.contracts = new Binder();
+        await compound.compoundContract.seal(true);
 
-        this.compoundContract.seal();
+        return compound;
+    }
+
+    /**
+     * Create Compound from compound contract.
+     *
+     * @param {Contract} compoundContract - Unpacked compound contract.
+     * @return {Compound} created Compound.
+     */
+    static async fromCompoundContract(compoundContract) {
+        let compound = await Compound.init();
+        compound.compoundContract = compoundContract;
+
+        let type = t.getOrDefault(compoundContract.definition.data, "type", "");
+        if (type !== Compound.TYPE)
+            throw new ex.IllegalArgumentError("Invalid 'definition.data.type':'" + type + "', expected:'" + Compound.TYPE + "'");
+
+        let version = t.getOrDefault(compoundContract.definition.data, "version", 999999);
+        if (version > Compound.VERSION)
+            throw new ex.IllegalArgumentError("'definition.data.version':'" + version + "' is not supported. Maximum supported version is " + Compound.VERSION);
+
+        return compound;
+    }
+
+    /**
+     * Create Compound from packed transaction of compound contract.
+     *
+     * @param {Uint8Array} packedTransaction - Packed transaction with compound contract.
+     * @return {Compound} created Compound.
+     */
+    static async fromPackedTransaction(packedTransaction) {
+        return await Compound.fromCompoundContract(await Contract.fromPackedTransaction(packedTransaction));
     }
 
     /**
@@ -82,56 +94,53 @@ class Compound {
      *
      * @param {HashId} contractInPack - Id of a contract held by compound.
      * @param {TransactionPack} transactionPack - Transaction pack to look into.
-     * @return {Compound} compound if exists of {@code null} otherwise.
+     * @return {Compound} compound if exists or null otherwise.
      */
-    getHoldingCompound(contractInPack, transactionPack) {
-        let compoundContract = transactionPack.findContract(  // TODO add findContract
-            c => c.newItems.stream().filter(ni => ni.id.equals(contractInPack)).findAny().isPresent());
+    static async getHoldingCompound(contractInPack, transactionPack) {
+        let compoundContract = transactionPack.findContract(
+            c => Array.from(c.newItems).some(ni => ni.id.equals(contractInPack)));
 
-        if (compoundContract != null && compoundContract.definition.data.type.equals(Compound.TYPE)) {
-            return new this.fromCompoundContract(compoundContract);
-        } else {
+        if (compoundContract != null && compoundContract.definition.data.type.equals(Compound.TYPE))
+            return await Compound.fromCompoundContract(compoundContract);
+        else
             return null;
-        }
     }
 
     /**
      * Add contract to Compound. Contract and its data will later be accessible by its tag.
      *
-     * Note: contract returned by {@link #getContract(String)} has reconstructed transaction pack
+     * Note: contract returned by {@see #getContractByTag(tag)} has reconstructed transaction pack
      * with referenced items include
      *
      * @param {string} tag - String associated with contract being added.
      * @param {Contract} contractToPutInto - Contract being added.
-     * @param dataToAssociateWith binder associated with contract being added.
+     * @param {Object} dataToAssociateWith - Data object associated with contract being added.
      */
-    addContract(tag, contractToPutInto, dataToAssociateWith) {
+    async addContract(tag, contractToPutInto, dataToAssociateWith) {
         this.compoundContract.newItems.add(contractToPutInto);
 
         try {
             //make a copy of contract transaction
-            contractToPutInto = Contract.fromPackedTransaction(contractToPutInto.getPackedTransaction());
+            contractToPutInto = await Contract.fromPackedTransaction(await contractToPutInto.getPackedTransaction());
         } catch (e) {
             throw new ex.IllegalArgumentError(e);
         }
 
-        let tagBinder = {};
-
-        let referencedItems = contractToPutInto.transactionPack.referencedItems.values();
+        let tagObj = {};
+        let referencedItems = Array.from(contractToPutInto.transactionPack.referencedItems.values());
         let tpTags = contractToPutInto.transactionPack.taggedItems;
 
-        tagBinder.id = contractToPutInto.id.base64;
-        tagBinder.data = dataToAssociateWith;
-        tagBinder.refs = referencedItems.stream().map(ri => ri.id.base64).collect(Collectors.toList());
+        tagObj.id = contractToPutInto.id.base64;
+        tagObj.data = dataToAssociateWith;
+        tagObj.refs = referencedItems.map(ri => ri.id.base64);
 
-        let tpTagsBinder = {};
-       // tpTags.forEach((k, v) =>  tpTagsBinder.put(k, v.id.base64));
+        let tpTaggedItems = {};
+        tpTags.forEach((k, v) => tpTaggedItems.put(k, v.id.base64));
+        tagObj.tags = tpTaggedItems;
 
-        tagBinder.tags = tpTagsBinder;
+        this.compoundContract.definition.data.contracts[tag] = tagObj;
 
-        this.compoundContract.definition.data.contracts.put(tag, tagBinder); //TODO
-
-        this.compoundContract.seal();
+        await this.compoundContract.seal();
 
         referencedItems.forEach(ri => this.compoundContract.transactionPack.addReferencedItem(ri));
     }
@@ -140,84 +149,76 @@ class Compound {
      * Get contract from Compound by id.
      *
      * @param {HashId} contractId - Id of a contract in compound.
-     * @return {Contract}contract found.
+     * @return {Contract} contract found.
      */
-    getContractById(contractId) {
+    async getContractById(contractId) {
         let tagsBinder = this.compoundContract.definition.data.contracts;
+        let tags = Object.keys(tagsBinder);
 
-        let tags = tagsBinder.keySet();
-        for(let tag of tags) {
-            let id = HashId.withBase64Digest(tagsBinder.getBinder(tag).getString("id"));
-            if(id.equals(contractId)) {
-                return this.getContractByTag(tag);
-            }
-        }
+        for (let tag of tags)
+            if (HashId.withBase64Digest(tagsBinder[tag].id).equals(contractId))
+                return await this.getContractByTag(tag);
+
         return null;
     }
 
     /**
      * Get contract from Compound by tag
      *
-     * @param tag string to find contract by
-     * @return contract found
+     * @param {String} tag - String to find contract by
+     * @return {Contract} contract found
      */
-    getContractByTag(tag) {
-        ///*try {
-            //get binder for tag specified
-            let tagBinder = this.compoundContract.definition.data.contracts.tag;
-            if(tagBinder == null)
+    async getContractByTag(tag) {
+        try {
+            // get binder for tag specified
+            let tagObj = this.compoundContract.definition.data.contracts[tag];
+            if (tagObj == null)
                 return null;
 
-            //We make a copy of transaction and extract everything from the copy (possibly breaking its internal structure)
-            //to keep the actual one untouched
-            let tpCopy = TransactionPack.unpack(this.compoundContract.getPackedTransaction());
+            // We make a copy of transaction and extract everything from the copy (possibly breaking its internal structure)
+            // to keep the actual one untouched
+            let tpCopy = await TransactionPack.unpack(await this.compoundContract.getPackedTransaction());
 
             //get contract by id and create transaction pack for it
-            let id = HashId.withDigest(tagBinder.id);
-            let contract = tpCopy.subItems.id;
+            let id = HashId.withDigest(tagObj.id);
+            let contract = tpCopy.subItems.get(id);
 
-          /*  let transactionPack = new TransactionPack(contract);
-            contract.setTransactionPack(transactionPack);
+            let tp = new TransactionPack(contract);
+            contract.transactionPack = tp;
 
-            //fill tp referenced items from refs
-            List<String> referencedItemsIds = tagBinder.getList("refs", new ArrayList<>());
-            referencedItemsIds.forEach(riId =>transactionPack.addReferencedItem(
-                tpCopy.getReferencedItems().get(HashId.withDigest(riId))));
+            // fill tp referenced items from "refs"
+            let referencedItemsIds = t.getOrDefault(tagObj, "refs", []);
+            referencedItemsIds.forEach(riId => tp.addReferencedItem(tpCopy.referencedItems.get(HashId.withBase64Digest(riId))));
 
-            //fill tp tags from "tags"
-            Binder tpTagsBinder = tagBinder.getBinder("tags",new Binder());
-            tpTagsBinder.forEach((k,v)->transactionPack.addTag(k,HashId.withDigest((String) v)));
+            // fill tp tags from "tags"
+            let tpTags = t.getOrDefault(tagObj, "tags", {});
+            for (let [k, v] of Object.entries(tpTags))
+                tp.addTag(k, HashId.withBase64Digest(v));
 
             return contract;
 
-        } catch (ignored) {
-            return null;
         } catch (e) {
             return null;
-        } catch (e) {
-            e.printStackTrace();
-            return null;
-        }*/
+        }
     }
 
     /**
      * Get contract associated data from Compound by tag
      *
-     * @param tag string to find data by
-     * @return contract associated data
+     * @param {string} tag - String to find data by
+     * @return {Object} contract associated data
      */
     getData(tag) {
-        let tagBinder = this.compoundContract.definition.data.contracts.tag;
-        return tagBinder.data;
+        return this.compoundContract.definition.data.contracts[tag].data;
     }
 
     /**
     * Get tags from Compound
     *
-    * @return tags
+    * @return {Array<string>} tags
     */
     getTags() {
-        return this.compoundContract.definition.data.contracts; //TODO
+        return Object.keys(this.compoundContract.definition.data.contracts);
     }
 }
 

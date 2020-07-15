@@ -910,7 +910,7 @@ class UnsContract extends NSmartContract {
 
         let prepaidNameDaysLeft = 0;
 
-        if(parentContract != null) {
+        if (parentContract != null) {
             prepaidNameDaysLeft = t.getOrDefault(parentContract.state.data, UnsContract.PREPAID_ND_FIELD_NAME, 0);
             prepaidNameDaysLeft -= parentContract.getStoredUnitsCount() *
                 Math.floor((this.getCreatedAt().getTime() - parentContract.getCreatedAt().getTime()) / 1000) / (3600*24);
@@ -920,13 +920,11 @@ class UnsContract extends NSmartContract {
 
         let amount = Math.ceil(nameDaysShouldBeValidFor / Number(this.getRate()));
 
-        if(amount <= 0) {
+        if (amount <= 0)
             return 0;
-        }
 
-        if(amount < this.getMinPayment()) {
+        if (amount < this.getMinPayment())
             return this.getMinPayment();
-        }
 
         return amount;
     }

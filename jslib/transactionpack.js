@@ -66,7 +66,7 @@ class TransactionPack {
      * Note: item with given id should exist in transaction pack as either main contract or subitem or referenced item
      *
      * @param {string} tag - Tag to add
-     * @param {HashId} itemId - Id of an item to set tag for
+     * @param {crypto.HashId} itemId - Id of an item to set tag for
      */
     addTag(tag, itemId) {
         let target = null;
@@ -252,6 +252,30 @@ class TransactionPack {
 
         let c = await impContract.fromSealedBinary(bytes);
         return c.transactionPack;
+    }
+
+    /**
+     * Find contract in transaction pack by given predicate
+     *
+     * Note: if there is more than one contract that matches predicate a random one will be returned
+     *
+     * @param {Function} predicate - predicate to match contract by (Contract -> boolean)
+     * @return {Contract} contract that matches predicate or null if no contract found
+     */
+
+    findContract(predicate) {
+        if (predicate(this.contract))
+            return this.contract;
+
+        for (let si of this.subItems.values())
+            if (predicate(si))
+                return si;
+
+        for (let si of this.referencedItems.values())
+            if (predicate(si))
+                return si;
+
+        return null;
     }
 }
 

@@ -6,7 +6,6 @@ const bs = require("biserializable");
 const ex = require("exceptions");
 const BiAdapter = require("biserializable").BiAdapter;
 const DefaultBiMapper = require("defaultbimapper").DefaultBiMapper;
-const NodeInfoProvider = require("services/NSmartContract").NodeInfoProvider;
 const BigDecimal = require("big").Big;
 
 class NodeConfigProvider extends bs.BiSerializable {
@@ -17,28 +16,28 @@ class NodeConfigProvider extends bs.BiSerializable {
 
     getUIssuerKeys() {
         if (this.config != null)
-            return this.config.getUIssuerKeys();
+            return this.config.uIssuerKeys;
         else
             return this.issuerKeyAddresses;
     }
 
     getUIssuerName() {
         if (this.config != null)
-            return this.config.getUIssuerName();
+            return this.config.uIssuerName;
         else
             return this.issuerName;
     }
 
     getMinPayment( extendedType) {
         if (this.config != null)
-            return this.config.getMinPayment(extendedType);
+            return this.config.minPayment[extendedType];
         else
             return this.minPayment[extendedType];
     }
 
     getServiceRate(extendedType) {
         if (this.config != null)
-            return this.config.getServiceRate(extendedType);
+            return this.config.rate[extendedType];
         else
             return this.rate[extendedType];
     }
@@ -46,7 +45,7 @@ class NodeConfigProvider extends bs.BiSerializable {
     getAdditionalKeysAddressesToSignWith(extendedType) {
         if (this.config != null) {
             if (NSmartContract.SmartContractType.UNS1.name().equals(extendedType))
-                return [this.config.getAuthorizedNameServiceCenterAddress()];
+                return [this.config.authorizedNameServiceCenterAddress];
             else
                 return [];
         } else
@@ -54,22 +53,41 @@ class NodeConfigProvider extends bs.BiSerializable {
     }
 
     async serialize(serializer) {
-        // TODO
+        if (this.config != null) {
+            this.issuerKeyAddresses = this.config.uIssuerKeys;
+            this.issuerName = this.config.uIssuerName;
+            this.minPayment = this.config.minPayment;
+            this.rate = this.config.rate;
+            this.additionalKeyAddresses = {};
+            this.additionalKeyAddresses[NSmartContract.SmartContractType.UNS1] = [this.config.authorizedNameServiceCenterAddress];
+        }
+
+        let r = {};
+        for (let rs of Object.keys(this.rate))
+            r[rs] = this.rate[rs].toFixed();
+
+        return {
+            issuer_keys: await serializer.serialize(this.issuerKeyAddresses),
+            issuer_name: this.issuerName,
+            rate: await serializer.serialize(r),
+            min_payment: await serializer.serialize(this.minPayment),
+            additional_keys: await serializer.serialize(this.additionalKeyAddresses)
+        };
     }
 
     async deserialize(data, deserializer) {
-        this.issuerKeyAddresses = new Set(await deserializer.deserialize(data.issuer_keys));
+        this.issuerKeyAddresses = await deserializer.deserialize(data.issuer_keys);
         this.issuerName = data.issuer_name;
         this.minPayment = await deserializer.deserialize(data.min_payment);
         this.additionalKeyAddresses = await deserializer.deserialize(data.additional_keys);
 
         let r = await deserializer.deserialize(data.rate);
-        this.rate = new Map();
+        this.rate = {};
         if (r == null && typeof r !== "object")
             throw new ex.IllegalArgumentError("NodeConfigProvider deserialize failed: rate must be object");
 
         for (let rs of Object.keys(r))
-            this.rate.set(rs, new BigDecimal(r[rs]));
+            this.rate[rs] = new BigDecimal(r[rs]);
     }
 }
 
