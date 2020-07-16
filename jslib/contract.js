@@ -2174,8 +2174,6 @@ class Contract extends bs.BiSerializable {
      */
     static async fromSealedBinary(sealed, transactionPack = null, contract = undefined) {
         let result = (contract === undefined) ? new Contract() : contract;
-        if (transactionPack == null)
-            transactionPack = new TransactionPack(result);
 
         let data;
         if (sealed.constructor.name === "Array") {
@@ -2189,12 +2187,9 @@ class Contract extends bs.BiSerializable {
             result.id = await crypto.HashId.of_async(sealed);
             data = await Boss.load(sealed);
         }
-        result.transactionPack = transactionPack;
-        result.isNeedVerifySealedKeys = true;
 
-        if(data.type !== "unicapsule") {
+        if (data.type !== "unicapsule")
             throw new ex.IllegalArgumentError("wrong object type, unicapsule required");
-        }
 
         result.apiLevel = data.version;
         let contractBytes = data.data;
@@ -2205,6 +2200,35 @@ class Contract extends bs.BiSerializable {
             payload = contractBytes[0];
         else
             payload = await Boss.load(contractBytes, null);
+
+        if (payload.contract.definition.extended_type != null && contract === undefined) {
+            let NSmartContract = require("services/NSmartContract").NSmartContract;
+
+            // extract NSmartContract by type
+            switch (payload.contract.definition.extended_type) {
+                case NSmartContract.SmartContractType.N_SMART_CONTRACT:
+                    return await this.NSmartContract.fromSealedBinary(sealed, transactionPack);
+
+                case NSmartContract.SmartContractType.SLOT1:
+                    let SlotContract = require("services/slotContract").SlotContract;
+                    return await SlotContract.fromSealedBinary(sealed, transactionPack);
+
+                case NSmartContract.SmartContractType.UNS1:
+                case NSmartContract.SmartContractType.UNS2:
+                    let UnsContract = require("services/unsContract").UnsContract;
+                    return await UnsContract.fromSealedBinary(sealed, transactionPack);
+
+                case NSmartContract.SmartContractType.FOLLOWER1:
+                    let FollowerContract = require("services/followerContract").FollowerContract;
+                    return await FollowerContract.fromSealedBinary(sealed, transactionPack);
+            }
+        }
+
+        if (transactionPack == null)
+            transactionPack = new TransactionPack(result);
+        result.transactionPack = transactionPack;
+        result.isNeedVerifySealedKeys = true;
+
         await result.deserialize(payload.contract, BossBiMapper.getInstance());
 
         this.newIds = new t.GenericSet();

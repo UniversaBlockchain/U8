@@ -9,7 +9,7 @@ const UBotClient = require('ubot/ubot_client').UBotClient;
 const ItemState = require("itemstate").ItemState;
 const tt = require("test_tools");
 const UnsContract = require('services/unsContract').UnsContract;
-const io = require("io");
+const NSmartContract = require("services/NSmartContract").NSmartContract;
 
 const TOPOLOGY_ROOT = "../test/ubot/topology/";
 const TOPOLOGY_FILE = "universa.pro.json";      //"mainnet_topology.json";
@@ -24,11 +24,7 @@ async function createU() {
 
     await U.addSignatureToSeal(tk.getTestKey());
 
-    let pack = await U.getPackedTransaction();
-    //await io.filePutContents("/home/dmitriy/U_07.unicon", pack);
-
-    let ir = await netClient.register(pack, 10000);
-
+    let ir = await netClient.register(await U.getPackedTransaction(), 10000);
     if (ir.state !== ItemState.APPROVED)
         throw new Error("Error createPayment: item state = " + ir.state.val);
 
@@ -44,8 +40,8 @@ unit.test("uns_test: registerUNS", async () => {
 
     uns.nodeInfoProvider = await netClient.getConfigProvider();
 
-    let keyToRegister = tk.TestKeys.getKey();
-    let authorizedNameServiceKey = tk.TestKeys.getKey();        // TODO
+    let keyToRegister = await crypto.PrivateKey.generate(2048);
+    let authorizedNameServiceKey = tk.getTestKey();
     let name = "Trust" + Date.now();
     let desc = "Trust test";
     uns.addName(name,name + "_reduced", desc);
@@ -59,27 +55,21 @@ unit.test("uns_test: registerUNS", async () => {
     let parcel = await uns.createRegistrationParcelFromExpirationDate(plannedExpirationDate, await createU(),
         [userPrivKey], [userPrivKey, authorizedNameServiceKey, keyToRegister]);
 
-    let pack = await parcel.pack();
-    //await io.filePutContents("/home/dmitriy/Parcel_07.uniparcel", pack);
+    let ir = await netClient.registerParcelWithState(await parcel.pack(), 20000);
+    assert(ir.state === ItemState.APPROVED);
 
-    let ir = await netClient.registerParcelWithState(pack, 8000);
-    let irx = await netClient.getState(parcel.getPaymentContract().id);
+    // let irx = await netClient.getState(parcel.getPaymentContract().id);
+    // console.log("Payload: " + JSON.stringify(ir));
+    // console.log("Payment: " + JSON.stringify(irx));
 
-    console.log("!!!" + JSON.stringify(ir));
-    console.log("!!!" + JSON.stringify(irx));
-    console.log("!!!" + JSON.stringify(irx.errors.length));
+    let packedUNS = await netClient.queryNameContract(name, NSmartContract.SmartContractType.UNS1);
 
-    // let tokenIssuerKey = tk.TestKeys.getKey();
-    // let tokenContract = await cs.createTokenContract([tokenIssuerKey], [tokenIssuerKey.publicKey], new BigDecimal("1000"));
-    //
-    // cs.createUnsContractForRegisterContractName()
-    //
-    // let ir = await netClient.register(await tokenContract.getPackedTransaction(), 10000);
+    assert(packedUNS != null);
 
-    if (ir.state === ItemState.APPROVED)
-        console.log("UNS contract registered");
-    else
-        console.log("Error: item state = " + ir.state.val);
+    let storedUNS = await Contract.fromSealedBinary(packedUNS);
+
+    assert(storedUNS.id.equals(uns.id));
+    assert(Array.from(storedUNS.getAddresses()).every(a => a.match(keyToRegister.publicKey)));
 
     await netClient.shutdown();
 

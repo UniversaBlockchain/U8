@@ -316,26 +316,24 @@ class Parcel extends bs.BiSerializable {
     }
 
     static findPaymentContract(contract, transactionPack, uIssuerKeys, uIssuerName) {
-        // for (Contract nc : contract.getNew()) {
-        //     String currentTag = null;
-        //     for(String tag : transactionPack.getTags().keySet()) {
-        //         if(transactionPack.getTags().get(tag) == contract) {
-        //             currentTag = tag;
-        //             break;
-        //         }
-        //     }
-        //
-        //     if (nc.isU(uIssuerKeys, uIssuerName) && (currentTag == null || !currentTag.startsWith(Parcel.TP_PAYING_FOR_TAG_PREFIX))) {
-        //         return nc;
-        //     }
-        // }
-        //
-        // //backward compatibility. SLOT1 and FOLLOWER may not have an ID at this point
-        // if(contract.getLastSealedBinary() != null) {
-        //     Contract payment = transactionPack.getTags().getOrDefault(Parcel.TP_PAYING_FOR_TAG_PREFIX + contract.getId().toBase64String(), null);
-        //     if (payment != null && payment.isU(uIssuerKeys, uIssuerName))
-        //         return payment;
-        // }
+        for (let nc of contract.newItems) {
+            let currentTag = null;
+            for (let tag of transactionPack.taggedItems.keys())
+                if (transactionPack.taggedItems.get(tag) === contract) {
+                    currentTag = tag;
+                    break;
+                }
+
+            if (nc.isU(uIssuerKeys, uIssuerName) && (currentTag == null || !currentTag.startsWith(Parcel.TP_PAYING_FOR_TAG_PREFIX)))
+                return nc;
+        }
+
+        //backward compatibility. SLOT1 and FOLLOWER may not have an ID at this point
+        if (contract.sealedBinary != null) {
+            let payment = transactionPack.taggedItems.get(Parcel.TP_PAYING_FOR_TAG_PREFIX + contract.id.base64);
+            if (payment != null && payment.isU(uIssuerKeys, uIssuerName))
+                return payment;
+        }
 
         return null;
     }

@@ -16,7 +16,7 @@ class UnsRecord extends bs.BiSerializable {
         super();
         this.unsAddresses = [];
         this.unsOrigin = null;
-        this.unsData = {};
+        this.unsData = null;
     }
 
     /**

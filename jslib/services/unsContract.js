@@ -160,7 +160,7 @@ class UnsContract extends NSmartContract {
         this.storedRecords = t.getOrDefault(this.state.data, UnsContract.ENTRIES_FIELD_NAME, null);
 
         this.paidU = t.getOrDefault(this.state.data, UnsContract.PAID_U_FIELD_NAME, 0);
-        this.prepaidNameDays = t.getOrDefault(this.state.data, UnsContract.PREPAID_ND_FIELD_NAME, 0);
+        this.prepaidNameDays = Number(t.getOrDefault(this.state.data, UnsContract.PREPAID_ND_FIELD_NAME, 0));
     }
 
     /**
@@ -269,13 +269,10 @@ class UnsContract extends NSmartContract {
      * @param {boolean} withSaveToState if true, calculated values is saving to state.data
      */
     calculatePrepaidNameDays(withSaveToState) {
-
-        this.paidU = this.getPaidU();
-
         let parentContract = this.getRevokingItem(this.state.parent);
         let prepaidNameDaysLeft = 0;
         if (parentContract != null) {
-            prepaidNameDaysLeft = t.getOrDefault(parentContract.state.data, UnsContract.PREPAID_ND_FIELD_NAME, 0);
+            prepaidNameDaysLeft = Number(t.getOrDefault(parentContract.state.data, UnsContract.PREPAID_ND_FIELD_NAME, 0));
             prepaidNameDaysLeft -= parentContract.getStoredUnitsCount() *
                 Math.floor((this.getCreatedAt().getTime() - parentContract.getCreatedAt().getTime()) / 1000) / (3600*24);
         }
@@ -284,7 +281,7 @@ class UnsContract extends NSmartContract {
 
         if (withSaveToState) {
             this.state.data[UnsContract.PAID_U_FIELD_NAME] = this.paidU;
-            this.state.data[UnsContract.PREPAID_ND_FIELD_NAME] = this.prepaidNameDays;
+            this.state.data[UnsContract.PREPAID_ND_FIELD_NAME] = this.prepaidNameDays.toString();
         }
 
         return this.prepaidNameDays;
@@ -436,7 +433,7 @@ class UnsContract extends NSmartContract {
         this.calculatePrepaidNameDays(false);
 
         // check that payment was not hacked
-        if (this.prepaidNameDays !== t.getOrDefault(this.state.data, UnsContract.PREPAID_ND_FIELD_NAME, 0)) {
+        if (this.prepaidNameDays !== Number(t.getOrDefault(this.state.data, UnsContract.PREPAID_ND_FIELD_NAME, 0))) {
             this.errors.push(new ErrorRecord(Errors.FAILED_CHECK, "Wrong [state.data." + UnsContract.PREPAID_ND_FIELD_NAME + "] value",
                 "Should be sum of early prepaid name days left and prepaid name days of current revision. " +
                 "Make sure contract was prepared using correct UNS1 rate."));
@@ -889,8 +886,6 @@ class UnsContract extends NSmartContract {
             }
     }
 
-    //TODO: payments
-
     /**
      * Get amount of U to be payed additionally to achieve desired UNS1 expiration date.
      *
@@ -911,7 +906,7 @@ class UnsContract extends NSmartContract {
         let prepaidNameDaysLeft = 0;
 
         if (parentContract != null) {
-            prepaidNameDaysLeft = t.getOrDefault(parentContract.state.data, UnsContract.PREPAID_ND_FIELD_NAME, 0);
+            prepaidNameDaysLeft = Number(t.getOrDefault(parentContract.state.data, UnsContract.PREPAID_ND_FIELD_NAME, 0));
             prepaidNameDaysLeft -= parentContract.getStoredUnitsCount() *
                 Math.floor((this.getCreatedAt().getTime() - parentContract.getCreatedAt().getTime()) / 1000) / (3600*24);
         }
@@ -951,7 +946,7 @@ class UnsContract extends NSmartContract {
         let prepaidNameDaysLeft = 0;
 
         if(parentContract != null) {
-            prepaidNameDaysLeft = t.getOrDefault(parentContract.state.data, UnsContract.PREPAID_ND_FIELD_NAME, 0);
+            prepaidNameDaysLeft = Number(t.getOrDefault(parentContract.state.data, UnsContract.PREPAID_ND_FIELD_NAME, 0));
             prepaidNameDaysLeft -= parentContract.getStoredUnitsCount() *
                 Math.floor((this.getCreatedAt().getTime() - parentContract.getCreatedAt().getTime()) / 1000) / (3600*24);
         }
@@ -1006,9 +1001,8 @@ class UnsContract extends NSmartContract {
     async createRegistrationParcelFromPaymentAmount(payingAmount, uContract, uKeys, keysToSignUnsWith) {
         if (this.paidU == null || payingAmount !== this.paidU) {
 
-            if (this.setPayingAmount(payingAmount) == null) {
+            if (this.setPayingAmount(payingAmount) == null)
                 return null;
-            }
 
             await this.seal();
             await this.addSignatureToSeal(keysToSignUnsWith);
@@ -1042,9 +1036,8 @@ class UnsContract extends NSmartContract {
      * @return {Date} calculated UNS1 expiration date.
      */
     setPayingAmount(payingAmount) {
-        if (payingAmount === 0 && this.state.revision === 1 || payingAmount > 0 && payingAmount < this.getMinPayment()) {
+        if (payingAmount === 0 && this.state.revision === 1 || payingAmount > 0 && payingAmount < this.getMinPayment())
             return null;
-        }
 
         this.paidU = payingAmount;
         this.calculatePrepaidNameDays(false);
