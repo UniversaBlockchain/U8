@@ -91,8 +91,10 @@ Scripter::Scripter() : Logging("SCR") {
     std::string s = ARGV1;
 
 #ifndef U8_BUILD_DEVELOPMENT
+    // production loading U8 core module from binary
     if (!u8coreLoaded)
-        loadModule(U8COREMODULE_FULLNAME);
+        if (!loadModule(U8COREMODULE_FULLNAME))
+            throw runtime_error("U8 core module was not loaded");
 #endif
 
     struct passwd *pw = getpwuid(getuid());
@@ -101,20 +103,16 @@ Scripter::Scripter() : Logging("SCR") {
     size_t zipPos = s.rfind(U8MODULE_EXTENSION);
     inZip = zipPos != std::string::npos;
 
-    if (inZip) {
-        s = s.substr(0, zipPos + 4);
-        BASE_PATH = makeAbsolutePath(s + path_separator);
-
-        if (!loadModule(s, true))
-            throw runtime_error("Failed loading module");
-    } else
+    if (!inZip)
         s = ARGV0;
-
-    //make path absolute
-    s = makeAbsolutePath(s);
 
     if (inZip) {
         if (!u8coreLoaded) {
+            // development loading U8 core module from file u8core.u8m
+
+            //make path absolute
+            s = makeAbsolutePath(s);
+
             // load u8 core module from starting module path
             auto path = s.substr(0, s.rfind(path_separator)) + path_separator + U8COREMODULE_FULLNAME;
 
@@ -144,6 +142,9 @@ Scripter::Scripter() : Logging("SCR") {
                 throw runtime_error("U8 core module was not loaded");
         }
     } else {
+        //make path absolute
+        s = makeAbsolutePath(s);
+
         auto root = s.substr(0, s.rfind(path_separator));
         auto path = root;
         bool root_found = false;
@@ -209,6 +210,19 @@ static void JsThrowScripterException(const FunctionCallbackInfo<Value> &args) {
                 throw std::invalid_argument("unknown error type parameter");
         }
     });
+}
+
+void Scripter::loadStartingModule() {
+    if (inZip) {
+        std::string s = ARGV1;
+        size_t zipPos = s.rfind(U8MODULE_EXTENSION);
+
+        s = s.substr(0, zipPos + 4);
+        BASE_PATH = makeAbsolutePath(s + path_separator);
+
+        if (!loadModule(s, true))
+            throw runtime_error("Failed loading module");
+    }
 }
 
 void Scripter::initialize(int accessLevel, bool forWorker) {
@@ -308,6 +322,8 @@ void Scripter::initialize(int accessLevel, bool forWorker) {
             }
         }
     });
+
+    loadStartingModule();
 }
 
 
@@ -556,11 +572,15 @@ bool Scripter::loadModule(const std::string& sourceName, bool isStarting) {
     if (!module->load())
         return false;
 
-    if (modules.find(module->getName()) != modules.end())   // if already checked
+    if (modules.find(module->getName()) != modules.end()) {   // if already checked
+        if (isStarting)
+            startingModuleName = module->getName();
+
         return true;
+    }
 
     // check signature
-    bool res = module->checkModuleSignature();
+    bool res = module->checkModuleSignature(this);
     if (res) {
         modules.insert(std::pair<std::string, std::shared_ptr<U8Module>>(module->getName(), module));
 

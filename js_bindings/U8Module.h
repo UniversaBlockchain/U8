@@ -8,7 +8,10 @@
 #include <string>
 #include <vector>
 #include <map>
+#include <memory>
 #include "zip.h"
+
+class Scripter;
 
 class U8Module {
     std::string name;
@@ -19,7 +22,8 @@ class U8Module {
     int lenSignData = 0;
     std::map<std::string, std::string> manifest;
 
-    bool checkKeyTrust(std::vector<unsigned char> &keyData);
+    bool checkKeyTrust(std::vector<unsigned char> &keyData, Scripter* se);
+    bool checkUNS(std::string UNSname, std::vector<unsigned char> &keyData, Scripter* se);
     std::map<std::string, std::string> loadManifest(zip* module);
     bool initRequireRoots();
     std::string searchU8Module(std::string basePath);
@@ -29,7 +33,7 @@ public:
     U8Module(const std::string& modulePath, const std::string &homeDir);
 
     bool load();
-    bool checkModuleSignature();
+    bool checkModuleSignature(Scripter* se);
 
     std::string getName();
     std::string resolveRequiredFile(const std::string &fileName);

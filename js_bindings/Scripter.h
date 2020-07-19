@@ -301,6 +301,7 @@ private:
     // prevent double initialize() call - it is dangerous
     bool initialized = false;
 
+    void loadStartingModule();
 
     // we should not put this code in the constructor as it uses shared_from_this()
     void initialize(int accessLevel, bool forWorker);

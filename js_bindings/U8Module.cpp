@@ -96,7 +96,7 @@ bool U8Module::load() {
     }
 }
 
-bool U8Module::checkModuleSignature() {
+bool U8Module::checkModuleSignature(Scripter* se) {
     try {
         if (lenSignData == 0) {
             printf("Signature of module %s not found\n", modulePath.c_str());
@@ -120,7 +120,7 @@ bool U8Module::checkModuleSignature() {
             PublicKey publicKey(key.data(), key.size());
             bool res = publicKey.verify(sign.data(), sign.size(), data, dataLen, HashType::SHA3_512);
 
-            if (!checkKeyTrust(key)) {
+            if (!checkKeyTrust(key, se)) {
                 printf("Untrusted signature key\n");
                 res = false;
             }
@@ -180,7 +180,7 @@ bool U8Module::checkModuleSignature() {
             bool res = publicKey->verify(sign.data(), sign.size(), data, dataLen, HashType::SHA3_512);
 
             // check public key
-            if (!checkKeyTrust(key)) {
+            if (!checkKeyTrust(key, se)) {
                 printf("Untrusted signature key\n");
                 res = false;
             }
@@ -224,7 +224,7 @@ bool U8Module::initRequireRoots() {
     return true;
 }
 
-bool U8Module::checkKeyTrust(std::vector<unsigned char> &keyData) {
+bool U8Module::checkKeyTrust(std::vector<unsigned char> &keyData, Scripter* se) {
 
     auto U8Key = base64_decodeToBytes(U8_PUBLIC_KEY);
     if (keyData.size() == U8Key.size() && memcmp(keyData.data(), U8Key.data(), U8Key.size()) == 0)
@@ -239,6 +239,7 @@ bool U8Module::checkKeyTrust(std::vector<unsigned char> &keyData) {
     bool checkU8trust = true;
     bool trustChanged = false;
     bool foundedModuleTrust = false;
+    bool askTrustUNS = false;
 
     // search u8trust file
     std::string path = searchU8TrustFile();
@@ -261,8 +262,10 @@ bool U8Module::checkKeyTrust(std::vector<unsigned char> &keyData) {
                 auto str = (*it).as<std::string>();
                 str.erase(std::remove(str.begin(), str.end(), ' '), str.end());
                 auto trustedKey = base64_decodeToBytes(str);
-                if (keyData.size() == trustedKey.size() && memcmp(keyData.data(), trustedKey.data(), trustedKey.size()) == 0)
+                if (keyData.size() == trustedKey.size() && memcmp(keyData.data(), trustedKey.data(), trustedKey.size()) == 0) {
+                    delete publicKey;
                     return true;
+                }
             }
 
         // check trusted addresses
@@ -311,8 +314,10 @@ bool U8Module::checkKeyTrust(std::vector<unsigned char> &keyData) {
                                 auto str = (*itk).as<std::string>();
                                 str.erase(std::remove(str.begin(), str.end(), ' '), str.end());
                                 auto trustedKey = base64_decodeToBytes(str);
-                                if (keyData.size() == trustedKey.size() && memcmp(keyData.data(), trustedKey.data(), trustedKey.size()) == 0)
+                                if (keyData.size() == trustedKey.size() && memcmp(keyData.data(), trustedKey.data(), trustedKey.size()) == 0) {
+                                    delete publicKey;
                                     return true;
+                                }
                             }
 
                         // check trusted addresses
@@ -342,13 +347,19 @@ bool U8Module::checkKeyTrust(std::vector<unsigned char> &keyData) {
 
         if (!UNS_name.empty()) {
             // scan trust addresses in module`s UNS contract
-
-
-            //trustUNS
+            if (checkUNS(UNS_name, keyData, se)) {
+                if (trustUNS) {
+                    delete publicKey;
+                    return true;
+                } else
+                    askTrustUNS = true;
+            }
         }
     }
 
     auto ka = new KeyAddress(*publicKey, 0, true);
+
+    // TODO: check askTrustUNS
 
     // ask for trust for module key
     printf("Module \"%s\" is untrusted.\nModule has signed by key with address: %s.\nTrust this key? (y/n)",
@@ -398,6 +409,13 @@ bool U8Module::checkKeyTrust(std::vector<unsigned char> &keyData) {
     }
 
     return trustChanged;
+}
+
+bool U8Module::checkUNS(std::string UNSname, std::vector<unsigned char> &keyData, Scripter* se) {
+//    std::string res = se->evaluate("5 + 9;");
+//    printf("!!! RESULT = %s\n", res.c_str());
+
+    return false;
 }
 
 std::map<std::string, std::string> U8Module::loadManifest(zip* module) {
