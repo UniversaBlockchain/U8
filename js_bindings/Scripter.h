@@ -93,7 +93,11 @@ public:
 
     int runAsMain(string sourceScript, const vector<string> &&args, string fileName);
 
+    int runCallMain(string sourceScript, const vector<string> &&args);
+
     void runMainLoop(bool forWorker = false);
+
+    void reset();
 
     template<typename T>
     string getString(MaybeLocal<T> value) {
@@ -196,7 +200,7 @@ public:
     /**
      * Turn "wait exit" more on (may not be effective except with runAsMain)
      */
-    bool getExitCode() { return exitCode; }
+    int getExitCode() { return exitCode; }
 
     /**
      * causes scripter main loop to exit with a code. All queued callbacks that are already in queue will be
@@ -302,6 +306,8 @@ private:
     bool initialized = false;
 
     void loadStartingModule();
+
+    void initializeInternal();
 
     // we should not put this code in the constructor as it uses shared_from_this()
     void initialize(int accessLevel, bool forWorker);

@@ -225,17 +225,7 @@ void Scripter::loadStartingModule() {
     }
 }
 
-void Scripter::initialize(int accessLevel, bool forWorker) {
-    if (initialized)
-        throw runtime_error("SR is already initialized");
-    initialized = true;
-
-    selfAccessLevel_ = accessLevel;
-
-    create_params.array_buffer_allocator =
-            v8::ArrayBuffer::Allocator::NewDefaultAllocator();
-    if (forWorker)
-        create_params.constraints.set_max_old_space_size(workerMemLimitMegabytes);
+void Scripter::initializeInternal() {
     pIsolate = v8::Isolate::New(create_params);
     v8::Isolate::Scope isolate_scope(pIsolate);
 
@@ -247,7 +237,7 @@ void Scripter::initialize(int accessLevel, bool forWorker) {
     // Global object for U8
     v8::Local<v8::ObjectTemplate> global = v8::ObjectTemplate::New(pIsolate);
 
-    if (accessLevel == 0) {
+    if (selfAccessLevel_ == 0) {
         // Bind the global 'print' function to the C++ Print callback.
         global->Set(v8String("__bios_print"), functionTemplate(JsPrint));
         global->Set(v8String("__debug_throw"), functionTemplate(JsThrowScripterException));
@@ -278,7 +268,7 @@ void Scripter::initialize(int accessLevel, bool forWorker) {
         JsInitBossBindings(*this, global);
         JsInitWorkerBindings(*this, global);
         JsInitZipBindings(*this, global);
-    } else if (accessLevel == 1) {
+    } else if (selfAccessLevel_ == 1) {
         global->Set(v8String("__bios_loadRequired"), functionTemplate(JsLoadRequiredRestricted));
         global->Set(v8String("__bios_initTimers"), functionTemplate(JsInitTimers));
         global->Set(v8String("utf8Decode"), functionTemplate(JsTypedArrayToString));
@@ -289,7 +279,7 @@ void Scripter::initialize(int accessLevel, bool forWorker) {
         JsInitCrypto(*this, global);
         JsInitBossBindings(*this, global);
     } else {
-        throw runtime_error("scripter's access level is unknown: " + std::to_string(accessLevel));
+        throw runtime_error("scripter's access level is unknown: " + std::to_string(selfAccessLevel_));
     }
 
     // Save context and wrap weak self:
@@ -301,7 +291,7 @@ void Scripter::initialize(int accessLevel, bool forWorker) {
 
     // now run initialization library script
     inContext([&](auto context) {
-        std::string initScriptFileName = accessLevel==0 ? "init_full.js" : "init_restricted.js";
+        std::string initScriptFileName = selfAccessLevel_==0 ? "init_full.js" : "init_restricted.js";
         auto src = loadCoreFileAsString(initScriptFileName);
         if (src.empty())
             throw runtime_error("failed to find U8 jslib");
@@ -322,8 +312,24 @@ void Scripter::initialize(int accessLevel, bool forWorker) {
             }
         }
     });
+}
 
-    loadStartingModule();
+void Scripter::initialize(int accessLevel, bool forWorker) {
+    if (initialized)
+        throw runtime_error("SR is already initialized");
+    initialized = true;
+
+    selfAccessLevel_ = accessLevel;
+
+    create_params.array_buffer_allocator =
+            v8::ArrayBuffer::Allocator::NewDefaultAllocator();
+    if (forWorker)
+        create_params.constraints.set_max_old_space_size(workerMemLimitMegabytes);
+
+    initializeInternal();
+
+    if (accessLevel == 0 && !forWorker) // TODO: -!forWorker & modules move from Scripter
+        loadStartingModule();
 }
 
 
@@ -437,6 +443,28 @@ int Scripter::runAsMain(string sourceScript, const vector<string> &&args, string
 
 }
 
+int Scripter::runCallMain(string sourceScript, const vector<string> &&args) {
+    v8::Isolate::Scope isolateScope(pIsolate);
+    inContext([&](Local<Context> &context) {
+        auto global = context->Global();
+        evaluate(sourceScript, false);
+        Local<Function> callmain = Local<Function>::Cast(global->Get(context, v8String("__call_main")).ToLocalChecked());
+
+        auto jsArgs = Array::New(pIsolate);
+        for (int i = 0; i < args.size(); i++)
+            auto unused = jsArgs->Set(context, i, String::NewFromUtf8(pIsolate, args[i].c_str()).ToLocalChecked());
+        auto param = Local<Value>::Cast(jsArgs);
+
+        TryCatch tryCatch(pIsolate);
+        auto unused2 = callmain->Call(context, global, 1, &param);
+        throwPendingException<ScriptError>(tryCatch, context);
+    });
+
+    runMainLoop();
+
+    return exitCode;
+}
+
 void Scripter::runMainLoop(bool forWorker) {
     // main loop: we process all callbacks here in the same thread:
     {
@@ -485,6 +513,12 @@ void Scripter::runMainLoop(bool forWorker) {
             }
         }
     }
+}
+
+void Scripter::reset() {
+    isActive = true;
+    exitCode = 0;
+    initializeInternal();
 }
 
 std::string Scripter::getHome() {

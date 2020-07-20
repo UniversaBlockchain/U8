@@ -251,7 +251,7 @@ function __call_main(args) {
                 if (error.stack) {
                     console.error(error.stack);
                 } else
-                    console.error("execution of aysnc main failed: " + error);
+                    console.error("execution of async main failed: " + error);
                 exit(1000);
             });
     } else

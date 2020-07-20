@@ -49,6 +49,7 @@ class UBotClient {
         this.clientPrivateKey = clientPrivateKey;
         this.topologyInput = topologyInput;
         this.topologyCacheDir = topologyCacheDir;
+        this.topology = null;
         this.logger = logger;
         this.nodes = [];
         this.ubots = [];
@@ -57,11 +58,17 @@ class UBotClient {
         this.ubotPublicKey = null;
         this.httpNodeClients = new Map();
         this.httpUbotClients = new Map();
-        //this.closingRequests = new Set();
         this.lock = new Lock();
         this.ubotRegistryContract = null;
         this.poolAndQuorum = null;
         this.waitSession = millisToWaitSession;
+    }
+
+    static clientWithTopologyAsJSON(clientPrivateKey, topologyJSON) {
+        let client = new UBotClient(clientPrivateKey, null);
+        client.topology = TopologyBuilder.extractTopologyFromFileData(topologyJSON).list;
+
+        return client;
     }
 
     /**
@@ -72,9 +79,11 @@ class UBotClient {
      * @return {Promise<UBotClient>}.
      */
     async start() {
-        let tb = await new TopologyBuilder().build(this.topologyInput, this.topologyCacheDir);
-        this.topology = tb.topology;
-        this.version = tb.version;
+        if (this.topology == null) {
+            let tb = await new TopologyBuilder().build(this.topologyInput, this.topologyCacheDir);
+            this.topology = tb.topology;
+            this.version = tb.version;
+        }
 
         this.topology.forEach(topologyItem => {
             let keyString = topologyItem.key;

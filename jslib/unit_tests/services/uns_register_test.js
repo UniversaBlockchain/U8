@@ -8,6 +8,7 @@ import * as tk from "unit_tests/test_keys";
 const UBotClient = require('ubot/ubot_client').UBotClient;
 const ItemState = require("itemstate").ItemState;
 const tt = require("test_tools");
+const io = require("io");
 const UnsContract = require('services/unsContract').UnsContract;
 const NSmartContract = require("services/NSmartContract").NSmartContract;
 
@@ -75,3 +76,42 @@ unit.test("uns_test: registerUNS", async () => {
 
     return 0;
 });
+
+// for trust test_module.u8m
+// unit.test("uns_test: registerTestModuleUNS", async () => {
+//     let netClient = await new UBotClient(tk.getTestKey(), TOPOLOGY_ROOT + TOPOLOGY_FILE).start();
+//
+//     let uns = UnsContract.fromPrivateKey(userPrivKey);
+//
+//     uns.nodeInfoProvider = await netClient.getConfigProvider();
+//
+//     let keyToRegister = new crypto.PrivateKey(await io.fileGetContentsAsBytes("../test/pregenerated_key.private.unikey"));
+//     let authorizedNameServiceKey = tk.getTestKey();
+//     let name = "testUNS";
+//     uns.addName(name, name, name);
+//     uns.addKey(keyToRegister.publicKey);
+//     uns.keysToSignWith.add(authorizedNameServiceKey);
+//     uns.keysToSignWith.add(keyToRegister);
+//
+//     let plannedExpirationDate = new Date();
+//     plannedExpirationDate.setFullYear(plannedExpirationDate.getFullYear() + 1);
+//
+//     let parcel = await uns.createRegistrationParcelFromExpirationDate(plannedExpirationDate, await createU(),
+//         [userPrivKey], [userPrivKey, authorizedNameServiceKey, keyToRegister]);
+//
+//     let ir = await netClient.registerParcelWithState(await parcel.pack(), 20000);
+//     assert(ir.state === ItemState.APPROVED);
+//
+//     let packedUNS = await netClient.queryNameContract(name, NSmartContract.SmartContractType.UNS1);
+//
+//     assert(packedUNS != null);
+//
+//     let storedUNS = await Contract.fromSealedBinary(packedUNS);
+//
+//     assert(storedUNS.id.equals(uns.id));
+//     assert(Array.from(storedUNS.getAddresses()).every(a => a.match(keyToRegister.publicKey)));
+//
+//     await netClient.shutdown();
+//
+//     return 0;
+// });

@@ -3,8 +3,10 @@
  */
 
 #include "U8Module.h"
+#include "topologies.h"
 #include "../tools/tools.h"
 #include "../u8core.u8m.h"
+#include "../crypto/base64.h"
 #include "../crypto/PrivateKey.h"
 #include "../crypto/PublicKey.h"
 #include "../types/UBinder.h"
@@ -252,8 +254,11 @@ bool U8Module::checkKeyTrust(std::vector<unsigned char> &keyData, Scripter* se) 
 
     auto publicKey = new PublicKey(keyData.data(), keyData.size());
 
+    std::string UNS_name = "";
     if (checkU8trust) {
-        std::string UNS_name = (manifest.find("UNS_name") != manifest.end()) ? manifest.find("UNS_name")->second : "";
+        if (manifest.find("UNS_name") != manifest.end())
+            UNS_name = manifest.find("UNS_name")->second;
+
         bool trustUNS = false;
 
         // check trusted keys
@@ -359,40 +364,79 @@ bool U8Module::checkKeyTrust(std::vector<unsigned char> &keyData, Scripter* se) 
 
     auto ka = new KeyAddress(*publicKey, 0, true);
 
-    // TODO: check askTrustUNS
+    printf("Module \"%s\" is untrusted.\n", name.data());
+    if (askTrustUNS)
+        printf("Module has signed by key from UNS contract: %s.\n", UNS_name.data());
+    printf("Module has signed by key with address: %s.\n", ka->toString().data());
 
-    // ask for trust for module key
-    printf("Module \"%s\" is untrusted.\nModule has signed by key with address: %s.\nTrust this key? (y/n)",
-           name.data(), ka->toString().data());
-    std::string ans;
-    getline(cin, ans);
+    if (askTrustUNS) {
+        // ask for trust for module UNS contract
+        printf("Trust this UNS contract? (y/n)");
+        std::string ans;
+        getline(cin, ans);
 
-    if (ans[0] == 'y' || ans[0] == 'Y') {
-        printf("Trust this key for ALL modules? (y/n)");
-        std::string ansAll;
-        getline(cin, ansAll);
+        if (ans[0] == 'y' || ans[0] == 'Y') {
+            printf("Trust this UNS contract for ALL modules? (y/n)");
+            std::string ansAll;
+            getline(cin, ansAll);
 
-        if (ansAll[0] == 'y' || ansAll[0] == 'Y') {
-            // add address to u8trust for all modules
-            trust["trust_all"]["addresses"].push_back(ka->toString());
+            if (ansAll[0] == 'y' || ansAll[0] == 'Y') {
+                // add UNS contract to u8trust for all modules
+                trust["trust_all"]["UNS_names"].push_back(UNS_name);
 
-            printf("Address %s has added to u8trust for all modules.\n", ka->toString().data());
-        } else {
-            // add address to u8trust for module
-            if (!foundedModuleTrust) {
-                auto newModuleTrust = new YAML::Node();
-                (*newModuleTrust)["module_names"].push_back(name);
-                (*newModuleTrust)["addresses"].push_back(ka->toString());
+                printf("UNS contract '%s' has added to u8trust for all modules.\n", UNS_name.data());
+            } else {
+                // add UNS contract to u8trust for module
+                if (!foundedModuleTrust) {
+                    auto newModuleTrust = new YAML::Node();
+                    (*newModuleTrust)["module_names"].push_back(name);
+                    (*newModuleTrust)["UNS_names"].push_back(UNS_name);
 
-                trust["trust_modules"].push_back(*newModuleTrust);
+                    trust["trust_modules"].push_back(*newModuleTrust);
+                }
+
+                (*moduleTrust)["UNS_names"].push_back(UNS_name);
+
+                printf("UNS contract '%s' has added to u8trust for module \"%s\".\n", UNS_name.data(), name.data());
             }
 
-            (*moduleTrust)["addresses"].push_back(ka->toString());
-
-            printf("Address %s has added to u8trust for module \"%s\".\n", ka->toString().data(), name.data());
+            trustChanged = true;
         }
+    }
 
-        trustChanged = true;
+    if (!trustChanged) {
+        // ask for trust for module key
+        printf("Trust this key? (y/n)");
+        std::string ans;
+        getline(cin, ans);
+
+        if (ans[0] == 'y' || ans[0] == 'Y') {
+            printf("Trust this key for ALL modules? (y/n)");
+            std::string ansAll;
+            getline(cin, ansAll);
+
+            if (ansAll[0] == 'y' || ansAll[0] == 'Y') {
+                // add address to u8trust for all modules
+                trust["trust_all"]["addresses"].push_back(ka->toString());
+
+                printf("Address %s has added to u8trust for all modules.\n", ka->toString().data());
+            } else {
+                // add address to u8trust for module
+                if (!foundedModuleTrust) {
+                    auto newModuleTrust = new YAML::Node();
+                    (*newModuleTrust)["module_names"].push_back(name);
+                    (*newModuleTrust)["addresses"].push_back(ka->toString());
+
+                    trust["trust_modules"].push_back(*newModuleTrust);
+                }
+
+                (*moduleTrust)["addresses"].push_back(ka->toString());
+
+                printf("Address %s has added to u8trust for module \"%s\".\n", ka->toString().data(), name.data());
+            }
+
+            trustChanged = true;
+        }
     }
 
     delete ka;
@@ -411,11 +455,38 @@ bool U8Module::checkKeyTrust(std::vector<unsigned char> &keyData, Scripter* se) 
     return trustChanged;
 }
 
-bool U8Module::checkUNS(std::string UNSname, std::vector<unsigned char> &keyData, Scripter* se) {
-//    std::string res = se->evaluate("5 + 9;");
-//    printf("!!! RESULT = %s\n", res.c_str());
+const std::string checkUNSscript = R"End(
+const UBotClient = require('ubot/ubot_client', 'u8core').UBotClient;
+const Contract = require('contract', 'u8core').Contract;
+const UnsContract = require('services/unsContract', 'u8core').UnsContract;
+const NSmartContract = require('services/NSmartContract', 'u8core').NSmartContract;
 
-    return false;
+async function main(args) {
+    let key = await crypto.PrivateKey.generate(2048);
+    let client = UBotClient.clientWithTopologyAsJSON(key, args[0]);
+    await client.start();
+
+    let packedUNS = await client.queryNameContract(args[1], NSmartContract.SmartContractType.UNS1);
+
+    await client.shutdown();
+
+    if (packedUNS != null) {
+        let storedUNS = await Contract.fromSealedBinary(packedUNS);
+
+        let signedKey = new crypto.PublicKey(atob(args[2]));
+        if (Array.from(storedUNS.getAddresses()).some(a => a.match(signedKey)))
+            return 1;
+    }
+
+    return 0;
+}
+)End";
+
+bool U8Module::checkUNS(std::string UNSname, std::vector<unsigned char> &keyData, Scripter* se) {
+    int res = se->runCallMain(checkUNSscript, {mainnet_topology, std::move(UNSname), base64_encode(keyData)});  // pro_topology
+
+    se->reset();
+    return res == 1;
 }
 
 std::map<std::string, std::string> U8Module::loadManifest(zip* module) {

@@ -9,7 +9,7 @@ const ex = require("exceptions");
 const MIN_CONFIRMED_RATIO = 0.4;
 const CONFIRMED_QUORUM_RATIO = 0.9;
 
-class Topology_builder {
+class TopologyBuilder {
     constructor() {
         // TOPOLOGY_DIR = System.getProperty("user.home")+"/.universa/topology/";
 
@@ -46,7 +46,7 @@ class Topology_builder {
         let topology = null;
 
         if (await io.isAccessible(topologyInput) && await io.isFile(topologyInput)) {
-            let providedTopology = Topology_builder.extractTopologyFromFileData(await io.fileGetContentsAsString(topologyInput));
+            let providedTopology = TopologyBuilder.extractTopologyFromFileData(await io.fileGetContentsAsString(topologyInput));
             if (topology == null || t.getOrDefault(providedTopology, "updated", 0) > t.getOrDefault(topology, "updated", 0))
                 topology = providedTopology;
         }
@@ -63,4 +63,4 @@ class Topology_builder {
 
 }
 
-module.exports = {TopologyBuilder: Topology_builder};
+module.exports = {TopologyBuilder};
