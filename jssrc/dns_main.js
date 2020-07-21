@@ -2,15 +2,15 @@
  * Copyright (c) 2019-present Sergey Chernov, iCodici S.n.C, All Rights Reserved.
  */
 
-import {DnsServer, DnsRRType} from 'web'
-import * as io from 'io'
-import * as t from 'tools'
+const {DnsServer, DnsRRType} = {...require('web', "u8core")};
+const io = require('io', "u8core");
+const t = require('tools', "u8core");
 
 const Logger = require("logger").Logger;
 const OptionParser = require("optionparser").OptionParser;
-const UBotClient = require('ubot/ubot_client').UBotClient;
-const UnsContract = require("services/unsContract").UnsContract;
-const yaml = require('yaml');
+const UBotClient = require('ubot/ubot_client', "u8core").UBotClient;
+const UnsContract = require("services/unsContract", "u8core").UnsContract;
+const yaml = require('yaml', "u8core");
 
 class DnsMain {
 

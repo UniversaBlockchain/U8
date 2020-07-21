@@ -2,12 +2,12 @@
  * Copyright (c) 2019-present Sergey Chernov, iCodici S.n.C, All Rights Reserved.
  */
 
-import {expect, unit, assert} from 'test'
-import * as tk from 'unit_tests/test_keys'
+const {expect, unit, assert} = {...require('test', "u8core")};
+const tk = require('unit_tests/test_keys', "u8core");
 
-const UnsContract = require("services/unsContract").UnsContract;
-const UBotClient = require('ubot/ubot_client').UBotClient;
-const tt = require("test_tools");
+const UnsContract = require("services/unsContract", "u8core").UnsContract;
+const UBotClient = require('ubot/ubot_client', "u8core").UBotClient;
+const tt = require("test_tools", "u8core");
 
 const TOPOLOGY_ROOT = "../test/ubot/topology/";
 const TOPOLOGY_FILE = "universa.pro.json";
