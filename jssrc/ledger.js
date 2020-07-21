@@ -65,7 +65,7 @@ class Ledger {
     }
 
     async init() {
-        await db.MigrationDriver.createDB(this.dbPool_, "jslib/migrations/postgres");
+        await db.MigrationDriver.createDB(this.dbPool_, "jssrc/migrations/postgres");
     }
 
     // Cache methods

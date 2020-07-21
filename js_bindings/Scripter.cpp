@@ -150,19 +150,22 @@ Scripter::Scripter() : Logging("SCR") {
         bool root_found = false;
 
         // Looking for library in the current tree
-        do {
-            auto x = path + "/jslib";
-            if (file_exists(x, true)) {
-                require_roots.push_back(x);
-                BASE_PATH = makeAbsolutePath(path + path_separator);
-                root_found = true;
-                break;
-            }
-            auto index = path.rfind(path_separator);
-            if (index == std::string::npos || (inZip && index < zipPos))
-                break;
-            path = path.substr(0, index);
-        } while (path != "/");
+        std::vector<std::string> folders = {"/jslib", "/jssrc"};
+        for (const auto& folder : folders) {
+            do {
+                auto x = path + folder;
+                if (file_exists(x, true)) {
+                    require_roots.push_back(x);
+                    BASE_PATH = makeAbsolutePath(path + path_separator);
+                    root_found = true;
+                    break;
+                }
+                auto index = path.rfind(path_separator);
+                if (index == std::string::npos || (inZip && index < zipPos))
+                    break;
+                path = path.substr(0, index);
+            } while (path != "/");
+        }
 
         // if not found, get from ENV
         if (!root_found) {
@@ -174,6 +177,8 @@ Scripter::Scripter() : Logging("SCR") {
                 // last chance ;)
                 require_roots.emplace_back("../jslib");
                 require_roots.emplace_back("./jslib");
+                require_roots.emplace_back("../jssrc");
+                require_roots.emplace_back("./jssrc");
             }
         }
 
