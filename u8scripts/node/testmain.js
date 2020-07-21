@@ -113,13 +113,6 @@ async function testES() {
 }
 
 //require('unit_tests/dns_test');
-require('unit_tests/changenumberpermission_test');
-require('unit_tests/changeownerpermission_test');
-require('unit_tests/changerolepermission_test');
-require('unit_tests/modifydatapermission_test');
-require('unit_tests/revokepermission_test');
-require('unit_tests/splitjoinpermission_test');
-require('unit_tests/constraint_test');
 require('unit_tests/ledger_test');
 require('unit_tests/itemcache_test');
 require('unit_tests/udp_test');
@@ -127,7 +120,6 @@ require('unit_tests/services/environment_test');
 require('unit_tests/services/slot_test');
 require('unit_tests/services/follower_test');
 //require('unit_tests/services/uns_test');
-require('unit_tests/parcel_test');
 require('unit_tests/contractsservice_test');
 require('unit_tests/notification_test');
 require('unit_tests/main_test');
