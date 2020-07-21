@@ -113,9 +113,7 @@ async function testES() {
 }
 
 //require('unit_tests/dns_test');
-require('unit_tests/services/uns_register_test');
 require('unit_tests/contract_test');
-require('unit_tests/deltas_test');
 require('unit_tests/role_test');
 require('unit_tests/simplerole_test');
 require('unit_tests/listrole_test');

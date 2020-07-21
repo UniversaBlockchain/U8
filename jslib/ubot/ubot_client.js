@@ -20,7 +20,7 @@ const constr = require('constraint');
 const t = require("tools");
 const ut = require("ubot/ubot_tools");
 const Parcel = require("parcel").Parcel;
-const ParcelProcessingState = require("parcelprocessor").ParcelProcessingState;
+const ParcelProcessingState = require("parcelprocessor_state").ParcelProcessingState;
 const NodeConfigProvider = require("services/NodeConfigProvider").NodeConfigProvider;
 
 class NodeRecord {

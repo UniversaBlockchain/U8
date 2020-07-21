@@ -6,7 +6,10 @@
 
 let io = require("io");
 let DefaultBiMapper = require("defaultbimapper").DefaultBiMapper;
+let Contract = require("contract").Contract;
+let TransactionPack = require("transactionpack").TransactionPack;
 let ExtendedSignature = require("extendedsignature").ExtendedSignature;
+let roles = require("roles");
 let t = require("tools");
 
 const Boss = require('boss.js');
@@ -14,6 +17,8 @@ const BossStreams = require('boss_streams.js');
 
 import {expect, unit} from 'test'
 
+require('unit_tests/services/uns_register_test');
+require('unit_tests/deltas_test');
 require('unit_tests/worker_tests');
 require('unit_tests/boss_test');
 require('unit_tests/crypto_test');
