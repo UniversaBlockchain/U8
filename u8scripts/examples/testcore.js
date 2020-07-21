@@ -24,6 +24,7 @@ require('unit_tests/pg_test');
 require('unit_tests/collection_test');
 require('unit_tests/asyncevent_test');
 require('unit_tests/lock_test');
+require('unit_tests/web_test');
 
 async function main(args) {
     await unit.perform(args);
