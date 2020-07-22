@@ -19,6 +19,7 @@
 #include "research_bindings.h"
 #include "boss_bindings.h"
 #include "worker_bindings.h"
+#include "../modules/ModuleManager.h"
 
 static const char *ARGV0 = nullptr;
 static const char *ARGV1 = nullptr;
@@ -28,6 +29,8 @@ const char *U8MODULE_EXTENSION = ".u8m/";
 const char *U8COREMODULE_NAME = "u8core";
 const char *U8COREMODULE_FULLNAME = "u8core.u8m";
 static char path_separator = '/';
+
+extern ModuleManager mainModuleManager;
 
 std::unique_ptr<v8::Platform> Scripter::initV8(const char *argv0) {
 
@@ -92,8 +95,8 @@ Scripter::Scripter() : Logging("SCR") {
 
 #ifndef U8_BUILD_DEVELOPMENT
     // production loading U8 core module from binary
-    if (!u8coreLoaded)
-        if (!loadModule(U8COREMODULE_FULLNAME))
+    if (!mainModuleManager.isU8coreLoaded())
+        if (!mainModuleManager.loadModule(U8COREMODULE_FULLNAME, this))
             throw runtime_error("U8 core module was not loaded");
 #endif
 
@@ -101,13 +104,11 @@ Scripter::Scripter() : Logging("SCR") {
     home = pw->pw_dir;
 
     size_t zipPos = s.rfind(U8MODULE_EXTENSION);
-    inZip = zipPos != std::string::npos;
-
-    if (!inZip)
-        s = ARGV0;
+    bool inZip = zipPos != std::string::npos;
+    mainModuleManager.setInZip(inZip);
 
     if (inZip) {
-        if (!u8coreLoaded) {
+        if (!mainModuleManager.isU8coreLoaded()) {
             // development loading U8 core module from file u8core.u8m
 
             //make path absolute
@@ -117,7 +118,7 @@ Scripter::Scripter() : Logging("SCR") {
             auto path = s.substr(0, s.rfind(path_separator)) + path_separator + U8COREMODULE_FULLNAME;
 
             if (file_exists(path)) {
-                if (!loadModule(path))
+                if (!mainModuleManager.loadModule(path, this))
                     throw runtime_error("Failed loading U8 core module");
             } else {
                 // load u8 core module from U8 path
@@ -126,7 +127,7 @@ Scripter::Scripter() : Logging("SCR") {
                 do {
                     auto x = path + path_separator + U8COREMODULE_FULLNAME;
                     if (file_exists(x)) {
-                        if (!loadModule(x))
+                        if (!mainModuleManager.loadModule(x, this))
                             throw runtime_error("Failed loading U8 core module");
                         else
                             break;
@@ -138,12 +139,12 @@ Scripter::Scripter() : Logging("SCR") {
                 } while (path != "/");
             }
 
-            if (!u8coreLoaded)
+            if (!mainModuleManager.isU8coreLoaded())
                 throw runtime_error("U8 core module was not loaded");
         }
     } else {
         //make path absolute
-        s = makeAbsolutePath(s);
+        s = makeAbsolutePath(ARGV0);
 
         auto root = s.substr(0, s.rfind(path_separator));
         auto path = root;
@@ -218,14 +219,14 @@ static void JsThrowScripterException(const FunctionCallbackInfo<Value> &args) {
 }
 
 void Scripter::loadStartingModule() {
-    if (inZip) {
+    if (mainModuleManager.isInZip()) {
         std::string s = ARGV1;
         size_t zipPos = s.rfind(U8MODULE_EXTENSION);
 
         s = s.substr(0, zipPos + 4);
         BASE_PATH = makeAbsolutePath(s + path_separator);
 
-        if (!loadModule(s, true))
+        if (!mainModuleManager.loadModule(s, this, true))
             throw runtime_error("Failed loading module");
     }
 }
@@ -333,7 +334,7 @@ void Scripter::initialize(int accessLevel, bool forWorker) {
 
     initializeInternal();
 
-    if (accessLevel == 0 && !forWorker) // TODO: -!forWorker & modules move from Scripter
+    if (accessLevel == 0)
         loadStartingModule();
 }
 
@@ -410,10 +411,10 @@ int Scripter::runAsMain(string sourceScript, const vector<string> &&args, string
         auto global = context->Global();
         // fix imports and requires
         auto unused = global->Set(context, v8String("__source"), v8String(sourceScript));
-        if (inZip)
-            auto unused1 = global->Set(context, v8String("__startingModuleName"), v8String(startingModuleName));
+        if (mainModuleManager.isInZip())
+            auto unused1 = global->Set(context, v8String("__startingModuleName"), v8String(mainModuleManager.getStartingModuleName()));
         string script = evaluate(
-                inZip ? "let r = __fix_require(__fix_imports(__source), __startingModuleName); __source = undefined; __startingModuleName = undefined; r" :
+                mainModuleManager.isInZip() ? "let r = __fix_require(__fix_imports(__source), __startingModuleName); __source = undefined; __startingModuleName = undefined; r" :
                 "let r = __fix_imports(__source); __source = undefined; r",
                 true);
         //printf("====== script = %s\n", script.data());
@@ -535,14 +536,14 @@ std::string Scripter::expandPath(const std::string &path) {
 }
 
 std::string Scripter::resolveRequiredFile(const std::string &fileName, const std::string &moduleName) {
-    auto module = modules.find(moduleName);
-    if (module != modules.end()) {
-        auto path = module->second->resolveRequiredFile(fileName);
+    auto module = mainModuleManager.getModule(moduleName);
+    if (module) {
+        auto path = module->resolveRequiredFile(fileName);
         if (!path.empty())
             return path;
     }
 
-    if (inZip)
+    if (mainModuleManager.isInZip())
         return "";
 
     if (fileName[0] == '.' || fileName[0] == path_separator) {
@@ -602,35 +603,4 @@ std::shared_ptr<Persistent<Object>> Scripter::getPrototype(const std::string& pr
 
 void Scripter::setPrototype(const std::string& protoName, std::shared_ptr<Persistent<Object>> proto) {
     prototypesHolder[protoName] = proto;
-}
-
-bool Scripter::loadModule(const std::string& sourceName, bool isStarting) {
-    std::shared_ptr<U8Module> module = std::shared_ptr<U8Module>(new U8Module(sourceName, getHome()));
-
-    // loading module
-    if (!module->load())
-        return false;
-
-    if (modules.find(module->getName()) != modules.end()) {   // if already checked
-        if (isStarting)
-            startingModuleName = module->getName();
-
-        return true;
-    }
-
-    // check signature
-    bool res = module->checkModuleSignature(this);
-    if (res) {
-        modules.insert(std::pair<std::string, std::shared_ptr<U8Module>>(module->getName(), module));
-
-        if (module->getName() == U8COREMODULE_NAME)
-            u8coreLoaded = true;
-
-        if (isStarting)
-            startingModuleName = module->getName();
-
-        //printf("Module %s successfully loaded\n", module->getName().data());
-    }
-
-    return res;
 }

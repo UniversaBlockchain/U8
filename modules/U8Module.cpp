@@ -56,7 +56,6 @@ std::string U8Module::searchU8TrustFile() {
 bool U8Module::load() {
     try {
         int err = 0;
-
         byte_vector u8coreBin;
         zip* z = nullptr;
         if (modulePath == U8COREMODULE_FULLNAME) {

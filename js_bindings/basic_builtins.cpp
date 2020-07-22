@@ -8,8 +8,10 @@
 #include "basic_builtins.h"
 #include "../tools/tools.h"
 #include "../tools/StreamPump.h"
+#include "../modules/ModuleManager.h"
 
 extern const char *U8COREMODULE_NAME;
+extern ModuleManager mainModuleManager;
 
 using namespace std;
 
@@ -64,7 +66,7 @@ void JsLoadModule(const v8::FunctionCallbackInfo<v8::Value> &args) {
         v8::String::Utf8Value v8str(isolate, args[0]);
 
         string sourceName = *v8::String::Utf8Value(isolate, args[0]);
-        auto res = se->loadModule(sourceName);
+        auto res = mainModuleManager.loadModule(sourceName, se.get());
 
         args.GetReturnValue().Set(res);
     });

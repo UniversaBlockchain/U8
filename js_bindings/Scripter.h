@@ -19,7 +19,6 @@
 #include "../tools/AsyncSleep.h"
 #include "../tools/ConditionVar.h"
 #include "binding_tools.h"
-#include "U8Module.h"
 
 using namespace std;
 using namespace v8;
@@ -290,8 +289,6 @@ public:
 
     std::string getHome();
 
-    bool loadModule(const std::string& sourceName, bool isStarting = false);
-
 private:
 
     std::string expandPath(const std::string &path);
@@ -340,12 +337,6 @@ private:
     bool _workersReady = false;
 
     int selfAccessLevel_;
-
-    std::map<std::string, std::shared_ptr<U8Module>> modules;
-
-    bool inZip = false;
-    bool u8coreLoaded = false;
-    std::string startingModuleName;
 
     // do not construct it manually
     explicit Scripter();
