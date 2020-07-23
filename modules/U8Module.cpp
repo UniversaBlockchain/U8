@@ -482,9 +482,15 @@ async function main(args) {
 )End";
 
 bool U8Module::checkUNS(std::string UNSname, std::vector<unsigned char> &keyData, Scripter* se) {
-    int res = se->runCallMain(checkUNSscript, {mainnet_topology, std::move(UNSname), base64_encode(keyData)});  // pro_topology
+    int res = 0;
+    if (se) {
+        res = se->runCallMain(checkUNSscript, {mainnet_topology, std::move(UNSname), base64_encode(keyData)});  // pro_topology
+        se->reset();
+    } else {
+        auto scr = Scripter::New(0, false);
+        res = scr->runCallMain(checkUNSscript, {mainnet_topology, std::move(UNSname), base64_encode(keyData)});  // pro_topology
+    }
 
-    se->reset();
     return res == 1;
 }
 

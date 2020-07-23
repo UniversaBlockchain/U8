@@ -28,7 +28,7 @@ bool ModuleManager::loadModule(const std::string& sourceName, Scripter* se, bool
     mutex.unlock();
 
     // check signature
-    bool res = module->checkModuleSignature(se);
+    bool res = module->checkModuleSignature((module->getName() == U8COREMODULE_NAME || isStarting) ? se: nullptr);
     if (res) {
         mutex.lock();
 
