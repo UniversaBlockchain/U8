@@ -1,0 +1,10 @@
+---
+http_client_port: 17000
+http_public_port: 17000
+udp_server_port: 16000
+database: host=172.17.0.1 port=5432 dbname=ubot user=ubot password=wa1pjua_lInPytyp
+node_number: 1
+public_host: dd.node-1-com.utoken.io
+node_name: node_001
+ip:
+- 68.183.211.195
