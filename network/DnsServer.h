@@ -37,6 +37,8 @@ public:
     std::string parseIpV6asString() const;
     std::string parseCNAME() const;
     std::string parseTXT() const;
+
+    std::string parseByType() const;
 private:
     byte_vector bin_;
     byte_vector msgBody_;

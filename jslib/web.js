@@ -731,4 +731,22 @@ network.DnsServer = class {
     }
 };
 
+network.DnsResolver = class {
+    constructor() {
+        this.dnsResolver_ = new network.DnsResolverImpl();
+    }
+
+    start(host, port) {
+        this.dnsResolver_.__start(host, port);
+    }
+
+    stop() {
+        return new Promise(resolve => this.dnsResolver_.__stop(resolve));
+    }
+
+    resolve(dnsName, dnsType) {
+        return new Promise(resolve => this.dnsResolver_.__resolve(dnsName, dnsType, resolve));
+    }
+};
+
 module.exports = network;

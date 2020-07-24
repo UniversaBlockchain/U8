@@ -115,6 +115,21 @@ std::string DnsResolverAnswer::parseTXT() const {
     return std::string(bin_.begin()+1, bin_.end());
 }
 
+std::string DnsResolverAnswer::parseByType() const {
+    switch (rtype_) {
+        case DnsRRType::DNS_A:
+            return parseIpV4asString();
+        case DnsRRType::DNS_AAAA:
+            return parseIpV6asString();
+        case DnsRRType::DNS_CNAME:
+        case DnsRRType::DNS_NS:
+            return parseCNAME();
+        case DnsRRType::DNS_TXT:
+        default:
+            return parseTXT();
+    }
+}
+
 DnsResolver::DnsResolver(): mgr_(new mg_mgr(), [](auto p){mg_mgr_free(p);delete p;}) {
     mg_mgr_init(mgr_.get(), this);
     ownId_ = genNextServerId_g();

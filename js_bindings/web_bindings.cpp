@@ -1322,6 +1322,108 @@ Local<FunctionTemplate> initDnsServer(Scripter& scripter) {
     return tpl;
 }
 
+class DnsResolverWrapper {
+public:
+    DnsResolver dnsResolver_;
+
+    DnsResolverWrapper() {}
+
+    void start(const string& host, int port) {
+        dnsResolver_.setNameServer(host, port);
+        dnsResolver_.start();
+    }
+
+    void stop() {
+        dnsResolver_.stop();
+        dnsResolver_.join();
+    }
+};
+
+void dnsResolver_start(const FunctionCallbackInfo<Value> &args) {
+    Scripter::unwrapArgs(args, [](ArgsContext &ac) {
+        if (ac.args.Length() == 2) {
+            try {
+                auto dnsResolver = unwrap<DnsResolverWrapper>(ac.args.This());
+                string host = ac.asString(0);
+                int port = ac.asInt(1);
+                dnsResolver->start(host, port);
+                return;
+            } catch (const std::exception& e) {
+                ac.throwError(e.what());
+                return;
+            }
+        }
+        ac.throwError("invalid arguments");
+    });
+}
+
+void dnsResolver_stop(const FunctionCallbackInfo<Value> &args) {
+    Scripter::unwrapArgs(args, [](ArgsContext &ac) {
+        if (ac.args.Length() == 1) {
+            auto dnsResolver = unwrap<DnsResolverWrapper>(ac.args.This());
+            auto onReady = ac.asFunction(0);
+            runAsync([dnsResolver, onReady](){
+                Blocking;
+                dnsResolver->stop();
+                onReady->lockedContext([onReady](Local<Context> &cxt) {
+                    onReady->invoke();
+                });
+            });
+            return;
+        }
+        ac.throwError("invalid arguments");
+    });
+}
+
+void dnsResolver_resolve(const FunctionCallbackInfo<Value> &args) {
+    Scripter::unwrapArgs(args, [](ArgsContext &ac) {
+        if (ac.args.Length() == 3) {
+            auto dnsResolver = unwrap<DnsResolverWrapper>(ac.args.This());
+            string name = ac.asString(0);
+            int query = ac.asInt(1);
+            auto onComplete = ac.asFunction(2);
+            dnsResolver->dnsResolver_.resolve(name, query, [=](const std::vector<DnsResolverAnswer>& ansArr) {
+                onComplete->lockedContext([=](Local<Context> &cxt) {
+                    auto isolate = cxt->GetIsolate();
+                    auto scripter = onComplete->scripter();
+                    Local<Value> res[ansArr.size()];
+
+                    for (int i = 0; i < ansArr.size(); i++) {
+                        Local<Name> names[2] = {
+                                String::NewFromUtf8(isolate, "type").ToLocalChecked(),
+                                String::NewFromUtf8(isolate, "value").ToLocalChecked(),
+                        };
+                        Local<Value> values[2] = {
+                                Number::New(isolate, ansArr[i].getType()),
+                                scripter->v8String(ansArr[i].parseByType())
+                        };
+
+                        res[i] = Object::New(cxt->GetIsolate(), v8::Null(isolate), names, values, 2);
+                    }
+
+                    Local<Array> result = Array::New(cxt->GetIsolate(), res, ansArr.size());
+                    onComplete->invoke(result);
+                });
+            });
+            return;
+        }
+        ac.throwError("invalid arguments");
+    });
+}
+
+Local<FunctionTemplate> initDnsResolver(Scripter& scripter) {
+    Isolate *isolate = scripter.isolate();
+    Local<FunctionTemplate> tpl = bindCppClass<DnsResolverWrapper>(isolate, "DnsResolverImpl");
+    auto prototype = tpl->PrototypeTemplate();
+
+    prototype->Set(isolate, "__start", FunctionTemplate::New(isolate, dnsResolver_start));
+    prototype->Set(isolate, "__stop", FunctionTemplate::New(isolate, dnsResolver_stop));
+    prototype->Set(isolate, "__resolve", FunctionTemplate::New(isolate, dnsResolver_resolve));
+
+    scripter.DnsResolverTpl.Reset(isolate, tpl);
+    return tpl;
+}
+
 void JsInitNetwork(Scripter& scripter, const Local<ObjectTemplate> &global) {
     Isolate *isolate = scripter.isolate();
 
@@ -1338,6 +1440,7 @@ void JsInitNetwork(Scripter& scripter, const Local<ObjectTemplate> &global) {
     network->Set(isolate, "HttpServerImpl", initHttpServer(scripter));
     network->Set(isolate, "HttpClientImpl", initHttpClient(scripter));
     network->Set(isolate, "DnsServerImpl", initDnsServer(scripter));
+    network->Set(isolate, "DnsResolverImpl", initDnsResolver(scripter));
 
     global->Set(isolate, "network", network);
 }

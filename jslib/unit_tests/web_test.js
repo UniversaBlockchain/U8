@@ -3,7 +3,7 @@
  */
 
 import {expect, unit, assert, assertSilent} from 'test'
-import {HttpServer, DnsServer, DnsRRType} from 'web'
+import {HttpServer, DnsServer, DnsRRType, DnsResolver} from 'web'
 import * as tk from 'unit_tests/test_keys'
 const Boss = require('boss.js');
 const t = require('tools.js');
@@ -587,4 +587,23 @@ unit.test("web_test: dns server hello world", async () => {
     await sleep(9000);
 
     await dnsServer.stop();
+});
+
+unit.test("web_test: dns resolver", async () => {
+    let dnsResolver = new DnsResolver();
+    dnsResolver.start("8.8.4.4", 53);
+
+    let answer = await dnsResolver.resolve("example.org", DnsRRType.DNS_TXT);
+    console.log(JSON.stringify(answer));
+    assert(answer[0].type === DnsRRType.DNS_TXT);
+    assert(answer[0].value === "v=spf1 -all");
+    assert(answer[1].type === DnsRRType.DNS_TXT);
+    assert(answer[1].value === "2b3dee88837848bbae05e3532f427b10");
+
+    answer = await dnsResolver.resolve("www.arubacloud.com", DnsRRType.DNS_CNAME);
+    console.log(JSON.stringify(answer));
+    assert(answer[0].type === DnsRRType.DNS_CNAME);
+    assert(answer[0].value === "www.arubacloud.com.cdn.cloudflare.net");
+
+    await dnsResolver.stop();
 });

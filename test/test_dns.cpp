@@ -86,21 +86,24 @@ TEST_CASE("dns_get_cname", "[!hide]") {
     dnsResolver.start();
 
     Semaphore sem;
+    // "example.org", DnsRRType::DNS_TXT
     dnsResolver.resolve("www.arubacloud.com", DnsRRType::DNS_CNAME, [&sem](const std::vector<DnsResolverAnswer>& ansArr){
         cout << "ansArr count = " << ansArr.size() << endl;
         for (auto& ans : ansArr) {
-            if (ans.getType() == DnsRRType::DNS_A)
-                cout << "  ans rtype=" << ans.getType() << ", value: " << ans.parseIpV4asString() << endl;
-            else if (ans.getType() == DnsRRType::DNS_AAAA)
-                cout << "  ans rtype=" << ans.getType() << ", value: " << ans.parseIpV6asString() << endl;
-            else if (ans.getType() == DnsRRType::DNS_TXT)
-                cout << "  ans rtype=" << ans.getType() << ", value: " << ans.parseTXT() << endl;
-            else if (ans.getType() == DnsRRType::DNS_CNAME)
-                cout << "  ans rtype=" << ans.getType() << ", value: " << ans.parseCNAME() << endl;
-            else if (ans.getType() == DnsRRType::DNS_NS)
-                cout << "  ans rtype=" << ans.getType() << ", value: " << ans.parseCNAME() << endl;
-            else
-                cout << "  ans rtype=" << ans.getType() << ", value: " << ans.parseTXT() << endl;
+            cout << "  ans rtype=" << ans.getType() << ", value: " << ans.parseByType() << endl;
+
+//            if (ans.getType() == DnsRRType::DNS_A)
+//                cout << "  ans rtype=" << ans.getType() << ", value: " << ans.parseIpV4asString() << endl;
+//            else if (ans.getType() == DnsRRType::DNS_AAAA)
+//                cout << "  ans rtype=" << ans.getType() << ", value: " << ans.parseIpV6asString() << endl;
+//            else if (ans.getType() == DnsRRType::DNS_TXT)
+//                cout << "  ans rtype=" << ans.getType() << ", value: " << ans.parseTXT() << endl;
+//            else if (ans.getType() == DnsRRType::DNS_CNAME)
+//                cout << "  ans rtype=" << ans.getType() << ", value: " << ans.parseCNAME() << endl;
+//            else if (ans.getType() == DnsRRType::DNS_NS)
+//                cout << "  ans rtype=" << ans.getType() << ", value: " << ans.parseCNAME() << endl;
+//            else
+//                cout << "  ans rtype=" << ans.getType() << ", value: " << ans.parseTXT() << endl;
         }
 
         sem.notify();
