@@ -35,7 +35,7 @@ end
 
 def rshell conf,cmd
   res = '  -> ' + cmd + ': '
-  o = `ssh -p 54324 ubot@#{conf['ip']} "#{cmd}"`
+  o = `ssh -o "StrictHostKeyChecking no" -p 54324 ubot@#{conf['ip']} "#{cmd}"`
   o.empty? ? res += "<ok>\n" : res += o
   return res
 end
