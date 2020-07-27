@@ -25,6 +25,7 @@ end
 def get_config x
   un = x.to_s.rjust(3, '0')
   res = {}
+  res['num'] = x
   res['file_name'] = 'node_' + un + '.yaml'
   conf_file_path = './config/nodes/' + res['file_name']
   res['conf'] = YAML.load_file(conf_file_path)
@@ -54,6 +55,13 @@ def each_ubot unums,pr
     }
   }
   await_all
+end
+
+def each_ubot_sync unums,pr
+  $unums.each { |x|
+    conf = get_config x
+    puts pr.call conf
+  }
 end
 
 def confirm txt
