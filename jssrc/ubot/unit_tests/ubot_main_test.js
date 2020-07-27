@@ -6,7 +6,7 @@ import * as tk from "unit_tests/test_keys";
 import {expect, assert, unit} from 'test'
 
 const io = require("io");
-import {HttpServer} from 'web'
+import {HttpServer, DnsRRType} from 'web'
 import {ExecutorWithFixedPeriod} from "executorservice";
 
 const UBotClient = require('ubot/ubot_client').UBotClient;
@@ -28,6 +28,8 @@ const clientKey = tk.TestKeys.getKey();
 const userPrivKey = tk.TestKeys.getKey();
 
 async function createPayment(cost) {
+    //return null;
+
     let netClient = await new UBotClient(tk.getTestKey(), TOPOLOGY_ROOT + TOPOLOGY_FILE).start();
 
     let U = await tt.createFreshU(100000000, [userPrivKey.publicKey]);
@@ -284,6 +286,35 @@ unit.test("ubot_main_test: execute high memory cloud method", async () => {
 
     assert(state.errors[0].error === "FAILURE" && state.errors[0].objectName === "loop" &&
         state.errors[0].message === "Cloud method return error: Executable contract uses too more memory");
+
+    await ubotClient.shutdown();
+});
+
+unit.test("ubot_main_test: DNS request", async () => {
+    let ubotClient = await new UBotClient(clientKey, TOPOLOGY_ROOT + TOPOLOGY_FILE).start();
+
+    let executableContract = await generateSimpleExecutableContract("dnsRequest.js", "checkDNS");
+    let requestContract = Contract.fromPrivateKey(userPrivKey);
+    requestContract.state.data.method_name = "checkDNS";
+    requestContract.state.data.executable_contract_id = executableContract.id;
+    requestContract.newItems.add(executableContract);
+
+    await cs.addConstraintToContract(requestContract, executableContract, "executable_contract_constraint",
+        Constraint.TYPE_EXISTING_STATE, ["this.state.data.executable_contract_id == ref.id"], true);
+
+    let state = await ubotClient.executeCloudMethod(requestContract, await createPayment(20));
+
+    console.log("State: " + JSON.stringify(state));
+
+    assert(state.state === UBotPoolState.FINISHED.val);
+
+    // checking DNS answer
+    assert(state.result instanceof Array);
+    assert(state.result[0] instanceof Array);
+    assert(state.result[0][0].type === DnsRRType.DNS_TXT);
+    assert(state.result[0][0].value === "v=spf1 -all");
+    assert(state.result[0][1].type === DnsRRType.DNS_TXT);
+    assert(state.result[0][1].value === "2b3dee88837848bbae05e3532f427b10");
 
     await ubotClient.shutdown();
 });
