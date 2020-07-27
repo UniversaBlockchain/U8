@@ -2,7 +2,7 @@ require_relative 'stuff.rb'
 
 #$unums = [1,2]
 
-puts "\nprepare remote directories..."
+puts "\nstop..."
 each_ubot $unums, proc { |conf|
   o = '' + conf['file_name'] + ' (' + conf['ip'] + ")\n"
   o += rshell conf, 'systemctl --user stop ubot-server.service'
