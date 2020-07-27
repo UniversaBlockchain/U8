@@ -12,9 +12,11 @@ each_ubot $unums, proc { |conf|
   next o
 }
 
-puts "\nupload u8..."
+puts "\nupload configs..."
 each_ubot $unums, proc { |conf|
-  next lshell "scp -P 54324 ../../cmake-build-monolith-release/u8 ubot@#{conf['ip']}:ubot-u8/"
+  o = '' + conf['file_name'] + ' (' + conf['ip'] + ")\n"
+  o += lshell "rsync --delete -e 'ssh -p 54324' -a ./config ubot@#{conf['ip']}:ubot-u8/"
+  o += lshell "scp -P 54324 ./config/nodes/#{conf['file_name']} ubot@#{conf['ip']}:ubot-u8/config/config.yaml"
 }
 
 puts "\ndone"
