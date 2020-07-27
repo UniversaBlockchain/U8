@@ -45,3 +45,20 @@ def lshell cmd
   o.empty? ? res += "<ok>\n" : res += o
   return res
 end
+
+def each_ubot unums,pr
+  $unums.each { |x|
+    conf = get_config x
+    do_async proc {
+      pr.call conf
+    }
+  }
+  await_all
+end
+
+def confirm txt
+  puts txt
+  puts 'contunue? (y/n): '
+  prompt = STDIN.gets.chomp
+  exit unless prompt == 'y'
+end
