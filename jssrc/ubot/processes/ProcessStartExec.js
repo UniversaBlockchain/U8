@@ -3,7 +3,7 @@
  */
 
 import {getWorker, consoleWrapper, farcallWrapper} from 'worker'
-import {HttpClient} from 'web'
+import {HttpClient, DnsResolver} from 'web'
 import {UBotQuantiserProcesses} from "ubot/ubot_quantiser";
 
 const ProcessBase = require("ubot/processes/ProcessBase").ProcessBase;
@@ -113,6 +113,16 @@ class ProcessStartExec extends ProcessBase {
     
     function doHTTPRequestWithCallback(url, onComplete, onError = (err) => {}) {
         doHTTPRequest(url).then(onComplete, onError);
+    }
+    
+    function doDNSRequests(host, port, requests) {
+        return new Promise((resolve, reject) => wrkInner.farcall("doDNSRequests", [host, port, requests], {},
+            ans => resolve(ans), err => reject(err)
+        ));
+    }
+    
+    function doDNSRequestsWithCallback(host, port, requests, onComplete, onError = (err) => {}) {
+        doDNSRequests(host, port, requests).then(onComplete, onError);
     }
     
     function getRequestContract() {
@@ -250,6 +260,10 @@ class ProcessStartExec extends ProcessBase {
 
                 this.pr.worker.export["doHTTPRequest"] = async (args, kwargs) => {
                     return await this.doHTTPRequest(args[0]);
+                };
+
+                this.pr.worker.export["doDNSRequests"] = async (args, kwargs) => {
+                    return await this.doDNSRequests(args[0], args[1], args[2]);
                 };
 
                 this.pr.worker.export["getRequestContract"] = async (args, kwargs) => {
@@ -895,6 +909,49 @@ class ProcessStartExec extends ProcessBase {
             this.pr.logger.log(err.stack);
             this.pr.errors.push(new ErrorRecord(Errors.FAILURE, "doHTTPRequest", "Error HTTP request: " + err.message));
             //this.pr.changeState(UBotPoolState.FAILED);
+
+            throw err;
+        }
+    }
+
+    /**
+     * Executes an DNS requests to an external host.
+     *
+     * @param {string} host - Host for send DNS request.
+     * @param {number} port - Port for send DNS request.
+     * @param {Array<Object>} requests - Array with DNS requests {name: string, type: number}.
+     * @return {Array<Object>} Array with DNS answers {type: number, value: string}.
+     *
+     * @throws {UBotQuantiserException} quantiser limit is reached.
+     * @throws {UBotProcessException} requests error.
+     */
+    async doDNSRequests(host, port, requests) {
+        if (!requests instanceof Array || requests.length === 0) {
+            let message = "Error DNS requests: requests must be not empty array";
+            this.pr.logger.log(message);
+            this.pr.errors.push(new ErrorRecord(Errors.BAD_VALUE, "doDNSRequests", message));
+
+            throw new UBotProcessException(message);
+        }
+
+        try {
+            this.pr.quantiser.addWorkCost(UBotQuantiserProcesses.PRICE_DNS_REQUEST * requests.length);
+
+            let dnsResolver = new DnsResolver();
+            dnsResolver.start(host, port);
+
+            let answers = [];
+            for (let request of requests)
+                answers.push(await dnsResolver.resolve(request.name, request.type));
+
+            await dnsResolver.stop();
+
+            return answers;
+
+        } catch (err) {
+            this.pr.logger.log("Error DNS requests: " + err.message);
+            this.pr.logger.log(err.stack);
+            this.pr.errors.push(new ErrorRecord(Errors.FAILURE, "doDNSRequests", "Error DNS requests: " + err.message));
 
             throw err;
         }
