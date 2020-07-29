@@ -2,6 +2,7 @@
  * Copyright (c) 2019-present Sergey Chernov, iCodici S.n.C, All Rights Reserved.
  */
 
+#include <regex>
 #include "U8Module.h"
 #include "topologies.h"
 #include "../tools/tools.h"
@@ -12,6 +13,8 @@
 #include "../types/UBinder.h"
 #include "../serialization/BossSerializer.h"
 #include "../crypto/base64.h"
+#include "../network/HttpClient.h"
+#include "../tools/Semaphore.h"
 
 using namespace crypto;
 
@@ -53,11 +56,73 @@ std::string U8Module::searchU8TrustFile() {
     return "";
 }
 
+/*char* replaceChar(char *src, const char from, const char to)
+{
+    char *beg = src;
+    for (char *p = src; (*p = *src); p++, src++)
+        if (*p == from)
+            *p = to;
+    return beg;
+}*/
+
+std::string U8Module::getFileFromURL(const std::string &url) {
+    std::string homeDirectory = homeDir + "/.u8";
+    std::string path = homeDirectory + "/loaded_modules/";
+
+    Semaphore sem;
+    std::string file_name = url;
+    bool result = false;
+
+    network::HttpClient httpClient("", 5);
+    printf("URL: %s\n", url.c_str());
+
+    httpClient.sendGetRequestUrl(url, [&sem, &homeDirectory, &path, &url, &file_name, &result](int respCode, byte_vector&& body) {
+        try {
+            //string bodyStr(body.begin(), body.end());
+            //printf("resp(%i): %s\n", respCode, bodyStr.c_str());
+
+            if (respCode == 200 && !body.empty()) {
+                createDirectory(homeDirectory);
+                createDirectory(path);
+
+                std::replace_if(file_name.begin(), file_name.end(), [](char ch) { return !::isalnum(ch);}, '_');
+                result = putFileContentsBin(path + file_name.append(".u8m"), body);
+            } else
+                result = false;
+
+        } catch (const std::exception& e) {
+            printf("Error downloading module: %s\n", e.what());
+        }
+
+        sem.notify();
+
+    });
+
+    sem.wait();
+
+    if (result)
+         return path + file_name;
+    else
+        throw std::runtime_error("Error downloading module");
+}
+
+bool isCorrectURL(const std::string &url) {
+    regex URL_RegEx("http://[-a-zA-Z0-9+&@#/%?=~_|$!:,.;]*[A-Z0-9+&@#/%=~_|$]");
+    return regex_search(url, URL_RegEx);
+}
+
 bool U8Module::load() {
     try {
         int err = 0;
         byte_vector u8coreBin;
         zip* z = nullptr;
+
+        if (isCorrectURL(modulePath)) {
+            modulePath = getFileFromURL(modulePath);
+        }
+
+        //printf("modulePath: %s\n", modulePath.c_str());
+
         if (modulePath == U8COREMODULE_FULLNAME) {
             struct zip_error error = {0};
             zip_source_t *zsrc = zip_source_buffer_create(u8core_u8m, u8core_u8m_len, 0, &error);

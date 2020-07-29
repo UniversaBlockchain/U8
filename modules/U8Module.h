@@ -37,6 +37,8 @@ public:
 
     std::string getName();
     std::string resolveRequiredFile(const std::string &fileName);
+
+    std::string getFileFromURL(const std::string &url);
 };
 
 
