@@ -939,6 +939,11 @@ class Contract extends bs.BiSerializable {
                 this.constraints.set(constr.name, constr);
             }
         }
+
+        // set contract for roles and constraints
+        Array.from(this.constraints.values()).forEach(constr => constr.baseContract = this);
+        Object.values(this.roles).forEach(role => role.contract = this);
+        Object.values(this.state.roles).forEach(role => role.contract = this);
     }
 
     /**
@@ -2154,7 +2159,7 @@ class Contract extends bs.BiSerializable {
         let creator = new roles.RoleLink("creator","issuer");
         c.registerRole(creator);
 
-        let chown = new roles.RoleLink("@change_ower_role","owner");
+        let chown = new roles.RoleLink("@change_owner_role","owner");
         chown.contract = c;
         c.definition.addPermission(new permissions.ChangeOwnerPermission(chown));
         c.keysToSignWith.add(key);

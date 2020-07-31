@@ -7,13 +7,15 @@ import {KeyAddress, PublicKey, HashId} from 'crypto'
 import * as tk from "unit_tests/test_keys";
 import * as io from "io";
 import {VerboseLevel} from "node_consts";
-import {HttpServer} from 'web'
+import {HttpServer, DnsServer, DnsRRType} from 'web'
 import {ExecutorWithFixedPeriod} from "executorservice";
 
 const UBotMain = require("ubot/ubot_main").UBotMain;
 const UBotPoolState = require("ubot/ubot_pool_state").UBotPoolState;
 const UBotClient = require('ubot/ubot_client').UBotClient;
 const UBotConfig = require("ubot/ubot_config").UBotConfig;
+const UnsContract = require('services/unsContract').UnsContract;
+const NSmartContract = require("services/NSmartContract").NSmartContract;
 const ItemResult = require('itemresult').ItemResult;
 const ItemState = require("itemstate").ItemState;
 const cs = require("contractsservice");
@@ -243,6 +245,81 @@ unit.test("ubot_local_test: ping", async () => {
     assert(result.UDP > -1 && result.TCP > -1);
 
     await ubotClient.shutdown();
+    await shutdownUBots(ubotMains);
+});
+
+unit.test("ubot_local_test: register UDNS contract", async () => {
+    let ubotMains = await createUBots(ubotsCount);
+
+    let ubotClient = await new UBotClient(clientKey, TOPOLOGY_ROOT + TOPOLOGY_FILE).start();
+
+    // create UDNS contract
+    const udnsUserKey = tk.TestKeys.getKey();
+    let udnsContract = await UnsContract.fromPrivateKey(udnsUserKey, NSmartContract.SmartContractType.UNS2);
+    udnsContract.nodeInfoProvider = await ubotClient.getConfigProvider();
+
+    // quorum vote role
+    let creator = new roles.QuorumVoteRole("creator", "refUbotRegistry.state.roles.ubots", "4", udnsContract);
+    udnsContract.registerRole(creator);
+
+    // constraint for UBotNet registry contract
+    let constr = new Constraint(udnsContract);
+    constr.name = "refUbotRegistry";
+    constr.type = Constraint.TYPE_EXISTING_DEFINITION;
+    let conditions = {};
+    conditions[Constraint.conditionsModeType.all_of] = ["ref.tag == \"universa:ubot_registry_contract\""];
+    constr.setConditions(conditions);
+    udnsContract.addConstraint(constr);
+
+    // DNS names
+    udnsContract.addName("test-name.com", "test-name.com", "");
+    udnsContract.addName("www.test-name.com", "www.test-name.com", "");
+
+    await udnsContract.seal();
+    let packedUdnsContract = await udnsContract.getPackedTransaction();
+
+    // start test DNS server
+    let dnsServer = new DnsServer();
+    dnsServer.setQuestionCallback(async question => {
+        console.log("DNS request: name = " + question.name + ", rType = " + question.rType);
+        question.resolveThroughUplink_start();
+        if (question.name === "test-name.com") {
+            if (question.rType === DnsRRType.DNS_TXT || question.rType === DnsRRType.DNS_ANY)
+                question.addAnswer_typeTXT(500, udnsUserKey.publicKey.shortAddress.toString());
+            question.sendAnswer();
+        } else if (question.name === "www.test-name.com") {
+            if (question.rType === DnsRRType.DNS_TXT || question.rType === DnsRRType.DNS_ANY)
+                question.addAnswer_typeTXT(500, udnsUserKey.publicKey.longAddress.toString());
+            question.sendAnswer();
+        } else {
+            question.resolveThroughUplink_finish();
+        }
+    });
+    dnsServer.start("0.0.0.0", 5353, "8.8.4.4");
+
+    // Ubots contracts
+
+    let executableContract = await generateSimpleExecutableContract("checkUDNS.js", "register");
+    let requestContract = await generateSimpleRegisterRequestContract(executableContract, packedUdnsContract);
+
+    let state = await ubotClient.executeCloudMethod(requestContract, await createPayment(20));
+
+    console.log("State: " + JSON.stringify(state));
+
+    assert(state.state === UBotPoolState.FINISHED.val);
+    // assert(state.result);
+    //
+    // // checking UDNS contract
+    // let ir = await ubotClient.getState(udnsContract.id);
+    // assert(ir instanceof ItemResult && ir.state === ItemState.APPROVED);
+
+    await ubotClient.shutdown();
+    await dnsServer.stop();
+
+    // waiting pool finished...
+    while (ubotMains.some(main => Array.from(main.ubot.processors.values()).some(proc => proc.state.canContinue)))
+        await sleep(100);
+
     await shutdownUBots(ubotMains);
 });
 
@@ -888,7 +965,7 @@ unit.test("ubot_local_test: http requests", async () => {
     let stopPrice = 5.073;
 
     // test HTTP server with prices
-    let httpServer = new HttpServer("0.0.0.0", 8080, 5);
+    let httpServer = new HttpServer("0.0.0.0", 8090, 5);
     httpServer.addEndpoint("/getPrice", async (request) => {
         request.setHeader("Content-Type", "text/html");
         return {"price": price};

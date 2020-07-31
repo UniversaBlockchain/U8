@@ -822,7 +822,7 @@ class Constraint extends bs.BiSerializable {
                             let tag = null;
 
                             if (left != null && typeof left === "object" && left.hasOwnProperty("contractForSearchByTag")) {
-                                if (left.contractForSearchByTag instanceof Contract && (right == null || typeof right === "string")) {
+                                if (right == null || typeof right === "string") {
                                     taggedContract = left.contractForSearchByTag;
 
                                     if (right != null && typeof right ==="string")
@@ -831,7 +831,7 @@ class Constraint extends bs.BiSerializable {
                                         tag = rightOperand;
                                 }
                             } else {
-                                if (right.contractForSearchByTag instanceof Contract && (left == null || typeof left === "string")) {
+                                if (left == null || typeof left === "string") {
                                     taggedContract = right.contractForSearchByTag;
 
                                     if (left != null && typeof left === "string")

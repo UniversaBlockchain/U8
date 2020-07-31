@@ -102,8 +102,14 @@ static unordered_set<string> validSourcesForRestrictedWorker = {
     "esprima.js",
     "itemresult.js",
     "itemstate.js",
+    "parcel.js",
+    "compound.js",
     "contractsservice.js",
-    "ubot/ubot_tools.js"
+    "ubot/ubot_tools.js",
+    "services/NSmartContract.js",
+    "services/unsContract.js",
+    "services/unsName.js",
+    "services/unsRecord.js"
 };
 
 void JsLoadRequiredRestricted(const v8::FunctionCallbackInfo<v8::Value> &args) {

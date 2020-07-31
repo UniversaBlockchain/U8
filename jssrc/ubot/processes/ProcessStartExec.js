@@ -149,6 +149,12 @@ class ProcessStartExec extends ProcessBase {
         ));
     }
     
+    function poolRandom() {
+        return new Promise((resolve, reject) => wrkInner.farcall("poolRandom", [], {},
+            ans => resolve(ans), err => reject(err)
+        ));
+    }
+    
     function errorFail(methodName, err) {
         return new Promise(resolve => wrkInner.farcall("errorFail", [methodName, err], {}, ans => resolve(ans)));
     }
@@ -280,6 +286,10 @@ class ProcessStartExec extends ProcessBase {
 
                 this.pr.worker.export["getUBotNumberInPool"] = async (args, kwargs) => {
                     return this.getUBotNumberInPool();
+                };
+
+                this.pr.worker.export["poolRandom"] = async (args, kwargs) => {
+                    return this.poolRandom();
                 };
 
                 this.pr.worker.export["startTransaction"] = async (args, kwargs) => {
@@ -991,6 +1001,15 @@ class ProcessStartExec extends ProcessBase {
      */
     getUBotNumberInPool() {
         return this.pr.selfPoolIndex;
+    }
+
+    /**
+     * Get pool random (value between 0 and 1).
+     *
+     * @return {number} UBot pool random.
+     */
+    poolRandom() {
+        return this.pr.prng.rand();
     }
 
     /**

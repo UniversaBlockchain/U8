@@ -55,6 +55,8 @@ class UnsContract extends NSmartContract {
         this.prepaidNameDays = 0;
         // Need origins of referenced contracts
         this.originContracts = new t.GenericMap();
+        // UNS contract type
+        this.unsType = NSmartContract.SmartContractType.UNS1;
     }
 
     /**
@@ -64,12 +66,15 @@ class UnsContract extends NSmartContract {
      * it is necessary to put real data to it first. It is allowed to change owner, expiration and data fields after
      * creation (but before sealing).
      *
-     * @param {PrivateKey} key is {@link PrivateKey} for creating roles "issuer", "owner", "creator" and sign contract.
+     * @param {PrivateKey} key - {@link PrivateKey} for creating roles "issuer", "owner", "creator" and sign contract.
+     * @param {string} unsType - UNS contract type.
      *
      * @return {UnsContract} created UNS contract.
      */
-    static fromPrivateKey(key) {
+    static fromPrivateKey(key, unsType = NSmartContract.SmartContractType.UNS1) {
         let c = Contract.fromPrivateKey(key, new UnsContract());
+
+        c.unsType = unsType;
 
         let revokePerm1 = new permissions.RevokePermission(new roles.RoleLink("@owner", "owner", c));
         c.definition.addPermission(revokePerm1);
@@ -167,7 +172,7 @@ class UnsContract extends NSmartContract {
      * Initialize UnsContract internal data structure with specific UNS1 parameters.
      */
     addUnsSpecific() {
-        this.definition.extendedType = NSmartContract.SmartContractType.UNS1;
+        this.definition.extendedType = this.unsType;
 
         let ownerLink = new roles.RoleLink("owner_link", "owner", this);
         this.registerRole(ownerLink);

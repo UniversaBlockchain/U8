@@ -16,7 +16,7 @@ async function stopOrder(stopPrice) {
         let work = true;
         while (work) {
             // Execute HTTP-request
-            let result = await doHTTPRequest("http://localhost:8080/getPrice");
+            let result = await doHTTPRequest("http://localhost:8090/getPrice");
             result.body = await Boss.load(result.body);     // HTTP server return packed (with BOSS) response with price
 
             // checking response
