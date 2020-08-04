@@ -795,7 +795,7 @@ class UnsContract extends NSmartContract {
 
     addOriginFromContract(contract) {
         this.addOrigin(contract.getOrigin());
-        this.originContracts.put(contract.getOrigin(), contract);
+        this.originContracts.set(contract.getOrigin(), contract);
     }
 
     /**
