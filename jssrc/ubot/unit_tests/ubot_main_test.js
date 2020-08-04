@@ -28,7 +28,7 @@ const clientKey = tk.TestKeys.getKey();
 const userPrivKey = tk.TestKeys.getKey();
 
 async function createPayment(cost) {
-    //return null;
+    return null;        // for MainNet (available 300 free quantas for UBot)
 
     let netClient = await new UBotClient(tk.getTestKey(), TOPOLOGY_ROOT + TOPOLOGY_FILE).start();
 
@@ -185,6 +185,32 @@ unit.test("ubot_main_test: secure random", async () => {
 
     // checking secure random value
     assert(typeof state.result === "number" && state.result >= 0 && state.result < 1000);
+
+    await ubotClient.shutdown();
+});
+
+unit.test("ubot_main_test: simple random", async () => {
+    let ubotClient = await new UBotClient(clientKey, TOPOLOGY_ROOT + TOPOLOGY_FILE).start();
+
+    let executableContract = await generateSimpleExecutableContract("simpleRandom.js", "getRandom");
+
+    let requestContract = Contract.fromPrivateKey(userPrivKey);
+    requestContract.state.data.method_name = "getRandom";
+    requestContract.state.data.method_args = [10000];
+    requestContract.state.data.executable_contract_id = executableContract.id;
+    requestContract.newItems.add(executableContract);
+
+    await cs.addConstraintToContract(requestContract, executableContract, "executable_contract_constraint",
+        Constraint.TYPE_EXISTING_STATE, ["this.state.data.executable_contract_id == ref.id"], true);
+
+    let state = await ubotClient.executeCloudMethod(requestContract, await createPayment(5));
+
+    console.log("State: " + JSON.stringify(state));
+
+    assert(state.state === UBotPoolState.FINISHED.val);
+
+    // checking secure random value
+    assert(typeof state.result === "number" && state.result >= 0 && state.result < 10000);
 
     await ubotClient.shutdown();
 });
