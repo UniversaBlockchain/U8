@@ -180,7 +180,7 @@ class Compound {
             let tpCopy = await TransactionPack.unpack(await this.compoundContract.getPackedTransaction());
 
             //get contract by id and create transaction pack for it
-            let id = HashId.withDigest(tagObj.id);
+            let id = HashId.withBase64Digest(tagObj.id);
             let contract = tpCopy.subItems.get(id);
 
             let tp = new TransactionPack(contract);

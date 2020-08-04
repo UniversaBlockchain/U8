@@ -36,6 +36,16 @@ const clientKey = tk.TestKeys.getKey();
 const userPrivKey = tk.TestKeys.getKey();
 
 async function createPayment(cost) {
+    let U = await createU();
+
+    U = await U.createRevision([userPrivKey]);
+    U.state.data.transaction_units = U.state.data.transaction_units - cost;
+    await U.seal();
+
+    return U;
+}
+
+async function createU() {
     let netClient = await new UBotClient(tk.getTestKey(), TOPOLOGY_ROOT + TOPOLOGY_FILE).start();
 
     let U = await tt.createFreshU(100000000, [userPrivKey.publicKey]);
@@ -43,13 +53,10 @@ async function createPayment(cost) {
     await U.seal(true);
 
     await U.addSignatureToSeal(tk.getTestKey());
-    let ir = await netClient.register(await U.getPackedTransaction(), 20000);
 
-    assert(ir.state === ItemState.APPROVED);
-
-    U = await U.createRevision([userPrivKey]);
-    U.state.data.transaction_units = U.state.data.transaction_units - cost;
-    await U.seal();
+    let ir = await netClient.register(await U.getPackedTransaction(), 10000);
+    if (ir.state !== ItemState.APPROVED)
+        throw new Error("Error createPayment: item state = " + ir.state.val);
 
     await netClient.shutdown();
 
@@ -272,10 +279,19 @@ unit.test("ubot_local_test: register UDNS contract", async () => {
     udnsContract.addConstraint(constr);
 
     // DNS names
-    udnsContract.addName("test-name.com", "test-name.com", "");
-    udnsContract.addName("www.test-name.com", "www.test-name.com", "");
+    let now = Date.now();
+    udnsContract.addName("test-name.com" + now, "/test-name.com" + now, "");
+    udnsContract.addName("www.test-name.com" + now, "/www.test-name.com" + now, "");
 
     await udnsContract.seal();
+
+    let plannedExpirationDate = new Date();
+    plannedExpirationDate.setFullYear(plannedExpirationDate.getFullYear() + 1);
+    let authorizedNameServiceKey = tk.getTestKey();
+
+    await udnsContract.createRegistrationTransactionPackFromExpirationDate(plannedExpirationDate,
+        await createU(), [userPrivKey], [udnsUserKey, authorizedNameServiceKey]);
+
     let packedUdnsContract = await udnsContract.getPackedTransaction();
 
     // start test DNS server
@@ -283,11 +299,11 @@ unit.test("ubot_local_test: register UDNS contract", async () => {
     dnsServer.setQuestionCallback(async question => {
         console.log("DNS request: name = " + question.name + ", rType = " + question.rType);
         question.resolveThroughUplink_start();
-        if (question.name === "test-name.com") {
+        if (question.name === "test-name.com" + now) {
             if (question.rType === DnsRRType.DNS_TXT || question.rType === DnsRRType.DNS_ANY)
                 question.addAnswer_typeTXT(500, udnsUserKey.publicKey.shortAddress.toString());
             question.sendAnswer();
-        } else if (question.name === "www.test-name.com") {
+        } else if (question.name === "www.test-name.com" + now) {
             if (question.rType === DnsRRType.DNS_TXT || question.rType === DnsRRType.DNS_ANY)
                 question.addAnswer_typeTXT(500, udnsUserKey.publicKey.longAddress.toString());
             question.sendAnswer();
@@ -307,11 +323,11 @@ unit.test("ubot_local_test: register UDNS contract", async () => {
     console.log("State: " + JSON.stringify(state));
 
     assert(state.state === UBotPoolState.FINISHED.val);
-    // assert(state.result);
-    //
-    // // checking UDNS contract
-    // let ir = await ubotClient.getState(udnsContract.id);
-    // assert(ir instanceof ItemResult && ir.state === ItemState.APPROVED);
+    assert(state.result);
+
+    // checking UDNS contract
+    let ir = await ubotClient.getState(udnsContract.id);
+    assert(ir instanceof ItemResult && ir.state === ItemState.APPROVED);
 
     await ubotClient.shutdown();
     await dnsServer.stop();

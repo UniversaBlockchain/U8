@@ -15,6 +15,7 @@ const ErrorRecord = e.ErrorRecord;
 const TransactionPack = require("transactionpack").TransactionPack;
 const Parcel = require("parcel").Parcel;
 const ex = require("exceptions");
+const Compound = require("compound").Compound;
 
 const NSmartContract = require("services/NSmartContract").NSmartContract;
 const UnsName = require("services/unsName").UnsName;
@@ -993,6 +994,22 @@ class UnsContract extends NSmartContract {
     }
 
     /**
+     * Create {@link TransactionPack} to be registered that ensures expiration date of current UNS1 is not less than desired one.
+     *
+     * @param {Date} unsExpirationDate - Desired expiration date.
+     * @param {Contract} uContract - Contract to used as payment.
+     * @param {Iterable<crypto.PrivateKey>} uKeys - Keys that resolve owner of payment contract.
+     * @param {Array<crypto.PrivateKey>|Set<crypto.PrivateKey>|crypto.PrivateKey}keysToSignUnsWith keys to sign UNS1 contract
+     * with (existing signatures are dropped when adding payment).
+     * @return {TransactionPack} Transaction pack to be registered.
+     */
+    async createRegistrationTransactionPackFromExpirationDate(unsExpirationDate, uContract, uKeys, keysToSignUnsWith) {
+        let amount = this.getPayingAmount(unsExpirationDate);
+
+        return await this.createRegistrationTransactionPackFromPaymentAmount(amount, uContract, uKeys, keysToSignUnsWith);
+    }
+
+    /**
      * Create {@link Parcel} to be registered that includes given amount paid.
      *
      * @param {number} payingAmount - Paying amount to pay.
@@ -1014,6 +1031,41 @@ class UnsContract extends NSmartContract {
         }
 
         return await Parcel.of(this, uContract, uKeys, payingAmount);
+    }
+
+    /**
+     * Create {@link TransactionPack} to be registered that includes given amount paid.
+     *
+     * @param {number} payingAmount - Paying amount to pay.
+     * @param {Contract} uContract - Contract to used as payment.
+     * @param {Iterable<crypto.PrivateKey>} uKeys - Keys that resolve owner of
+     * payment contract.
+     * @param {Array<crypto.PrivateKey>|Set<crypto.PrivateKey>|crypto.PrivateKey} keysToSignUnsWith - Keys to sign UNS1
+     * contract with (existing signatures are dropped when adding payment).
+     * @return {TransactionPack} Transaction pack to be registered.
+     */
+    async createRegistrationTransactionPackFromPaymentAmount(payingAmount, uContract, uKeys, keysToSignUnsWith) {
+        let seal = false;
+        if (this.paidU == null || payingAmount !== this.paidU) {
+
+            if (this.setPayingAmount(payingAmount) == null)
+                return null;
+
+            seal = true;
+        }
+
+        if (payingAmount > 0) {
+            let payment = await Parcel.createPayment(uContract, uKeys, payingAmount, false);
+            this.newItems.add(payment);
+            seal = true;
+        }
+
+        if (seal) {
+            await this.seal();
+            await this.addSignatureToSeal(keysToSignUnsWith);
+        }
+
+        return this.transactionPack;
     }
 
     /**
