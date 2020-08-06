@@ -775,11 +775,11 @@ async function createUnsContractForRegisterContractName(issuerKeys, ownerKeys, n
     if (namedContract.id == null)
         throw new ex.IllegalArgumentError("createUnsContractForRegisterContractName: namedContract not sealed.");
 
-    let unsName = new UnsName(name, description, URL);
-    let unsRecord = UnsRecord.fromOrigin(namedContract.id);
-    unsName.addUnsRecord(unsRecord);
-    unsContract.addUnsName(unsName);
-    unsContract.addOriginContract(namedContract);
+    unsContract.addName(name, null, description);
+    unsContract.addOriginFromContract(namedContract);
+
+    for (let k of issuerKeys)
+        unsContract.keysToSignWith.add(k);
 
     await unsContract.seal(true);
     await unsContract.addSignatureToSeal(issuerKeys);
@@ -810,10 +810,11 @@ async function createUnsContractForRegisterKeyName(issuerKeys, ownerKeys, nodeIn
 
     let unsContract = createSimpleUnsContract(issuerKeys, ownerKeys, nodeInfoProvider);
 
-    let unsName = new UnsName(name, description, URL);
-    let unsRecord = UnsRecord.fromKey(namedKey instanceof crypto.PrivateKey ? namedKey.publicKey : namedKey);
-    unsName.addUnsRecord(unsRecord);
-    unsContract.addUnsName(unsName);
+    unsContract.addName(name, null, description);
+    unsContract.addKey(namedKey.publicKey);
+
+    for (let k of issuerKeys)
+        unsContract.keysToSignWith.add(k);
 
     await unsContract.seal(true);
     await unsContract.addSignatureToSeal(issuerKeys);

@@ -978,7 +978,7 @@ class Contract extends bs.BiSerializable {
      * Useful if you got contracts from third-party and need to sign it.
      * F.e. contracts that should be sign with two persons.
      *
-     * @param {Array<crypto.PrivateKey>|Set<crypto.PrivateKey>|crypto.PrivateKey} x - Keys to sign contract with
+     * @param {Iterable<crypto.PrivateKey>} x - Keys to sign contract with
      */
     async addSignatureToSeal(x) {
         let keys;
