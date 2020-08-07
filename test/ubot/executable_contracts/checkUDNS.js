@@ -3,6 +3,8 @@
  */
 
 const NSmartContract = require("services/NSmartContract").NSmartContract;
+const Compound = require("compound").Compound;
+const Parcel = require("parcel").Parcel;
 
 const DNS_TXT = 16;
 
@@ -14,11 +16,30 @@ const DNSlist = [
 /**
  * Register UDNS contract.
  *
- * @param {Uint8Array} packedContract - packed UDNS contract.
- * @return {Promise<ItemResult>} - Result of registration UDNS contract.
+ * @param {Uint8Array} packed - packed transaction with UDNS contract.
+ * @return {Promise<ItemState>} - Result of registration UDNS contract.
  */
-async function register(packedContract) {
-    let contract = await Contract.fromPackedTransaction(packedContract);
+async function register(packed) {
+    let contract = await Contract.fromPackedTransaction(packed);
+    return await registerTransaction(packed, contract, null);
+}
+
+/**
+ * Register UDNS contract.
+ *
+ * @param {Uint8Array} packed - packed transaction with compound of UDNS contract.
+ * @return {Promise<ItemState>} - Result of registration UDNS contract.
+ */
+async function registerCompound(packed) {
+    let compound = await Compound.fromPackedTransaction(packed);
+    let contract = await compound.getContractByTag(Parcel.COMPOUND_MAIN_TAG);
+    if (contract == null)
+        throw new Error("Contract not found in compound.");
+
+    return await registerTransaction(packed, contract, [contract.id.base64]);
+}
+
+async function registerTransaction(packed, contract, contractIdsForPoolSign) {
     if (contract.definition.extendedType !== NSmartContract.SmartContractType.UNS2)
         throw new Error("Contract must have UNS2 type.");
 
@@ -57,5 +78,5 @@ async function register(packedContract) {
             throw new Error("UDNS contract can`t register DNS names: " + JSON.stringify(untrustedNames));
     }
 
-    return await registerContract(packedContract);
+    return (await registerContract(packed, contractIdsForPoolSign)).state;
 }

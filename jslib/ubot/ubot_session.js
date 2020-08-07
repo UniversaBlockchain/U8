@@ -2,6 +2,8 @@
  * Copyright (c) 2019-present Sergey Chernov, iCodici S.n.C, All Rights Reserved.
  */
 
+import {HashId} from 'crypto';
+
 const t = require("tools");
 const ut = require("ubot/ubot_tools");
 const UBotConfig = require("ubot/ubot_config").UBotConfig;
@@ -167,7 +169,7 @@ class UBotSession {
         return result;
     }
 
-    async registerContract(packed, requestContract) {
+    async registerContract(packed, contractIdsForPoolSign, requestContract) {
         let contract = await Contract.fromPackedTransaction(packed);
 
         if (this.ubot != null)
@@ -175,7 +177,10 @@ class UBotSession {
 
         // if (initiateLongVote)
         //     await this.client.askSessionOnAllNodes("initiateVote", {packedItem: contract.sealedBinary});
-        await this.client.askOnAllNodes("addKeyToContract", {itemId: contract.id});
+        if (contractIdsForPoolSign == null || !contractIdsForPoolSign instanceof Array || contractIdsForPoolSign.length === 0)
+            await this.client.askOnAllNodes("addKeyToContract", {itemId: contract.id});
+        else for (let contractId of contractIdsForPoolSign)
+            await this.client.askOnAllNodes("addKeyToContract", {itemId: HashId.withBase64Digest(contractId)});
 
         let quorum = 0;
         if (this.ubot != null)      // UBot session

@@ -262,6 +262,7 @@ unit.test("ubot_local_test: register UDNS contract", async () => {
 
     // create UDNS contract
     const udnsUserKey = tk.TestKeys.getKey();
+    const udnsAddUserKey = tk.TestKeys.getKey();
     let udnsContract = await UnsContract.fromPrivateKey(udnsUserKey, NSmartContract.SmartContractType.UNS2);
     udnsContract.nodeInfoProvider = await ubotClient.getConfigProvider();
 
@@ -283,7 +284,7 @@ unit.test("ubot_local_test: register UDNS contract", async () => {
     udnsContract.addName("test-name.com" + now, "/test-name.com" + now, "");
     udnsContract.addName("www.test-name.com" + now, "/www.test-name.com" + now, "");
 
-    await udnsContract.seal();
+    await udnsContract.seal();рать проверить
 
     let plannedExpirationDate = new Date();
     plannedExpirationDate.setFullYear(plannedExpirationDate.getFullYear() + 1);
@@ -307,6 +308,10 @@ unit.test("ubot_local_test: register UDNS contract", async () => {
             if (question.rType === DnsRRType.DNS_TXT || question.rType === DnsRRType.DNS_ANY)
                 question.addAnswer_typeTXT(500, udnsUserKey.publicKey.longAddress.toString());
             question.sendAnswer();
+        } else if (question.name === "add-name.com" + now) {
+            if (question.rType === DnsRRType.DNS_TXT || question.rType === DnsRRType.DNS_ANY)
+                question.addAnswer_typeTXT(500, udnsAddUserKey.publicKey.longAddress.toString());
+            question.sendAnswer();
         } else {
             question.resolveThroughUplink_finish();
         }
@@ -314,7 +319,6 @@ unit.test("ubot_local_test: register UDNS contract", async () => {
     dnsServer.start("0.0.0.0", 5353, "8.8.4.4");
 
     // Ubots contracts
-
     let executableContract = await generateSimpleExecutableContract("checkUDNS.js", "register");
     let requestContract = await generateSimpleRegisterRequestContract(executableContract, packedUdnsContract);
 
@@ -323,10 +327,108 @@ unit.test("ubot_local_test: register UDNS contract", async () => {
     console.log("State: " + JSON.stringify(state));
 
     assert(state.state === UBotPoolState.FINISHED.val);
-    assert(state.result);
+    assert(state.result === ItemState.APPROVED.val);
 
     // checking UDNS contract
     let ir = await ubotClient.getState(udnsContract.id);
+    assert(ir instanceof ItemResult && ir.state === ItemState.APPROVED);
+
+    // trying registration not trust name
+    let udnsRevision = await udnsContract.createRevision([udnsUserKey]);
+    udnsRevision.nodeInfoProvider = await ubotClient.getConfigProvider();
+    creator = new roles.QuorumVoteRole("creator", "refUbotRegistry.state.roles.ubots", "4", udnsRevision);
+    udnsRevision.registerRole(creator);
+    udnsRevision.addName("not-name.com" + now, "/not-name.com" + now, "");
+    await udnsRevision.seal();
+
+    await udnsRevision.createRegistrationTransactionPackFromExpirationDate(plannedExpirationDate,
+        await createU(), [userPrivKey], [udnsUserKey, authorizedNameServiceKey]);
+
+    packedUdnsContract = await udnsRevision.getPackedTransaction();
+
+    requestContract = Contract.fromPrivateKey(userPrivKey);
+    requestContract.state.data.method_name = "register";
+    requestContract.state.data.method_args = [packedUdnsContract];
+    requestContract.state.data.executable_contract_id = executableContract.id;
+
+    await cs.addConstraintToContract(requestContract, executableContract, "executable_contract_constraint",
+        Constraint.TYPE_EXISTING_STATE, ["this.state.data.executable_contract_id == ref.id"], true);
+
+    state = await ubotClient.executeCloudMethod(requestContract, await createPayment(20));
+
+    console.log("State: " + JSON.stringify(state));
+
+    assert(state.state === UBotPoolState.FAILED.val);
+    assert(state.errors.length === 1);
+    assert(state.errors[0].message === "Error in cloud method register: UDNS contract can`t register DNS names: [\"not-name.com" + now + "\"]");
+
+    // checking UDNS contract
+    ir = await ubotClient.getState(udnsRevision.id);
+    assert(ir instanceof ItemResult && ir.state === ItemState.UNDEFINED);
+
+    // trying registration with not trust key
+    udnsRevision = await udnsContract.createRevision();
+    udnsRevision.nodeInfoProvider = await ubotClient.getConfigProvider();
+    creator = new roles.QuorumVoteRole("creator", "refUbotRegistry.state.roles.ubots", "4", udnsRevision);
+    udnsRevision.registerRole(creator);
+    udnsRevision.addName("add-name.com" + now, "/add-name.com" + now, "");
+    await udnsRevision.seal();
+
+    await udnsRevision.createRegistrationTransactionPackFromExpirationDate(plannedExpirationDate,
+        await createU(), [userPrivKey], [udnsUserKey, authorizedNameServiceKey]);
+
+    packedUdnsContract = await udnsRevision.getPackedTransaction();
+
+    requestContract = Contract.fromPrivateKey(userPrivKey);
+    requestContract.state.data.method_name = "register";
+    requestContract.state.data.method_args = [packedUdnsContract];
+    requestContract.state.data.executable_contract_id = executableContract.id;
+
+    await cs.addConstraintToContract(requestContract, executableContract, "executable_contract_constraint",
+        Constraint.TYPE_EXISTING_STATE, ["this.state.data.executable_contract_id == ref.id"], true);
+
+    state = await ubotClient.executeCloudMethod(requestContract, await createPayment(20));
+
+    console.log("State: " + JSON.stringify(state));
+
+    assert(state.state === UBotPoolState.FAILED.val);
+    assert(state.errors.length === 1);
+    assert(state.errors[0].message === "Error in cloud method register: UDNS contract can`t register DNS names: [\"add-name.com" + now + "\"]");
+
+    // checking UDNS contract
+    ir = await ubotClient.getState(udnsRevision.id);
+    assert(ir instanceof ItemResult && ir.state === ItemState.UNDEFINED);
+
+    // register revision
+    udnsRevision = await udnsContract.createRevision();
+    udnsRevision.nodeInfoProvider = await ubotClient.getConfigProvider();
+    creator = new roles.QuorumVoteRole("creator", "refUbotRegistry.state.roles.ubots", "4", udnsRevision);
+    udnsRevision.registerRole(creator);
+    udnsRevision.addName("add-name.com" + now, "/add-name.com" + now, "");
+    await udnsRevision.seal();
+
+    await udnsRevision.createRegistrationTransactionPackFromExpirationDate(plannedExpirationDate,
+        await createU(), [userPrivKey], [udnsUserKey, udnsAddUserKey, authorizedNameServiceKey]);
+
+    packedUdnsContract = await udnsRevision.getPackedTransaction();
+
+    requestContract = Contract.fromPrivateKey(userPrivKey);
+    requestContract.state.data.method_name = "register";
+    requestContract.state.data.method_args = [packedUdnsContract];
+    requestContract.state.data.executable_contract_id = executableContract.id;
+
+    await cs.addConstraintToContract(requestContract, executableContract, "executable_contract_constraint",
+        Constraint.TYPE_EXISTING_STATE, ["this.state.data.executable_contract_id == ref.id"], true);
+
+    state = await ubotClient.executeCloudMethod(requestContract, await createPayment(20));
+
+    console.log("State: " + JSON.stringify(state));
+
+    assert(state.state === UBotPoolState.FINISHED.val);
+    assert(state.result === ItemState.APPROVED.val);
+
+    // checking UDNS revision
+    ir = await ubotClient.getState(udnsRevision.id);
     assert(ir instanceof ItemResult && ir.state === ItemState.APPROVED);
 
     await ubotClient.shutdown();
@@ -338,6 +440,91 @@ unit.test("ubot_local_test: register UDNS contract", async () => {
 
     await shutdownUBots(ubotMains);
 });
+
+// unit.test("ubot_local_test: register UDNS contract from compound", async () => {
+//     let ubotMains = await createUBots(ubotsCount);
+//
+//     let ubotClient = await new UBotClient(clientKey, TOPOLOGY_ROOT + TOPOLOGY_FILE).start();
+//
+//     // create UDNS contract
+//     const udnsUserKey = tk.TestKeys.getKey();
+//     let udnsContract = await UnsContract.fromPrivateKey(udnsUserKey, NSmartContract.SmartContractType.UNS2);
+//     udnsContract.nodeInfoProvider = await ubotClient.getConfigProvider();
+//
+//     // quorum vote role
+//     let creator = new roles.QuorumVoteRole("creator", "refUbotRegistry.state.roles.ubots", "4", udnsContract);
+//     udnsContract.registerRole(creator);
+//
+//     // constraint for UBotNet registry contract
+//     let constr = new Constraint(udnsContract);
+//     constr.name = "refUbotRegistry";
+//     constr.type = Constraint.TYPE_EXISTING_DEFINITION;
+//     let conditions = {};
+//     conditions[Constraint.conditionsModeType.all_of] = ["ref.tag == \"universa:ubot_registry_contract\""];
+//     constr.setConditions(conditions);
+//     udnsContract.addConstraint(constr);
+//
+//     // DNS names
+//     let now = Date.now();
+//     udnsContract.addName("ctest-name.com" + now, "/ctest-name.com" + now, "");
+//     udnsContract.addName("www.ctest-name.com" + now, "/www.ctest-name.com" + now, "");
+//
+//     await udnsContract.seal();
+//
+//     let plannedExpirationDate = new Date();
+//     plannedExpirationDate.setFullYear(plannedExpirationDate.getFullYear() + 1);
+//     let authorizedNameServiceKey = tk.getTestKey();
+//
+//     await udnsContract.createRegistrationCompoundFromExpirationDate(plannedExpirationDate,
+//         await createU(), [userPrivKey], [udnsUserKey, authorizedNameServiceKey]);
+//
+//     let packedUdnsContract = await udnsContract.getPackedTransaction();
+//
+//     // start test DNS server
+//     let dnsServer = new DnsServer();
+//     dnsServer.setQuestionCallback(async question => {
+//         console.log("DNS request: name = " + question.name + ", rType = " + question.rType);
+//         question.resolveThroughUplink_start();
+//         if (question.name === "ctest-name.com" + now) {
+//             if (question.rType === DnsRRType.DNS_TXT || question.rType === DnsRRType.DNS_ANY)
+//                 question.addAnswer_typeTXT(500, udnsUserKey.publicKey.shortAddress.toString());
+//             question.sendAnswer();
+//         } else if (question.name === "www.ctest-name.com" + now) {
+//             if (question.rType === DnsRRType.DNS_TXT || question.rType === DnsRRType.DNS_ANY)
+//                 question.addAnswer_typeTXT(500, udnsUserKey.publicKey.longAddress.toString());
+//             question.sendAnswer();
+//         } else {
+//             question.resolveThroughUplink_finish();
+//         }
+//     });
+//     dnsServer.start("0.0.0.0", 5353, "8.8.4.4");
+//
+//     // Ubots contracts
+//     let executableContract = await generateSimpleExecutableContract("checkUDNS.js", "registerCompound");
+//     let requestContract = await generateSimpleRegisterRequestContract(executableContract, packedUdnsContract);
+//     requestContract.state.data.method_name = "registerCompound";
+//     await requestContract.seal();
+//
+//     let state = await ubotClient.executeCloudMethod(requestContract, await createPayment(20));
+//
+//     console.log("State: " + JSON.stringify(state));
+//
+//     assert(state.state === UBotPoolState.FINISHED.val);
+//     assert(state.result === ItemState.APPROVED);
+//
+//     // checking UDNS contract
+//     let ir = await ubotClient.getState(udnsContract.id);
+//     assert(ir instanceof ItemResult && ir.state === ItemState.APPROVED);
+//
+//     await ubotClient.shutdown();
+//     await dnsServer.stop();
+//
+//     // waiting pool finished...
+//     while (ubotMains.some(main => Array.from(main.ubot.processors.values()).some(proc => proc.state.canContinue)))
+//         await sleep(100);
+//
+//     await shutdownUBots(ubotMains);
+// });
 
 // unit.test("ubot_local_test: transactions", async () => {
 //     let ubotMains = await createUBots(ubotsCount);

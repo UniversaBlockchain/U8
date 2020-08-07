@@ -671,7 +671,7 @@ unit.test("contractsservice_test: createUnsContractForRegisterContractName", asy
     let key2 = tk.TestKeys.getKey();
 
     let unsContract = await cs.createUnsContractForRegisterContractName([key1], [key2.publicKey],
-        tt.createNodeInfoProvider(), "testUnsContract", "test description", "http://test.com", namedContract);
+        tt.createNodeInfoProvider(), "http://test.com", "test description", namedContract);
 
     await simpleCheckContract(unsContract, key1, key2);
 
@@ -687,14 +687,10 @@ unit.test("contractsservice_test: createUnsContractForRegisterContractName", asy
     assert(mdp[0].fields.hasOwnProperty(UnsContract.PAID_U_FIELD_NAME));
     assert(mdp[0].fields.hasOwnProperty(UnsContract.PREPAID_ND_FIELD_NAME));
 
-    assert(unsContract.getName("testUnsContract").unsName === "testUnsContract");
-    assert(unsContract.getName("testUnsContract").unsDescription === "test description");
-    //assert(unsContract.getName("testUnsContract").unsURL === "http://test.com");
+    assert(unsContract.getName("http://test.com").unsName === "http://test.com");
+    assert(unsContract.getName("http://test.com").unsDescription === "test description");
 
     assert(unsContract.getOrigins().has(namedContract.getOrigin()));
-
-    //assert(unsContract.getAddresses().has(key2.publicKey.longAddress)); //???
-    //assert(desContract.getAddresses().has(key2.publicKey.shortAddress));
 });
 
 unit.test("contractsservice_test: createUnsContractForRegisterKeyName", async () => {
@@ -704,7 +700,7 @@ unit.test("contractsservice_test: createUnsContractForRegisterKeyName", async ()
     let key2 = tk.TestKeys.getKey();
 
     let unsContract = await cs.createUnsContractForRegisterKeyName([key1], [key2.publicKey],
-        tt.createNodeInfoProvider(), "testUnsContract", "test description", "http://test.com", namedKey);
+        tt.createNodeInfoProvider(), "http://test.com", "test description", namedKey);
 
     await simpleCheckContract(unsContract, key1, key2);
 
@@ -720,12 +716,11 @@ unit.test("contractsservice_test: createUnsContractForRegisterKeyName", async ()
     assert(mdp[0].fields.hasOwnProperty(UnsContract.PAID_U_FIELD_NAME));
     assert(mdp[0].fields.hasOwnProperty(UnsContract.PREPAID_ND_FIELD_NAME));
 
-    //assert(unsContract.getName("testUnsContract").findUnsRecordByKey(namedKey.publicKey) !== -1);
-    //assert(unsContract.getName(reducedName).unsReducedName === reducedName);
-    assert(unsContract.getName("testUnsContract").unsDescription === "test description");
+    assert(unsContract.getName("http://test.com").unsName === "http://test.com");
+    assert(unsContract.getName("http://test.com").unsDescription === "test description");
 
-    //assert(unsContract.getUnsName("testUnsContract").findUnsRecordByAddress(new crypto.KeyAddress(namedKey.publicKey, 0, true)) !== -1);
-    //assert(unsContract.getUnsName("testUnsContract").findUnsRecordByAddress(new crypto.KeyAddress(namedKey.publicKey, 0, false)) !== -1);
+    assert(unsContract.getAddresses().has(namedKey.publicKey.longAddress));
+    assert(unsContract.getAddresses().has(namedKey.publicKey.shortAddress));
 });
 
 unit.test("contractsservice_test: createFollowerContract", async () => {

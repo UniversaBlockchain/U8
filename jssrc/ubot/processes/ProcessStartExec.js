@@ -32,6 +32,7 @@ class ProcessStartExec extends ProcessBase {
 
     static workerSrc = consoleWrapper + farcallWrapper + `
     const Contract = require("contract").Contract;
+    const UnsContract = require('services/unsContract').UnsContract;
     
     function writeSingleStorage(data, storageName = "default") {
         return new Promise((resolve, reject) => wrkInner.farcall("writeSingleStorage", [data, storageName], {},
@@ -81,8 +82,14 @@ class ProcessStartExec extends ProcessBase {
         ));
     }
     
-    function registerContract(contract) {
-        return new Promise((resolve, reject) => wrkInner.farcall("registerContract", [contract], {},
+    function registerContract(packedTransaction, contractIdsForPoolSign = null) {
+        return new Promise((resolve, reject) => wrkInner.farcall("registerContract", [packedTransaction, contractIdsForPoolSign], {},
+            ans => resolve(ans), err => reject(err)
+        ));
+    }
+    
+    function registerTransaction(packedTransaction, contractIdsForPoolSign = null) {
+        return new Promise((resolve, reject) => wrkInner.farcall("registerContract", [packedTransaction, contractIdsForPoolSign], {},
             ans => resolve(ans), err => reject(err)
         ));
     }
@@ -705,11 +712,12 @@ class ProcessStartExec extends ProcessBase {
      * Register a contract transferred as part of a packed transaction.
      *
      * @param {Uint8Array} packedTransaction - Packed transaction for registration.
+     * @param {Array<string>} contractIdsForPoolSign - IDs (as BASE64 string) of contracts for sign with pool.
      * @return {Promise<ItemResult>} - Result of registration or current state of registration (if wasn't finished yet).
      * @throws {UBotQuantiserException} quantiser limit is reached.
      * @throws {UBotClientException} client exception if error register contract.
      */
-    async registerContract(packedTransaction) {
+    async registerContract(packedTransaction, contractIdsForPoolSign = null) {
         try {
             let contract = await Contract.fromPackedTransaction(packedTransaction);
             await contract.check();
@@ -717,7 +725,7 @@ class ProcessStartExec extends ProcessBase {
             let cost = Math.ceil(contract.quantiser.getQuantaSum() / this.pr.poolSize);
             this.pr.quantiser.addWorkCost(cost);
 
-            return await this.pr.session.registerContract(packedTransaction, this.pr.requestContract);
+            return await this.pr.session.registerContract(packedTransaction, contractIdsForPoolSign, this.pr.requestContract);
 
         } catch (err) {
             this.pr.logger.log("Error register contract: " + err.message);
@@ -729,6 +737,8 @@ class ProcessStartExec extends ProcessBase {
             throw err;
         }
     }
+
+    //registerTransaction(packedTransaction, contractIdsForPoolSign)
 
     /**
      * Create a pool contract. Pool contract a special contract for the formation and registration of the pool.

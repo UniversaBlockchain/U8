@@ -764,11 +764,10 @@ async function createUnsContract(issuerKeys, ownerKeys, nodeInfoProvider) {
  * @param {NodeInfoProvider} nodeInfoProvider - Provider receiving information from node.
  * @param {string} name - Name for registration.
  * @param {string} description - Description associated with name for registration.
- * @param {string} URL - URL associated with name for registration.
  * @param {Contract} namedContract - Named contract.
  * @return {UnsContract} UNS-contract, ready for register.
  */
-async function createUnsContractForRegisterContractName(issuerKeys, ownerKeys, nodeInfoProvider, name, description, URL, namedContract) {
+async function createUnsContractForRegisterContractName(issuerKeys, ownerKeys, nodeInfoProvider, name, description, namedContract) {
 
     let unsContract = createSimpleUnsContract(issuerKeys, ownerKeys, nodeInfoProvider);
 
@@ -802,11 +801,10 @@ async function createUnsContractForRegisterContractName(issuerKeys, ownerKeys, n
  * @param {NodeInfoProvider} nodeInfoProvider - Provider receiving information from node.
  * @param {string} name - Name for registration.
  * @param {string} description - Description associated with name for registration.
- * @param {string} URL - URL associated with name for registration.
  * @param {crypto.PrivateKey | crypto.PublicKey} namedKey - Named key.
  * @return {UnsContract} UNS-contract, ready for register.
  */
-async function createUnsContractForRegisterKeyName(issuerKeys, ownerKeys, nodeInfoProvider, name, description, URL, namedKey) {
+async function createUnsContractForRegisterKeyName(issuerKeys, ownerKeys, nodeInfoProvider, name, description, namedKey) {
 
     let unsContract = createSimpleUnsContract(issuerKeys, ownerKeys, nodeInfoProvider);
 
