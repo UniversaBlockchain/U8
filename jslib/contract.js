@@ -611,10 +611,11 @@ class Contract extends bs.BiSerializable {
                 this.transactionPack.referencedItems.set(k,v);
 
             for (let [k,v] of tpBackup.taggedItems) {
+                let itemId = v.id;
                 //if main contract was tagged use its new it instead
-                if (previousId != null && v.equals(previousId))
-                    v = id;
-                this.transactionPack.addTag(k, v);
+                if (previousId != null && itemId.equals(previousId))
+                    itemId = id;
+                this.transactionPack.addTag(k, itemId);
             }
         }
     }
