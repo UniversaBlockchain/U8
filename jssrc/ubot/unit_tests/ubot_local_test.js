@@ -158,6 +158,18 @@ async function generateSimpleRegisterRequestContract(executableContract, contrac
     return requestContract;
 }
 
+async function generateSimpleCheckRequestContract(executableContract) {
+    let requestContract = Contract.fromPrivateKey(userPrivKey);
+    requestContract.state.data.method_name = "check";
+    requestContract.state.data.executable_contract_id = executableContract.id;
+    requestContract.newItems.add(executableContract);
+
+    await cs.addConstraintToContract(requestContract, executableContract, "executable_contract_constraint",
+        Constraint.TYPE_EXISTING_STATE, ["this.state.data.executable_contract_id == ref.id"], true);
+
+    return requestContract;
+}
+
 // unit.test("ubot_local_test: simple", async () => {
 //     for (let i = 0; i < 50; i++) {
 //         let ubotMains = await createUBots(ubotsCount);
@@ -746,6 +758,32 @@ unit.test("ubot_main_test: simple random", async () => {
 
     // checking secure random value
     assert(typeof state.result === "number" && state.result >= 0 && state.result < 10000);
+
+    await ubotClient.shutdown();
+
+    // waiting pool finished...
+    while (ubotMains.some(main => Array.from(main.ubot.processors.values()).some(proc => proc.state.canContinue)))
+        await sleep(100);
+
+    await shutdownUBots(ubotMains);//}
+});
+
+unit.test("ubot_local_test: local storage", async () => {
+    let ubotMains = await createUBots(ubotsCount);
+
+    let ubotClient = await new UBotClient(clientKey, TOPOLOGY_ROOT + TOPOLOGY_FILE).start();
+
+    let executableContract = await generateSimpleExecutableContract("localStorage.js", "check");
+    let requestContract = await generateSimpleCheckRequestContract(executableContract);
+
+    let state = await ubotClient.executeCloudMethod(requestContract, await createPayment(20));
+
+    console.log("State: " + JSON.stringify(state));
+
+    assert(state.state === UBotPoolState.FINISHED.val);
+
+    // checking secure random value
+    assert(typeof state.result === "number" && state.result === 777);
 
     await ubotClient.shutdown();
 

@@ -10,6 +10,7 @@ const Errors = require("errors").Errors;
 const UBotPoolState = require("ubot/ubot_pool_state").UBotPoolState;
 const UBotProcessException = require("ubot/ubot_exceptions").UBotProcessException;
 const UBotCloudNotification_process = require("ubot/ubot_notification").UBotCloudNotification_process;
+const UBotStorageType = require("ubot/ubot_ledger").UBotStorageType;
 const BossBiMapper = require("bossbimapper").BossBiMapper;
 const Boss = require('boss.js');
 const t = require("tools");
@@ -125,7 +126,7 @@ class UBotProcess_writeSingleStorage extends ProcessBase {
     }
 
     generateSelfRecordID() {
-        if (this.previousRecordId != null && this.previousRecordId.equals(this.pr.getDefaultRecordId(this.storageName, false)))
+        if (this.previousRecordId != null && this.previousRecordId.equals(this.pr.getDefaultRecordId(this.storageName, UBotStorageType.SINGLE)))
             this.recordId = this.previousRecordId;   // executable contract id - default record id
         else {
             let poolId = this.pr.poolId.digest;

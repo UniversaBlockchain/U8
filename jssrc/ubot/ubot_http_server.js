@@ -11,6 +11,7 @@ const e = require("errors");
 const Errors = e.Errors;
 const ErrorRecord = e.ErrorRecord;
 const UBotConfig = require("ubot/ubot_config").UBotConfig;
+const UBotStorageType = require("ubot/ubot_ledger").UBotStorageType;
 
 class UBotHttpServer extends network.HttpServer {
 
@@ -28,8 +29,8 @@ class UBotHttpServer extends network.HttpServer {
         this.addRawEndpoint("/getRequestContract", request => this.onGetRequestContract(request));
         this.addRawEndpoint("/getSingleStorageResult", request => this.onGetStorageResult(request, false));
         this.addRawEndpoint("/getMultiStorageResult", request => this.onGetStorageResult(request, true));
-        this.addRawEndpoint("/downloadActualSingleStorageResult", request => this.onDownloadActualStorageResult(request, false));
-        this.addRawEndpoint("/downloadActualMultiStorageResult", request => this.onDownloadActualStorageResult(request, true));
+        this.addRawEndpoint("/downloadActualSingleStorageResult", request => this.onDownloadActualStorageResult(request, UBotStorageType.SINGLE));
+        this.addRawEndpoint("/downloadActualMultiStorageResult", request => this.onDownloadActualStorageResult(request, UBotStorageType.MULTI));
         this.addRawEndpoint("/ping", request => this.onPing(request));
 
         super.startServer();
@@ -127,7 +128,7 @@ class UBotHttpServer extends network.HttpServer {
         request.sendAnswer();
     }
 
-    async onDownloadActualStorageResult(request, multi) {
+    async onDownloadActualStorageResult(request, type) {
         let paramIndex = request.path.indexOf("/", 1) + 1;
         let paramsString = request.path.substring(paramIndex);
         let params = paramsString.split("_");
@@ -136,7 +137,7 @@ class UBotHttpServer extends network.HttpServer {
 
         let result = null;
         let resultHash = null;
-        if (multi) {
+        if (type === UBotStorageType.MULTI) {
             let storageResults = await this.ubot.getRecordsFromMultiStorageByRecordId(recordId, true);
             if (storageResults != null) {
                 resultHash = storageResults.cortegeId;
@@ -150,8 +151,8 @@ class UBotHttpServer extends network.HttpServer {
 
                 result = await Boss.dump(result);
             }
-        } else {
-            result = await this.ubot.getStoragePackedResultByRecordId(recordId, false);
+        } else if (type === UBotStorageType.SINGLE) {
+            result = await this.ubot.getStoragePackedResultByRecordId(recordId, type);
             if (result != null)
                 resultHash = HashId.of(result);
         }

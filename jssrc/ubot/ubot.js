@@ -9,7 +9,7 @@ const UBotCloudNotification = require("ubot/ubot_notification").UBotCloudNotific
 const UBotConfig = require("ubot/ubot_config").UBotConfig;
 const UBotResultCache = require("ubot/ubot_result_cache").UBotResultCache;
 const UBotCloudProcessorsCache = require("ubot/ubot_cloudprocessors_cache").UBotCloudProcessorsCache;
-//const UBotSessionStorageCache = require("ubot/ubot_session_storage_cache").UBotSessionStorageCache;
+const UBotStorageType = require("ubot/ubot_ledger").UBotStorageType;
 const UBotClient = require('ubot/ubot_client').UBotClient;
 const BossBiMapper = require("bossbimapper").BossBiMapper;
 const Lock = require("lock").Lock;
@@ -148,23 +148,25 @@ class UBot {
         return result;
     }
 
-    async getStorageResultByRecordId(recordId, multi, ubotNumber = undefined) {
-        let result = await this.getStoragePackedResultByRecordId(recordId, multi, ubotNumber);
+    async getStorageResultByRecordId(recordId, type, ubotNumber = undefined) {
+        let result = await this.getStoragePackedResultByRecordId(recordId, type, ubotNumber);
         if (result == null)
             return null;
 
         return await BossBiMapper.getInstance().deserialize(await Boss.load(result));
     }
 
-    async getStoragePackedResultByRecordId(recordId, multi, ubotNumber = undefined) {
+    async getStoragePackedResultByRecordId(recordId, type, ubotNumber = undefined) {
         let result = this.resultCache.get(recordId, ubotNumber);
         if (result != null)
             return result;
 
-        if (multi)
+        if (type === UBotStorageType.MULTI)
             result = await this.ledger.getMultiStorageDataByRecordId(recordId, ubotNumber);
-        else
+        else if (type === UBotStorageType.SINGLE)
             result = await this.ledger.getSingleStorageDataByRecordId(recordId);
+        else if (type === UBotStorageType.LOCAL)
+            result = await this.ledger.getLocalStorageDataByRecordId(recordId);
 
         return result;
     }
@@ -228,10 +230,10 @@ class UBot {
         };
     }
 
-    static getDefaultRecordId(executableContractId, storageName, multi) {
+    static getDefaultRecordId(executableContractId, storageName, type) {
         let storageId = crypto.HashId.of(storageName);
         let concat = new Uint8Array(executableContractId.digest.length + storageId.digest.length + 1);
-        concat[0] = multi ? 1 : 0;
+        concat[0] = type.ordinal;
         concat.set(executableContractId.digest, 1);
         concat.set(storageId.digest, executableContractId.digest.length + 1);
 
@@ -253,7 +255,7 @@ class UBot {
         let storage = {};
 
         // multi storage
-        let recordId = UBot.getDefaultRecordId(executableContractId, storageName, true);
+        let recordId = UBot.getDefaultRecordId(executableContractId, storageName, UBotStorageType.MULTI);
         let result = await this.getRecordsFromMultiStorageByRecordId(recordId);
 
         if (result != null) {
@@ -264,8 +266,8 @@ class UBot {
             storage.multi = null;
 
         // single storage
-        recordId = UBot.getDefaultRecordId(executableContractId, storageName, false);
-        storage.single = await this.getStorageResultByRecordId(recordId, false);
+        recordId = UBot.getDefaultRecordId(executableContractId, storageName, UBotStorageType.SINGLE);
+        storage.single = await this.getStorageResultByRecordId(recordId, UBotStorageType.SINGLE);
 
         return storage;
     }

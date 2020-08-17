@@ -9,6 +9,7 @@ import {UBotQuantiserProcesses} from "ubot/ubot_quantiser";
 const ProcessBase = require("ubot/processes/ProcessBase").ProcessBase;
 const UBotProcess_writeSingleStorage = require("ubot/processes/UBotProcess_writeSingleStorage").UBotProcess_writeSingleStorage;
 const UBotProcess_writeMultiStorage = require("ubot/processes/UBotProcess_writeMultiStorage").UBotProcess_writeMultiStorage;
+const UBotStorageType = require("ubot/ubot_ledger").UBotStorageType;
 const ScheduleExecutor = require("executorservice").ScheduleExecutor;
 const BossBiMapper = require("bossbimapper").BossBiMapper;
 const UBotConfig = require("ubot/ubot_config").UBotConfig;
@@ -78,6 +79,18 @@ class ProcessStartExec extends ProcessBase {
     
     function getWorkerBoundStorage(storageName = "default") {
         return new Promise((resolve, reject) => wrkInner.farcall("getMultiStorage", [storageName], {},
+            ans => resolve(ans), err => reject(err)
+        ));
+    }
+    
+    function writeLocalStorage(data, storageName = "default") {
+        return new Promise((resolve, reject) => wrkInner.farcall("writeLocalStorage", [data, storageName], {},
+            ans => resolve(ans), err => reject(err)
+        ));
+    }
+    
+    function getLocalStorage(storageName = "default") {
+        return new Promise((resolve, reject) => wrkInner.farcall("getLocalStorage", [storageName], {},
             ans => resolve(ans), err => reject(err)
         ));
     }
@@ -253,6 +266,14 @@ class ProcessStartExec extends ProcessBase {
 
                 this.pr.worker.export["getMultiStorage"] = async (args, kwargs) => {
                     return await this.getMultiStorage(args[0]);
+                };
+
+                this.pr.worker.export["writeLocalStorage"] = async (args, kwargs) => {
+                    return await this.writeLocalStorage(args[0], args[1]);
+                };
+
+                this.pr.worker.export["getLocalStorage"] = async (args, kwargs) => {
+                    return await this.getLocalStorage(args[0]);
                 };
 
                 this.pr.worker.export["registerContract"] = async (args, kwargs) => {
@@ -437,21 +458,20 @@ class ProcessStartExec extends ProcessBase {
         }
     }
 
-    static getStorageId(storageName, multi) {
+    static getStorageId(storageName, type) {
         let storageId = crypto.HashId.of(storageName);
         let concat = new Uint8Array(storageId.digest.length + 1);
-        concat[0] = multi ? 1 : 0;
+        concat[0] = type.ordinal;
         concat.set(storageId.digest, 1);
 
         return crypto.HashId.of(concat);
     }
 
-    checkStorageAccessibly(storageName, write, multi) {
+    checkStorageAccessibly(storageName, write, type) {
         if ((write && this.writesTo != null && !this.writesTo.has(storageName)) ||
             (!write && this.readsFrom != null && !this.readsFrom.has(storageName))) {
 
-            let message = "Can`t " + (write ? "write data to " : "read data from ") +
-                (multi ? "worker-bound storage \"" : "pool-bound storage \"") + storageName + "\"";
+            let message = "Can`t " + (write ? "write data to " : "read data from ") + type.description + " \"" + storageName + "\"";
 
             this.pr.logger.log(message);
             this.pr.errors.push(new ErrorRecord(Errors.FORBIDDEN, "checkStorageAccessibly", message));
@@ -482,7 +502,7 @@ class ProcessStartExec extends ProcessBase {
             throw new UBotProcessException("Error writePoolBoundStorage: Can`t write empty data to pool-bound storage \"" + storageName + "\"");
         }
 
-        this.checkStorageAccessibly(storageName, true, false);
+        this.checkStorageAccessibly(storageName, true, UBotStorageType.SINGLE);
 
         try {
             this.pr.quantiser.addWorkCost(UBotQuantiserProcesses.PRICE_WRITE_SINGLE_STORAGE);
@@ -497,7 +517,7 @@ class ProcessStartExec extends ProcessBase {
         }
 
         return new Promise(async (resolve, reject) => {
-            let storageId = ProcessStartExec.getStorageId(storageName, false);
+            let storageId = ProcessStartExec.getStorageId(storageName, UBotStorageType.SINGLE);
             let proc = await this.lock.synchronize("processes", async () => {
                 if (!this.processes.has(storageId.base64))
                     this.processes.set(storageId.base64, []);
@@ -515,7 +535,7 @@ class ProcessStartExec extends ProcessBase {
                 return process;
             });
 
-            await proc.init(data, this.pr.getDefaultRecordId(storageName, false), {storage_name: storageName});
+            await proc.init(data, this.pr.getDefaultRecordId(storageName, UBotStorageType.SINGLE), {storage_name: storageName});
             await proc.start();
         });
     }
@@ -540,7 +560,7 @@ class ProcessStartExec extends ProcessBase {
             throw new UBotProcessException("Error writeWorkerBoundStorage: Can`t write empty data to worker-bound storage \"" + storageName + "\"");
         }
 
-        this.checkStorageAccessibly(storageName, true, true);
+        this.checkStorageAccessibly(storageName, true, UBotStorageType.MULTI);
 
         try {
             this.pr.quantiser.addWorkCost(UBotQuantiserProcesses.PRICE_WRITE_MULTI_STORAGE);
@@ -555,7 +575,7 @@ class ProcessStartExec extends ProcessBase {
         }
 
         return new Promise(async (resolve, reject) => {
-            let storageId = ProcessStartExec.getStorageId(storageName, true);
+            let storageId = ProcessStartExec.getStorageId(storageName, UBotStorageType.MULTI);
             let proc = await this.lock.synchronize("processes", async () => {
                 if (!this.processes.has(storageId.base64))
                     this.processes.set(storageId.base64, []);
@@ -573,7 +593,7 @@ class ProcessStartExec extends ProcessBase {
                 return process;
             });
 
-            await proc.init(data, this.pr.getDefaultRecordId(storageName, true), {storage_name: storageName});
+            await proc.init(data, this.pr.getDefaultRecordId(storageName, UBotStorageType.MULTI), {storage_name: storageName});
             await proc.start();
         });
     }
@@ -587,12 +607,12 @@ class ProcessStartExec extends ProcessBase {
      * @throws {UBotClientException} UBot client error.
      */
     async getSingleStorage(storageName = "default") {
-        this.checkStorageAccessibly(storageName, false, false);
+        this.checkStorageAccessibly(storageName, false, UBotStorageType.SINGLE);
 
         try {
             this.pr.quantiser.addWorkCost(UBotQuantiserProcesses.PRICE_GET_STORAGE);
             
-            let recordId = this.pr.getDefaultRecordId(storageName, false);
+            let recordId = this.pr.getDefaultRecordId(storageName, UBotStorageType.SINGLE);
 
             // get actual hash from MainNet by this.executableContract.id (further recordId)
             let actualHash = await this.pr.session.getStorage(storageName, false, this.trustLevel, this.pr.requestContract);
@@ -602,7 +622,7 @@ class ProcessStartExec extends ProcessBase {
             } else
                 this.pr.logger.log("getPoolBoundStorage: actual hash = " + actualHash);
 
-            let result = await this.pr.ubot.getStoragePackedResultByRecordId(recordId, false);
+            let result = await this.pr.ubot.getStoragePackedResultByRecordId(recordId, UBotStorageType.SINGLE);
 
             if (result != null)
                 this.pr.logger.log("getPoolBoundStorage: current result hash = " + crypto.HashId.of(result));
@@ -647,12 +667,12 @@ class ProcessStartExec extends ProcessBase {
      * @throws {UBotClientException} UBot client error.
      */
     async getMultiStorage(storageName = "default") {
-        this.checkStorageAccessibly(storageName, false, true);
+        this.checkStorageAccessibly(storageName, false, UBotStorageType.MULTI);
 
         try {
             this.pr.quantiser.addWorkCost(UBotQuantiserProcesses.PRICE_GET_STORAGE);
             
-            let recordId = this.pr.getDefaultRecordId(storageName, true);
+            let recordId = this.pr.getDefaultRecordId(storageName, UBotStorageType.MULTI);
 
             // get actual hash from MainNet by this.executableContract.id (further recordId)
             let actualHash = await this.pr.session.getStorage(storageName, true, this.trustLevel, this.pr.requestContract);
@@ -703,6 +723,77 @@ class ProcessStartExec extends ProcessBase {
             this.pr.errors.push(new ErrorRecord(Errors.FAILURE, "getWorkerBoundStorage",
                 "Error get data from worker-bound storage \"" + storageName + "\": " + err.message));
             //this.pr.changeState(UBotPoolState.FAILED);
+
+            throw err;
+        }
+    }
+
+    /**
+     * Get data from local UBot-server storage.
+     *
+     * @param {string} storageName - Storage name. Optional, if undefined - using default storage.
+     * @return {Promise<null|*>} data from local UBot-server storage or null if storage is empty.
+     * @throws {UBotClientException} UBot client error.
+     */
+    async getLocalStorage(storageName = "default") {
+        this.checkStorageAccessibly(storageName, false, UBotStorageType.LOCAL);
+
+        try {
+            let recordId = this.pr.getDefaultRecordId(storageName, UBotStorageType.LOCAL);
+
+            let result = await this.pr.ubot.getStoragePackedResultByRecordId(recordId, UBotStorageType.LOCAL);
+
+            if (result == null) {
+                this.pr.logger.log("getLocalStorage: current result is null");
+                return null;
+            }
+
+            return await BossBiMapper.getInstance().deserialize(await Boss.load(result));
+
+        } catch (err) {
+            this.pr.logger.log("Error get data from local storage \"" + storageName + "\": " + err.message);
+            this.pr.logger.log(err.stack);
+            this.pr.errors.push(new ErrorRecord(Errors.FAILURE, "getLocalStorage",
+                "Error get data from local storage \"" + storageName + "\": " + err.message));
+
+            throw err;
+        }
+    }
+
+    /**
+     * Write data to local UBot-server storage.
+     *
+     * @param {*} data - Data to write to local UBot-server storage. Data can be primitive JS types or
+     * special U8 types that are may be packed by the Boss.
+     * @param {string} storageName - Storage name. Optional, if undefined - using default storage.
+     * @return {Promise<void>}
+     * @throws {UBotProcessException} process exception if can`t write empty data to pool-bound storage.
+     */
+    async writeLocalStorage(data, storageName = "default") {
+        if (data == null) {
+            this.pr.logger.log("Can`t write empty data to local storage \"" + storageName + "\"");
+            this.pr.errors.push(new ErrorRecord(Errors.FORBIDDEN, "writeLocalStorage",
+                "Can`t write empty data to local storage \"" + storageName + "\""));
+
+            throw new UBotProcessException("Error writeLocalStorage: Can`t write empty data to local storage \"" + storageName + "\"");
+        }
+
+        this.checkStorageAccessibly(storageName, true, UBotStorageType.LOCAL);
+
+        try {
+            let packedData = await Boss.dump(await BossBiMapper.getInstance().serialize(data));
+            let recordId = this.pr.getDefaultRecordId(storageName, UBotStorageType.LOCAL);
+
+            // put result to cache
+            this.pr.ubot.resultCache.put(recordId, packedData);
+
+            await this.pr.ledger.writeToLocalStorage(this.pr.executableContract.id, storageName, packedData, recordId);
+
+        } catch (err) {
+            this.pr.logger.log("Error writing data to local storage \"" + storageName + "\": " + err.message);
+            this.pr.logger.log(err.stack);
+            this.pr.errors.push(new ErrorRecord(Errors.FAILURE, "writeLocalStorage",
+                "Error writing data to local storage \"" + storageName + "\": " + err.message));
 
             throw err;
         }

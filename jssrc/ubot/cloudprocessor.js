@@ -169,10 +169,10 @@ class CloudProcessor {
         }
     }
 
-    getDefaultRecordId(storageName, multi) {
+    getDefaultRecordId(storageName, type) {
         let storageId = crypto.HashId.of(storageName);
         let concat = new Uint8Array(this.executableContract.id.digest.length + storageId.digest.length + 1);
-        concat[0] = multi ? 1 : 0;
+        concat[0] = type.ordinal;
         concat.set(this.executableContract.id.digest, 1);
         concat.set(storageId.digest, this.executableContract.id.digest.length + 1);
 

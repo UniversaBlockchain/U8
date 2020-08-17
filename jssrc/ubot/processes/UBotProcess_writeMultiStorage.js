@@ -11,6 +11,7 @@ const Errors = require("errors").Errors;
 const UBotProcessException = require("ubot/ubot_exceptions").UBotProcessException;
 const UBotPoolState = require("ubot/ubot_pool_state").UBotPoolState;
 const UBotCloudNotification_process = require("ubot/ubot_notification").UBotCloudNotification_process;
+const UBotStorageType = require("ubot/ubot_ledger").UBotStorageType;
 const BossBiMapper = require("bossbimapper").BossBiMapper;
 const Boss = require('boss.js');
 const t = require("tools");
@@ -444,7 +445,7 @@ class UBotProcess_writeMultiStorage extends UBotProcess_writeSingleStorage {
         let current = await BossBiMapper.getInstance().deserialize(await Boss.load(result));
         let previous = null;
         if (previousRecordId != null)
-            previous = await this.pr.ubot.getStorageResultByRecordId(previousRecordId, true, ubotNumber);
+            previous = await this.pr.ubot.getStorageResultByRecordId(previousRecordId, UBotStorageType.MULTI, ubotNumber);
 
         return new Promise(resolve => {
             let verifyProcess = new this.pr.ProcessStartExec(this.pr, (output) => {
@@ -460,7 +461,7 @@ class UBotProcess_writeMultiStorage extends UBotProcess_writeSingleStorage {
     }
 
     generateSelfRecordID() {
-        if (this.previousRecordId != null && this.previousRecordId.equals(this.pr.getDefaultRecordId(this.storageName, true)))
+        if (this.previousRecordId != null && this.previousRecordId.equals(this.pr.getDefaultRecordId(this.storageName, UBotStorageType.MULTI)))
             this.recordId = this.previousRecordId;   //executable contract id - default record id
         else {
             let poolId = this.pr.poolId.digest;

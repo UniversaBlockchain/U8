@@ -6,9 +6,15 @@ const UBotConfig = require("ubot/ubot_config").UBotConfig;
 import * as db from "pg_driver";
 
 const UBotStorageType = {
-    SINGLE : {ordinal: 0},
-    MULTI  : {ordinal: 1}
+    SINGLE : {ordinal: 0, val: "SINGLE", description: "pool-bound storage"},
+    MULTI  : {ordinal: 1, val: "MULTI", description: "worker-bound storage"},
+    LOCAL  : {ordinal: 2, val: "LOCAL", description: "local storage"}
 };
+
+UBotStorageType.byOrdinal = new Map();
+UBotStorageType.byOrdinal.set(UBotStorageType.SINGLE.ordinal, UBotStorageType.SINGLE);
+UBotStorageType.byOrdinal.set(UBotStorageType.MULTI.ordinal, UBotStorageType.MULTI);
+UBotStorageType.byOrdinal.set(UBotStorageType.LOCAL.ordinal, UBotStorageType.LOCAL);
 
 class UBotLedgerException extends Error {
     constructor(message = undefined) {
@@ -298,6 +304,26 @@ class UBotLedger {
             });
         });
     }
+
+    async getLocalStorageDataByRecordId(recordId) {
+        return this.simpleQuery(
+            "SELECT storage_data FROM local_records WHERE record_id = ? LIMIT 1",
+            null,
+            null,
+            recordId.digest);
+    }
+
+    async writeToLocalStorage(executable_contract_id, storage_name, storage_data, record_id) {
+        let id = await this.findOrCreateStorage(executable_contract_id, storage_name, UBotStorageType.LOCAL);
+
+        return this.simpleUpdate(
+            "INSERT INTO local_records (record_id, storage_id, storage_data) VALUES (?,?,?) " +
+            "ON CONFLICT (record_id, storage_id) DO UPDATE SET storage_data = EXCLUDED.storage_data",
+            null,
+            record_id.digest,
+            id,
+            storage_data);
+    }
 }
 
-module.exports = {UBotLedger};
+module.exports = {UBotLedger, UBotStorageType};
