@@ -158,11 +158,12 @@ async function generateSimpleRegisterRequestContract(executableContract, contrac
     return requestContract;
 }
 
-async function generateSimpleCheckRequestContract(executableContract) {
+async function generateSimpleCheckRequestContract(executableContract, methodName, addExecutable = true) {
     let requestContract = Contract.fromPrivateKey(userPrivKey);
-    requestContract.state.data.method_name = "check";
+    requestContract.state.data.method_name = methodName;
     requestContract.state.data.executable_contract_id = executableContract.id;
-    requestContract.newItems.add(executableContract);
+    if (addExecutable)
+        requestContract.newItems.add(executableContract);
 
     await cs.addConstraintToContract(requestContract, executableContract, "executable_contract_constraint",
         Constraint.TYPE_EXISTING_STATE, ["this.state.data.executable_contract_id == ref.id"], true);
@@ -765,7 +766,7 @@ unit.test("ubot_main_test: simple random", async () => {
     while (ubotMains.some(main => Array.from(main.ubot.processors.values()).some(proc => proc.state.canContinue)))
         await sleep(100);
 
-    await shutdownUBots(ubotMains);//}
+    await shutdownUBots(ubotMains);
 });
 
 unit.test("ubot_local_test: local storage", async () => {
@@ -773,8 +774,23 @@ unit.test("ubot_local_test: local storage", async () => {
 
     let ubotClient = await new UBotClient(clientKey, TOPOLOGY_ROOT + TOPOLOGY_FILE).start();
 
-    let executableContract = await generateSimpleExecutableContract("localStorage.js", "check");
-    let requestContract = await generateSimpleCheckRequestContract(executableContract);
+    let executableContract = Contract.fromPrivateKey(userPrivKey);
+
+    executableContract.state.data.cloud_methods = {};
+    executableContract.state.data.cloud_methods["check"] = {
+        pool: {size: 16},
+        quorum: {size: 16}
+    };
+    executableContract.state.data.cloud_methods["reuse"] = {
+        pool: {size: 16},
+        quorum: {size: 16}
+    };
+
+    executableContract.state.data.js = await io.fileGetContentsAsString(TEST_CONTRACTS_PATH + "localStorage.js");
+
+    await executableContract.seal();
+
+    let requestContract = await generateSimpleCheckRequestContract(executableContract, "check");
 
     let state = await ubotClient.executeCloudMethod(requestContract, await createPayment(20));
 
@@ -782,8 +798,23 @@ unit.test("ubot_local_test: local storage", async () => {
 
     assert(state.state === UBotPoolState.FINISHED.val);
 
-    // checking secure random value
+    // checking local storage value
     assert(typeof state.result === "number" && state.result === 777);
+
+    // reuse
+    requestContract = await generateSimpleCheckRequestContract(executableContract, "reuse", false);
+
+    state = await ubotClient.executeCloudMethod(requestContract, await createPayment(20));
+
+    console.log("State: " + JSON.stringify(state));
+
+    assert(state.state === UBotPoolState.FINISHED.val);
+
+    // checking reuse local storage value
+    assert(state.result instanceof Array && state.result.length === 16);
+    let reused = state.result.filter(x => x.storage != null && x.storage.info === 777).length;
+    assert(reused >= 2);
+    console.log("Reused: " + reused);
 
     await ubotClient.shutdown();
 
@@ -791,7 +822,7 @@ unit.test("ubot_local_test: local storage", async () => {
     while (ubotMains.some(main => Array.from(main.ubot.processors.values()).some(proc => proc.state.canContinue)))
         await sleep(100);
 
-    await shutdownUBots(ubotMains);//}
+    await shutdownUBots(ubotMains);
 });
 
 unit.test("ubot_local_test: error in cloud method", async () => {
