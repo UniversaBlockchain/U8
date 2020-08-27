@@ -31,6 +31,14 @@ async function putTokenIntoWallet(packedToken) {
     )
         return {error: "Invalid token constraint: refUbotRegistry"};
 
+    let refUbot = token.findConstraintByName("refUbotRegistry");
+    if (refUbot === null || refUbot.type !== Constraint.TYPE_TRANSACTIONAL ||
+        !refUbot.assemblyConditions(refUbot.conditions).equals(
+            {all_of: ["this.ubot==\"" + walletContract.getOrigin().base64 + "\""]}
+        )
+    )
+        return {error: "Invalid token constraint: refUbot"};
+
     // get storage
     let storage = await getSingleStorage();
 

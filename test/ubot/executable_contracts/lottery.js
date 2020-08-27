@@ -47,6 +47,14 @@ async function buyTicket(packedPayment, userKey, parallel = false) {
         )
         return {error: "Invalid payment constraint: refUbotRegistry"};
 
+    let refUbot = payment.findConstraintByName("refUbot");
+    if (refUbot === null || refUbot.type !== Constraint.TYPE_TRANSACTIONAL ||
+        !refUbot.assemblyConditions(refUbot.conditions).equals(
+            {all_of: ["this.ubot==\"" + lotteryContract.getOrigin().base64 + "\""]}
+            )
+        )
+        return {error: "Invalid payment constraint: refUbot"};
+
     // register ticket payment contract
     let ir = await registerContract(packedPayment);
     if (ir.state !== ItemState.APPROVED.val)

@@ -849,6 +849,26 @@ class ProcessStartExec extends ProcessBase {
             expires.setDate(expires.getDate() + 90);
             c.state.expiresAt = expires;
 
+            // constraint for UBotNet registry contract
+            let constrReg = new Constraint(c);
+            constrReg.name = "refUbotRegistry";
+            constrReg.type = Constraint.TYPE_EXISTING_DEFINITION;
+            let conditionsReg = {};
+            conditionsReg[Constraint.conditionsModeType.all_of] = ["ref.tag == \"universa:ubot_registry_contract\""];
+            constrReg.setConditions(conditionsReg);
+            c.addConstraint(constrReg);
+
+            // constraint for this UBot
+            let constr = new Constraint(c);
+            constr.name = "refUbot";
+            constr.type = Constraint.TYPE_EXISTING_DEFINITION;
+            let conditions = {};
+            conditions[Constraint.conditionsModeType.all_of] = [
+                "this.ubot == \"" + this.pr.executableContract.getOrigin().base64 + "\""
+            ];
+            constr.setConditions(conditions);
+            c.addConstraint(constr);
+
             // quorum vote role
             let issuer = new roles.QuorumVoteRole(
                 "issuer",
@@ -856,6 +876,7 @@ class ProcessStartExec extends ProcessBase {
                 this.pr.quorumSize.toString(),
                 c
             );
+            issuer.requiredAllConstraints.add("refUbot");
             c.registerRole(issuer);
             let owner = new roles.RoleLink("owner", "issuer");
             c.registerRole(owner);
@@ -867,15 +888,6 @@ class ProcessStartExec extends ProcessBase {
             let chownPerm = new permissions.ChangeOwnerPermission(chown);
             chownPerm.id = this.pr.prng.randomString(6);
             c.definition.addPermission(chownPerm);
-
-            // constraint for UBotNet registry contract
-            let constr = new Constraint(c);
-            constr.name = "refUbotRegistry";
-            constr.type = Constraint.TYPE_EXISTING_DEFINITION;
-            let conditions = {};
-            conditions[Constraint.conditionsModeType.all_of] = ["ref.tag == \"universa:ubot_registry_contract\""];
-            constr.setConditions(conditions);
-            c.addConstraint(constr);
 
             // random salt for seal (common for pool)
             c.state.data.ubot_pool_random_salt = this.pr.prng.randomBytes(12);
@@ -932,22 +944,35 @@ class ProcessStartExec extends ProcessBase {
             let preparePool = (contract) => {
                 contract.state.createdAt = created;
 
-                contract.registerRole(new roles.QuorumVoteRole(
+                // constraint for UBotNet registry contract
+                contract.createTransactionalSection();
+                let constrReg = new Constraint(contract);
+                constrReg.name = "refUbotRegistry";
+                constrReg.type = Constraint.TYPE_TRANSACTIONAL;
+                let conditionsReg = {};
+                conditionsReg[Constraint.conditionsModeType.all_of] = ["ref.tag == \"universa:ubot_registry_contract\""];
+                constrReg.setConditions(conditionsReg);
+                contract.addConstraint(constrReg);
+
+                // constraint for this UBot
+                let constr = new Constraint(contract);
+                constr.name = "refUbot";
+                constr.type = Constraint.TYPE_TRANSACTIONAL;
+                let conditions = {};
+                conditions[Constraint.conditionsModeType.all_of] = [
+                    "this.ubot == \"" + this.pr.executableContract.getOrigin().base64 + "\""
+                ];
+                constr.setConditions(conditions);
+                contract.addConstraint(constr);
+
+                let creator = new roles.QuorumVoteRole(
                     "creator",
                     "refUbotRegistry.state.roles.ubots",
                     this.pr.quorumSize.toString(),
                     contract
-                ));
-
-                // constraint for UBotNet registry contract
-                contract.createTransactionalSection();
-                let constr = new Constraint(contract);
-                constr.name = "refUbotRegistry";
-                constr.type = Constraint.TYPE_TRANSACTIONAL;
-                let conditions = {};
-                conditions[Constraint.conditionsModeType.all_of] = ["ref.tag == \"universa:ubot_registry_contract\""];
-                constr.setConditions(conditions);
-                contract.addConstraint(constr);
+                );
+                creator.requiredAllConstraints.add("refUbot");
+                contract.registerRole(creator);
             };
 
             preparePool(mainContract);

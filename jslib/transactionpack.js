@@ -27,6 +27,7 @@ class TransactionPack {
             this.contract.transactionPack = this;
         }
         this.packedBinary = null;
+        this.ubotId = null;
     }
 
     /**

@@ -254,6 +254,8 @@ function TestKeys() {
 
 TestKeys.prototype.getKey = function() {
     if(this.keys.length === 0 ) {
+        // for(let kd of keyData)
+        //     this.keys.push(new crypto.PrivateKey(atob(kd)));
         throw new ex.IllegalStateError("test set is out of keys");
     }
 

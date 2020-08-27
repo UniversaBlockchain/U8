@@ -786,6 +786,10 @@ class Contract extends bs.BiSerializable {
                 return this.roles.creator;
             case "tag":
                 return {contractForSearchByTag: this};
+            case "ubot":
+                if (this.transactionPack == null)
+                    return null;
+                return this.transactionPack.ubotId;
             case "newItems":
                 if (this.newIds == null || this.apiLevel < 3)
                     return new t.GenericSet(Array.from(this.newItems).map(c => c.id));

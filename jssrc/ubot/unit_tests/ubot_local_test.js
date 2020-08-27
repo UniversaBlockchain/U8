@@ -273,24 +273,37 @@ unit.test("ubot_local_test: register UDNS contract", async () => {
 
     let ubotClient = await new UBotClient(clientKey, TOPOLOGY_ROOT + TOPOLOGY_FILE).start();
 
+    // UBot executable contract
+    let executableContract = await generateSimpleExecutableContract("checkUDNS.js", "register");
+
     // create UDNS contract
     const udnsUserKey = tk.TestKeys.getKey();
     const udnsAddUserKey = tk.TestKeys.getKey();
     let udnsContract = await UnsContract.fromPrivateKey(udnsUserKey, NSmartContract.SmartContractType.UNS2);
     udnsContract.nodeInfoProvider = await ubotClient.getConfigProvider();
 
-    // quorum vote role
-    let creator = new roles.QuorumVoteRole("creator", "refUbotRegistry.state.roles.ubots", "4", udnsContract);
-    udnsContract.registerRole(creator);
-
     // constraint for UBotNet registry contract
+    let constrReg = new Constraint(udnsContract);
+    constrReg.name = "refUbotRegistry";
+    constrReg.type = Constraint.TYPE_EXISTING_DEFINITION;
+    let conditionsReg = {};
+    conditionsReg[Constraint.conditionsModeType.all_of] = ["ref.tag == \"universa:ubot_registry_contract\""];
+    constrReg.setConditions(conditionsReg);
+    udnsContract.addConstraint(constrReg);
+
+    // constraint for this UBot
     let constr = new Constraint(udnsContract);
-    constr.name = "refUbotRegistry";
+    constr.name = "refUbot";
     constr.type = Constraint.TYPE_EXISTING_DEFINITION;
     let conditions = {};
-    conditions[Constraint.conditionsModeType.all_of] = ["ref.tag == \"universa:ubot_registry_contract\""];
+    conditions[Constraint.conditionsModeType.all_of] = ["this.ubot == \"" + executableContract.getOrigin().base64 + "\""];
     constr.setConditions(conditions);
     udnsContract.addConstraint(constr);
+
+    // quorum vote role
+    let creator = new roles.QuorumVoteRole("creator", "refUbotRegistry.state.roles.ubots", "4", udnsContract);
+    creator.requiredAllConstraints.add("refUbot");
+    udnsContract.registerRole(creator);
 
     // DNS names
     let now = Date.now();
@@ -331,8 +344,7 @@ unit.test("ubot_local_test: register UDNS contract", async () => {
     });
     dnsServer.start("0.0.0.0", 5353, "8.8.4.4");
 
-    // Ubots contracts
-    let executableContract = await generateSimpleExecutableContract("checkUDNS.js", "register");
+    // UBot request contract
     let requestContract = await generateSimpleRegisterRequestContract(executableContract, packedUdnsContract);
 
     let state = await ubotClient.executeCloudMethod(requestContract, await createPayment(20));
@@ -350,6 +362,7 @@ unit.test("ubot_local_test: register UDNS contract", async () => {
     let udnsRevision = await udnsContract.createRevision([udnsUserKey]);
     udnsRevision.nodeInfoProvider = await ubotClient.getConfigProvider();
     creator = new roles.QuorumVoteRole("creator", "refUbotRegistry.state.roles.ubots", "4", udnsRevision);
+    creator.requiredAllConstraints.add("refUbot");
     udnsRevision.registerRole(creator);
     udnsRevision.addName("not-name.com" + now, "/not-name.com" + now, "");
     await udnsRevision.seal();
@@ -383,6 +396,7 @@ unit.test("ubot_local_test: register UDNS contract", async () => {
     udnsRevision = await udnsContract.createRevision();
     udnsRevision.nodeInfoProvider = await ubotClient.getConfigProvider();
     creator = new roles.QuorumVoteRole("creator", "refUbotRegistry.state.roles.ubots", "4", udnsRevision);
+    creator.requiredAllConstraints.add("refUbot");
     udnsRevision.registerRole(creator);
     udnsRevision.addName("add-name.com" + now, "/add-name.com" + now, "");
     await udnsRevision.seal();
@@ -416,6 +430,7 @@ unit.test("ubot_local_test: register UDNS contract", async () => {
     udnsRevision = await udnsContract.createRevision();
     udnsRevision.nodeInfoProvider = await ubotClient.getConfigProvider();
     creator = new roles.QuorumVoteRole("creator", "refUbotRegistry.state.roles.ubots", "4", udnsRevision);
+    creator.requiredAllConstraints.add("refUbot");
     udnsRevision.registerRole(creator);
     udnsRevision.addName("add-name.com" + now, "/add-name.com" + now, "");
     await udnsRevision.seal();
@@ -459,23 +474,36 @@ unit.test("ubot_local_test: register UDNS contract from compound", async () => {
 
     let ubotClient = await new UBotClient(clientKey, TOPOLOGY_ROOT + TOPOLOGY_FILE).start();
 
+    // UBot executable contract
+    let executableContract = await generateSimpleExecutableContract("checkUDNS.js", "registerCompound");
+
     // create UDNS contract
     const udnsUserKey = tk.TestKeys.getKey();
     let udnsContract = await UnsContract.fromPrivateKey(udnsUserKey, NSmartContract.SmartContractType.UNS2);
     udnsContract.nodeInfoProvider = await ubotClient.getConfigProvider();
 
-    // quorum vote role
-    let creator = new roles.QuorumVoteRole("creator", "refUbotRegistry.state.roles.ubots", "4", udnsContract);
-    udnsContract.registerRole(creator);
-
     // constraint for UBotNet registry contract
+    let constrReg = new Constraint(udnsContract);
+    constrReg.name = "refUbotRegistry";
+    constrReg.type = Constraint.TYPE_EXISTING_DEFINITION;
+    let conditionsReg = {};
+    conditionsReg[Constraint.conditionsModeType.all_of] = ["ref.tag == \"universa:ubot_registry_contract\""];
+    constrReg.setConditions(conditionsReg);
+    udnsContract.addConstraint(constrReg);
+
+    // constraint for this UBot
     let constr = new Constraint(udnsContract);
-    constr.name = "refUbotRegistry";
+    constr.name = "refUbot";
     constr.type = Constraint.TYPE_EXISTING_DEFINITION;
     let conditions = {};
-    conditions[Constraint.conditionsModeType.all_of] = ["ref.tag == \"universa:ubot_registry_contract\""];
+    conditions[Constraint.conditionsModeType.all_of] = ["this.ubot == \"" + executableContract.getOrigin().base64 + "\""];
     constr.setConditions(conditions);
     udnsContract.addConstraint(constr);
+
+    // quorum vote role
+    let creator = new roles.QuorumVoteRole("creator", "refUbotRegistry.state.roles.ubots", "4", udnsContract);
+    creator.requiredAllConstraints.add("refUbot");
+    udnsContract.registerRole(creator);
 
     // DNS names
     let now = Date.now();
@@ -493,8 +521,9 @@ unit.test("ubot_local_test: register UDNS contract from compound", async () => {
 
     // make compound contract also pool contract
     let compoundContract = udnsContract.transactionPack.contract;
-    compoundContract.registerRole(creator);
+    compoundContract.addConstraint(constrReg);
     compoundContract.addConstraint(constr);
+    compoundContract.registerRole(creator);
     await compoundContract.seal();
 
     let packedUdnsContract = await udnsContract.getPackedTransaction();
@@ -518,8 +547,7 @@ unit.test("ubot_local_test: register UDNS contract from compound", async () => {
     });
     dnsServer.start("0.0.0.0", 5353, "8.8.4.4");
 
-    // Ubots contracts
-    let executableContract = await generateSimpleExecutableContract("checkUDNS.js", "registerCompound");
+    // UBot request contract
     let requestContract = await generateSimpleRegisterRequestContract(executableContract, packedUdnsContract);
     requestContract.state.data.method_name = "registerCompound";
     await requestContract.seal();
@@ -1659,19 +1687,32 @@ unit.test("ubot_local_test: lottery", async () => {
     for (let i = 0; i < TICKETS; i++) {
         let payment = await payments[i].createRevision([userKeys[i]]);
 
-        // quorum vote role
-        payment.registerRole(new roles.QuorumVoteRole("owner", "refUbotRegistry.state.roles.ubots", "10", payment));
-        payment.registerRole(new roles.QuorumVoteRole("creator", "refUbotRegistry.state.roles.ubots", "3", payment));
-
         // constraint for UBotNet registry contract
         payment.createTransactionalSection();
+        let constrReg = new Constraint(payment);
+        constrReg.name = "refUbotRegistry";
+        constrReg.type = Constraint.TYPE_TRANSACTIONAL;
+        let conditionsReg = {};
+        conditionsReg[Constraint.conditionsModeType.all_of] = ["ref.tag == \"universa:ubot_registry_contract\""];
+        constrReg.setConditions(conditionsReg);
+        payment.addConstraint(constrReg);
+
+        // constraint for this UBot
         let constr = new Constraint(payment);
-        constr.name = "refUbotRegistry";
+        constr.name = "refUbot";
         constr.type = Constraint.TYPE_TRANSACTIONAL;
         let conditions = {};
-        conditions[Constraint.conditionsModeType.all_of] = ["ref.tag == \"universa:ubot_registry_contract\""];
+        conditions[Constraint.conditionsModeType.all_of] = ["this.ubot == \"" + lotteryContract.getOrigin().base64 + "\""];
         constr.setConditions(conditions);
         payment.addConstraint(constr);
+
+        // quorum vote role
+        let owner = new roles.QuorumVoteRole("owner", "refUbotRegistry.state.roles.ubots", "10", payment);
+        let creator = new roles.QuorumVoteRole("creator", "refUbotRegistry.state.roles.ubots", "3", payment);
+        owner.requiredAllConstraints.add("refUbot");
+        creator.requiredAllConstraints.add("refUbot");
+        payment.registerRole(owner);
+        payment.registerRole(creator);
 
         await payment.seal();
 
@@ -2172,19 +2213,32 @@ unit.test("ubot_local_test: parallel purchase of lottery tickets", async () => {
 
             let payment = await payments[i].createRevision([userKeys[i]]);
 
-            // quorum vote role
-            payment.registerRole(new roles.QuorumVoteRole("owner", "refUbotRegistry.state.roles.ubots", "10", payment));
-            payment.registerRole(new roles.QuorumVoteRole("creator", "refUbotRegistry.state.roles.ubots", "3", payment));
-
             // constraint for UBotNet registry contract
             payment.createTransactionalSection();
+            let constrReg = new Constraint(payment);
+            constrReg.name = "refUbotRegistry";
+            constrReg.type = Constraint.TYPE_TRANSACTIONAL;
+            let conditionsReg = {};
+            conditionsReg[Constraint.conditionsModeType.all_of] = ["ref.tag == \"universa:ubot_registry_contract\""];
+            constrReg.setConditions(conditionsReg);
+            payment.addConstraint(constrReg);
+
+            // constraint for this UBot
             let constr = new Constraint(payment);
-            constr.name = "refUbotRegistry";
+            constr.name = "refUbot";
             constr.type = Constraint.TYPE_TRANSACTIONAL;
             let conditions = {};
-            conditions[Constraint.conditionsModeType.all_of] = ["ref.tag == \"universa:ubot_registry_contract\""];
+            conditions[Constraint.conditionsModeType.all_of] = ["this.ubot == \"" + lotteryContract.getOrigin().base64 + "\""];
             constr.setConditions(conditions);
             payment.addConstraint(constr);
+
+            // quorum vote role
+            let owner = new roles.QuorumVoteRole("owner", "refUbotRegistry.state.roles.ubots", "10", payment);
+            let creator = new roles.QuorumVoteRole("creator", "refUbotRegistry.state.roles.ubots", "3", payment);
+            owner.requiredAllConstraints.add("refUbot");
+            creator.requiredAllConstraints.add("refUbot");
+            payment.registerRole(owner);
+            payment.registerRole(creator);
 
             await payment.seal();
 
@@ -2242,6 +2296,7 @@ unit.test("ubot_local_test: parallel purchase of lottery tickets", async () => {
     assert(keys.size === 1 && keys.has(userKeys[ticketsOrder[state.result.winTicket]].publicKey));
 
     assert(prizeContract.getOrigin().equals(origin));
+    console.log("prizeContract.state.data.amount = " + prizeContract.state.data.amount);
     assert(prizeContract.state.data.amount === "100");
 
     for (let i = 0; i < TICKETS; i++)
