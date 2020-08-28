@@ -13,3 +13,14 @@ async function reuse() {
     await writeMultiStorage({storage: ls});
     return await getMultiStorage();
 }
+
+async function save() {
+    await writeLocalStorage({data: 88});
+    await writeMultiStorage({number : await getUBotNumber()});
+
+    return await getMultiStorage();
+}
+
+async function load() {
+    return (await getLocalStorage()).data;
+}

@@ -853,6 +853,185 @@ unit.test("ubot_local_test: local storage", async () => {
     await shutdownUBots(ubotMains);
 });
 
+unit.test("ubot_local_test: local storage with predefined pool", async () => {
+    let ubotMains = await createUBots(ubotsCount);
+
+    let ubotClient = await new UBotClient(clientKey, TOPOLOGY_ROOT + TOPOLOGY_FILE).start();
+
+    let executableContract = Contract.fromPrivateKey(userPrivKey);
+
+    executableContract.state.data.cloud_methods = {};
+    executableContract.state.data.cloud_methods["save"] = {
+        pool: {size: 5},
+        quorum: {size: 5}
+    };
+    executableContract.state.data.cloud_methods["load"] = {
+        pool: {size: 5},
+        quorum: {size: 5}
+    };
+
+    executableContract.state.data.js = await io.fileGetContentsAsString(TEST_CONTRACTS_PATH + "localStorage.js");
+
+    await executableContract.seal();
+
+    let requestContract = await generateSimpleCheckRequestContract(executableContract, "save");
+
+    let state = await ubotClient.executeCloudMethod(requestContract, await createPayment(20));
+
+    console.log("State: " + JSON.stringify(state));
+
+    assert(state.state === UBotPoolState.FINISHED.val);
+
+    // checking result
+    assert(state.result instanceof Array && state.result.length === 5 &&
+        state.result.every(x => typeof x.number === "number" && x.number >= 0 && x.number < ubotsCount));
+
+    // loading from predefined pool
+    requestContract = Contract.fromPrivateKey(userPrivKey);
+    requestContract.state.data.method_name = "load";
+    requestContract.state.data.executable_contract_id = executableContract.id;
+    requestContract.state.data.predefined_pool = state.result.map(x => x.number);
+
+    await cs.addConstraintToContract(requestContract, executableContract, "executable_contract_constraint",
+        Constraint.TYPE_EXISTING_STATE, ["this.state.data.executable_contract_id == ref.id"], true);
+
+    state = await ubotClient.executeCloudMethod(requestContract, await createPayment(20));
+
+    console.log("State: " + JSON.stringify(state));
+
+    assert(state.state === UBotPoolState.FINISHED.val);
+
+    // checking loaded local storage value
+    assert(state.result === 88);
+
+    await ubotClient.shutdown();
+
+    // waiting pool finished...
+    while (ubotMains.some(main => Array.from(main.ubot.processors.values()).some(proc => proc.state.canContinue)))
+        await sleep(100);
+
+    await shutdownUBots(ubotMains);
+});
+
+unit.test("ubot_local_test: local storage with pool less than predefined pool", async () => {
+    let ubotMains = await createUBots(ubotsCount);
+
+    let ubotClient = await new UBotClient(clientKey, TOPOLOGY_ROOT + TOPOLOGY_FILE).start();
+
+    let executableContract = Contract.fromPrivateKey(userPrivKey);
+
+    executableContract.state.data.cloud_methods = {};
+    executableContract.state.data.cloud_methods["save"] = {
+        pool: {size: 5},
+        quorum: {size: 4}
+    };
+    executableContract.state.data.cloud_methods["load"] = {
+        pool: {size: 3},
+        quorum: {size: 3}
+    };
+
+    executableContract.state.data.js = await io.fileGetContentsAsString(TEST_CONTRACTS_PATH + "localStorage.js");
+
+    await executableContract.seal();
+
+    let requestContract = await generateSimpleCheckRequestContract(executableContract, "save");
+
+    let state = await ubotClient.executeCloudMethod(requestContract, await createPayment(20));
+
+    console.log("State: " + JSON.stringify(state));
+
+    assert(state.state === UBotPoolState.FINISHED.val);
+
+    // checking result
+    assert(state.result instanceof Array && state.result.every(x => typeof x.number === "number" && x.number >= 0 && x.number < ubotsCount));
+
+    // loading from predefined pool
+    requestContract = Contract.fromPrivateKey(userPrivKey);
+    requestContract.state.data.method_name = "load";
+    requestContract.state.data.executable_contract_id = executableContract.id;
+    requestContract.state.data.predefined_pool = state.result.map(x => x.number);
+
+    await cs.addConstraintToContract(requestContract, executableContract, "executable_contract_constraint",
+        Constraint.TYPE_EXISTING_STATE, ["this.state.data.executable_contract_id == ref.id"], true);
+
+    state = await ubotClient.executeCloudMethod(requestContract, await createPayment(20));
+
+    console.log("State: " + JSON.stringify(state));
+
+    assert(state.state === UBotPoolState.FINISHED.val);
+
+    // checking loaded local storage value
+    assert(state.result === 88);
+
+    await ubotClient.shutdown();
+
+    // waiting pool finished...
+    while (ubotMains.some(main => Array.from(main.ubot.processors.values()).some(proc => proc.state.canContinue)))
+        await sleep(100);
+
+    await shutdownUBots(ubotMains);
+});
+
+unit.test("ubot_local_test: local storage with pool more than predefined pool", async () => {
+    let ubotMains = await createUBots(ubotsCount);
+
+    let ubotClient = await new UBotClient(clientKey, TOPOLOGY_ROOT + TOPOLOGY_FILE).start();
+
+    let executableContract = Contract.fromPrivateKey(userPrivKey);
+
+    executableContract.state.data.cloud_methods = {};
+    executableContract.state.data.cloud_methods["save"] = {
+        pool: {size: 5},
+        quorum: {size: 5}
+    };
+    executableContract.state.data.cloud_methods["reuse"] = {
+        pool: {size: 10},
+        quorum: {size: 10}
+    };
+
+    executableContract.state.data.js = await io.fileGetContentsAsString(TEST_CONTRACTS_PATH + "localStorage.js");
+
+    await executableContract.seal();
+
+    let requestContract = await generateSimpleCheckRequestContract(executableContract, "save");
+
+    let state = await ubotClient.executeCloudMethod(requestContract, await createPayment(20));
+
+    console.log("State: " + JSON.stringify(state));
+
+    assert(state.state === UBotPoolState.FINISHED.val);
+
+    // checking result
+    assert(state.result instanceof Array && state.result.every(x => typeof x.number === "number" && x.number >= 0 && x.number < ubotsCount));
+
+    // loading from predefined pool
+    requestContract = Contract.fromPrivateKey(userPrivKey);
+    requestContract.state.data.method_name = "reuse";
+    requestContract.state.data.executable_contract_id = executableContract.id;
+    requestContract.state.data.predefined_pool = state.result.map(x => x.number);
+
+    await cs.addConstraintToContract(requestContract, executableContract, "executable_contract_constraint",
+        Constraint.TYPE_EXISTING_STATE, ["this.state.data.executable_contract_id == ref.id"], true);
+
+    state = await ubotClient.executeCloudMethod(requestContract, await createPayment(20));
+
+    console.log("State: " + JSON.stringify(state));
+
+    assert(state.state === UBotPoolState.FINISHED.val);
+
+    // checking reuse local storage value
+    assert(state.result instanceof Array && state.result.length === 10 &&
+        state.result.filter(x => x.storage != null && x.storage.data === 88).length === 5);
+
+    await ubotClient.shutdown();
+
+    // waiting pool finished...
+    while (ubotMains.some(main => Array.from(main.ubot.processors.values()).some(proc => proc.state.canContinue)))
+        await sleep(100);
+
+    await shutdownUBots(ubotMains);
+});
+
 unit.test("ubot_local_test: error in cloud method", async () => {
     let ubotMains = await createUBots(ubotsCount);
 

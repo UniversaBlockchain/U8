@@ -85,20 +85,34 @@ async function createWallet(ownerKey, quorum, pool, gettingQuorum = 3, gettingPo
 async function prepareToken(walletContract, token, tokenOwnerKeys) {
     let walletToken = await token.createRevision(tokenOwnerKeys);
 
-    // quorum vote role
-    let quorum = walletContract.state.data.cloud_methods.putTokenIntoWallet.quorum.size.toString();
-    walletToken.registerRole(new roles.QuorumVoteRole("owner", "refUbotRegistry.state.roles.ubots", quorum, walletToken));
-    walletToken.registerRole(new roles.QuorumVoteRole("creator", "refUbotRegistry.state.roles.ubots", quorum, walletToken));
-
     // constraint for UBotNet registry contract
     walletToken.createTransactionalSection();
+    let constrReg = new Constraint(walletToken);
+    constrReg.name = "refUbotRegistry";
+    constrReg.type = Constraint.TYPE_TRANSACTIONAL;
+    let conditionsReg = {};
+    conditionsReg[Constraint.conditionsModeType.all_of] = ["ref.tag == \"universa:ubot_registry_contract\""];
+    constrReg.setConditions(conditionsReg);
+    walletToken.addConstraint(constrReg);
+
+    // constraint for this UBot
+    walletToken.createTransactionalSection();
     let constr = new Constraint(walletToken);
-    constr.name = "refUbotRegistry";
+    constr.name = "refUbot";
     constr.type = Constraint.TYPE_TRANSACTIONAL;
     let conditions = {};
-    conditions[Constraint.conditionsModeType.all_of] = ["ref.tag == \"universa:ubot_registry_contract\""];
+    conditions[Constraint.conditionsModeType.all_of] = ["this.ubot == \"" + walletContract.getOrigin().base64 + "\""];
     constr.setConditions(conditions);
     walletToken.addConstraint(constr);
+
+    // quorum vote role
+    let quorum = walletContract.state.data.cloud_methods.putTokenIntoWallet.quorum.size.toString();
+    let owner = new roles.QuorumVoteRole("owner", "refUbotRegistry.state.roles.ubots", quorum, walletToken);
+    let creator = new roles.QuorumVoteRole("creator", "refUbotRegistry.state.roles.ubots", quorum, walletToken);
+    owner.requiredAllConstraints.add("refUbot");
+    creator.requiredAllConstraints.add("refUbot");
+    walletToken.registerRole(owner);
+    walletToken.registerRole(creator);
 
     await walletToken.seal();
 
