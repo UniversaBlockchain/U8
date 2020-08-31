@@ -351,13 +351,14 @@ class UBotSession {
         return false;
     }
 
-    async close(finished) {
+    async close(finished, quantasLeft) {
         if (this.ubot != null)
-            this.ubot.logger.log("UBotSession.close finished = " + finished);
+            this.ubot.logger.log("UBotSession.close finished = " + finished + " quantasLeft = " + quantasLeft);
 
         await this.client.askOnAllNodes("ubotCloseSession", {
             requestId: this.requestId,
-            finished: finished
+            finished: finished,
+            remain: quantasLeft
         });
     }
 

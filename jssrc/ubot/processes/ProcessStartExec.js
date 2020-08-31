@@ -400,7 +400,8 @@ class ProcessStartExec extends ProcessBase {
                 this.pr.logger.log("QuantaSum of " + methodName + ": " + this.pr.quantiser.quantaSum_);
 
                 try {
-                    await this.pr.session.close(this.pr.state !== UBotPoolState.FAILED && !terminate);
+                    await this.pr.session.close(this.pr.state !== UBotPoolState.FAILED && !terminate,
+                        this.pr.quantiser.quantasLeft());
                     this.pr.session = null;
 
                     if (this.pr.userHttpClient != null) {
