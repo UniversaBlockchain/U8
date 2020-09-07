@@ -79,6 +79,39 @@ static void privateKeyDecrypt(const FunctionCallbackInfo<Value> &args) {
     });
 }
 
+static void privateKeyGetE(const FunctionCallbackInfo<Value> &args) {
+    Scripter::unwrapArgs(args, [&](ArgsContext &ac) {
+        if (args.Length() == 0) {
+            auto key = unwrap<PrivateKey>(args.This());
+            ac.setReturnValue(ac.v8String(key->get_e()));
+            return;
+        }
+        ac.throwError("invalid arguments");
+    });
+}
+
+static void privateKeyGetP(const FunctionCallbackInfo<Value> &args) {
+    Scripter::unwrapArgs(args, [&](ArgsContext &ac) {
+        if (args.Length() == 0) {
+            auto key = unwrap<PrivateKey>(args.This());
+            ac.setReturnValue(ac.v8String(key->get_p()));
+            return;
+        }
+        ac.throwError("invalid arguments");
+    });
+}
+
+static void privateKeyGetQ(const FunctionCallbackInfo<Value> &args) {
+    Scripter::unwrapArgs(args, [&](ArgsContext &ac) {
+        if (args.Length() == 0) {
+            auto key = unwrap<PrivateKey>(args.This());
+            ac.setReturnValue(ac.v8String(key->get_q()));
+            return;
+        }
+        ac.throwError("invalid arguments");
+    });
+}
+
 static void privateKeyPack(const FunctionCallbackInfo<Value> &args) {
     Scripter::unwrapArgs(args, [&](ArgsContext &ac) {
         if (args.Length() == 0) {
@@ -163,6 +196,28 @@ static void publicKeyEncrypt(const FunctionCallbackInfo<Value> &args) {
                 });
                 return;
             }
+        }
+        ac.throwError("invalid arguments");
+    });
+}
+
+static void publicKeyGetE(const FunctionCallbackInfo<Value> &args) {
+    Scripter::unwrapArgs(args, [&](ArgsContext &ac) {
+        if (args.Length() == 0) {
+            auto key = unwrap<PublicKey>(args.This());
+            ac.setReturnValue(ac.v8String(key->get_e()));
+            return;
+        }
+        ac.throwError("invalid arguments");
+    });
+}
+
+static void publicKeyGetN(const FunctionCallbackInfo<Value> &args) {
+    Scripter::unwrapArgs(args, [&](ArgsContext &ac) {
+        if (args.Length() == 0) {
+            auto key = unwrap<PublicKey>(args.This());
+            ac.setReturnValue(ac.v8String(key->get_n()));
+            return;
         }
         ac.throwError("invalid arguments");
     });
@@ -293,6 +348,9 @@ Local<FunctionTemplate> initPrivateKey(Scripter& scripter, Isolate *isolate) {
     prototype->Set(isolate, "__sign", FunctionTemplate::New(isolate, privateKeySign));
     prototype->Set(isolate, "__pack", FunctionTemplate::New(isolate, privateKeyPack));
     prototype->Set(isolate, "__decrypt", FunctionTemplate::New(isolate, privateKeyDecrypt));
+    prototype->Set(isolate, "__get_e", FunctionTemplate::New(isolate, privateKeyGetE));
+    prototype->Set(isolate, "__get_p", FunctionTemplate::New(isolate, privateKeyGetP));
+    prototype->Set(isolate, "__get_q", FunctionTemplate::New(isolate, privateKeyGetQ));
 
     tpl->Set(isolate, "__generate", FunctionTemplate::New(isolate, privateKeyGenerate));
 
@@ -331,6 +389,8 @@ Local<FunctionTemplate> initPublicKey(Scripter& scripter, Isolate *isolate) {
     prototype->Set(isolate, "__getFingerprints", FunctionTemplate::New(isolate, publicKeyFingerprints));
     prototype->Set(isolate, "__getBitsStrength", FunctionTemplate::New(isolate, publicKeyBitsStrength));
     prototype->Set(isolate, "__encrypt", FunctionTemplate::New(isolate, publicKeyEncrypt));
+    prototype->Set(isolate, "__get_e", FunctionTemplate::New(isolate, publicKeyGetE));
+    prototype->Set(isolate, "__get_n", FunctionTemplate::New(isolate, publicKeyGetN));
 
     scripter.publicKeyTpl.Reset(isolate, tpl);
     return tpl;

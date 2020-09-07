@@ -60,6 +60,9 @@ namespace crypto {
 
 		std::vector<unsigned char> getKeyComponentsAsBytes() const;
 
+		std::string get_e() const;
+		std::string get_n() const;
+
 	private:
 
 		void initFromBytes(const UBytes &eValue, const UBytes &nValue);

@@ -248,4 +248,18 @@ namespace crypto {
 		return output;
 	}
 
+	std::string PublicKey::get_e() const {
+		byte_vector bv(2048);
+		zeromem(&bv[0], bv.size());
+		gmp_snprintf((char*)&bv[0], bv.size(), "%Zx", key.key.e);
+		return std::string((char*)&bv[0]);
+	}
+
+	std::string PublicKey::get_n() const {
+		byte_vector bv(2048);
+		zeromem(&bv[0], bv.size());
+		gmp_snprintf((char*)&bv[0], bv.size(), "%Zx", key.key.N);
+		return std::string((char*)&bv[0]);
+	}
+
 };
