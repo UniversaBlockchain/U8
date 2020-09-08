@@ -1,4 +1,4 @@
-const Module = require('unicrypto-u8impl').Module;
+const {Module, TextDecoder} = require('unicrypto-u8impl');
 
 (function webpackUniversalModuleDefinition(root, factory) {
 	if(typeof exports === 'object' && typeof module === 'object')
@@ -3703,6 +3703,7 @@ exports.textToBytes = (text) => {
 };
 exports.bytesToText = (bytes) => {
   if (typeof TextDecoder !== 'function') {
+    console.log("typeof TextDecoder: " + typeof TextDecoder);
     const polyfill = __webpack_require__(15);
     TextDecoder = polyfill.TextDecoder;
   }

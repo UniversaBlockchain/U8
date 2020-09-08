@@ -52,6 +52,12 @@ let Module = {
             // do nothing
         }
 
+        static initFromPackedBinary(packedBinary, onComplete) {
+            let res = new Module.PublicKeyImpl();
+            res.impl_ = new crypto.PublicKey(packedBinary);
+            onComplete(res);
+        }
+
         getBitStrength() {
             return this.impl_.bitStrength;
         }
@@ -90,4 +96,9 @@ let Module = {
     },
 };
 
-module.exports = {Module};
+class TextDecoder {
+    constructor() {}
+    decode(bytes) {return utf8Decode(bytes);}
+}
+
+module.exports = {Module, TextDecoder};
