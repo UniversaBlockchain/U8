@@ -21,6 +21,14 @@ let Module = {
             onComplete(this.impl_.packed);
         }
 
+        sign(data, pssHashType, mgf1HashType, saltLen, onComplete) {
+            this.impl_.__signEx(data, pssHashType, mgf1HashType, saltLen, onComplete);
+        }
+
+        // signWithCustomSalt(data, pssHashType, mgf1HashType, salt, onComplete) {
+        //     this.impl_.__signExWithCustomSalt(data, pssHashType, mgf1HashType, salt, onComplete);
+        // }
+
         get_e() {
             return this.impl_.__get_e();
         }

@@ -13,6 +13,6 @@ unit.test("unicrypto example: signed record", async () => {
     console.log(key.publicKey.longAddress.base58);
     console.log(key.publicKey.fingerprint);
 
-    //const recordBinary = await SignedRecord.packWithKey(key, payload, nonce);
-    //console.log(recordBinary.constructor.name); // Uint8Array
+    const recordBinary = await SignedRecord.packWithKey(key, payload, nonce);
+    console.log(recordBinary.constructor.name); // Uint8Array
 });

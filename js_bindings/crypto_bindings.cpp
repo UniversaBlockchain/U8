@@ -45,6 +45,59 @@ static void privateKeySign(const FunctionCallbackInfo<Value> &args) {
     });
 }
 
+static void privateKeySignEx(const FunctionCallbackInfo<Value> &args) {
+    Scripter::unwrapArgs(args, [&](ArgsContext &ac) {
+        // __sign(data, hashType, callback)
+        if (args.Length() == 5) {
+            auto key = unwrap<PrivateKey>(args.This());
+            auto data = ac.asBuffer(0);
+            if (data->data() != nullptr) {
+                auto isolate = ac.isolate;
+                auto ht = (HashType) ac.asInt(1);
+                auto ht_mgf1 = (HashType) ac.asInt(2);
+                auto saltLen = (HashType) ac.asInt(3);
+                auto onReady = ac.asFunction(4);
+                runAsync([=]() {
+                    auto signature = key->signEx(data->data(), data->size(), ht, ht_mgf1, saltLen);
+                    onReady->lockedContext([=](Local<Context> cxt) {
+                        Local<Value> result = vectorToV8(isolate, signature);
+                        onReady->call(cxt, 1, &result);
+                    });
+                });
+                return;
+            }
+        }
+        ac.throwError("invalid arguments");
+    });
+}
+
+static void privateKeySignExWithCustomSalt(const FunctionCallbackInfo<Value> &args) {
+    Scripter::unwrapArgs(args, [&](ArgsContext &ac) {
+        // __sign(data, hashType, callback)
+        if (args.Length() == 5) {
+            auto key = unwrap<PrivateKey>(args.This());
+            auto data = ac.asBuffer(0);
+            auto salt = ac.asBuffer(3);
+            if ((data->data() != nullptr) && (salt->data() != nullptr)) {
+                auto isolate = ac.isolate;
+                auto ht = (HashType) ac.asInt(1);
+                auto ht_mgf1 = (HashType) ac.asInt(2);
+                auto saltLen = (HashType) ac.asInt(3);
+                auto onReady = ac.asFunction(4);
+                runAsync([=]() {
+                    auto signature = key->signExWithCustomSalt(data->data(), data->size(), ht, ht_mgf1, salt->data(), salt->size());
+                    onReady->lockedContext([=](Local<Context> cxt) {
+                        Local<Value> result = vectorToV8(isolate, signature);
+                        onReady->call(cxt, 1, &result);
+                    });
+                });
+                return;
+            }
+        }
+        ac.throwError("invalid arguments");
+    });
+}
+
 static void privateKeyDecrypt(const FunctionCallbackInfo<Value> &args) {
     Scripter::unwrapArgs(args, [&](ArgsContext &ac) {
         // __decrypt(data, callback)
@@ -346,6 +399,8 @@ Local<FunctionTemplate> initPrivateKey(Scripter& scripter, Isolate *isolate) {
             });
     auto prototype = tpl->PrototypeTemplate();
     prototype->Set(isolate, "__sign", FunctionTemplate::New(isolate, privateKeySign));
+    prototype->Set(isolate, "__signEx", FunctionTemplate::New(isolate, privateKeySignEx));
+    prototype->Set(isolate, "__signExWithCustomSalt", FunctionTemplate::New(isolate, privateKeySignExWithCustomSalt));
     prototype->Set(isolate, "__pack", FunctionTemplate::New(isolate, privateKeyPack));
     prototype->Set(isolate, "__decrypt", FunctionTemplate::New(isolate, privateKeyDecrypt));
     prototype->Set(isolate, "__get_e", FunctionTemplate::New(isolate, privateKeyGetE));

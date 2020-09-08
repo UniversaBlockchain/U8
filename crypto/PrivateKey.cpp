@@ -7,6 +7,7 @@
 #include "PrivateKey.h"
 #include "PublicKey.h"
 #include "cryptoCommonPrivate.h"
+#include "no_prng.h"
 #include "../types/UBytes.h"
 #include "../types/UArray.h"
 #include "../serialization/BossSerializer.h"
@@ -239,6 +240,75 @@ namespace crypto {
 
 		std::vector<unsigned char> output;
 		output.insert(output.begin(), tomSig, tomSig + tomSigLen);
+		return output;
+	}
+
+	std::vector<unsigned char> PrivateKey::signEx(const std::vector<unsigned char> &input, HashType hashType, HashType mgf1HashType, int saltLen) const {
+		return signEx((void *) &input[0], input.size(), hashType, mgf1HashType, saltLen);
+	}
+
+	std::vector<unsigned char> PrivateKey::signEx(void *data, size_t size, HashType hashType, HashType mgf1HashType, int saltLen) const {
+		int mgf1hash_idx = getHashIndex(mgf1HashType);
+		int hash_idx = getHashIndex(hashType);
+		auto desc = getHashDescriptor(hashType);
+		int prng_indx = find_prng("sprng");
+
+		unsigned char hashResult[desc.hashsize];
+		hash_state md;
+		desc.init(&md);
+		desc.process(&md, (unsigned char *) data, size);
+		desc.done(&md, hashResult);
+
+		if (saltLen == -1)
+			saltLen = rsa_sign_saltlen_get_max_ex(LTC_PKCS_1_PSS, hash_idx, &key.key);
+
+		unsigned long tomSigLen = 1024;
+		unsigned char tomSig[tomSigLen];
+		int res = rsa_sign_hash_ex(
+				hashResult, desc.hashsize, hash_idx,
+				tomSig, &tomSigLen,
+				LTC_PKCS_1_PSS, NULL, prng_indx, mgf1hash_idx, saltLen, &key.key);
+		if (res != CRYPT_OK)
+			printf("rsa_sign_hash_ex error: %i\n", res);
+
+		std::vector<unsigned char> output;
+		output.insert(output.begin(), tomSig, tomSig + tomSigLen);
+		return output;
+	}
+
+	std::vector<unsigned char> PrivateKey::signExWithCustomSalt(void *data, size_t size, HashType hashType, HashType mgf1HashType, void *saltData, size_t saltSize) const {
+		ltc_prng_descriptor* no_prng_desc = no_prng_desc_get();
+		int mgf1hash_idx = getHashIndex(mgf1HashType);
+		int hash_idx = getHashIndex(hashType);
+		auto desc = getHashDescriptor(hashType);
+		int prng_indx = register_prng(no_prng_desc);
+
+		unsigned char hashResult[desc.hashsize];
+		hash_state md;
+		desc.init(&md);
+		desc.process(&md, (unsigned char *) data, size);
+		desc.done(&md, hashResult);
+
+		if (saltSize > 0)
+			prng_descriptor[prng_indx].add_entropy((unsigned char *) saltData, saltSize, (prng_state*)no_prng_desc);
+
+		int saltLen = (int) saltSize;
+
+		unsigned long tomSigLen = 1024;
+		unsigned char tomSig[tomSigLen];
+		int res = rsa_sign_hash_ex(
+				hashResult, desc.hashsize, hash_idx,
+				tomSig, &tomSigLen,
+				LTC_PKCS_1_PSS, (prng_state*)no_prng_desc, prng_indx, mgf1hash_idx, saltLen, &key.key);
+		if (res != CRYPT_OK)
+			printf("rsa_sign_hash_ex error: %i\n", res);
+
+		std::vector<unsigned char> output;
+		output.insert(output.begin(), tomSig, tomSig + tomSigLen);
+
+		unregister_prng(no_prng_desc);
+		no_prng_desc_free(no_prng_desc);
+
 		return output;
 	}
 

@@ -40,6 +40,12 @@ namespace crypto {
 
 		std::vector<unsigned char> sign(void *data, size_t size, HashType hashType) const;
 
+		std::vector<unsigned char> signEx(const std::vector<unsigned char> &input, HashType hashType, HashType mgf1HashType, int saltLen = -1) const;
+
+		std::vector<unsigned char> signEx(void *data, size_t size, HashType hashType, HashType mgf1HashType, int saltLen = -1) const;
+
+		std::vector<unsigned char> signExWithCustomSalt(void *data, size_t size, HashType hashType, HashType mgf1HashType, void *saltData, size_t saltSize) const;
+
 		void decrypt(const std::vector<unsigned char> &encrypted, std::vector<unsigned char> &output);
 
 		std::vector<unsigned char> decrypt(const std::vector<unsigned char> &encrypted);
