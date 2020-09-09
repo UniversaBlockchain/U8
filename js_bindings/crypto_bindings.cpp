@@ -660,6 +660,22 @@ static void digest(const FunctionCallbackInfo<Value> &args) {
     });
 }
 
+static void generateSecurePseudoRandomBytes(const FunctionCallbackInfo<Value> &args) {
+    Scripter::unwrapArgs(args, [](ArgsContext &ac) {
+        if (ac.args.Length() == 1) {
+            int len = ac.asInt(0);
+            if (len < 0 || len > 1024*1024) {
+                ac.throwError("illegal length in argument");
+            } else {
+                ac.setReturnValue(ac.toBinary(crypto::generateSecurePseudoRandomBytes(len)));
+                return;
+            }
+        } else {
+            ac.throwError("one argument required");
+        }
+    });
+}
+
 static void JsVerifyExtendedSignature(const FunctionCallbackInfo<Value> &args) {
     Scripter::unwrapArgs(args, [](ArgsContext &ac) {
         if (ac.args.Length() == 4) {
@@ -748,6 +764,7 @@ void JsInitCrypto(Scripter& scripter, const Local<ObjectTemplate> &global) {
     crypto->Set(isolate, "version", String::NewFromUtf8(isolate, "0.0.1").ToLocalChecked());
     crypto->Set(isolate, "HashIdImpl", initHashId(scripter, isolate));
     crypto->Set(isolate, "__digest", FunctionTemplate::New(isolate, digest));
+    crypto->Set(isolate, "__generateSecurePseudoRandomBytes", FunctionTemplate::New(isolate, generateSecurePseudoRandomBytes));
 
     global->Set(isolate, "crypto", crypto);
 

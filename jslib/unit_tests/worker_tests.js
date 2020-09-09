@@ -114,7 +114,7 @@ unit.test("worker_tests: check that all global objects are frozen", async () => 
 
     class Worker {
         constructor() {this.worker = null;}
-        async release() {await this.worker.release();}
+        async release() {await this.worker.release(true);}
         static async start(accessLevel) {
             let res = new Worker();
             let wrappers = accessLevel === 1 ? consoleWrapper+farcallWrapper : farcallWrapper;

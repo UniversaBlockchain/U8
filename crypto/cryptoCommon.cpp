@@ -149,4 +149,10 @@ namespace crypto {
         rsa_free(&key);
     }
 
+    byte_vector generateSecurePseudoRandomBytes(int length) {
+        byte_vector res((size_t)length);
+        sprng_read(&res[0], (size_t)length, nullptr);
+        return res;
+    }
+
 };

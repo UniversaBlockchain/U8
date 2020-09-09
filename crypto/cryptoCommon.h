@@ -9,6 +9,7 @@
 #include <tomcrypt.h>
 #include <gmp.h>
 #include <vector>
+#include "../tools/tools.h"
 
 namespace crypto {
 
@@ -52,6 +53,8 @@ namespace crypto {
         ltc_hash_descriptor desc;
         std::vector<unsigned char> out;
     };
+
+    byte_vector generateSecurePseudoRandomBytes(int length);
 
 };
 

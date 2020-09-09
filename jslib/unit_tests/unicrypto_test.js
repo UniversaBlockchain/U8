@@ -1,4 +1,4 @@
-import { SignedRecord, decode64, PublicKey, PrivateKey } from 'unicrypto';
+import { SignedRecord, decode64, PublicKey, PrivateKey, randomBytes } from 'unicrypto';
 
 unit.test("unicrypto examples", async () => {
 
@@ -32,6 +32,15 @@ unit.test("unicrypto examples", async () => {
         console.log(record.nonce); // nonce
         console.log(record.payload); // payload
         console.log(record.key.shortAddress.base58); // PublicKey address
+    }
+
+
+
+    // # Misc
+
+    { // Random byte array for given length
+        const bytes16 = randomBytes(16);
+        console.log("randomBytes: " + new Uint8Array(bytes16.buffer));
     }
 
 });
