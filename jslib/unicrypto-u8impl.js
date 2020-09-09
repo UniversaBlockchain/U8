@@ -105,10 +105,15 @@ class TextDecoder {
     decode(bytes) {return utf8Decode(bytes);}
 }
 
+class TextEncoder {
+    constructor() {}
+    encode(text) {return utf8Encode(text);}
+}
+
 function freezeUnicrypto() {
     Object.freeze(Base58.encode);
     Object.freeze(Base58.decode);
     Object.freeze(Base58);
 }
 
-module.exports = {Module, TextDecoder, freezeUnicrypto};
+module.exports = {Module, TextDecoder, TextEncoder, freezeUnicrypto};

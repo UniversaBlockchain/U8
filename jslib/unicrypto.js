@@ -1,4 +1,4 @@
-const {Module, TextDecoder, freezeUnicrypto} = require('unicrypto-u8impl');
+const {Module, TextDecoder, TextEncoder, freezeUnicrypto} = require('unicrypto-u8impl');
 
 (function webpackUniversalModuleDefinition(root, factory) {
 	if(typeof exports === 'object' && typeof module === 'object')
