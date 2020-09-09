@@ -94,6 +94,10 @@ let Module = {
             onComplete(this.impl_.longAddress.getPacked());
         }
     },
+
+    calcHashId: (binaryToHash, onComplete) => {
+        onComplete(crypto.HashId.of(binaryToHash).digest);
+    },
 };
 
 class TextDecoder {

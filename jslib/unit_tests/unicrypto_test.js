@@ -1,4 +1,4 @@
-import { SignedRecord, decode64, PublicKey, PrivateKey, randomBytes } from 'unicrypto';
+import { SignedRecord, encode64, decode64, PublicKey, PrivateKey, randomBytes, hashId } from 'unicrypto';
 
 unit.test("unicrypto examples", async () => {
 
@@ -41,6 +41,11 @@ unit.test("unicrypto examples", async () => {
     { // Random byte array for given length
         const bytes16 = randomBytes(16);
         console.log("randomBytes: " + new Uint8Array(bytes16.buffer));
+    }
+
+    { // HashId for binary data
+        const id = await hashId(decode64("abc")); // Uint8Array
+        console.log("hashId: " + encode64(id));
     }
 
 });
