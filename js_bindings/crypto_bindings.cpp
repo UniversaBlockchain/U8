@@ -660,6 +660,76 @@ static void digest(const FunctionCallbackInfo<Value> &args) {
     });
 }
 
+static void digestImpl_update(const FunctionCallbackInfo<Value> &args) {
+    Scripter::unwrapArgs(args, [](ArgsContext &ac) {
+        if (ac.args.Length() == 1 && ac.args[0]->IsTypedArray()) {
+            auto digest = unwrap<Digest>(ac.args.This());
+            auto c = ac.as<TypedArray>(0)->Buffer()->GetContents();
+            auto data = c.Data();
+            auto size = c.ByteLength();
+            digest->update(data, size);
+            return;
+        }
+        ac.throwError("invalid arguments");
+    });
+}
+
+static void digestImpl_doFinal(const FunctionCallbackInfo<Value> &args) {
+    Scripter::unwrapArgs(args, [](ArgsContext &ac) {
+        if (ac.args.Length() == 0) {
+            auto digest = unwrap<Digest>(ac.args.This());
+            digest->doFinal();
+            return;
+        }
+        ac.throwError("invalid arguments");
+    });
+}
+
+static void digestImpl_getDigest(const FunctionCallbackInfo<Value> &args) {
+    Scripter::unwrapArgs(args, [](ArgsContext &ac) {
+        if (ac.args.Length() == 0) {
+            auto digest = unwrap<Digest>(ac.args.This());
+            ac.setReturnValue(ac.toBinary(digest->getDigest()));
+            return;
+        }
+        ac.throwError("invalid arguments");
+    });
+}
+
+static void digestImpl_getDigestSize(const FunctionCallbackInfo<Value> &args) {
+    Scripter::unwrapArgs(args, [](ArgsContext &ac) {
+        if (ac.args.Length() == 0) {
+            auto digest = unwrap<Digest>(ac.args.This());
+            ac.setReturnValue((int)digest->getDigestSize());
+            return;
+        }
+        ac.throwError("invalid arguments");
+    });
+}
+
+Local<FunctionTemplate> initDigestImpl(Scripter& scripter, Isolate *isolate) {
+    Local<FunctionTemplate>
+            tpl = bindCppClass<Digest>(
+            isolate,
+            "DigestImpl",
+            [=](const FunctionCallbackInfo<Value> &args) -> Digest * {
+                Isolate *isolate = args.GetIsolate();
+                if (args.Length() == 1) {
+                    auto context = args.GetIsolate()->GetCurrentContext();
+                    return new Digest((HashType)args[0]->Int32Value(context).FromJust());
+                }
+                isolate->ThrowException(
+                        Exception::TypeError(String::NewFromUtf8(isolate, "bad constructor arguments").ToLocalChecked()));
+                return nullptr;
+            });
+    auto prototype = tpl->PrototypeTemplate();
+    prototype->Set(isolate, "update", FunctionTemplate::New(isolate, digestImpl_update));
+    prototype->Set(isolate, "doFinal", FunctionTemplate::New(isolate, digestImpl_doFinal));
+    prototype->Set(isolate, "getDigest", FunctionTemplate::New(isolate, digestImpl_getDigest));
+    prototype->Set(isolate, "getDigestSize", FunctionTemplate::New(isolate, digestImpl_getDigestSize));
+    return tpl;
+}
+
 static void generateSecurePseudoRandomBytes(const FunctionCallbackInfo<Value> &args) {
     Scripter::unwrapArgs(args, [](ArgsContext &ac) {
         if (ac.args.Length() == 1) {
@@ -764,6 +834,7 @@ void JsInitCrypto(Scripter& scripter, const Local<ObjectTemplate> &global) {
     crypto->Set(isolate, "version", String::NewFromUtf8(isolate, "0.0.1").ToLocalChecked());
     crypto->Set(isolate, "HashIdImpl", initHashId(scripter, isolate));
     crypto->Set(isolate, "__digest", FunctionTemplate::New(isolate, digest));
+    crypto->Set(isolate, "DigestImpl", initDigestImpl(scripter, isolate));
     crypto->Set(isolate, "__generateSecurePseudoRandomBytes", FunctionTemplate::New(isolate, generateSecurePseudoRandomBytes));
 
     global->Set(isolate, "crypto", crypto);

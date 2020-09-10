@@ -98,6 +98,18 @@ let Module = {
     calcHashId: (binaryToHash, onComplete) => {
         onComplete(crypto.HashId.of(binaryToHash).digest);
     },
+
+    DigestImpl: class DigestImpl extends crypto.DigestImpl {
+        constructor(hashType) {
+            super(hashType);
+        }
+        delete() {
+            // do nothing
+        }
+        getDigest(onComplete) {
+            onComplete(super.getDigest());
+        }
+    },
 };
 
 class TextDecoder {

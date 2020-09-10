@@ -3,6 +3,7 @@ import { bytesToHex, hexToBytes } from 'unicrypto';
 import { textToBytes, bytesToText } from 'unicrypto';
 import { encode64, encode64Short, decode64 } from 'unicrypto';
 import { encode58, decode58 } from 'unicrypto';
+import { SHA } from 'unicrypto';
 
 unit.test("unicrypto examples", async () => {
 
@@ -93,6 +94,37 @@ unit.test("unicrypto examples", async () => {
         console.log("bytes: " + bytes);
         const base58str = encode58(bytes); // String
         console.log("base58str: " + base58str);
+    }
+
+
+
+    // # SHA, Supports SHA256, SHA512, SHA1, SHA3(256, 384, 512)
+
+    { // Get instant hash value for given byte array
+        const resultBytes1 = await SHA.getDigest('sha256', textToBytes('somevalue')); // Uint8Array
+        console.log("resultBytes1: " + resultBytes1);
+    }
+
+    { // Get hash value for large data
+        const sha512 = new SHA(512);
+        const dataPart1 = textToBytes('dataPart1');
+        const dataPart2 = textToBytes('dataPart2');
+        const dataPartFinal = textToBytes('dataPartFinal');
+
+        await sha512.put(dataPart1); // dataPart1 is Uint8Array
+        await sha512.put(dataPart2);
+        // .....
+        await sha512.put(dataPartFinal);
+
+        const resultBytes = await sha512.get(); // Uint8Array
+        console.log("resultBytes: " + resultBytes);
+        console.log("resultBytes size: " + sha512.getDigestSize());
+    }
+
+    { // Get hash value in HEX
+        const sha256 = new SHA(256);
+        const hexResult = await sha256.get(textToBytes("one two three"), 'hex'); // String
+        console.log("hexResult: " + hexResult);
     }
 
 });
