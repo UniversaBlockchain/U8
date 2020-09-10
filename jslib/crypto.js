@@ -365,6 +365,7 @@ Object.freeze(crypto.__digest);
 Object.freeze(crypto.DigestImpl);
 Object.freeze(crypto.__generateSecurePseudoRandomBytes);
 Object.freeze(crypto.__calcHmac);
+Object.freeze(crypto.__pbkdf2);
 Object.freeze(crypto.Exception);
 Object.freeze(crypto.PrivateKey);
 Object.freeze(crypto.PublicKey);

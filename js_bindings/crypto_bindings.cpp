@@ -14,6 +14,7 @@
 #include "../crypto/base64.h"
 #include "../crypto/HashId.h"
 #include "../crypto/SymmetricKey.h"
+#include "../crypto/PBKDF2.h"
 #include "../serialization/BossSerializer.h"
 #include "../types/UBinder.h"
 #include "../types/UDateTime.h"
@@ -767,6 +768,27 @@ static void calcHmac(const FunctionCallbackInfo<Value> &args) {
     });
 }
 
+static void pbkdf2(const FunctionCallbackInfo<Value> &args) {
+    Scripter::unwrapArgs(args, [](ArgsContext &ac) {
+        if (ac.args.Length() == 5) {
+            int hashType = ac.asInt(0);
+            int rounds = ac.asInt(1);
+            int keyLength = ac.asInt(2);
+            auto password = ac.asString(3);
+            auto saltBinary = ac.args[4].As<TypedArray>()->Buffer()->GetContents();
+
+            byte_vector bvSalt(saltBinary.ByteLength());
+            memcpy(&bvSalt[0], saltBinary.Data(), saltBinary.ByteLength());
+            auto res = crypto::PBKDF2::derive((crypto::HashType)hashType, password, bvSalt, rounds, keyLength);
+
+            ac.setReturnValue(ac.toBinary(res));
+            return;
+        } else {
+            ac.throwError("5 arguments required");
+        }
+    });
+}
+
 static void JsVerifyExtendedSignature(const FunctionCallbackInfo<Value> &args) {
     Scripter::unwrapArgs(args, [](ArgsContext &ac) {
         if (ac.args.Length() == 4) {
@@ -858,6 +880,7 @@ void JsInitCrypto(Scripter& scripter, const Local<ObjectTemplate> &global) {
     crypto->Set(isolate, "DigestImpl", initDigestImpl(scripter, isolate));
     crypto->Set(isolate, "__generateSecurePseudoRandomBytes", FunctionTemplate::New(isolate, generateSecurePseudoRandomBytes));
     crypto->Set(isolate, "__calcHmac", FunctionTemplate::New(isolate, calcHmac));
+    crypto->Set(isolate, "__pbkdf2", FunctionTemplate::New(isolate, pbkdf2));
 
     global->Set(isolate, "crypto", crypto);
 

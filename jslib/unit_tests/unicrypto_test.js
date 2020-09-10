@@ -4,6 +4,7 @@ import { textToBytes, bytesToText } from 'unicrypto';
 import { encode64, encode64Short, decode64 } from 'unicrypto';
 import { encode58, decode58 } from 'unicrypto';
 import { SHA, HMAC } from 'unicrypto';
+import { pbkdf2 } from 'unicrypto';
 
 unit.test("unicrypto examples", async () => {
 
@@ -137,6 +138,19 @@ unit.test("unicrypto examples", async () => {
         const hmac = new HMAC('sha256', key);
         const result = await hmac.get(data); // Uint8Array
         console.log("hmac result: " + result);
+    }
+
+
+
+    // # PBKDF2
+    {
+        const derivedKey = await pbkdf2('sha256', {
+            rounds: 1, // number of iterations
+            keyLength: 20,  // bytes length
+            password: 'password',
+            salt: hexToBytes('abc123')
+        }); // Uint8Array
+        console.log("derivedKey: " + derivedKey);
     }
 
 });

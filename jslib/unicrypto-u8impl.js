@@ -114,6 +114,10 @@ let Module = {
     calcHmac: (hashType, keyBinary, dataBinary, onComplete) => {
         onComplete(crypto.__calcHmac(hashType, keyBinary, dataBinary));
     },
+
+    pbkdf2: (hashType, rounds, keyLength, password, salt, onComplete) => {
+        onComplete(crypto.__pbkdf2(hashType, rounds, keyLength, password, salt));
+    },
 };
 
 class TextDecoder {
