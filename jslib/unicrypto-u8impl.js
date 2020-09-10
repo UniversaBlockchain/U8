@@ -110,6 +110,10 @@ let Module = {
             onComplete(super.getDigest());
         }
     },
+
+    calcHmac: (hashType, keyBinary, dataBinary, onComplete) => {
+        onComplete(crypto.__calcHmac(hashType, keyBinary, dataBinary));
+    },
 };
 
 class TextDecoder {

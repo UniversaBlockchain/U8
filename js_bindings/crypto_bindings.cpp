@@ -746,6 +746,27 @@ static void generateSecurePseudoRandomBytes(const FunctionCallbackInfo<Value> &a
     });
 }
 
+static void calcHmac(const FunctionCallbackInfo<Value> &args) {
+    Scripter::unwrapArgs(args, [](ArgsContext &ac) {
+        if (ac.args.Length() == 3) {
+            int hashType = ac.asInt(0);
+            auto keyBinary = ac.args[1].As<TypedArray>()->Buffer()->GetContents();
+            auto dataBinary = ac.args[2].As<TypedArray>()->Buffer()->GetContents();
+
+            int hashIndex = crypto::getHashIndex((crypto::HashType)hashType);
+            byte_vector res;
+            size_t resSize = MAXBLOCKSIZE;
+            res.resize(resSize);
+            hmac_memory(hashIndex, (unsigned char*)keyBinary.Data(), keyBinary.ByteLength(), (unsigned char*)dataBinary.Data(), dataBinary.ByteLength(), &res[0], &resSize);
+            res.resize(resSize);
+            ac.setReturnValue(ac.toBinary(res));
+            return;
+        } else {
+            ac.throwError("three arguments required");
+        }
+    });
+}
+
 static void JsVerifyExtendedSignature(const FunctionCallbackInfo<Value> &args) {
     Scripter::unwrapArgs(args, [](ArgsContext &ac) {
         if (ac.args.Length() == 4) {
@@ -836,6 +857,7 @@ void JsInitCrypto(Scripter& scripter, const Local<ObjectTemplate> &global) {
     crypto->Set(isolate, "__digest", FunctionTemplate::New(isolate, digest));
     crypto->Set(isolate, "DigestImpl", initDigestImpl(scripter, isolate));
     crypto->Set(isolate, "__generateSecurePseudoRandomBytes", FunctionTemplate::New(isolate, generateSecurePseudoRandomBytes));
+    crypto->Set(isolate, "__calcHmac", FunctionTemplate::New(isolate, calcHmac));
 
     global->Set(isolate, "crypto", crypto);
 

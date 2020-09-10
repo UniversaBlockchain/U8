@@ -3,7 +3,7 @@ import { bytesToHex, hexToBytes } from 'unicrypto';
 import { textToBytes, bytesToText } from 'unicrypto';
 import { encode64, encode64Short, decode64 } from 'unicrypto';
 import { encode58, decode58 } from 'unicrypto';
-import { SHA } from 'unicrypto';
+import { SHA, HMAC } from 'unicrypto';
 
 unit.test("unicrypto examples", async () => {
 
@@ -125,6 +125,18 @@ unit.test("unicrypto examples", async () => {
         const sha256 = new SHA(256);
         const hexResult = await sha256.get(textToBytes("one two three"), 'hex'); // String
         console.log("hexResult: " + hexResult);
+    }
+
+
+
+    // # HMAC
+    {
+        const data = textToBytes('a quick brown for his done something disgusting');
+        const key = textToBytes('1234567890abcdef1234567890abcdef');
+
+        const hmac = new HMAC('sha256', key);
+        const result = await hmac.get(data); // Uint8Array
+        console.log("hmac result: " + result);
     }
 
 });
