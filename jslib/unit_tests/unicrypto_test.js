@@ -1,4 +1,4 @@
-import { SignedRecord, PublicKey, PrivateKey, BigInteger, randomBytes, hashId, crc32 } from 'unicrypto';
+import { SignedRecord, PublicKey, PrivateKey, AbstractKey, BigInteger, randomBytes, hashId, crc32 } from 'unicrypto';
 import { bytesToHex, hexToBytes } from 'unicrypto';
 import { textToBytes, bytesToText } from 'unicrypto';
 import { encode64, encode64Short, decode64 } from 'unicrypto';
@@ -174,6 +174,84 @@ unit.test("unicrypto examples", async () => {
             password: "qwerty"
         });
         console.log("key unpack password-protected: " + privateKey4.publicKey.shortAddress.base58);
+    }
+
+    { // Public key unpack
+        const pk = await PrivateKey.generate({strength: 2048});
+        console.log("key generated: " + pk.publicKey.shortAddress.base58);
+        const keyPacked64 = encode64(await pk.pack());
+
+        const bossEncodedKey = decode64(keyPacked64);
+        const privateKey1 = await PrivateKey.unpack(bossEncodedKey);
+        const publicKey1 = privateKey1.publicKey;
+        console.log("publicKey1: " + publicKey1.shortAddress.base58);
+
+        const bossEncodedPublicKey = await publicKey1.pack();
+        const publicKey2 = await PublicKey.unpack(bossEncodedPublicKey);
+        console.log("publicKey2: " + publicKey2.shortAddress.base58);
+    }
+
+    { // Public key fingerprint
+        const publicKey = (await PrivateKey.generate({strength: 2048})).publicKey;
+        console.log("publicKey.fingerprint: " + publicKey.fingerprint); // fingerprint (Uint8Array)
+    }
+
+    { // Public key bit strength
+        const publicKey = (await PrivateKey.generate({strength: 2048})).publicKey;
+        console.log("publicKey.getBitStrength: " + publicKey.getBitStrength()); // number
+    }
+
+    { // Public key address
+        const publicKey = (await PrivateKey.generate({strength: 2048})).publicKey;
+
+        console.log("publicKey.shortAddress.bytes: " + publicKey.shortAddress.bytes);   // short address (Uint8Array)
+        console.log("publicKey.shortAddress.base58: " + publicKey.shortAddress.base58);   // short address (Uint8Array)
+        console.log("publicKey.longAddress.bytes: " + publicKey.longAddress.bytes);    // long address (Uint8Array)
+        console.log("publicKey.longAddress.base58: " + publicKey.longAddress.base58);    // long address (Uint8Array)
+
+        // DEPRECATED
+        console.log("publicKey.shortAddress58: " + publicKey.shortAddress58); // short address (base58)
+        console.log("publicKey.longAddress58: " + publicKey.longAddress58);  // long address (base58)
+    }
+
+    { // Check if given address is valid
+        const publicKey = (await PrivateKey.generate({strength: 2048})).publicKey;
+
+        console.log(PublicKey.isValidAddress(publicKey.shortAddress)); // true
+
+        // accepts base58 representation of address too
+        console.log(PublicKey.isValidAddress(publicKey.shortAddress58)); // true
+    }
+
+    { // Generate private key
+        const options = { strength: 2048 };
+        const priv = await PrivateKey.generate(options); // instance of PrivateKey
+        console.log("priv key generated: " + priv.publicKey.shortAddress.base58);
+    }
+
+    { // Private(public) key - export
+        const pk = await PrivateKey.generate({strength: 2048});
+        const keyPacked64 = encode64(await pk.pack());
+        const bossEncodedKey = decode64(keyPacked64);
+
+        const key = await PrivateKey.unpack(bossEncodedKey);
+        const keyPacked = await key.pack(); // Uint8Array
+        console.log("keyPacked: " + keyPacked);
+        const keyPackedProtected = await key.pack("somepassword"); // Uint8Array
+        console.log("keyPackedProtected: " + keyPackedProtected);
+        const keyPackedProtected1000 = await key.pack({ password: "qwerty", rounds: 1000 });
+        console.log("keyPackedProtected1000: " + keyPackedProtected1000);
+
+        const bossEncodedPublic = key.publicKey.packed;
+        console.log("bossEncodedPublic: " + bossEncodedPublic);
+    }
+
+    { // Get type of key package
+        const privateKey = await PrivateKey.generate({strength: 2048});
+
+        const bossEncoded = await privateKey.pack("somepassword");
+
+        console.log("check type of key package: " + (AbstractKey.typeOf(bossEncoded) === AbstractKey.TYPE_PRIVATE_PASSWORD_V2)); // true
     }
 
 });
