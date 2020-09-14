@@ -1,4 +1,4 @@
-import { SignedRecord, PublicKey, PrivateKey, randomBytes, hashId, crc32 } from 'unicrypto';
+import { SignedRecord, PublicKey, PrivateKey, BigInteger, randomBytes, hashId, crc32 } from 'unicrypto';
 import { bytesToHex, hexToBytes } from 'unicrypto';
 import { textToBytes, bytesToText } from 'unicrypto';
 import { encode64, encode64Short, decode64 } from 'unicrypto';
@@ -151,6 +151,29 @@ unit.test("unicrypto examples", async () => {
             salt: hexToBytes('abc123')
         }); // Uint8Array
         console.log("derivedKey: " + derivedKey);
+    }
+
+
+
+    // # RSA Pair, keys helpers
+
+    { // Private key unpack
+        const pk = await PrivateKey.generate({strength: 2048});
+        console.log("key generated: " + pk.publicKey.shortAddress.base58);
+        const keyPacked64 = encode64(await pk.pack());
+        const keyPacked64pswd = encode64(await pk.pack("qwerty"));
+        const bossEncodedKey = decode64(keyPacked64);
+        const bossEncodedKeyPswd = decode64(keyPacked64pswd);
+
+        const privateKey2 = await PrivateKey.unpack(bossEncodedKey);
+        console.log("key unpack: " + privateKey2.publicKey.shortAddress.base58);
+
+        // Read password-protected key
+        const privateKey4 = await PrivateKey.unpack({
+            bin: bossEncodedKeyPswd,
+            password: "qwerty"
+        });
+        console.log("key unpack password-protected: " + privateKey4.publicKey.shortAddress.base58);
     }
 
 });

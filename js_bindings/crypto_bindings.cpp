@@ -177,6 +177,19 @@ static void privateKeyPack(const FunctionCallbackInfo<Value> &args) {
     });
 }
 
+static void privateKeyPackWithPassword(const FunctionCallbackInfo<Value> &args) {
+    Scripter::unwrapArgs(args, [&](ArgsContext &ac) {
+        if (args.Length() == 2) {
+            auto passwordString = ac.asString(0);
+            int rounds = ac.asInt(1);
+            auto key = unwrap<PrivateKey>(args.This());
+            ac.setReturnValue(ac.toBinary(key->packWithPassword(passwordString, rounds)));
+            return;
+        }
+        ac.throwError("invalid arguments");
+    });
+}
+
 static void privateKeyGenerate(const FunctionCallbackInfo<Value> &args) {
     Scripter::unwrapArgs(args, [&](ArgsContext &ac) {
         if (args.Length() == 2 && args[0]->IsNumber()) {
@@ -196,6 +209,40 @@ static void privateKeyGenerate(const FunctionCallbackInfo<Value> &args) {
             }
             ac.throwError("invalid arguments");
         }
+    });
+}
+
+static void privateKeyUnpackWithPassword(const FunctionCallbackInfo<Value> &args) {
+    Scripter::unwrapArgs(args, [&](ArgsContext &ac) {
+        if (args.Length() == 3 && args[0]->IsUint8Array() && args[1]->IsString()) {
+            auto packedBinary = ac.asBuffer(0);
+            auto passwordString = ac.asString(1);
+            auto onReady = ac.asFunction(2);
+            auto se = ac.scripter;
+            runAsync([=]() {
+                try {
+                    byte_vector bv(packedBinary->size());
+                    memcpy(&bv[0], packedBinary->data(), packedBinary->size());
+                    auto key = PrivateKey::unpackWithPassword(bv, passwordString);
+                    onReady->lockedContext([=](Local<Context> &cxt) {
+                        Local<Value> res[2];
+                        res[0] = Local<Object>::Cast(String::NewFromUtf8(cxt->GetIsolate(), "").ToLocalChecked());
+                        res[1] = wrap(se->privateKeyTpl, onReady->isolate(), new PrivateKey(key), true);
+                        onReady->invoke(2, res);
+                    });
+                } catch (const std::exception& e) {
+                    std::string errText(e.what());
+                    onReady->lockedContext([=](Local<Context> &cxt) {
+                        Local<Value> res[2];
+                        res[0] = Local<Object>::Cast(String::NewFromUtf8(cxt->GetIsolate(), errText.data()).ToLocalChecked());
+                        res[1] = Local<Object>::Cast(Null(cxt->GetIsolate()));
+                        onReady->invoke(2, res);
+                    });
+                }
+            });
+            return;
+        }
+        ac.throwError("invalid arguments");
     });
 }
 
@@ -403,12 +450,14 @@ Local<FunctionTemplate> initPrivateKey(Scripter& scripter, Isolate *isolate) {
     prototype->Set(isolate, "__signEx", FunctionTemplate::New(isolate, privateKeySignEx));
     prototype->Set(isolate, "__signExWithCustomSalt", FunctionTemplate::New(isolate, privateKeySignExWithCustomSalt));
     prototype->Set(isolate, "__pack", FunctionTemplate::New(isolate, privateKeyPack));
+    prototype->Set(isolate, "__packWithPassword", FunctionTemplate::New(isolate, privateKeyPackWithPassword));
     prototype->Set(isolate, "__decrypt", FunctionTemplate::New(isolate, privateKeyDecrypt));
     prototype->Set(isolate, "__get_e", FunctionTemplate::New(isolate, privateKeyGetE));
     prototype->Set(isolate, "__get_p", FunctionTemplate::New(isolate, privateKeyGetP));
     prototype->Set(isolate, "__get_q", FunctionTemplate::New(isolate, privateKeyGetQ));
 
     tpl->Set(isolate, "__generate", FunctionTemplate::New(isolate, privateKeyGenerate));
+    tpl->Set(isolate, "__unpackWithPassword", FunctionTemplate::New(isolate, privateKeyUnpackWithPassword));
 
     scripter.privateKeyTpl.Reset(isolate, tpl);
     return tpl;

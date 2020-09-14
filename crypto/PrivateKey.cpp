@@ -8,6 +8,7 @@
 #include "PublicKey.h"
 #include "cryptoCommonPrivate.h"
 #include "no_prng.h"
+#include "KeyInfo.h"
 #include "../types/UBytes.h"
 #include "../types/UArray.h"
 #include "../serialization/BossSerializer.h"
@@ -202,6 +203,69 @@ namespace crypto {
 		std::vector<unsigned char> output(bbp.size());
 		memcpy(&output[0], bbp.data(), bbp.size());
 		return output;
+	}
+
+	std::vector<unsigned char> PrivateKey::packWithPassword(const std::string& passwordString, int rounds) const {
+		KeyInfo::PRF prf = KeyInfo::PRF::HMAC_SHA256;
+
+		byte_vector salt(12);
+		sprng_read(&salt[0], salt.size(), nullptr);
+
+		KeyInfo keyInfo(prf, rounds, salt, nullptr);
+		crypto::SymmetricKey symmKey = keyInfo.derivePassword(passwordString);
+
+		byte_vector packedKey = pack();
+
+		UArray uArray;
+		uArray.push_back(UInt(3)); // TYPE_PRIVATE_PASSWORD_V2
+		uArray.push_back(UBytes(keyInfo.pack()));
+		uArray.push_back(UBytes(symmKey.etaEncrypt(packedKey)));
+
+		BossSerializer::Writer w;
+		w.writeObject(uArray);
+
+		return w.getBytes().get();
+	}
+
+	PrivateKey PrivateKey::unpackWithPassword(const byte_vector& packedBinary, const std::string& passwordString) {
+		byte_vector bv = packedBinary;
+		UBytes uBytes(std::move(bv));
+		BossSerializer::Reader reader(uBytes);
+		UObject uObj = reader.readObject();
+		UArray params = UArray::asInstance(uObj);
+		auto keyType = UInt::asInstance(params.at(0)).get();
+		if (keyType == 0) { // TYPE_PRIVATE
+			return PrivateKey(packedBinary);
+		} else if (keyType == 1) { // TYPE_PUBLIC
+			throw std::runtime_error("unpackWithPassword: the key is public, not private");
+		} else if (keyType == 2) { // TYPE_PRIVATE_PASSWORD
+			int rounds = (int)UInt::asInstance(params.at(1)).get();
+			byte_vector salt = UBytes::asInstance(params.at(2)).get();
+			std::string functionName = UString::asInstance(params.at(3)).get();
+			byte_vector packedEncryptedKey = UBytes::asInstance(params.at(4)).get();
+			byte_vector digest = UBytes::asInstance(params.at(5)).get();
+			crypto::SymmetricKey symmKey = KeyInfo(KeyInfo::PRFFromName(functionName), rounds, salt, nullptr).derivePassword(passwordString);
+			byte_vector packedKey = symmKey.decrypt(packedEncryptedKey);
+
+			crc32_state crcs;
+			crc32_init(&crcs);
+			crc32_update(&crcs, &packedKey[0], packedKey.size());
+			byte_vector resDigest(4);
+			crc32_finish(&crcs, &resDigest[0], resDigest.size());
+			if (digest != resDigest)
+				throw std::invalid_argument("unpackWithPassword: wrong password");
+
+			return PrivateKey(packedKey);
+		} else if (keyType == 3) { // TYPE_PRIVATE_PASSWORD_V2
+			byte_vector keyInfoBin = UBytes::asInstance(params.at(1)).get();
+			byte_vector encryptedBin = UBytes::asInstance(params.at(2)).get();
+			KeyInfo keyInfo(keyInfoBin);
+			crypto::SymmetricKey symmKey = keyInfo.derivePassword(passwordString);
+			byte_vector packedKey = symmKey.etaDecrypt(encryptedBin);
+			return PrivateKey(packedKey);
+		} else {
+			throw std::runtime_error("unpackWithPassword: Bad or unknown private key type");
+		}
 	}
 
 	void

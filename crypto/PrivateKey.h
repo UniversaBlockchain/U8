@@ -32,6 +32,9 @@ namespace crypto {
 		PrivateKey(int bitStrength);
 
 		std::vector<unsigned char> pack() const;
+		std::vector<unsigned char> packWithPassword(const std::string& passwordString, int rounds) const;
+
+		static PrivateKey unpackWithPassword(const byte_vector& packedBinary, const std::string& passwordString);
 
 		// Signature is created using RSA-PSS as described in PKCS# 1 v 2.1.
 		void sign(const std::vector<unsigned char> &input, HashType hashType, std::vector<unsigned char> &output) const;

@@ -17,8 +17,25 @@ let Module = {
             });
         }
 
+        static unpackWithPassword(packedBinary, passwordString, onComplete) {
+            crypto.PrivateKey.__unpackWithPassword(packedBinary, passwordString, (err, key) => {
+                if (err === "") {
+                    let res = new Module.PrivateKeyImpl();
+                    res.impl_ = key;
+                    onComplete("", res);
+                } else {
+                    console.log("err: " + err);
+                    onComplete(err);
+                }
+            });
+        }
+
         pack(onComplete) {
             onComplete(this.impl_.packed);
+        }
+
+        packWithPassword(passwordString, rounds, onComplete) {
+            onComplete("", this.impl_.__packWithPassword(passwordString, rounds));
         }
 
         sign(data, pssHashType, mgf1HashType, saltLen, onComplete) {
