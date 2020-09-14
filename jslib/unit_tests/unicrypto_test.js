@@ -1,4 +1,5 @@
-import { SignedRecord, PublicKey, PrivateKey, AbstractKey, BigInteger, randomBytes, hashId, crc32 } from 'unicrypto';
+import { SignedRecord, PublicKey, PrivateKey, AbstractKey, SymmetricKey } from 'unicrypto';
+import { BigInteger, randomBytes, hashId, crc32 } from 'unicrypto';
 import { bytesToHex, hexToBytes } from 'unicrypto';
 import { textToBytes, bytesToText } from 'unicrypto';
 import { encode64, encode64Short, decode64 } from 'unicrypto';
@@ -252,6 +253,42 @@ unit.test("unicrypto examples", async () => {
         const bossEncoded = await privateKey.pack("somepassword");
 
         console.log("check type of key package: " + (AbstractKey.typeOf(bossEncoded) === AbstractKey.TYPE_PRIVATE_PASSWORD_V2)); // true
+    }
+
+
+
+    // # KEY INFO
+    // todo: .......
+    // .......
+    // .......
+    // .......
+
+
+
+    // # SYMMETRIC KEY
+
+    { // main interface to the symmetric cipher
+        // Creates random key (AES256, CTR)
+        const symmetricKey = new SymmetricKey();
+        console.log("random symmetricKey: " + encode64(symmetricKey.pack()));
+
+        // Creates key by derived key (Uint8Array) and it's info (KeyInfo)
+        const symmetricKey2 = new SymmetricKey({
+            keyBytes: symmetricKey.pack(),
+            keyInfo: symmetricKey.keyInfo
+        });
+        console.log("symmetricKey2: " + encode64(symmetricKey2.pack()));
+
+        // Creates key by derived key (Uint8Array)
+        const symmetricKey3 = new SymmetricKey({
+            keyBytes: symmetricKey.pack()
+        });
+        console.log("symmetricKey3: " + encode64(symmetricKey3.pack()));
+
+        // Creates key by password (String) and number of rounds (Int). Salt is optional
+        // Uint8Array, null by default
+        const symmetricKey4 = await SymmetricKey.fromPassword("some_password", 1000, decode64('abc'));
+        console.log("symmetricKey4: " + encode64(symmetricKey4.pack()));
     }
 
 });
