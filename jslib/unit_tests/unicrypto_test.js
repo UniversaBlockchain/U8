@@ -1,4 +1,4 @@
-import { SignedRecord, PublicKey, PrivateKey, AbstractKey, SymmetricKey, ExtendedSignature } from 'unicrypto';
+import { SignedRecord, PublicKey, PrivateKey, AbstractKey, SymmetricKey, ExtendedSignature, AES } from 'unicrypto';
 import { BossSerializable, Boss } from 'unicrypto';
 import { BigInteger, randomBytes, hashId, crc32 } from 'unicrypto';
 import { bytesToHex, hexToBytes } from 'unicrypto';
@@ -465,6 +465,21 @@ unit.test("unicrypto examples", async () => {
         console.log("Decode stream arg3: " + arg3);
         console.log("Decode stream arg4: " + arg4);
         console.log("Decode stream arg5: " + arg5);
+    }
+
+
+
+    // # AES
+
+    { // Encrypt/decrypt
+        const key = textToBytes("some text01234567890123456789012"); // 16 bytes for aes128, 32 bytes for aes256
+        const message = textToBytes('some text0123456');
+
+        const aes256 = new AES(key);
+        const encrypted = aes256.encrypt(message);   // Uint8Array
+        console.log("AES encrypted: " + encrypted);
+        const decrypted = aes256.decrypt(encrypted); // Uint8Array
+        console.log("AES decrypted: " + decrypted);
     }
 
 
