@@ -1,4 +1,4 @@
-import { SignedRecord, PublicKey, PrivateKey, AbstractKey, SymmetricKey } from 'unicrypto';
+import { SignedRecord, PublicKey, PrivateKey, AbstractKey, SymmetricKey, ExtendedSignature } from 'unicrypto';
 import { BigInteger, randomBytes, hashId, crc32 } from 'unicrypto';
 import { bytesToHex, hexToBytes } from 'unicrypto';
 import { textToBytes, bytesToText } from 'unicrypto';
@@ -400,6 +400,25 @@ unit.test("unicrypto examples", async () => {
         const signature = await privateKey.sign(message, options);
         const isCorrect = await publicKey.verify(message, signature, options);
         console.log("PSS sign/verify: " + isCorrect); // true
+    }
+
+
+
+    // # Extended signature
+
+    { // Sign/verify
+        const data = decode64("abcde12345");
+        const privateKey = await PrivateKey.unpack(privateKeyPacked);
+        const publicKey = privateKey.publicKey;
+
+        const signature = await privateKey.signExtended(data);
+        const es = await publicKey.verifyExtended(signature, data);
+
+        const isCorrect = !!es;
+        console.log("Extended signature isCorrect: " + isCorrect);
+        console.log("Extended signature es.created_at: " + es.created_at); // Date - signature created at
+        console.log("Extended signature es.key: " + encode64(es.key)); // Uint8Array - PublicKey fingerprint
+        console.log("extractPublicKey: " + encode64((await ExtendedSignature.extractPublicKey(signature)).fingerprint));
     }
 
 });
