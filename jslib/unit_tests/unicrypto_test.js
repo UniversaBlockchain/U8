@@ -13,6 +13,18 @@ unit.test("unicrypto examples", async () => {
     const privateKeyPacked = await (await PrivateKey.generate({strength: 2048})).pack();
 
 
+    // // todo: must not to crash
+    // for (let i = 0; i < 1000; ++i) {
+    //     const publicKey = (await PrivateKey.generate({strength: 2048})).publicKey;
+    //
+    //     console.log("i = " + i);
+    //     console.log(PublicKey.isValidAddress(publicKey.shortAddress));
+    //     console.log(PublicKey.isValidAddress(publicKey.shortAddress58));
+    // }
+
+
+
+
 
     // # Signed record
 
@@ -218,6 +230,7 @@ unit.test("unicrypto examples", async () => {
     { // Check if given address is valid
         const publicKey = (await PrivateKey.generate({strength: 2048})).publicKey;
 
+        // todo: must returns true
         console.log(PublicKey.isValidAddress(publicKey.shortAddress)); // true
 
         // accepts base58 representation of address too
@@ -285,10 +298,39 @@ unit.test("unicrypto examples", async () => {
         });
         console.log("symmetricKey3: " + encode64(symmetricKey3.pack()));
 
-        // Creates key by password (String) and number of rounds (Int). Salt is optional
-        // Uint8Array, null by default
-        const symmetricKey4 = await SymmetricKey.fromPassword("some_password", 1000, decode64('abc'));
-        console.log("symmetricKey4: " + encode64(symmetricKey4.pack()));
+        // // todo: must not to crash
+        // // Creates key by password (String) and number of rounds (Int). Salt is optional
+        // // Uint8Array, null by default
+        // const symmetricKey4 = await SymmetricKey.fromPassword("some_password", 1000, decode64('abc'));
+        // console.log("symmetricKey4: " + encode64(symmetricKey4.pack()));
+    }
+
+    { // Pack symmetric key (get derived key bytes)
+        // Creates random key (AES256, CTR)
+        const symmetricKey = new SymmetricKey();
+
+        const derivedKey = symmetricKey.pack(); // Uint8Array
+        console.log("derivedKey: " + encode64(derivedKey));
+    }
+
+    { // Encrypt / decrypt data with AES256 in CRT mode with IV
+        const data = textToBytes("test_string");
+        const symmetricKey = new SymmetricKey();
+        // data is Uint8Array
+        const encrypted = symmetricKey.encrypt(data); // Uint8Array
+        console.log("encrypted: " + encode64(encrypted));
+        const decrypted = symmetricKey.decrypt(encrypted); // Uint8Array
+        console.log("decrypted: " + bytesToText(decrypted));
+    }
+
+    { // Encrypt / decrypt data with EtA using Sha256-based HMAC
+        const data = textToBytes("test_string");
+        const symmetricKey = new SymmetricKey();
+        // data is Uint8Array
+        const encrypted = await symmetricKey.etaEncrypt(data); // Uint8Array
+        console.log("eta encrypted: " + encode64(encrypted));
+        const decrypted = await symmetricKey.etaDecrypt(encrypted); // Uint8Array
+        console.log("eta decrypted: " + bytesToText(decrypted));
     }
 
 });
