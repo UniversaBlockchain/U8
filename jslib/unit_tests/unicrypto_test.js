@@ -1,4 +1,5 @@
 import { SignedRecord, PublicKey, PrivateKey, AbstractKey, SymmetricKey, ExtendedSignature } from 'unicrypto';
+import { BossSerializable, Boss } from 'unicrypto';
 import { BigInteger, randomBytes, hashId, crc32 } from 'unicrypto';
 import { bytesToHex, hexToBytes } from 'unicrypto';
 import { textToBytes, bytesToText } from 'unicrypto';
@@ -420,5 +421,51 @@ unit.test("unicrypto examples", async () => {
         console.log("Extended signature es.key: " + encode64(es.key)); // Uint8Array - PublicKey fingerprint
         console.log("extractPublicKey: " + encode64((await ExtendedSignature.extractPublicKey(signature)).fingerprint));
     }
+
+
+
+    // # BOSS
+
+    { // Encode/decode
+        const data = {
+            a: decode64("abc"),
+            b: new Date(),
+            c: [1, 2, 'test'],
+            d: {a: 1}
+        };
+
+        const encoded = Boss.dump(data); // Uint8Array
+        console.log("BOSS encoded: " + encoded);
+        const decoded = Boss.load(encoded); // original data
+        console.log("BOSS decoded: " + JSON.stringify(decoded));
+    }
+
+    { // Encode stream
+        const writer = new Boss.Writer();
+
+        writer.write(0);
+        writer.write(1);
+        writer.write(2);
+        writer.write(3);
+
+        const dump = writer.get(); // Uint8Array
+        console.log("BOSS Encode stream: " + dump);
+    }
+
+    { // Decode stream
+        const reader = new Boss.Reader(hexToBytes('00081018'));
+
+        const arg1 = reader.read(); // 0
+        const arg2 = reader.read(); // 1
+        const arg3 = reader.read(); // 2
+        const arg4 = reader.read(); // 3
+        const arg5 = reader.read(); // undefined
+        console.log("Decode stream arg1: " + arg1);
+        console.log("Decode stream arg2: " + arg2);
+        console.log("Decode stream arg3: " + arg3);
+        console.log("Decode stream arg4: " + arg4);
+        console.log("Decode stream arg5: " + arg5);
+    }
+
 
 });
