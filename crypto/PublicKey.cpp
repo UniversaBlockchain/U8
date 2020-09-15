@@ -9,7 +9,9 @@
 #include <tomcrypt.h>
 #include "KeyAddress.h"
 #include "PublicKey.h"
+#include "no_prng.h"
 #include "cryptoCommonPrivate.h"
+#include "base64.h"
 #include "../types/UBytes.h"
 #include "../types/UArray.h"
 #include "../serialization/BossSerializer.h"
@@ -152,6 +154,30 @@ namespace crypto {
 		return stat != 0;
 	}
 
+	bool PublicKey::verifyEx(void *sigData, size_t sigSize, void *bodyData, size_t bodySize, HashType pssHashType, HashType mgf1HashType, int saltLen) const {
+		int mgf1hash_idx = getHashIndex(mgf1HashType);
+		int hash_idx = getHashIndex(pssHashType);
+		auto desc = hash_descriptor[hash_idx];
+
+		unsigned char hashResult[desc.hashsize];
+		hash_state md;
+		desc.init(&md);
+		desc.process(&md, (unsigned char *) bodyData, bodySize);
+		desc.done(&md, hashResult);
+
+		if (saltLen == -1)
+			saltLen = rsa_sign_saltlen_get_max_ex(LTC_PKCS_1_PSS, hash_idx, &key.key);
+
+		int stat = -1;
+		int err = rsa_verify_hash_ex(
+				(unsigned char *) sigData, sigSize,
+				hashResult, desc.hashsize, hash_idx,
+				LTC_PKCS_1_PSS, mgf1hash_idx, saltLen, &stat, &key.key);
+//	if (err != CRYPT_OK)
+//		printf("  warning (rsa_verify_hash_ex): %s\n", error_to_string(err));
+		return stat != 0;
+	}
+
 	void PublicKey::encrypt(const std::vector<unsigned char> &input, std::vector<unsigned char> &output) const {
 		output.resize(0);
 		auto a = encrypt(input);
@@ -180,6 +206,55 @@ namespace crypto {
 
 		std::vector<unsigned char> output;
 		output.insert(output.begin(), buf, buf + bufLen);
+		return output;
+	}
+
+	std::vector<unsigned char> PublicKey::encryptEx(void *input_data, size_t input_size, int oaepHashType) const {
+		int hash_idx = crypto::getHashIndex((crypto::HashType)oaepHashType);
+		int prng_indx = find_prng("sprng");
+
+		size_t bufLen = 1024;
+		unsigned char buf[bufLen];
+
+		int err = rsa_encrypt_key_ex(
+				(unsigned char *) input_data, input_size,
+				buf, &bufLen,
+				NULL, 0,
+				NULL, prng_indx,
+				hash_idx, LTC_PKCS_1_OAEP, &key.key);
+		if (err != CRYPT_OK)
+			printf("rsa_encrypt_key_ex error: %i\n", err);
+
+		std::vector<unsigned char> output;
+		output.insert(output.begin(), buf, buf + bufLen);
+		return output;
+	}
+
+	std::vector<unsigned char> PublicKey::encryptExWithSeed(void *input_data, size_t input_size, int oaepHashType, void *seed_data, size_t seed_size) const {
+		ltc_prng_descriptor* no_prng_desc = no_prng_desc_get();
+		int hash_idx = crypto::getHashIndex((crypto::HashType)oaepHashType);
+		int prng_indx = register_prng(no_prng_desc);
+
+		prng_descriptor[prng_indx].add_entropy((unsigned char*)seed_data, seed_size, (prng_state*)no_prng_desc);
+
+		size_t bufLen = 1024;
+		unsigned char buf[bufLen];
+
+		int err = rsa_encrypt_key_ex(
+				(unsigned char *) input_data, input_size,
+				buf, &bufLen,
+				NULL, 0,
+				(prng_state*)no_prng_desc, prng_indx,
+				hash_idx, LTC_PKCS_1_OAEP, &key.key);
+		if (err != CRYPT_OK)
+			printf("rsa_encrypt_key_ex error: %i\n", err);
+
+		std::vector<unsigned char> output;
+		output.insert(output.begin(), buf, buf + bufLen);
+
+		unregister_prng(no_prng_desc);
+		no_prng_desc_free(no_prng_desc);
+
 		return output;
 	}
 

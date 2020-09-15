@@ -133,6 +133,42 @@ static void privateKeyDecrypt(const FunctionCallbackInfo<Value> &args) {
     });
 }
 
+static void privateKeyDecryptEx(const FunctionCallbackInfo<Value> &args) {
+    Scripter::unwrapArgs(args, [&](ArgsContext &ac) {
+        // __decrypt(data, callback)
+        if (args.Length() == 4) {
+            auto key = unwrap<PrivateKey>(args.This());
+            auto data = ac.asBuffer(0);
+            int oaepHashType = ac.asInt(1);
+            if (data->data() != nullptr) {
+                auto isolate = ac.isolate;
+                auto onReady = ac.asFunction(2);
+                auto onError = ac.asFunction(3);
+                auto scripter = ac.scripter;
+                runAsync([=]() {
+                    string errorString;
+                    try {
+                        auto plain = key->decryptEx(data->data(), data->size(), oaepHashType);
+                        scripter->lockedContext([=](Local<Context> cxt) {
+                            Local<Value> result = vectorToV8(isolate, plain);
+                            onReady->call(cxt, 1, &result);
+                        });
+                    }
+                    catch (const exception &e) {
+                        std::string errorText(e.what());
+                        scripter->lockedContext([=](Local<Context> cxt) {
+                            Local<Value> result = scripter->v8String(errorText);
+                            onError->call(cxt, 1, &result);
+                        });
+                    }
+                });
+                return;
+            }
+        }
+        ac.throwError("invalid arguments");
+    });
+}
+
 static void privateKeyGetE(const FunctionCallbackInfo<Value> &args) {
     Scripter::unwrapArgs(args, [&](ArgsContext &ac) {
         if (args.Length() == 0) {
@@ -279,6 +315,30 @@ static void publicKeyVerify(const FunctionCallbackInfo<Value> &args) {
     });
 }
 
+static void publicKeyVerifyEx(const FunctionCallbackInfo<Value> &args) {
+    Scripter::unwrapArgs(args, [](ArgsContext &ac) {
+        if (ac.args.Length() == 6) {
+            auto key = unwrap<PublicKey>(ac.args.This());
+            auto pdata = ac.asBuffer(0);
+            auto psig = ac.asBuffer(1);
+            if (psig->data() && pdata->data()) {
+                auto pssHashType = (HashType) ac.asInt(2);
+                auto mgf1HashType = (HashType) ac.asInt(3);
+                auto saltLen = (HashType) ac.asInt(4);
+                auto onReady = ac.asFunction(5);
+                runAsync([=]() {
+                    bool result = key->verifyEx(psig->data(), psig->size(), pdata->data(), pdata->size(), pssHashType, mgf1HashType, saltLen);
+                    onReady->lockedContext([=](Local<Context> &cxt) {
+                        onReady->invoke(Boolean::New(cxt->GetIsolate(), result));
+                    });
+                });
+            }
+            return;
+        }
+        ac.throwError("invalid arguments");
+    });
+}
+
 static void publicKeyEncrypt(const FunctionCallbackInfo<Value> &args) {
     Scripter::unwrapArgs(args, [](ArgsContext &ac) {
         if (ac.args.Length() == 2) {
@@ -290,6 +350,57 @@ static void publicKeyEncrypt(const FunctionCallbackInfo<Value> &args) {
                 shared_ptr<Scripter> scripter = ac.scripter;
                 runAsync([=]() {
                     auto result = key->encrypt(data->data(), data->size());
+                    scripter->lockedContext([=](Local<Context> cxt) {
+                        Local<Value> res = vectorToV8(isolate, result);
+                        onReady->call(cxt, 1, &res);
+                    });
+                });
+                return;
+            }
+        }
+        ac.throwError("invalid arguments");
+    });
+}
+
+static void publicKeyEncryptEx(const FunctionCallbackInfo<Value> &args) {
+    Scripter::unwrapArgs(args, [](ArgsContext &ac) {
+        if (ac.args.Length() == 3) {
+            auto key = unwrap<PublicKey>(ac.args.This());
+            auto data = ac.asBuffer(0);
+            int oaepHashType = ac.asInt(1);
+            if (data) {
+                auto isolate = ac.isolate;
+                auto onReady = ac.asFunction(2);
+                shared_ptr<Scripter> scripter = ac.scripter;
+                runAsync([=]() {
+
+                    auto result = key->encryptEx(data->data(), data->size(), oaepHashType);
+                    scripter->lockedContext([=](Local<Context> cxt) {
+                        Local<Value> res = vectorToV8(isolate, result);
+                        onReady->call(cxt, 1, &res);
+                    });
+                });
+                return;
+            }
+        }
+        ac.throwError("invalid arguments");
+    });
+}
+
+static void publicKeyEncryptExWithSeed(const FunctionCallbackInfo<Value> &args) {
+    Scripter::unwrapArgs(args, [](ArgsContext &ac) {
+        if (ac.args.Length() == 4) {
+            auto key = unwrap<PublicKey>(ac.args.This());
+            auto data = ac.asBuffer(0);
+            int oaepHashType = ac.asInt(1);
+            auto customSeed = ac.asBuffer(2);
+            if (data) {
+                auto isolate = ac.isolate;
+                auto onReady = ac.asFunction(3);
+                shared_ptr<Scripter> scripter = ac.scripter;
+                runAsync([=]() {
+
+                    auto result = key->encryptExWithSeed(data->data(), data->size(), oaepHashType, customSeed->data(), customSeed->size());
                     scripter->lockedContext([=](Local<Context> cxt) {
                         Local<Value> res = vectorToV8(isolate, result);
                         onReady->call(cxt, 1, &res);
@@ -452,6 +563,7 @@ Local<FunctionTemplate> initPrivateKey(Scripter& scripter, Isolate *isolate) {
     prototype->Set(isolate, "__pack", FunctionTemplate::New(isolate, privateKeyPack));
     prototype->Set(isolate, "__packWithPassword", FunctionTemplate::New(isolate, privateKeyPackWithPassword));
     prototype->Set(isolate, "__decrypt", FunctionTemplate::New(isolate, privateKeyDecrypt));
+    prototype->Set(isolate, "__decryptEx", FunctionTemplate::New(isolate, privateKeyDecryptEx));
     prototype->Set(isolate, "__get_e", FunctionTemplate::New(isolate, privateKeyGetE));
     prototype->Set(isolate, "__get_p", FunctionTemplate::New(isolate, privateKeyGetP));
     prototype->Set(isolate, "__get_q", FunctionTemplate::New(isolate, privateKeyGetQ));
@@ -490,10 +602,13 @@ Local<FunctionTemplate> initPublicKey(Scripter& scripter, Isolate *isolate) {
             });
     auto prototype = tpl->PrototypeTemplate();
     prototype->Set(isolate, "__verify", FunctionTemplate::New(isolate, publicKeyVerify));
+    prototype->Set(isolate, "__verifyEx", FunctionTemplate::New(isolate, publicKeyVerifyEx));
     prototype->Set(isolate, "__pack", FunctionTemplate::New(isolate, publicKeyPack));
     prototype->Set(isolate, "__getFingerprints", FunctionTemplate::New(isolate, publicKeyFingerprints));
     prototype->Set(isolate, "__getBitsStrength", FunctionTemplate::New(isolate, publicKeyBitsStrength));
     prototype->Set(isolate, "__encrypt", FunctionTemplate::New(isolate, publicKeyEncrypt));
+    prototype->Set(isolate, "__encryptEx", FunctionTemplate::New(isolate, publicKeyEncryptEx));
+    prototype->Set(isolate, "__encryptExWithSeed", FunctionTemplate::New(isolate, publicKeyEncryptExWithSeed));
     prototype->Set(isolate, "__get_e", FunctionTemplate::New(isolate, publicKeyGetE));
     prototype->Set(isolate, "__get_n", FunctionTemplate::New(isolate, publicKeyGetN));
 

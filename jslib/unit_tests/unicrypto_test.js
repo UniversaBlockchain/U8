@@ -10,7 +10,7 @@ import { pbkdf2 } from 'unicrypto';
 unit.test("unicrypto examples", async () => {
 
     // some test data
-    const privateKeyPacked = await (await PrivateKey.generate({strength: 2048})).pack();
+    const privateKeyPacked = decode64("JgAcAQABvID1lpufFoyMlR5FYtVgzbVnSGk50h6sHpIXTYMMqlu54dQ5eD+qH2s2WNAajXmj9bjFW6CCBFzQAY3tY/9m8peSncNBjBLw/goXbEij3fCf0SqQllf9PSXBZAYwATqzdhrE8zRlMCZFXe6tspmATn/s9YME/A5CFCRz81l1tgOqw7yA5eOoQmB9kJTcLvzGKFSNjcVY7lwjkx8ND8Da/0AczIsiDCVvmYjgZVU9N1uxMMbR+D+NCGgHThpbDXIW0TSGNz8Xg0uA3B999bzGhRDeoUxs7sBqzb+ZgluGsIf8GSwpkhaX+7JiBPzHKjuTSDC86JSXzvllW2/BR+JlSUlvtPk=");
 
 
     // // todo: must not to crash
@@ -331,6 +331,75 @@ unit.test("unicrypto examples", async () => {
         console.log("eta encrypted: " + encode64(encrypted));
         const decrypted = await symmetricKey.etaDecrypt(encrypted); // Uint8Array
         console.log("eta decrypted: " + bytesToText(decrypted));
+    }
+
+
+
+    // # RSA OAEP/PSS
+
+    { // OAEP encrypt/decrypt
+        const privateKey = await PrivateKey.unpack(privateKeyPacked);
+        const publicKey = privateKey.publicKey;
+
+        // encrypt data
+        const data = decode64("abc123");
+        const options = {
+            seed: decode64("abcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcab="), // optional, default none
+            mgf1Hash: 'sha512', // optional, default SHA(256)
+            oaepHash: 'sha512' // optional, default SHA(256)
+        };
+        const encrypted = await publicKey.encrypt(data, options);
+        console.log("encrypted: " + encode64(encrypted));
+        const decrypted = await privateKey.decrypt(encrypted, options);
+
+        console.log("check OAEP encrypt/decrypt: " + (encode64(data) === encode64(decrypted))); // true
+    }
+
+    { // OAEP max encryption message length
+        const privateKey = await PrivateKey.unpack(privateKeyPacked);
+        const publicKey = privateKey.publicKey;
+
+        // encrypt data
+        const options = {
+            mgf1Hash: 'SHA512', // optional, default SHA(256)
+            oaepHash: 'SHA512' // optional, default SHA(256)
+        };
+
+        const maxLength = publicKey.encryptionMaxLength(options);
+        console.log("encryptionMaxLength: " + publicKey.encryptionMaxLength(options));
+    }
+
+    { // OAEP default hash
+        const privateKey = await PrivateKey.unpack(privateKeyPacked);
+        const publicKey = privateKey.publicKey;
+        // todo: must not be undefined
+        console.log("publicKey.DEFAULT_OAEP_HASH: " + PublicKey.DEFAULT_OAEP_HASH); // SHA1 instance
+    }
+
+    { // MGF1 default hash
+        const privateKey = await PrivateKey.unpack(privateKeyPacked);
+        const publicKey = privateKey.publicKey;
+        // todo: must not be undefined
+        console.log("publicKey.DEFAULT_OAEP_HASH: " + PublicKey.DEFAULT_MGF1_HASH); // SHA1 instance
+    }
+
+    { // PSS sign/verify
+        const privateKey = await PrivateKey.unpack(privateKeyPacked);
+        const publicKey = privateKey.publicKey;
+
+        const options = {
+            // // todo: "salt is not defined" error
+            // salt: decode64("abcabc"), // optional
+            // saltLength: null, // optional, numeric
+            mgf1Hash: 'sha512', // optional, default SHA(256)
+            pssHash: 'sha512' // optional, default SHA(256)
+        };
+
+        const message = 'abc123';
+
+        const signature = await privateKey.sign(message, options);
+        const isCorrect = await publicKey.verify(message, signature, options);
+        console.log("PSS sign/verify: " + isCorrect); // true
     }
 
 });

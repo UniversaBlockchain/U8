@@ -37,12 +37,16 @@ namespace crypto {
 		bool verify(const std::vector<unsigned char> &sig, const std::vector<unsigned char> &data, HashType hashType) const;
 
 		bool verify(void *sigData, size_t sigSize, void *bodyData, size_t bodySize, HashType hashType) const;
+		bool verifyEx(void *sigData, size_t sigSize, void *bodyData, size_t bodySize, HashType pssHashType, HashType mgf1HashType, int saltLen = -1) const;
 
 		void encrypt(const std::vector<unsigned char> &input, std::vector<unsigned char> &output) const;
 
 		std::vector<unsigned char> encrypt(const std::vector<unsigned char> &input) const;
 
 		std::vector<unsigned char> encrypt(void *data, size_t size) const;
+
+		std::vector<unsigned char> encryptEx(void *input_data, size_t input_size, int oaepHashType) const;
+		std::vector<unsigned char> encryptExWithSeed(void *input_data, size_t input_size, int oaepHashType, void *seed_data, size_t seed_size) const;
 
 		const KeyAddress &getShortAddress();
 

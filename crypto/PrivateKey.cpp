@@ -406,6 +406,26 @@ namespace crypto {
 		return output;
 	}
 
+	std::vector<unsigned char> PrivateKey::decryptEx(void *data, size_t size, int oaepHashType) {
+		int hash_idx = crypto::getHashIndex((crypto::HashType)oaepHashType);
+
+		size_t bufLen = 1024;
+		unsigned char buf[bufLen];
+
+		int stat = -1;
+		int err = rsa_decrypt_key_ex(
+				(unsigned char *) data, size,
+				buf, &bufLen,
+				NULL, 0,
+				hash_idx, LTC_PKCS_1_OAEP, &stat, &key.key);
+		if (err != CRYPT_OK)
+			throw std::runtime_error(std::string("rsa_decrypt_key_ex error: ") + std::string(error_to_string(err)));
+
+		std::vector<unsigned char> output;
+		output.insert(output.begin(), buf, buf + bufLen);
+		return output;
+	}
+
 	std::string PrivateKey::get_e() const {
 		byte_vector bv(2048);
 		zeromem(&bv[0], bv.size());

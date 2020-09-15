@@ -39,12 +39,24 @@ let Module = {
         }
 
         sign(data, pssHashType, mgf1HashType, saltLen, onComplete) {
+            if (typeof (data) == 'string')
+                data = utf8Encode(data);
             this.impl_.__signEx(data, pssHashType, mgf1HashType, saltLen, onComplete);
         }
 
-        // signWithCustomSalt(data, pssHashType, mgf1HashType, salt, onComplete) {
-        //     this.impl_.__signExWithCustomSalt(data, pssHashType, mgf1HashType, salt, onComplete);
-        // }
+        signWithCustomSalt(data, pssHashType, mgf1HashType, salt, onComplete) {
+            if (typeof (data) == 'string')
+                data = utf8Encode(data);
+            this.impl_.__signExWithCustomSalt(data, pssHashType, mgf1HashType, salt, onComplete);
+        }
+
+        decrypt(data, oaepHash, onComplete) {
+            this.impl_.__decryptEx(data, oaepHash, result => {
+                onComplete(result);
+            }, errorText => {
+                throw new Error("unicrypto-u8impl PrivateKeyImpl decrypt error: " + errorText);
+            });
+        }
 
         get_e() {
             return this.impl_.__get_e();
@@ -73,6 +85,20 @@ let Module = {
             let res = new Module.PublicKeyImpl();
             res.impl_ = new crypto.PublicKey(packedBinary);
             onComplete(res);
+        }
+
+        verify(data, signature, pssHashType, mgf1HashType, saltLen, onComplete) {
+            if (typeof (data) == 'string')
+                data = utf8Encode(data);
+            this.impl_.__verifyEx(data, signature, pssHashType, mgf1HashType, saltLen, onComplete);
+        }
+
+        encrypt(data, oaepHash, onComplete) {
+            this.impl_.__encryptEx(data, oaepHash, onComplete);
+        }
+
+        encryptWithSeed(data, oaepHash, seed, onComplete) {
+            this.impl_.__encryptExWithSeed(data, oaepHash, seed, onComplete);
         }
 
         getBitStrength() {

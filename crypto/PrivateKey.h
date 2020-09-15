@@ -55,6 +55,8 @@ namespace crypto {
 
 		std::vector<unsigned char> decrypt(void *data, size_t size);
 
+		std::vector<unsigned char> decryptEx(void *data, size_t size, int oaepHashType);
+
 		std::string get_e() const;
 		std::string get_p() const;
 		std::string get_q() const;
