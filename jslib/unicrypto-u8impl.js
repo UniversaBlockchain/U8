@@ -152,6 +152,11 @@ let Module = {
         getDigest(onComplete) {
             onComplete(super.getDigest());
         }
+        update(data) {
+            if (typeof (data) == 'string')
+                data = utf8Encode(data);
+            return super.update(data);
+        }
     },
 
     calcHmac: (hashType, keyBinary, dataBinary, onComplete) => {
@@ -174,9 +179,11 @@ class TextEncoder {
 }
 
 function freezeUnicrypto() {
-    Object.freeze(Base58.encode);
-    Object.freeze(Base58.decode);
-    Object.freeze(Base58);
+    if (typeof Base58 !== 'undefined') {
+        Object.freeze(Base58.encode);
+        Object.freeze(Base58.decode);
+        Object.freeze(Base58);
+    }
 }
 
 module.exports = {Module, TextDecoder, TextEncoder, freezeUnicrypto};
