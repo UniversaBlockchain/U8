@@ -23,6 +23,8 @@ namespace crypto {
 
 		PrivateKey(const std::string &strE, const std::string &strP, const std::string &strQ);
 
+		PrivateKey(const std::string &strE, const std::string &strP, const std::string &strQ, bool base16);
+
 		PrivateKey(const UBytes &eValue, const UBytes &pValue, const UBytes &qValue);
 
 		PrivateKey(const std::vector<unsigned char> &packedBinaryKey);
@@ -35,6 +37,7 @@ namespace crypto {
 		std::vector<unsigned char> packWithPassword(const std::string& passwordString, int rounds) const;
 
 		static PrivateKey unpackWithPassword(const byte_vector& packedBinary, const std::string& passwordString);
+		static PrivateKey unpackFromHexStrings(const std::string &strE, const std::string &strP, const std::string &strQ);
 
 		// Signature is created using RSA-PSS as described in PKCS# 1 v 2.1.
 		void sign(const std::vector<unsigned char> &input, HashType hashType, std::vector<unsigned char> &output) const;
@@ -67,7 +70,8 @@ namespace crypto {
 
 		void initFromBytes(const UBytes &eValue, const UBytes &pValue, const UBytes &qValue);
 
-		void initFromDecimalStrings(const std::string &strE, const std::string &strP, const std::string &strQ);
+		void initFromDecimalStrings(const std::string &strE, const std::string &strP, const std::string &strQ, int base = 10);
+		void initFromHexStrings(const std::string &strE, const std::string &strP, const std::string &strQ);
 
 		void generate(int bitStrength);
 

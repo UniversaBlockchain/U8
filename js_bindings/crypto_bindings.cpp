@@ -282,6 +282,39 @@ static void privateKeyUnpackWithPassword(const FunctionCallbackInfo<Value> &args
     });
 }
 
+static void privateKeyInitFromHexExponents(const FunctionCallbackInfo<Value> &args) {
+    Scripter::unwrapArgs(args, [&](ArgsContext &ac) {
+        if (args.Length() == 4) {
+            auto strE = ac.asString(0);
+            auto strP = ac.asString(1);
+            auto strQ = ac.asString(2);
+            auto onReady = ac.asFunction(3);
+            auto se = ac.scripter;
+            runAsync([=]() {
+                try {
+                    auto key = PrivateKey::unpackFromHexStrings(strE, strP, strQ);
+                    onReady->lockedContext([=](Local<Context> &cxt) {
+                        Local<Value> res[2];
+                        res[0] = Local<Object>::Cast(String::NewFromUtf8(cxt->GetIsolate(), "").ToLocalChecked());
+                        res[1] = wrap(se->privateKeyTpl, onReady->isolate(), new PrivateKey(key), true);
+                        onReady->invoke(2, res);
+                    });
+                } catch (const std::exception& e) {
+                    std::string errText(e.what());
+                    onReady->lockedContext([=](Local<Context> &cxt) {
+                        Local<Value> res[2];
+                        res[0] = Local<Object>::Cast(String::NewFromUtf8(cxt->GetIsolate(), errText.data()).ToLocalChecked());
+                        res[1] = Local<Object>::Cast(Null(cxt->GetIsolate()));
+                        onReady->invoke(2, res);
+                    });
+                }
+            });
+            return;
+        }
+        ac.throwError("invalid arguments");
+    });
+}
+
 static void publicKeyPack(const FunctionCallbackInfo<Value> &args) {
     Scripter::unwrapArgs(args, [&](ArgsContext &ac) {
         if (args.Length() == 0) {
@@ -570,6 +603,7 @@ Local<FunctionTemplate> initPrivateKey(Scripter& scripter, Isolate *isolate) {
 
     tpl->Set(isolate, "__generate", FunctionTemplate::New(isolate, privateKeyGenerate));
     tpl->Set(isolate, "__unpackWithPassword", FunctionTemplate::New(isolate, privateKeyUnpackWithPassword));
+    tpl->Set(isolate, "__initFromHexExponents", FunctionTemplate::New(isolate, privateKeyInitFromHexExponents));
 
     scripter.privateKeyTpl.Reset(isolate, tpl);
     return tpl;

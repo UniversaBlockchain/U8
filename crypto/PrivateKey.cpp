@@ -19,6 +19,10 @@ namespace crypto {
 		initFromDecimalStrings(strE, strP, strQ);
 	}
 
+	PrivateKey::PrivateKey(const std::string &strE, const std::string &strP, const std::string &strQ, bool base16) {
+		initFromHexStrings(strE, strP, strQ);
+	}
+
 	PrivateKey::PrivateKey(const UBytes &eValue, const UBytes &pValue, const UBytes &qValue) {
 		initFromBytes(eValue, pValue, qValue);
 	}
@@ -75,7 +79,7 @@ namespace crypto {
 		initFromDecimalStrings(std::string(str_e), std::string(str_p), std::string(str_q));
 	}
 
-	void PrivateKey::initFromDecimalStrings(const std::string &strE, const std::string &strP, const std::string &strQ) {
+	void PrivateKey::initFromDecimalStrings(const std::string &strE, const std::string &strP, const std::string &strQ, int base) {
 		int err = -1;
 		MP_INT e, d, N, dQ, dP, qP, p, q;
 		MP_INT t1, t2, t3, one;
@@ -93,9 +97,9 @@ namespace crypto {
 		mpz_init(&t2);
 		mpz_init(&t3);
 
-		mpz_set_str(&e, strE.c_str(), 10);
-		mpz_set_str(&p, strP.c_str(), 10);
-		mpz_set_str(&q, strQ.c_str(), 10);
+		mpz_set_str(&e, strE.c_str(), base);
+		mpz_set_str(&p, strP.c_str(), base);
+		mpz_set_str(&q, strQ.c_str(), base);
 
 		mpz_mul(&N, &p, &q);
 
@@ -159,6 +163,10 @@ namespace crypto {
 		mpz_clear(&t1);
 		mpz_clear(&t2);
 		mpz_clear(&t3);
+	}
+
+	void PrivateKey::initFromHexStrings(const std::string &strE, const std::string &strP, const std::string &strQ) {
+		initFromDecimalStrings(strE, strP, strQ, 16);
 	}
 
 	void PrivateKey::generate(int bitStrength) {
@@ -266,6 +274,10 @@ namespace crypto {
 		} else {
 			throw std::runtime_error("unpackWithPassword: Bad or unknown private key type");
 		}
+	}
+
+	PrivateKey PrivateKey::unpackFromHexStrings(const std::string &strE, const std::string &strP, const std::string &strQ) {
+		return PrivateKey(strE, strP, strQ, true);
 	}
 
 	void

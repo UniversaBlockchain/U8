@@ -12,6 +12,7 @@ let Module = {
         static generate(strength, onComplete) {
             crypto.PrivateKey.generate(strength).then(key => {
                 let res = new Module.PrivateKeyImpl();
+                key.__proto__ = crypto.PrivateKey.prototype;
                 res.impl_ = key;
                 onComplete(res);
             });
@@ -21,11 +22,26 @@ let Module = {
             crypto.PrivateKey.__unpackWithPassword(packedBinary, passwordString, (err, key) => {
                 if (err === "") {
                     let res = new Module.PrivateKeyImpl();
+                    key.__proto__ = crypto.PrivateKey.prototype;
                     res.impl_ = key;
                     onComplete("", res);
                 } else {
                     console.log("err: " + err);
                     onComplete(err);
+                }
+            });
+        }
+
+        static initFromHexExponents(hexString_e, hexString_p, hexString_q, onComplete) {
+            crypto.PrivateKey.__initFromHexExponents(hexString_e, hexString_p, hexString_q, (err, key) => {
+                if (err === "") {
+                    let res = new Module.PrivateKeyImpl();
+                    key.__proto__ = crypto.PrivateKey.prototype;
+                    res.impl_ = key;
+                    onComplete(res);
+                } else {
+                    console.log("err: " + err);
+                    onComplete(undefined);
                 }
             });
         }
