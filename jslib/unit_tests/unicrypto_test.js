@@ -1,4 +1,4 @@
-import { SignedRecord, PublicKey, PrivateKey, AbstractKey, SymmetricKey, ExtendedSignature, AES } from 'unicrypto';
+import { SignedRecord, PublicKey, PrivateKey, AbstractKey, SymmetricKey, KeyInfo, ExtendedSignature, AES } from 'unicrypto';
 import { BossSerializable, Boss } from 'unicrypto';
 import { BigInteger, randomBytes, hashId, crc32 } from 'unicrypto';
 import { bytesToHex, hexToBytes } from 'unicrypto';
@@ -12,18 +12,6 @@ unit.test("unicrypto examples", async () => {
 
     // some test data
     const privateKeyPacked = decode64("JgAcAQABvID1lpufFoyMlR5FYtVgzbVnSGk50h6sHpIXTYMMqlu54dQ5eD+qH2s2WNAajXmj9bjFW6CCBFzQAY3tY/9m8peSncNBjBLw/goXbEij3fCf0SqQllf9PSXBZAYwATqzdhrE8zRlMCZFXe6tspmATn/s9YME/A5CFCRz81l1tgOqw7yA5eOoQmB9kJTcLvzGKFSNjcVY7lwjkx8ND8Da/0AczIsiDCVvmYjgZVU9N1uxMMbR+D+NCGgHThpbDXIW0TSGNz8Xg0uA3B999bzGhRDeoUxs7sBqzb+ZgluGsIf8GSwpkhaX+7JiBPzHKjuTSDC86JSXzvllW2/BR+JlSUlvtPk=");
-
-
-    // // todo: must not to crash
-    // for (let i = 0; i < 1000; ++i) {
-    //     const publicKey = (await PrivateKey.generate({strength: 2048})).publicKey;
-    //
-    //     console.log("i = " + i);
-    //     console.log(PublicKey.isValidAddress(publicKey.shortAddress));
-    //     console.log(PublicKey.isValidAddress(publicKey.shortAddress58));
-    // }
-
-
 
 
 
@@ -59,7 +47,7 @@ unit.test("unicrypto examples", async () => {
     // # Misc
 
     { // Random byte array for given length
-        const bytes16 = randomBytes(16);
+        const bytes16 = randomBytes(16); // Buffer
         console.log("randomBytes: " + new Uint8Array(bytes16.buffer));
     }
 
@@ -232,10 +220,10 @@ unit.test("unicrypto examples", async () => {
         const publicKey = (await PrivateKey.generate({strength: 2048})).publicKey;
 
         // todo: must returns true
-        console.log(PublicKey.isValidAddress(publicKey.shortAddress)); // true
+        console.log("isValidAddress: " + PublicKey.isValidAddress(publicKey.shortAddress)); // true
 
         // accepts base58 representation of address too
-        console.log(PublicKey.isValidAddress(publicKey.shortAddress58)); // true
+        console.log("isValidAddress: " + PublicKey.isValidAddress(publicKey.shortAddress58)); // true
     }
 
     { // Generate private key
@@ -272,12 +260,44 @@ unit.test("unicrypto examples", async () => {
 
 
     // # KEY INFO
-    // todo: .......
-    // .......
-    // .......
-    // .......
+    const keyInfo0 = new KeyInfo({
+        algorithm: KeyInfo.Algorithm.AES256,
+        tag: decode64("abc"), // Uint8Array
+        keyLength: 32,        // Int
+        prf: KeyInfo.PRF.HMAC_SHA256,
+        rounds: 16000,        // number of iterations
+        salt: decode64("bcd") // Uint8Array
+    });
 
+    { // Pack to BOSS
+        // todo: must not crash
+        // const packed = keyInfo0.pack(); // Uint8Array
+        // console.log("keyInfo0 packed: " + packed);
+    }
 
+    { // Read from BOSS
+        // todo: must not crash
+        // const keyInfo = KeyInfo.unpack(keyInfo0.pack()); // KeyInfo
+        // console.log("keyInfo unpacked: " + keyInfo);
+    }
+
+    { // Check that this key can decrypt other key
+        const otherKeyInfo = new KeyInfo({
+            algorithm: KeyInfo.Algorithm.RSAPublic,
+            tag: decode64("abc"), // Uint8Array
+            keyLength: 32,        // Int
+            prf: KeyInfo.PRF.HMAC_SHA256,
+            rounds: 16000,        // number of iterations
+            salt: decode64("bcd") // Uint8Array
+        });
+        const canDecrypt = keyInfo0.matchType(otherKeyInfo); // boolean
+        console.log("canDecrypt keyInfo: " + canDecrypt);
+    }
+
+    { // Derived key from password
+        const derivedKey = await keyInfo0.derivePassword("somepassword"); // Uint8Array
+        console.log("keyInfo derivedKey: " + encode64(derivedKey));
+    }
 
     // # SYMMETRIC KEY
 
@@ -299,11 +319,10 @@ unit.test("unicrypto examples", async () => {
         });
         console.log("symmetricKey3: " + encode64(symmetricKey3.pack()));
 
-        // // todo: must not to crash
-        // // Creates key by password (String) and number of rounds (Int). Salt is optional
-        // // Uint8Array, null by default
-        // const symmetricKey4 = await SymmetricKey.fromPassword("some_password", 1000, decode64('abc'));
-        // console.log("symmetricKey4: " + encode64(symmetricKey4.pack()));
+        // Creates key by password (String) and number of rounds (Int). Salt is optional
+        // Uint8Array, null by default
+        const symmetricKey4 = await SymmetricKey.fromPassword("some_password", 1000, decode64('abc'));
+        console.log("symmetricKey4: " + encode64(symmetricKey4.pack()));
     }
 
     { // Pack symmetric key (get derived key bytes)
@@ -371,17 +390,11 @@ unit.test("unicrypto examples", async () => {
     }
 
     { // OAEP default hash
-        const privateKey = await PrivateKey.unpack(privateKeyPacked);
-        const publicKey = privateKey.publicKey;
-        // todo: must not be undefined
-        console.log("publicKey.DEFAULT_OAEP_HASH: " + PublicKey.DEFAULT_OAEP_HASH); // SHA1 instance
+        console.log("publicKey.DEFAULT_OAEP_HASH: " + PublicKey.DEFAULT_OAEP_HASH); // sha1
     }
 
     { // MGF1 default hash
-        const privateKey = await PrivateKey.unpack(privateKeyPacked);
-        const publicKey = privateKey.publicKey;
-        // todo: must not be undefined
-        console.log("publicKey.DEFAULT_OAEP_HASH: " + PublicKey.DEFAULT_MGF1_HASH); // SHA1 instance
+        console.log("publicKey.DEFAULT_OAEP_HASH: " + PublicKey.DEFAULT_MGF1_HASH); // sha1
     }
 
     { // PSS sign/verify
@@ -389,9 +402,8 @@ unit.test("unicrypto examples", async () => {
         const publicKey = privateKey.publicKey;
 
         const options = {
-            // // todo: "salt is not defined" error
-            // salt: decode64("abcabc"), // optional
-            // saltLength: null, // optional, numeric
+            salt: decode64("abcabc"), // optional
+            saltLength: null, // optional, numeric
             mgf1Hash: 'sha512', // optional, default SHA(256)
             pssHash: 'sha512' // optional, default SHA(256)
         };
