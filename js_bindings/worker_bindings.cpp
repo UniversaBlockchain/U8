@@ -4,6 +4,7 @@
 
 #include "worker_bindings.h"
 #include "../types/UObject.h"
+#include "../types/UArray.h"
 #include "../types/UBinder.h"
 #include "../types/UString.h"
 #include "../types/TypesFactory.h"
@@ -195,7 +196,7 @@ void extractCustomJsLibFiles(const UObject& obj, unordered_map<string,string>& d
 
 static void JsGetWorker(const FunctionCallbackInfo<Value> &args) {
     Scripter::unwrapArgs(args, [](ArgsContext &ac) {
-        if (ac.args.Length() == 4) {
+        if (ac.args.Length() == 6) {
             auto se = ac.scripter;
             int accessLevel = ac.asInt(0);
             if (se->getSelfAcceccLevel() > accessLevel) {
@@ -206,11 +207,33 @@ static void JsGetWorker(const FunctionCallbackInfo<Value> &args) {
             auto workerSrc = ac.asString(1);
             auto onComplete = ac.asFunction(2);
             UObject customJsLibFiles = v8ValueToUObject(ac.isolate, ac.args[3]);
-            runAsync([accessLevel, workerSrc, onComplete, customJsLibFiles{move(customJsLibFiles)}]() {
+            UObject modulesObj = v8ValueToUObject(ac.isolate, ac.args[4]);
+            UObject signersObj = v8ValueToUObject(ac.isolate, ac.args[5]);
+
+            if (!UArray::isInstance(modulesObj) || !UArray::isInstance(signersObj)) {
+                ac.throwError("JsGetWorker error: modules and signers parameters must be arrays");
+                return;
+            }
+
+            UArray modules = UArray::asInstance(modulesObj);
+            UArray signers = UArray::asInstance(signersObj);
+
+            if (modules.size() != signers.size()) {
+                ac.throwError("JsGetWorker error: modules and signers arrays sizes must be equal");
+                return;
+            }
+
+            runAsync([accessLevel, workerSrc, onComplete, customJsLibFiles{move(customJsLibFiles)},
+                      modules{move(modules)}, signers{move(signers)}]() {
                 Blocking;
                 auto w = GetWorker(accessLevel);
                 w->customJsLibFiles.clear();
                 extractCustomJsLibFiles(customJsLibFiles, w->customJsLibFiles);
+
+                // preload modules
+                for (int i = 0; i < modules.size(); i++)
+                    w->se->preloadModule(UString::asInstance(modules[i]).get(), UString::asInstance(signers[i]).get());
+
                 Semaphore sem;
                 w->onGetWorker->lockedContext([w,&sem](auto cxt){
                     w->onGetWorker->invoke();

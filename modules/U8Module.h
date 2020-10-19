@@ -24,6 +24,7 @@ class U8Module {
 
     bool checkKeyTrust(std::vector<unsigned char> &keyData, Scripter* se);
     bool checkUNS(std::string UNSname, std::vector<unsigned char> &keyData, Scripter* se);
+    bool checkSigner(std::vector<unsigned char> &keyData, const std::string &signer);
     std::map<std::string, std::string> loadManifest(zip* module);
     bool initRequireRoots();
     std::string searchU8Module(std::string basePath);
@@ -33,7 +34,7 @@ public:
     U8Module(const std::string& modulePath, const std::string &homeDir);
 
     bool load();
-    bool checkModuleSignature(Scripter* se);
+    bool checkModuleSignature(Scripter* se, const std::string &signer);
 
     std::string getName();
     std::string resolveRequiredFile(const std::string &fileName);

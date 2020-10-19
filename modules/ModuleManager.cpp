@@ -6,29 +6,34 @@
 
 extern const char *U8COREMODULE_NAME;
 
-bool ModuleManager::loadModule(const std::string& sourceName, Scripter* se, bool isStarting) {
-    lock_guard lock(mutex);
+bool ModuleManager::loadModule(const std::string& sourceName, Scripter* se, bool isStarting, const std::string& signer) {
+    mutex.lock();
 
-    if (modulesByPath.find(sourceName) != modulesByPath.end())
+    if (modulesByPath.find(sourceName) != modulesByPath.end()) {
+        mutex.unlock();
         return true;
+    }
 
     std::shared_ptr<U8Module> module = std::make_shared<U8Module>(sourceName, se->getHome());
 
     // loading module
-    if (!module->load())
+    if (!module->load()) {
+        mutex.unlock();
         return false;
+    }
 
     if (modules.find(module->getName()) != modules.end()) {   // if module with this name was already loaded
         if (isStarting)
             startingModuleName = module->getName();
 
+        mutex.unlock();
         return true;
     }
 
     mutex.unlock();
 
     // check signature
-    bool res = module->checkModuleSignature((module->getName() == U8COREMODULE_NAME || isStarting) ? se: nullptr);
+    bool res = module->checkModuleSignature((module->getName() == U8COREMODULE_NAME || isStarting) ? se: nullptr, signer);
     if (res) {
         mutex.lock();
 
@@ -50,10 +55,14 @@ bool ModuleManager::loadModule(const std::string& sourceName, Scripter* se, bool
 }
 
 std::shared_ptr<U8Module> ModuleManager::getModule(const std::string& moduleName) {
-    lock_guard lock(mutex);
+    mutex.lock();
 
     auto module = modules.find(moduleName);
-    if (module != modules.end())
+    bool found = module != modules.end();
+
+    mutex.unlock();
+
+    if (found)
         return module->second;
     else
         return std::shared_ptr<U8Module>();

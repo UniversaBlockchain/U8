@@ -119,7 +119,10 @@ void JsLoadRequiredRestricted(const v8::FunctionCallbackInfo<v8::Value> &args) {
 
         string sourceName = *v8::String::Utf8Value(isolate, args[0]);
         string moduleName = (args.Length() > 1) ? *v8::String::Utf8Value(isolate, args[1]) : U8COREMODULE_NAME;
-        if (validSourcesForRestrictedWorker.find(sourceName) != validSourcesForRestrictedWorker.end()) {
+
+        if ((mainModuleManager.getModule(moduleName) && moduleName != U8COREMODULE_NAME) ||
+            validSourcesForRestrictedWorker.find(sourceName) != validSourcesForRestrictedWorker.end()) {
+
             string name = se->resolveRequiredFile(sourceName, moduleName);
 
             // If it is empty we just return empty array

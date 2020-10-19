@@ -231,6 +231,11 @@ void Scripter::loadStartingModule() {
     }
 }
 
+void Scripter::preloadModule(const string &URL, const string &signer) {
+    if (!mainModuleManager.loadModule(URL, this, false, signer))
+        throw runtime_error("Failed loading module");
+}
+
 void Scripter::initializeInternal() {
     pIsolate = v8::Isolate::New(create_params);
     v8::Isolate::Scope isolate_scope(pIsolate);

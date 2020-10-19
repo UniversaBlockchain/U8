@@ -119,7 +119,7 @@ wrk.WorkerHandle = class {
     }
 };
 
-wrk.getWorker = function(accessLevel, workerSrc, customJsLib = {}) {
+wrk.getWorker = function(accessLevel, workerSrc, customJsLib = {}, modules = [], signers = []) {
     return new Promise(resolve => {
         wrkImpl.__getWorker(accessLevel, workerSrc, workerImpl => {
             let w = new wrk.WorkerHandle(workerImpl);
@@ -128,7 +128,7 @@ wrk.getWorker = function(accessLevel, workerSrc, customJsLib = {}) {
                 w.lowMemoryPromiseResolver();
             });
             resolve(w);
-        }, customJsLib);
+        }, customJsLib, modules, signers);
     });
 };
 

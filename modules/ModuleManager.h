@@ -22,7 +22,7 @@ class ModuleManager {
     std::mutex mutex;
 
 public:
-    bool loadModule(const std::string& sourceName, Scripter* se, bool isStarting = false);
+    bool loadModule(const std::string& sourceName, Scripter* se, bool isStarting = false, const std::string& signer = "");
 
     std::shared_ptr<U8Module> getModule(const std::string& moduleName);
 

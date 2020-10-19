@@ -268,6 +268,73 @@ unit.test("ubot_local_test: ping", async () => {
     await shutdownUBots(ubotMains);
 });
 
+unit.test("ubot_local_test: ethereum", async () => {
+    let ubotMains = await createUBots(ubotsCount);
+
+    // start HTTP-server with ethereum module
+    let httpServer = new HttpServer("0.0.0.0", 8091, 5);
+    httpServer.addRawEndpoint("/ubots_ethereum.u8m", async (request) => {
+        request.setAnswerBody(await io.fileGetContentsAsBytes("../ubots_ethereum.u8m"));
+        request.sendAnswer();
+    });
+
+    httpServer.startServer();
+
+    let ubotClient = await new UBotClient(clientKey, TOPOLOGY_ROOT + TOPOLOGY_FILE).start();
+
+    // UBot executable contract
+    let executableContract = Contract.fromPrivateKey(userPrivKey);
+
+    executableContract.state.data.cloud_methods = {};
+    executableContract.state.data.cloud_methods["init"] = {
+        pool: {size: 30},
+        quorum: {size: 30},
+        modules: ["ubots_ethereum"]
+    };
+
+    executableContract.state.data.modules = {};
+    executableContract.state.data.modules["ubots_ethereum"] = {
+        URL: "http://localhost:8091/ubots_ethereum.u8m",
+        signer: "JjdrfxsqN4x5ztFbuJAVqkXz8zumSxX5gKoBMWmfpsbUZgiKZvV4ar3ZH95hcFFcZti23yAz"
+    };
+
+    executableContract.state.data.js = await io.fileGetContentsAsString(TEST_CONTRACTS_PATH + "uBTC.js");
+
+    await executableContract.seal();
+
+    let requestContract = await generateSimpleCheckRequestContract(executableContract, "init");
+
+    // UBot run
+    let session = await ubotClient.startCloudMethod(requestContract, await createPayment(20));
+
+    console.log("Session: " + session);
+
+    let states = await Promise.all(session.pool.map(async (ubotNumber) => {
+        let state = await ubotClient.getStateCloudMethod(requestContract.id, ubotNumber);
+
+        if (state.state !== UBotPoolState.FINISHED.val)
+            state = await ubotClient.waitCloudMethod(requestContract.id, ubotNumber);
+
+        return state;
+    }));
+
+    console.log("Final states: " + JSON.stringify(states));
+
+    assert(states.every(state =>
+        state.state === UBotPoolState.FINISHED.val &&
+        typeof state.result === "string" && state.result.length === 42 && state.result.startsWith("0x")));
+
+    await ubotClient.shutdown();
+
+    // waiting pool finished...
+    while (ubotMains.some(main => Array.from(main.ubot.processors.values()).some(proc => proc.state.canContinue)))
+        await sleep(100);
+
+    await httpServer.stopServer();
+
+    await shutdownUBots(ubotMains);
+});
+
 unit.test("ubot_local_test: register UDNS contract", async () => {
     let ubotMains = await createUBots(ubotsCount);
 

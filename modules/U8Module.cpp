@@ -74,7 +74,7 @@ std::string U8Module::getFileFromURL(const std::string &url) {
     bool result = false;
 
     network::HttpClient httpClient("", 5);
-    printf("URL: %s\n", url.c_str());
+    //printf("URL: %s\n", url.c_str());
 
     httpClient.sendGetRequestUrl(url, [&sem, &homeDirectory, &path, &url, &file_name, &result](int respCode, byte_vector&& body) {
         try {
@@ -162,7 +162,7 @@ bool U8Module::load() {
     }
 }
 
-bool U8Module::checkModuleSignature(Scripter* se) {
+bool U8Module::checkModuleSignature(Scripter* se, const std::string &signer) {
     try {
         if (lenSignData == 0) {
             printf("Signature of module %s not found\n", modulePath.c_str());
@@ -246,7 +246,12 @@ bool U8Module::checkModuleSignature(Scripter* se) {
             bool res = publicKey->verify(sign.data(), sign.size(), data, dataLen, HashType::SHA3_512);
 
             // check public key
-            if (!checkKeyTrust(key, se)) {
+            if (!signer.empty()) {
+                if (!checkSigner(key, signer)) {
+                    printf("Untrusted module signer\n");
+                    res = false;
+                }
+            } else if (!checkKeyTrust(key, se)) {
                 printf("Untrusted signature key\n");
                 res = false;
             }
@@ -557,6 +562,19 @@ bool U8Module::checkUNS(std::string UNSname, std::vector<unsigned char> &keyData
     }
 
     return res == 1;
+}
+
+bool U8Module::checkSigner(std::vector<unsigned char> &keyData, const std::string &signer) {
+    auto publicKey = new PublicKey(keyData.data(), keyData.size());
+    auto ka = new KeyAddress(signer);
+
+    // check signer address
+    bool res = ka->isMatchingKey(*publicKey);
+
+    delete ka;
+    delete publicKey;
+
+    return res;
 }
 
 std::map<std::string, std::string> U8Module::loadManifest(zip* module) {

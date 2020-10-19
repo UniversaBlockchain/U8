@@ -220,7 +220,8 @@ class ProcessStartExec extends ProcessBase {
         this.pr.logger.log("  method name: " + methodName);
         this.pr.logger.log("  executable contract: " + this.pr.requestContract.state.data.executable_contract_id);
 
-        this.initStorages(this.pr.executableContract.state.data.cloud_methods[methodName]);
+        let methodData = this.pr.executableContract.state.data.cloud_methods[methodName];
+        this.initStorages(methodData);
 
         if (this.pr.executableContract.state.data.hasOwnProperty("js")) {
             if (this.pr.worker != null) {
@@ -243,8 +244,23 @@ class ProcessStartExec extends ProcessBase {
                     "   }" +
                     "};";
 
+                let modules = [];
+                let signers = [];
+
+                if (this.pr.executableContract.state.data.hasOwnProperty("modules") &&
+                    methodData.hasOwnProperty("modules") && methodData.modules instanceof Array) {
+                    methodData.modules.forEach(module => {
+                        let moduleData = this.pr.executableContract.state.data.modules[module];
+                        if (moduleData.hasOwnProperty("URL") && moduleData.hasOwnProperty("signer")) {
+                            modules.push(moduleData.URL);
+                            signers.push(moduleData.signer);
+                        } else
+                            this.pr.logger.log("Error: loading module '" + module + "' failed. Check 'URL' and 'signer' fields");
+                    });
+                }
+
                 this.pr.worker = await getWorker(1,
-                    ProcessStartExec.workerSrc + this.pr.executableContract.state.data.js + methodExport);
+                    ProcessStartExec.workerSrc + this.pr.executableContract.state.data.js + methodExport, {}, modules, signers);
 
                 this.pr.logger.log("worker initialized");
 
