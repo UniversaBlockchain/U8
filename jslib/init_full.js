@@ -19,6 +19,9 @@ const console = {
             __bios_print(true, "Error: ", args[0].message, ...args.slice(1), "\n", args[0].stack, "\n");
         else
             __bios_print(true, ...args, "\n");
+    },
+    warn(...args) {
+        this.log(...args)
     }
 };
 
