@@ -1,4 +1,5 @@
 const hash = require('hash.js');
+const rlp = require('rlp.js');
 const elliptic = require("elliptic.js");
 const secp256k1 = new (elliptic.ec)("secp256k1");
 
@@ -22,6 +23,20 @@ const concat = (a, b) => {
     r.set(b, a.length);
     return r;
 };
+
+const fromNumber = num => {
+    let hex = num.toString(16);
+    return hex.length % 2 === 0 ? "0x" + hex : "0x0" + hex ;
+};
+
+const toNumber = hex =>
+    parseInt(hex.slice(2), 16);
+
+const fromNat = bn =>
+    bn === "0x0" ? "0x" : bn.length % 2 === 0 ? bn : "0x0" + bn.slice(2);
+
+const toNat = bn =>
+    bn[2] === "0" ? "0x" + bn.slice(3) : bn;
 
 const toChecksum = address => {
     const addressHash = hash.keccak256s(address.slice(2));
@@ -54,8 +69,9 @@ function createWallet() {
     // return x;
 }
 
-function createTransaction() {
-
+function createTransaction(nonce, gasPrice, gasLimit, address, code) {
+    let transactionData = [fromNat(nonce), fromNat(gasPrice), fromNat(gasLimit), address, '0x', code];
+    return rlp.encode(transactionData);
 }
 
 module.exports = {createWallet, createTransaction};
