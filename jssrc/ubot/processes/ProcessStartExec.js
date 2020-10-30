@@ -125,14 +125,14 @@ class ProcessStartExec extends ProcessBase {
         ));
     }
     
-    function doHTTPRequest(url) {
-        return new Promise((resolve, reject) => wrkInner.farcall("doHTTPRequest", [url], {},
+    function doHTTPRequest(url, method = undefined, headers = undefined, body = undefined) {
+        return new Promise((resolve, reject) => wrkInner.farcall("doHTTPRequest", [url, method, headers, body], {},
             ans => resolve(ans), err => reject(err)
         ));
     }
     
-    function doHTTPRequestWithCallback(url, onComplete, onError = (err) => {}) {
-        doHTTPRequest(url).then(onComplete, onError);
+    function doHTTPRequestWithCallback(url, onComplete, onError = (err) => {}, method = undefined, headers = undefined, body = undefined) {
+        doHTTPRequest(url, method, headers, body).then(onComplete, onError);
     }
     
     function doDNSRequests(host, port, requests) {
@@ -309,7 +309,7 @@ class ProcessStartExec extends ProcessBase {
                 };
 
                 this.pr.worker.export["doHTTPRequest"] = async (args, kwargs) => {
-                    return await this.doHTTPRequest(args[0]);
+                    return await this.doHTTPRequest(args[0], args[1], args[2], args[3]);
                 };
 
                 this.pr.worker.export["doDNSRequests"] = async (args, kwargs) => {
@@ -1034,10 +1034,13 @@ class ProcessStartExec extends ProcessBase {
      * Executes an HTTP request to an external service by URL.
      *
      * @param {string} url - URL of the external service.
+     * @param {string} method - HTTP method (GET, POST, ...). Optional (GET by default).
+     * @param {string} headers - HTTP headers. Optional.
+     * @param {string} body - HTTP request body. Optional.
      * @return {Promise<Object>} body: HTTP response body, response_code: HTTP response code.
      * @throws {UBotQuantiserException} quantiser limit is reached.
      */
-    async doHTTPRequest(url) {
+    async doHTTPRequest(url, method = undefined, headers = undefined, body = undefined) {
         try {
             this.pr.quantiser.addWorkCost(UBotQuantiserProcesses.PRICE_HTTP_REQUEST);
 
@@ -1046,12 +1049,21 @@ class ProcessStartExec extends ProcessBase {
 
             return await new Promise(async(resolve, reject) => {
                 try {
-                    this.pr.userHttpClient.sendGetRequestUrl(url, (respCode, body) => {
-                        resolve({
-                            response_code: respCode,
-                            body: body
+                    if (method == null || headers == null || body == null)
+                        this.pr.userHttpClient.sendGetRequestUrl(url, (respCode, body) => {
+                            resolve({
+                                response_code: respCode,
+                                body: body
+                            });
                         });
-                    });
+                    else {
+                        this.pr.userHttpClient.sendRequestUrl(url, method, headers, body, (respCode, body) => {
+                            resolve({
+                                response_code: respCode,
+                                body: body
+                            });
+                        });
+                    }
                 } catch (err) {
                     reject(err);
                 }

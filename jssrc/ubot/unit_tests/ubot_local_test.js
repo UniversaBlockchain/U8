@@ -285,10 +285,31 @@ unit.test("ubot_local_test: ethereum", async () => {
     // UBot executable contract
     let executableContract = Contract.fromPrivateKey(userPrivKey);
 
+    executableContract.registerRole(new roles.SimpleRole("initiator", userPrivKey));
+
     executableContract.state.data.cloud_methods = {};
     executableContract.state.data.cloud_methods["init"] = {
         pool: {size: 30},
         quorum: {size: 30},
+        launcher: "initiator",
+        modules: ["ubots_ethereum"]
+    };
+
+    executableContract.state.data.cloud_methods["changeEthereumURL"] = {
+        pool: {size: 30},
+        quorum: {size: 30},
+        launcher: "initiator"
+    };
+
+    executableContract.state.data.cloud_methods["changeEthereumContract"] = {
+        pool: {size: 30},
+        quorum: {size: 30},
+        launcher: "initiator"
+    };
+
+    executableContract.state.data.cloud_methods["mint"] = {
+        pool: {size: 12},
+        quorum: {size: 10},
         modules: ["ubots_ethereum"]
     };
 
@@ -302,9 +323,19 @@ unit.test("ubot_local_test: ethereum", async () => {
 
     await executableContract.seal();
 
-    let requestContract = await generateSimpleCheckRequestContract(executableContract, "init");
+    // init wallets
+    let requestContract = Contract.fromPrivateKey(userPrivKey);
+    requestContract.state.data.method_name = "init";
+    requestContract.state.data.method_args = ["http://127.0.0.1:8548", "0xfB0A82165Af395014026ECf88e5904c7d51f59B0"];
+    requestContract.state.data.executable_contract_id = executableContract.id;
+    requestContract.newItems.add(executableContract);
 
-    // UBot run
+    await cs.addConstraintToContract(requestContract, executableContract, "executable_contract_constraint",
+        Constraint.TYPE_EXISTING_STATE, [
+            "this.state.data.executable_contract_id == ref.id",
+            "this can_perform ref.state.roles.initiator"
+        ], true);
+
     let session = await ubotClient.startCloudMethod(requestContract, await createPayment(20));
 
     console.log("Session: " + session);
@@ -321,8 +352,25 @@ unit.test("ubot_local_test: ethereum", async () => {
     console.log("Final states: " + JSON.stringify(states));
 
     assert(states.every(state =>
-        state.state === UBotPoolState.FINISHED.val &&
-        typeof state.result === "string" && state.result.length === 42 && state.result.startsWith("0x")));
+        state.state === UBotPoolState.FINISHED.val && state.result.status === "OK" && state.result.hasOwnProperty("wallet") &&
+        typeof state.result.wallet === "string" && state.result.wallet.length === 42 && state.result.wallet.startsWith("0x")));
+
+    await ubotClient.disconnectUbot();
+
+    // mint token
+    requestContract = Contract.fromPrivateKey(userPrivKey);
+    requestContract.state.data.method_name = "mint";
+    requestContract.state.data.method_args = ["0x7e3023941039e0064efFac2c0F02aB1C096A1b8C", "123456789012345678901234567890"];
+    requestContract.state.data.executable_contract_id = executableContract.id;
+
+    await cs.addConstraintToContract(requestContract, executableContract, "executable_contract_constraint",
+        Constraint.TYPE_EXISTING_STATE, ["this.state.data.executable_contract_id == ref.id"], true);
+
+    let state = await ubotClient.executeCloudMethod(requestContract, await createPayment(20));
+
+    console.log("State: " + JSON.stringify(state));
+
+    assert(state.state === UBotPoolState.FINISHED.val && state.result.status === "OK");
 
     await ubotClient.shutdown();
 

@@ -417,7 +417,7 @@ network.HttpServer = class {
 };
 
 network.HttpClient = class {
-    constructor(rootUrl) {
+    constructor(rootUrl = "") {
         this.autoReconnectOnCommandError = true;
         this.retryCount = 5; // total count of tries
         this.retryTimeoutMillis = 2000;
@@ -583,6 +583,19 @@ network.HttpClient = class {
         let reqId = this.getReqId();
         this.callbacks_.set(reqId, block);
         this.httpClient_.__sendRawRequestUrl(reqId, url, method, extHeaders, utf8Encode(bodyStr));
+    }
+
+    /**
+     * @param url {String} full url to server endpoint
+     * @param method {String} GET, POST, etc
+     * @param headers {String} request headers
+     * @param body {String} request body
+     * @param block onComplete callback
+     */
+    sendRequestUrl(url, method, headers, body, block) {
+        let reqId = this.getReqId();
+        this.callbacks_.set(reqId, block);
+        this.httpClient_.__sendRawRequestUrl(reqId, url, method, headers, utf8Encode(body));
     }
 
     async command(name, params, onComplete, onError) {

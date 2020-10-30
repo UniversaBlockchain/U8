@@ -955,7 +955,7 @@ class Contract extends bs.BiSerializable {
      * Register new role for contract. If role with the same name already exists it will be replaced with new one
      *
      * @param role {Role} to register
-     * @returns {Role}
+     * @return {Role}
      */
     registerRole(role) {
         if (~predefinedRoles.indexOf(role.name))
@@ -965,6 +965,19 @@ class Contract extends bs.BiSerializable {
 
         role.contract = this;
         return role;
+    }
+
+    /**
+     * Get registered role from the contract
+     *
+     * @param {string} roleName - name of the role to get
+     * @return {Role} role or null if not exists
+     */
+    getRole(roleName) {
+        if (~predefinedRoles.indexOf(roleName))
+            return this.roles[roleName];
+        else
+            return this.state.roles[roleName];
     }
 
     getRevokingItem(id) {

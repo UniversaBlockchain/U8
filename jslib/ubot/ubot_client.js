@@ -867,7 +867,7 @@ class UBotClient {
             if (typeof launcher !== "string")
                 throw new UBotClientException("Error executable contract: starting cloud launcher role name is not string");
 
-            if (!executableContract.state.roles.hasOwnProperty(launcher) || !executableContract.state.roles.launcher instanceof roles.Role)
+            if (!executableContract.getRole(launcher))
                 throw new UBotClientException("Error executable contract: role is not defined");
 
             // check launcher condition
