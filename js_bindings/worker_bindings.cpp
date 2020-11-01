@@ -196,7 +196,7 @@ void extractCustomJsLibFiles(const UObject& obj, unordered_map<string,string>& d
 
 static void JsGetWorker(const FunctionCallbackInfo<Value> &args) {
     Scripter::unwrapArgs(args, [](ArgsContext &ac) {
-        if (ac.args.Length() == 6) {
+        if (ac.args.Length() == 4) {
             auto se = ac.scripter;
             int accessLevel = ac.asInt(0);
             if (se->getSelfAcceccLevel() > accessLevel) {
@@ -207,32 +207,12 @@ static void JsGetWorker(const FunctionCallbackInfo<Value> &args) {
             auto workerSrc = ac.asString(1);
             auto onComplete = ac.asFunction(2);
             UObject customJsLibFiles = v8ValueToUObject(ac.isolate, ac.args[3]);
-            UObject modulesObj = v8ValueToUObject(ac.isolate, ac.args[4]);
-            UObject signersObj = v8ValueToUObject(ac.isolate, ac.args[5]);
 
-            if (!UArray::isInstance(modulesObj) || !UArray::isInstance(signersObj)) {
-                ac.throwError("JsGetWorker error: modules and signers parameters must be arrays");
-                return;
-            }
-
-            UArray modules = UArray::asInstance(modulesObj);
-            UArray signers = UArray::asInstance(signersObj);
-
-            if (modules.size() != signers.size()) {
-                ac.throwError("JsGetWorker error: modules and signers arrays sizes must be equal");
-                return;
-            }
-
-            runAsync([accessLevel, workerSrc, onComplete, customJsLibFiles{move(customJsLibFiles)},
-                      modules{move(modules)}, signers{move(signers)}]() {
+            runAsync([accessLevel, workerSrc, onComplete, customJsLibFiles{move(customJsLibFiles)}]() {
                 Blocking;
                 auto w = GetWorker(accessLevel);
                 w->customJsLibFiles.clear();
                 extractCustomJsLibFiles(customJsLibFiles, w->customJsLibFiles);
-
-                // preload modules
-                for (int i = 0; i < modules.size(); i++)
-                    w->se->preloadModule(UString::asInstance(modules[i]).get(), UString::asInstance(signers[i]).get());
 
                 Semaphore sem;
                 w->onGetWorker->lockedContext([w,&sem](auto cxt){
@@ -375,6 +355,52 @@ void JsScripterWrap_getProcessorTime(const FunctionCallbackInfo<Value> &args) {
     });
 }
 
+void JsScripterWrap_preloadModules(const FunctionCallbackInfo<Value> &args) {
+    Scripter::unwrapArgs(args, [](ArgsContext &ac) {
+        if (ac.args.Length() == 3) {
+            UObject modulesObj = v8ValueToUObject(ac.isolate, ac.args[0]);
+            UObject signersObj = v8ValueToUObject(ac.isolate, ac.args[1]);
+            auto onComplete = ac.asFunction(2);
+
+            if (!UArray::isInstance(modulesObj) || !UArray::isInstance(signersObj)) {
+                ac.throwError("JsGetWorker error: modules and signers parameters must be arrays");
+                return;
+            }
+
+            UArray modules = UArray::asInstance(modulesObj);
+            UArray signers = UArray::asInstance(signersObj);
+
+            if (modules.size() != signers.size()) {
+                ac.throwError("JsGetWorker error: modules and signers arrays sizes must be equal");
+                return;
+            }
+
+            auto pws = unwrap<WorkerScripter>(ac.args.This());
+
+            runAsync([pws, onComplete, modules{move(modules)}, signers{move(signers)}]() {
+                Blocking;
+
+                bool result = true;
+                // preload modules
+                for (int i = 0; i < modules.size(); i++)
+                    if (!pws->se->preloadModule(UString::asInstance(modules[i]).get(), UString::asInstance(signers[i]).get())) {
+                        result = false;
+                        break;
+                    }
+
+                onComplete->lockedContext([=](Local<Context> cxt) {
+                    Local<Value> res = Boolean::New(cxt->GetIsolate(), result);
+                    onComplete->invoke(move(res));
+                });
+            });
+
+            //ac.setReturnValue(time);
+            return;
+        }
+        ac.throwError("invalid number of arguments");
+    });
+}
+
 void JsInitWorkerScripter(Scripter& scripter, const Local<ObjectTemplate> &global) {
     Isolate *isolate = scripter.isolate();
     
@@ -390,6 +416,7 @@ void JsInitWorkerScripter(Scripter& scripter, const Local<ObjectTemplate> &globa
     prototype->Set(isolate, "_release", FunctionTemplate::New(isolate, JsScripterWrap_release));
     prototype->Set(isolate, "_terminate", FunctionTemplate::New(isolate, JsScripterWrap_terminate));
     prototype->Set(isolate, "_getProcessorTime", FunctionTemplate::New(isolate, JsScripterWrap_getProcessorTime));
+    prototype->Set(isolate, "_preloadModules", FunctionTemplate::New(isolate, JsScripterWrap_preloadModules));
 
     // register it into global namespace
     scripter.WorkerScripterTpl.Reset(isolate, tpl);

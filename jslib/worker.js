@@ -63,6 +63,12 @@ wrk.WorkerHandle = class {
         });
     }
 
+    async preloadModules(modules = [], signers = []) {
+        return new Promise(resolve => {
+            this.workerImpl._preloadModules(modules, signers, result => resolve(result));
+        });
+    }
+
     async send(obj) {
         if (obj.hasOwnProperty("args"))
             obj.args = await DefaultBiMapper.getInstance().serialize(obj.args);
@@ -119,7 +125,7 @@ wrk.WorkerHandle = class {
     }
 };
 
-wrk.getWorker = function(accessLevel, workerSrc, customJsLib = {}, modules = [], signers = []) {
+wrk.getWorker = function(accessLevel, workerSrc, customJsLib = {}) {
     return new Promise(resolve => {
         wrkImpl.__getWorker(accessLevel, workerSrc, workerImpl => {
             let w = new wrk.WorkerHandle(workerImpl);
@@ -128,7 +134,7 @@ wrk.getWorker = function(accessLevel, workerSrc, customJsLib = {}, modules = [],
                 w.lowMemoryPromiseResolver();
             });
             resolve(w);
-        }, customJsLib, modules, signers);
+        }, customJsLib);
     });
 };
 

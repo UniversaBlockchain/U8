@@ -231,9 +231,8 @@ void Scripter::loadStartingModule() {
     }
 }
 
-void Scripter::preloadModule(const string &URL, const string &signer) {
-    if (!mainModuleManager.loadModule(URL, this, false, signer))
-        throw runtime_error("Failed loading module");
+bool Scripter::preloadModule(const string &URL, const string &signer) {
+    return mainModuleManager.loadModule(URL, this, false, true, signer);
 }
 
 void Scripter::initializeInternal() {

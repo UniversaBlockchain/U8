@@ -6,7 +6,7 @@
 
 extern const char *U8COREMODULE_NAME;
 
-bool ModuleManager::loadModule(const std::string& sourceName, Scripter* se, bool isStarting, const std::string& signer) {
+bool ModuleManager::loadModule(const std::string& sourceName, Scripter* se, bool isStarting, bool inUBot, const std::string& signer) {
     mutex.lock();
 
     if (modulesByPath.find(sourceName) != modulesByPath.end()) {
@@ -17,7 +17,7 @@ bool ModuleManager::loadModule(const std::string& sourceName, Scripter* se, bool
     std::shared_ptr<U8Module> module = std::make_shared<U8Module>(sourceName, se->getHome());
 
     // loading module
-    if (!module->load()) {
+    if (!module->load(inUBot)) {
         mutex.unlock();
         return false;
     }

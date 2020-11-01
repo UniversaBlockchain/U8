@@ -125,24 +125,24 @@ class ProcessStartExec extends ProcessBase {
         ));
     }
     
-    function doHTTPRequest(url, method = undefined, headers = undefined, body = undefined) {
-        return new Promise((resolve, reject) => wrkInner.farcall("doHTTPRequest", [url, method, headers, body], {},
+    function doHTTPRequest(url, method = undefined, headers = undefined, body = undefined, timeout = 5000) {
+        return new Promise((resolve, reject) => wrkInner.farcall("doHTTPRequest", [url, method, headers, body, timeout], {},
             ans => resolve(ans), err => reject(err)
         ));
     }
     
-    function doHTTPRequestWithCallback(url, onComplete, onError = (err) => {}, method = undefined, headers = undefined, body = undefined) {
-        doHTTPRequest(url, method, headers, body).then(onComplete, onError);
+    function doHTTPRequestWithCallback(url, onComplete, onError = (err) => {}, method = undefined, headers = undefined, body = undefined, timeout = 5000) {
+        doHTTPRequest(url, method, headers, body, timeout).then(onComplete, onError);
     }
     
-    function doDNSRequests(host, port, requests) {
-        return new Promise((resolve, reject) => wrkInner.farcall("doDNSRequests", [host, port, requests], {},
+    function doDNSRequests(host, port, requests, timeout = 5000) {
+        return new Promise((resolve, reject) => wrkInner.farcall("doDNSRequests", [host, port, requests, timeout], {},
             ans => resolve(ans), err => reject(err)
         ));
     }
     
-    function doDNSRequestsWithCallback(host, port, requests, onComplete, onError = (err) => {}) {
-        doDNSRequests(host, port, requests).then(onComplete, onError);
+    function doDNSRequestsWithCallback(host, port, requests, onComplete, onError = (err) => {}, timeout = 5000) {
+        doDNSRequests(host, port, requests, timeout).then(onComplete, onError);
     }
     
     function getRequestContract() {
@@ -260,160 +260,171 @@ class ProcessStartExec extends ProcessBase {
                 }
 
                 this.pr.worker = await getWorker(1,
-                    ProcessStartExec.workerSrc + this.pr.executableContract.state.data.js + methodExport, {}, modules, signers);
+                    ProcessStartExec.workerSrc + this.pr.executableContract.state.data.js + methodExport, {});
 
                 this.pr.logger.log("worker initialized");
-
-                this.pr.worker.startFarcallCallbacks();
-
-                this.pr.logger.log("start worker");
-
-                this.pr.worker.export["writeSingleStorage"] = async (args, kwargs) => {
-                    return await this.writeSingleStorage(args[0], args[1]);
-                };
-
-                this.pr.worker.export["writeMultiStorage"] = async (args, kwargs) => {
-                    return await this.writeMultiStorage(args[0], args[1]);
-                };
-
-                this.pr.worker.export["getSingleStorage"] = async (args, kwargs) => {
-                    return await this.getSingleStorage(args[0]);
-                };
-
-                this.pr.worker.export["getMultiStorage"] = async (args, kwargs) => {
-                    return await this.getMultiStorage(args[0]);
-                };
-
-                this.pr.worker.export["writeLocalStorage"] = async (args, kwargs) => {
-                    return await this.writeLocalStorage(args[0], args[1]);
-                };
-
-                this.pr.worker.export["getLocalStorage"] = async (args, kwargs) => {
-                    return await this.getLocalStorage(args[0]);
-                };
-
-                this.pr.worker.export["registerContract"] = async (args, kwargs) => {
-                    return await this.registerContract(args[0]);
-                };
-
-                this.pr.worker.export["createPoolContract"] = async (args, kwargs) => {
-                    return await this.createPoolContract();
-                };
-
-                this.pr.worker.export["preparePoolRevision"] = async (args, kwargs) => {
-                    return await this.preparePoolRevision(args[0]);
-                };
-
-                this.pr.worker.export["sealAndGetPackedTransactionByPool"] = async (args, kwargs) => {
-                    return await this.sealAndGetPackedTransactionByPool(args[0]);
-                };
-
-                this.pr.worker.export["doHTTPRequest"] = async (args, kwargs) => {
-                    return await this.doHTTPRequest(args[0], args[1], args[2], args[3]);
-                };
-
-                this.pr.worker.export["doDNSRequests"] = async (args, kwargs) => {
-                    return await this.doDNSRequests(args[0], args[1], args[2]);
-                };
-
-                this.pr.worker.export["getRequestContract"] = async (args, kwargs) => {
-                    return await this.getRequestContract();
-                };
-
-                this.pr.worker.export["getUBotRegistryContract"] = async (args, kwargs) => {
-                    return await this.getUBotRegistryContract();
-                };
-
-                this.pr.worker.export["getUBotNumber"] = async (args, kwargs) => {
-                    return this.getUBotNumber();
-                };
-
-                this.pr.worker.export["getUBotNumberInPool"] = async (args, kwargs) => {
-                    return this.getUBotNumberInPool();
-                };
-
-                this.pr.worker.export["poolRandom"] = async (args, kwargs) => {
-                    return this.poolRandom();
-                };
-
-                this.pr.worker.export["startTransaction"] = async (args, kwargs) => {
-                    return await this.startTransaction(args[0], args[1]);
-                };
-
-                this.pr.worker.export["finishTransaction"] = async (args, kwargs) => {
-                    return await this.finishTransaction(args[0], args[1]);
-                };
-
-                this.pr.worker.export["errorFail"] = (args, kwargs) => {
-                    this.errorFail(args[0], args[1]);
-                };
-
-                this.pr.worker.export["__worker_bios_print"] = async (args, kwargs) => {
-                    let out = args[0] === true ? console.error : console.logPut;
-                    out("worker debug console:", ...args[1], args[2]);
-                };
-
-                let expired = Math.min(
-                    this.pr.executableContract.getExpiresAt().getTime(),
-                    this.pr.requestContract.getExpiresAt().getTime(),
-                    Date.now() + UBotConfig.requestExpiredTime
-                );
 
                 let terminate = false;
                 let result = null;
 
-                if (Date.now() <= expired) {
-                    let startProcessorTime = this.pr.worker.getProcessorTime();
-                    let startAbsoluteTime = Date.now();
-                    result = await Promise.race([
-                        new Promise(async (resolve) =>
-                            await this.pr.worker.farcall(methodName, methodArgs, {}, ans => resolve(ans))
-                        ),
-                        new Promise(async (resolve) => {
-                            do {
-                                await sleep(UBotConfig.checkQuantiserPeriod);
-
-                                if (this.pr.worker != null) {
-                                    if (Date.now() > expired) {
-                                        terminate = true;
-                                        resolve(new UBotProcessException("Executable contract or request is expired"));
-                                    }
-
-                                    let endProcessorTime = this.pr.worker.getProcessorTime();
-                                    let endAbsoluteTime = Date.now();
-                                    let processorTime = endProcessorTime - startProcessorTime;
-                                    let waitingTime = (endAbsoluteTime - startAbsoluteTime) / 1000 - processorTime;
-                                    if (waitingTime < 0)
-                                        waitingTime = 0;
-                                    let cost = (UBotQuantiserProcesses.PRICE_WORK_MINUTE * processorTime +
-                                        UBotQuantiserProcesses.PRICE_WAITING_MINUTE * waitingTime) / 60;
-
-                                    try {
-                                        this.pr.quantiser.addWorkCost(cost);
-                                    } catch (err) {
-                                        terminate = true;
-                                        resolve(err);
-                                    }
-
-                                    startProcessorTime = endProcessorTime;
-                                    startAbsoluteTime = endAbsoluteTime;
-                                }
-                            } while (this.pr.worker != null && !terminate);
-                        }),
-                        new Promise(async resolve => {
-                            await this.pr.worker.waitForOnLowMemory();
-                            if (this.pr.worker != null && !terminate) {
-                                terminate = true;
-                                resolve(new UBotProcessException("Executable contract uses too more memory"));
-                            }
-                        })
-                    ]);
-                } else {
-                    terminate = true;
-                    result = new UBotProcessException("Executable contract or request is expired");
+                if (modules.length > 0) {
+                    if (await this.pr.worker.preloadModules(modules, signers))
+                        this.pr.logger.log("modules pre-loaded");
+                    else {
+                        result = new UBotProcessException("Error pre-loading modules");
+                        this.pr.changeState(UBotPoolState.FAILED);
+                    }
                 }
 
-                this.pr.logger.log("QuantaSum of " + methodName + ": " + this.pr.quantiser.quantaSum_);
+                if (result == null) {
+                    this.pr.worker.startFarcallCallbacks();
+
+                    this.pr.logger.log("start worker");
+
+                    this.pr.worker.export["writeSingleStorage"] = async (args, kwargs) => {
+                        return await this.writeSingleStorage(args[0], args[1]);
+                    };
+
+                    this.pr.worker.export["writeMultiStorage"] = async (args, kwargs) => {
+                        return await this.writeMultiStorage(args[0], args[1]);
+                    };
+
+                    this.pr.worker.export["getSingleStorage"] = async (args, kwargs) => {
+                        return await this.getSingleStorage(args[0]);
+                    };
+
+                    this.pr.worker.export["getMultiStorage"] = async (args, kwargs) => {
+                        return await this.getMultiStorage(args[0]);
+                    };
+
+                    this.pr.worker.export["writeLocalStorage"] = async (args, kwargs) => {
+                        return await this.writeLocalStorage(args[0], args[1]);
+                    };
+
+                    this.pr.worker.export["getLocalStorage"] = async (args, kwargs) => {
+                        return await this.getLocalStorage(args[0]);
+                    };
+
+                    this.pr.worker.export["registerContract"] = async (args, kwargs) => {
+                        return await this.registerContract(args[0]);
+                    };
+
+                    this.pr.worker.export["createPoolContract"] = async (args, kwargs) => {
+                        return await this.createPoolContract();
+                    };
+
+                    this.pr.worker.export["preparePoolRevision"] = async (args, kwargs) => {
+                        return await this.preparePoolRevision(args[0]);
+                    };
+
+                    this.pr.worker.export["sealAndGetPackedTransactionByPool"] = async (args, kwargs) => {
+                        return await this.sealAndGetPackedTransactionByPool(args[0]);
+                    };
+
+                    this.pr.worker.export["doHTTPRequest"] = async (args, kwargs) => {
+                        return await this.doHTTPRequest(args[0], args[1], args[2], args[3], args[4]);
+                    };
+
+                    this.pr.worker.export["doDNSRequests"] = async (args, kwargs) => {
+                        return await this.doDNSRequests(args[0], args[1], args[2], args[3]);
+                    };
+
+                    this.pr.worker.export["getRequestContract"] = async (args, kwargs) => {
+                        return await this.getRequestContract();
+                    };
+
+                    this.pr.worker.export["getUBotRegistryContract"] = async (args, kwargs) => {
+                        return await this.getUBotRegistryContract();
+                    };
+
+                    this.pr.worker.export["getUBotNumber"] = async (args, kwargs) => {
+                        return this.getUBotNumber();
+                    };
+
+                    this.pr.worker.export["getUBotNumberInPool"] = async (args, kwargs) => {
+                        return this.getUBotNumberInPool();
+                    };
+
+                    this.pr.worker.export["poolRandom"] = async (args, kwargs) => {
+                        return this.poolRandom();
+                    };
+
+                    this.pr.worker.export["startTransaction"] = async (args, kwargs) => {
+                        return await this.startTransaction(args[0], args[1]);
+                    };
+
+                    this.pr.worker.export["finishTransaction"] = async (args, kwargs) => {
+                        return await this.finishTransaction(args[0], args[1]);
+                    };
+
+                    this.pr.worker.export["errorFail"] = (args, kwargs) => {
+                        this.errorFail(args[0], args[1]);
+                    };
+
+                    this.pr.worker.export["__worker_bios_print"] = async (args, kwargs) => {
+                        let out = args[0] === true ? console.error : console.logPut;
+                        out("worker debug console:", ...args[1], args[2]);
+                    };
+
+                    let expired = Math.min(
+                        this.pr.executableContract.getExpiresAt().getTime(),
+                        this.pr.requestContract.getExpiresAt().getTime(),
+                        Date.now() + UBotConfig.requestExpiredTime
+                    );
+
+                    if (Date.now() <= expired) {
+                        let startProcessorTime = this.pr.worker.getProcessorTime();
+                        let startAbsoluteTime = Date.now();
+                        result = await Promise.race([
+                            new Promise(async (resolve) =>
+                                await this.pr.worker.farcall(methodName, methodArgs, {}, ans => resolve(ans))
+                            ),
+                            new Promise(async (resolve) => {
+                                do {
+                                    await sleep(UBotConfig.checkQuantiserPeriod);
+
+                                    if (this.pr.worker != null) {
+                                        if (Date.now() > expired) {
+                                            terminate = true;
+                                            resolve(new UBotProcessException("Executable contract or request is expired"));
+                                        }
+
+                                        let endProcessorTime = this.pr.worker.getProcessorTime();
+                                        let endAbsoluteTime = Date.now();
+                                        let processorTime = endProcessorTime - startProcessorTime;
+                                        let waitingTime = (endAbsoluteTime - startAbsoluteTime) / 1000 - processorTime;
+                                        if (waitingTime < 0)
+                                            waitingTime = 0;
+                                        let cost = (UBotQuantiserProcesses.PRICE_WORK_MINUTE * processorTime +
+                                            UBotQuantiserProcesses.PRICE_WAITING_MINUTE * waitingTime) / 60;
+
+                                        try {
+                                            this.pr.quantiser.addWorkCost(cost);
+                                        } catch (err) {
+                                            terminate = true;
+                                            resolve(err);
+                                        }
+
+                                        startProcessorTime = endProcessorTime;
+                                        startAbsoluteTime = endAbsoluteTime;
+                                    }
+                                } while (this.pr.worker != null && !terminate);
+                            }),
+                            new Promise(async resolve => {
+                                await this.pr.worker.waitForOnLowMemory();
+                                if (this.pr.worker != null && !terminate) {
+                                    terminate = true;
+                                    resolve(new UBotProcessException("Executable contract uses too more memory"));
+                                }
+                            })
+                        ]);
+                    } else {
+                        terminate = true;
+                        result = new UBotProcessException("Executable contract or request is expired");
+                    }
+
+                    this.pr.logger.log("QuantaSum of " + methodName + ": " + this.pr.quantiser.quantaSum_);
+                }
 
                 try {
                     await this.pr.session.close(this.pr.state !== UBotPoolState.FAILED && !terminate,
@@ -431,7 +442,6 @@ class ProcessStartExec extends ProcessBase {
                     console.error(err.stack);
                     console.error("Error closing session or worker: " + err.message);
                 }
-
 
                 if (terminate) {
                     this.pr.logger.log("Cloud method return error: " + result.message);
@@ -1037,10 +1047,11 @@ class ProcessStartExec extends ProcessBase {
      * @param {string} method - HTTP method (GET, POST, ...). Optional (GET by default).
      * @param {string} headers - HTTP headers. Optional.
      * @param {string} body - HTTP request body. Optional.
+     * @param {number} timeout - HTTP request timeout in milliseconds. Optional. Default 5000.
      * @return {Promise<Object>} body: HTTP response body, response_code: HTTP response code.
      * @throws {UBotQuantiserException} quantiser limit is reached.
      */
-    async doHTTPRequest(url, method = undefined, headers = undefined, body = undefined) {
+    async doHTTPRequest(url, method = undefined, headers = undefined, body = undefined, timeout = 5000) {
         try {
             this.pr.quantiser.addWorkCost(UBotQuantiserProcesses.PRICE_HTTP_REQUEST);
 
@@ -1049,6 +1060,8 @@ class ProcessStartExec extends ProcessBase {
 
             return await new Promise(async(resolve, reject) => {
                 try {
+                    setTimeout(() => reject(new UBotProcessException("HTTP request timeout reached")), timeout);
+
                     if (method == null || headers == null || body == null)
                         this.pr.userHttpClient.sendGetRequestUrl(url, (respCode, body) => {
                             resolve({
@@ -1085,12 +1098,13 @@ class ProcessStartExec extends ProcessBase {
      * @param {string} host - Host for send DNS request.
      * @param {number} port - Port for send DNS request.
      * @param {Array<Object>} requests - Array with DNS requests {name: string, type: number}.
+     * @param {number} timeout - HTTP request timeout in milliseconds. Optional. Default 5000.
      * @return {Array<Object>} Array with DNS answers {type: number, value: string}.
      *
      * @throws {UBotQuantiserException} quantiser limit is reached.
      * @throws {UBotProcessException} requests error.
      */
-    async doDNSRequests(host, port, requests) {
+    async doDNSRequests(host, port, requests, timeout = 5000) {
         if (!requests instanceof Array || requests.length === 0) {
             let message = "Error DNS requests: requests must be not empty array";
             this.pr.logger.log(message);
@@ -1102,17 +1116,24 @@ class ProcessStartExec extends ProcessBase {
         try {
             this.pr.quantiser.addWorkCost(UBotQuantiserProcesses.PRICE_DNS_REQUEST * requests.length);
 
-            let dnsResolver = new DnsResolver();
-            dnsResolver.start(host, port);
+            return await new Promise(async(resolve, reject) => {
+                try {
+                    setTimeout(() => reject(new UBotProcessException("DNS requests timeout reached")), timeout);
 
-            let answers = [];
-            for (let request of requests)
-                answers.push(await dnsResolver.resolve(request.name, request.type));
+                    let dnsResolver = new DnsResolver();
+                    dnsResolver.start(host, port);
 
-            await dnsResolver.stop();
+                    let answers = [];
+                    for (let request of requests)
+                        answers.push(await dnsResolver.resolve(request.name, request.type));
 
-            return answers;
+                    await dnsResolver.stop();
 
+                    resolve(answers);
+                } catch (err) {
+                    reject(err);
+                }
+            });
         } catch (err) {
             this.pr.logger.log("Error DNS requests: " + err.message);
             this.pr.logger.log(err.stack);

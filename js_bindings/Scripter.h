@@ -290,7 +290,7 @@ public:
 
     std::string getHome();
 
-    void preloadModule(const string &URL, const string &signer);
+    bool preloadModule(const string &URL, const string &signer);
 
 private:
 

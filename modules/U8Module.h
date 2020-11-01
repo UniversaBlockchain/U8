@@ -33,7 +33,7 @@ class U8Module {
 public:
     U8Module(const std::string& modulePath, const std::string &homeDir);
 
-    bool load();
+    bool load(bool inUBot = false);
     bool checkModuleSignature(Scripter* se, const std::string &signer);
 
     std::string getName();

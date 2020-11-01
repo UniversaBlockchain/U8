@@ -103,7 +103,7 @@ std::string U8Module::getFileFromURL(const std::string &url) {
     if (result)
          return path + file_name;
     else
-        throw std::runtime_error("Error downloading module");
+        throw std::runtime_error("Error downloading module from " + url);
 }
 
 bool isCorrectURL(const std::string &url) {
@@ -111,7 +111,7 @@ bool isCorrectURL(const std::string &url) {
     return regex_search(url, URL_RegEx);
 }
 
-bool U8Module::load() {
+bool U8Module::load(bool inUBot) {
     try {
         int err = 0;
         byte_vector u8coreBin;
@@ -154,6 +154,12 @@ bool U8Module::load() {
         name = (manifest.find("name") != manifest.end()) ? manifest.find("name")->second : modulePath;
 
         zip_close(z);
+
+        if (inUBot && (manifest.find("useInUBot") == manifest.end() || manifest.find("useInUBot")->second != "true")) {
+            printf("Module %s is not allowed for usage in UBot\n", modulePath.c_str());
+            return false;
+        }
+
         return true;
 
     } catch (const std::exception& e) {
@@ -602,6 +608,9 @@ std::map<std::string, std::string> U8Module::loadManifest(zip* module) {
 
     if (manifestYaml["UNS_name"])
         manifest.insert(std::pair<std::string, std::string>("UNS_name", manifestYaml["UNS_name"].as<std::string>()));
+
+    if (manifestYaml["useInUBot"])
+        manifest.insert(std::pair<std::string, std::string>("useInUBot", manifestYaml["useInUBot"].as<std::string>()));
 
     delete[] contents;
 
