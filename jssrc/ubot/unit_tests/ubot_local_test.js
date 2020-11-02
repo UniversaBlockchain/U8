@@ -326,7 +326,7 @@ unit.test("ubot_local_test: ethereum", async () => {
     // init wallets
     let requestContract = Contract.fromPrivateKey(userPrivKey);
     requestContract.state.data.method_name = "init";
-    requestContract.state.data.method_args = ["http://127.0.0.1:8548", "0xfB0A82165Af395014026ECf88e5904c7d51f59B0"];
+    requestContract.state.data.method_args = ["http://127.0.0.1:8548", "0x92515142fF4827d4D35f43ABcd1E757a32FC5e25"];
     requestContract.state.data.executable_contract_id = executableContract.id;
     requestContract.newItems.add(executableContract);
 
