@@ -30,12 +30,6 @@ const toNumber = hex =>
 const fromNat = bn =>
     bn === "0x0" ? "0x" : bn.length % 2 === 0 ? bn : "0x0" + bn.slice(2);
 
-const toNat = bn =>
-    bn[2] === "0" ? "0x" + bn.slice(3) : bn;
-
-const pad = (l,hex) =>
-    hex.length === l*2+2 ? hex : pad(l,"0x"+"0"+hex.slice(2));
-
 /**
  * Generate http request (body) for eth.estimateGas.
  *
@@ -57,4 +51,4 @@ function generateEstimateGasRequest(id, from, to, value = null, data = null) {
     return request + '"}],"id":' + id + '}';
 }
 
-module.exports = {randomBytes, hexToBytes, concat, fromNumber, toNumber, fromNat, toNat, pad, generateEstimateGasRequest};
+module.exports = {randomBytes, hexToBytes, concat, fromNumber, toNumber, fromNat, generateEstimateGasRequest};

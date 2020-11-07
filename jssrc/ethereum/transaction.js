@@ -80,8 +80,8 @@ function signTransaction(transaction, privateKey) {
     const signature = ecKey.sign(common.hexToBytes(hash.keccak256(transaction)), {canonical: true});
 
     transactionData[6] = common.fromNumber(common.toNumber(transactionData[6]) * 2 + 35 + signature.recoveryParam);
-    transactionData[7] = common.pad(32, "0x" + signature.r.toString(16));
-    transactionData[8] = common.pad(32, "0x" + signature.s.toString(16));
+    transactionData[7] = common.fromNat("0x" + signature.r.toString(16));
+    transactionData[8] = common.fromNat("0x" + signature.s.toString(16));
 
     return rlp.encode(transactionData);
 }

@@ -1,6 +1,7 @@
 const ethWallet = require('wallet.js', 'ubots_ethereum');
 const ethRPC = require('rpc.js', 'ubots_ethereum');
 const ethTransaction = require('transaction.js', 'ubots_ethereum');
+const ethCommon = require('common.js', 'ubots_ethereum');
 
 async function init(ethereumURL, ethereumContract, startMintId) {
     let wallet = ethWallet.createWallet();
@@ -71,28 +72,36 @@ async function mint(address, amount) {
 
     await finishTransaction("csMint");
 
-    let gasPrice = await ethRPC.getGasPrice(doHTTPRequest, singleStorage.ethereumURL, 1);
+    let gasPrice = await ethRPC.getGasPrice(doHTTPRequest, singleStorage.ethereumURL);
     console.log("eth_gasPrice: " + gasPrice);
 
-    let nonce = await ethRPC.getNonce(doHTTPRequest, singleStorage.ethereumURL, localStorage.wallet.address, 2);
+    let nonce = await ethRPC.getNonce(doHTTPRequest, singleStorage.ethereumURL, localStorage.wallet.address);
     console.log("eth_getTransactionCount: " + nonce);
 
-    let chainId = await ethRPC.getChainId(doHTTPRequest, singleStorage.ethereumURL, 3);
+    let chainId = await ethRPC.getChainId(doHTTPRequest, singleStorage.ethereumURL);
     console.log("eth_chainId: " + chainId);
 
     // form transaction
     // 0x836a1040 - first bytes Keccak-256 of "mint(uint256,address,uint256)"
     let data = ethTransaction.generateTransactionData("0x836a1040", [singleStorage.mintId, address, amount]);
 
-    // estimate gas
-    let estimateGas = await ethRPC.estimateGas(doHTTPRequest, singleStorage.ethereumURL, singleStorage.ethereumContract, localStorage.wallet.address, data, 4);
+    let estimateGas = await ethRPC.estimateGas(doHTTPRequest, singleStorage.ethereumURL, singleStorage.ethereumContract, localStorage.wallet.address, data);
     console.log("eth_estimateGas: " + estimateGas);
+    estimateGas = ethCommon.fromNumber(Math.max(ethCommon.toNumber(estimateGas) + 100000, 1000000));
 
-    let transaction = ethTransaction.createTransaction(chainId, nonce, gasPrice, '0x5208', singleStorage.ethereumContract, "0x", data);
+    let transaction = ethTransaction.createTransaction(chainId, nonce, gasPrice, estimateGas, singleStorage.ethereumContract, "0x", data);
     console.log("Formed transaction: " + transaction);
 
     // sign transaction
+    let signed = ethTransaction.signTransaction(transaction, localStorage.wallet.privateKey);
+    console.log("Signed transaction: " + signed);
+
     // send transaction
+    let transactionHash = await ethRPC.sendTransaction(doHTTPRequest, singleStorage.ethereumURL, signed);
+    console.log("Transaction hash: " + transactionHash);
+
+    let receipt = await ethRPC.waitTransaction(doHTTPRequest, singleStorage.ethereumURL, transactionHash);
+    console.log("Transaction receipt: " + JSON.stringify(receipt));
 
     return {status: "OK"};
 }

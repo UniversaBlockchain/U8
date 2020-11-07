@@ -6,7 +6,6 @@ load("../ubots_ethereum.u8m");
 const ethTransaction = require('transaction.js', 'ubots_ethereum');
 const ethCommon = require('common.js', 'ubots_ethereum');
 const ethRPC = require('rpc.js', 'ubots_ethereum');
-const ethHash = require('hash.js', 'ubots_ethereum');
 
 import {expect, assert, unit} from 'test'
 import {KeyAddress, PublicKey, HashId} from 'crypto'
@@ -388,52 +387,63 @@ unit.test("ubot_local_test: ethereum", async () => {
         }
     });
 
-    let gasPrice = await ethRPC.getGasPrice(doHTTPRequest, "http://127.0.0.1:8548", 1);
+    let gasPrice = await ethRPC.getGasPrice(doHTTPRequest, "http://127.0.0.1:8548");
     console.log("eth_gasPrice: " + gasPrice);
 
-    let nonce = await ethRPC.getNonce(doHTTPRequest, "http://127.0.0.1:8548", "0x2056F5ac47f93C4cd89fDDfe926c1A5D4d82d7d8", 2);
+    let nonce = await ethRPC.getNonce(doHTTPRequest, "http://127.0.0.1:8548", "0x2056F5ac47f93C4cd89fDDfe926c1A5D4d82d7d8");
     console.log("eth_getTransactionCount: " + nonce);
 
-    let chainId = await ethRPC.getChainId(doHTTPRequest, "http://127.0.0.1:8548", 3);
+    let chainId = await ethRPC.getChainId(doHTTPRequest, "http://127.0.0.1:8548");
     console.log("eth_chainId: " + chainId);
 
-    let block = await ethRPC.getBlockNumber(doHTTPRequest, "http://127.0.0.1:8548", 4);
-    console.log("eth_getBlockNumber: " + block);
-
     // add ether to ubot ethereum wallets
-    let transaction = ethTransaction.createTransaction(chainId, nonce, gasPrice, "0x5208", states[0].result.wallet, "0x0AE9F7BCC000");
-    console.log("Transaction: " + transaction);
+    let transactionHashes = [];
+    let setUBotsParams = ["0x20", 30];
+    for (let i = 0; i < states.length; i++) {
+        let transaction = ethTransaction.createTransaction(chainId, ethCommon.fromNumber(ethCommon.toNumber(nonce) + i),
+            gasPrice, "0x5208", states[i].result.wallet, "0x038D7EA4C68000");
+        let signed = ethTransaction.signTransaction(transaction, ethCommon.hexToBytes("0xc7d95481df3eba77db3ca679a20828296f1f0f36ac7855fa6a821f9e8743c23a"));
+        console.log("Transaction " + i + ": " + signed);
 
-    let signed = ethTransaction.signTransaction(transaction, ethCommon.hexToBytes("0xc7d95481df3eba77db3ca679a20828296f1f0f36ac7855fa6a821f9e8743c23a"));
-    console.log("Signed: " + JSON.stringify(signed));
-    console.log("Hash: " + ethHash.keccak256(signed));
+        let transactionHash = await ethRPC.sendTransaction(doHTTPRequest, "http://127.0.0.1:8548", signed);
+        console.log("Hash " + i + ": " + transactionHash);
+        transactionHashes.push(transactionHash);
 
-    let transactionHash = await ethRPC.sendTransaction(doHTTPRequest, "http://127.0.0.1:8548", signed, 5);
-    console.log("transactionHash: " + transactionHash);
-
-    for (let i = 0; i < 5; i++) {
-        if (i > 0)
-            await sleep(10000);
-
-        let receipt = await ethRPC.checkTransaction(doHTTPRequest, "http://127.0.0.1:8548", transactionHash, 6 + i);
-        console.log("receipt: " + JSON.stringify(receipt));
-
-        if (receipt != null)
-            break;
+        setUBotsParams.push(states[i].result.wallet);
     }
 
-    block = await ethRPC.getBlockNumber(doHTTPRequest, "http://127.0.0.1:8548", 12);
-    console.log("eth_getBlockNumber: " + block);
+    await Promise.all(transactionHashes.map(async (transactionHash, i) => {
+        let receipt = await ethRPC.waitTransaction(doHTTPRequest, "http://127.0.0.1:8548", transactionHash, 3);
+        console.log("Receipt " + i + ": " + JSON.stringify(receipt));
+    }));
 
     // UET.setUBots
+    // 0x8fad0248 - first bytes Keccak-256 of "setUBots(address[])"
+    let data = ethTransaction.generateTransactionData("0x8fad0248", setUBotsParams);
 
+    nonce = await ethRPC.getNonce(doHTTPRequest, "http://127.0.0.1:8548", "0x2056F5ac47f93C4cd89fDDfe926c1A5D4d82d7d8");
+    console.log("eth_getTransactionCount: " + nonce);
+
+    let estimateGas = await ethRPC.estimateGas(doHTTPRequest, "http://127.0.0.1:8548",
+        "0x92515142fF4827d4D35f43ABcd1E757a32FC5e25", "0x2056F5ac47f93C4cd89fDDfe926c1A5D4d82d7d8", data);
+    console.log("eth_estimateGas: " + estimateGas);
+
+    let transaction = ethTransaction.createTransaction(chainId, nonce, gasPrice, estimateGas, "0x92515142fF4827d4D35f43ABcd1E757a32FC5e25", "0x", data);
+    let signed = ethTransaction.signTransaction(transaction, ethCommon.hexToBytes("0xc7d95481df3eba77db3ca679a20828296f1f0f36ac7855fa6a821f9e8743c23a"));
+    console.log("setUBots transaction: " + signed);
+
+    let transactionHash = await ethRPC.sendTransaction(doHTTPRequest, "http://127.0.0.1:8548", signed);
+    console.log("setUBots transaction hash: " + transactionHash);
+
+    let receipt = await ethRPC.waitTransaction(doHTTPRequest, "http://127.0.0.1:8548", transactionHash, 5);
+    console.log("setUBots transaction receipt: " + JSON.stringify(receipt));
 
     await httpClient.stop();
 
     // mint token
     requestContract = Contract.fromPrivateKey(userPrivKey);
     requestContract.state.data.method_name = "mint";
-    requestContract.state.data.method_args = ["0x7e3023941039e0064efFac2c0F02aB1C096A1b8C", "123456789012345678901234567890"];
+    requestContract.state.data.method_args = ["0x7e3023941039e0064efFac2c0F02aB1C096A1b8C", "33000000000000"];
     requestContract.state.data.executable_contract_id = executableContract.id;
 
     await cs.addConstraintToContract(requestContract, executableContract, "executable_contract_constraint",
