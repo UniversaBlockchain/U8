@@ -67,6 +67,7 @@ async function mint(address, amount) {
 
         let mintId = BigInt(singleStorage.mintId) + BigInt(1);
         singleStorage.mintId = mintId.toString(10);
+        console.log("mintId: " + singleStorage.mintId);
 
         await writeSingleStorage(singleStorage);
 
@@ -103,5 +104,22 @@ async function mint(address, amount) {
     let receipt = await ethRPC.waitTransaction(doHTTPRequest, singleStorage.ethereumURL, transactionHash);
     console.log("Transaction receipt: " + JSON.stringify(receipt));
 
-    return {status: "OK"};
+    // wait minted
+    // 0xeb7604af - first bytes Keccak-256 of "checkMinted(uint256)"
+    data = ethTransaction.generateTransactionData("0xeb7604af", [singleStorage.mintId]);
+
+    let timeout = 1000;
+    for (let i = 0; i < 50; i++) {
+        let result = await ethRPC.call(doHTTPRequest, singleStorage.ethereumURL, localStorage.wallet.address, singleStorage.ethereumContract, data);
+        console.log("checkMinted(" + singleStorage.mintId + ") result: " + result);
+
+        if (result === "0x0000000000000000000000000000000000000000000000000000000000000001")
+            return {status: "OK"};
+
+        await sleep(timeout);
+        if (timeout < 15000)
+            timeout += 1000;
+    }
+
+    return {status: "Fail", error: "UET wasn`t minted"};
 }

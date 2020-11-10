@@ -57,12 +57,12 @@ function generateTransactionData(methodHash, parameters) {
  * @param gasLimit {string} gas limit for transaction as hex string.
  * @param address {string} destination address of transaction as hex string.
  * @param value {string} transaction value as hex string.
- * @param code {string} transaction code as hex string.
+ * @param data {string} transaction data as hex string.
  * @return {string} transaction as hex string.
  */
-function createTransaction(chainId, nonce, gasPrice, gasLimit, address, value, code = "0x") {
+function createTransaction(chainId, nonce, gasPrice, gasLimit, address, value, data = "0x") {
     let transactionData = [common.fromNat(nonce), common.fromNat(gasPrice), common.fromNat(gasLimit),
-        address, value, code, common.fromNat(chainId), "0x", "0x"];
+        address, value, data, common.fromNat(chainId), "0x", "0x"];
     return rlp.encode(transactionData);
 }
 

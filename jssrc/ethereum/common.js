@@ -30,25 +30,4 @@ const toNumber = hex =>
 const fromNat = bn =>
     bn === "0x0" ? "0x" : bn.length % 2 === 0 ? bn : "0x0" + bn.slice(2);
 
-/**
- * Generate http request (body) for eth.estimateGas.
- *
- * @param id {number} request id.
- * @param from {string} transaction sender address as hex string.
- * @param to {string} transaction receiver (or contract) address as hex string.
- * @param value {string | null} transaction value as hex string.
- * @param data {string | null} transaction data as hex string.
- * @return {string} estimateGas request body.
- */
-function generateEstimateGasRequest(id, from, to, value = null, data = null) {
-    let request = '{"jsonrpc":"2.0","method":"eth_estimateGas","params":[{"from": "' + from + '","to": "' + to;
-
-    if (value)
-        request += '","value": "' + value;
-    if (data)
-        request += '","data": "' + data;
-
-    return request + '"}],"id":' + id + '}';
-}
-
-module.exports = {randomBytes, hexToBytes, concat, fromNumber, toNumber, fromNat, generateEstimateGasRequest};
+module.exports = {randomBytes, hexToBytes, concat, fromNumber, toNumber, fromNat};
