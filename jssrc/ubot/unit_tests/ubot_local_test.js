@@ -6,6 +6,7 @@ load("../ubots_ethereum.u8m");
 const ethTransaction = require('transaction.js', 'ubots_ethereum');
 const ethCommon = require('common.js', 'ubots_ethereum');
 const ethRPC = require('rpc.js', 'ubots_ethereum');
+const ethSignature = require('signature.js', 'ubots_ethereum');
 
 import {expect, assert, unit} from 'test'
 import {KeyAddress, PublicKey, HashId} from 'crypto'
@@ -274,6 +275,15 @@ unit.test("ubot_local_test: ping", async () => {
 });
 
 unit.test("ubot_local_test: ethereum", async () => {
+    // let signature = {
+    //     "address": "0x2056f5ac47f93c4cd89fddfe926c1a5d4d82d7d8",
+    //     "msg": "id=1\ntxIds=0x0000",
+    //     "sig": "0x200224e397b7c73d767d4ce0f23b9dd99479487b1f1bcb6255c584f4997b273f3f2bde42c2dd11f2bbaff3cf24be8d2e0c9d97fcf0a844e0e5768843456023141b",
+    //     "version": "2"
+    // };
+    //
+    // console.log("verifySignature:", ethSignature.verifySignature(signature));
+
     // let tr = ethTransaction.createTransaction("0x4", "0x2", "0x170cdc1e00", "0x5208",
     //     "0x14a54cd65963e4f42b22ccb84dbc8b8b15955d28", "0x0de0b6b3a7640000");
     // console.log("Transaction: " + tr);
@@ -319,7 +329,7 @@ unit.test("ubot_local_test: ethereum", async () => {
         launcher: "initiator"
     };
 
-    executableContract.state.data.cloud_methods["mint"] = {
+    executableContract.state.data.cloud_methods["BTCtoETH"] = {
         pool: {size: 12},
         quorum: {size: 10},
         modules: ["ubots_ethereum"]
@@ -445,9 +455,9 @@ unit.test("ubot_local_test: ethereum", async () => {
 
     await httpClient.stop();
 
-    // mint token
+    // pay ETH token
     requestContract = Contract.fromPrivateKey(userPrivKey);
-    requestContract.state.data.method_name = "mint";
+    requestContract.state.data.method_name = "BTCtoETH";
     requestContract.state.data.method_args = ["0xcc130a8A9D9262205E7B6b1d9C9a178176bC4C0C", "170000000000000000000"];
     requestContract.state.data.executable_contract_id = executableContract.id;
 
